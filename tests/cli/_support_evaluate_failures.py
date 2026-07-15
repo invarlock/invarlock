@@ -11,6 +11,7 @@ import invarlock.cli.commands.run as run_mod
 import invarlock.cli.run_execution as run_exec_mod
 from invarlock.cli.commands import evaluate as mod
 from tests.cli._support_console import RecordingConsole
+from tests.cli._support_effective_config import preserve_effective_config
 
 
 def _stub_run_dir(out_dir: Path, name: str = "report.json") -> Path:
@@ -28,6 +29,15 @@ def _write_json(path: Path, payload: object) -> Path:
     return path
 
 
+def _materialize_test_checkpoint(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    return path
+
+
 def _fake_run_command_with_paths(
     path_by_out_dir: dict[str, Path | None],
     *,
@@ -35,6 +45,7 @@ def _fake_run_command_with_paths(
     validator: Callable[[dict[str, object], str], None] | None = None,
 ) -> Callable[..., str | None]:
     def _fake_run(**kwargs):
+        preserve_effective_config(kwargs)
         if run_calls is not None:
             run_calls.append(kwargs)
         out_name = Path(kwargs["out"]).name
@@ -127,8 +138,8 @@ def _prepare_evaluate_paths(
     monkeypatch.chdir(tmp_path)
     src = Path("src")
     edt = Path("edt")
-    src.mkdir()
-    edt.mkdir()
+    _materialize_test_checkpoint(src)
+    _materialize_test_checkpoint(edt)
     return src, edt
 
 
@@ -174,6 +185,7 @@ __all__ = [
     "_assert_baseline_report_validation_exit",
     "_evaluate_basic",
     "_fake_run_command_with_paths",
+    "_materialize_test_checkpoint",
     "_patch_generate_reports_noop",
     "_patch_run_command_reports",
     "_prepare_evaluate_paths",

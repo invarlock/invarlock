@@ -1,6 +1,8 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _base_report_with_windows():
@@ -11,6 +13,7 @@ def _base_report_with_windows():
             "device": "cpu",
             "seed": 1,
             "tokenizer_hash": "tok-123",
+            "auto": {"tier": "balanced"},
         },
         "metrics": {
             "primary_metric": {
@@ -22,6 +25,7 @@ def _base_report_with_windows():
             # Supply initial ratio_ci with non-numeric to hit observed-not-number branch
             "ppl_ratio_ci": ("x", "y"),
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "d",
             "split": "val",
@@ -49,12 +53,7 @@ def test_meta_tokenizer_hash_propagates_and_ratio_ci_non_numeric_continues():
     report = _base_report_with_windows()
     # Normalization preserves tokenizer_hash from data/meta only when present in data
     report.setdefault("data", {})["tokenizer_hash"] = report["meta"]["tokenizer_hash"]
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [1.0, 2.0]}},
-    }
+    baseline = {**report, "run_id": "b", "edit": {"name": "noop"}}
 
     # Patch paired delta CI computation so ratio_ci_source == 'paired_baseline'
     with (

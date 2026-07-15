@@ -5,7 +5,8 @@ invarlock verify command
 Validates generated evaluation reports for internal consistency. The command
 ensures schema compliance, checks that the primary metric ratio agrees with the
 baseline reference, and enforces paired-window guarantees (match=1.0,
-overlap=0.0).
+overlap=0.0). Strict paired PPL verification also independently replays the
+reported confidence interval from independently supplied raw baseline windows.
 """
 
 from __future__ import annotations
@@ -44,6 +45,10 @@ class RuntimeVerifyPayload(TypedDict):
     errors: list[str]
     report: str
     manifest: str
+    binding_verified: bool
+    expected_digest_matched: bool
+    trust_status: str
+    declared_image_digest: str | None
 
 
 def _allow_unverified_provenance_for_runtime_provenance(
@@ -95,22 +100,29 @@ def _verify_exit_code(
 def verify_command(
     reports: list[Path],
     baseline: Path | None = None,
+    policy_pack: Path | None = None,
     tolerance: float = 1e-9,
-    profile: str | None = "dev",
+    profile: str | None = None,
     json_out: bool = False,
     runtime_provenance: str = "container",
     assurance: str = "report",
     warning_policy: str = "pass",
+    expected_runtime_image_digest: str | None = None,
 ) -> None:
     """
     Verify evaluation report integrity.
 
     Ensures each evaluation report passes schema validation, ratio consistency checks,
-    and strict pairing requirements (match=1.0, overlap=0.0).
+    and strict pairing requirements (match=1.0, overlap=0.0). Strict paired PPL
+    reports require the external canonical noop baseline run report and a
+    independently supplied policy pack.
+    PPL intervals and accuracy counts are replayed from its raw evidence, and
+    model/dataset/provider/tokenizer provenance must match the subject.
     """
     result = run_verify_reports(
         reports,
         baseline=baseline,
+        policy_pack=policy_pack,
         tolerance=tolerance,
         profile=profile,
         allow_unverified_provenance=(
@@ -119,6 +131,7 @@ def verify_command(
         json_mode=bool(json_out),
         assurance_mode=normalize_verify_assurance_mode(assurance),
         warning_policy=warning_policy,
+        expected_runtime_image_digest=expected_runtime_image_digest,
     )
     exit_code = _verify_exit_code(result, profile=profile)
     if not json_out:
@@ -156,14 +169,30 @@ def _emit_version(version_console: Any) -> None:
     version_console.print("InvarLock runtime verifier version unknown")
 
 
-def _runtime_verify_payload(*, report: str, manifest: str) -> RuntimeVerifyPayload:
-    result = verify_runtime_manifest(report, manifest)
+def _runtime_verify_payload(
+    *,
+    report: str,
+    manifest: str,
+    expected_runtime_image_digest: str | None = None,
+) -> RuntimeVerifyPayload:
+    if expected_runtime_image_digest is None:
+        result = verify_runtime_manifest(report, manifest)
+    else:
+        result = verify_runtime_manifest(
+            report,
+            manifest,
+            expected_image_digest=expected_runtime_image_digest,
+        )
     return {
         "format_version": RUNTIME_VERIFY_FORMAT_VERSION,
         "ok": result.ok,
         "errors": list(result.errors),
         "report": result.report,
         "manifest": result.manifest,
+        "binding_verified": result.binding_verified,
+        "expected_digest_matched": result.expected_digest_matched,
+        "trust_status": result.trust_status,
+        "declared_image_digest": result.declared_image_digest,
     }
 
 
@@ -173,10 +202,15 @@ def _run_runtime_verify(
     manifest: str,
     emit_json: bool,
     no_color: bool,
+    expected_runtime_image_digest: str | None = None,
 ) -> int:
-    payload = _runtime_verify_payload(report=report, manifest=manifest)
+    payload = _runtime_verify_payload(
+        report=report,
+        manifest=manifest,
+        expected_runtime_image_digest=expected_runtime_image_digest,
+    )
     if emit_json:
-        print(json.dumps(payload, sort_keys=True))
+        print(json.dumps(payload, sort_keys=True, allow_nan=False))
         return 0 if bool(payload["ok"]) else 1
 
     runtime_console = cli_output.make_console(no_color=no_color)
@@ -184,7 +218,7 @@ def _run_runtime_verify(
         cli_output.print_command_event(
             runtime_console,
             "PASS",
-            "Runtime manifest verification passed",
+            "Runtime report/manifest binding passed",
         )
     else:
         cli_output.print_command_event(
@@ -194,6 +228,9 @@ def _run_runtime_verify(
         )
     cli_output.print_command_detail(runtime_console, f"Report: {payload['report']}")
     cli_output.print_command_detail(runtime_console, f"Manifest: {payload['manifest']}")
+    cli_output.print_command_detail(
+        runtime_console, f"Runtime trust: {payload['trust_status']}"
+    )
     for error in payload["errors"]:
         cli_output.print_command_detail(runtime_console, str(error), prefix="  -")
     return 0 if bool(payload["ok"]) else 1
@@ -209,6 +246,11 @@ def runtime_verify_callback(
         ...,
         "--manifest",
         help="Path to the sibling runtime.manifest.json companion.",
+    ),
+    expected_runtime_image_digest: str | None = typer.Option(
+        None,
+        "--expected-runtime-image-digest",
+        help=("Independent sha256:... trust anchor for the declared runtime image."),
     ),
     emit_json: bool = typer.Option(
         False,
@@ -237,6 +279,7 @@ def runtime_verify_callback(
             manifest=manifest,
             emit_json=emit_json,
             no_color=no_color,
+            expected_runtime_image_digest=expected_runtime_image_digest,
         )
     )
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import types
-from types import SimpleNamespace
 
 import pytest
 
@@ -62,9 +61,23 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(sys.modules, "transformers", transformers)
     monkeypatch.setitem(sys.modules, "gptqmodel", gptqmodel)
 
+    import invarlock.plugins as plugins
     from invarlock.plugins import HF_AWQ_Adapter
 
     adapter = HF_AWQ_Adapter()
+    monkeypatch.setattr(
+        plugins,
+        "_gptqmodel_jit_toolchain_required",
+        lambda device: device == "cuda",
+    )
+    runtime_calls: list[str] = []
+    monkeypatch.setattr(
+        plugins,
+        "import_gptqmodel",
+        lambda **kwargs: (
+            runtime_calls.append(str(kwargs["require_jit_toolchain"])) or gptqmodel
+        ),
+    )
     monkeypatch.setattr(
         adapter,
         "_safe_to_device",
@@ -79,6 +92,8 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     with runtime_allowances_scope(allow_remote_code=True):
         loaded = adapter.load_model("demo/model", trust_remote_code=True)
         assert loaded["kwargs"]["trust_remote_code"] is True
+    adapter.load_model("demo/model", device="cuda")
+    assert runtime_calls == ["False", "False", "True"]
 
 
 @pytest.mark.unit
@@ -93,13 +108,33 @@ def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     gptqmodel.GPTQModel = _GPTQModel
     monkeypatch.setitem(sys.modules, "gptqmodel", gptqmodel)
 
+    import invarlock.plugins as plugins
     from invarlock.plugins import HF_GPTQ_Adapter
 
     adapter = HF_GPTQ_Adapter()
     monkeypatch.setattr(
+        plugins,
+        "_gptqmodel_jit_toolchain_required",
+        lambda device: device == "cuda",
+    )
+    runtime_calls: list[str] = []
+    validated_models: list[object] = []
+    monkeypatch.setattr(
+        plugins,
+        "import_gptqmodel",
+        lambda **kwargs: (
+            runtime_calls.append(str(kwargs["require_jit_toolchain"])) or gptqmodel
+        ),
+    )
+    monkeypatch.setattr(
         adapter,
         "_safe_to_device",
         lambda model, device, capabilities=None: model,
+    )
+    monkeypatch.setattr(
+        plugins,
+        "validate_gptq_checkpoint_bindings",
+        lambda model: validated_models.append(model),
     )
 
     _clear_remote_code_env(monkeypatch)
@@ -109,28 +144,27 @@ def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     with runtime_allowances_scope(allow_remote_code=True):
         loaded = adapter.load_model("demo/model", trust_remote_code=True)
         assert loaded["kwargs"]["trust_remote_code"] is True
+    adapter.load_model("demo/model", device="cuda")
+    assert runtime_calls == ["False", "False", "True"]
+    assert len(validated_models) == 3
 
 
 @pytest.mark.unit
-def test_gptqmodel_hub_compat_patch_bridges_transformers_512_namespace(
+def test_gptqmodel_jit_preflight_policy_detects_explicit_and_auto_cuda(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    transformers = types.ModuleType("transformers")
-    transformers.utils = SimpleNamespace(hub=SimpleNamespace())
-    huggingface_hub = types.ModuleType("huggingface_hub")
-    huggingface_hub.create_repo = object()
+    import invarlock.plugins as plugins
 
-    class _Api:
-        def list_repo_tree(self) -> list[object]:
-            return []
+    torch = types.ModuleType("torch")
+    torch.cuda = type("Cuda", (), {"is_available": staticmethod(lambda: True)})()
+    monkeypatch.setattr(
+        plugins.importlib,
+        "import_module",
+        lambda name: (
+            torch if name == "torch" else (_ for _ in ()).throw(AssertionError(name))
+        ),
+    )
 
-    huggingface_hub.HfApi = _Api
-    monkeypatch.setitem(sys.modules, "transformers", transformers)
-    monkeypatch.setitem(sys.modules, "huggingface_hub", huggingface_hub)
-
-    from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
-
-    _patch_gptqmodel_transformers_hub_compat()
-
-    assert transformers.utils.hub.create_repo is huggingface_hub.create_repo
-    assert transformers.utils.hub.list_repo_tree.__self__.__class__ is _Api
+    assert plugins._gptqmodel_jit_toolchain_required("cuda:0") is True
+    assert plugins._gptqmodel_jit_toolchain_required("auto") is True
+    assert plugins._gptqmodel_jit_toolchain_required("cpu") is False

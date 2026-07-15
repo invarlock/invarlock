@@ -4,7 +4,6 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from types import SimpleNamespace
 
 import invarlock.evidence_pack as evidence_pack_mod
 import invarlock.evidence_pack_integrity as evidence_pack_integrity_mod
@@ -14,6 +13,10 @@ from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
+from tests._support_evidence_pack_signing import (
+    generate_signing_keypair,
+    sign_manifest,
+)
 
 __all__ = [
     "RUNTIME_MANIFEST_FILENAME",
@@ -22,12 +25,9 @@ __all__ = [
     "_build_pack",
     "_build_report_payload",
     "_digest",
-    "_patch_verify_result",
-    "_read_manifest",
     "_sign_pack",
     "_successful_verify_payload",
     "_successful_verify_result",
-    "_write_build_inputs",
     "_write_json",
     "_write_manifest_and_checksums",
     "_write_pack_with_manifest",
@@ -43,10 +43,6 @@ _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
-
-
-def _read_manifest(pack_dir: Path) -> dict[str, object]:
-    return json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
 
 
 def _sha256_file(path: Path) -> str:
@@ -109,31 +105,6 @@ def _successful_verify_result(
         outcome=VerifyOutcome.OK,
         payload=_successful_verify_payload(reports),
         diagnostics=(),
-    )
-
-
-def _patch_verify_result(
-    monkeypatch,  # noqa: ANN001
-    *,
-    outcome: VerifyOutcome = VerifyOutcome.OK,
-    payload: object | None = None,
-) -> None:
-    if payload is None:
-        payload = {"ok": outcome is VerifyOutcome.OK}
-
-    def _run_verify_command(
-        reports,  # noqa: ANN001
-        profile=None,  # noqa: ANN001
-        report_assurance="report",  # noqa: ANN001
-    ) -> VerifyExecutionResult:
-        _ = reports, profile, report_assurance
-        return VerifyExecutionResult(outcome=outcome, payload=payload, diagnostics=())
-
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        _run_verify_command,
-        raising=True,
     )
 
 
@@ -231,14 +202,17 @@ def _build_pack(
     *,
     report_rel_path: str,
     report_payload: object | None = None,
+    scenario_strictness: str | None = "must_pass",
+    scenario_metadata: dict[str, object] | None = None,
+    report_sidecars: dict[str, object] | None = None,
 ) -> Path:
     final_verdict = pack_dir / "results/final_verdict.json"
     source_repo = pack_dir / "metadata/source_repo.json"
     environment = pack_dir / "metadata/environment.json"
     materials = pack_dir / "metadata/model_revisions.json"
+    scenarios = pack_dir / "metadata/scenarios.json"
     report = pack_dir / report_rel_path
 
-    _write_json(final_verdict, {"verdict": "PASS"})
     _write_json(source_repo, {"commit": "abc123"})
     _write_json(environment, {"platform": "test"})
     _write_json(materials, {"models": {"org/model": {"revision": "rev1"}}})
@@ -247,7 +221,42 @@ def _build_pack(
         report.write_text("{}", encoding="utf-8")
     else:
         _write_json(report, report_payload)
+    _write_json(
+        final_verdict,
+        {"verdict": "PASS", "report_sha256": _sha256_file(report)},
+    )
     _write_runtime_manifest(report)
+
+    if scenario_strictness is not None:
+        report_parts = Path(report_rel_path).relative_to("reports").parts
+        scenario_id = (
+            report_parts[2]
+            if len(report_parts) >= 4 and report_parts[1] == "errors"
+            else report_parts[1]
+        )
+        scenario = {"id": scenario_id, "strictness": scenario_strictness}
+        if scenario_strictness == "must_fail":
+            scenario["primary_guard"] = "primary_metric"
+        if scenario_metadata:
+            scenario.update(scenario_metadata)
+        else:
+            # Most callers of this generic pack scaffold exercise report or
+            # manifest behavior, not an edit family.  Give those packs a real
+            # closed fault-injection contract rather than an abbreviated
+            # scenario that could silently bypass proof dispatch.
+            scenario.update(
+                {
+                    "artifact_class": "fault_injection_fixture",
+                    "generation": {
+                        "kind": "error",
+                        "error_type": "nan_injection",
+                    },
+                }
+            )
+        _write_json(
+            scenarios,
+            {"scenarios": [scenario]},
+        )
 
     covered = [
         "results/final_verdict.json",
@@ -257,6 +266,12 @@ def _build_pack(
         report_rel_path,
         str((Path(report_rel_path).parent / RUNTIME_MANIFEST_FILENAME).as_posix()),
     ]
+    if scenario_strictness is not None:
+        covered.append("metadata/scenarios.json")
+    for filename, payload in (report_sidecars or {}).items():
+        sidecar = report.parent / filename
+        _write_json(sidecar, payload)
+        covered.append(sidecar.relative_to(pack_dir).as_posix())
     _write_checksums(pack_dir, covered)
 
     manifest = {
@@ -278,6 +293,13 @@ def _build_pack(
             }
         ],
     }
+    if scenario_strictness is not None:
+        manifest["materials"].append(
+            {
+                "name": "scenarios",
+                **_digest_ref(scenarios, "metadata/scenarios.json"),
+            }
+        )
     _write_json(pack_dir / "manifest.json", manifest)
     return pack_dir
 
@@ -292,7 +314,10 @@ def _write_pack_scaffold(pack_dir: Path) -> tuple[Path, Path, Path]:
 
     final_verdict = pack_dir / "results" / "final_verdict.json"
     environment = pack_dir / "metadata" / "environment.json"
-    _write_json(final_verdict, {"verdict": "PASS"})
+    _write_json(
+        final_verdict,
+        {"verdict": "PASS", "report_sha256": _sha256_file(report_path)},
+    )
     _write_json(environment, {"platform": "test"})
     return report_path, final_verdict, environment
 
@@ -305,6 +330,28 @@ def _write_pack_with_manifest(
     with_error_report: bool = False,
 ) -> Path:
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    scenarios = [
+        {
+            "id": "clean",
+            "strictness": "must_pass",
+            "artifact_class": "evidence_only_pack",
+            "generation": {"kind": "evidence_only"},
+        }
+    ]
+    if with_error_report:
+        error_dir = pack_dir / "reports" / "model" / "errors" / "noop"
+        error_dir.mkdir(parents=True, exist_ok=True)
+        (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+        scenarios.append(
+            {
+                "id": "noop",
+                "strictness": "must_fail",
+                "primary_guard": "primary_metric",
+                "artifact_class": "evidence_only_pack",
+                "generation": {"kind": "evidence_only"},
+            }
+        )
+    _write_json(pack_dir / "metadata/scenarios.json", {"scenarios": scenarios})
     _write_manifest_and_checksums(
         pack_dir,
         report_path=report_path,
@@ -313,40 +360,7 @@ def _write_pack_with_manifest(
         manifest_overrides=manifest_overrides,
         checksum_lines=checksum_lines,
     )
-    if with_error_report:
-        error_dir = pack_dir / "reports" / "model" / "errors" / "noop"
-        error_dir.mkdir(parents=True, exist_ok=True)
-        (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
     return pack_dir
-
-
-def _write_build_inputs(tmp_path: Path, *, readme: bool = False) -> SimpleNamespace:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    runtime_manifest = report_path.parent / RUNTIME_MANIFEST_FILENAME
-    source_repo = tmp_path / "source_repo.json"
-    environment = tmp_path / "environment.json"
-    material = tmp_path / "material.json"
-    readme_path = tmp_path / "README.md"
-
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(report_path, {"ok": True})
-    _write_json(runtime_manifest, {"ok": True})
-    _write_json(source_repo, {"commit": "abc123"})
-    _write_json(environment, {"platform": "test"})
-    _write_json(material, {"name": "demo"})
-    if readme:
-        readme_path.write_text("# Evidence Pack\n", encoding="utf-8")
-
-    return SimpleNamespace(
-        final_verdict=final_verdict,
-        report_path=report_path,
-        runtime_manifest=runtime_manifest,
-        source_repo=source_repo,
-        environment=environment,
-        material=material,
-        readme=readme_path,
-    )
 
 
 def _write_manifest_and_checksums(
@@ -364,6 +378,7 @@ def _write_manifest_and_checksums(
     ).replace("\\", "/")
     rel_verdict = str(final_verdict.relative_to(pack_dir)).replace("\\", "/")
     rel_environment = str(environment.relative_to(pack_dir)).replace("\\", "/")
+    scenarios = pack_dir / "metadata/scenarios.json"
     if checksum_lines is None:
         checksum_lines = [
             f"{evidence_pack_mod._sha256_bytes(final_verdict.read_bytes())}  {rel_verdict}",
@@ -371,6 +386,10 @@ def _write_manifest_and_checksums(
             f"{evidence_pack_mod._sha256_bytes(report_path.read_bytes())}  {rel_report}",
             f"{evidence_pack_mod._sha256_bytes((report_path.parent / RUNTIME_MANIFEST_FILENAME).read_bytes())}  {rel_runtime}",
         ]
+        if scenarios.is_file():
+            checksum_lines.append(
+                f"{evidence_pack_mod._sha256_bytes(scenarios.read_bytes())}  metadata/scenarios.json"
+            )
     checksums_path = pack_dir / "checksums.sha256"
     checksums_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
     manifest = {
@@ -407,7 +426,7 @@ def _sign_pack(
     )
     private_key = key_root
     public_key = key_root.with_name(f"{key_root.stem}.pub.pem")
-    fingerprint = evidence_pack_mod._generate_signing_keypair(
+    fingerprint = generate_signing_keypair(
         private_key,
         public_key_path=public_key,
     )
@@ -419,7 +438,5 @@ def _sign_pack(
             else manifest_fingerprint_override
         )
         _write_json(pack_dir / "manifest.json", manifest)
-    evidence_pack_mod._sign_manifest(
-        pack_dir / "manifest.json", signing_key_path=private_key
-    )
+    sign_manifest(pack_dir / "manifest.json", signing_key_path=private_key)
     return fingerprint

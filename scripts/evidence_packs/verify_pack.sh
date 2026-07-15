@@ -34,6 +34,11 @@ Options:
                      Require the signed manifest to use this signer fingerprint
   --report-assurance MODE
                      Nested report assurance mode (report|strict|off)
+  --expected-runtime-image-digest DIGEST
+                     Independently trusted runtime image pin (sha256:<64 hex>);
+                     required when --report-assurance strict is selected
+  --policy-pack FILE  Independently supplied policy authorization; required for
+                     strict report assurance and matched to signed pack material
   --help              Show this help message
 
 Notes:
@@ -48,13 +53,18 @@ Exit codes:
   3  missing pack or required pack files
   4  manifest format / schema validation failed
   5  signature verification failed
-  6  integrity verification failed (checksum binding, checksums, signed provenance refs, or strict extra-file checks)
+  6  integrity verification failed (checksums, verdict/report binding, signed provenance refs, or strict extra-file checks)
   7  report verification failed
 EOF
 }
 
 pack_warn() {
     echo "WARNING: $*" >&2
+}
+
+pack_runtime_image_digest_valid() {
+    local digest="$1"
+    [[ "${digest}" =~ ^sha256:[[:xdigit:]]{64}$ ]]
 }
 
 pack_sha256_cmd() {
@@ -141,6 +151,44 @@ pack_verify_manifest_provenance() {
         return 1
     fi
     return 0
+}
+
+pack_verify_final_verdict_binding() {
+    local pack_dir="$1"
+    local require_binding="$2"
+    local verifier="${SCRIPT_DIR}/python/verify_pack_checks.py"
+    local -a args=("${verifier}" final-verdict-binding "${pack_dir}")
+    if [[ "${require_binding}" == "1" ]]; then
+        args+=(--require-binding)
+    fi
+    _cmd_python "${args[@]}"
+}
+
+pack_verify_baseline_materials() {
+    local pack_dir="$1"
+    local report_assurance="$2"
+    _cmd_python \
+        "${SCRIPT_DIR}/python/verify_pack_checks.py" \
+        baseline-materials \
+        "${pack_dir}" \
+        --report-assurance "${report_assurance}"
+}
+
+pack_verify_policy_materials() {
+    local pack_dir="$1"
+    local report_assurance="$2"
+    local policy_pack="$3"
+    local -a args=(
+        "${SCRIPT_DIR}/python/verify_pack_checks.py"
+        policy-materials
+        "${pack_dir}"
+        --report-assurance
+        "${report_assurance}"
+    )
+    if [[ -n "${policy_pack}" ]]; then
+        args+=(--policy-pack "${policy_pack}")
+    fi
+    _cmd_python "${args[@]}"
 }
 
 pack_verify_checksums() {
@@ -232,6 +280,8 @@ pack_verify_reports() {
     local json_out="$2"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
+    local expected_runtime_image_digest="${PACK_EXPECTED_RUNTIME_IMAGE_DIGEST:-}"
+    local policy_pack="${PACK_POLICY_PACK:-}"
     local -a args=(
         "${SCRIPT_DIR}/python/verify_pack_checks.py"
         verify-reports
@@ -242,6 +292,15 @@ pack_verify_reports() {
         "${report_assurance}"
         --require-clean
     )
+    if [[ -n "${expected_runtime_image_digest}" ]]; then
+        args+=(
+            --expected-runtime-image-digest
+            "${expected_runtime_image_digest}"
+        )
+    fi
+    if [[ -n "${policy_pack}" ]]; then
+        args+=(--policy-pack "${policy_pack}")
+    fi
     if [[ -n "${json_out}" ]]; then
         args+=(--json-out "${json_out}")
     fi
@@ -257,6 +316,9 @@ pack_verify_pack() {
     local strict="${PACK_STRICT_MODE:-0}"
     local expected_fingerprint="${PACK_EXPECTED_FINGERPRINT:-}"
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
+    local expected_runtime_image_digest="${PACK_EXPECTED_RUNTIME_IMAGE_DIGEST:-}"
+    local policy_pack="${PACK_POLICY_PACK:-}"
+    local binding_required=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -313,6 +375,22 @@ pack_verify_pack() {
                 esac
                 shift 2
                 ;;
+            --expected-runtime-image-digest)
+                expected_runtime_image_digest="${2:-}"
+                if [[ -z "${expected_runtime_image_digest}" ]]; then
+                    echo "ERROR: --expected-runtime-image-digest requires a value" >&2
+                    return "${PACK_VERIFY_USAGE}"
+                fi
+                shift 2
+                ;;
+            --policy-pack)
+                policy_pack="${2:-}"
+                if [[ -z "${policy_pack}" ]]; then
+                    echo "ERROR: --policy-pack requires a value" >&2
+                    return "${PACK_VERIFY_USAGE}"
+                fi
+                shift 2
+                ;;
             --)
                 shift
                 break
@@ -328,6 +406,24 @@ pack_verify_pack() {
     if [[ -z "${pack_dir}" ]]; then
         echo "ERROR: --pack is required" >&2
         pack_usage >&2
+        return "${PACK_VERIFY_USAGE}"
+    fi
+    if [[ -n "${expected_runtime_image_digest}" ]] \
+        && ! pack_runtime_image_digest_valid "${expected_runtime_image_digest}"; then
+        echo "ERROR: --expected-runtime-image-digest must match sha256:<64 hex chars>" >&2
+        return "${PACK_VERIFY_USAGE}"
+    fi
+    if [[ "${report_assurance}" == "strict" ]] \
+        && [[ -z "${expected_runtime_image_digest}" ]]; then
+        echo "ERROR: --report-assurance strict requires --expected-runtime-image-digest" >&2
+        return "${PACK_VERIFY_USAGE}"
+    fi
+    if [[ "${report_assurance}" == "strict" && -z "${policy_pack}" ]]; then
+        echo "ERROR: --report-assurance strict requires --policy-pack" >&2
+        return "${PACK_VERIFY_USAGE}"
+    fi
+    if [[ -n "${policy_pack}" && ! -f "${policy_pack}" ]]; then
+        echo "ERROR: Policy pack not found: ${policy_pack}" >&2
         return "${PACK_VERIFY_USAGE}"
     fi
     if [[ ! -d "${pack_dir}" ]]; then
@@ -347,7 +443,12 @@ pack_verify_pack() {
         return "${PACK_VERIFY_USAGE}"
     fi
     PACK_REPORT_ASSURANCE="${report_assurance}"
-    export PACK_REPORT_ASSURANCE
+    PACK_EXPECTED_RUNTIME_IMAGE_DIGEST="${expected_runtime_image_digest}"
+    PACK_POLICY_PACK="${policy_pack}"
+    export PACK_REPORT_ASSURANCE PACK_EXPECTED_RUNTIME_IMAGE_DIGEST PACK_POLICY_PACK
+    if [[ "${strict}" == "1" || "${report_assurance}" == "strict" ]]; then
+        binding_required=1
+    fi
 
     if ! pack_validate_manifest_schema "${pack_dir}"; then
         return "${PACK_VERIFY_FORMAT}"
@@ -356,6 +457,15 @@ pack_verify_pack() {
         return "${PACK_VERIFY_SIGNATURE}"
     fi
     if ! pack_verify_manifest_binds_checksums "${pack_dir}" "${strict}"; then
+        return "${PACK_VERIFY_INTEGRITY}"
+    fi
+    if ! pack_verify_final_verdict_binding "${pack_dir}" "${binding_required}"; then
+        return "${PACK_VERIFY_INTEGRITY}"
+    fi
+    if ! pack_verify_baseline_materials "${pack_dir}" "${report_assurance}"; then
+        return "${PACK_VERIFY_INTEGRITY}"
+    fi
+    if ! pack_verify_policy_materials "${pack_dir}" "${report_assurance}" "${policy_pack}"; then
         return "${PACK_VERIFY_INTEGRITY}"
     fi
     if ! pack_verify_checksums "${pack_dir}"; then

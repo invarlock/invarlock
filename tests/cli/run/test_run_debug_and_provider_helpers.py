@@ -3,13 +3,15 @@ from __future__ import annotations
 import pytest
 
 from invarlock.cli import run_pairing as pairing_helpers_mod
-from invarlock.cli.run_overhead import plan_release_windows
+from invarlock.cli.run_metric_impact import plan_release_windows
 from invarlock.cli.run_pairing import (
     _canonical_dataset_id,
     compute_provider_digest,
     resolve_metric_and_provider,
 )
-from invarlock.reporting.report_overhead import normalize_guard_overhead_result
+from invarlock.reporting.report_metric_impact import (
+    normalize_guard_metric_impact_result,
+)
 from invarlock.reporting.run_report_metrics_contract import format_debug_metric_diffs
 
 
@@ -40,17 +42,17 @@ def test_format_debug_metric_diffs_happy_and_degenerate() -> None:
     }
     base = {"metrics": {"primary_metric": {"final": 5.0}}}
     rendered = format_debug_metric_diffs(pm, metrics, base)
-    assert "final: v1-v1" in rendered
+    assert "final: recomputed-recorded" in rendered
     assert "Δlog(final)" in rendered or "log" in rendered
     assert "ratio_vs_baseline" in rendered
     assert format_debug_metric_diffs(None, None, None) == ""
 
 
-def test_normalize_overhead_result_handles_non_finite() -> None:
-    out = normalize_guard_overhead_result({})
-    assert out["evaluated"] is False and out["passed"] is True
-    ok = {"overhead_ratio": 0.005}
-    out2 = normalize_guard_overhead_result(ok)
+def test_normalize_metric_impact_result_handles_non_finite() -> None:
+    out = normalize_guard_metric_impact_result({})
+    assert out["evaluated"] is False and out["passed"] is False
+    ok = {"degradation": 0.005}
+    out2 = normalize_guard_metric_impact_result(ok)
     assert "evaluated" not in out2 and "passed" not in out2
 
 

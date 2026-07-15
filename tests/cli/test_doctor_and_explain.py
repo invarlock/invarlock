@@ -7,6 +7,7 @@ import pytest
 
 from invarlock.cli.commands.explain_gates import explain_gates_command
 from invarlock.core.plugins_inventory import get_adapter_rows
+from tests.cli._support_runtime_policy import bind_runtime_policy
 
 
 def test_plugins_inventory_rows(monkeypatch):
@@ -31,7 +32,7 @@ def test_plugins_inventory_rows(monkeypatch):
 
 
 def _make_min_report():
-    return {
+    report = {
         "meta": {
             "model_id": "m",
             "adapter": "hf",
@@ -60,18 +61,25 @@ def _make_min_report():
             },
         },
         "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
+    return bind_runtime_policy(report)
 
 
 def _make_baseline():
-    return {
-        "schema_version": "baseline-v1",
-        "meta": {"commit": "beefdead"},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    baseline = _make_min_report()
+    baseline["meta"]["commit"] = "beefdead"
+    baseline["edit"]["name"] = "noop"
+    baseline["edit"]["deltas"]["params_changed"] = 0
+    return bind_runtime_policy(baseline)
 
 
 def test_explain_gates_happy_and_missing(tmp_path: Path):

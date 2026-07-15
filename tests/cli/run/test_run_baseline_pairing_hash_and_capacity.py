@@ -13,6 +13,7 @@ from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     SNS as _SNS,
 )
+from tests.cli.run._support_run_common import configure_guard_metric_impact_skip
 from tests.cli.run._support_run_pairing import (
     baseline_pairing_common_patches_ce as _common_patches_ce,
 )
@@ -80,7 +81,7 @@ def _common_patches_mlm():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
@@ -94,7 +95,7 @@ def _common_patches_mlm():
 
 
 def test_baseline_pairing_computes_hashes_and_tokens_in_dataset_meta(tmp_path: Path):
-    cfg = _write_base_cfg(tmp_path)
+    cfg = configure_guard_metric_impact_skip(_write_base_cfg(tmp_path))
     baseline = tmp_path / "baseline.json"
     preview_ids = [[1, 2, 3], [4, 5]]
     final_ids = [[7, 8], [9, 10, 11]]
@@ -135,6 +136,11 @@ def test_baseline_pairing_computes_hashes_and_tokens_in_dataset_meta(tmp_path: P
                 return SimpleNamespace(
                     edit={},
                     metrics={
+                        "primary_metric": {
+                            "kind": "ppl_causal",
+                            "preview": 1.0,
+                            "final": 1.0,
+                        },
                         "ppl_preview": 1.0,
                         "ppl_final": 1.0,
                         "ppl_ratio": 1.0,
@@ -166,12 +172,12 @@ def test_baseline_pairing_computes_hashes_and_tokens_in_dataset_meta(tmp_path: P
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
             baseline=str(baseline),
             until_pass=False,
@@ -226,7 +232,7 @@ def test_window_match_fraction_mismatch_exit(tmp_path: Path):
 
 
 def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
-    cfg = _write_base_cfg(tmp_path)
+    cfg = configure_guard_metric_impact_skip(_write_base_cfg(tmp_path))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -273,6 +279,11 @@ def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
                 return SimpleNamespace(
                     edit={},
                     metrics={
+                        "primary_metric": {
+                            "kind": "ppl_causal",
+                            "preview": 1.0,
+                            "final": 1.0,
+                        },
                         "ppl_preview": 1.0,
                         "ppl_final": 1.0,
                         "ppl_ratio": 1.0,
@@ -312,12 +323,12 @@ def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
             baseline=str(baseline),
             until_pass=False,
@@ -385,6 +396,11 @@ output:
                     execute=lambda **k: SimpleNamespace(
                         edit={},
                         metrics={
+                            "primary_metric": {
+                                "kind": "ppl_causal",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            },
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,

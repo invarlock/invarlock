@@ -55,7 +55,7 @@ def _variance_metric_fallback(
 def _attach_ratio_ci(result: dict[str, Any], ratio_ci: Any) -> None:
     if isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2:
         try:
-            result["ratio_ci"] = (float(ratio_ci[0]), float(ratio_ci[1]))
+            result["ratio_ci"] = [float(ratio_ci[0]), float(ratio_ci[1])]
         except _GUARD_PARSE_EXCEPTIONS:
             pass
 
@@ -78,6 +78,9 @@ def _attach_metadata_fields(
         "mode",
         "min_rel_gain",
         "alpha",
+        "ve_enabled_during_validation",
+        "subject_restored_after_ab",
+        "met_threshold",
     ]
     for field in metadata_fields:
         value = guard_metrics.get(field)
@@ -120,7 +123,17 @@ def _build_ab_section(guard_metrics: dict[str, Any]) -> dict[str, Any]:
         if isinstance(provenance, dict):
             prov_out = dict(provenance)
             if "window_ids" not in prov_out:
-                window_ids = _collect_window_ids(prov_out)
+                condition_a = prov_out.get("condition_a")
+                condition_ids = (
+                    condition_a.get("window_ids")
+                    if isinstance(condition_a, dict)
+                    else None
+                )
+                window_ids = (
+                    list(condition_ids)
+                    if isinstance(condition_ids, list) and condition_ids
+                    else _collect_window_ids(prov_out)
+                )
                 if window_ids:
                     prov_out["window_ids"] = window_ids
             ab_section["provenance"] = prov_out
@@ -128,6 +141,8 @@ def _build_ab_section(guard_metrics: dict[str, Any]) -> dict[str, Any]:
             ab_section["provenance"] = provenance
     if guard_metrics.get("ab_point_estimates"):
         ab_section["point_estimates"] = guard_metrics["ab_point_estimates"]
+    if guard_metrics.get("ab_measurements"):
+        ab_section["measurements"] = guard_metrics["ab_measurements"]
     return ab_section
 
 

@@ -65,6 +65,29 @@ def test_accuracy_point_from_windows_and_policies() -> None:
     assert acc == pytest.approx(0.9)
 
 
+def test_accuracy_primary_metric_uses_percentage_point_baseline_delta() -> None:
+    report = {
+        "metrics": {
+            "classification": {
+                "preview": {"correct_total": 8, "total": 10},
+                "final": {"correct_total": 9, "total": 10},
+                "counts_source": "measured",
+            }
+        }
+    }
+    baseline = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.85}}}
+
+    payload = compute_primary_metric_from_report(
+        report,
+        kind="accuracy",
+        baseline=baseline,
+    )
+
+    assert payload["final"] == pytest.approx(0.9)
+    assert payload["delta_vs_baseline_pp"] == pytest.approx(5.0)
+    assert "ratio_vs_baseline" not in payload
+
+
 def test_accuracy_point_from_windows_handles_bad_policy_safely() -> None:
     metric = _Accuracy()
     win = {
@@ -88,7 +111,8 @@ def test_compute_primary_metric_from_report_empty_windows_returns_nan() -> None:
     payload = compute_primary_metric_from_report({}, kind="ppl_causal", baseline=None)
     assert math.isnan(payload["preview"])
     assert math.isnan(payload["final"])
-    assert math.isnan(payload["ratio_vs_baseline"])
+    assert "ratio_vs_baseline" not in payload
+    assert "delta_vs_baseline_pp" not in payload
 
 
 def test_validate_primary_metric_block_success_and_failure() -> None:
@@ -193,7 +217,8 @@ def test_compute_primary_metric_accuracy_handles_non_dict_preview_window() -> No
     }
     payload = compute_primary_metric_from_report(report, kind="accuracy")
     assert math.isnan(payload["preview"])
-    assert 0.0 <= payload["final"] <= 1.0
+    assert math.isnan(payload["final"])
+    assert payload["invalid"] is True
 
 
 def test_accuracy_paired_compare_ignores_invalid_values() -> None:
@@ -228,8 +253,10 @@ def test_compute_primary_metric_accuracy_ensure_counts_handles_non_dict_windows(
     )
 
     assert math.isnan(payload["preview"])
-    assert payload["final"] == pytest.approx(1.0)
-    assert math.isnan(payload["ratio_vs_baseline"])
+    assert math.isnan(payload["final"])
+    assert payload["invalid"] is True
+    assert "delta_vs_baseline_pp" not in payload
+    assert "ratio_vs_baseline" not in payload
 
 
 def test_compute_accuracy_counts_prefers_explicit_bool_correct_flags() -> None:
@@ -239,7 +266,7 @@ def test_compute_accuracy_counts_prefers_explicit_bool_correct_flags() -> None:
         [{"correct": True}, {"correct": False}, {"input_ids": [1, 2, 3]}]
     )
 
-    assert (correct, total) == (2, 3)
+    assert (correct, total) == (1, 2)
 
 
 def test_primary_metric_helper_coercers_skip_invalid_dict_entries() -> None:

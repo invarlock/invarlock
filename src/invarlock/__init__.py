@@ -9,7 +9,7 @@ For torch-dependent functionality, see subpackages under `invarlock.*`:
 - `invarlock.adapters`: Model adapters (HF causal/MLM/seq2seq + auto)
 - `invarlock.guards`: Guard mechanisms (invariants, spectral, RMT, variance)
 - `invarlock.edits`: Built-in quantization and edit interfaces
-- `invarlock.eval`: Metrics, guard-overhead checks, and evaluation reporting
+- `invarlock.eval`: Metrics, guard-metric-impact checks, and evaluation reporting
 """
 
 __version__ = "0.12.1"

@@ -13,6 +13,23 @@ import invarlock.runtime_security_helpers as runtime_security_helpers
 from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.core.exceptions import InvarlockError
 
+_IMMUTABLE_IMAGE_ID = "sha256:" + "e" * 64
+
+
+@pytest.fixture(autouse=True)
+def _observe_immutable_runtime_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_resolve_observed_container_image",
+        lambda engine, image: runtime_security_helpers._ObservedContainerImage(
+            immutable_ref=_IMMUTABLE_IMAGE_ID,
+            image_digest=_IMMUTABLE_IMAGE_ID,
+            image_id=_IMMUTABLE_IMAGE_ID,
+            repo_digests=(),
+        ),
+        raising=True,
+    )
+
 
 def _env_value(command: list[str], key: str) -> str:
     needle = f"{key}="
@@ -246,8 +263,10 @@ def test_container_launch_uses_runtime_image_entrypoint(
 
     command = _build_container_command(["evaluate", "--help"])
 
-    assert command[-3:] == ["invarlock-runtime:local", "evaluate", "--help"]
-    assert "python" not in command[command.index("invarlock-runtime:local") + 1 :]
+    assert command[-3:] == [_IMMUTABLE_IMAGE_ID, "evaluate", "--help"]
+    assert "python" not in command[command.index(_IMMUTABLE_IMAGE_ID) + 1 :]
+    assert _env_value(command, "INVARLOCK_RUNTIME_IMAGE") == _IMMUTABLE_IMAGE_ID
+    assert _env_value(command, "INVARLOCK_RUNTIME_IMAGE_DIGEST") == _IMMUTABLE_IMAGE_ID
 
 
 @pytest.mark.parametrize("engine", ["docker", "podman"])

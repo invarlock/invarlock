@@ -5,8 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tests.reporting._support_evidence_pack_paths import (
     _digest,
@@ -29,50 +27,6 @@ def test_signature_warnings_to_errors_converts_signature_paths() -> None:
         "manifest.signature.json missing; signed manifest required by default.",
         "other warning",
     ]
-
-
-def test_signing_key_validation_and_generation_error_paths(tmp_path: Path) -> None:
-    missing = tmp_path / "missing-key.pem"
-    assert evidence_pack_integrity_mod.validate_signing_key(missing) == [
-        f"signing key file not found: {missing}"
-    ]
-
-    invalid_key = tmp_path / "invalid-key.pem"
-    invalid_key.write_text("not-a-pem", encoding="utf-8")
-    assert (
-        "signing key is invalid:"
-        in evidence_pack_integrity_mod.validate_signing_key(invalid_key)[0]
-    )
-
-    rsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    rsa_key_path = tmp_path / "rsa-key.pem"
-    rsa_key_path.write_bytes(
-        rsa_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-    )
-    assert (
-        "Ed25519" in evidence_pack_integrity_mod.validate_signing_key(rsa_key_path)[0]
-    )
-
-    private_key = tmp_path / "existing-private.pem"
-    public_key = tmp_path / "existing-public.pem"
-    private_key.write_text("exists", encoding="utf-8")
-    with pytest.raises(FileExistsError):
-        evidence_pack_integrity_mod.generate_signing_keypair(
-            private_key,
-            public_key_path=public_key,
-        )
-
-    private_key.unlink()
-    public_key.write_text("exists", encoding="utf-8")
-    with pytest.raises(FileExistsError):
-        evidence_pack_integrity_mod.generate_signing_keypair(
-            private_key,
-            public_key_path=public_key,
-        )
 
 
 def test_manual_validate_manifest_reports_structural_errors() -> None:

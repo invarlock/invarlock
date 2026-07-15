@@ -103,13 +103,17 @@ output:
 
     def fake_pm(report, *, kind, baseline=None):
         # Provide display_ci to mimic schema invariants
-        return {
+        payload = {
             "kind": kind,
             "preview": 12.3,
             "final": 12.1,
-            "ratio_vs_baseline": 1.01 if kind != "accuracy" else 0.0,
             "display_ci": (12.0, 12.5),
         }
+        comparison_field = (
+            "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+        )
+        payload[comparison_field] = 0.0 if kind == "accuracy" else 1.01
+        return payload
 
     captured = {}
 
@@ -144,7 +148,7 @@ output:
         patch(
             "invarlock.eval.primary_metric.compute_primary_metric_from_report", fake_pm
         ),
-        patch("invarlock.reporting.report_files.save_report", fake_save_report),
+        patch("invarlock.reporting.report_bundle.save_report", fake_save_report),
     ):
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
@@ -153,7 +157,10 @@ output:
     # PM present
     pm = report.get("metrics", {}).get("primary_metric")
     assert isinstance(pm, dict) and pm.get("kind") == metric_kind
-    assert "preview" in pm and "final" in pm and "ratio_vs_baseline" in pm
+    comparison_field = (
+        "delta_vs_baseline_pp" if metric_kind == "accuracy" else "ratio_vs_baseline"
+    )
+    assert "preview" in pm and "final" in pm and comparison_field in pm
     # No ppl_* writes in run report metrics
     for key in (report.get("metrics", {}) or {}).keys():
         assert not key.startswith("ppl_"), f"unexpected ppl_* key {key}"

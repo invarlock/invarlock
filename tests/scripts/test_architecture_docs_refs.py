@@ -12,7 +12,7 @@ def test_architecture_doc_tracks_shell_core_redesign() -> None:
         "cli/run_config.py",
         "cli/config_execution.py",
         "cli/run_pairing.py",
-        "cli/run_overhead.py",
+        "cli/run_metric_impact.py",
         "cli/run_execution.py",
         "`report_make.py` | Evaluation-report input normalization, build-section extraction, output shaping, and public report assembly",
         "`report_make_assembly.py` | Policy/provenance/guard assembly and report build-context composition",
@@ -22,13 +22,13 @@ def test_architecture_doc_tracks_shell_core_redesign() -> None:
         "`run_policy.py`",
         "`retry.py`",
         "`run_snapshot_contract.py`",
-        "`report_overhead.py`",
+        "`report_metric_impact.py`",
         "`run_report_contract.py` | Run provenance finalization, payload shaping, and run-report assembly contracts",
         "## Architecture Guardrails",
-        "No lazy exports",
-        "No `rmt_legacy` references in production source.",
-        "No dependency-map orchestration in command shells.",
-        "No CLI imports inside owner layers.",
+        "Package roots such as `adapters/__init__.py` and `guards/__init__.py` expose",
+        "RMT ownership lives in `rmt.py`, `rmt_analysis.py`, and `rmt_detection.py`.",
+        "Public command shells stay thin",
+        "independently of `invarlock.cli`.",
     )
 
     missing = [snippet for snippet in required_snippets if snippet not in text]

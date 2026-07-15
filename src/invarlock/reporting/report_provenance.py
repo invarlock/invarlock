@@ -8,6 +8,7 @@ import os
 import platform
 from typing import Any
 
+from invarlock.json_serialization import normalize_optional_nonfinite_json
 from invarlock.utils import hash_json
 
 POLICY_VERSION = "policy-v1"
@@ -126,35 +127,15 @@ def collect_backend_versions() -> dict[str, Any]:
 def compute_report_digest(report: dict[str, Any] | None) -> str | None:
     if not isinstance(report, dict):
         return None
-    meta = report.get("meta", {}) if isinstance(report.get("meta"), dict) else {}
-    edit = report.get("edit", {}) if isinstance(report.get("edit"), dict) else {}
-    metrics = (
-        report.get("metrics", {}) if isinstance(report.get("metrics"), dict) else {}
+    canonical = json.dumps(
+        normalize_optional_nonfinite_json(report),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+        allow_nan=False,
     )
-    spectral_metrics = metrics.get("spectral", {})
-    rmt_metrics = metrics.get("rmt", {})
-    subset = {
-        "meta": {
-            "model_id": meta.get("model_id"),
-            "adapter": meta.get("adapter"),
-            "commit": meta.get("commit"),
-            "ts": meta.get("ts"),
-        },
-        "edit": {
-            "name": edit.get("name"),
-            "plan_digest": edit.get("plan_digest"),
-        },
-        "metrics": {
-            "spectral_caps": spectral_metrics.get("caps_applied")
-            if isinstance(spectral_metrics, dict)
-            else None,
-            "rmt_outliers": rmt_metrics.get("outliers")
-            if isinstance(rmt_metrics, dict)
-            else None,
-        },
-    }
-    canonical = json.dumps(subset, sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def build_provenance_block(

@@ -16,6 +16,7 @@ from tests.cli.run._support_run_common import (
 )
 from tests.cli.run._support_run_common import (
     assert_single_run_output_artifacts,
+    configure_guard_metric_impact_skip,
 )
 from tests.cli.run._support_run_pairing import (
     baseline_pairing_common_patches_ce as _common_patches_ce,
@@ -106,7 +107,7 @@ def test_metrics_window_plan_stats_and_capacity_mapping(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -169,7 +170,7 @@ def test_metrics_loss_type_fallback_from_dataset_meta_context(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -251,7 +252,7 @@ def test_report_meta_includes_tokenizer_hash_on_provider_path(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -338,7 +339,7 @@ output:
 
 
 def test_baseline_pairing_respects_existing_hashes_in_meta(tmp_path: Path):
-    cfg = _write_base_cfg(tmp_path)
+    cfg = configure_guard_metric_impact_skip(_write_base_cfg(tmp_path))
     baseline = tmp_path / "baseline.json"
     preview_ids = [[1, 2, 3]]
     final_ids = [[4, 5, 6]]
@@ -425,12 +426,12 @@ def test_baseline_pairing_respects_existing_hashes_in_meta(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
             baseline=str(baseline),
             until_pass=False,
@@ -489,7 +490,7 @@ def test_metrics_inherits_masked_token_counts_from_dataset_meta_context(tmp_path
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),

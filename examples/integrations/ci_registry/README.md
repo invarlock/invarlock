@@ -2,14 +2,14 @@
 
 Status: `reference-pattern`
 
-This example shows how to attach existing InvarLock evidence to CI, MLflow, and
-Hugging Face Hub surfaces without adding a new model registry.
+This example shows how to attach current InvarLock evidence to CI, MLflow, and
+Hugging Face Hub surfaces without adding a new model registry. It requires a
+current report and its independently supplied strict inputs.
 
 ## GitHub Actions
 
-Use the first-party composite action to verify an existing report, render HTML,
-generate a review packet, and upload the evidence bundle. This minimal example
-uses an existing public evidence report checked into the repository:
+Use the first-party composite action to verify a current report, render HTML,
+generate a review packet, and upload the evidence bundle:
 
 ```yaml
 jobs:
@@ -23,10 +23,13 @@ jobs:
       - run: python -m pip install -e .
       - uses: ./.github/actions/invarlock-report-gate
         with:
-          report: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
+          report: path/to/current/evaluation.report.json
+          baseline: path/to/raw-baseline-report.json
+          policy-pack: path/to/acceptance-policy-pack.json
           profile: release
           assurance: strict
           runtime-provenance: container
+          expected-runtime-image-digest: sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST
 ```
 
 The `uses: ./.github/actions/invarlock-report-gate` line is a repo-local action
@@ -47,17 +50,22 @@ The action writes:
 
 ## MLflow Tags
 
-Generate a dependency-free MLflow tag export:
+Generate a dependency-free MLflow tag export from a successful current strict
+verification:
 
 ```bash
 invarlock verify --json \
-  public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
+  path/to/current/evaluation.report.json \
+  --baseline path/to/raw-baseline-report.json \
+  --policy-pack path/to/acceptance-policy-pack.json \
   --profile release \
   --assurance strict \
+  --runtime-provenance container \
+  --expected-runtime-image-digest sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST \
   > reports/eval/invarlock-verify.json
 
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
+  --evaluation-report path/to/current/evaluation.report.json \
   --format mlflow-tags \
   --policy-profile release \
   --verify-result reports/eval/invarlock-verify.json \
@@ -80,7 +88,8 @@ mlflow.log_artifact(
 ```
 
 The export sets tags for status, report SHA-256, policy profile, baseline, and
-subject.
+subject. It is a derived handoff record, not an independent release acceptance;
+retain the successful verifier result and its strict inputs with the export.
 
 ## Hugging Face Model Card Block
 
@@ -88,7 +97,7 @@ Generate a copy-pasteable evidence block:
 
 ```bash
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
+  --evaluation-report path/to/current/evaluation.report.json \
   --format model-card-md \
   --report-url https://example.test/evaluation.report.json \
   --evidence-url https://example.test/evidence.zip \
@@ -105,7 +114,7 @@ Generate a release-review packet for release maintainers and auditors:
 
 ```bash
 invarlock report export \
-  --evaluation-report public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json \
+  --evaluation-report path/to/current/evaluation.report.json \
   --format release-review-md \
   --policy-profile release \
   --verify-result reports/eval/invarlock-verify.json \

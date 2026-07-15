@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
 import os
-import shutil
 import subprocess
 import sys
 import textwrap
@@ -13,11 +13,16 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.core.assurance_contract import ASSURANCE_CLAIM_SET, CANONICAL_GUARD_CHAIN
 from invarlock.reporting import verify_contract as verify_mod
+from invarlock.reporting.report_provenance import compute_report_digest
 from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
+)
+from tests.cli._support_verify_runtime_provenance import (
+    _matching_strict_policy_pack,
+    _matching_strict_ppl_baseline,
+    _strict_provenance_gate_cert,
 )
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
@@ -26,6 +31,7 @@ _CORE_DEPENDENCY_IMPORTS = (
     "cryptography",
     "jsonschema",
     "markdown",
+    "numpy",
     "psutil",
     "pydantic",
     "rich",
@@ -108,8 +114,7 @@ def _select_python(repo_root: Path) -> Path:
 
 
 def _build_wheel(tmp_path: Path, python_exe: Path) -> Path:
-    repo_root = Path(__file__).resolve().parents[3]
-    shutil.rmtree(repo_root / "build", ignore_errors=True)
+    build_base = tmp_path / "build"
     subprocess.run(
         [
             str(python_exe),
@@ -118,6 +123,11 @@ def _build_wheel(tmp_path: Path, python_exe: Path) -> Path:
             "--wheel",
             "--outdir",
             str(tmp_path),
+            # Setuptools otherwise materializes into the shared repository
+            # ``build/`` tree.  Pytest-xdist can start several wheel checks at
+            # once, so each invocation must own every mutable build path.
+            "--config-setting=--global-option=build",
+            f"--config-setting=--global-option=--build-base={build_base}",
         ],
         check=True,
     )
@@ -573,51 +583,23 @@ def _build_valid_report() -> dict[str, object]:
 
 
 def _build_strict_report() -> dict[str, object]:
-    report = _build_valid_report()
-    guard_chain = list(CANONICAL_GUARD_CHAIN)
-    report["plugins"] = {"guards": guard_chain}
-    report["guards"] = [{"name": name} for name in guard_chain]
-    report["meta"] = {"profile": "ci"}
-    report["context"] = {
-        "profile": "ci",
-        "runtime": {"execution_mode": "container"},
-    }
-    report["auto"] = {"tier": "balanced"}
-    report["provenance"] = {"provider_digest": {"ids_sha256": "subject-ids"}}
-    report["report_build"] = {
-        "synthesized_fields": [],
-        "repaired_fields": [],
-        "fallback_fields": [],
-    }
-    primary_metric = report["primary_metric"]
-    if isinstance(primary_metric, dict):
-        primary_metric["ci"] = [0.0, 0.0]
-    spectral = report["spectral"]
-    if isinstance(spectral, dict):
-        spectral.update({"supported": True, "status": "pass"})
-    rmt = report["rmt"]
-    if isinstance(rmt, dict):
-        rmt.update({"supported": True, "status": "pass"})
-    report["variance"] = {"supported": True, "status": "pass"}
-    report["invariants"] = {"supported": True, "status": "pass"}
-    report["assurance"] = {
-        "mode": "strict",
-        "profile": "ci",
-        "tier": "balanced",
-        "claim_set": ASSURANCE_CLAIM_SET,
-        "canonical_guard_chain": guard_chain,
-        "guard_chain_observed": guard_chain,
-        "canonical_guard_chain_enforced": True,
-        "fallback_fields_used": False,
-        "runtime_provenance_verified": False,
-        "runtime_provenance_declared": "container",
-        "runtime_provenance_verification_status": "pending",
-        "verdict": "pending_verifier",
-        "report_local_verdict": "pass",
-        "verified_assurance_verdict": "pending",
-        "blocking_reasons": [],
-    }
-    return report
+    return copy.deepcopy(_strict_provenance_gate_cert())
+
+
+def _build_strict_policy_pack() -> dict[str, object]:
+    return copy.deepcopy(_matching_strict_policy_pack())
+
+
+def _build_strict_baseline_report() -> dict[str, object]:
+    """Return the independent raw baseline required for strict PPL replay."""
+
+    return copy.deepcopy(_matching_strict_ppl_baseline())
+
+
+def _strict_baseline_report_hash() -> str:
+    digest = compute_report_digest(_build_strict_baseline_report())
+    assert digest is not None
+    return digest
 
 
 def _build_evidence_pack(pack_dir: Path) -> Path:
@@ -625,6 +607,7 @@ def _build_evidence_pack(pack_dir: Path) -> Path:
     source_repo = pack_dir / "metadata" / "source_repo.json"
     environment = pack_dir / "metadata" / "environment.json"
     materials = pack_dir / "metadata" / "model_revisions.json"
+    scenarios = pack_dir / "metadata" / "scenarios.json"
     report_rel_path = "reports/model/clean/noop/evaluation.report.json"
     report_path = pack_dir / report_rel_path
 
@@ -632,6 +615,19 @@ def _build_evidence_pack(pack_dir: Path) -> Path:
     _write_json(source_repo, {"commit": "abc123"})
     _write_json(environment, {"platform": "test"})
     _write_json(materials, {"models": {"org/model": {"revision": "rev1"}}})
+    _write_json(
+        scenarios,
+        {
+            "scenarios": [
+                {
+                    "id": "clean",
+                    "strictness": "must_pass",
+                    "artifact_class": "evidence_only_pack",
+                    "generation": {"kind": "evidence_only"},
+                }
+            ]
+        },
+    )
     _write_json(report_path, _build_valid_report())
     _write_runtime_manifest(report_path)
 
@@ -640,6 +636,7 @@ def _build_evidence_pack(pack_dir: Path) -> Path:
         "metadata/source_repo.json",
         "metadata/environment.json",
         "metadata/model_revisions.json",
+        "metadata/scenarios.json",
         report_rel_path,
         str((Path(report_rel_path).parent / RUNTIME_MANIFEST_FILENAME).as_posix()),
     ]
@@ -660,7 +657,11 @@ def _build_evidence_pack(pack_dir: Path) -> Path:
             {
                 "name": "model_revisions",
                 **_digest_ref(materials, "metadata/model_revisions.json"),
-            }
+            },
+            {
+                "name": "scenarios",
+                **_digest_ref(scenarios, "metadata/scenarios.json"),
+            },
         ],
     }
     _write_json(pack_dir / "manifest.json", manifest)

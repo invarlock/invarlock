@@ -12,6 +12,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import NotRequired, TypedDict
 
 from invarlock.core.plugins_inventory import bitsandbytes_runtime_available
+from invarlock.gptqmodel_runtime import require_gptqmodel_runtime
 
 _EXTRA_CHECK_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, ValueError)
 
@@ -114,12 +115,8 @@ def check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
             missing_packages.append(pkg)
 
     if not missing_packages:
-        if plugin_info["extra"]:
-            return f"✓ {plugin_info['extra']}"
-        return "✓ Available"
-    if plugin_info["extra"]:
-        return f"⚠️ missing {plugin_info['extra']}"
-    return f"⚠️ missing {', '.join(missing_packages)}"
+        return f"✓ {plugin_info['extra']}"
+    return f"⚠️ missing {plugin_info['extra']}"
 
 
 def _plugin_package_importable(package_name: str) -> bool:
@@ -128,9 +125,8 @@ def _plugin_package_importable(package_name: str) -> bool:
             raise ImportError("bitsandbytes not importable")
         return True
     if package_name == "gptqmodel":
-        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
-
-        _patch_gptqmodel_transformers_hub_compat()
+        require_gptqmodel_runtime()
+        return True
     with (
         warnings.catch_warnings(),
         redirect_stdout(io.StringIO()),

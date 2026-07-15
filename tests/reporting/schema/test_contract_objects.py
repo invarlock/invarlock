@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from invarlock.reporting.report_builder_support import EvaluationReportBuilder
 from invarlock.reporting.verify_contract import VerifyRequest
 from invarlock.runtime_provenance import (
@@ -19,12 +21,15 @@ def test_runtime_provenance_verdict_payload_uses_shared_status_vocabulary() -> N
     payload = verdict.as_verification_payload()["runtime_provenance"]
 
     assert payload["declared_mode"] == "container"
-    assert payload["status"] == "verified"
+    assert payload["status"] == "expected_image_digest_matched"
+    assert payload["expected_digest_matched"] is True
     assert payload["verified"] is True
     assert payload["strict_blocking"] is False
 
 
-def test_verify_request_normalizes_tolerance_and_assurance_mode() -> None:
+def test_verify_request_rejects_invalid_tolerance_and_normalizes_assurance_mode() -> (
+    None
+):
     request = VerifyRequest.from_args(
         [Path("report.json")],
         tolerance="bad",  # type: ignore[arg-type]
@@ -32,11 +37,12 @@ def test_verify_request_normalizes_tolerance_and_assurance_mode() -> None:
     )
 
     assert request.reports == (Path("report.json"),)
-    assert request.normalized_tolerance == 1e-9
+    with pytest.raises(ValueError, match="finite number between 0 and 1e-9"):
+        _ = request.normalized_tolerance
     assert request.normalized_assurance_mode == "strict"
 
 
-def test_evaluation_report_builder_attaches_pending_assurance() -> None:
+def test_evaluation_report_builder_fails_closed_on_incomplete_guard_evidence() -> None:
     report = {
         "context": {
             "assurance": {"mode": "strict"},
@@ -65,6 +71,9 @@ def test_evaluation_report_builder_attaches_pending_assurance() -> None:
     assurance = EvaluationReportBuilder(report).finalize_assurance()
 
     assert assurance["mode"] == "strict"
-    assert assurance["verdict"] == "pending_verifier"
+    assert assurance["verdict"] == "fail"
+    assert assurance["report_local_verdict"] == "fail"
+    assert assurance["verified_assurance_verdict"] == "fail"
+    assert any("strict assurance" in reason for reason in assurance["blocking_reasons"])
     assert assurance["runtime_provenance_declared"] == "container"
     assert assurance["runtime_provenance_verification_status"] == "pending"

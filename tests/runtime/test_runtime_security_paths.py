@@ -64,14 +64,16 @@ def test_load_runtime_manifest_reports_read_failures(
     manifest_path = report_path.parent / runtime_security.RUNTIME_MANIFEST_FILENAME
     manifest_path.write_text('{"ok": true}\n', encoding="utf-8")
 
-    original_read_text = Path.read_text
+    def _read_regular_file_bytes(path: Path, *, label: str) -> bytes:
+        assert path == manifest_path
+        assert label == runtime_security.RUNTIME_MANIFEST_FILENAME
+        raise runtime_security_helpers.StrictJsonError("boom")
 
-    def _read_text(self: Path, *args, **kwargs) -> str:
-        if self == manifest_path:
-            raise OSError("boom")
-        return original_read_text(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "read_text", _read_text, raising=True)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "read_regular_file_bytes",
+        _read_regular_file_bytes,
+    )
 
     result = runtime_security.load_runtime_manifest(report_path)
 

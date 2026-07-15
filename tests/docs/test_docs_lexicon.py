@@ -20,7 +20,7 @@ def test_reference_uses_canonical_labels_only():
         "primary_metric_acceptable",
         "primary_metric_tail_acceptable",
         "preview_final_drift_acceptable",
-        "guard_overhead_acceptable",
+        "guard_metric_impact_acceptable",
         # optional non-gating rows may be omitted from examples
     }
     assert set(validation.keys()).issubset(allowed)

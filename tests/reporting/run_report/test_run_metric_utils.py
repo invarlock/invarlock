@@ -43,9 +43,9 @@ def test_format_debug_metric_diffs_includes_ratio_vs_baseline_fallback() -> None
     baseline = {"metrics": {"primary_metric": {"final": 5.0}}}
 
     out = format_debug_metric_diffs(pm, metrics, baseline)
-    assert "final: v1-v1 = +2.000000000" in out
-    assert "preview: v1-v1 = +2.000000000" in out
-    assert "ratio_vs_baseline: v1-v1 = +0.400000000" in out
+    assert "final: recomputed-recorded = +2.000000000" in out
+    assert "preview: recomputed-recorded = +2.000000000" in out
+    assert "ratio_vs_baseline: recomputed-recorded = +0.400000000" in out
 
 
 def test_format_debug_metric_diffs_skips_log_terms_on_domain_error() -> None:
@@ -53,7 +53,7 @@ def test_format_debug_metric_diffs_skips_log_terms_on_domain_error() -> None:
     metrics = {"primary_metric": {"final": 10.0, "preview": 9.0}}
 
     out = format_debug_metric_diffs(pm, metrics, baseline_report_data=None)
-    assert "final: v1-v1 = -11.000000000" in out
+    assert "final: recomputed-recorded = -11.000000000" in out
     assert "Δlog(final)" not in out
 
 
@@ -71,8 +71,8 @@ def test_format_debug_metric_diffs_handles_non_mapping_primary_metric_block() ->
 
     out = format_debug_metric_diffs(pm, metrics, baseline_report_data=None)
 
-    assert "final: v1-v1" not in out
-    assert "preview: v1-v1" not in out
+    assert "final: recomputed-recorded" not in out
+    assert "preview: recomputed-recorded" not in out
 
 
 def test_format_debug_metric_diffs_ignores_missing_baseline_final_ratio_fallback() -> (
@@ -90,6 +90,6 @@ def test_format_debug_metric_diffs_ignores_missing_baseline_final_ratio_fallback
 
     out = format_debug_metric_diffs(pm, metrics, baseline)
 
-    assert "final: v1-v1 = +2.000000000" in out
-    assert "preview: v1-v1 = +2.000000000" in out
-    assert "ratio_vs_baseline: v1-v1" not in out
+    assert "final: recomputed-recorded = +2.000000000" in out
+    assert "preview: recomputed-recorded = +2.000000000" in out
+    assert "ratio_vs_baseline: recomputed-recorded" not in out

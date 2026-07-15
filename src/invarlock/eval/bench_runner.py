@@ -234,7 +234,9 @@ def execute_single_run(
             path.mkdir(parents=True, exist_ok=True)
 
         def _write_json(path: Path, payload: dict[str, Any]) -> None:
-            path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            path.write_text(
+                json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8"
+            )
 
         if runtime is None:
             runtime = {}
@@ -480,7 +482,7 @@ def execute_scenario(
     if isinstance(pairing_schedule, dict):
         pairing_path = scenario_dir / "pairing_schedule.json"
         pairing_path.write_text(
-            json.dumps(pairing_schedule, indent=2), encoding="utf-8"
+            json.dumps(pairing_schedule, indent=2, allow_nan=False), encoding="utf-8"
         )
         artifacts["pairing_schedule"] = str(pairing_path)
     bare_report_path = _extract_success_report_path(bare_result, run_label="bare")
@@ -507,7 +509,8 @@ def execute_scenario(
                     logger.info(summary_line)
             report_path = scenario_dir / "evaluation.report.json"
             report_path.write_text(
-                json.dumps(evaluation_report, indent=2), encoding="utf-8"
+                json.dumps(evaluation_report, indent=2, allow_nan=False),
+                encoding="utf-8",
             )
             artifacts["evaluation_report"] = str(report_path)
         except _BENCHMARK_RECOVERABLE_ERRORS as exc:
@@ -558,7 +561,7 @@ def generate_outputs(summary: BenchmarkSummary) -> None:
     json_path = results_dir / "guard_effect.json"
     json_data = summary_to_step14_json(summary)
     with open(json_path, "w") as handle:
-        json.dump(json_data, handle, indent=2)
+        json.dump(json_data, handle, indent=2, allow_nan=False)
     logger.info(f"JSON artifact saved: {json_path}")
 
     md_path = results_dir / "guard_effect.md"

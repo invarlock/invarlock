@@ -1,36 +1,38 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import subprocess
 import sys
 import tarfile
 from pathlib import Path
 
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _release_checker_module(repo_root: Path):
-    module_path = repo_root / "scripts" / "release" / "evidence_contracts.py"
-    script_dir = str(module_path.parent)
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-    spec = importlib.util.spec_from_file_location(
-        "release_evidence_contracts_under_test", module_path
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from scripts.smoke.guard_validation_smoke import (
+    _render_markdown,
+    build_guard_validation_smoke,
+)
+from tests.scripts._support_release_evidence_check import (
+    release_checker_module as _release_checker_module,
+)
+from tests.scripts._support_release_evidence_check import repo_root as _repo_root
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_guard_smoke(guard_dir: Path) -> dict[str, object]:
+    guard_dir.mkdir(exist_ok=True)
+    payload = build_guard_validation_smoke(replicates=5, seed=7)
+    (guard_dir / "guard-validation-smoke.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    (guard_dir / "guard-validation-smoke.md").write_text(
+        _render_markdown(payload),
+        encoding="utf-8",
+    )
+    return payload
 
 
 def _write_offline_bundle(output_dir: Path) -> None:
@@ -48,16 +50,6 @@ def _write_offline_bundle(output_dir: Path) -> None:
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with tarfile.open(tarball, "w:gz") as tar:
         tar.add(manifest_path, arcname=f"{bundle_root}/release_manifest.json")
-    manifest_path.unlink()
-
-
-def _write_bundle_manifest(output_dir: Path, name: str, manifest: object) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    root = name.removesuffix(".tar.gz")
-    manifest_path = output_dir / f"{root}.manifest.json"
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    with tarfile.open(output_dir / name, "w:gz") as tar:
-        tar.add(manifest_path, arcname=f"{root}/release_manifest.json")
     manifest_path.unlink()
 
 
@@ -109,8 +101,10 @@ def _write_valid_release_evidence(
                         "id": str(release / "strict" / "evaluation.report.json"),
                         "verification": {
                             "runtime_provenance": {
-                                "status": "verified",
+                                "status": "expected_image_digest_matched",
                                 "verified": True,
+                                "binding_verified": True,
+                                "expected_digest_matched": True,
                             }
                         },
                     }
@@ -120,24 +114,7 @@ def _write_valid_release_evidence(
         encoding="utf-8",
     )
     sbom.write_text('{"bomFormat":"CycloneDX"}', encoding="utf-8")
-    guard_dir.mkdir()
-    (guard_dir / "guard-validation-smoke.json").write_text(
-        json.dumps(
-            {
-                "schema": "invarlock/guard-validation-smoke-v1",
-                "rate_rows": [
-                    {"guard": "spectral"},
-                    {"guard": "rmt"},
-                    {"guard": "variance"},
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    (guard_dir / "guard-validation-smoke.md").write_text(
-        "# Guard Validation Smoke\n",
-        encoding="utf-8",
-    )
+    _write_guard_smoke(guard_dir)
     _write_offline_bundle(offline_dir)
     return dist, release, sbom, guard_dir, offline_dir
 
@@ -174,13 +151,9 @@ def _release_check_command(
     return command
 
 
-def test_release_checklist_is_not_part_of_public_repo_surface() -> None:
-    repo_root = _repo_root()
-    assert not (repo_root / ".github" / "release-checklist.md").exists()
-    assert not (repo_root / "docs" / "release").exists()
-
-
-def test_release_evidence_check_passes_with_required_artifacts(tmp_path: Path) -> None:
+def test_release_artifact_shape_check_is_explicitly_non_authoritative(
+    tmp_path: Path,
+) -> None:
     repo_root = _repo_root()
     dist, release, sbom, guard_dir, offline_dir = _write_valid_release_evidence(
         tmp_path
@@ -222,7 +195,129 @@ def test_release_evidence_check_passes_with_required_artifacts(tmp_path: Path) -
     )
 
     assert proc.returncode == 0, proc.stderr
-    assert '"ok": true' in proc.stdout
+    summary = json.loads(proc.stdout)
+    assert summary["ok"] is True
+    assert summary["schema"] == "invarlock/release-artifact-shape-check-v1"
+    assert summary["check_scope"] == "local artifact shape only"
+    assert summary["authoritative_release_approval"] is False
+
+
+def test_guard_validation_v1_rejects_forged_and_retired_artifacts(
+    tmp_path: Path,
+) -> None:
+    module = _release_checker_module(_repo_root())
+    guard_dir = tmp_path / "guard-validation"
+    payload = _write_guard_smoke(guard_dir)
+    json_path = guard_dir / "guard-validation-smoke.json"
+    markdown_path = guard_dir / "guard-validation-smoke.md"
+
+    failures: list[str] = []
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert failures == []
+
+    forged = json.loads(json.dumps(payload))
+    forged["rate_rows"][0]["null_trigger_rate"] = 0.5
+    json_path.write_text(json.dumps(forged), encoding="utf-8")
+    failures.clear()
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert any("null_trigger_rate does not match outcomes" in item for item in failures)
+    assert any("evidence_sha256 does not match" in item for item in failures)
+
+    retired = json.loads(json.dumps(payload))
+    retired["schema"] = "invarlock/guard-validation-smoke-v2"
+    json_path.write_text(json.dumps(retired), encoding="utf-8")
+    failures.clear()
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert "guard-validation JSON schema is not recognized." in failures
+
+    source_forgery = json.loads(json.dumps(payload))
+    source_forgery["source_identity"]["producer"]["sha256"] = "sha256:" + "0" * 64
+    json_path.write_text(json.dumps(source_forgery), encoding="utf-8")
+    failures.clear()
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert any("producer source digest does not match" in item for item in failures)
+
+    json_path.write_text(json.dumps(payload), encoding="utf-8")
+    markdown_path.write_text("# forged\n", encoding="utf-8")
+    failures.clear()
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert any("markdown bytes do not match" in item for item in failures)
+    assert any("markdown does not render" in item for item in failures)
+
+
+def test_guard_validation_v1_rejects_ambiguous_json_and_symlinks(
+    tmp_path: Path,
+) -> None:
+    module = _release_checker_module(_repo_root())
+    guard_dir = tmp_path / "guard-validation"
+    _write_guard_smoke(guard_dir)
+    json_path = guard_dir / "guard-validation-smoke.json"
+    markdown_path = guard_dir / "guard-validation-smoke.md"
+    original_json = json_path.read_text(encoding="utf-8")
+
+    json_path.write_text(
+        original_json.replace(
+            '"schema": "invarlock/guard-validation-smoke-v1"',
+            '"schema": "invarlock/guard-validation-smoke-v1", '
+            '"schema": "invarlock/guard-validation-smoke-v1"',
+        ),
+        encoding="utf-8",
+    )
+    failures: list[str] = []
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert any("duplicate JSON key 'schema'" in item for item in failures)
+
+    json_path.write_text(
+        original_json.replace(
+            '"null_trigger_rate": 0.0', '"null_trigger_rate": NaN', 1
+        ),
+        encoding="utf-8",
+    )
+    failures.clear()
+    module._validate_guard_validation(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        failures=failures,
+    )
+    assert any("non-finite JSON value 'NaN'" in item for item in failures)
+
+    json_path.write_text(original_json, encoding="utf-8")
+    json_link = tmp_path / "guard.json"
+    markdown_link = tmp_path / "guard.md"
+    json_link.symlink_to(json_path)
+    markdown_link.symlink_to(markdown_path)
+    failures.clear()
+    module._validate_guard_validation(
+        json_path=json_link,
+        markdown_path=markdown_link,
+        failures=failures,
+    )
+    assert any("JSON must be a readable regular file" in item for item in failures)
+    assert any("markdown must be a readable regular file" in item for item in failures)
 
 
 def test_release_evidence_check_reports_missing_artifacts(tmp_path: Path) -> None:
@@ -257,7 +352,7 @@ def test_release_evidence_check_reports_missing_artifacts(tmp_path: Path) -> Non
     assert proc.returncode == 1
     assert "wheel artifact missing" in proc.stderr
     assert "strict example report missing" in proc.stderr
-    assert "guard-validation JSON missing" in proc.stderr
+    assert "guard-validation JSON must be a readable regular file" in proc.stderr
     assert "offline release bundle missing" in proc.stderr
 
 
@@ -301,8 +396,10 @@ def test_release_evidence_check_rejects_weak_artifact_contents(
                         "id": "other.report.json",
                         "verification": {
                             "runtime_provenance": {
-                                "status": "pending",
+                                "status": "manifest_bound",
                                 "verified": False,
+                                "binding_verified": True,
+                                "expected_digest_matched": False,
                             }
                         },
                     }
@@ -311,14 +408,12 @@ def test_release_evidence_check_rejects_weak_artifact_contents(
         ),
         encoding="utf-8",
     )
+    payload = json.loads(
+        (guard_dir / "guard-validation-smoke.json").read_text(encoding="utf-8")
+    )
+    payload["rate_rows"] = payload["rate_rows"][:4]
     (guard_dir / "guard-validation-smoke.json").write_text(
-        json.dumps(
-            {
-                "schema": "invarlock/guard-validation-smoke-v1",
-                "rate_rows": [{"guard": "spectral"}],
-            }
-        ),
-        encoding="utf-8",
+        json.dumps(payload), encoding="utf-8"
     )
     bad_bundle = offline_dir / "bad.tar.gz"
     with tarfile.open(bad_bundle, "w:gz"):
@@ -354,8 +449,8 @@ def test_release_evidence_check_rejects_weak_artifact_contents(
     assert "runtime image digest must contain exactly one" in proc.stderr
     assert "assurance.mode must be strict" in proc.stderr
     assert "summary.ok must be true" in proc.stderr
-    assert "verified runtime provenance" in proc.stderr
-    assert "guard-validation JSON missing guard rows" in proc.stderr
+    assert "independently supplied runtime image digest pin" in proc.stderr
+    assert "rate_rows must contain exactly 12 rows" in proc.stderr
     assert "offline release bundle manifest missing" in proc.stderr
 
 
@@ -461,9 +556,6 @@ def test_release_evidence_contract_owner_paths(tmp_path: Path) -> None:
     assert any(
         "guard-validation JSON must be a JSON object" in item for item in failures
     )
-    assert any(
-        "guard-validation markdown must not be empty" in item for item in failures
-    )
 
     failures.clear()
     bad_sbom = tmp_path / "sbom.json"
@@ -536,8 +628,10 @@ def test_release_evidence_contract_edge_paths(tmp_path: Path) -> None:
                         "id": "evaluation.report.json",
                         "verification": {
                             "runtime_provenance": {
-                                "status": "verified",
+                                "status": "expected_image_digest_matched",
                                 "verified": True,
+                                "binding_verified": True,
+                                "expected_digest_matched": True,
                             }
                         },
                     }
@@ -548,21 +642,7 @@ def test_release_evidence_contract_edge_paths(tmp_path: Path) -> None:
     )
     sbom = tmp_path / "sbom.json"
     sbom.write_text("[]", encoding="utf-8")
-    guard_dir.mkdir()
-    (guard_dir / "guard-validation-smoke.json").write_text(
-        json.dumps(
-            {
-                "schema": "invarlock/guard-validation-smoke-v1",
-                "rate_rows": [
-                    {"guard": "spectral"},
-                    {"guard": "rmt"},
-                    {"guard": "variance"},
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    (guard_dir / "guard-validation-smoke.md").write_text("ok", encoding="utf-8")
+    _write_guard_smoke(guard_dir)
     _write_offline_bundle(offline)
 
     failures = ReleaseEvidenceManifest(
@@ -641,73 +721,6 @@ def test_release_evidence_check_rejects_report_and_verify_shape_edges(
         encoding="utf-8",
     )
     module._validate_strict_verify(verify, report, failures)
-    assert any("verified runtime provenance" in item for item in failures)
-
-
-def test_release_evidence_check_rejects_guard_sbom_and_bundle_edges(
-    tmp_path: Path,
-) -> None:
-    module = _release_checker_module(_repo_root())
-    failures: list[str] = []
-
-    guard_json = tmp_path / "guard-validation-smoke.json"
-    guard_md = tmp_path / "guard-validation-smoke.md"
-    guard_json.write_text(
-        json.dumps({"schema": "unexpected", "rate_rows": "not-a-list"}),
-        encoding="utf-8",
+    assert any(
+        "independently supplied runtime image digest pin" in item for item in failures
     )
-    guard_md.write_text("", encoding="utf-8")
-    module._validate_guard_validation(
-        json_path=guard_json,
-        markdown_path=guard_md,
-        failures=failures,
-    )
-    assert any("schema is not recognized" in item for item in failures)
-    assert any("missing rate_rows list" in item for item in failures)
-    assert any("markdown must not be empty" in item for item in failures)
-
-    failures.clear()
-    sbom = tmp_path / "sbom.json"
-    sbom.write_text("[]", encoding="utf-8")
-    module._validate_sbom(sbom, failures)
-    assert any("SBOM must be a JSON object" in item for item in failures)
-
-    failures.clear()
-    missing_bundle_dir = tmp_path / "missing-bundles"
-    module._validate_offline_bundle(missing_bundle_dir, failures)
-    assert any("offline release bundle missing" in item for item in failures)
-
-    failures.clear()
-    bundle_dir = tmp_path / "bundles"
-    bundle_dir.mkdir()
-    (bundle_dir / "invalid.tar.gz").write_text("not a tarball", encoding="utf-8")
-    _write_bundle_manifest(bundle_dir, "non-object.tar.gz", [])
-    _write_bundle_manifest(bundle_dir, "bad-schema.tar.gz", {"schema": "bad"})
-    _write_bundle_manifest(
-        bundle_dir,
-        "empty-distributions.tar.gz",
-        {"schema": "invarlock/release-offline-bundle-v1", "distributions": []},
-    )
-    _write_bundle_manifest(
-        bundle_dir,
-        "missing-wheel.tar.gz",
-        {
-            "schema": "invarlock/release-offline-bundle-v1",
-            "distributions": [{"path": "dist/invarlock-0.9.0.tar.gz"}],
-        },
-    )
-    _write_bundle_manifest(
-        bundle_dir,
-        "missing-sdist.tar.gz",
-        {
-            "schema": "invarlock/release-offline-bundle-v1",
-            "distributions": [{"path": "dist/invarlock-0.9.0-py3-none-any.whl"}],
-        },
-    )
-    module._validate_offline_bundle(bundle_dir, failures)
-    assert any("offline release bundle invalid" in item for item in failures)
-    assert any("manifest must be an object" in item for item in failures)
-    assert any("schema is not recognized" in item for item in failures)
-    assert any("has no distributions" in item for item in failures)
-    assert any("missing wheel distribution" in item for item in failures)
-    assert any("missing sdist distribution" in item for item in failures)

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import copy
 
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import AutoConfig, RunReport, create_empty_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 
 def _mk_report_with_bad_window_entries() -> RunReport:
@@ -18,6 +21,8 @@ def _mk_report_with_bad_window_entries() -> RunReport:
         probes_used=0,
         target_pm_ratio=None,
     )
+    r["context"] = {"profile": "dev"}
+    r["edit"]["name"] = "structured"
     r["data"]["dataset"] = "unit"
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
@@ -34,7 +39,11 @@ def _mk_report_with_bad_window_entries() -> RunReport:
         "seed": 0,
         "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
     }
-    r["metrics"]["paired_delta_summary"] = {"mean": 0.0}
+    r["metrics"]["preview_final_slice_delta_summary"] = independent_slice_summary(
+        0.0,
+        preview_windows=2,
+        final_windows=2,
+    )
     r["metrics"]["preview_total_tokens"] = 50
     r["metrics"]["final_total_tokens"] = 50
     r["metrics"]["logloss_delta"] = 0.0
@@ -53,7 +62,17 @@ def _mk_baseline() -> dict:
     return {
         "run_id": "base",
         "model_id": "m",
-        "meta": {"seed": 0, "model_id": "m"},
+        "meta": {
+            "seed": 0,
+            "model_id": "m",
+            "adapter": "hf",
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "evaluation_windows": {
             "final": {
                 "window_ids": [1, 2],
@@ -70,7 +89,7 @@ def _mk_baseline() -> dict:
             "stride": 8,
         },
         "edit": {
-            "name": "none",
+            "name": "noop",
             "plan_digest": "0",
             "deltas": {
                 "params_changed": 0,
@@ -80,7 +99,13 @@ def _mk_baseline() -> dict:
             },
         },
         "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }

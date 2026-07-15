@@ -1,54 +1,61 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_make as C
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import canonical_run_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report() -> dict:
     import math
 
-    return {
-        "meta": {
-            "model_id": "gpt2",
-            "adapter": "hf_causal",
-            "device": "cpu",
-            "seed": 42,
-        },
-        "data": {
-            "dataset": "dummy",
-            "split": "validation",
-            "seq_len": 8,
-            "stride": 4,
-            "preview_n": 2,
-            "final_n": 2,
-        },
-        "edit": {"name": "noop", "plan_digest": "noop"},
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 50.0,
-                "final": 50.0,
-                "ratio_vs_baseline": 1.0,
-                "display_ci": (0.98, 1.02),
+    return canonical_run_report(
+        {
+            "meta": {
+                "model_id": "gpt2",
+                "adapter": "hf_causal",
+                "device": "cpu",
+                "seed": 42,
+                "auto": {"tier": "balanced"},
             },
-            "bootstrap": {"replicates": 50, "alpha": 0.1},
-        },
-        "evaluation_windows": {
-            "preview": {
-                "window_ids": [1, 2],
-                "logloss": [math.log(50.0), math.log(50.0)],
-                "token_counts": [10, 20],
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "dummy",
+                "split": "validation",
+                "seq_len": 8,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
             },
-            "final": {
-                "window_ids": [3, 4],
-                "logloss": [math.log(50.0), math.log(50.0)],
-                "token_counts": [10, 20],
+            "edit": {"name": "noop", "plan_digest": "noop"},
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 50.0,
+                    "final": 50.0,
+                    "ratio_vs_baseline": 1.0,
+                    "display_ci": (0.98, 1.02),
+                },
+                "bootstrap": {"replicates": 50, "alpha": 0.1},
             },
-        },
-        "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
+            "evaluation_windows": {
+                "preview": {
+                    "window_ids": [1, 2],
+                    "logloss": [math.log(50.0), math.log(50.0)],
+                    "token_counts": [10, 20],
+                },
+                "final": {
+                    "window_ids": [3, 4],
+                    "logloss": [math.log(50.0), math.log(50.0)],
+                    "token_counts": [10, 20],
+                },
+            },
+            "guards": [],
+            "artifacts": {"events_path": "", "logs_path": ""},
+        }
+    )
 
 
 def _cert_skeleton() -> dict:
@@ -68,7 +75,7 @@ def _cert_skeleton() -> dict:
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "meta": {
             "model_id": "m",

@@ -1,6 +1,10 @@
-from invarlock.reporting.report_make import make_report
+import copy
+
 from invarlock.reporting.verify_check_helpers_metrics import (
     _validate_primary_metric_policy,
+)
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
 )
 
 
@@ -12,8 +16,16 @@ def _report_with_meta_pm_drift_band():
             "seed": 7,
             "device": "cpu",
             "pm_drift_band": {"min": 0.9, "max": 1.3},
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
-        "context": {"primary_metric": {"drift_band": {"min": 0.9, "max": 1.3}}},
+        "context": {
+            "profile": "dev",
+            "primary_metric": {"drift_band": {"min": 0.9, "max": 1.3}},
+        },
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -47,17 +59,13 @@ def _report_with_meta_pm_drift_band():
 
 
 def _baseline():
-    return {
-        "run_id": "baseline",
-        "model_id": "m",
-        "ppl_final": 12.0,
-        "evaluation_windows": {
-            "final": {"window_ids": [1], "logloss": [1.0], "token_counts": [100]}
-        },
-        "metrics": {
-            "bootstrap": {"replicates": 150, "alpha": 0.05, "method": "percentile"}
-        },
+    baseline = copy.deepcopy(_report_with_meta_pm_drift_band())
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 12.0,
+        "final": 12.0,
     }
+    return baseline
 
 
 def test_make_evaluation_report_uses_pm_drift_band_from_report_context():

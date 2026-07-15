@@ -11,6 +11,15 @@ from typing import Any
 
 import yaml
 
+from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
+from invarlock.strict_yaml import (
+    StrictSafeLoader,
+    StrictYamlError,
+    load_yaml_object,
+    parse_yaml_bytes,
+)
+
+from .checkpoint_identity import LEGACY_MODEL_IDENTITY_FIELDS
 from .config_runtime import InvarLockConfig, VarianceGuardConfig
 
 _RUNTIME_RESOURCE_ERRORS = (
@@ -78,8 +87,8 @@ def create_config_loader(
     max_include_depth: int = CONFIG_INCLUDE_MAX_DEPTH,
     dependency_paths: set[Path] | None = None,
 ):
-    class Loader(yaml.SafeLoader):
-        pass
+    class Loader(StrictSafeLoader):
+        allowed_custom_tags = frozenset({"!include"})
 
     Loader._base_dir = Path(base_dir).resolve()
     Loader._include_stack = tuple(Path(p).resolve() for p in include_stack)
@@ -88,7 +97,7 @@ def create_config_loader(
 
     def _construct_include(loader: yaml.SafeLoader, node: yaml.Node):
         rel = loader.construct_scalar(node)
-        path = (loader._base_dir / rel).resolve()
+        path = absolute_path_no_resolve(loader._base_dir / rel)
         active_stack = tuple(getattr(loader, "_include_stack", ()))
         active_max_depth = int(
             getattr(loader, "_max_include_depth", CONFIG_INCLUDE_MAX_DEPTH)
@@ -114,14 +123,23 @@ def create_config_loader(
         tracked_paths = getattr(loader, "_dependency_paths", None)
         if isinstance(tracked_paths, set):
             tracked_paths.add(path)
-        with path.open(encoding="utf-8") as fh:
-            inc_loader = create_config_loader(
-                path.parent,
-                include_stack=(*active_stack, path),
-                max_include_depth=active_max_depth,
-                dependency_paths=tracked_paths,
-            )
-            return yaml.load(fh, Loader=inc_loader)
+        if not path.exists():
+            raise FileNotFoundError(path)
+        inc_loader = create_config_loader(
+            path.parent,
+            include_stack=(*active_stack, path),
+            max_include_depth=active_max_depth,
+            dependency_paths=tracked_paths,
+        )
+        try:
+            payload = read_regular_file_bytes(path, label="Config !include")
+        except StrictJsonError as exc:
+            raise ValueError(str(exc)) from exc
+        return parse_yaml_bytes(
+            payload,
+            label=f"Config !include {path}",
+            loader_cls=inc_loader,
+        )
 
     Loader.add_constructor("!include", _construct_include)
     return Loader
@@ -142,8 +160,11 @@ def _load_raw_config_payload(
         resolved.parent,
         dependency_paths=dependency_paths,
     )
-    with resolved.open(encoding="utf-8") as fh:
-        raw = yaml.load(fh, Loader=loader)
+    try:
+        payload = read_regular_file_bytes(resolved, label="Configuration file")
+    except StrictJsonError as exc:
+        raise ValueError(str(exc)) from exc
+    raw = parse_yaml_bytes(payload, label="Configuration file", loader_cls=loader)
     if not isinstance(raw, dict):
         raise ValueError("Top-level config must be a mapping")
     return raw
@@ -177,11 +198,10 @@ def _load_runtime_yaml(*rel_parts: str) -> dict[str, Any] | None:
         for part in rel_parts:
             p = p / part
         if p.exists():
-            with p.open(encoding="utf-8") as fh:
-                data = yaml.safe_load(fh) or {}
-                if not isinstance(data, dict):
-                    raise ValueError("Runtime YAML must be a mapping")
-                return data
+            try:
+                return load_yaml_object(p, label="Runtime YAML")
+            except StrictYamlError as exc:
+                raise ValueError(str(exc)) from exc
 
     try:
         base = _ires.files("invarlock._data.runtime")
@@ -193,7 +213,12 @@ def _load_runtime_yaml(*rel_parts: str) -> dict[str, Any] | None:
             read_text = getattr(res, "read_text", None)
             if callable(is_file) and is_file() and callable(read_text):
                 text = read_text(encoding="utf-8")
-                data = yaml.safe_load(text) or {}
+                data = (
+                    parse_yaml_bytes(
+                        text.encode("utf-8"), label="Packaged runtime YAML"
+                    )
+                    or {}
+                )
                 if not isinstance(data, dict):
                     return None
                 return data
@@ -211,6 +236,18 @@ def load_config(path: str | Path) -> InvarLockConfig:
         raise ValueError("defaults must be a mapping when present")
     if isinstance(defaults, dict):
         raw = _deep_merge(defaults, raw)
+
+    model_block = raw.get("model")
+    legacy_model_identity_fields = (
+        sorted(field for field in LEGACY_MODEL_IDENTITY_FIELDS if field in model_block)
+        if isinstance(model_block, dict)
+        else []
+    )
+    if legacy_model_identity_fields:
+        raise ValueError(
+            "Config uses legacy model identity field(s): "
+            + ", ".join(legacy_model_identity_fields)
+        )
 
     edit_block = raw.get("edit")
     if isinstance(edit_block, dict) and "parameters" in edit_block:

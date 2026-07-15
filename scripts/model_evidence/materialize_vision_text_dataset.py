@@ -16,6 +16,14 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from invarlock.evidence_pack_json import read_jsonl_snapshot, sha256_prefixed
+from invarlock.vision_dataset_evidence import (
+    build_materialization_evidence,
+    canonical_json_bytes,
+    dataset_record_digest,
+    materialized_record_digest,
+)
+
 
 @dataclass(frozen=True)
 class MaterializeConfig:
@@ -76,14 +84,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _safe_slug(value: object, *, fallback: str) -> str:
@@ -188,6 +188,24 @@ def _write_image(
     return image_path, _sha256_bytes(image_bytes), len(image_bytes)
 
 
+def _canonical_record_id(raw_id: Any, *, row_index: int) -> str:
+    if raw_id is None or raw_id == "":
+        return f"row-{row_index}"
+    rendered = str(raw_id)
+    if (
+        rendered
+        and rendered == rendered.strip()
+        and len(rendered.encode("utf-8")) <= 1024
+        and all(ord(character) >= 32 for character in rendered)
+    ):
+        return rendered
+    try:
+        identity_bytes = canonical_json_bytes(raw_id)
+    except (TypeError, ValueError):
+        identity_bytes = canonical_json_bytes(rendered)
+    return "source-id-sha256-" + hashlib.sha256(identity_bytes).hexdigest()
+
+
 def _record_from_row(
     row: Mapping[str, Any],
     *,
@@ -218,7 +236,7 @@ def _record_from_row(
         return None
 
     raw_id = _field_value(row, config.id_field) if config.id_field else None
-    record_id = str(raw_id if raw_id not in (None, "") else f"row-{index}")
+    record_id = _canonical_record_id(raw_id, row_index=index)
     image_path, image_sha256, image_bytes = _write_image(
         image_value,
         images_dir=images_dir,
@@ -227,7 +245,24 @@ def _record_from_row(
         image_format=config.image_format,
     )
     prompt = _format_prompt(config.prompt_template, question=question)
-    return {
+    prompt_sha256 = _sha256_bytes(prompt.encode("utf-8"))
+    answer_sha256 = _sha256_bytes(
+        json.dumps(
+            deduped_answers,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    dataset_record_sha256 = dataset_record_digest(
+        dataset=config.dataset,
+        revision=config.revision,
+        split=config.split,
+        row_index=index,
+        record_id=record_id,
+        question=question,
+        answers=deduped_answers,
+    )
+    record: dict[str, Any] = {
         "id": record_id,
         "image_path": image_path.relative_to(images_dir.parent).as_posix(),
         "prompt": prompt,
@@ -241,8 +276,13 @@ def _record_from_row(
             "question": question,
             "image_sha256": image_sha256,
             "image_bytes": image_bytes,
+            "prompt_sha256": prompt_sha256,
+            "answer_sha256": answer_sha256,
+            "dataset_record_sha256": dataset_record_sha256,
         },
     }
+    record["source"]["record_sha256"] = materialized_record_digest(record)
+    return record
 
 
 def _select_rows(dataset: Any, *, config: MaterializeConfig) -> list[Mapping[str, Any]]:
@@ -293,7 +333,12 @@ def materialize_rows(
     if not records:
         raise RuntimeError("No usable vision_text records were materialized.")
 
-    manifest_sha256 = _sha256_file(manifest_path)
+    manifest_bytes, parsed_records = read_jsonl_snapshot(
+        manifest_path, label="vision-text materialized manifest"
+    )
+    if parsed_records != records:
+        raise RuntimeError("materialized manifest bytes do not match selected records")
+    manifest_sha256 = sha256_prefixed(manifest_bytes)
     image_hashes = [
         str(record.get("source", {}).get("image_sha256", "")) for record in records
     ]
@@ -307,27 +352,36 @@ def materialize_rows(
         )
         for record in records
     ]
+    evidence = build_materialization_evidence(
+        dataset=config.dataset,
+        revision=config.revision,
+        config_name=config.config_name,
+        split=config.split,
+        seed=config.seed,
+        shuffle=config.shuffle,
+        prompt_template_sha256=_sha256_bytes(config.prompt_template.encode("utf-8")),
+        manifest_sha256=manifest_sha256,
+        records=records,
+    )
     summary = {
-        "schema": "invarlock/vision-text-materialization-v1",
+        **evidence,
         "generated_at": datetime.now(UTC).isoformat(),
-        "dataset": config.dataset,
-        "split": config.split,
-        "revision": config.revision,
-        "config_name": config.config_name,
+        "selected_count": len(rows),
         "record_count": len(records),
         "skipped_count": skipped,
         "max_samples": config.max_samples,
         "seed": config.seed,
         "shuffle": config.shuffle,
+        "prompt_template_sha256": _sha256_bytes(config.prompt_template.encode("utf-8")),
         "image_format": config.image_format,
         "manifest": {
             "path": manifest_path.name,
             "sha256": manifest_sha256,
-            "bytes": manifest_path.stat().st_size,
+            "bytes": len(manifest_bytes),
         },
         "hashes": {
             "ids_sha256": _sha256_bytes(
-                "".join(str(record["id"]) for record in records).encode("utf-8")
+                canonical_json_bytes([str(record["id"]) for record in records])
             ),
             "images_sha256": _sha256_bytes("".join(image_hashes).encode("utf-8")),
             "prompts_sha256": _sha256_bytes("".join(prompt_hashes).encode("utf-8")),
@@ -340,16 +394,12 @@ def materialize_rows(
             "answers": config.answers_field,
             "id": config.id_field,
         },
-        "records": [
-            {
-                "id": record["id"],
-                "image_path": record["image_path"],
-                "source_row_index": record["source"]["row_index"],
-                "image_sha256": record["source"]["image_sha256"],
-            }
-            for record in records
-        ],
+        "records": evidence["records"],
     }
+    (output_dir / "dataset_evidence.json").write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     (output_dir / "materialization_summary.json").write_text(
         json.dumps(summary, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

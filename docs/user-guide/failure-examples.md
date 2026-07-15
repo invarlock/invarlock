@@ -76,37 +76,21 @@ tests, or treat the run as exploratory. See
 [Model Family Catalog](../reference/model-family-catalog.md) for the current
 support status.
 
-## Guard Catches Clean Primary Metric
+## Guard Diagnostics
 
-**Reproduce:**
+A paired primary metric and checkpoint guards answer different review questions. A report can preserve its task metric while a spectral, RMT, invariant, or variance policy requests additional review.
+
+Run the verifier against a current evaluation bundle:
 
 ```bash
 invarlock verify --profile release --assurance strict \
-  public_evidence/caught_regressions/spectral_guard_failure/evaluation.report.json
+  --baseline PATH/TO/baseline.report.json \
+  --policy-pack PATH/TO/policy-pack.json \
+  --expected-runtime-image-digest sha256:REVIEWED_DIGEST \
+  PATH/TO/evaluation.report.json
 ```
 
-**Symptom:**
-
-```text
-Release verification requires validation.spectral_stable == true
-spectral did not pass
-```
-
-**Meaning:** the primary metric can still look acceptable while a guard blocks
-release. In the shipped fixture, `primary_metric.ratio_vs_baseline` is `1.0`,
-but the spectral guard records a release-blocking weight-geometry violation.
-
-**Action:** inspect the guard diagnostics, regenerate the edited checkpoint, or
-route the run to exploratory/non-assurance review. See
-[Public Evidence Walkthrough](public-evidence-walkthrough.md).
-
-For a real model-run counterpart, inspect
-`public_evidence/published_basis/mistral_7b/guard_value_demo/guard_value_summary.json`.
-That artifact includes a Mistral 7B targeted spectral probe where the primary
-metric passes, but the evidence-pack guard-value comparison records a new FFN
-spectral cap relative to the published noop basis. It also includes a selected
-attention 1.05x negative control that passes PM, adds no new baseline-relative
-cap, and keeps the edited target below the documented stock attention cap.
+Use the emitted diagnostic code and guard payload to locate the affected module family, compare it with the baseline, and decide whether to adjust the edited checkpoint or the independently maintained policy.
 
 ## Development Fallback
 

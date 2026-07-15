@@ -1,7 +1,7 @@
 [
   "guard_warning_policy_acceptable",
   "guard_warnings_present",
-  "guard_overhead_acceptable",
+  "guard_metric_impact_acceptable",
   "hysteresis_applied",
   "invariants_pass",
   "moe_identity_ok",

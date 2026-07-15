@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 
 from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _minimal_report() -> dict:
@@ -13,9 +15,11 @@ def _minimal_report() -> dict:
         "meta": {
             "model_id": "stub",
             "adapter": "hf_causal",
+            "auto": {"tier": "balanced"},
             "device": "cpu",
             "seed": 7,
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",

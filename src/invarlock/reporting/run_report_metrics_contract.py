@@ -301,6 +301,216 @@ def _classification_counts_from_primary_metric(
     return correct_preview, n_preview, correct_final, n_final
 
 
+def _existing_classification_metrics(
+    report: Mapping[str, Any], core_report: Any
+) -> dict[str, Any] | None:
+    report_metrics = report.get("metrics")
+    existing = (
+        report_metrics.get("classification")
+        if isinstance(report_metrics, Mapping)
+        else None
+    )
+    if isinstance(existing, dict):
+        return existing
+    core_metrics = getattr(core_report, "metrics", None)
+    if not isinstance(core_metrics, Mapping):
+        return None
+    classification = core_metrics.get("classification")
+    return dict(classification) if isinstance(classification, Mapping) else None
+
+
+def _measured_classification_is_complete(classification: Mapping[str, Any]) -> bool:
+    final = classification.get("final")
+    return (
+        str(classification.get("counts_source", "")).lower() == "measured"
+        and isinstance(final, Mapping)
+        and isinstance(final.get("total"), int | float)
+        and int(final.get("total", 0)) > 0
+    )
+
+
+def _evaluation_windows(report: Mapping[str, Any], core_report: Any) -> dict[str, Any]:
+    core_windows = getattr(core_report, "evaluation_windows", None)
+    if isinstance(core_windows, dict) and core_windows:
+        return core_windows
+    report_windows = report.get("evaluation_windows")
+    return report_windows if isinstance(report_windows, dict) else {}
+
+
+def _fallback_classification_counts(
+    *,
+    report: Mapping[str, Any],
+    core_report: Any,
+    cfg: Any,
+    preview_count_report: Any,
+    final_count_report: Any,
+) -> tuple[int, int, int, int, bool]:
+    report_metrics = report.get("metrics")
+    seed = (
+        report_metrics.get("primary_metric")
+        if isinstance(report_metrics, Mapping)
+        else None
+    )
+    if not isinstance(seed, Mapping):
+        core_metrics = getattr(core_report, "metrics", None)
+        seed = (
+            core_metrics.get("primary_metric")
+            if isinstance(core_metrics, Mapping)
+            else None
+        )
+    derived = _classification_counts_from_primary_metric(seed)
+    if derived is not None:
+        return *derived, False
+
+    dataset = getattr(cfg, "dataset", None)
+    preview_configured = getattr(dataset, "preview_n", None)
+    final_configured = getattr(dataset, "final_n", None)
+    try:
+        preview_total = int(preview_count_report or preview_configured or 0)
+        final_total = int(final_count_report or final_configured or 0)
+    except (TypeError, ValueError, OverflowError):
+        preview_total = 0
+        final_total = 0
+    preview_pair = (preview_total, preview_total) if preview_total > 0 else (0, 0)
+    final_pair = (final_total, final_total) if final_total > 0 else (0, 0)
+    return *preview_pair, *final_pair, preview_total > 0 or final_total > 0
+
+
+def _enrich_classification_metrics(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    run_config: Any,
+    cfg: Any,
+    profile: str,
+    preview_count_report: Any,
+    final_count_report: Any,
+) -> None:
+    existing = _existing_classification_metrics(report, core_report)
+    if existing and _measured_classification_is_complete(existing):
+        report.setdefault("metrics", {})["classification"] = dict(existing)
+        return
+
+    from invarlock.eval.primary_metric import compute_accuracy_counts
+
+    windows = _evaluation_windows(report, core_report)
+    preview_records = _classification_records(windows.get("preview", {}))
+    final_records = _classification_records(windows.get("final", {}))
+    correct_preview, total_preview = compute_accuracy_counts(preview_records)
+    correct_final, total_final = compute_accuracy_counts(final_records)
+    pseudo = False
+    if total_preview == 0 and total_final == 0:
+        (
+            correct_preview,
+            total_preview,
+            correct_final,
+            total_final,
+            pseudo,
+        ) = _fallback_classification_counts(
+            report=report,
+            core_report=core_report,
+            cfg=cfg,
+            preview_count_report=preview_count_report,
+            final_count_report=final_count_report,
+        )
+        if pseudo and not _pseudo_accuracy_allowed(profile, run_config):
+            raise ValueError(
+                "pseudo accuracy is only allowed in dev profile or when "
+                "INVARLOCK_ALLOW_PSEUDO_ACCURACY=1 / "
+                "eval.allow_pseudo_accuracy=true is set"
+            )
+
+    classification = {
+        "preview": {
+            "correct_total": int(correct_preview),
+            "total": int(total_preview),
+        },
+        "final": {"correct_total": int(correct_final), "total": int(total_final)},
+        "n_correct": int(correct_final),
+        "n_total": int(total_final),
+        "counts_source": "pseudo_config" if pseudo else "measured",
+        "estimated": pseudo,
+    }
+    report.setdefault("metrics", {})["classification"] = classification
+    if total_final > 0:
+        report["metrics"]["accuracy"] = float(correct_final / total_final)
+    if pseudo:
+        provenance = report.setdefault("provenance", {})
+        notes = provenance.setdefault("metric_notes", [])
+        if isinstance(notes, list):
+            notes.append("accuracy: pseudo counts from preview_n/final_n")
+
+
+def _recompute_primary_metric(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    cfg: Any,
+    model_profile: Any,
+    baseline_report_data: Mapping[str, Any] | None,
+    metric_kind: str | None,
+    resolved_loss_type: str,
+    debug_metric_diffs_enabled: bool,
+    resolve_metric_and_provider_fn: Any,
+) -> str:
+    metric_kind_resolved, _provider_kind, metric_opts = resolve_metric_and_provider_fn(
+        cfg,
+        model_profile,
+        resolved_loss_type=resolved_loss_type,
+        metric_kind_override=metric_kind,
+    )
+    if not metric_kind_resolved:
+        return ""
+    normalized = normalize_metric_kind(metric_kind_resolved)
+    if normalized is None:
+        raise TypeError("metric kind could not be normalized")
+
+    from invarlock.eval.primary_metric import compute_primary_metric_from_report
+
+    baseline_report = (
+        dict(baseline_report_data)
+        if isinstance(baseline_report_data, Mapping)
+        else None
+    )
+    primary_metric = compute_primary_metric_from_report(
+        report, kind=normalized, baseline=baseline_report
+    )
+    core_metrics = getattr(core_report, "metrics", None)
+    core_primary = (
+        core_metrics.get("primary_metric")
+        if isinstance(core_metrics, Mapping)
+        else None
+    )
+    if isinstance(core_primary, dict):
+        core_values = (
+            _coerce_finite_float(core_primary.get("preview")),
+            _coerce_finite_float(core_primary.get("final")),
+        )
+        computed_values = (
+            _coerce_finite_float(primary_metric.get("preview")),
+            _coerce_finite_float(primary_metric.get("final")),
+        )
+        if None not in core_values and None in computed_values:
+            primary_metric = dict(core_primary)
+    primary_metric = merge_primary_metric_health(primary_metric, core_primary)
+    report.setdefault("metrics", {})["primary_metric"] = primary_metric
+    try:
+        if "reps" in metric_opts:
+            primary_metric["reps"] = int(metric_opts["reps"])
+        if "ci_level" in metric_opts:
+            primary_metric["ci_level"] = float(metric_opts["ci_level"])
+    except (KeyError, TypeError, ValueError):
+        pass
+
+    if debug_metric_diffs_enabled and str(primary_metric.get("kind", "")).startswith(
+        "ppl"
+    ):
+        return format_debug_metric_diffs(
+            primary_metric, report.get("metrics", {}), baseline_report
+        )
+    return ""
+
+
 def enrich_run_report_metrics(
     *,
     report: dict[str, Any],
@@ -331,139 +541,15 @@ def enrich_run_report_metrics(
     )
     if loss_type == "classification":
         try:
-            existing_classification = (
-                report.get("metrics", {}).get("classification")
-                if isinstance(report.get("metrics"), dict)
-                else None
+            _enrich_classification_metrics(
+                report=report,
+                core_report=core_report,
+                run_config=run_config,
+                cfg=cfg,
+                profile=profile_normalized or "",
+                preview_count_report=preview_count_report,
+                final_count_report=final_count_report,
             )
-            if not isinstance(existing_classification, dict) and hasattr(
-                core_report, "metrics"
-            ):
-                core_metrics = (
-                    core_report.metrics if isinstance(core_report.metrics, dict) else {}
-                )
-                existing_classification = (
-                    core_metrics.get("classification")
-                    if isinstance(core_metrics.get("classification"), dict)
-                    else None
-                )
-            if isinstance(existing_classification, dict) and existing_classification:
-                counts_source = str(
-                    existing_classification.get("counts_source", "")
-                ).lower()
-                final_existing = existing_classification.get("final", {})
-                if (
-                    counts_source == "measured"
-                    and isinstance(final_existing, Mapping)
-                    and isinstance(final_existing.get("total"), (int, float))
-                    and int(final_existing.get("total", 0)) > 0
-                ):
-                    report.setdefault("metrics", {})["classification"] = dict(
-                        existing_classification
-                    )
-                    raise StopIteration
-
-            from invarlock.eval.primary_metric import compute_accuracy_counts
-
-            evaluation_windows = {}
-            try:
-                if hasattr(core_report, "evaluation_windows") and isinstance(
-                    core_report.evaluation_windows, dict
-                ):
-                    evaluation_windows = core_report.evaluation_windows
-            except (AttributeError, TypeError):
-                evaluation_windows = {}
-            if not evaluation_windows:
-                report_windows = report.get("evaluation_windows")
-                if isinstance(report_windows, dict):
-                    evaluation_windows = report_windows
-
-            preview_records = _classification_records(
-                evaluation_windows.get("preview", {})
-                if isinstance(evaluation_windows, dict)
-                else {}
-            )
-            final_records = _classification_records(
-                evaluation_windows.get("final", {})
-                if isinstance(evaluation_windows, dict)
-                else {}
-            )
-            c_prev, n_prev = compute_accuracy_counts(preview_records)
-            c_fin, n_fin = compute_accuracy_counts(final_records)
-
-            used_pseudo_counts = False
-            if n_prev == 0 and n_fin == 0:
-                primary_metric_seed = (
-                    report.get("metrics", {}).get("primary_metric")
-                    if isinstance(report.get("metrics"), dict)
-                    else None
-                )
-                if not isinstance(primary_metric_seed, Mapping) and hasattr(
-                    core_report, "metrics"
-                ):
-                    core_metrics = (
-                        core_report.metrics
-                        if isinstance(core_report.metrics, dict)
-                        else {}
-                    )
-                    primary_metric_seed = (
-                        core_metrics.get("primary_metric")
-                        if isinstance(core_metrics.get("primary_metric"), Mapping)
-                        else None
-                    )
-                derived_counts = _classification_counts_from_primary_metric(
-                    primary_metric_seed
-                )
-                if derived_counts is not None:
-                    c_prev, n_prev, c_fin, n_fin = derived_counts
-                else:
-                    try:
-                        prev_n_cfg = getattr(cfg.dataset, "preview_n", None)
-                        fin_n_cfg = getattr(cfg.dataset, "final_n", None)
-                    except (AttributeError, TypeError):
-                        prev_n_cfg = None
-                        fin_n_cfg = None
-                    try:
-                        prev_n = int(preview_count_report or prev_n_cfg or 0)
-                        fin_n = int(final_count_report or fin_n_cfg or 0)
-                    except (TypeError, ValueError, OverflowError):
-                        prev_n = 0
-                        fin_n = 0
-                    c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
-                    c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
-                    used_pseudo_counts = prev_n > 0 or fin_n > 0
-                    if used_pseudo_counts and not _pseudo_accuracy_allowed(
-                        profile_normalized or "",
-                        run_config,
-                    ):
-                        raise ValueError(
-                            "pseudo accuracy is only allowed in dev profile or when "
-                            "INVARLOCK_ALLOW_PSEUDO_ACCURACY=1 / "
-                            "eval.allow_pseudo_accuracy=true is set"
-                        )
-
-            classification_metrics = {
-                "preview": {"correct_total": int(c_prev), "total": int(n_prev)},
-                "final": {"correct_total": int(c_fin), "total": int(n_fin)},
-                "n_correct": int(c_fin),
-                "n_total": int(n_fin),
-                "counts_source": "pseudo_config" if used_pseudo_counts else "measured",
-                "estimated": bool(used_pseudo_counts),
-            }
-            if used_pseudo_counts:
-                try:
-                    provenance = report.setdefault("provenance", {})
-                    notes = provenance.setdefault("metric_notes", [])
-                    if isinstance(notes, list):
-                        notes.append("accuracy: pseudo counts from preview_n/final_n")
-                except (AttributeError, KeyError, TypeError):
-                    pass
-
-            report.setdefault("metrics", {})["classification"] = classification_metrics
-            if n_fin > 0:
-                report["metrics"]["accuracy"] = float(c_fin / n_fin)
-        except StopIteration:
-            pass
         except (
             AttributeError,
             ImportError,
@@ -493,75 +579,17 @@ def enrich_run_report_metrics(
 
     debug_diffs_line = ""
     try:
-        metric_kind_resolved, _provider_kind, metric_opts = (
-            resolve_metric_and_provider_fn(
-                cfg,
-                model_profile,
-                resolved_loss_type=resolved_loss_type,
-                metric_kind_override=metric_kind,
-            )
+        debug_diffs_line = _recompute_primary_metric(
+            report=report,
+            core_report=core_report,
+            cfg=cfg,
+            model_profile=model_profile,
+            baseline_report_data=baseline_report_data,
+            metric_kind=metric_kind,
+            resolved_loss_type=resolved_loss_type,
+            debug_metric_diffs_enabled=debug_metric_diffs_enabled,
+            resolve_metric_and_provider_fn=resolve_metric_and_provider_fn,
         )
-        if metric_kind_resolved:
-            metric_kind_normalized = normalize_metric_kind(metric_kind_resolved)
-            if metric_kind_normalized is None:
-                raise TypeError("metric kind could not be normalized")
-            from invarlock.eval.primary_metric import compute_primary_metric_from_report
-
-            baseline_report = (
-                dict(baseline_report_data)
-                if isinstance(baseline_report_data, Mapping)
-                else None
-            )
-            primary_metric = compute_primary_metric_from_report(
-                report,
-                kind=metric_kind_normalized,
-                baseline=baseline_report,
-            )
-            core_primary_metric = None
-            if hasattr(core_report, "metrics") and isinstance(
-                core_report.metrics, dict
-            ):
-                core_primary_metric = core_report.metrics.get("primary_metric")
-            primary_metric = merge_primary_metric_health(
-                primary_metric, core_primary_metric
-            )
-            report.setdefault("metrics", {})["primary_metric"] = primary_metric
-            if metric_opts:
-                try:
-                    if "reps" in metric_opts:
-                        report["metrics"]["primary_metric"]["reps"] = int(
-                            metric_opts["reps"]
-                        )
-                    if "ci_level" in metric_opts:
-                        report["metrics"]["primary_metric"]["ci_level"] = float(
-                            metric_opts["ci_level"]
-                        )
-                except (KeyError, TypeError, ValueError):
-                    pass
-
-            try:
-                primary_metric_block = report.get("metrics", {}).get(
-                    "primary_metric", {}
-                )
-                ppl_final_v1 = float(primary_metric_block.get("final"))
-                ppl_final_v2 = float(primary_metric.get("final", float("nan")))
-                if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
-                    if not math.isclose(
-                        ppl_final_v1, ppl_final_v2, rel_tol=1e-9, abs_tol=1e-9
-                    ):
-                        report.setdefault("metrics", {}).setdefault(
-                            "_metric_v1_mismatch", {}
-                        )["ppl_final_diff"] = ppl_final_v2 - ppl_final_v1
-                if debug_metric_diffs_enabled and str(
-                    primary_metric.get("kind", "")
-                ).startswith("ppl"):
-                    debug_diffs_line = format_debug_metric_diffs(
-                        primary_metric,
-                        report.get("metrics", {}),
-                        baseline_report,
-                    )
-            except (AttributeError, TypeError, ValueError):
-                pass
     except (
         AttributeError,
         ImportError,

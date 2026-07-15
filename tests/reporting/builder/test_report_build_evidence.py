@@ -82,7 +82,7 @@ def test_primary_metric_repair_paths_record_structured_evidence() -> None:
     ).read_text(encoding="utf-8")
 
     for required in (
-        'field="primary_metric.ratio_vs_baseline"',
+        'field=f"primary_metric.{comparison_field}"',
         'field="primary_metric.display_ci"',
         'field="primary_metric"',
         'category="fallback_fields"',

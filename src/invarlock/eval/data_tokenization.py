@@ -20,6 +20,7 @@ _TOKENIZATION_ERRORS = (
     TypeError,
     ValueError,
 )
+_TOKENIZER_BATCH_SIZE = 256
 
 
 def call_tokenizer(tokenizer: Any, /, *args: Any, **kwargs: Any) -> Any:
@@ -175,6 +176,31 @@ def materialize_token_row(
     )
 
 
+def _materialize_callable_batch(
+    tokenizer: Any,
+    texts: Sequence[str],
+    *,
+    seq_len: int,
+    pad_id: int,
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Tokenize one batch, leaving per-row recovery to the caller on failure."""
+
+    tokens = call_tokenizer(
+        tokenizer,
+        list(texts),
+        truncation=True,
+        padding="max_length",
+        max_length=seq_len,
+        return_attention_mask=True,
+    )
+    return extract_padded_token_rows(
+        tokens,
+        batch_size=len(texts),
+        seq_len=seq_len,
+        pad_id=pad_id,
+    )
+
+
 def tokenize_texts_padded(
     texts: Sequence[str],
     tokenizer: Any,
@@ -189,6 +215,33 @@ def tokenize_texts_padded(
         raise ValueError("texts and positions must have matching lengths")
 
     pad_id = int(getattr(tokenizer, "pad_token_id", 0) or 0)
+    if len(texts) > 1 and callable(tokenizer):
+        batched_ids: list[list[int]] = []
+        batched_masks: list[list[int]] = []
+        for start in range(0, len(texts), _TOKENIZER_BATCH_SIZE):
+            chunk = texts[start : start + _TOKENIZER_BATCH_SIZE]
+            try:
+                chunk_ids, chunk_masks = _materialize_callable_batch(
+                    tokenizer,
+                    chunk,
+                    seq_len=seq_len,
+                    pad_id=pad_id,
+                )
+            except _TOKENIZATION_ERRORS:
+                # Some callable tokenizers only accept a single string, and a
+                # batch-level failure does not identify which row was invalid.
+                # Preserve the existing per-row diagnostics and partial-success
+                # behavior by retrying below.
+                break
+            batched_ids.extend(chunk_ids)
+            batched_masks.extend(chunk_masks)
+        else:
+            return (
+                batched_ids,
+                batched_masks,
+                [int(position) for position in positions],
+            )
+
     input_ids_list: list[list[int]] = []
     attention_masks_list: list[list[int]] = []
     kept_positions: list[int] = []

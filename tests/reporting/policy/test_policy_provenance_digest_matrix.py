@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _base_report() -> dict:
@@ -13,6 +15,8 @@ def _base_report() -> dict:
     report["meta"]["commit"] = "deadbeef"
     report["meta"]["seed"] = 1
     report["meta"]["auto"] = {"enabled": True, "tier": "balanced"}
+    report["context"] = {"profile": "dev"}
+    report["edit"]["name"] = "structured"
     report["data"].update(
         {"dataset": "d", "split": "validation", "seq_len": 8, "stride": 8}
     )
@@ -27,6 +31,7 @@ def _base_report() -> dict:
     report["guards"] = [
         {
             "name": "spectral",
+            "passed": True,
             "policy": {
                 "deadband": 0.10,
                 "max_caps": 5,
@@ -37,6 +42,7 @@ def _base_report() -> dict:
         },
         {
             "name": "rmt",
+            "passed": True,
             "policy": {
                 "deadband": 0.10,
                 "margin": 1.5,
@@ -47,6 +53,7 @@ def _base_report() -> dict:
         },
         {
             "name": "variance",
+            "passed": True,
             "policy": {
                 "deadband": 0.02,
                 "min_abs_adjust": 0.012,
@@ -63,16 +70,16 @@ def _base_report() -> dict:
 
 
 def _baseline() -> dict:
-    return {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 40.0,
-        "primary_metric": {
-            "kind": "ppl_causal",
-            "final": 40.0,
-        },
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
+    baseline = _base_report()
+    baseline["run_id"] = "b"
+    baseline["edit"]["name"] = "noop"
+    baseline["guards"] = []
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 40.0,
+        "final": 40.0,
     }
+    return baseline
 
 
 def _digest(report: dict) -> str:

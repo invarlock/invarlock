@@ -44,22 +44,23 @@ def _resolve_degraded_reason(
     *,
     preview_value: float | None,
     final_value: float | None,
-    ratio_value: float | None,
+    comparison_value: float | None,
     baseline_final_value: float | None,
+    kind: str,
 ) -> str | None:
     degraded_reason: str | None = pm_copy.get("degraded_reason")
     baseline_has_reference = baseline_final_value is not None
     needs_pm_fallback = not (preview_value is not None and final_value is not None)
-    needs_ratio_fallback = baseline_has_reference and ratio_value is None
-    can_recompute_ratio = (
+    needs_comparison_fallback = baseline_has_reference and comparison_value is None
+    can_recompute_comparison = (
         final_value is not None
         and baseline_final_value is not None
-        and baseline_final_value > 0.0
+        and (kind == "accuracy" or baseline_final_value > 0.0)
     )
     if degraded_reason is None:
         if needs_pm_fallback:
             degraded_reason = "non_finite_pm"
-        elif needs_ratio_fallback and not can_recompute_ratio:
+        elif needs_comparison_fallback and not can_recompute_comparison:
             degraded_reason = "non_finite_delta"
         elif pm_copy.get("invalid"):
             degraded_reason = "primary_metric_invalid"
@@ -79,6 +80,10 @@ def _resolve_logspace_ci(
                 pairing_source = stats.get("pairing")
             if pairing_source == "paired_baseline":
                 dlci_source = _coerce_interval(ppl_analysis.get("logloss_delta_ci"))
+            elif pairing_source == "independent_preview_final":
+                # A preview/final interval compares disjoint slices and is not
+                # a baseline-ratio CI. Keep it on the slice-summary surface.
+                return None
         if dlci_source is None:
             dlci_source = (
                 _coerce_interval(metrics_map.get("logloss_delta_ci"))
@@ -192,9 +197,22 @@ def _finalize_primary_metric_snapshot(
     ppl_analysis: dict[str, Any] | None,
 ) -> dict[str, Any]:
     pm_copy.setdefault("invalid", bool(pm_copy.get("invalid", False)))
+    try:
+        kind = str(pm_copy.get("kind", "")).lower()
+    except _NON_FATAL_EXCEPTIONS:
+        kind = ""
+    if kind == "accuracy" and "ratio_vs_baseline" in pm_copy:
+        raise ValueError(
+            "Accuracy primary metrics cannot contain ratio_vs_baseline; "
+            "use delta_vs_baseline_pp."
+        )
     preview_value = _coerce_finite_float(pm_copy.get("preview"))
     final_value = _coerce_finite_float(pm_copy.get("final"))
-    ratio_value = _coerce_finite_float(pm_copy.get("ratio_vs_baseline"))
+    comparison_value = _coerce_finite_float(
+        pm_copy.get(
+            "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+        )
+    )
     baseline_final = (
         baseline_ref.get("primary_metric", {}).get("final")
         if isinstance(baseline_ref, dict)
@@ -205,8 +223,9 @@ def _finalize_primary_metric_snapshot(
         pm_copy,
         preview_value=preview_value,
         final_value=final_value,
-        ratio_value=ratio_value,
+        comparison_value=comparison_value,
         baseline_final_value=baseline_final_value,
+        kind=kind,
     )
     pm_copy["degraded"] = bool(
         pm_copy.get("degraded") or pm_copy.get("invalid") or degraded_reason
@@ -225,15 +244,10 @@ def _finalize_primary_metric_snapshot(
         ppl_analysis=ppl_analysis,
     )
     try:
-        try:
-            kind = str(pm_copy.get("kind", "")).lower()
-        except _NON_FATAL_EXCEPTIONS:
-            kind = ""
         if final_value is not None and baseline_final_value is not None:
             if kind == "accuracy":
-                pm_copy["ratio_vs_baseline"] = (
-                    final_value - baseline_final_value
-                ) * 100.0
+                delta_pp = (final_value - baseline_final_value) * 100.0
+                pm_copy["delta_vs_baseline_pp"] = delta_pp
             elif baseline_final_value > 0:
                 pm_copy["ratio_vs_baseline"] = final_value / baseline_final_value
         ci = pm_copy.get("ci")
@@ -276,7 +290,16 @@ def _attach_primary_metric_from_report(
             metrics_map.get("primary_metric") if isinstance(metrics_map, dict) else None
         )
         if isinstance(pm, dict) and pm:
-            original_ratio = _coerce_finite_float(pm.get("ratio_vs_baseline"))
+            try:
+                original_kind = str(pm.get("kind", "")).lower()
+            except _NON_FATAL_EXCEPTIONS:
+                original_kind = ""
+            comparison_field = (
+                "delta_vs_baseline_pp"
+                if original_kind == "accuracy"
+                else "ratio_vs_baseline"
+            )
+            original_comparison = _coerce_finite_float(pm.get(comparison_field))
             original_display_present = "display_ci" in pm
             try:
                 original_display_value = pm.get("display_ci")
@@ -291,8 +314,8 @@ def _attach_primary_metric_from_report(
                 ppl_analysis=ppl_analysis,
             )
             final_primary_metric = evaluation_report["primary_metric"]
-            final_ratio = _coerce_finite_float(
-                final_primary_metric.get("ratio_vs_baseline")
+            final_comparison = _coerce_finite_float(
+                final_primary_metric.get(comparison_field)
             )
             try:
                 final_display_value = (
@@ -303,11 +326,11 @@ def _attach_primary_metric_from_report(
                 )
             except _NON_FATAL_EXCEPTIONS:
                 final_display_value = None
-            if original_ratio is None and final_ratio is not None:
+            if original_comparison is None and final_comparison is not None:
                 record_report_build_event(
                     evaluation_report,
                     category="synthesized_fields",
-                    field="primary_metric.ratio_vs_baseline",
+                    field=f"primary_metric.{comparison_field}",
                     reason="computed_from_final_and_baseline_final",
                     source="primary_metric_utils._attach_primary_metric_from_report",
                 )
@@ -465,7 +488,8 @@ def _attach_classification_primary_metric_fallback(
                     if nb_value is not None and db_value is not None and db_value > 0:
                         acc_base = nb_value / db_value
             if isinstance(pm_point, float) and isinstance(acc_base, float):
-                acc_pm["ratio_vs_baseline"] = (pm_point - acc_base) * 100.0
+                delta_pp = (pm_point - acc_base) * 100.0
+                acc_pm["delta_vs_baseline_pp"] = delta_pp
         except _NON_FATAL_EXCEPTIONS:
             pass
         evaluation_report["primary_metric"] = acc_pm
@@ -498,7 +522,13 @@ def _ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None
         ):
             return
         point = None
-        for key in ("ratio_vs_baseline", "final", "preview"):
+        kind = str(pm.get("kind") or "").strip().lower()
+        point_keys = (
+            ("delta_vs_baseline_pp",)
+            if kind == "accuracy"
+            else ("ratio_vs_baseline", "final", "preview")
+        )
+        for key in point_keys:
             point_value = _coerce_finite_float(pm.get(key))
             if point_value is not None:
                 point = point_value
@@ -537,7 +567,7 @@ def attach_primary_metric(
 
     Behavior matches the canonical evaluation-report assembly contract and preserves structure:
     - Prefer explicit metrics.primary_metric if present
-    - Compute missing ratio_vs_baseline, degenerate display_ci
+    - Compute the kind-specific baseline comparison and degenerate display_ci
     - ppl window-based analysis info (mean logloss) added when available
     - Fallbacks for classification metrics and eval-window-derived ppl
     - Ensure display_ci always present for schema invariants

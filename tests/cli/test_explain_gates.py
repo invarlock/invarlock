@@ -60,7 +60,7 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
                 "hysteresis_applied": True,
                 "primary_metric_acceptable": True,
                 "preview_final_drift_acceptable": True,
-                "guard_overhead_acceptable": True,
+                "guard_metric_impact_acceptable": True,
             },
             "telemetry": {"preview_total_tokens": 30000, "final_total_tokens": 30000},
             "primary_metric": {
@@ -70,7 +70,13 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
                 "ratio_vs_baseline": 1.01,
                 "display_ci": [0.99, 1.02],
             },
-            "guard_overhead": {"overhead_ratio": 1.015, "overhead_threshold": 0.02},
+            "guard_metric_impact": {
+                "evaluated": True,
+                "degradation": 0.015,
+                "degradation_limit": 0.02,
+                "display_value": 1.5,
+                "display_unit": "percent",
+            },
         }
 
     monkeypatch.setattr(mod, "make_report", _fake_cert)
@@ -88,8 +94,8 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
     assert r.exit_code == 0
     # Hysteresis note printed
     assert "hysteresis applied" in r.stdout.lower()
-    # Overhead ratio rendered
-    assert "1.015x" in r.stdout
+    # Direction-aware quality degradation rendered
+    assert "+1.50%" in r.stdout
 
 
 def test_explain_gates_accuracy_uses_delta_pp_and_audit_outline(monkeypatch, tmp_path):
@@ -122,7 +128,7 @@ def test_explain_gates_accuracy_uses_delta_pp_and_audit_outline(monkeypatch, tmp
                 "kind": "accuracy",
                 "preview": 0.850,
                 "final": 0.855,
-                "ratio_vs_baseline": +0.50,
+                "delta_vs_baseline_pp": +0.50,
                 "display_ci": [-0.1, 1.1],
             },
             "resolved_policy": {

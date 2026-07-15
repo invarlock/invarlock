@@ -381,8 +381,6 @@ run "invarlock report validate --help" "$CLI report validate --help"
 run "invarlock doctor --help"         "$CLI doctor --help"
 run "invarlock advanced --help"       "$CLI advanced --help"
 run "invarlock advanced evidence-pack --help" "$CLI advanced evidence-pack --help"
-run "invarlock advanced evidence-pack build --help" "$CLI advanced evidence-pack build --help"
-run "invarlock advanced evidence-pack keygen --help" "$CLI advanced evidence-pack keygen --help"
 run "invarlock advanced evidence-pack inspect --help" "$CLI advanced evidence-pack inspect --help"
 run "invarlock advanced evidence-pack verify --help" "$CLI advanced evidence-pack verify --help"
 run "invarlock advanced policy --help" "$CLI advanced policy --help"
@@ -411,14 +409,9 @@ run "invarlock doctor --json"                    "$CLI doctor --json"
 # Extended: verify and evaluate with and without network
 TMP_DIR="$WORK_ROOT/tmp"
 mkdir -p "$TMP_DIR"
-printf '%s\n' '{"verdict":"PASS","summary":{"status":"smoke"}}' >"$TMP_DIR/final_verdict.json"
-printf '%s\n' '{"commit":"smoke","branch":"staging/next"}' >"$TMP_DIR/source_repo.json"
-printf '%s\n' '{"platform":"cli-smoke","mode":"container-fixture"}' >"$TMP_DIR/environment.json"
-printf '%s\n' '{"models":{"sshleifer/tiny-gpt2":{"revision":"fixture"}}}' >"$TMP_DIR/model_revisions.json"
 printf '%s\n' '{"metrics":{"pm_ratio":{"ratio_limit_base":1.1}}}' >"$TMP_DIR/resolved_policy.json"
 printf '%s\n' '[{"path":"metrics.pm_ratio.ratio_limit_base","value":1.1}]' >"$TMP_DIR/policy_overrides.json"
 printf '%s\n' '{"support_tiers":["published_basis"]}' >"$TMP_DIR/policy_compatibility.json"
-EVIDENCE_PACK_SIGNING_KEY="$TMP_DIR/evidence_pack_signing_key.pem"
 EVIDENCE_PACK_REPORT_DIR="$TMP_DIR/evidence_pack_report"
 mkdir -p "$EVIDENCE_PACK_REPORT_DIR"
 # smoke-plan-fixture-contract: invarlock.reporting.verify_contract
@@ -582,7 +575,7 @@ subject_report = {
                 "final": {"used": 2},
             },
         },
-        "paired_delta_summary": {"mean": 0.0},
+        "preview_final_slice_delta_summary": {"mean": 0.0},
         "preview_total_tokens": 50000,
         "final_total_tokens": 50000,
         "logloss_delta": 0.0,
@@ -700,11 +693,6 @@ run "invarlock report generate (demo run reports)" "$CLI report generate --run \
 run "invarlock report validate (demo generated report)" "$CLI report validate \"$TMP_DIR/generated_report/evaluation.report.json\""
 run "invarlock report html (demo generated report)" "$CLI report html -i \"$TMP_DIR/generated_report/evaluation.report.json\" -o \"$TMP_DIR/generated_report/evaluation.html\" --force"
 run "invarlock report explain (demo run reports)" "$CLI report explain --subject-report \"$TMP_DIR/runs/subject/report.json\" --baseline-report \"$TMP_DIR/runs/source/report.json\""
-# smoke-plan-command-group: evidence_pack
-run "invarlock advanced evidence-pack keygen --json" "$CLI advanced evidence-pack keygen \"$EVIDENCE_PACK_SIGNING_KEY\" --json"
-run "invarlock advanced evidence-pack build" "$CLI advanced evidence-pack build \"$TMP_DIR/evidence_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$EVIDENCE_PACK_REPORT_DIR/evaluation.report.json\" --signing-key \"$EVIDENCE_PACK_SIGNING_KEY\" --profile ci --json"
-run "invarlock advanced evidence-pack inspect --json" "$CLI advanced evidence-pack inspect \"$TMP_DIR/evidence_pack_cli\" --json"
-run "invarlock advanced evidence-pack verify --json" "$CLI advanced evidence-pack verify \"$TMP_DIR/evidence_pack_cli\" --json"
 # smoke-plan-command-group: policy
 run "invarlock advanced policy build" "$CLI advanced policy build --resolved-policy \"$TMP_DIR/resolved_policy.json\" --overrides \"$TMP_DIR/policy_overrides.json\" --compatibility \"$TMP_DIR/policy_compatibility.json\" --out \"$TMP_DIR/policy-pack.json\" --owner smoke"
 run "invarlock advanced policy verify --json" "$CLI advanced policy verify \"$TMP_DIR/policy-pack.json\" --json"

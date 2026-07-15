@@ -1,17 +1,35 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from invarlock.evidence_pack_json import (
+    StrictJsonError,
+    parse_json_bytes,
+    read_regular_file_bytes,
+)
 
 ExtractPairingScheduleFn = Callable[[dict[str, Any] | None], dict[str, Any] | None]
 ApplyMlmMasksFn = Callable[..., tuple[int, list[int]]]
 ResolvePmMinTokensTargetFn = Callable[..., int]
 HashSequencesFn = Callable[[Any], str]
 TensorOrListToIntsFn = Callable[[Any], list[int]]
+
+_MULTIMODAL_BINDING_FIELDS = (
+    "image_ref",
+    "image_sha256",
+    "prompt_sha256",
+    "answer_sha256",
+    "dataset_record_sha256",
+    "materialization_digest",
+    "manifest_sha256",
+    "record_sha256",
+    "source_ref",
+    "source_line",
+)
 
 
 @dataclass(frozen=True)
@@ -95,8 +113,9 @@ def load_baseline_pairing_evidence(
         )
 
     try:
-        loaded = json.loads(baseline_path.read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError) as exc:
+        raw = read_regular_file_bytes(baseline_path, label="baseline report")
+        loaded = parse_json_bytes(raw, label="baseline report")
+    except StrictJsonError as exc:
         return BaselineEvidenceLoadResult(
             report_data=None,
             pairing_schedule=None,
@@ -163,7 +182,19 @@ def _materialize_multimodal_pairing_schedule(
     dataset_meta: dict[str, Any],
     window_plan: dict[str, Any] | None,
 ) -> BaselinePairingMaterializationResult:
-    materialized = list(calibration_data)
+    runtime_records: dict[str, dict[str, Any]] = {}
+    for record in calibration_data:
+        record_id = str(record.get("example_id") or record.get("id") or "")
+        if not record_id:
+            continue
+        if record_id in runtime_records:
+            raise ValueError(
+                "Baseline multimodal pairing found duplicate provider example ID "
+                f"{record_id!r}."
+            )
+        runtime_records[record_id] = dict(record)
+
+    materialized: list[dict[str, Any]] = []
     preview_section = pairing_schedule.get("preview", {})
     final_section = pairing_schedule.get("final", {})
     materialized_preview_records: list[dict[str, Any]] = []
@@ -204,16 +235,59 @@ def _materialize_multimodal_pairing_schedule(
             str(record.get("id") or record.get("example_id") or "")
             for record in final_records
         ]
-    for arm, records, target_records in (
-        ("preview", preview_records, materialized_preview_records),
-        ("final", final_records, materialized_final_records),
+    for arm, records, example_ids, target_records in (
+        ("preview", preview_records, preview_ids, materialized_preview_records),
+        ("final", final_records, final_ids, materialized_final_records),
     ):
-        for index, record in enumerate(records):
-            entry = dict(record)
-            entry["example_id"] = str(
-                record.get("id") or record.get("example_id") or ""
+        for index, example_id in enumerate(example_ids):
+            baseline_record = dict(records[index]) if index < len(records) else {}
+            baseline_record_id = str(
+                baseline_record.get("id")
+                or baseline_record.get("example_id")
+                or example_id
             )
-            entry["window_id"] = f"{arm}::{index}"
+            if baseline_record_id != example_id:
+                raise ValueError(
+                    "Baseline multimodal pairing record ID does not match its "
+                    f"schedule ID ({baseline_record_id!r} != {example_id!r})."
+                )
+
+            runtime_record = runtime_records.get(example_id)
+            if runtime_records and runtime_record is None:
+                raise ValueError(
+                    "Baseline multimodal pairing example is missing from the current "
+                    f"provider materialization ({example_id!r})."
+                )
+            if runtime_record is not None:
+                for field in _MULTIMODAL_BINDING_FIELDS:
+                    if field in baseline_record and baseline_record.get(field) != (
+                        runtime_record.get(field)
+                    ):
+                        raise ValueError(
+                            "Baseline multimodal pairing binding does not match the "
+                            f"current provider materialization ({example_id!r}, {field})."
+                        )
+                image_path = runtime_record.get("image_path")
+                if not isinstance(image_path, str) or not image_path.strip():
+                    raise ValueError(
+                        "Current multimodal provider materialization is missing the "
+                        f"runtime image path for {example_id!r}."
+                    )
+                entry = dict(runtime_record)
+                entry.update(baseline_record)
+                entry["image_path"] = image_path
+                if "source_file" in runtime_record:
+                    entry["source_file"] = runtime_record["source_file"]
+            else:
+                entry = baseline_record
+
+            entry["example_id"] = example_id
+            # Multimodal pairing is identity-based: the variance guard derives its
+            # expected schedule from the authenticated example IDs.  Preserve that
+            # identity in calibration batches instead of replacing it with a
+            # positional index, which would make an unchanged baseline/subject
+            # pair fail closed as a schedule mismatch.
+            entry["window_id"] = f"{arm}::{example_id}"
             target_records.append(dict(entry))
             materialized.append(entry)
 

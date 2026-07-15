@@ -16,6 +16,7 @@ TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/hf-py313.txt"),
     Path("requirements/workflows/runtime-image-py312.txt"),
     Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
+    Path("requirements/workflows/training-profile-py312.txt"),
 )
 TRANSFORMERS_512_HASHES = {
     "500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c",
@@ -163,7 +164,7 @@ def test_repo_hygiene_checks_uv_lock_sync() -> None:
 
     uv_step = _find_step_by_name(steps, "Set up uv")
     assert (
-        uv_step["uses"] == "astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39"
+        uv_step["uses"] == "astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990"
     )
     assert uv_step["with"]["version"] == "0.10.10"
 
@@ -232,7 +233,12 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     build_step = _find_step_by_name(steps, "Build release wheel")
     assert "rm -rf build dist" in build_step["run"]
-    assert "python -m build" in build_step["run"]
+    build_commands = [
+        line.strip()
+        for line in build_step["run"].splitlines()
+        if line.strip().startswith("python -m build")
+    ]
+    assert build_commands == ["python -m build --no-isolation"]
 
     venv_step = _find_step_by_name(steps, "Create install-surface venv")
     assert venv_step["id"] == "install_surface"
@@ -623,6 +629,14 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
         install_step["run"]
         == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
     )
+
+    build_step = _find_step_by_name(build_steps, "Build wheel/sdist")
+    build_commands = [
+        line.strip()
+        for line in build_step["run"].splitlines()
+        if line.strip().startswith("python -m build")
+    ]
+    assert build_commands == ["python -m build --no-isolation"]
 
     gitleaks_cache = _find_step_by_name(build_steps, "Cache gitleaks binary")
     assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN

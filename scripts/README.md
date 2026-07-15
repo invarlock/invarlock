@@ -14,8 +14,11 @@ The checked taxonomy lives in `scripts/scripts_inventory.toml`:
 - `coverage`: coverage surface selection and threshold checks.
 - `smoke-runtime`: local smoke, runtime, tiny-model, and guard-validation entry
   points. See `scripts/smoke/README.md` for the per-script smoke map.
-- `model-evidence`: model-evidence sweep planning and remote launch helpers.
-- `evidence-packs`: evidence-pack orchestration, helpers, and shell tests.
+- `catalog-lane-production`: single-lane catalog evaluation, verification, and
+  signed staging-pack production.
+- `model-evidence`: bounded public-input materialization and negative-fixture
+  helpers.
+- `evidence-packs`: local artifact validators and evidence-pack verification.
 - `release`: release evidence and offline-bundle helpers.
 - `security-supply-chain`: SBOM, CVE audit, pip-audit, requirements pinning, and
   scorecard helpers.
@@ -29,29 +32,27 @@ High-signal workflow front doors:
 - `python scripts/smoke/run_tiny_fine_tune_byoe_smoke.py`: run the local
   CPU-only BYOE fine-tune smoke against a cached tiny GPT-2 model, then verify
   the enriched report with evaluation-realism, topology, and delta/privacy
-  metadata. Generated fine-tune validation-subject coverage lives in the
-  evidence-pack harness.
-- `python scripts/smoke/run_training_evidence_campaign.py --dry-run`: inspect
-  the real PEFT LoRA train-and-merge plus full fine-tune training-evidence
-  campaign. Remove `--dry-run` for local tiny CPU lanes, or use
-  `--execution-lane cuda` on a CUDA-capable validation host for the strict
-  CUDA/container matrix. Generated checkpoints stay local; publish only the
-  public summary and hash inventory after review.
-- `make model-evidence-list`: print the maintained shipped-model evidence lane
-  manifest.
-- `make model-evidence-sweep MODEL_EVIDENCE_ARGS='--dry-run'`: inspect the
-  commands for the maintained model-evidence sweep without running downloads or
-  evaluations. Remove `--dry-run` for a real sweep; use `MODEL_EVIDENCE_ARGS`
-  for `--suite`, `--slug`, `--lane-id`, `--device`, sharding, and execution-mode
-  overrides.
+  metadata. Deterministic synthetic dense-update validation-subject coverage
+  lives in the evidence-pack harness; that generator does not perform
+  fine-tuning or use training data.
 - `python scripts/checks/check_model_candidate_compatibility.py`: run the
   offline candidate compatibility audit used by `make contracts-check` before
-  spending GPU time on named model-evidence lanes.
-- `scripts/evidence_packs/run_suite.sh`: run evidence-pack scenarios without
-  packaging the result. This is for development/debugging.
-- `scripts/evidence_packs/run_pack.sh`: run the suite and build a distributable
-  evidence pack. Prefer this over `run_suite.sh` for release or public
-  artifacts.
+  evaluating entries from the public evidence catalog.
+- `python scripts/model_evidence/run_catalog_lane.py`: evaluate one catalog lane,
+  strictly verify its report, assemble and sign its evidence pack with a
+  caller-supplied key, strictly verify the pack, and expose the result in a
+  staging directory. See `scripts/evidence_packs/README.md` for the inputs and
+  execution boundary.
+- `python scripts/checks/benchmark_command_hotpaths.py --json`: measure the
+  schema-validation, bootstrap, report-assembly, evidence-snapshot/verification,
+  and evidence-verification hot paths with deterministic input/output digests. Results
+  are written only to standard output. Use repeatable `--benchmark` selectors for
+  a subset and `--cuda` to include CUDA availability and peak-memory fields.
+  For optimization acceptance, supply a prior payload with `--baseline-json`,
+  identify changed paths with repeatable `--target`, and retain the default
+  requirement of at least 10% target improvement with no untargeted regression.
+- `scripts/evidence_packs/verify_pack.sh`: verify an evidence pack against the
+  core public contracts.
 
 Each family records owner, purpose, stability, audience, expected runtime,
 network/GPU needs, and known callers. The audit expands those family entries to
@@ -73,7 +74,30 @@ checker, and `select_workspace_python.sh`. Run
 workflow code must go under an existing family subdirectory unless it is the
 inventory checker itself.
 
-`make architecture-fragmentation-check` also includes tracked `scripts/` metrics
-for large shell files, small-file churn, evidence-pack script concentration, and
-ignored generated cruft. Use those metrics when deciding whether to consolidate
-helpers before sharing generated evidence or examples externally.
+`make architecture-fragmentation-check` enforces the category-based policy in
+`contracts/architecture_policy.toml` across production source, operational
+Python and shell, and tests. Category soft limits identify review hotspots;
+hard limits block release. The checker also measures Python function span and
+deterministic AST complexity, rejects import-only facades and tiny production
+owners, limits direct files per package, and enforces library dependency
+direction. These rules apply consistently by category across the current
+module layout.
+
+Protocol and constants modules may be declared as contract owners by semantic
+path pattern. They must remain declaration/constant-only; runtime logic fails
+the contract-owner check. This is an ownership overlay, not a separate size
+category, so contract files continue to count in the same source-package
+concentration budget.
+
+The policy has no generated-code exclusion. Python and shell files under its
+governed roots are checked like maintained code, so a declaration cannot create
+an unverified bypass. Uncategorized governed files fail the policy instead of
+silently escaping it.
+
+Temporary hard-limit exceptions belong only in
+`contracts/architecture_debt.toml`. Each debt entry identifies one deterministic
+finding key and records a ceiling, owner, reason, and expiry. Debt is diagnostic
+only: it never suppresses the original release blocker. New, expired, duplicate,
+malformed, regressed, and stale-ceiling entries also fail the check. Expiry is
+effective at the start of the recorded date. The release ledger must remain
+empty.

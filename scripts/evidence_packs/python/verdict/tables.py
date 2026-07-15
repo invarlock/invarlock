@@ -22,7 +22,13 @@ DEFAULT_CORE_GUARDS: tuple[str, ...] = (
     "variance",
     "primary_metric",
 )
-DEFAULT_CATEGORIES: tuple[str, ...] = ("clean", "stress", "error_injection")
+DEFAULT_CATEGORIES: tuple[str, ...] = (
+    "clean",
+    "trained",
+    "deployable",
+    "stress",
+    "error_injection",
+)
 _COERCE_ERRORS = (TypeError, ValueError, OverflowError)
 _JSON_READ_ERRORS = (OSError, TypeError, ValueError)
 

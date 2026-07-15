@@ -32,14 +32,14 @@ _FORWARDED_ENV_VARS = {
     "HF_DATASETS_OFFLINE",
     "HF_HUB_DISABLE_XET",
     "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
-    "INVARLOCK_DETERMINISM",
-    "INVARLOCK_DETERMINISM_WARN_ONLY",
     "INVARLOCK_RUNTIME_IMAGE",
     "INVARLOCK_TINY_RELAX",
     "NVIDIA_VISIBLE_DEVICES",
-    "INVARLOCK_SKIP_OVERHEAD_CHECK",
+    "INVARLOCK_SKIP_GUARD_METRIC_IMPACT_CHECK",
     "INVARLOCK_SNAPSHOT_MODE",
     "INVARLOCK_STORE_EVAL_WINDOWS",
+    "INVARLOCK_SOURCE_BUNDLE_READ_ONLY",
+    "INVARLOCK_SOURCE_BUNDLE_SHA256",
     "PACK_DETERMINISM",
 }
 
@@ -316,7 +316,6 @@ def _resolve_container_launch_context(plan: Any) -> Any:
 
     cwd = Path.cwd().resolve()
     image = helpers.resolve_runtime_image()
-    digest = helpers.resolve_runtime_image_digest() or ""
     if not helpers.network_allowed() and not helpers.container_image_available_locally(
         image, engine=engine
     ):
@@ -326,12 +325,14 @@ def _resolve_container_launch_context(plan: Any) -> Any:
             f"`{helpers._runtime_image_build_command(image)}` or set "
             f"{helpers.ALLOW_NETWORK_ENV}=1 to allow pulling the image."
         )
+    observed_image = helpers._resolve_observed_container_image(engine, image)
 
     pythonpath_entries, pythonpath_mounts = helpers._container_pythonpath_entries(
         cwd=cwd
     )
     env_pairs, env_mounts = helpers._delegated_env_pairs(cwd=cwd)
-    env_pairs[helpers.RUNTIME_IMAGE_DIGEST_ENV] = digest
+    env_pairs[helpers.RUNTIME_IMAGE_ENV] = observed_image.immutable_ref
+    env_pairs[helpers.RUNTIME_IMAGE_DIGEST_ENV] = observed_image.image_digest
     env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
     base_mounts = _merge_container_mounts(
         plan.argv_mounts,
@@ -341,7 +342,7 @@ def _resolve_container_launch_context(plan: Any) -> Any:
     return helpers._ContainerLaunchContext(
         engine=engine,
         cwd=cwd,
-        image=image,
+        image=observed_image.immutable_ref,
         env_pairs=env_pairs,
         base_mounts=base_mounts,
     )
@@ -361,9 +362,12 @@ def _compose_container_run_args(
         command.extend(["--gpus", "all"])
     if not helpers.network_allowed():
         command.extend(["--network", "none"])
-    command.extend(["-v", f"{context.cwd}:/workspace", "-w", "/workspace"])
+    workspace_suffix = ":ro" if plan.workspace_read_only else ""
+    command.extend(
+        ["-v", f"{context.cwd}:/workspace{workspace_suffix}", "-w", "/workspace"]
+    )
     if plan.needs_cwd_host_mirror:
-        command.extend(["-v", f"{context.cwd}:{context.cwd}"])
+        command.extend(["-v", f"{context.cwd}:{context.cwd}{workspace_suffix}"])
     for mount in _merge_container_mounts(context.base_mounts, extra_mounts):
         command.extend(["-v", f"{mount}:{mount}"])
     for key, value in context.env_pairs.items():

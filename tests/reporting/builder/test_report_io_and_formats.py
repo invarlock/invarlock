@@ -1,64 +1,79 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from invarlock.reporting.report_bundle import save_evaluation_bundle, save_report
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport
 from invarlock.reporting.run_report_formatters import to_html, to_json, to_markdown
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def make_min_report() -> RunReport:
-    return RunReport(
-        meta={
-            "model_id": "m",
-            "adapter": "hf",
-            "commit": "deadbeef",
-            "seed": 1,
-            "device": "cpu",
-            "ts": "2025-01-01T00:00:00",
-            "auto": None,
-        },
-        data={
-            "dataset": "ds",
-            "split": "val",
-            "seq_len": 4,
-            "stride": 4,
-            "preview_n": 1,
-            "final_n": 1,
-        },
-        edit={
-            "name": "quant_rtn",
-            "plan_digest": "abc123",
-            "deltas": {
-                "params_changed": 1,
-                "sparsity": None,
-                "bitwidth_map": None,
-                "layers_modified": 1,
+    return canonical_run_report(
+        RunReport(
+            meta={
+                "model_id": "m",
+                "adapter": "hf",
+                "commit": "deadbeef",
+                "seed": 1,
+                "device": "cpu",
+                "ts": "2025-01-01T00:00:00",
+                "auto": {
+                    "tier": "balanced",
+                    "probes_used": 0,
+                    "target_pm_ratio": None,
+                },
             },
-        },
-        guards=[],
-        metrics={
-            "primary_metric": {"kind": "ppl_causal", "final": 10.0},
-            "preview_total_tokens": 100,
-            "final_total_tokens": 100,
-            "latency_ms_per_tok": 1.23,
-            "memory_mb_peak": 256.0,
-        },
-        artifacts={"events_path": "", "logs_path": "", "checkpoint_path": None},
-        flags={"guard_recovered": False, "rollback_reason": None},
+            context={"profile": "dev"},
+            data={
+                "dataset": "ds",
+                "split": "val",
+                "seq_len": 4,
+                "stride": 4,
+                "preview_n": 1,
+                "final_n": 1,
+            },
+            edit={
+                "name": "quant_rtn",
+                "plan_digest": "abc123",
+                "deltas": {
+                    "params_changed": 1,
+                    "sparsity": None,
+                    "bitwidth_map": None,
+                    "layers_modified": 1,
+                },
+            },
+            guards=[],
+            metrics={
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 10.0,
+                    "final": 10.0,
+                },
+                "preview_total_tokens": 100,
+                "final_total_tokens": 100,
+                "latency_ms_per_tok": 1.23,
+                "memory_mb_peak": 256.0,
+            },
+            artifacts={"events_path": "", "logs_path": "", "checkpoint_path": None},
+            flags={"guard_recovered": False, "rollback_reason": None},
+        )
     )
 
 
 def make_baseline() -> dict:
-    return {
-        "schema_version": "baseline-v1",
-        "meta": {"commit": "beefdead"},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    baseline = copy.deepcopy(make_min_report())
+    baseline["meta"]["commit"] = "beefdead"
+    baseline["edit"]["name"] = "noop"
+    baseline["edit"]["deltas"]["params_changed"] = 0
+    return canonical_baseline(baseline)
 
 
 def test_to_json_markdown_html_variants(tmp_path: Path) -> None:

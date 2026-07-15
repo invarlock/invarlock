@@ -12,7 +12,7 @@ from invarlock.runtime_security import (
     RUNTIME_IMAGE_ENV,
     write_runtime_manifest,
 )
-from invarlock.runtime_verify import verify_report_manifest
+from invarlock.runtime_verify import verify_report_manifest, verify_runtime_manifest
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 
@@ -107,7 +107,7 @@ def test_runtime_verifier_reports_unreadable_report(tmp_path: Path) -> None:
     manifest_path.write_text("{}", encoding="utf-8")
 
     assert verify_report_manifest(missing_report, manifest_path) == [
-        f"unable to read report: [Errno 2] No such file or directory: '{missing_report}'"
+        f"unable to read report: runtime report is unavailable: {missing_report}"
     ]
 
 
@@ -181,6 +181,77 @@ def test_runtime_verifier_accepts_valid_manifest(tmp_path: Path, monkeypatch) ->
     report_path, manifest_path = _write_valid_report_and_manifest(tmp_path)
 
     assert verify_report_manifest(report_path, manifest_path) == []
+
+
+def test_strict_runtime_verifier_rejects_remote_code_and_third_party_allowances(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv(CONTAINER_EXECUTION_ENV, "1")
+    monkeypatch.setenv(RUNTIME_IMAGE_ENV, "ghcr.io/invarlock/invarlock-runtime:test")
+    monkeypatch.setenv(RUNTIME_IMAGE_DIGEST_ENV, _VALID_TEST_IMAGE_DIGEST)
+    report_path, manifest_path = _write_valid_report_and_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["runtime"]["allow_remote_code"] = True
+    manifest["runtime"]["allow_third_party_plugins"] = True
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert verify_report_manifest(report_path, manifest_path) == []
+    result = verify_runtime_manifest(
+        report_path,
+        manifest_path,
+        require_strict_runtime=True,
+    )
+
+    assert result.ok is False
+    assert "strict runtime forbids allow_remote_code=true" in result.errors
+    assert "strict runtime forbids allow_third_party_plugins=true" in result.errors
+
+
+def test_runtime_verifier_uses_one_manifest_payload_for_binding_and_image_pin(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A manifest swap must not splice binding and image trust across reads."""
+
+    monkeypatch.setenv(CONTAINER_EXECUTION_ENV, "1")
+    monkeypatch.setenv(RUNTIME_IMAGE_ENV, "ghcr.io/invarlock/invarlock-runtime:test")
+    monkeypatch.setenv(RUNTIME_IMAGE_DIGEST_ENV, _VALID_TEST_IMAGE_DIGEST)
+    report_path, manifest_path = _write_valid_report_and_manifest(tmp_path)
+    bound_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    trusted_digest = "sha256:" + ("b" * 64)
+    swapped_manifest = json.loads(json.dumps(bound_manifest))
+    swapped_manifest["runtime"]["image_digest"] = trusted_digest
+    swapped_manifest["report"]["sha256"] = "0" * 64
+    payloads = iter(
+        (json.dumps(bound_manifest).encode(), json.dumps(swapped_manifest).encode())
+    )
+    reads = 0
+    from invarlock import runtime_verify
+
+    original_read = runtime_verify.read_regular_file_bytes
+
+    def _alternating_manifest_read(path: Path, *, label: str) -> bytes:
+        nonlocal reads
+        if path == manifest_path:
+            reads += 1
+            return next(payloads)
+        return original_read(path, label=label)
+
+    monkeypatch.setattr(
+        runtime_verify, "read_regular_file_bytes", _alternating_manifest_read
+    )
+
+    result = verify_runtime_manifest(
+        report_path,
+        manifest_path,
+        expected_image_digest=trusted_digest,
+    )
+
+    assert reads == 1
+    assert result.binding_verified is True
+    assert result.expected_digest_matched is False
+    assert result.declared_image_digest == _VALID_TEST_IMAGE_DIGEST
+    assert result.ok is False
+    assert any("runtime image digest mismatch" in error for error in result.errors)
 
 
 def test_runtime_verifier_reports_contract_runtime_and_digest_mismatches(

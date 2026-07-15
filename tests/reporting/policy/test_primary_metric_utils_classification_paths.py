@@ -282,7 +282,7 @@ def test_attach_accuracy_primary_metric_uses_classification_count_ci(monkeypatch
             "primary_metric": {
                 "kind": "accuracy",
                 "final": 0.55,
-                "ratio_vs_baseline": 0.0,
+                "delta_vs_baseline_pp": 0.0,
             },
             "classification": {
                 "final": {"correct_total": 55, "total": 100},

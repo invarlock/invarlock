@@ -279,7 +279,10 @@ class QuantTargetSelector:
 
             if not should_include and self.scope in {"ffn", "attn"}:
                 for pattern in default_patterns:
-                    if pattern in lowered:
+                    if pattern in lowered and self._default_pattern_matches_scope(
+                        module_name=lowered,
+                        pattern=pattern,
+                    ):
                         should_include = True
                         selection_reason = "name_heuristic"
                         matched_pattern = pattern
@@ -319,6 +322,21 @@ class QuantTargetSelector:
             return isinstance(module, Conv1D)
         except ImportError:
             return False
+
+    def _default_pattern_matches_scope(self, *, module_name: str, pattern: str) -> bool:
+        """Keep BERT-family FFN and attention defaults role-disjoint.
+
+        BERT and RoBERTa use ``output.dense`` both for the FFN output
+        projection and, under ``attention.output.dense``, for an attention
+        projection.  The broad FFN suffix remains useful for the former but
+        must not capture the latter.  Explicit user selectors remain an
+        intentional override and are evaluated before this default matcher.
+        """
+        return not (
+            self.scope == "ffn"
+            and pattern == "output.dense"
+            and "attention.output.dense" in module_name
+        )
 
     def _selector_patterns_for_scope(self) -> tuple[str, ...]:
         if not self.module_selectors:

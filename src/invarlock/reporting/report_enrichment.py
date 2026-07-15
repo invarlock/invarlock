@@ -24,11 +24,11 @@ def _sanitize_summary_value(value: Any) -> str | None:
     return normalized or None
 
 
-def attach_quality_overhead(
+def attach_guard_metric_impact(
     evaluation_report: dict[str, Any],
     raw_guard_ctx: Any,
     report: dict[str, Any],
-    compute_quality_overhead_from_guard_fn: Any,
+    compute_guard_metric_impact_from_guard_fn: Any,
 ) -> None:
     try:
         pm_kind_hint = None
@@ -42,15 +42,39 @@ def attach_quality_overhead(
                 pm_kind_hint = pm_try.get("kind")
         except _NON_FATAL_EXCEPTIONS:
             pm_kind_hint = None
-        quality_overhead = compute_quality_overhead_from_guard_fn(
+        guard_metric_impact = compute_guard_metric_impact_from_guard_fn(
             raw_guard_ctx, pm_kind_hint
         )
+        if "guard_metric_impact" in evaluation_report:
+            return
+        canonical_fields = {
+            "metric_kind",
+            "direction",
+            "degradation_basis",
+            "bare_value",
+            "guarded_value",
+            "bare_facts",
+            "guarded_facts",
+            "degradation",
+            "degradation_limit",
+            "display_value",
+            "display_unit",
+            "evaluated",
+            "passed",
+            "checks",
+            "diagnostics",
+            "source",
+            "schedule_digest",
+        }
         if (
-            isinstance(quality_overhead, dict)
-            and "value" in quality_overhead
-            and math.isfinite(float(quality_overhead.get("value", float("nan"))))
+            isinstance(guard_metric_impact, dict)
+            and canonical_fields <= set(guard_metric_impact)
+            and "degradation" in guard_metric_impact
+            and math.isfinite(
+                float(guard_metric_impact.get("degradation", float("nan")))
+            )
         ):
-            evaluation_report["quality_overhead"] = quality_overhead
+            evaluation_report["guard_metric_impact"] = guard_metric_impact
     except _NON_FATAL_EXCEPTIONS:
         pass
 
@@ -65,36 +89,26 @@ def attach_policy_digest(
     compute_thresholds_hash_fn: Any,
     policy_version: str,
 ) -> None:
-    try:
-        cur_tier = str(auto.get("tier", "balanced")).lower()
-    except _NON_FATAL_EXCEPTIONS:
-        cur_tier = "balanced"
+    current_tier = auto.get("tier") if isinstance(auto, dict) else None
+    if not isinstance(current_tier, str) or not current_tier.strip():
+        raise ValueError("Canonical subject report requires non-empty meta.auto.tier.")
+    cur_tier = current_tier.strip().lower()
     thresholds_payload = compute_thresholds_payload_fn(cur_tier, resolved_policy)
     thresholds_hash = compute_thresholds_hash_fn(thresholds_payload)
-    base_tier = None
-    try:
-        if isinstance(baseline_raw, dict):
-            baseline_meta = baseline_raw.get("meta")
-            if isinstance(baseline_meta, dict):
-                baseline_auto = baseline_meta.get("auto")
-                if isinstance(baseline_auto, dict) and baseline_auto.get("tier"):
-                    base_tier = str(baseline_auto.get("tier")).lower()
-        if base_tier is None and isinstance(baseline_normalized, dict):
-            base_meta = baseline_normalized.get("meta")
-            if isinstance(base_meta, dict):
-                base_auto = base_meta.get("auto")
-                if isinstance(base_auto, dict) and base_auto.get("tier"):
-                    base_tier = str(base_auto.get("tier")).lower()
-    except _NON_FATAL_EXCEPTIONS:
-        base_tier = None
-    baseline_payload = compute_thresholds_payload_fn(
-        base_tier or cur_tier, resolved_policy
+    _ = baseline_normalized
+    baseline_meta = baseline_raw.get("meta") if isinstance(baseline_raw, dict) else None
+    baseline_auto = (
+        baseline_meta.get("auto") if isinstance(baseline_meta, dict) else None
     )
+    baseline_tier = (
+        baseline_auto.get("tier") if isinstance(baseline_auto, dict) else None
+    )
+    if not isinstance(baseline_tier, str) or not baseline_tier.strip():
+        raise ValueError("Canonical baseline requires non-empty meta.auto.tier.")
+    base_tier = baseline_tier.strip().lower()
+    baseline_payload = compute_thresholds_payload_fn(base_tier, resolved_policy)
     baseline_hash = compute_thresholds_hash_fn(baseline_payload)
-    changed = bool(
-        (base_tier is not None and base_tier != cur_tier)
-        or (baseline_hash != thresholds_hash)
-    )
+    changed = bool((base_tier != cur_tier) or (baseline_hash != thresholds_hash))
 
     metrics_policy = (
         resolved_policy.get("metrics", {}) if isinstance(resolved_policy, dict) else {}
@@ -143,6 +157,7 @@ def attach_secondary_metrics(
                             "preview",
                             "final",
                             "ratio_vs_baseline",
+                            "delta_vs_baseline_pp",
                             "unit",
                             "display_ci",
                             "ci",
@@ -291,12 +306,8 @@ def attach_system_overhead(
             if isinstance(base_val, int | float) and math.isfinite(float(base_val)):
                 entry["baseline"] = float(base_val)
                 entry["delta"] = float(edited_val - base_val)
-                try:
-                    entry["ratio"] = (
-                        float(edited_val / base_val) if base_val != 0 else float("nan")
-                    )
-                except _NON_FATAL_EXCEPTIONS:
-                    entry["ratio"] = float("nan")
+                if base_val != 0:
+                    entry["ratio"] = float(edited_val / base_val)
             system_overhead[metric_key] = entry
         if system_overhead:
             evaluation_report["system_overhead"] = system_overhead
@@ -322,7 +333,12 @@ def ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None:
                 pm["display_ci"] = [float(disp[0]), float(disp[1])]
             else:
                 point = None
-                for key in ("ratio_vs_baseline", "final", "preview"):
+                for key in (
+                    "delta_vs_baseline_pp",
+                    "ratio_vs_baseline",
+                    "final",
+                    "preview",
+                ):
                     val = pm.get(key)
                     if isinstance(val, int | float) and math.isfinite(float(val)):
                         point = float(val)
@@ -392,12 +408,16 @@ def attach_telemetry_summary_line(
             tokens_total = None
         ci_lo = None
         ci_hi = None
-        ratio = None
         pmc = evaluation_report.get("primary_metric", {})
         rci = pmc.get("display_ci") or pmc.get("ci")
         if isinstance(rci, tuple | list) and len(rci) == 2:
             ci_lo, ci_hi = rci[0], rci[1]
-        ratio = pmc.get("ratio_vs_baseline")
+        pm_kind = str(pmc.get("kind") or "").strip().lower()
+        comparison = (
+            pmc.get("delta_vs_baseline_pp")
+            if pm_kind == "accuracy"
+            else pmc.get("ratio_vs_baseline")
+        )
         ci_w = None
         try:
             if isinstance(ci_lo, int | float) and isinstance(ci_hi, int | float):
@@ -437,8 +457,9 @@ def attach_telemetry_summary_line(
             parts.append(f"ci={ci_lo:.3f}-{ci_hi:.3f}")
             if isinstance(ci_w, int | float):
                 parts.append(f"width={ci_w:.3f}")
-        if isinstance(ratio, int | float):
-            parts.append(f"ratio={float(ratio):.3f}")
+        if isinstance(comparison, int | float):
+            comparison_label = "delta_pp" if pm_kind == "accuracy" else "ratio"
+            parts.append(f"{comparison_label}={float(comparison):.3f}")
         if isinstance(gate_ok, bool):
             parts.append(f"gate={'pass' if gate_ok else 'fail'}")
         summary_line = "INVARLOCK_TELEMETRY " + " ".join(parts)

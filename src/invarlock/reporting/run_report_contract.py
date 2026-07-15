@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import copy
 import importlib
 import json
+import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -24,9 +27,13 @@ from .run_report_payloads import build_run_report_data as build_run_report_data
 from .run_report_payloads import build_run_report_meta as build_run_report_meta
 from .run_report_payloads import build_snapshot_provenance as build_snapshot_provenance
 from .run_report_payloads import merge_core_timing_metrics as merge_core_timing_metrics
+from .runtime_policy_receipt import build_runtime_policy_receipt
 
-report_files = cast(Any, importlib.import_module("invarlock.reporting.report_files"))
+report_bundle_module = cast(
+    Any, importlib.import_module("invarlock.reporting.report_bundle")
+)
 _NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
+_SOURCE_COMMIT_RE = re.compile(r"[a-f0-9]{40}\Z")
 
 
 @dataclass(frozen=True)
@@ -53,7 +60,10 @@ class RunProvenanceResult:
 
 def _detect_commit_value(cfg: Any) -> str:
     commit_value = getattr(getattr(cfg, "meta", None), "commit", "") or ""
-    return str(commit_value) if commit_value else ""
+    if commit_value:
+        return str(commit_value)
+    source_commit = os.environ.get("INVARLOCK_SOURCE_COMMIT", "").strip().lower()
+    return source_commit if _SOURCE_COMMIT_RE.fullmatch(source_commit) else ""
 
 
 def _resolve_version() -> str | None:
@@ -252,7 +262,7 @@ def assemble_run_report(
     auto_config: dict[str, Any] | None,
     resolved_device: str,
     seed_bundle: dict[str, Any],
-    guard_overhead_threshold: float,
+    guard_metric_degradation_limit: float,
     model_profile: Any,
     determinism_meta: dict[str, Any],
     pm_acceptance_range: tuple[float, float] | None,
@@ -268,7 +278,7 @@ def assemble_run_report(
     run_config: Any,
     resolved_loss_type: str,
     timings: dict[str, float],
-    guard_overhead_payload: dict[str, Any] | None,
+    guard_metric_impact_payload: dict[str, Any] | None,
     baseline: str | None,
     preview_records: list[dict[str, Any]],
     final_records: list[dict[str, Any]],
@@ -295,7 +305,7 @@ def assemble_run_report(
     build_artifacts_payload_fn: Any,
     merge_core_timing_metrics_fn: Any,
     build_metrics_payload_fn: Any,
-    prepare_guard_overhead_report_fn: Any,
+    prepare_guard_metric_impact_report_fn: Any,
     finalize_run_provenance_fn: Any,
     build_guard_entries_fn: Any,
     build_flags_payload_fn: Any,
@@ -325,8 +335,13 @@ def assemble_run_report(
             commit_value=_detect_commit_value(cfg),
             seed_bundle=seed_bundle,
             auto_config=auto_config,
-            guard_overhead_threshold=guard_overhead_threshold,
+            guard_metric_degradation_limit=guard_metric_degradation_limit,
             model_profile=model_profile,
+            model_identity=(
+                cfg.model.get("model_identity")
+                if hasattr(cfg.model, "get")
+                else getattr(cfg.model, "model_identity", None)
+            ),
             timestamp=datetime.now().isoformat(),
             invarlock_version=_resolve_version(),
             env_flags=_collect_env_flags(optional_torch_fn, environ),
@@ -335,6 +350,14 @@ def assemble_run_report(
             pm_drift_band=pm_drift_band,
         )
     )
+    plugin_provenance = (
+        run_context.get("plugins") if isinstance(run_context, Mapping) else None
+    )
+    if isinstance(plugin_provenance, Mapping) and plugin_provenance:
+        report["meta"]["plugins"] = copy.deepcopy(dict(plugin_provenance))
+    run_id = run_context.get("run_id") if isinstance(run_context, Mapping) else None
+    if isinstance(run_id, str) and run_id.strip():
+        report["meta"]["run_id"] = run_id.strip()
 
     dataset_provider = getattr(cfg.dataset, "provider", None)
     if dataset_provider is None:
@@ -397,13 +420,13 @@ def assemble_run_report(
         )
         report["metrics"].update(metrics_payload)
 
-    if guard_overhead_payload is not None:
-        report["guard_overhead"] = prepare_guard_overhead_report_fn(
-            guard_overhead_payload,
+    if guard_metric_impact_payload is not None:
+        report["guard_metric_impact"] = prepare_guard_metric_impact_report_fn(
+            guard_metric_impact_payload,
             resolved_loss_type=resolved_loss_type,
             core_report=core_report,
             report=report,
-            default_threshold=guard_overhead_threshold,
+            default_limit=guard_metric_degradation_limit,
         )
 
     provenance_result = finalize_run_provenance_fn(
@@ -428,6 +451,29 @@ def assemble_run_report(
             else None
         )
     )
+
+    core_meta = getattr(core_report, "meta", None)
+    runtime_policies = (
+        core_meta.get("tier_policies") if isinstance(core_meta, Mapping) else None
+    )
+    if isinstance(runtime_policies, Mapping) and runtime_policies:
+        edit_payload = report.get("edit")
+        edit_name = (
+            str(edit_payload.get("name") or "").strip()
+            if isinstance(edit_payload, dict)
+            else ""
+        )
+        if not edit_name:
+            raise ValueError("runtime policy receipt requires a canonical edit name")
+        resolved_policy, policy_resolution = build_runtime_policy_receipt(
+            runtime_policies,
+            report["guards"],
+            tier=str((auto_config or {}).get("tier") or "balanced"),
+            profile=profile_normalized or "dev",
+            edit_name=edit_name,
+        )
+        report["resolved_policy"] = resolved_policy
+        report["policy_resolution"] = policy_resolution
 
     report["flags"].update(
         build_flags_payload_fn(
@@ -475,7 +521,7 @@ def persist_run_report_outputs(
         telemetry_path = run_dir / "telemetry.json"
         report["artifacts"]["telemetry_path"] = str(telemetry_path)
 
-    saved_paths = report_files.save_report(
+    saved_paths = report_bundle_module.save_report(
         report,
         run_dir,
         formats=["json"],

@@ -37,7 +37,7 @@ def test_validate_evaluation_report_accepts_pm_only_without_ppl_block():
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
     }
     assert validate_report(cert) is True

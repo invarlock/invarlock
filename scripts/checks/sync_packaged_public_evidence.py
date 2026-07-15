@@ -11,6 +11,8 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from invarlock.evidence_pack_json import load_json_object, read_regular_file_bytes
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "public_evidence"
 SUPPORT_MATRIX = REPO_ROOT / "contracts" / "support_matrix.json"
@@ -45,18 +47,16 @@ _SUPPORT_MATRIX_ARTIFACT_KEYS = {
 
 
 def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return "sha256:" + digest.hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(
+            read_regular_file_bytes(path, label="public evidence artifact")
+        ).hexdigest()
+    )
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"expected JSON object: {path}")
-    return payload
+    return load_json_object(path, label="public evidence object")
 
 
 def _validate_public_evidence_index(path: Path, payload: dict[str, Any]) -> None:
@@ -68,10 +68,15 @@ def _validate_public_evidence_index(path: Path, payload: dict[str, Any]) -> None
     if carrier_policy.get("installed_wheel") != "compact_index_only":
         raise ValueError(f"{path}: installed_wheel carrier policy invalid")
     entries = payload.get("entries")
-    if not isinstance(entries, list) or not entries:
-        raise ValueError(f"{path}: entries must be a non-empty list")
+    if not isinstance(entries, list):
+        raise ValueError(f"{path}: entries must be a list")
     if payload.get("published_basis_count") != len(entries):
         raise ValueError(f"{path}: published_basis_count must match entries")
+    if not entries and (
+        payload.get("status") != "not_created"
+        or payload.get("status_label") != "Evidence not yet created"
+    ):
+        raise ValueError(f"{path}: empty index must declare not_created status")
 
 
 def _logical_path(path: Path, *, source_root: Path) -> str:

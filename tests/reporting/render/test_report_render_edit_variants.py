@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_cert(edit_name):
@@ -14,7 +16,9 @@ def _mk_cert(edit_name):
             "ts": "2025-01-01T00:00:00",
             "commit": "dead",
             "seed": 1,
+            "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -35,21 +39,17 @@ def _mk_cert(edit_name):
         },
         "guards": [],
         "metrics": {
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_ratio": 1.0,
-            "ppl_preview_ci": (9.5, 10.5),
-            "ppl_final_ci": (9.5, 10.5),
-            "ppl_ratio_ci": (0.9, 1.1),
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+                "display_ci": (0.9, 1.1),
+            },
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
     }
-    baseline = {
-        "run_id": "b2",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
-    }
+    baseline = {**report, "run_id": "b2", "edit": {"name": "noop"}}
     with (
         patch(
             "invarlock.reporting.report_normalization.validate_report",
@@ -65,7 +65,7 @@ def _mk_cert(edit_name):
 
 
 def test_render_edit_name_variants():
-    for name in ("quant_rtn", "lowrank_svd", "structured", "custom_unknown"):
+    for name in ("quant_rtn", "magnitude_prune", "structured", "custom_unknown"):
         cert = _mk_cert(name)
         md = render_report_markdown(cert)
         assert isinstance(md, str) and "Guard Observability" in md

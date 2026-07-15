@@ -1,49 +1,71 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_markdown_window_plan_line_and_policy_digest_changed():
     # Build a valid evaluation_report via make_report
-    report = {
-        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
-        "data": {
-            "dataset": "prov",
-            "split": "val",
-            "seq_len": 128,
-            "stride": 8,
-            "preview_n": 1,
-            "final_n": 2,
-        },
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 10.0,
-                "final": 10.0,
-                "ratio_vs_baseline": 1.0,
-                "display_ci": [1.0, 1.0],
+    report = canonical_run_report(
+        {
+            "meta": {
+                "model_id": "m",
+                "adapter": "hf",
+                "device": "cpu",
+                "seed": 1,
+                "auto": {"tier": "balanced"},
             },
-        },
-        "evaluation_windows": {
-            "preview": {
-                "window_ids": [1],
-                "logloss": [2.302585093],
-                "token_counts": [1],
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "prov",
+                "split": "val",
+                "seq_len": 128,
+                "stride": 8,
+                "preview_n": 1,
+                "final_n": 2,
             },
-            "final": {"window_ids": [2], "logloss": [2.302585093], "token_counts": [1]},
-        },
-        "edit": {"name": "noop"},
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
-    baseline = {
-        **report,
-        "edit": {
-            "name": "baseline",
-            "plan_digest": "baseline_noop",
-            "deltas": {"params_changed": 0},
-        },
-    }
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": 10.0,
+                    "final": 10.0,
+                    "ratio_vs_baseline": 1.0,
+                    "display_ci": [1.0, 1.0],
+                },
+            },
+            "evaluation_windows": {
+                "preview": {
+                    "window_ids": [1],
+                    "logloss": [2.302585093],
+                    "token_counts": [1],
+                },
+                "final": {
+                    "window_ids": [2],
+                    "logloss": [2.302585093],
+                    "token_counts": [1],
+                },
+            },
+            "edit": {"name": "noop"},
+            "guards": [],
+            "artifacts": {"events_path": "", "logs_path": ""},
+        }
+    )
+    baseline = canonical_baseline(
+        {
+            **report,
+            "edit": {
+                "name": "noop",
+                "plan_digest": "baseline_noop",
+                "deltas": {"params_changed": 0},
+            },
+        }
+    )
     cert = make_report(report, baseline)
     # Inject window_plan and policy_digest for rendering branches
     cert["window_plan"] = {"profile": "ci", "actual_preview": 1, "actual_final": 2}

@@ -249,7 +249,10 @@ class GuardChain:
     def all_passed(self, outcomes: list[Any]) -> bool:
         """Check if all guard outcomes passed."""
         for outcome in outcomes:
-            if hasattr(outcome, "passed") and not outcome.passed:
+            if isinstance(outcome, dict):
+                if outcome.get("passed") is not True:
+                    return False
+            elif hasattr(outcome, "passed") and outcome.passed is not True:
                 return False
         return True
 

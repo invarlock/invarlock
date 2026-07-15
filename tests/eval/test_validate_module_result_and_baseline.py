@@ -17,7 +17,7 @@ from invarlock.reporting.validate import (
     save_baseline,
     validate_against_baseline,
     validate_drift_gate,
-    validate_guard_overhead,
+    validate_guard_metric_impact,
 )
 
 if __name__ == "__main__":
@@ -125,7 +125,8 @@ class TestValidateAgainstBaseline:
         """Test successful validation with all checks passing."""
         run_report = {
             "metrics": {
-                "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.25}
+                "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.25},
+                "invariants_passed": True,
             },
             "param_reduction_ratio": 0.020,  # Use exactly same value to pass tolerance
             "heads_pruned": 16,
@@ -241,7 +242,8 @@ class TestValidateAgainstBaseline:
 
         result = validate_against_baseline(run_report, baseline, structural_exact=False)
 
-        assert result.checks["structural_counts"] is True
+        assert "structural_counts" not in result.checks
+        assert result.passed is False
 
     def test_against_baseline_exception_handling(self):
         """Test exception handling in validation."""
@@ -264,11 +266,15 @@ class TestValidateAgainstBaseline:
     def test_against_baseline_accuracy_delta_bounds_success(self):
         run_report = {
             "metrics": {
-                "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": -0.004}
+                "primary_metric": {
+                    "kind": "accuracy",
+                    "delta_vs_baseline_pp": -0.4,
+                },
+                "invariants_passed": True,
             },
             "param_reduction_ratio": 0.02,
         }
-        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+        baseline = {"param_reduction_ratio": 0.02}
 
         result = validate_against_baseline(
             run_report,
@@ -286,7 +292,7 @@ class TestValidateAgainstBaseline:
             "metrics": {"primary_metric": {"kind": "accuracy"}},
             "param_reduction_ratio": 0.02,
         }
-        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+        baseline = {"param_reduction_ratio": 0.02}
 
         result = validate_against_baseline(
             run_report,
@@ -297,16 +303,20 @@ class TestValidateAgainstBaseline:
 
         assert result.passed is False
         assert result.checks["delta_bounds_pp"] is False
-        assert "Cannot extract ratio_vs_baseline" in " ".join(result.errors)
+        assert "Cannot extract delta_vs_baseline_pp" in " ".join(result.errors)
 
     def test_against_baseline_accuracy_with_invalid_delta_bounds_skips_check(self):
         run_report = {
             "metrics": {
-                "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": -0.004}
+                "primary_metric": {
+                    "kind": "accuracy",
+                    "delta_vs_baseline_pp": -0.4,
+                },
+                "invariants_passed": True,
             },
             "param_reduction_ratio": 0.02,
         }
-        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+        baseline = {"param_reduction_ratio": 0.02}
 
         result = validate_against_baseline(
             run_report,
@@ -321,11 +331,14 @@ class TestValidateAgainstBaseline:
     def test_against_baseline_accuracy_delta_bounds_failure_message(self):
         run_report = {
             "metrics": {
-                "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": -0.02}
+                "primary_metric": {
+                    "kind": "accuracy",
+                    "delta_vs_baseline_pp": -2.0,
+                }
             },
             "param_reduction_ratio": 0.02,
         }
-        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+        baseline = {"param_reduction_ratio": 0.02}
 
         result = validate_against_baseline(
             run_report,
@@ -356,7 +369,7 @@ class TestValidateAgainstBaseline:
 
         assert result.passed is False
         assert result.checks["invariants"] is False
-        assert "Model invariants validation failed" in result.errors
+        assert "Model invariants evidence is missing or failed" in result.errors
 
     def test_against_baseline_pm_kind_lookup_failure_falls_back_to_none(self):
         class KindBoomDict(dict):
@@ -369,7 +382,8 @@ class TestValidateAgainstBaseline:
             "metrics": {
                 "primary_metric": KindBoomDict(
                     {"ratio_vs_baseline": 1.25, "kind": "ppl_causal"}
-                )
+                ),
+                "invariants_passed": True,
             },
             "param_reduction_ratio": 0.02,
         }
@@ -441,63 +455,63 @@ class TestDriftAndOverheadValidation:
         assert result.checks == {"drift_gate_error": False}
         assert "Drift gate validation failed: drift boom" in result.errors
 
-    def test_validate_guard_overhead_success(self):
-        result = validate_guard_overhead(
-            {"metrics": {"primary_metric": {"final": 10.0}}},
-            {"metrics": {"primary_metric": {"final": 10.05}}},
-            overhead_threshold=0.01,
+    def test_validate_guard_metric_impact_success(self):
+        result = validate_guard_metric_impact(
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}},
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.05}}},
+            degradation_limit=0.01,
         )
 
         assert result.passed is True
-        assert result.checks["guard_overhead"] is True
-        assert result.metrics["overhead_percent"] == pytest.approx(0.5)
+        assert result.checks["guard_metric_impact"] is True
+        assert result.metrics["display_value"] == pytest.approx(0.5)
 
-    def test_validate_guard_overhead_failure(self):
-        result = validate_guard_overhead(
-            {"metrics": {"primary_metric": {"final": 10.0}}},
-            {"metrics": {"primary_metric": {"final": 10.3}}},
-            overhead_threshold=0.01,
+    def test_validate_guard_metric_impact_failure(self):
+        result = validate_guard_metric_impact(
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}},
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.3}}},
+            degradation_limit=0.01,
         )
 
         assert result.passed is False
-        assert result.checks["guard_overhead"] is False
-        assert "Guard overhead FAILED" in " ".join(result.errors)
+        assert result.checks["guard_metric_impact"] is False
+        assert "Guard metric impact FAILED" in " ".join(result.errors)
 
-    def test_validate_guard_overhead_missing_values(self):
-        result = validate_guard_overhead(
-            {"metrics": {"primary_metric": {"final": 0.0}}},
-            {"metrics": {"primary_metric": {"final": 10.3}}},
+    def test_validate_guard_metric_impact_missing_values(self):
+        result = validate_guard_metric_impact(
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 0.0}}},
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.3}}},
         )
 
         assert result.passed is False
-        assert result.checks["guard_overhead"] is False
-        assert "Cannot calculate guard overhead" in " ".join(result.errors)
+        assert result.checks["guard_metric_impact"] is False
+        assert "Cannot calculate guard metric impact" in " ".join(result.errors)
 
-    def test_validate_guard_overhead_rejects_non_mapping_primary_metric(self):
-        result = validate_guard_overhead(
+    def test_validate_guard_metric_impact_rejects_non_mapping_primary_metric(self):
+        result = validate_guard_metric_impact(
             {"metrics": {"primary_metric": "bad"}},
             {"metrics": {"primary_metric": "bad"}},
         )
 
         assert result.passed is False
-        assert result.checks["guard_overhead"] is False
-        assert "Cannot calculate guard overhead" in " ".join(result.errors)
+        assert result.checks["guard_metric_impact"] is False
+        assert "Cannot calculate guard metric impact" in " ".join(result.errors)
 
-    def test_validate_guard_overhead_exception_path(self):
+    def test_validate_guard_metric_impact_exception_path(self):
         class ExplodingMetrics(dict):
             def get(self, key, default=None):
                 if key == "primary_metric":
-                    raise RuntimeError("overhead boom")
+                    raise RuntimeError("impact boom")
                 return super().get(key, default)
 
-        result = validate_guard_overhead(
+        result = validate_guard_metric_impact(
             {"metrics": ExplodingMetrics({"sentinel": True})},
-            {"metrics": {"primary_metric": {"final": 10.0}}},
+            {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}},
         )
 
         assert result.passed is False
-        assert result.checks == {"guard_overhead_error": False}
-        assert "Guard overhead validation failed: overhead boom" in result.errors
+        assert result.checks == {"guard_metric_impact_error": False}
+        assert "Guard metric impact validation failed: impact boom" in result.errors
 
 
 class TestValidateStructuralCounts:
@@ -535,8 +549,7 @@ class TestValidateStructuralCounts:
 
         result = _validate_structural_counts(run_report, baseline)
 
-        # Should not fail on missing data
-        assert all(result["checks"].values())
+        assert result["checks"]["layers_count_exact"] is False
         assert len(result["warnings"]) > 0
         assert "Cannot validate" in " ".join(result["warnings"])
 
@@ -588,7 +601,7 @@ class TestValidateInvariants:
         }
 
         result = _validate_invariants(run_report)
-        assert result is None
+        assert result is False
 
 
 class TestValidateFileIO:

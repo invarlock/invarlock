@@ -311,13 +311,13 @@ class TestUtilityFunctions:
         model.transformer.h.append(layer)
 
         gains = scan_model_gains(model)
-
-        assert isinstance(gains, dict)
-        # The placeholder implementation just returns basic stats
-        if "total_layers" in gains:
-            assert gains["total_layers"] > 0
-        if "scanned_gains" in gains:
-            assert isinstance(gains["scanned_gains"], int)
+        assert gains["scanned_modules"] == 2
+        assert len(gains["spectral_norms"]) == 2
+        assert set(gains["weight_statistics"]) == {
+            "transformer.h.0.mlp.c_fc",
+            "transformer.h.0.mlp.c_proj",
+        }
+        assert all(value > 0.0 for value in gains["spectral_norms"])
 
     def test_mp_bulk_edge(self):
         """Test mp_bulk_edge function."""
@@ -398,13 +398,22 @@ class TestUtilityFunctions:
 
         dataset = TensorDataset(data)
         dataloader = DataLoader(dataset, batch_size=1)
+        attn_weight_before = model.transformer.h[0].attn.c_proj.weight.detach().clone()
+        mlp_weight_before = model.transformer.h[0].mlp.c_proj.weight.detach().clone()
 
         scales = equalise_residual_variance(
             model, dataloader, windows=2, allow_empty=True
         )
 
-        assert isinstance(scales, dict)
-        # May be empty if no scaling was needed, which is fine
+        assert scales == {"block0.attn": 1.1, "block0.mlp": 1.1}
+        assert torch.allclose(
+            model.transformer.h[0].attn.c_proj.weight,
+            attn_weight_before * 1.1,
+        )
+        assert torch.allclose(
+            model.transformer.h[0].mlp.c_proj.weight,
+            mlp_weight_before * 1.1,
+        )
 
 
 class TestPolicyFunctions:
@@ -418,7 +427,7 @@ class TestPolicyFunctions:
         assert "sigma_quantile" in policy
         assert "deadband" in policy
         assert "scope" in policy
-        assert policy.get("correction_enabled") is False
+        assert policy.get("correction_enabled") is True
 
         # Test all available policies
         for name in ["conservative", "balanced", "aggressive", "attn_aware"]:
@@ -458,7 +467,7 @@ class TestPolicyFunctions:
         assert "deadband" in policy
         assert "margin" in policy
         assert "correct" in policy
-        assert policy["correct"] is False
+        assert policy["correct"] is True
 
         # Test all available policies
         for name in ["conservative", "balanced", "aggressive"]:

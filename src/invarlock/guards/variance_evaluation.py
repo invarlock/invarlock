@@ -21,6 +21,11 @@ _VARIANCE_EVALUATION_ERRORS = (
     ValueError,
 )
 
+_AB_BOOTSTRAP_REPLICATES = 500
+_AB_DELTA_SEED_OFFSET = 211
+_AB_RATIO_METHOD = "percentile_mean_ppl_ratio"
+_AB_DELTA_METHOD = "bca_paired_delta_log"
+
 
 def _initial_predictive_state(guard: Any) -> dict[str, Any]:
     predictive_enabled = bool(guard._policy.get("predictive_gate", True))
@@ -168,7 +173,7 @@ def _record_condition_a(
     fingerprint: str | None,
     coverage: int,
 ) -> None:
-    window_ids = guard._calibration_window_ids
+    window_ids = guard._calibration_window_ids[:coverage]
     status_a = "evaluated" if coverage > 0 else "no_data"
     guard._record_ab_provenance(
         "condition_a",
@@ -180,16 +185,65 @@ def _record_condition_a(
     )
 
 
+def _record_ab_measurements(
+    guard: Any,
+    *,
+    coverage: int,
+    calib_seed: int,
+    ppl_no_ve_samples: list[float],
+    loss_no_ve_samples: list[float],
+    token_counts: list[int],
+    ppl_with_ve_samples: list[float],
+    loss_with_ve_samples: list[float],
+    token_counts_with: list[int],
+    ratio_ci: tuple[float, float] | None,
+    delta_ci: tuple[float, float] | None,
+) -> None:
+    """Persist the exact paired window measurements used by the A/B decision."""
+    alpha = float(guard._policy.get("alpha", 0.05))
+    guard._stats["ab_measurements"] = {
+        "window_ids": list(guard._calibration_window_ids[:coverage]),
+        "condition_a": {
+            "ppl": [float(value) for value in ppl_no_ve_samples[:coverage]],
+            "log_loss": [float(value) for value in loss_no_ve_samples[:coverage]],
+            "token_counts": [int(value) for value in token_counts[:coverage]],
+        },
+        "condition_b": {
+            "ppl": [float(value) for value in ppl_with_ve_samples[:coverage]],
+            "log_loss": [float(value) for value in loss_with_ve_samples[:coverage]],
+            "token_counts": [int(value) for value in token_counts_with[:coverage]],
+        },
+        "ratio_bootstrap": {
+            "method": _AB_RATIO_METHOD,
+            "replicates": _AB_BOOTSTRAP_REPLICATES,
+            "alpha": alpha,
+            "seed": calib_seed,
+        },
+        "delta_log_bootstrap": {
+            "method": _AB_DELTA_METHOD,
+            "replicates": _AB_BOOTSTRAP_REPLICATES,
+            "alpha": alpha,
+            "seed": calib_seed + _AB_DELTA_SEED_OFFSET,
+            "weights": "condition_a_token_counts",
+        },
+        "ratio_ci": list(ratio_ci) if ratio_ci is not None else None,
+        "delta_log_ci": list(delta_ci) if delta_ci is not None else None,
+    }
+
+
 def _handle_no_scales_path(
     guard: Any,
     *,
     ppl_no_ve_samples: list[float],
+    loss_no_ve_samples: list[float],
+    token_counts: list[int],
     coverage: int,
     min_coverage: int,
     calib_seed: int,
     tag: str,
     fingerprint: str | None,
     predictive_state: dict[str, Any],
+    compute_paired_delta_log_ci_fn: Any,
 ) -> bool:
     if coverage < min_coverage or guard._scales:
         return False
@@ -220,16 +274,49 @@ def _handle_no_scales_path(
         "tag": tag,
         "ppl_no_ve": ppl_no_ve_mean,
         "ppl_with_ve": ppl_no_ve_mean,
+        "coverage": coverage,
     }
     guard._record_ab_provenance(
         "condition_b",
         tag=tag,
         mode="virtual_ve",
-        window_ids=guard._calibration_window_ids,
+        window_ids=guard._calibration_window_ids[:coverage],
         fingerprint=fingerprint,
         status="no_scales",
     )
-    predictive_state.update({"evaluated": True, "passed": False, "reason": "no_scales"})
+    delta_ci = _compute_delta_ci(
+        guard,
+        loss_with_ve_samples=loss_no_ve_samples[:coverage],
+        loss_no_ve_samples=loss_no_ve_samples[:coverage],
+        token_counts=token_counts[:coverage],
+        calib_seed=calib_seed,
+        compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci_fn,
+    )
+    _record_ab_measurements(
+        guard,
+        coverage=coverage,
+        calib_seed=calib_seed,
+        ppl_no_ve_samples=trimmed_ppl_no_ve,
+        loss_no_ve_samples=loss_no_ve_samples,
+        token_counts=token_counts,
+        ppl_with_ve_samples=trimmed_ppl_no_ve,
+        loss_with_ve_samples=loss_no_ve_samples,
+        token_counts_with=token_counts,
+        ratio_ci=(1.0, 1.0),
+        delta_ci=delta_ci,
+    )
+    if bool(getattr(guard, "_explicit_noop_no_change", False)):
+        predictive_state.update(
+            {
+                "evaluated": True,
+                "passed": True,
+                "reason": "no_adjustment_required",
+            }
+        )
+    else:
+        predictive_state.update(
+            {"evaluated": True, "passed": False, "reason": "no_scales"}
+        )
     _persist_predictive_state(guard, predictive_state)
     return True
 
@@ -276,9 +363,9 @@ def _compute_delta_ci(
             loss_no_ve_samples,
             weights=token_counts,
             method="bca",
-            replicates=500,
+            replicates=_AB_BOOTSTRAP_REPLICATES,
             alpha=guard._policy.get("alpha", 0.05),
-            seed=calib_seed + 211,
+            seed=calib_seed + _AB_DELTA_SEED_OFFSET,
         )
     except _VARIANCE_EVALUATION_ERRORS as exc:
         guard._log_event(
@@ -298,6 +385,7 @@ def _handle_complete_calibration(
     ppl_with_ve_samples: list[float],
     loss_with_ve_samples: list[float],
     token_counts: list[int],
+    token_counts_with: list[int],
     coverage: int,
     calib_seed: int,
     tag: str,
@@ -311,6 +399,7 @@ def _handle_complete_calibration(
     trimmed_loss_with_ve = loss_with_ve_samples[:coverage]
     trimmed_token_counts = token_counts[:coverage]
 
+    ratio_ci: tuple[float, float] | None = None
     ratios = [
         with_val / no_val
         for with_val, no_val in zip(
@@ -322,7 +411,7 @@ def _handle_complete_calibration(
         ratio_ci = guard._bootstrap_mean_ci(
             ratios,
             alpha=guard._policy.get("alpha", 0.05),
-            n_bootstrap=500,
+            n_bootstrap=_AB_BOOTSTRAP_REPLICATES,
             seed=calib_seed,
         )
         ppl_no_ve_mean = safe_mean(trimmed_ppl_no_ve) or 0.0
@@ -346,7 +435,7 @@ def _handle_complete_calibration(
             "condition_b",
             tag=tag,
             mode="virtual_ve",
-            window_ids=guard._calibration_window_ids,
+            window_ids=guard._calibration_window_ids[:coverage],
             fingerprint=fingerprint,
             status="evaluated",
         )
@@ -364,6 +453,19 @@ def _handle_complete_calibration(
         token_counts=trimmed_token_counts,
         calib_seed=calib_seed,
         compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci_fn,
+    )
+    _record_ab_measurements(
+        guard,
+        coverage=coverage,
+        calib_seed=calib_seed,
+        ppl_no_ve_samples=trimmed_ppl_no_ve,
+        loss_no_ve_samples=trimmed_loss_no_ve,
+        token_counts=trimmed_token_counts,
+        ppl_with_ve_samples=trimmed_ppl_with_ve,
+        loss_with_ve_samples=trimmed_loss_with_ve,
+        token_counts_with=token_counts_with,
+        ratio_ci=ratio_ci,
+        delta_ci=delta_ci,
     )
     predictive_state["evaluated"] = True
     mean_delta = _weighted_mean_delta(
@@ -548,12 +650,15 @@ def evaluate_calibration_pass(
     if _handle_no_scales_path(
         guard,
         ppl_no_ve_samples=ppl_no_ve_samples,
+        loss_no_ve_samples=loss_no_ve_samples,
+        token_counts=token_counts,
         coverage=coverage,
         min_coverage=min_coverage,
         calib_seed=calib_seed,
         tag=tag,
         fingerprint=fingerprint,
         predictive_state=predictive_state,
+        compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci_fn,
     ):
         return
 
@@ -565,6 +670,7 @@ def evaluate_calibration_pass(
             ppl_with_ve_samples=ppl_with_ve_samples,
             loss_with_ve_samples=loss_with_ve_samples,
             token_counts=token_counts,
+            token_counts_with=token_counts_with,
             coverage=coverage,
             calib_seed=calib_seed,
             tag=tag,
@@ -618,18 +724,22 @@ def refresh_after_edit_metrics(
     guard._target_modules = guard._resolve_target_modules(model, adapter_ref)
     guard._stats["target_module_names"] = sorted(guard._target_modules.keys())
 
-    try:
-        guard._scales = guard._compute_variance_scales(
-            model, guard._calibration_batches
-        )
-    except _VARIANCE_EVALUATION_ERRORS as exc:
-        guard._log_event(
-            "post_edit_scale_failure",
-            level="ERROR",
-            message="Failed to recompute VE scales after edit",
-            error=str(exc),
-        )
+    if bool(getattr(guard, "_explicit_noop_no_change", False)):
         guard._scales = {}
+        guard._raw_scales = {}
+    else:
+        try:
+            guard._scales = guard._compute_variance_scales(
+                model, guard._calibration_batches
+            )
+        except _VARIANCE_EVALUATION_ERRORS as exc:
+            guard._log_event(
+                "post_edit_scale_failure",
+                level="ERROR",
+                message="Failed to recompute VE scales after edit",
+                error=str(exc),
+            )
+            guard._scales = {}
 
     if guard._focus_modules:
         guard._scales = {

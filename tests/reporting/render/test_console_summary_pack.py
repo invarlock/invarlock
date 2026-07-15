@@ -24,9 +24,9 @@ def test_console_summary_pack_basic():
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            # guard overhead may be omitted (treated as not evaluated)
+            # guard metric impact may be omitted (treated as not evaluated)
         },
-        "guard_overhead": {"evaluated": False},
+        "guard_metric_impact": {"evaluated": False},
     }
 
     # Block should compute and overall pass should be True

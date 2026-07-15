@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_rep_base_with_windows(delta: float) -> tuple[dict, dict]:
@@ -19,6 +22,7 @@ def _mk_rep_base_with_windows(delta: float) -> tuple[dict, dict]:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -62,18 +66,13 @@ def _mk_rep_base_with_windows(delta: float) -> tuple[dict, dict]:
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    base = {
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": math.exp(base_ll[0])}
-        },
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2, 3, 4],
-                "logloss": base_ll,
-                "token_counts": [100, 100, 100, 100],
-            }
-        },
+    base = deepcopy(rep)
+    base["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": math.exp(base_ll[0]),
+        "final": math.exp(base_ll[0]),
     }
+    base["evaluation_windows"]["final"]["logloss"] = base_ll
     return rep, base
 
 

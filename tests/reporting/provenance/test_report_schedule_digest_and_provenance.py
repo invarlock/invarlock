@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report_with_final_windows() -> dict[str, Any]:
     return {
-        "meta": {"model_id": "stub", "adapter": "hf", "device": "cpu", "seed": 1},
+        "meta": {
+            "model_id": "stub",
+            "adapter": "hf",
+            "device": "cpu",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -43,12 +52,7 @@ def _mk_report_with_final_windows() -> dict[str, Any]:
 
 def _mk_baseline_like(report: dict[str, Any]) -> dict[str, Any]:
     # Reuse final windows to ensure pairing logic is valid
-    return {
-        "run_id": "base",
-        "model_id": report["meta"]["model_id"],
-        "evaluation_windows": {"final": report["evaluation_windows"]["final"]},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    return {**report, "run_id": "base", "edit": {"name": "noop"}}
 
 
 def test_window_ids_digest_and_guard_schedule_digest_present() -> None:
@@ -62,7 +66,7 @@ def test_window_ids_digest_and_guard_schedule_digest_present() -> None:
     digest = prov.get("window_ids_digest")
     assert isinstance(digest, str) and len(digest) >= 8
 
-    # Guard overhead section mirrors schedule digest for auditability
-    guard = cert.get("guard_overhead", {})
+    # Guard metric impact section mirrors schedule digest for auditability
+    guard = cert.get("guard_metric_impact", {})
     assert isinstance(guard, dict)
     assert guard.get("schedule_digest") == digest

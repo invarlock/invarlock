@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -32,13 +33,43 @@ def test_compressed_tensors_runner_has_expected_adapter_contract() -> None:
     assert "prepare_tiny_hf_ct_fixture.py" in text
     assert "--lane MODE" in text
     assert 'compare_cmd+=(--lane "$lane")' in text
-    assert "--lane cuda" in text
+    assert "strict packed-storage assurance is not implemented" in text
     assert "adapter_runtime_summary.json" in text
     assert "integration_default_host_device" in text
     assert "integration_preflight_host_cuda_device" in text
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+    assert 'if [[ "$effective_assurance" == "strict" ]]' in text
+    assert "not eligible for strict assurance" in text
+
+
+def test_compressed_tensors_runner_rejects_strict_lane_before_setup() -> None:
+    result = subprocess.run(
+        ["bash", str(RUNNER), "--lane", "cuda"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "not eligible for strict assurance" in result.stderr
+
+
+def test_compressed_tensors_runner_defaults_to_diagnostic_host_off_mode() -> None:
+    """The example must not advertise a default that it immediately rejects."""
+
+    result = subprocess.run(
+        ["bash", str(RUNNER)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHON_BIN": "/bin/false"},
+    )
+
+    assert result.returncode == 2
+    assert "not eligible for strict assurance" not in result.stderr
+    assert "Missing example dependency: compressed-tensors" in result.stderr
 
 
 def test_compressed_tensors_helper_writes_local_jsonl_and_preset(

@@ -11,6 +11,7 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
+    configure_guard_metric_impact_skip,
     runner_success,
 )
 from tests.cli.run._support_run_snapshot import (
@@ -28,7 +29,7 @@ from tests.cli.run._support_run_snapshot import (
 def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
     tmp_path: Path, monkeypatch
 ):
-    cfg = snapshot_cfg(tmp_path, 1, 1)
+    cfg = configure_guard_metric_impact_skip(snapshot_cfg(tmp_path, 1, 1))
 
     class Adapter:
         name = "hf_causal"
@@ -143,7 +144,7 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
 def test_until_pass_materialize_sets_flags_and_retries_once(
     tmp_path: Path, monkeypatch
 ):
-    cfg = snapshot_cfg(tmp_path, 1, 1)
+    cfg = configure_guard_metric_impact_skip(snapshot_cfg(tmp_path, 1, 1))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -253,9 +254,9 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
             patch("invarlock.cli.run_execution.build_evaluation_report", make_cert)
         )
         for target in (
-            "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.reporting.validate.validate_guard_metric_impact",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
         ):
             stack.enter_context(
                 patch(
@@ -265,8 +266,8 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
                         messages=[],
                         warnings=[],
                         errors=[],
-                        checks={},
-                        metrics={"overhead_ratio": 0.0, "overhead_percent": 0.0},
+                        checks={"guard_metric_impact": True},
+                        metrics={"degradation": 1.0, "display_value": 0.0},
                     ),
                 )
             )

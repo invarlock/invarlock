@@ -296,6 +296,27 @@ def test_resolve_targets_adapter_fallback_unknown_structure():
     assert len(targets) >= 2, f"Expected >= 2 targets, got {len(targets)}: {targets}"
 
 
+def test_resolve_targets_adapter_fallback_maps_masked_lm_output_dense():
+    """Masked-LM adapters expose the FFN projection as ``output.dense``."""
+
+    class MaskedLMAdapter:
+        def describe(self, _model):
+            return {"n_layer": 1}
+
+        def get_layer_modules(self, _model, _layer_idx):
+            return {
+                "attention.output.dense": nn.Linear(4, 4, bias=False),
+                "output.dense": nn.Linear(4, 4, bias=False),
+            }
+
+    model = TinyUnknownStructure(n_layers=0)
+    guard = VarianceGuard(policy={"scope": "ffn", "min_gain": 0.0})
+
+    targets = guard._resolve_target_modules(model, adapter=MaskedLMAdapter())
+
+    assert set(targets) == {"transformer.h.0.mlp.c_proj"}
+
+
 def test_resolve_targets_adapter_fallback_wrapped_unknown():
     """Adapter fallback works for wrapped model with unknown structure."""
     inner = TinyUnknownStructure(n_layers=2)

@@ -1,9 +1,20 @@
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def _minimal_pm_report():
     return {
-        "meta": {"model_id": "m", "adapter": "hf_causal", "seed": 7, "device": "cpu"},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 7,
+            "device": "cpu",
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -37,19 +48,11 @@ def _minimal_pm_report():
 
 
 def _baseline():
-    return {
-        "run_id": "baseline",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {
-            "final": {"window_ids": [1], "logloss": [1.0], "token_counts": [100]}
-        },
-        "metrics": {
-            "bootstrap": {"replicates": 150, "alpha": 0.05, "method": "percentile"}
-        },
-    }
+    payload = _minimal_pm_report()
+    payload["metrics"]["primary_metric"].pop("ratio_vs_baseline", None)
+    return canonical_baseline(payload)
 
 
 def test_evaluation_report_has_no_ppl_keys():
-    cert = make_report(_minimal_pm_report(), _baseline())
+    cert = make_report(canonical_run_report(_minimal_pm_report()), _baseline())
     assert "ppl" not in cert

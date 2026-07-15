@@ -34,6 +34,12 @@ class GuardEvidence:
     reason: Any = None
     assurance_blocking: Any = None
     status: Any = None
+    baseline_metrics: Any = None
+    final_metrics: Any = None
+    final_degeneracy: Any = None
+    measurement_inventory: Any = None
+    correction_ledger: Any = None
+    stage: Any = None
 
     @classmethod
     def from_result(cls, name: str, result: Any) -> GuardEvidence | None:
@@ -57,6 +63,12 @@ class GuardEvidence:
             reason=result.get("reason"),
             assurance_blocking=result.get("assurance_blocking"),
             status=result.get("status"),
+            baseline_metrics=result.get("baseline_metrics"),
+            final_metrics=result.get("final_metrics"),
+            final_degeneracy=result.get("final_degeneracy"),
+            measurement_inventory=result.get("measurement_inventory"),
+            correction_ledger=result.get("correction_ledger"),
+            stage=result.get("stage"),
         )
 
     @classmethod
@@ -90,6 +102,12 @@ class GuardEvidence:
             "reason",
             "assurance_blocking",
             "status",
+            "baseline_metrics",
+            "final_metrics",
+            "final_degeneracy",
+            "measurement_inventory",
+            "correction_ledger",
+            "stage",
         ):
             value = getattr(self, key)
             if value is not None:
@@ -130,7 +148,8 @@ def maybe_dump_guard_evidence(
         path.mkdir(parents=True, exist_ok=True)
         out = path / "guards_evidence.json"
         out.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+            json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False),
+            encoding="utf-8",
         )
         return out
     except _EVIDENCE_DUMP_EXCEPTIONS:

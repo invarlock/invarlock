@@ -17,7 +17,10 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import assert_single_run_output_artifacts
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
+)
 
 
 def _cfg(tmp_path: Path, preview=1, final=1) -> Path:
@@ -60,7 +63,7 @@ def _common_patches_detect_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -150,7 +153,7 @@ def _common_device_and_save():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -192,7 +195,7 @@ def _runner_min():
     return SimpleNamespace(
         execute=lambda **k: SimpleNamespace(
             edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics=canonical_ppl_metrics(),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -267,14 +270,14 @@ def test_transfer_guard_extras_and_guard_recovered_flag(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+                "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
                 lambda *a, **k: SimpleNamespace(
                     passed=True,
                     messages=[],
                     warnings=[],
                     errors=[],
-                    checks={},
-                    metrics={"overhead_ratio": 0.0, "overhead_percent": 0.0},
+                    checks={"guard_metric_impact": True},
+                    metrics={"degradation": 1.0, "display_value": 0.0},
                 ),
             )
         )
@@ -492,7 +495,7 @@ def test_baseline_stride_mismatch_exit(tmp_path: Path):
         )
 
 
-def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
+def test_bare_metric_impact_measurement_pass(monkeypatch, tmp_path):
     cfg = _cfg(tmp_path)
 
     class DummyRegistry:
@@ -528,6 +531,11 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
             return SimpleNamespace(
                 edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
                 metrics={
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 10.0,
+                        "final": 10.0,
+                    },
                     "ppl_preview": 10.0,
                     "ppl_final": 10.0,
                     "ppl_ratio": 1.0,
@@ -537,7 +545,18 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
                 },
                 guards={},
                 context={"dataset_meta": {}},
-                evaluation_windows={},
+                evaluation_windows={
+                    "preview": {
+                        "window_ids": [0],
+                        "logloss": [2.302585092994046],
+                        "token_counts": [1],
+                    },
+                    "final": {
+                        "window_ids": [1],
+                        "logloss": [2.302585092994046],
+                        "token_counts": [1],
+                    },
+                },
                 status="success",
             )
 
@@ -600,14 +619,13 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
     def _exec(**kwargs):
         return SimpleNamespace(
             edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
-            metrics={
-                "ppl_preview": 10.0,
-                "ppl_final": 10.0,
-                "ppl_ratio": 1.0,
-                "window_overlap_fraction": 0.0,
-                "window_match_fraction": 1.0,
-                "loss_type": "ce",
-            },
+            metrics=canonical_ppl_metrics(
+                preview=10.0,
+                final=10.0,
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+                loss_type="ce",
+            ),
             guards={},
             context={
                 "dataset_meta": {

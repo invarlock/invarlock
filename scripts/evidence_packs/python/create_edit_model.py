@@ -2,368 +2,245 @@ from __future__ import annotations
 
 import argparse
 import gc
-import os
+import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 import torch
 
 try:
-    from .editing.implementations import (
-        apply_dense_lora_merge_delta,
-        apply_dense_lowrank_approximation,
-        apply_dense_magnitude_prune,
-        apply_fp8_dequantized_simulation,
-        apply_rtn_dequantized_simulation,
-        apply_tiny_fine_tune_update,
-        build_fine_tune_validation_metadata,
-        build_lora_merge_validation_metadata,
-        build_validation_edit_metadata,
-        fp8_dtype,
+    from .editing.streaming_pruning import materialize_magnitude_pruned_artifact
+    from .editing.streaming_transform import materialize_transformation_artifact
+    from .editing.training_contract import (
+        DEFAULT_TRAINING_PROFILES_PATH,
+        TrainingProfileError,
+        load_training_profile,
     )
-    from .editing.validate_artifact import save_edited_subject_artifact
-    from .runtime_tools import load_causal_model, require_remote_code_opt_in
+    from .editing.training_runtime import (
+        TrainingRuntimeError,
+        run_training_profile,
+        verify_training_artifact,
+    )
+    from .editing.transformation_contract import (
+        SYNTHETIC_DENSE_UPDATE,
+        SYNTHETIC_LOWRANK_DELTA,
+        TransformationContractError,
+        canonical_transformation_spec,
+        validate_transformation_scope,
+    )
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from editing.implementations import (
-        apply_dense_lora_merge_delta,
-        apply_dense_lowrank_approximation,
-        apply_dense_magnitude_prune,
-        apply_fp8_dequantized_simulation,
-        apply_rtn_dequantized_simulation,
-        apply_tiny_fine_tune_update,
-        build_fine_tune_validation_metadata,
-        build_lora_merge_validation_metadata,
-        build_validation_edit_metadata,
-        fp8_dtype,
+    from editing.streaming_pruning import materialize_magnitude_pruned_artifact
+    from editing.streaming_transform import materialize_transformation_artifact
+    from editing.training_contract import (
+        DEFAULT_TRAINING_PROFILES_PATH,
+        TrainingProfileError,
+        load_training_profile,
     )
-    from editing.validate_artifact import save_edited_subject_artifact
-    from runtime_tools import load_causal_model, require_remote_code_opt_in
-from transformers import AutoTokenizer
+    from editing.training_runtime import (
+        TrainingRuntimeError,
+        run_training_profile,
+        verify_training_artifact,
+    )
+    from editing.transformation_contract import (
+        SYNTHETIC_DENSE_UPDATE,
+        SYNTHETIC_LOWRANK_DELTA,
+        TransformationContractError,
+        canonical_transformation_spec,
+        validate_transformation_scope,
+    )
 
 
 def _configure_determinism() -> None:
-    mode = os.environ.get("PACK_DETERMINISM", "throughput").strip().lower()
-    if mode == "strict":
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cudnn.allow_tf32 = False
-    else:
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
+    """Disable gradients; streaming transformations use canonical CPU math."""
+
     torch.set_grad_enabled(False)
 
 
 def _clear_memory() -> None:
     gc.collect()
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
-def _load_model_and_tokenizer(
-    baseline_path: Path,
+def _canonical_transformation_inputs(
+    args: argparse.Namespace,
     *,
-    require_cuda: bool = False,
-    flash_attention: bool = False,
-) -> tuple[Any, Any]:
-    if require_cuda and not torch.cuda.is_available():
-        raise RuntimeError("CUDA not available")
+    edit_type: str,
+) -> tuple[dict[str, object], str]:
+    """Turn CLI fields into exactly the replay contract's typed input."""
 
-    print(f"Loading baseline from {baseline_path}...")
-    trust_remote_code = require_remote_code_opt_in("create_edit_model.py")
-    tokenizer = AutoTokenizer.from_pretrained(
-        baseline_path, trust_remote_code=trust_remote_code
-    )
-    model_kwargs: dict[str, object] = {
-        "dtype": torch.bfloat16,
-        "trust_remote_code": trust_remote_code,
-        "device_map": "auto",
-        "low_cpu_mem_usage": True,
-    }
-    if flash_attention:
-        model_kwargs["attn_implementation"] = "flash_attention_2"
-    model, _ = load_causal_model(baseline_path, **model_kwargs)
-    return model, tokenizer
+    raw_parameters: dict[str, object]
+    if edit_type == "quant_rtn":
+        raw_parameters = {
+            "bits": int(args.bits),
+            "group_size": int(args.group_size),
+        }
+    elif edit_type == SYNTHETIC_LOWRANK_DELTA:
+        raw_parameters = {"rank": int(args.rank), "scale": float(args.scale)}
+    elif edit_type == SYNTHETIC_DENSE_UPDATE:
+        raw_parameters = {
+            "step_size": float(args.step_size),
+            "iterations": int(args.iterations),
+        }
+    else:  # defensive: the CLI exposes only the three supported families
+        raise TransformationContractError(
+            f"{edit_type!r} has no verifier-grade transformation contract"
+        )
+
+    specification = canonical_transformation_spec(edit_type, raw_parameters)
+    parameters = specification.get("parameters")
+    if not isinstance(parameters, Mapping):  # contract invariant
+        raise TransformationContractError("canonical transformation parameters missing")
+    return dict(parameters), validate_transformation_scope(str(args.scope))
 
 
-def _save_model(
+def _create_streaming_transformation(
+    args: argparse.Namespace,
     *,
-    model: Any,
-    tokenizer: Any,
-    output_path: Path,
-    metadata: dict[str, Any],
-) -> None:
-    model = model.cpu()
-    _clear_memory()
-    save_edited_subject_artifact(
-        model=model,
-        tokenizer=tokenizer,
-        output_path=output_path,
-        metadata=metadata,
+    edit_type: str,
+) -> int:
+    """Materialize a replayable subject without loading a mutable model."""
+
+    _configure_determinism()
+    parameters, scope = _canonical_transformation_inputs(args, edit_type=edit_type)
+    max_output_shard_mib = int(getattr(args, "max_output_shard_mib", 1024))
+    result = materialize_transformation_artifact(
+        baseline_path=Path(args.baseline_path),
+        output_path=Path(args.output_path),
+        edit_type=edit_type,
+        parameters=parameters,
+        scope=scope,
+        max_output_shard_bytes=max_output_shard_mib * 1024 * 1024,
+        restart=bool(getattr(args, "restart", False)),
     )
-    del model
-    _clear_memory()
+    print(
+        "Materialized replayable transformation "
+        f"{edit_type} over {result['selected_tensors']} tensors "
+        f"({result['selected_params']:,} parameters; "
+        f"{result['actual_changes']['value_changed_params']:,} changed)."
+    )
+    print(f"Saved replayable edited model to {args.output_path}")
+    return 0
 
 
 def _create_quant_rtn(args: argparse.Namespace) -> int:
-    _configure_determinism()
-    flash_available = os.environ.get("FLASH_ATTENTION_AVAILABLE", "false") == "true"
-    model, tokenizer = _load_model_and_tokenizer(
-        Path(args.baseline_path), flash_attention=flash_available
-    )
-
-    bits = int(args.bits)
-    group_size = int(args.group_size)
-    scope = str(args.scope)
-    print(
-        "Applying RTN quantize/dequantize simulation "
-        f"to {bits}-bit on GPU (scope={scope}, group_size={group_size})..."
-    )
-    stats = apply_rtn_dequantized_simulation(
-        model,
-        bits=bits,
-        group_size=group_size,
-        scope=scope,
-    )
-    coverage_pct = 100.0 * stats.coverage_ratio
-    print(
-        f"Quantized {stats.edited_tensors} tensors "
-        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
-    )
-
-    metadata = build_validation_edit_metadata(
-        edit_type="quant_rtn",
-        scope=scope,
-        parameters={"bits": bits, "group_size": group_size},
-        coverage=stats.coverage_payload(),
-        extra={
-            "quantization_mode": "rtn_dequantized_external_subject_simulation",
-            "quantized_params": stats.edited_tensors,
-        },
-    )
-    _save_model(
-        model=model,
-        tokenizer=tokenizer,
-        output_path=Path(args.output_path),
-        metadata=metadata,
-    )
-    print(f"Saved edited model to {args.output_path}")
-    return 0
+    return _create_streaming_transformation(args, edit_type="quant_rtn")
 
 
 def _create_magnitude_prune(args: argparse.Namespace) -> int:
-    _configure_determinism()
-    model, tokenizer = _load_model_and_tokenizer(Path(args.baseline_path))
     sparsity = float(args.sparsity)
     scope = str(args.scope)
-
-    print(f"Pruning with sparsity={sparsity} (scope={scope})...")
-    stats = apply_dense_magnitude_prune(model, sparsity=sparsity, scope=scope)
-    actual_sparsity = float(stats.details.get("actual_sparsity") or 0.0)
-    coverage_pct = 100.0 * stats.coverage_ratio
-    print(
-        f"Pruned {stats.edited_tensors} tensors "
-        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
-    )
-    print(f"Actual sparsity within edited params: {actual_sparsity:.2%}")
-
-    metadata = build_validation_edit_metadata(
-        edit_type="magnitude_prune",
-        scope=scope,
-        parameters={"target_sparsity": sparsity},
-        coverage=stats.coverage_payload(),
-        extra={
-            "target_sparsity": sparsity,
-            "actual_sparsity": actual_sparsity,
-            "pruned_params": stats.edited_tensors,
-        },
-    )
-    _save_model(
-        model=model,
-        tokenizer=tokenizer,
+    result = materialize_magnitude_pruned_artifact(
+        baseline_path=Path(args.baseline_path),
         output_path=Path(args.output_path),
-        metadata=metadata,
+        sparsity=sparsity,
+        scope=scope,
+        max_output_shard_bytes=int(args.max_output_shard_mib) * 1024 * 1024,
+        restart=bool(args.restart),
     )
-    print(f"Saved pruned model to {args.output_path}")
+    print(
+        "Pruned "
+        f"{result['selected_tensors']} tensors "
+        f"({result['selected_params']:,} parameters; "
+        f"{result['effective_changed_params']:,} changed) on {result['device']}"
+    )
+    print(f"Saved replayable pruned model to {args.output_path}")
     return 0
 
 
-def _create_lowrank_svd(args: argparse.Namespace) -> int:
-    _configure_determinism()
-    model, tokenizer = _load_model_and_tokenizer(Path(args.baseline_path))
-    rank = int(args.rank)
-    scope = str(args.scope)
+def _create_synthetic_lowrank_delta(args: argparse.Namespace) -> int:
+    return _create_streaming_transformation(
+        args,
+        edit_type=SYNTHETIC_LOWRANK_DELTA,
+    )
 
-    print(f"Applying low-rank SVD with rank={rank} (scope={scope})...")
-    stats = apply_dense_lowrank_approximation(model, rank=rank, scope=scope)
-    avg_energy = float(stats.details.get("avg_energy_retained") or 1.0)
-    coverage_pct = 100.0 * stats.coverage_ratio
+
+def _create_synthetic_dense_update(args: argparse.Namespace) -> int:
+    return _create_streaming_transformation(
+        args,
+        edit_type=SYNTHETIC_DENSE_UPDATE,
+    )
+
+
+def _create_training_profile(args: argparse.Namespace) -> int:
+    """Run one immutable tiny-model training profile and publish its receipt."""
+
+    repo_root = Path(args.repo_root).resolve()
+    profile = load_training_profile(
+        str(args.profile_id),
+        profiles_path=Path(args.profiles_path).resolve(),
+        repo_root=repo_root,
+    )
+    result = run_training_profile(
+        profile,
+        Path(args.output_path),
+        repo_root=repo_root,
+        local_files_only=not bool(args.allow_network),
+    )
     print(
-        f"Modified {stats.edited_tensors} matrices "
-        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
-    )
-    print(f"Average energy retained: {avg_energy:.2%}")
-
-    metadata = build_validation_edit_metadata(
-        edit_type="lowrank_svd",
-        scope=scope,
-        parameters={"rank": rank},
-        coverage=stats.coverage_payload(),
-        extra={
-            "rank": rank,
-            "modified_matrices": stats.edited_tensors,
-            "avg_energy_retained": avg_energy,
-            "base_scope": stats.details.get("base_scope"),
-            "layer_limit": stats.details.get("layer_limit"),
-            "layer": stats.details.get("layer"),
-        },
-    )
-    _save_model(
-        model=model,
-        tokenizer=tokenizer,
-        output_path=Path(args.output_path),
-        metadata=metadata,
-    )
-    print(f"Saved low-rank model to {args.output_path}")
-    return 0
-
-
-def _create_fp8_quant(args: argparse.Namespace) -> int:
-    _configure_determinism()
-    format_type = str(args.format)
-    scope = str(args.scope)
-    model, tokenizer = _load_model_and_tokenizer(
-        Path(args.baseline_path), require_cuda=True
-    )
-
-    if fp8_dtype(format_type) is None:
-        print(
-            "WARNING: torch float8 dtype not available; falling back to float16 quantization"
+        json.dumps(
+            {
+                "edit_type": profile.edit_type,
+                "profile_id": profile.profile_id,
+                "profile_sha256": profile.profile_sha256,
+                "receipt_path": str(result.receipt_path),
+                "receipt_sha256": result.receipt["receipt_sha256"],
+                "subject_dir": str(result.subject_dir),
+            },
+            sort_keys=True,
         )
-
-    print(f"Applying FP8 quantization (format={format_type}, scope={scope})...")
-    stats = apply_fp8_dequantized_simulation(
-        model,
-        format_type=format_type,
-        scope=scope,
     )
-    avg_error = float(stats.details.get("avg_relative_error") or 0.0)
-    print(
-        f"Quantized {stats.edited_tensors} tensors, avg relative error: {avg_error:.4f}"
-    )
-
-    metadata = build_validation_edit_metadata(
-        edit_type="fp8_quant",
-        scope=scope,
-        parameters={"format": format_type},
-        coverage=stats.coverage_payload(),
-        extra={
-            "quantization_mode": "fp8_dequantized_external_subject_simulation",
-            "format": format_type,
-            "quantized_tensors": stats.edited_tensors,
-            "avg_relative_error": avg_error,
-            "torch_fp8_dtype_available": bool(
-                stats.details.get("torch_fp8_dtype_available")
-            ),
-        },
-    )
-    _save_model(
-        model=model,
-        tokenizer=tokenizer,
-        output_path=Path(args.output_path),
-        metadata=metadata,
-    )
-    print(f"Saved FP8-quantized model to {args.output_path}")
     return 0
 
 
-def _create_lora_merge(args: argparse.Namespace) -> int:
-    _configure_determinism()
-    rank = int(args.rank)
-    alpha = float(args.alpha)
-    scope = str(args.scope)
-    if rank < 1:
-        raise ValueError("lora-merge rank must be a positive integer")
-    if alpha <= 0:
-        raise ValueError("lora-merge alpha must be positive")
-    model, tokenizer = _load_model_and_tokenizer(Path(args.baseline_path))
+def _verify_training_profile(args: argparse.Namespace) -> int:
+    """Independently recompute a published tiny-training artifact contract."""
 
+    repo_root = Path(args.repo_root).resolve()
+    profile = load_training_profile(
+        str(args.profile_id),
+        profiles_path=Path(args.profiles_path).resolve(),
+        repo_root=repo_root,
+    )
+    receipt = verify_training_artifact(
+        profile,
+        Path(args.subject_path),
+        repo_root=repo_root,
+        local_files_only=not bool(args.allow_network),
+    )
     print(
-        f"Applying deterministic LoRA merge (rank={rank}, alpha={alpha}, scope={scope})..."
+        json.dumps(
+            {
+                "profile_id": profile.profile_id,
+                "receipt_sha256": receipt["receipt_sha256"],
+                "status": "verified",
+                "subject_dir": str(Path(args.subject_path).resolve()),
+            },
+            sort_keys=True,
+        )
     )
-    stats = apply_dense_lora_merge_delta(
-        model,
-        rank=rank,
-        alpha=alpha,
-        scope=scope,
-    )
-    coverage_pct = 100.0 * stats.coverage_ratio
-    print(
-        f"Modified {stats.edited_tensors} matrices "
-        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
-    )
-
-    metadata = build_lora_merge_validation_metadata(
-        scope=scope,
-        rank=rank,
-        alpha=alpha,
-        stats=stats,
-    )
-    _save_model(
-        model=model,
-        tokenizer=tokenizer,
-        output_path=Path(args.output_path),
-        metadata=metadata,
-    )
-    print(f"Saved LoRA-merged model to {args.output_path}")
-    return 0
-
-
-def _create_fine_tune(args: argparse.Namespace) -> int:
-    _configure_determinism()
-    learning_rate = float(args.learning_rate)
-    steps = int(args.steps)
-    scope = str(args.scope)
-    if learning_rate <= 0:
-        raise ValueError("fine-tune learning_rate must be positive")
-    if steps < 1:
-        raise ValueError("fine-tune steps must be a positive integer")
-    model, tokenizer = _load_model_and_tokenizer(Path(args.baseline_path))
-
-    print(
-        "Applying deterministic tiny fine-tune update "
-        f"(learning_rate={learning_rate}, steps={steps}, scope={scope})..."
-    )
-    stats = apply_tiny_fine_tune_update(
-        model,
-        learning_rate=learning_rate,
-        steps=steps,
-        scope=scope,
-    )
-    coverage_pct = 100.0 * stats.coverage_ratio
-    print(
-        f"Modified {stats.edited_tensors} matrices "
-        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
-    )
-
-    metadata = build_fine_tune_validation_metadata(
-        scope=scope,
-        learning_rate=learning_rate,
-        steps=steps,
-        stats=stats,
-    )
-    _save_model(
-        model=model,
-        tokenizer=tokenizer,
-        output_path=Path(args.output_path),
-        metadata=metadata,
-    )
-    print(f"Saved fine-tuned model to {args.output_path}")
     return 0
 
 
 def _add_common_paths(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("baseline_path")
     parser.add_argument("output_path")
+
+
+def _add_streaming_materialization_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--max-output-shard-mib",
+        type=int,
+        default=1024,
+        help="Maximum materialized safetensors shard size (default: 1024 MiB).",
+    )
+    parser.add_argument(
+        "--restart",
+        action="store_true",
+        help="Discard a stale resumable transformation staging directory before starting.",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -377,39 +254,80 @@ def build_parser() -> argparse.ArgumentParser:
     quant.add_argument("bits")
     quant.add_argument("group_size")
     quant.add_argument("scope")
+    _add_streaming_materialization_options(quant)
     quant.set_defaults(func=_create_quant_rtn)
 
     prune = subparsers.add_parser("magnitude-prune")
     _add_common_paths(prune)
     prune.add_argument("sparsity")
     prune.add_argument("scope")
+    _add_streaming_materialization_options(prune)
     prune.set_defaults(func=_create_magnitude_prune)
 
-    lowrank = subparsers.add_parser("lowrank-svd")
-    _add_common_paths(lowrank)
-    lowrank.add_argument("rank")
-    lowrank.add_argument("scope")
-    lowrank.set_defaults(func=_create_lowrank_svd)
+    synthetic_lowrank = subparsers.add_parser("synthetic-lowrank-delta")
+    _add_common_paths(synthetic_lowrank)
+    synthetic_lowrank.add_argument("rank")
+    synthetic_lowrank.add_argument("scale")
+    synthetic_lowrank.add_argument("scope")
+    _add_streaming_materialization_options(synthetic_lowrank)
+    synthetic_lowrank.set_defaults(func=_create_synthetic_lowrank_delta)
 
-    fp8 = subparsers.add_parser("fp8-quant")
-    _add_common_paths(fp8)
-    fp8.add_argument("format")
-    fp8.add_argument("scope")
-    fp8.set_defaults(func=_create_fp8_quant)
+    synthetic_dense = subparsers.add_parser("synthetic-dense-update")
+    _add_common_paths(synthetic_dense)
+    synthetic_dense.add_argument("step_size")
+    synthetic_dense.add_argument("iterations")
+    synthetic_dense.add_argument("scope")
+    _add_streaming_materialization_options(synthetic_dense)
+    synthetic_dense.set_defaults(func=_create_synthetic_dense_update)
 
-    lora = subparsers.add_parser("lora-merge")
-    _add_common_paths(lora)
-    lora.add_argument("rank")
-    lora.add_argument("alpha")
-    lora.add_argument("scope")
-    lora.set_defaults(func=_create_lora_merge)
+    training = subparsers.add_parser(
+        "train-profile",
+        help=(
+            "Run an immutable tiny-model training profile, verify its "
+            "artifacts, and publish the subject atomically."
+        ),
+    )
+    training.add_argument("profile_id")
+    training.add_argument("output_path")
+    training.add_argument(
+        "--profiles-path",
+        default=str(DEFAULT_TRAINING_PROFILES_PATH),
+        help="Immutable training-profile JSON document.",
+    )
+    training.add_argument(
+        "--repo-root",
+        default=str(Path(__file__).resolve().parents[3]),
+        help="Repository root used to resolve vendored training data.",
+    )
+    training.add_argument(
+        "--allow-network",
+        action="store_true",
+        help="Allow retrieval of the pinned model and tokenizer revision.",
+    )
+    training.set_defaults(func=_create_training_profile)
 
-    fine_tune = subparsers.add_parser("fine-tune")
-    _add_common_paths(fine_tune)
-    fine_tune.add_argument("learning_rate")
-    fine_tune.add_argument("steps")
-    fine_tune.add_argument("scope")
-    fine_tune.set_defaults(func=_create_fine_tune)
+    training_verify = subparsers.add_parser(
+        "verify-training-profile",
+        help="Recompute artifact evidence for a tiny training-profile subject.",
+    )
+    training_verify.add_argument("profile_id")
+    training_verify.add_argument("subject_path")
+    training_verify.add_argument(
+        "--profiles-path",
+        default=str(DEFAULT_TRAINING_PROFILES_PATH),
+        help="Immutable training-profile JSON document.",
+    )
+    training_verify.add_argument(
+        "--repo-root",
+        default=str(Path(__file__).resolve().parents[3]),
+        help="Repository root used to resolve vendored training data.",
+    )
+    training_verify.add_argument(
+        "--allow-network",
+        action="store_true",
+        help="Allow retrieval of the pinned model and tokenizer revision.",
+    )
+    training_verify.set_defaults(func=_verify_training_profile)
 
     return parser
 
@@ -418,7 +336,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        return int(args.func(args))
+        try:
+            return int(args.func(args))
+        except (
+            TrainingProfileError,
+            TrainingRuntimeError,
+            TransformationContractError,
+            ValueError,
+            OSError,
+            RuntimeError,
+        ) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
     finally:
         _clear_memory()
 

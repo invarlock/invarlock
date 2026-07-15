@@ -43,11 +43,17 @@ def test_wikitext2_load_uses_namespaced_hf_dataset(monkeypatch):
         data_providers_mod, "load_dataset_with_cache_fallback", load_stub
     )
 
-    texts = data_mod.WikiText2Provider().load(max_samples=1)
+    revision = "96df5e686bee6baa90b8bee7c28b81fa3fa6223d"
+    provider = data_mod.WikiText2Provider(revision=revision)
+    texts = provider.load(max_samples=1)
 
     assert texts == ["A long enough WikiText sample with alphabetic content."]
+    assert provider.dataset_name == "Salesforce/wikitext"
+    assert provider.config_name == "wikitext-2-raw-v1"
+    assert provider.revision == revision
     assert calls[0][0][:2] == ("Salesforce/wikitext", "wikitext-2-raw-v1")
     assert calls[0][1]["split"] == "validation[:1]"
+    assert calls[0][1]["revision"] == revision
 
 
 def test_hf_text_default_uses_namespaced_wikitext(monkeypatch):

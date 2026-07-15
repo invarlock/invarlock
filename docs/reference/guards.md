@@ -14,7 +14,27 @@
 | **Source of truth** | `src/invarlock/guards/*.py`, `src/invarlock/guards/policies.py`, packaged `runtime/tiers.yaml`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of guard terms such
-as kappa threshold, epsilon band, and guard overhead.
+as kappa threshold, epsilon band, and guard metric impact.
+
+## Evidence Maturity and Enforcement
+
+| Surface | Empirical maturity | Current strict behavior | Interpretation |
+| --- | --- | --- | --- |
+| Paired primary metric | **Implemented, recomputed gate** | Must satisfy the configured paired regression policy. | Main baseline-versus-subject decision; field sensitivity depends on the selected data, metric, and thresholds. It is documented with reports because it is not a guard plugin. |
+| Invariants | **Stable blocking guard** | Structural and non-finite findings block. | Fail-closed integrity evidence. |
+| Spectral | **Operational diagnostic** | Selected external-baseline spectral violations block. | Baseline-relative weight diagnostic with a versioned measurement contract; interpret only within calibrated scope. |
+| RMT | **Experimental diagnostic** | Epsilon violations block. | Activation edge-risk diagnostic; interpret only within its evaluated sampling and family scope. |
+| Variance/VE | **Experimental intervention** | Predictive gate must be evaluated and pass. | A/B remediation/intervention evidence whose usefulness depends on workload-specific calibration and paired evidence. |
+
+Maturity is not the same as enforcement. Current strict verification requires
+the canonical guard evidence and applies the blocking rules shown above even
+when the empirical interpretation remains diagnostic or experimental. The
+labels communicate how broadly to interpret each signal; they do not introduce
+separate core, diagnostic, calibrated, or research CLI modes.
+
+The paired primary metric is the implemented behavioral acceptance surface. Guards
+add structural checks and checkpoint-internal diagnostics; they do not replace
+task evaluation, external benchmarks, or deployment monitoring.
 
 ## Quick Start
 
@@ -35,20 +55,9 @@ guards:
 > Most thresholds come from the tier defaults (see `tiers.yaml`). Use overrides
 > sparingly and keep evidence in the report.
 >
-> Assurance scope note: the published assurance basis is the set of
-> `published_basis` rows in `contracts/support_matrix.json`, with the readable
-> grouping in `docs/README.md#support-matrix`.
-> Modern published-basis no-op reports are included as null-behavior guard
-> evidence, but transferred attention caps are budgeted sentinels until
-> family-specific calibration re-derives κ.
-> The strongest public guard-value evidence is the Mistral 7B scenario package
-> under `public_evidence/published_basis/mistral_7b/guard_value_demo/`: PM-only
-> accepts the selected edits while clean confirmation reruns record
-> baseline-relative spectral, RMT, and variance/VE movement. Invariants remain
-> structural checks in that package and are required to pass.
-> Additional runnable but unpublished lanes are tracked in
-> `contracts/support_matrix.json`; they expand runnable coverage, not the
-> published assurance basis.
+> `contracts/support_matrix.json` records the maintained lanes and their current
+> evidence status. Family-specific calibration studies can refine the shipped
+> tier defaults for a selected workload.
 
 ## Guard Pipeline Flow
 
@@ -57,33 +66,22 @@ guards:
 │                        GUARD PIPELINE FLOW                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐          │
-│   │invariants│───▶│ spectral │───▶│   rmt    │───▶│ variance │          │
-│   │(pre-edit)│    │ (weight) │    │(activatn)│    │  (A/B)   │          │
-│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘          │
-│        │               │               │               │                │
-│        ▼               ▼               ▼               ▼                │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐          │
-│   │ prepare  │    │ prepare  │    │ prepare  │    │ prepare  │          │
-│   │(baseline)│    │(baseline)│    │(calibrtn)│    │(calibrtn)│          │
-│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘          │
-│        │               │               │               │                │
-│        ▼               ▼               ▼               ▼                │
-│   ┌──────────────────────────────────────────────────────────┐          │
-│   │                    EDIT APPLIED                          │          │
-│   └──────────────────────────────────────────────────────────┘          │
-│        │               │               │               │                │
-│        ▼               ▼               ▼               ▼                │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐          │
-│   │ validate │    │ validate │    │ validate │    │ validate │          │
-│   │(post-edt)│    │(κ-check) │    │(ε-band)  │    │(gain>0?) │          │
-│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘          │
-│        │               │               │               │                │
-│        ▼               ▼               ▼               ▼                │
-│   ┌──────────────────────────────────────────────────────────┐          │
-│   │                GUARD RESULTS → report                    │          │
-│   │     (passed/warned/failed + metrics + measurement_hash)  │          │
-│   └──────────────────────────────────────────────────────────┘          │
+│   prepare model + prepare all guards                                   │
+│                         │                                               │
+│                         ▼                                               │
+│   invariants(pre).validate                                              │
+│                         │                                               │
+│                         ▼                                               │
+│   edit/noop stage                                                       │
+│                         │                                               │
+│                         ▼                                               │
+│   spectral.validate → rmt.validate → variance.validate                  │
+│                         │                                               │
+│                         ▼                                               │
+│   invariants(post).validate → evaluate → finalize                       │
+│                         │                                               │
+│                         ▼                                               │
+│   report guard statuses, metrics, and measurement-contract hashes      │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -113,7 +111,7 @@ guards:
 | Gate | Required fields | Applies |
 | --- | --- | --- |
 | Measurement contracts | `spectral.measurement_contract_hash`, `rmt.measurement_contract_hash`, `resolved_policy.*`. | CI/Release. |
-| Guard overhead | `guard_overhead.*`. | Release only. |
+| Guard metric degradation | `guard_metric_impact.{metric_kind,direction,degradation_basis,bare_value,guarded_value,degradation,degradation_limit,display_value,display_unit}`. | Release only; kind-specific values are recomputed. |
 | Validation allow‑list | `validation.*` booleans. | Schema validation. |
 
 ## Reference
@@ -135,7 +133,7 @@ guards:
 | `guards.spectral.*` | `report.guards[name=spectral]` | `report.spectral`, `resolved_policy.spectral`, `validation.spectral_stable` | Measurement contracts (CI/Release). |
 | `guards.rmt.*` | `report.guards[name=rmt]` | `report.rmt`, `resolved_policy.rmt`, `validation.rmt_stable` | Measurement contracts (CI/Release). |
 | `guards.variance.*` | `report.guards[name=variance]` | `report.variance`, `resolved_policy.variance` | Schema only. |
-| `--profile release` | `report.guard_overhead` | `report.guard_overhead` | Required unless skipped. |
+| `--profile release` | `report.guard_metric_impact` | `report.guard_metric_impact` | Requires evaluated, passing paired evidence with the registered direction and degradation basis; skips fail. |
 
 ### Invariants Guard
 
@@ -204,8 +202,9 @@ packaged presets include it by default; remove a guard from the list to skip it.
 - **Guard prepare failed**: set `context.run.strict_guard_prepare: false` in
   your run config for local debugging, or adjust tier policies for the guard
   that failed.
-- **Spectral instability**: lower `sigma_quantile`, narrow `scope`, or increase
-  deadband to reduce noise.
+- **Spectral instability**: inspect family dispersion and cap diagnostics before
+  changing policy. `spectral.deadband` only affects the zero-standard-deviation
+  fallback; it does not buffer the normal positive-variance z-score path.
 - **RMT ε-band violations**: tighten calibration (more windows) or adjust
   `epsilon_by_family` only if you are updating tier policy evidence.
 - **Variance guard never enables**: A/B gate may fail; inspect
@@ -221,7 +220,7 @@ packaged presets include it by default; remove a guard from the list to skip it.
 - Reports may include `guard_warnings`. These are baseline-relative guard-signal
   changes that still pass the hard policy, such as a new capped spectral module
   while `caps_applied <= max_caps`. They are advisory by default and become
-  verification failures only with `invarlock verify --fail-on-warnings`.
+  verification failures only with `invarlock verify --warning-policy fail`.
 - Evidence packs use the same guard observations but apply stricter scenario
   semantics. A public guard-value claim requires reproduced baseline-relative
   scenario evidence; an ordinary warning alone is not enough.

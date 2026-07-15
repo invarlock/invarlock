@@ -40,6 +40,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
     "conservative": {
         "metrics": {
             "pm_ratio": {
+                "ratio_limit_base": 1.05,
                 # Lower token floor for CI-friendly smokes while retaining
                 # dataset-fraction guardrails via min_token_fraction.
                 "min_tokens": 20000,
@@ -53,7 +54,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "quantile": 0.95,
                 "quantile_max": 0.12,
                 "epsilon": 1e-4,
-                # Default to non-binding tail-mass checks until calibrated.
+                # This policy intentionally leaves tail-mass non-binding.
                 "mass_max": 1.0,
             },
             "accuracy": {
@@ -67,6 +68,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "sigma_quantile": 0.90,  # Tighter spectral percentile
             "deadband": 0.05,  # Smaller no-op zone
             "scope": "ffn",
+            "correction_enabled": True,
             "family_caps": {
                 "ffn": {"kappa": 3.849},
                 "attn": {"kappa": 2.6},
@@ -75,11 +77,13 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             },
             "ignore_preview_inflation": True,
             "max_caps": 3,
+            "max_spectral_norm": None,
             "multiple_testing": {"method": "bonferroni", "alpha": 0.000625, "m": 4},
         },
         "rmt": {
-            "margin": 1.40,  # Lower spike allowance
-            "deadband": 0.10,  # Standard deadband
+            "q": "auto",
+            "margin": 1.30,  # Lower spike allowance
+            "deadband": 0.05,
             "correct": True,
             "epsilon_default": 0.01,
             "epsilon_by_family": {
@@ -118,6 +122,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
     "balanced": {
         "metrics": {
             "pm_ratio": {
+                "ratio_limit_base": 1.10,
                 "min_tokens": 50000,
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
@@ -141,6 +146,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "sigma_quantile": 0.95,  # Default spectral percentile
             "deadband": 0.10,  # Standard no-op zone
             "scope": "all",
+            "correction_enabled": True,
             "family_caps": {
                 "ffn": {"kappa": 3.849},
                 "attn": {"kappa": 3.018},
@@ -153,6 +159,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "max_spectral_norm": None,
         },
         "rmt": {
+            "q": "auto",
             "margin": 1.50,  # Default spike allowance
             "deadband": 0.10,  # Standard deadband
             "correct": True,
@@ -193,6 +200,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
     "aggressive": {
         "metrics": {
             "pm_ratio": {
+                "ratio_limit_base": 1.20,
                 "min_tokens": 50000,
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
@@ -216,6 +224,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "sigma_quantile": 0.98,  # Looser spectral percentile
             "deadband": 0.15,  # Larger no-op zone
             "scope": "ffn",
+            "correction_enabled": True,
             "family_caps": {
                 "ffn": {"kappa": 3.849},
                 "attn": {"kappa": 3.5},
@@ -228,7 +237,8 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "max_spectral_norm": None,
         },
         "rmt": {
-            "margin": 1.70,  # Higher spike allowance
+            "q": "auto",
+            "margin": 1.80,  # Higher spike allowance
             "deadband": 0.15,  # Larger deadband
             "correct": True,
             "epsilon_default": 0.01,
@@ -251,6 +261,11 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "alpha": 0.05,
             "tie_breaker_deadband": 0.0005,
             "min_effect_lognll": 0.033,
+            "min_abs_adjust": 0.012,
+            "max_scale_step": 0.03,
+            "topk_backstop": 1,
+            "max_adjusted_modules": 1,
+            "predictive_one_sided": True,
             "tap": ["transformer.h.*.mlp.c_proj", "transformer.h.*.attn.c_proj"],
             "predictive_gate": True,
             "calibration": {
@@ -382,7 +397,15 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
 
     variance_src = tier_entry.get("variance_guard")
     if isinstance(variance_src, dict):
-        out["variance"] = copy.deepcopy(variance_src)
+        variance = copy.deepcopy(variance_src)
+        clamp = variance.get("clamp")
+        if (
+            isinstance(clamp, list | tuple)
+            and len(clamp) == 2
+            and all(isinstance(value, int | float) for value in clamp)
+        ):
+            variance["clamp"] = (float(clamp[0]), float(clamp[1]))
+        out["variance"] = variance
 
     return out
 

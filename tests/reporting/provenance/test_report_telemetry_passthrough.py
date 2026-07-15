@@ -1,14 +1,25 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_evaluation_report_telemetry_fields_and_device_default():
     report = {
-        "meta": {"model_id": "m", "seed": 1, "device": "cpu"},
+        "meta": {
+            "adapter": "hf",
+            "model_id": "m",
+            "seed": 1,
+            "device": "cpu",
+            "auto": {"tier": "balanced"},
+        },
         "metrics": {
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            },
             "latency_ms_per_tok": 1.23,
             "memory_mb_peak": 456,
             "throughput_tok_per_s": 789.0,
@@ -19,6 +30,7 @@ def test_evaluation_report_telemetry_fields_and_device_default():
             "masked_tokens_final": 0,
             "edge_device": {"name": "mps", "available": False},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "d",
             "split": "val",
@@ -39,12 +51,7 @@ def test_evaluation_report_telemetry_fields_and_device_default():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
-    }
+    baseline = {**report, "run_id": "b", "edit": {"name": "noop"}}
 
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True

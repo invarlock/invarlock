@@ -8,6 +8,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+_YAML_LOAD_ERRORS: tuple[type[BaseException], ...]
+
 try:
     import yaml
 
@@ -104,6 +106,94 @@ def _load_guard_order_and_assurance(
     return guards_order, assurance_cfg
 
 
+def _record_section(rec: dict[str, Any], name: str) -> dict[str, Any]:
+    value = rec.get(name)
+    return value if isinstance(value, dict) else {}
+
+
+def _merge_spectral_record(
+    rec: dict[str, Any],
+    metrics: dict[str, Any],
+    policy: dict[str, Any],
+    guard: dict[str, Any],
+) -> None:
+    spectral = _record_section(rec, "spectral")
+    for key in ("family_z_quantiles", "family_z_summary", "family_caps", "families"):
+        value = metrics.get(key)
+        if value:
+            spectral.setdefault(key, value)
+    for key in ("sigma_quantile", "deadband", "max_caps"):
+        value = metrics.get(key)
+        if value is not None:
+            spectral.setdefault(key, value)
+    if metrics.get("family_stats"):
+        spectral.setdefault("families", metrics["family_stats"])
+    z_scores = guard.get("final_z_scores") or metrics.get("final_z_scores")
+    if isinstance(z_scores, dict):
+        spectral["final_z_scores"] = z_scores
+    family_map = guard.get("module_family_map") or metrics.get("module_family_map")
+    if isinstance(family_map, dict):
+        spectral["module_family_map"] = family_map
+    if policy and not spectral.get("policy"):
+        spectral["policy"] = policy
+    rec["spectral"] = spectral
+
+
+def _merge_rmt_record(
+    rec: dict[str, Any], metrics: dict[str, Any], policy: dict[str, Any]
+) -> None:
+    rmt = _record_section(rec, "rmt")
+    for key in (
+        "outliers_per_family",
+        "baseline_outliers_per_family",
+        "families",
+        "edge_risk_by_family_base",
+        "edge_risk_by_family",
+    ):
+        value = metrics.get(key)
+        if isinstance(value, dict) and value:
+            rmt.setdefault(key, value)
+    epsilon_by_family = metrics.get("epsilon_by_family")
+    if epsilon_by_family:
+        rmt.setdefault("epsilon_by_family", epsilon_by_family)
+    else:
+        epsilon = metrics.get("epsilon")
+        if isinstance(epsilon, dict):
+            rmt.setdefault("epsilon_by_family", epsilon)
+        elif epsilon is not None:
+            rmt.setdefault("epsilon_default", epsilon)
+    for source, target in (
+        ("epsilon_default", "epsilon_default"),
+        ("margin_used", "margin"),
+        ("deadband_used", "deadband"),
+    ):
+        if metrics.get(source) is not None:
+            rmt.setdefault(target, metrics[source])
+    if policy and not rmt.get("policy"):
+        rmt["policy"] = policy
+    rec["rmt"] = rmt
+
+
+def _merge_variance_record(
+    rec: dict[str, Any], metrics: dict[str, Any], policy: dict[str, Any]
+) -> None:
+    variance = _record_section(rec, "variance")
+    for key in (
+        "predictive_gate",
+        "ab_windows_used",
+        "deadband",
+        "min_gain",
+        "min_effect_lognll",
+        "calibration",
+        "calibration_stats",
+    ):
+        if metrics.get(key) is not None:
+            variance.setdefault(key, metrics[key])
+    if policy and not variance.get("policy"):
+        variance["policy"] = policy
+    rec["variance"] = variance
+
+
 def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
     rec: dict[str, Any] = {}
     if isinstance(cert, dict):
@@ -133,92 +223,11 @@ def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
         gpolicy = guard.get("policy", {}) or {}
 
         if name == "spectral":
-            spec = (
-                rec.get("spectral", {}) if isinstance(rec.get("spectral"), dict) else {}
-            )
-            if gmetrics.get("family_z_quantiles"):
-                spec.setdefault(
-                    "family_z_quantiles", gmetrics.get("family_z_quantiles")
-                )
-            if gmetrics.get("family_z_summary"):
-                spec.setdefault("family_z_summary", gmetrics.get("family_z_summary"))
-            if gmetrics.get("family_caps"):
-                spec.setdefault("family_caps", gmetrics.get("family_caps"))
-            if gmetrics.get("sigma_quantile") is not None:
-                spec.setdefault("sigma_quantile", gmetrics.get("sigma_quantile"))
-            if gmetrics.get("deadband") is not None:
-                spec.setdefault("deadband", gmetrics.get("deadband"))
-            if gmetrics.get("max_caps") is not None:
-                spec.setdefault("max_caps", gmetrics.get("max_caps"))
-            if gmetrics.get("families"):
-                spec.setdefault("families", gmetrics.get("families"))
-            if gmetrics.get("family_stats"):
-                spec.setdefault("families", gmetrics.get("family_stats"))
-            z_scores = guard.get("final_z_scores") or gmetrics.get("final_z_scores")
-            if isinstance(z_scores, dict):
-                spec["final_z_scores"] = z_scores
-            fam_map = guard.get("module_family_map") or gmetrics.get(
-                "module_family_map"
-            )
-            if isinstance(fam_map, dict):
-                spec["module_family_map"] = fam_map
-            if gpolicy and not spec.get("policy"):
-                spec["policy"] = gpolicy
-            rec["spectral"] = spec
-
+            _merge_spectral_record(rec, gmetrics, gpolicy, guard)
         elif name == "rmt":
-            rmt = rec.get("rmt", {}) if isinstance(rec.get("rmt"), dict) else {}
-            for key in (
-                "outliers_per_family",
-                "baseline_outliers_per_family",
-                "families",
-                "edge_risk_by_family_base",
-                "edge_risk_by_family",
-            ):
-                val = gmetrics.get(key)
-                if isinstance(val, dict) and val:
-                    rmt.setdefault(key, val)
-            epsilon_by_family = gmetrics.get("epsilon_by_family")
-            if epsilon_by_family:
-                rmt.setdefault("epsilon_by_family", epsilon_by_family)
-            else:
-                epsilon = gmetrics.get("epsilon")
-                if epsilon is not None:
-                    if isinstance(epsilon, dict):
-                        rmt.setdefault("epsilon_by_family", epsilon)
-                    else:
-                        rmt.setdefault("epsilon_default", epsilon)
-            if gmetrics.get("epsilon_default") is not None:
-                rmt.setdefault("epsilon_default", gmetrics.get("epsilon_default"))
-            if gmetrics.get("margin_used") is not None:
-                rmt.setdefault("margin", gmetrics.get("margin_used"))
-            if gmetrics.get("deadband_used") is not None:
-                rmt.setdefault("deadband", gmetrics.get("deadband_used"))
-            if gpolicy and not rmt.get("policy"):
-                rmt["policy"] = gpolicy
-            rec["rmt"] = rmt
-
+            _merge_rmt_record(rec, gmetrics, gpolicy)
         elif name == "variance":
-            var = (
-                rec.get("variance", {}) if isinstance(rec.get("variance"), dict) else {}
-            )
-            if gmetrics.get("predictive_gate") is not None:
-                var.setdefault("predictive_gate", gmetrics.get("predictive_gate"))
-            if gmetrics.get("ab_windows_used") is not None:
-                var.setdefault("ab_windows_used", gmetrics.get("ab_windows_used"))
-            if gmetrics.get("deadband") is not None:
-                var.setdefault("deadband", gmetrics.get("deadband"))
-            if gmetrics.get("min_gain") is not None:
-                var.setdefault("min_gain", gmetrics.get("min_gain"))
-            if gmetrics.get("min_effect_lognll") is not None:
-                var.setdefault("min_effect_lognll", gmetrics.get("min_effect_lognll"))
-            if gmetrics.get("calibration") is not None:
-                var.setdefault("calibration", gmetrics.get("calibration"))
-            if gmetrics.get("calibration_stats") is not None:
-                var.setdefault("calibration_stats", gmetrics.get("calibration_stats"))
-            if gpolicy and not var.get("policy"):
-                var["policy"] = gpolicy
-            rec["variance"] = var
+            _merge_variance_record(rec, gmetrics, gpolicy)
 
     return rec or None
 
@@ -324,19 +333,52 @@ def _allocate_budget(counts: dict[str, int], budget: int) -> dict[str, int]:
     alloc = {fam: int(round(val)) for fam, val in raw.items()}
     diff = budget - sum(alloc.values())
     if diff > 0:
-        for fam in sorted(raw, key=raw.get, reverse=True):
+        for fam in sorted(raw, key=lambda name: raw[name], reverse=True):
             if diff == 0:
                 break
             alloc[fam] += 1
             diff -= 1
     elif diff < 0:
-        for fam in sorted(raw, key=raw.get):
+        for fam in sorted(raw, key=lambda name: raw[name]):
             if diff == 0:
                 break
             if alloc.get(fam, 0) > 0:
                 alloc[fam] -= 1
                 diff += 1
     return alloc
+
+
+def _proposed_spectral_caps(
+    *,
+    per_run_caps: dict[str, list[float]],
+    q99_values: dict[str, list[float]],
+    max_values: dict[str, list[float]],
+    existing_caps: dict[str, float],
+    margin: float,
+) -> dict[str, dict[str, float]]:
+    proposed: dict[str, dict[str, float]] = {}
+    observed_families = sorted(set(q99_values) | set(max_values))
+    if per_run_caps:
+        for family, candidates in per_run_caps.items():
+            if not candidates:
+                continue
+            base = max(candidates)
+            if family in existing_caps:
+                base = max(base, existing_caps[family])
+            proposed[family] = {"kappa": round(base + margin, 3)}
+    if per_run_caps or q99_values or max_values:
+        for family in observed_families:
+            if family in proposed:
+                continue
+            observed = q99_values.get(family, []) + max_values.get(family, [])
+            if not observed:
+                continue
+            base = max(observed)
+            if family in existing_caps:
+                base = max(base, existing_caps[family])
+            proposed[family] = {"kappa": round(base + margin, 3)}
+        return proposed
+    return {family: {"kappa": kappa} for family, kappa in existing_caps.items()}
 
 
 def calibrate_spectral(
@@ -452,38 +494,13 @@ def calibrate_spectral(
         "max_caps": max_caps,
     }
 
-    proposed_caps: dict[str, dict[str, float]] = {}
-    margin = _spectral_margin(tier)
-    if per_run_caps:
-        for fam, candidates in per_run_caps.items():
-            if not candidates:
-                continue
-            base = max(candidates)
-            if fam in existing_caps:
-                base = max(base, existing_caps[fam])
-            proposed_caps[fam] = {"kappa": round(base + margin, 3)}
-        for fam in sorted(set(q99_values) | set(max_values)):
-            if fam in proposed_caps:
-                continue
-            observed = q99_values.get(fam, []) + max_values.get(fam, [])
-            if not observed:
-                continue
-            base = max(observed)
-            if fam in existing_caps:
-                base = max(base, existing_caps[fam])
-            proposed_caps[fam] = {"kappa": round(base + margin, 3)}
-    elif q99_values or max_values:
-        for fam in sorted(set(q99_values) | set(max_values)):
-            observed = q99_values.get(fam, []) + max_values.get(fam, [])
-            if not observed:
-                continue
-            base = max(observed)
-            if fam in existing_caps:
-                base = max(base, existing_caps[fam])
-            proposed_caps[fam] = {"kappa": round(base + margin, 3)}
-    else:
-        for fam, kappa in existing_caps.items():
-            proposed_caps[fam] = {"kappa": kappa}
+    proposed_caps = _proposed_spectral_caps(
+        per_run_caps=per_run_caps,
+        q99_values=q99_values,
+        max_values=max_values,
+        existing_caps=existing_caps,
+        margin=_spectral_margin(tier),
+    )
 
     return summary, proposed_caps
 
@@ -649,10 +666,8 @@ def calibrate_variance(recs: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _spectral_max_caps_for_edit_type(edit_type: str) -> int:
     et = (edit_type or "").strip().lower()
-    if et in {"quant_rtn", "fp8_quant"}:
+    if et == "quant_rtn":
         return 15
-    if et in {"lowrank_svd"}:
-        return 25
     return 10
 
 

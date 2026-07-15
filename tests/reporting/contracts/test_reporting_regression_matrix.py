@@ -4,15 +4,16 @@ from pathlib import Path
 
 import pytest
 
-import invarlock.reporting.report_validation as report_validation_mod
 import invarlock.reporting.run_report_contract as run_report_contract_mod
 import invarlock.reporting.run_report_formatters as run_report_formatters_mod
 import invarlock.reporting.validate as validate_mod
+import invarlock.reporting.validation.report as report_validation_mod
 import invarlock.reporting.verify_check_helpers_consistency as verify_helpers_mod
 import invarlock.reporting.verify_check_helpers_metrics as verify_metrics_mod
 import invarlock.reporting.verify_contract as verify_contract_mod
-from invarlock.core.exceptions import InvarlockError
 from invarlock.reporting.report_types import RunReport, create_empty_report
+from invarlock.reporting.verify_contract_types import normalize_warning_policy
+from tests.reporting._support_guard_metric_impact import canonical_ppl_impact
 
 
 def _valid_report() -> RunReport:
@@ -95,34 +96,42 @@ def test_validation_result_diagnostics_and_summary_cover_warning_and_error_paths
     assert "warn only" in warnings_summary
 
 
-def test_report_validation_helpers_cover_guard_overhead_and_ratio_lower_bound() -> None:
-    assert report_validation_mod._guard_overhead_has_error_diagnostic(None) is False  # noqa: SLF001
+def test_report_validation_helpers_cover_guard_metric_impact_and_degradation_limit() -> (
+    None
+):
     assert (
-        report_validation_mod._guard_overhead_has_error_diagnostic(  # noqa: SLF001
+        report_validation_mod._guard_metric_impact_has_error_diagnostic(None) is False
+    )  # noqa: SLF001
+    assert (
+        report_validation_mod._guard_metric_impact_has_error_diagnostic(  # noqa: SLF001
             {"diagnostics": "bad"}
         )
         is False
     )
     assert (
-        report_validation_mod._guard_overhead_has_error_diagnostic(  # noqa: SLF001
+        report_validation_mod._guard_metric_impact_has_error_diagnostic(  # noqa: SLF001
             {"diagnostics": ["bad"]}
         )
         is False
     )
     assert (
-        report_validation_mod._guard_overhead_has_error_diagnostic(  # noqa: SLF001
+        report_validation_mod._guard_metric_impact_has_error_diagnostic(  # noqa: SLF001
             {"diagnostics": [{"severity": "error"}]}
         )
         is True
     )
 
-    assert report_validation_mod._resolve_guard_overhead_pass(  # noqa: SLF001
-        {"overhead_ratio": 1.005, "overhead_threshold": None},
+    assert not report_validation_mod._resolve_guard_metric_impact_pass(  # noqa: SLF001
+        {"degradation": 1.005, "degradation_limit": None},
         tiny_relax=False,
     )
-    assert report_validation_mod._resolve_guard_overhead_pass(  # noqa: SLF001
+    assert not report_validation_mod._resolve_guard_metric_impact_pass(  # noqa: SLF001
         {"passed": False, "evaluated": False},
         tiny_relax=True,
+    )
+    assert report_validation_mod._resolve_guard_metric_impact_pass(  # noqa: SLF001
+        canonical_ppl_impact(10.0, 10.05, degradation_limit=0.01),
+        tiny_relax=False,
     )
 
     class _ExplodingFloat(float):
@@ -142,13 +151,43 @@ def test_report_validation_helpers_cover_guard_overhead_and_ratio_lower_bound() 
     assert flags["preview_final_drift_acceptable"] is True
 
 
+def test_metric_impact_validation_rejects_boolean_uncoercible_and_untyped_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invarlock.reporting.validation import metric_impact
+
+    class _Uncoercible:
+        def __float__(self) -> float:
+            raise ValueError("not numeric")
+
+    assert metric_impact._coerce_finite_float(True) is None
+    assert metric_impact._coerce_finite_float(_Uncoercible()) is None
+
+    monkeypatch.setattr(
+        metric_impact, "guard_metric_impact_payload_errors", lambda *_a, **_k: []
+    )
+    assert (
+        metric_impact.resolve_guard_metric_impact_pass(
+            {
+                "evaluated": True,
+                "passed": "yes",
+                "degradation": 0.0,
+                "degradation_limit": 0.1,
+                "diagnostics": [],
+            },
+            tiny_relax=False,
+        )
+        is False
+    )
+
+
 def test_run_report_contract_persistence_covers_missing_json_and_telemetry_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     report = create_empty_report()
 
     monkeypatch.setattr(
-        run_report_contract_mod.report_files,
+        run_report_contract_mod.report_bundle_module,
         "save_report",
         lambda *_args, **_kwargs: {},
     )
@@ -164,7 +203,7 @@ def test_run_report_contract_persistence_covers_missing_json_and_telemetry_error
         )
 
     monkeypatch.setattr(
-        run_report_contract_mod.report_files,
+        run_report_contract_mod.report_bundle_module,
         "save_report",
         lambda *_args, **_kwargs: {"json": tmp_path / "report.json"},
     )
@@ -250,20 +289,18 @@ def test_verify_helpers_cover_report_loading_primary_metric_and_validation_edges
             "baseline_ref": {"primary_metric": {"final": 0.0}},
         }
     )
-    assert any("Baseline final must be > 0.0" in err for err in pm_errors)
-    assert (
-        verify_helpers_mod._validate_primary_metric(  # noqa: SLF001
-            {
-                "primary_metric": {
-                    "kind": "ppl_causal",
-                    "final": 2.0,
-                    "ratio_vs_baseline": 1.0,
-                },
-                "baseline_ref": {"primary_metric": {"final": "bad"}},
-            }
-        )
-        == []
+    assert any("baseline final must be at least 1.0" in err for err in pm_errors)
+    malformed_baseline_errors = verify_helpers_mod._validate_primary_metric(  # noqa: SLF001
+        {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "final": 2.0,
+                "ratio_vs_baseline": 1.0,
+            },
+            "baseline_ref": {"primary_metric": {"final": "bad"}},
+        }
     )
+    assert any("same-kind baseline" in err for err in malformed_baseline_errors)
 
     assert verify_helpers_mod._validate_release_gate_outcomes({}) == [  # noqa: SLF001
         "Release verification requires a validation block."
@@ -281,7 +318,39 @@ def test_verify_helpers_cover_report_loading_primary_metric_and_validation_edges
             },
         }
     )
-    assert any("primary_metric_tail_acceptable" in err for err in tail_gate_errors)
+    assert any("rejected primary_metric_tail" in err for err in tail_gate_errors)
+    fabricated_tail_flag_errors = verify_helpers_mod._validate_release_gate_outcomes(  # noqa: SLF001
+        {
+            "validation": {
+                "primary_metric_acceptable": True,
+                "preview_final_drift_acceptable": True,
+                "invariants_pass": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+                "primary_metric_tail_acceptable": True,
+            }
+        }
+    )
+    assert any(
+        "without primary_metric_tail evidence" in error
+        for error in fabricated_tail_flag_errors
+    )
+    missing_ppl_tail_errors = verify_helpers_mod._validate_release_gate_outcomes(  # noqa: SLF001
+        {
+            "primary_metric": {"kind": "ppl_causal"},
+            "validation": {
+                "primary_metric_acceptable": True,
+                "preview_final_drift_acceptable": True,
+                "invariants_pass": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+            },
+        }
+    )
+    assert any(
+        "requires primary_metric_tail evidence" in error
+        for error in missing_ppl_tail_errors
+    )
     pairing_errors = verify_helpers_mod._validate_pairing(  # noqa: SLF001
         {
             "dataset": {
@@ -521,18 +590,16 @@ def test_verify_contract_profile_resolution_and_baseline_digest_fallbacks(
         is None
     )
 
-    assert verify_contract_mod._normalize_warning_policy("strict") == "fail"  # noqa: SLF001
+    for removed_alias in ("strict", "warn", "advisory"):
+        with pytest.raises(ValueError, match="warning_policy"):
+            normalize_warning_policy(removed_alias)
     with pytest.raises(ValueError, match="warning_policy"):
-        verify_contract_mod._normalize_warning_policy("bad")  # noqa: SLF001
-
-    class _BadWarningCount:
-        def __int__(self) -> int:
-            raise TypeError("not an int")
+        normalize_warning_policy("bad")
 
     diagnostics = verify_contract_mod._guard_warning_diagnostics(  # noqa: SLF001
         {
             "guard_warnings": {
-                "warning_count": _BadWarningCount(),
+                "warning_count": 2,
                 "warnings": [
                     "bad-entry",
                     {
@@ -547,11 +614,15 @@ def test_verify_contract_profile_resolution_and_baseline_digest_fallbacks(
     )
     assert [diagnostic.level for diagnostic in diagnostics] == ["warning", "warning"]
     assert "layers.0.mlp" in diagnostics[1].message
-    summary_only = verify_contract_mod._guard_warning_diagnostics(  # noqa: SLF001
-        {"guard_warnings": {"warning_count": 2, "warnings": "not-a-list"}}
-    )
-    assert len(summary_only) == 1
-    assert summary_only[0].message == "Guard warnings present: 2"
+    for malformed_warnings in (
+        {"warning_count": "2", "warnings": [{}, {}]},
+        {"warning_count": 2, "warnings": "not-a-list"},
+        {"warning_count": 2, "warnings": [{}]},
+    ):
+        with pytest.raises(ValueError, match="guard_warnings"):
+            verify_contract_mod._guard_warning_diagnostics(  # noqa: SLF001
+                {"guard_warnings": malformed_warnings}
+            )
 
 
 def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
@@ -589,7 +660,8 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
         tol=1e-9,
         json_mode=False,
     )
-    assert accuracy_warning and "missing aggregates" in accuracy_warning[0].message
+    assert accuracy_warning.diagnostics == ()
+    assert accuracy_warning.metric_mismatch is False
     assert (
         verify_contract_mod._append_recompute_errors(  # noqa: SLF001
             [],
@@ -597,10 +669,9 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
             prof="dev",
             tol=1e-9,
             json_mode=True,
-        )
+        ).diagnostics
         == ()
     )
-
     assert (
         verify_contract_mod._append_recompute_errors(  # noqa: SLF001
             [],
@@ -611,7 +682,7 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
             prof="dev",
             tol=1e-9,
             json_mode=True,
-        )
+        ).diagnostics
         == ()
     )
     assert (
@@ -624,10 +695,10 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
             prof="dev",
             tol=1e-9,
             json_mode=True,
-        )
+        ).diagnostics
         == ()
     )
-    with pytest.raises(InvarlockError, match="PROVIDER-DIGEST-MISSING"):
+    assert (
         verify_contract_mod._append_recompute_errors(  # noqa: SLF001
             [],
             cert_obj={
@@ -637,7 +708,9 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
             prof="ci",
             tol=1e-9,
             json_mode=False,
-        )
+        ).diagnostics
+        == ()
+    )
 
     basis_errors: list[str] = []
     assert (
@@ -655,88 +728,42 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
             prof="dev",
             tol=1e-9,
             json_mode=True,
-        )
+        ).diagnostics
         == ()
     )
     assert any("Basis mismatch" in error for error in basis_errors)
 
 
-def test_validate_variance_enablement_rejects_missing_gate_provenance() -> None:
-    report = {
-        "resolved_policy": {"variance": {"min_effect_lognll": 0.0}},
-        "variance": {
-            "enabled": True,
-            "predictive_gate": {
-                "evaluated": True,
-                "passed": False,
-                "delta_ci": [-0.003, 0.0],
-                "mean_delta": -0.001,
-            },
-            "ab_test": {"seed": 123, "windows_used": 2},
-        },
+def test_release_payload_rejects_report_controlled_tiny_relax(tmp_path: Path) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text("{}", encoding="utf-8")
+    report = {"context": {"run": {"tiny_relax": "on"}}}
+
+    common = {
+        "report_payload": report,
+        "validate_report_fn": lambda _report: True,
+        "validate_report_schema_strict_fn": lambda _report: True,
+        "validate_primary_metric_fn": lambda _report: [],
+        "validate_pairing_fn": lambda _report: [],
+        "validate_counts_fn": lambda _report: [],
+        "validate_logspace_ci_identity_fn": lambda _report, profile=None: [],
+        "validate_drift_band_fn": lambda _report: [],
+        "validate_primary_metric_policy_fn": lambda _report, profile=None: [],
+        "apply_profile_lints_fn": lambda _report: [],
+        "validate_tokenizer_hash_fn": lambda _report: [],
+        "validate_measurement_contracts_fn": lambda _report, profile=None: [],
+        "validate_variance_enablement_fn": lambda _report: [],
     }
 
-    errors = verify_helpers_mod._validate_variance_enablement(report)  # noqa: SLF001
+    dev_errors = verify_helpers_mod._validate_evaluation_report_payload(  # noqa: SLF001
+        report_path, profile="dev", **common
+    )
+    release_errors = verify_helpers_mod._validate_evaluation_report_payload(  # noqa: SLF001
+        report_path, profile="release", **common
+    )
 
-    assert any("variance.predictive_gate.passed" in error for error in errors)
-    assert any("variance.predictive_gate.delta_ci" in error for error in errors)
-    assert any("variance.ab_test.provenance" in error for error in errors)
-
-
-def test_validate_variance_enablement_accepts_complete_enabled_evidence() -> None:
-    report = {
-        "resolved_policy": {"variance": {"min_effect_lognll": 0.001}},
-        "variance": {
-            "enabled": True,
-            "predictive_gate": {
-                "evaluated": True,
-                "passed": True,
-                "delta_ci": [-0.004, -0.002],
-                "mean_delta": -0.003,
-            },
-            "ab_test": {
-                "seed": 123,
-                "windows_used": 2,
-                "provenance": {"window_ids": [11, 12]},
-            },
-        },
-    }
-
+    assert dev_errors == []
     assert (
-        verify_helpers_mod._validate_variance_enablement(report) == []  # noqa: SLF001
+        "Release verification forbids development-only tiny_relax policy."
+        in release_errors
     )
-
-
-def test_validate_evaluation_report_payload_runs_variance_enablement_lint(
-    tmp_path: Path,
-) -> None:
-    report = {
-        "variance": {
-            "enabled": True,
-            "predictive_gate": {
-                "passed": True,
-                "delta_ci": [-0.003, 0.001],
-                "mean_delta": -0.001,
-            },
-            "ab_test": {"seed": 123, "windows_used": 2},
-        }
-    }
-
-    errors = verify_helpers_mod._validate_evaluation_report_payload(  # noqa: SLF001
-        tmp_path / "evaluation.report.json",
-        load_evaluation_report_fn=lambda _path: report,
-        validate_report_fn=lambda _report: True,
-        validate_report_schema_strict_fn=lambda _report: True,
-        validate_primary_metric_fn=lambda _report: [],
-        validate_pairing_fn=lambda _report: [],
-        validate_counts_fn=lambda _report: [],
-        validate_logspace_ci_identity_fn=lambda _report, profile=None: [],
-        validate_drift_band_fn=lambda _report: [],
-        validate_primary_metric_policy_fn=lambda _report, profile=None: [],
-        apply_profile_lints_fn=lambda _report: [],
-        validate_tokenizer_hash_fn=lambda _report: [],
-        validate_measurement_contracts_fn=lambda _report, profile=None: [],
-    )
-
-    assert any("variance.predictive_gate.delta_ci" in error for error in errors)
-    assert any("variance.ab_test.provenance" in error for error in errors)

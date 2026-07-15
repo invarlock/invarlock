@@ -1,18 +1,33 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_evaluation_report_has_no_ppl_block_pm_only():
     report = {
-        "meta": {"model_id": "m", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 1,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "metrics": {
-            # Minimal ppl-like inputs; PM fallback should be populated automatically
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_ratio": 1.0,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            },
         },
         "data": {
             "dataset": "dummy",
@@ -29,7 +44,9 @@ def test_evaluation_report_has_no_ppl_block_pm_only():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
+    baseline = deepcopy(report)
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"].pop("ratio_vs_baseline")
 
     with patch(
         "invarlock.reporting.report_normalization.validate_report", return_value=True

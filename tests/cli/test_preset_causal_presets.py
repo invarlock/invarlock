@@ -71,14 +71,6 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen3_8b_512.yaml": "hf_text",
         "smollm3_3b_512.yaml": "hf_text",
     }
-    expected_skip_overhead = {
-        "gemma4_e2b_512.yaml",
-        "gpt_oss_20b_512.yaml",
-        "mixtral_8x7b_512.yaml",
-        "olmoe_1b_7b_0924_512.yaml",
-        "phi4_reasoning_plus_512.yaml",
-        "qwen3_30b_a3b_instruct_2507_512.yaml",
-    }
     for name, model_id in presets.items():
         cfg = load_config(root / "configs/presets/causal_lm" / name)
         assert cfg.require_section("model")["id"] == model_id
@@ -145,7 +137,7 @@ def test_causal_lm_family_presets_load() -> None:
             assert guards["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in guards
         if name == "phi4_reasoning_plus_512.yaml":
-            assert cfg.require_section("model")["trust_remote_code"] is True
+            assert "trust_remote_code" not in cfg.require_section("model")
         if name == "phi4_mini_512.yaml":
             assert "trust_remote_code" not in cfg.require_section("model")
         provider = cfg.data["dataset"]["provider"]
@@ -153,8 +145,12 @@ def test_causal_lm_family_presets_load() -> None:
             assert provider["kind"] == expected_provider_kinds[name]
         else:
             assert provider == "wikitext2"
-        if name in expected_skip_overhead:
-            assert cfg.data["context"]["run"]["skip_overhead_check"] is True
+        assert (
+            cfg.data.get("context", {})
+            .get("run", {})
+            .get("skip_guard_metric_impact_check", False)
+            is False
+        )
         if name != "wikitext2_512.yaml":
             assert cfg.data["primary_metric"]["drift_band"] == expected_drift_band
 
@@ -162,7 +158,7 @@ def test_causal_lm_family_presets_load() -> None:
 def test_null_sweep_calibration_configs_reference_models() -> None:
     root = _repo_root()
     expected_drift_band = {"min": 0.9, "max": 1.2}
-    expected_null_sweep_skip_overhead = {
+    expected_null_sweep_skip_guard_metric_impact = {
         "null_sweep_mixtral_8x7b.yaml",
         "null_sweep_olmoe_1b_7b_0924.yaml",
         "null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
@@ -292,8 +288,8 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["model"]["collect_loading_info"] is False
             assert data["guards"]["spectral"]["family_caps"]["router"] == 5.0
             assert "rmt" not in data["guards"]
-        if name in expected_null_sweep_skip_overhead:
-            assert data["context"]["run"]["skip_overhead_check"] is True
+        if name in expected_null_sweep_skip_guard_metric_impact:
+            assert data["context"]["run"]["skip_guard_metric_impact_check"] is True
         assert data["primary_metric"]["drift_band"] == expected_drift_band
 
 

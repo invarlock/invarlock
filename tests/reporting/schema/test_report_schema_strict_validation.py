@@ -4,10 +4,16 @@ import math
 
 import pytest
 
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import (
     REPORT_JSON_SCHEMA,
     validate_report,
+)
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
 )
 
 
@@ -33,44 +39,85 @@ def _mock_report_with_windows():
     }
     ppl_prev = math.exp((1.00 * 100 + 1.06 * 200) / 300)
     ppl_fin_subj = math.exp((1.05 * 100 + 1.15 * 200) / 300)
-    report = {
-        "meta": {
-            "model_id": "stub",
-            "adapter": "hf_causal",
-            "device": "cpu",
-            "seed": 7,
-            "seeds": {"python": 7, "numpy": 7, "torch": 7},
-        },
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": ppl_prev,
-                "final": ppl_fin_subj,
-                "ratio_vs_baseline": 1.0,
+    report = canonical_run_report(
+        {
+            "meta": {
+                "model_id": "stub",
+                "adapter": "hf_causal",
+                "auto": {"tier": "balanced"},
+                "device": "cpu",
+                "seed": 7,
+                "seeds": {"python": 7, "numpy": 7, "torch": 7},
             },
-            "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
-        },
-        "evaluation_windows": {"preview": preview, "final": final},
-        "edit": {"name": "structured"},
-        "artifacts": {"events_path": "", "logs_path": ""},
-        "guards": [],
-    }
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "dummy",
+                "split": "validation",
+                "seq_len": 8,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
+            },
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": ppl_prev,
+                    "final": ppl_fin_subj,
+                    "ratio_vs_baseline": ppl_fin_subj
+                    / math.exp((1.00 * 100 + 1.10 * 200) / 300),
+                },
+                "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
+            },
+            "evaluation_windows": {"preview": preview, "final": final},
+            "edit": {"name": "structured"},
+            "artifacts": {"events_path": "", "logs_path": ""},
+            "guards": [],
+        }
+    )
     return report
 
 
 def _mock_baseline(report):
     prev = report["evaluation_windows"]["preview"]
-    fin = report["evaluation_windows"]["final"]
     ppl_fin_base = math.exp((1.00 * 100 + 1.10 * 200) / 300)
-    return {
-        "run_id": "baseline",
-        "model_id": report["meta"]["model_id"],
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": ppl_fin_base},
-            "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
-        },
-        "evaluation_windows": {"preview": prev, "final": fin},
-    }
+    return canonical_baseline(
+        {
+            "run_id": "baseline",
+            "model_id": report["meta"]["model_id"],
+            "meta": {
+                "model_id": report["meta"]["model_id"],
+                "adapter": "hf_causal",
+                "auto": {"tier": "balanced"},
+            },
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "dummy",
+                "split": "validation",
+                "seq_len": 8,
+                "stride": 4,
+                "preview_n": 2,
+                "final_n": 2,
+            },
+            "edit": {"name": "noop"},
+            "guards": [],
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "preview": math.exp((1.00 * 100 + 1.06 * 200) / 300),
+                    "final": ppl_fin_base,
+                },
+                "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
+            },
+            "evaluation_windows": {
+                "preview": prev,
+                "final": {
+                    "window_ids": [3, 4],
+                    "logloss": [1.00, 1.10],
+                    "token_counts": [100, 200],
+                },
+            },
+        }
+    )
 
 
 @pytest.mark.unit

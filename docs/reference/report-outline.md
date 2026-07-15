@@ -10,9 +10,8 @@ The outline is implemented by
 
 ## Why This Exists
 
-The original report body was built as a linear Markdown document. That worked
-for early GPT-2/BERT preservation reports, but the repo now emits richer report
-shapes:
+Early GPT-2/BERT preservation reports used a linear Markdown body. The current
+report contract also supports richer report shapes:
 
 - policy failures, warning-mode guard movement, and strict warning policies
 - causal, MLM, seq2seq, image-text, and MoE evidence lanes

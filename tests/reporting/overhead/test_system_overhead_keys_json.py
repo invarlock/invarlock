@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
+from tests.reporting.overhead._support import overhead_run_report
 
 
-def _mk_report_with_overhead(metrics: dict) -> dict:
-    return {
-        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
-        "metrics": {
+def _mk_report_with_metric_impact(metrics: dict) -> dict:
+    return overhead_run_report(
+        metrics={
             # primary metric and overhead metrics
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -18,20 +20,17 @@ def _mk_report_with_overhead(metrics: dict) -> dict:
             # overhead metrics
             **metrics,
         },
-        "evaluation_windows": {
-            "preview": {"window_ids": [1], "logloss": [1.0], "token_counts": [10]},
-            "final": {"window_ids": [2], "logloss": [1.0], "token_counts": [10]},
-        },
-        "guards": [],
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
+        edit_name="noop",
+        tier="balanced",
+        profile="dev",
+    )
 
 
 def test_system_overhead_json_keys():
-    report = _mk_report_with_overhead(
+    report = _mk_report_with_metric_impact(
         {"latency_ms_p50": 2.0, "latency_ms_p95": 3.5, "throughput_sps": 77.7}
     )
-    baseline = _mk_report_with_overhead(
+    baseline = _mk_report_with_metric_impact(
         {"latency_ms_p50": 1.5, "latency_ms_p95": 3.0, "throughput_sps": 80.0}
     )
     cert = make_report(report, baseline)

@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_enrichment import compute_confidence_label
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_make import make_report as production_make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+    refresh_runtime_policy_receipt,
+)
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report(ratio: float = 1.00, reps: int | None = None) -> dict:
@@ -28,6 +36,7 @@ def _mk_report(ratio: float = 1.00, reps: int | None = None) -> dict:
             "ts": "now",
             "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -79,26 +88,22 @@ def test_confidence_label_low_on_failure():
     assert cert.get("confidence", {}).get("label") == "Low"
 
 
-def test_confidence_thresholds_can_be_overridden_by_policy(monkeypatch):
-    # Override tier policy confidence widths and expect threshold to reflect it
-    from invarlock.core import auto_tuning as at
-
-    base_policies = at.get_tier_policies()
-    balanced = dict(base_policies.get("balanced", {}))
-    metrics_obj = balanced.get("metrics", {})
-    metrics = dict(metrics_obj) if isinstance(metrics_obj, dict) else {}
-    metrics["confidence"] = {
+def test_confidence_thresholds_can_be_overridden_by_runtime_policy():
+    report = _mk_report(ratio=1.02, reps=500)
+    baseline = _mk_report(ratio=1.0, reps=500)
+    canonical_report = canonical_run_report(report)
+    canonical_report["resolved_policy"]["metrics"]["confidence"] = {
         "ppl_ratio_width_max": 0.02,
         "accuracy_delta_pp_width_max": 0.5,
     }
-    balanced["metrics"] = metrics
-    patched = dict(base_policies)
-    patched["balanced"] = balanced
-    monkeypatch.setattr(at, "get_tier_policies", lambda *_a, **_k: patched)
-
-    report = _mk_report(ratio=1.02, reps=500)
-    baseline = _mk_report(ratio=1.0, reps=500)
-    cert = make_report(report, baseline)
+    canonical_report["resolved_policy"]["confidence"] = {
+        "ppl_ratio_width_max": 0.02,
+        "accuracy_delta_pp_width_max": 0.5,
+    }
+    cert = production_make_report(
+        refresh_runtime_policy_receipt(canonical_report),
+        canonical_baseline(baseline),
+    )
     conf = cert.get("confidence", {})
     assert conf.get("basis") == "ppl_ratio"
     assert abs(float(conf.get("threshold")) - 0.02) < 1e-9

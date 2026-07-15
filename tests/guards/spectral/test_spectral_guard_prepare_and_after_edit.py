@@ -117,7 +117,7 @@ def test_after_edit_applies_spectral_control_when_enabled(monkeypatch) -> None:
             return iter([])
 
     guard.after_edit(Model())
-    assert any(e.get("operation") == "spectral_control_applied" for e in guard.events)
+    assert any(e.get("operation") == "spectral_control_attempted" for e in guard.events)
 
 
 def test_detect_violations_computes_sigma_and_classifies_family_when_missing(

@@ -324,7 +324,7 @@ def compute_provider_digest(
     report: dict[str, Any],
     *,
     compute_mask_positions_digest_fn: Any | None = None,
-) -> dict[str, str] | None:
+) -> dict[str, Any] | None:
     """Compute provider digest (ids/tokenizer/masking) from report context."""
     from invarlock.utils import hash_json
 
@@ -385,7 +385,7 @@ def compute_provider_digest(
 
     masking = compute_mask_positions_digest_fn(windows)
 
-    digest: dict[str, str] = {}
+    digest: dict[str, Any] = {}
     if isinstance(ids_sha, str) and ids_sha:
         digest["ids_sha256"] = ids_sha
     if isinstance(tok_hash, str) and tok_hash:
@@ -394,6 +394,11 @@ def compute_provider_digest(
         digest["processor_sha256"] = str(processor_sha)
     if isinstance(masking, str) and masking:
         digest["masking_sha256"] = masking
+    from invarlock.vision_dataset_evidence import build_report_evidence_from_run_report
+
+    dataset_evidence = build_report_evidence_from_run_report(report)
+    if dataset_evidence is not None:
+        digest["dataset_evidence"] = dataset_evidence
     return digest or None
 
 

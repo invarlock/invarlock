@@ -1,0 +1,146 @@
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+
+from invarlock.reporting.verify_adapter_family import warn_adapter_family_mismatch
+
+
+def _write_json(path: Path, payload: dict) -> Path:
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_warn_adapter_family_mismatch_covers_baseline_paths(
+    tmp_path: Path,
+) -> None:
+    base_cert = {
+        "plugins": {"adapter": {"provenance": {"family": "hf"}}},
+        "provenance": {"baseline": {"report_path": ""}},
+    }
+
+    # provenance not a dict: baseline_report_path should remain None
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"] = "not-a-dict"
+    warn_adapter_family_mismatch(payload)
+
+    # baseline path points to a missing file: p.exists() is False
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"]["baseline"]["report_path"] = str(tmp_path / "missing.json")
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=tmp_path / "missing.json",
+    )
+
+    # baseline file exists but meta.plugins is not a dict
+    baseline_path = _write_json(
+        tmp_path / "base_plugins_not_dict.json", {"meta": {"plugins": []}}
+    )
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+    assert baseline_path.is_file()
+
+    # baseline file exists, adapter is not a dict
+    baseline_path = _write_json(
+        tmp_path / "base_adapter_not_dict.json",
+        {"meta": {"plugins": {"adapter": "nope"}}},
+    )
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+    assert baseline_path.is_file()
+
+    # baseline file exists, provenance is not a dict
+    baseline_path = _write_json(
+        tmp_path / "base_prov_not_dict.json",
+        {"meta": {"plugins": {"adapter": {"provenance": "nope"}}}},
+    )
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+
+    # baseline file exists, family is missing/empty (val check branch)
+    baseline_path = _write_json(
+        tmp_path / "base_family_empty.json",
+        {"meta": {"plugins": {"adapter": {"provenance": {"family": ""}}}}},
+    )
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+
+    # baseline file exists, family present (no mismatch warning when equal)
+    baseline_path = _write_json(
+        tmp_path / "base_family_ok.json",
+        {"meta": {"plugins": {"adapter": {"provenance": {"family": "hf"}}}}},
+    )
+    payload = copy.deepcopy(base_cert)
+    payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+
+
+def test_warn_adapter_family_mismatch_swallows_invalid_baseline_json(
+    tmp_path: Path,
+) -> None:
+    baseline_path = tmp_path / "invalid.json"
+    baseline_path.write_text("{", encoding="utf-8")
+
+    payload = {
+        "plugins": {"adapter": {"provenance": {"family": "hf"}}},
+        "provenance": {"baseline": {"report_path": str(baseline_path)}},
+    }
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+    assert baseline_path.is_file()
+
+    warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+
+
+def test_warn_adapter_family_mismatch_ignores_untrusted_baseline_path(
+    tmp_path: Path,
+) -> None:
+    trusted_path = _write_json(tmp_path / "trusted.json", {"meta": {}})
+    untrusted_path = _write_json(
+        tmp_path / "untrusted.json",
+        {
+            "meta": {
+                "plugins": {
+                    "adapter": {"provenance": {"family": "ggml", "library": "ggml"}}
+                }
+            }
+        },
+    )
+    payload = {
+        "plugins": {
+            "adapter": {"provenance": {"family": "hf", "library": "transformers"}}
+        },
+        "provenance": {"baseline": {"report_path": str(untrusted_path)}},
+    }
+
+    warnings = warn_adapter_family_mismatch(
+        payload,
+        trusted_baseline_path=trusted_path,
+    )
+
+    assert warnings == ()

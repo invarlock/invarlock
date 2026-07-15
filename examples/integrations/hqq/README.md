@@ -1,8 +1,9 @@
 # HQQ Runtime Integration Example
 
-Status: `runnable`; strict container evidence is verified for the
-`cuda-container-strict` lane on CUDA for this tiny HQQ example. `cuda-host-off`
-and `cpu-host-off` lanes are supported.
+Status: `runnable`. A `cuda-container-strict` result requires independent
+acceptance inputs and the successful current run described below.
+`cuda-host-off` and `cpu-host-off`
+lanes are supported.
 
 This example shows how to attach InvarLock regression evidence to a Hugging
 Face causal checkpoint loaded through InvarLock's `hf_hqq` adapter. It creates a
@@ -50,7 +51,11 @@ with that image configured:
 examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-hqq
 examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-hqq
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-hqq \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 uv run --extra hqq \
   examples/integrations/hqq/run_tiny_hf_hqq.sh \
   --allow-network \
@@ -58,8 +63,9 @@ uv run --extra hqq \
   --lane cuda
 ```
 
-Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared externally.
+Obtain the trusted digest independently from reviewed build/release policy.
+The matching digest in `runtime.manifest.json` is a manifest claim, not the source of
+the verifier pin.
 This strict lane is scoped to the configured tiny `hf_hqq` runtime-load subject
 and image. Rerun the strict lane for the target runtime before using the
 artifact as shared integration evidence.
@@ -96,6 +102,7 @@ The runner writes generated outputs under local output directories:
 | `reports/tiny-hf-hqq/<artifact-lane>/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-hf-hqq/<artifact-lane>/evaluation.html` | Human-readable report. |
 | `reports/tiny-hf-hqq/<artifact-lane>/backend_inventory.json` | HQQ backend version and quantized module inventory when exposed. |
+| `reports/tiny-hf-hqq/<artifact-lane>/runtime_quantization_proof.json` | Strict-lane v1 process receipt listing recognized HQQ runtime types; wrapper-side schema checks are not an independent runtime observation or checkpoint-artifact proof. |
 | `reports/tiny-hf-hqq/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-hqq/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
 | `reports/tiny-hf-hqq/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
@@ -111,4 +118,9 @@ The example uses native HQQ runtime quantization after loading the HF checkpoint
 so the subject remains an HF-loadable checkpoint plus adapter runtime
 configuration rather than an HQQ-lib-only checkpoint format.
 The shell runner relies on InvarLock report persistence to emit
-`backend_inventory.json` when adapter provenance is available.
+`backend_inventory.json` when adapter provenance is available and, for
+`cuda-container-strict`, requires `runtime_quantization_proof.json`. The shared
+wrapper validates the receipt's v1 schema, selected adapter/backend binding,
+allowed type-name surface, and matching backend inventory before `verify`.
+Those checks validate sidecars written by the evaluated process; they are not
+an independent runtime observation or checkpoint-artifact proof.

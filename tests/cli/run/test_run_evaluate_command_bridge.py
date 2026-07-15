@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,36 +10,42 @@ import yaml
 
 from invarlock.cli.commands.evaluate import evaluate_command
 from invarlock.core.assurance_contract import CANONICAL_GUARD_CHAIN
+from invarlock.core.auto_tuning import resolve_tier_policies
+from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
-
-
-def _stub_run(out_dir: Path) -> Path:
-    ts_dir = out_dir / "20250101_000000"
-    ts_dir.mkdir(parents=True, exist_ok=True)
-    report = {
-        "meta": {"model_id": "stub", "adapter": "hf_causal", "device": "cpu"},
-        "edit": {"name": "noop"},
-        "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
-        "data": {"preview_n": 1, "final_n": 1},
-    }
-    report_path = ts_dir / "report.json"
-    report_path.write_text(json.dumps(report), encoding="utf-8")
-    return report_path
+from tests.cli._support_effective_config import preserve_effective_config
+from tests.cli._support_verify_runtime_provenance import (
+    _write_matching_strict_policy_pack,
+    bind_runtime_policy_receipt,
+)
+from tests.cli.run._support_run_evaluate_command_bridge import _stub_run
+from tests.core._support_assurance_contract import (
+    _plugin_metadata,
+    bind_noop_variance_evidence,
+    bind_raw_guard_evidence,
+)
 
 
 def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict:
+    assert edit_name == "noop"
+    window_count = 180
     windows = {
         "preview": {
-            "window_ids": [1, 2],
-            "input_ids": [[1, 2, 3], [4, 5, 6]],
-            "logloss": [0.6931471805599453, 0.6931471805599453],
-            "token_counts": [10, 10],
+            "window_ids": list(range(window_count)),
+            "input_ids": [
+                [index, index + 1, index + 2] for index in range(window_count)
+            ],
+            "logloss": [0.6931471805599453] * window_count,
+            "token_counts": [10] * window_count,
         },
         "final": {
-            "window_ids": [3, 4],
-            "input_ids": [[7, 8, 9], [10, 11, 12]],
-            "logloss": [0.6931471805599453, 0.6931471805599453],
-            "token_counts": [10, 10],
+            "window_ids": list(range(window_count, window_count * 2)),
+            "input_ids": [
+                [index, index + 1, index + 2]
+                for index in range(window_count, window_count * 2)
+            ],
+            "logloss": [0.6931471805599453] * window_count,
+            "token_counts": [10] * window_count,
         },
     }
     invariant_metrics = {
@@ -48,7 +55,9 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
         "warning_violations": 0,
     }
     measurement_contract = {"kind": "activation_edge_risk", "version": "test-v1"}
-    return {
+    strict_context = dict(context)
+    strict_context["guard_chain_observed"] = list(CANONICAL_GUARD_CHAIN)
+    report = {
         "meta": {
             "model_id": model_id,
             "adapter": "hf_causal",
@@ -57,16 +66,24 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
             "seeds": {"python": 7, "numpy": 7, "torch": 7},
             "auto": {"tier": "balanced"},
             "tokenizer_hash": "strict-tokenizer",
+            "plugins": {
+                "adapter": _plugin_metadata("adapters", "hf_causal"),
+                "edit": _plugin_metadata("edits", "noop"),
+                "guards": [
+                    _plugin_metadata("guards", name) for name in CANONICAL_GUARD_CHAIN
+                ],
+            },
         },
-        "context": dict(context),
+        "context": strict_context,
         "edit": {"name": edit_name, "deltas": {"params_changed": 0}},
         "data": {
             "dataset": "strict-local-jsonl",
             "split": "validation",
             "seq_len": 8,
             "stride": 8,
-            "preview_n": 2,
-            "final_n": 2,
+            "preview_n": window_count,
+            "final_n": window_count,
+            "dataset_hash": "strict-dataset",
             "tokenizer_hash": "strict-tokenizer",
         },
         "metrics": {
@@ -78,22 +95,72 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
                 "ci": [0.0, 0.0],
                 "display_ci": [1.0, 1.0],
             },
-            "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
+            "bootstrap": {
+                "enabled": True,
+                "replicates": 1200,
+                "alpha": 0.05,
+                "method": "bca_paired_delta_log",
+                "seed": 7,
+                "preview_final_delta_basis": "independent_disjoint_slices",
+                "preview_final_delta_method": ("independent_percentile_delta_log"),
+                "preview_final_delta_seed": 104,
+                "coverage": {
+                    "tier": "balanced",
+                    "preview": {
+                        "used": window_count,
+                        "required": window_count,
+                        "ok": True,
+                    },
+                    "final": {
+                        "used": window_count,
+                        "required": window_count,
+                        "ok": True,
+                    },
+                    "replicates": {
+                        "used": 1200,
+                        "required": 1200,
+                        "ok": True,
+                    },
+                },
+            },
+            "preview_final_slice_delta_summary": {
+                "mean": 0.0,
+                "ci": [0.0, 0.0],
+                "basis": "independent_disjoint_slices",
+                "paired": False,
+                "ci_method": "independent_percentile_delta_log",
+                "ci_reason": None,
+                "preview_windows": window_count,
+                "final_windows": window_count,
+                "degenerate": True,
+                "degenerate_reason": "constant_bootstrap_distribution",
+            },
         },
         "evaluation_windows": windows,
-        "provenance": {"provider_digest": {"ids_sha256": "strict-provider-ids"}},
+        "provenance": {
+            "provider_digest": {
+                "ids_sha256": "strict-provider-ids",
+                "tokenizer_sha256": "strict-tokenizer",
+            }
+        },
         "artifacts": {},
+        "flags": {"guard_recovered": False, "rollback_reason": None},
         "guards": [
             {
                 "name": "invariants",
+                "stage": "pre",
+                "supported": True,
                 "passed": True,
                 "decision": "allow",
+                "violations": [],
                 "metrics": invariant_metrics,
             },
             {
                 "name": "spectral",
+                "supported": True,
                 "passed": True,
                 "decision": "allow",
+                "violations": [],
                 "metrics": {
                     "stable": True,
                     "caps_applied": 0,
@@ -104,29 +171,99 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
             },
             {
                 "name": "rmt",
+                "supported": True,
                 "passed": True,
                 "decision": "allow",
+                "violations": [],
                 "metrics": {
                     "stable": True,
-                    "edge_risk_by_family_base": {"linear": 1.0},
-                    "edge_risk_by_family": {"linear": 1.0},
+                    "edge_risk_by_family_base": dict.fromkeys(
+                        ("attn", "embed", "ffn", "other"), 1.0
+                    ),
+                    "edge_risk_by_family": dict.fromkeys(
+                        ("attn", "embed", "ffn", "other"), 1.0
+                    ),
+                    "epsilon_by_family": dict.fromkeys(
+                        ("attn", "embed", "ffn", "other"), 0.01
+                    ),
                     "measurement_contract": measurement_contract,
                 },
             },
             {
                 "name": "variance",
+                "supported": True,
                 "passed": True,
                 "decision": "allow",
-                "metrics": {"ve_enabled": False, "gain": 0.0},
+                "violations": [],
+                "metrics": {
+                    "ve_enabled": False,
+                    "monitor_only": False,
+                    "gain": 0.0,
+                    "predictive_gate": {
+                        "evaluated": True,
+                        "passed": True,
+                        "reason": "no_adjustment_required",
+                    },
+                    "calibration": {
+                        "status": "no_scaling_required",
+                        "coverage": 8,
+                        "min_coverage": 6,
+                    },
+                },
             },
             {
                 "name": "invariants",
+                "stage": "post",
+                "supported": True,
                 "passed": True,
                 "decision": "allow",
+                "violations": [],
                 "metrics": invariant_metrics,
             },
         ],
+        "guard_metric_impact": {
+            "evaluated": True,
+            "metric_kind": "ppl_causal",
+            "bare_value": 2.0,
+            "guarded_value": 2.0,
+            "degradation_limit": 0.01,
+            "passed": True,
+        },
     }
+    report["variance"] = {
+        "enabled": False,
+        "monitor_only": False,
+        "predictive_gate": {
+            "evaluated": True,
+            "passed": True,
+            "reason": "no_adjustment_required",
+        },
+        "calibration": {
+            "status": "no_scaling_required",
+            "coverage": 8,
+            "min_coverage": 6,
+        },
+    }
+    bound = bind_noop_variance_evidence(bind_raw_guard_evidence(report))
+    resolved_policy = resolve_tier_policies("balanced", profile="ci")
+    for guard in bound["guards"]:
+        guard_name = guard.get("name")
+        guard_policy = guard.get("policy")
+        resolved_guard_policy = resolved_policy.get(guard_name)
+        if not isinstance(guard_policy, dict) or not isinstance(
+            resolved_guard_policy, dict
+        ):
+            continue
+        if guard_name == "spectral":
+            guard_policy["family_caps"] = copy.deepcopy(
+                resolved_guard_policy["family_caps"]
+            )
+        elif guard_name == "rmt":
+            guard_policy["epsilon_by_family"] = copy.deepcopy(
+                resolved_guard_policy["epsilon_by_family"]
+            )
+    bound["resolved_policy"] = resolved_policy
+    return bind_runtime_policy_receipt(bound)
 
 
 def _write_strict_stub_run(out_dir: Path, config_path: str, *, call_index: int) -> Path:
@@ -145,6 +282,12 @@ def _write_strict_stub_run(out_dir: Path, config_path: str, *, call_index: int) 
         else "noop",
         context=context,
     )
+    report["meta"]["run_id"] = f"strict-stub-run-{call_index}"
+    model_cfg = cfg.get("model", {}) if isinstance(cfg, dict) else {}
+    if isinstance(model_cfg, dict):
+        for field in ("model_identity",):
+            if field in model_cfg:
+                report["meta"][field] = model_cfg[field]
     report_path = ts_dir / "report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     return report_path
@@ -168,7 +311,7 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
 
     def fake_run(**kwargs):  # noqa: ANN001
         calls["runs"] += 1
-        return str(_stub_run(Path(kwargs["out"])))
+        return str(_stub_run(Path(kwargs["out"]), run_kwargs=kwargs))
 
     def fake_report(**_kwargs):  # noqa: ANN001
         calls["reports"] += 1
@@ -196,7 +339,7 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
     assert calls["reports"] == 1
 
 
-def test_evaluate_command_strict_path_generates_verifiable_pending_report(
+def test_evaluate_command_strict_path_rejects_incomplete_stub_evidence(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -217,17 +360,20 @@ def test_evaluate_command_strict_path_generates_verifiable_pending_report(
     import invarlock.cli.evaluate_output as evaluate_output_mod
     from invarlock.cli.commands import evaluate as eval_mod
 
-    calls = {"runs": 0}
+    calls: dict[str, object] = {"runs": 0, "run_reports": []}
 
     def fake_run(**kwargs):  # noqa: ANN001
-        calls["runs"] += 1
-        return str(
-            _write_strict_stub_run(
-                Path(kwargs["out"]),
-                str(kwargs["config"]),
-                call_index=calls["runs"],
-            )
+        calls["runs"] = int(calls["runs"]) + 1
+        preserve_effective_config(kwargs)
+        report = _write_strict_stub_run(
+            Path(kwargs["out"]),
+            str(kwargs["config"]),
+            call_index=int(calls["runs"]),
         )
+        run_reports = calls["run_reports"]
+        assert isinstance(run_reports, list)
+        run_reports.append(report)
+        return str(report)
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
@@ -261,9 +407,9 @@ def test_evaluate_command_strict_path_generates_verifiable_pending_report(
 
     assert calls["runs"] == 2
     assert payload["assurance"]["mode"] == "strict"
-    assert payload["assurance"]["verdict"] == "pending_verifier"
-    assert payload["assurance"]["report_local_verdict"] == "pass"
-    assert payload["assurance"]["verified_assurance_verdict"] == "pending"
+    assert payload["assurance"]["verdict"] == "fail"
+    assert payload["assurance"]["report_local_verdict"] == "fail"
+    assert payload["assurance"]["blocking_reasons"]
     assert payload["assurance"]["guard_chain_observed"] == list(CANONICAL_GUARD_CHAIN)
     assert payload["assurance"]["runtime_provenance_verification_status"] == "pending"
     assert payload["assurance"]["runtime_provenance_declared"] == "container"
@@ -272,14 +418,18 @@ def test_evaluate_command_strict_path_generates_verifiable_pending_report(
         "repaired_fields": [],
         "fallback_fields": [],
     }
+    policy_path = _write_matching_strict_policy_pack(report_path, payload)
 
     result = run_verify_reports(
         [report_path],
+        baseline=calls["run_reports"][0],
+        policy_pack=policy_path,
         profile="ci",
         assurance_mode="strict",
+        expected_runtime_image_digest="sha256:" + "1" * 64,
     )
 
-    assert result.outcome == VerifyOutcome.OK
+    assert result.outcome == VerifyOutcome.POLICY_FAIL
 
 
 def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_path):
@@ -299,6 +449,7 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
     baseline_dir = tmp_path / "baseline_report_dir"
     baseline_dir.mkdir()
     baseline_report = baseline_dir / "report.json"
+    baseline_digest = checkpoint_tree_sha256(src)
     baseline_report.write_text(
         json.dumps(
             {
@@ -306,6 +457,10 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
                     "model_id": str(src),
                     "adapter": "hf_causal",
                     "device": "cpu",
+                    "model_identity": {
+                        "kind": "local_checkpoint_tree",
+                        "sha256": baseline_digest,
+                    },
                 },
                 "context": {
                     "profile": "ci",
@@ -343,7 +498,7 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
 
     def fake_run(**kwargs):  # noqa: ANN001
         calls["runs"].append(kwargs)
-        return str(_stub_run(Path(kwargs["out"])))
+        return str(_stub_run(Path(kwargs["out"]), run_kwargs=kwargs))
 
     def fake_report(**kwargs):  # noqa: ANN001
         calls["reports"].append(kwargs)
@@ -393,7 +548,7 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
 
     def fake_run(**kwargs):  # noqa: ANN001
         captured_runs.append(kwargs)
-        return str(_stub_run(Path(kwargs["out"])))
+        return str(_stub_run(Path(kwargs["out"]), run_kwargs=kwargs))
 
     def fake_report(**_kwargs):  # noqa: ANN001
         return None
@@ -443,7 +598,7 @@ def test_evaluate_command_passes_host_mode_execution_mode_to_runs(
 
     def fake_run(**kwargs):  # noqa: ANN001
         captured_runs.append(kwargs)
-        return str(_stub_run(Path(kwargs["out"])))
+        return str(_stub_run(Path(kwargs["out"]), run_kwargs=kwargs))
 
     def fake_report(**_kwargs):  # noqa: ANN001
         return None
@@ -508,7 +663,7 @@ def test_evaluate_command_resets_runtime_security_on_success(
 
     def fake_run(**kwargs):
         out = Path(kwargs["out"])
-        return str(_stub_run(out))
+        return str(_stub_run(out, run_kwargs=kwargs))
 
     monkeypatch.setattr(security_helpers, "configure_runtime_security", fake_configure)
     monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
@@ -599,56 +754,3 @@ def test_evaluate_command_resets_runtime_security_on_raise(
     assert state["active"] is False
     assert state["enter"] == 1
     assert state["exit"] == 1
-
-
-def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) -> None:
-    src = tmp_path / "src_model"
-    edt = tmp_path / "edt_model"
-    src.mkdir()
-    edt.mkdir()
-    (src / "config.json").write_text(
-        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
-        encoding="utf-8",
-    )
-    (edt / "config.json").write_text(
-        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
-        encoding="utf-8",
-    )
-
-    captured_runs: list[dict[str, object]] = []
-
-    def fake_run(**kwargs):  # noqa: ANN001
-        captured_runs.append(kwargs)
-        return str(_stub_run(Path(kwargs["out"])))
-
-    def fake_report(**_kwargs):  # noqa: ANN001
-        return None
-
-    import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import evaluate as cert_mod
-
-    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(cert_mod, "generate_reports", fake_report, raising=False)
-
-    evaluate_command(
-        baseline=str(src),
-        subject=str(edt),
-        baseline_adapter="auto",
-        subject_adapter="auto",
-        profile="ci",
-        out=str(tmp_path / "runs"),
-        report_out=str(tmp_path / "reports"),
-        timing=False,
-        progress=False,
-        assurance="off",
-    )
-
-    assert len(captured_runs) == 2
-    for call in captured_runs:
-        assert call["until_pass"] is False
-        assert call["max_attempts"] == 1
-        assert call["timeout"] is None
-        assert call["allow_network"] is False
-        assert call["allow_host_execution"] is False
-        assert call["allow_third_party_plugins"] is False
-        assert call["allow_remote_code"] is False

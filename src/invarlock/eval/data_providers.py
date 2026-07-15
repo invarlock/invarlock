@@ -79,9 +79,13 @@ class WikiText2Provider:
         self,
         cache_dir: Path | None = None,
         device_hint: str | None = None,
+        revision: str | None = None,
         **_: Any,
     ):
         self.cache_dir = cache_dir
+        self.dataset_name = "Salesforce/wikitext"
+        self.config_name = "wikitext-2-raw-v1"
+        self.revision = revision or None
         self._validate_dependencies()
         self._last_stratification_stats: dict[str, Any] | None = None
         self._last_batch_size_used: int = 0
@@ -126,10 +130,11 @@ class WikiText2Provider:
 
         dataset_slice = f"{split}[:{max_samples}]" if max_samples > 0 else split
         dataset = load_dataset_with_cache_fallback(
-            "Salesforce/wikitext",
-            "wikitext-2-raw-v1",
+            self.dataset_name,
+            self.config_name,
             split=dataset_slice,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
+            revision=self.revision,
         )
 
         valid_texts: list[str] = []

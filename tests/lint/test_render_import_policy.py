@@ -5,10 +5,10 @@ from pathlib import Path
 
 
 def test_no_render_helpers_imported_from_evaluation_report():
-    """Ensure code imports render helpers from invarlock.reporting.render, not report_make.
+    """Ensure code imports the canonical renderer, not report construction.
 
     This guards future modules from re-introducing imports like:
-    from invarlock.reporting.render import render_report_markdown
+    from invarlock.reporting.report_make import render_report_markdown
     """
     repo_root = Path(__file__).resolve().parents[2]
     src_dir = repo_root / "src"

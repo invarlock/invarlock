@@ -4,12 +4,21 @@ from invarlock.reporting.report_builder_support import (
     telemetry_output_enabled,
     telemetry_summary_line,
 )
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_minimal_report() -> dict:
     return {
-        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf",
+            "device": "cpu",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",

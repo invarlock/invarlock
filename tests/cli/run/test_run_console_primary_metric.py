@@ -109,7 +109,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },

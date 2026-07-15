@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import sys
-import types
 from pathlib import Path
 
 import pytest
 
+from invarlock.training_protocol import (
+    FULL_FINE_TUNE_FIXTURE_FORMAT,
+    PEFT_LORA_FIXTURE_FORMAT,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INTEGRATIONS_DIR = REPO_ROOT / "examples" / "integrations"
-PEFT_DIR = INTEGRATIONS_DIR / "peft_lora"
-FINE_TUNE_DIR = INTEGRATIONS_DIR / "fine_tune"
+TRAINING_FIXTURE_HELPER = INTEGRATIONS_DIR / "_shared" / "prepare_training_fixture.py"
 MAGNITUDE_PRUNE_DIR = INTEGRATIONS_DIR / "magnitude_prune"
 TORCHAO_DIR = INTEGRATIONS_DIR / "torchao_int8_runtime"
 
@@ -52,12 +54,13 @@ def _assert_local_fixture(
 
 def test_peft_lora_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_module(
-        PEFT_DIR / "materialize_tiny_peft_lora_subject.py",
-        "peft_lora_example",
+        TRAINING_FIXTURE_HELPER,
+        "training_fixture_peft_example",
     )
     summary = helper.write_text_fixture(
         tmp_path,
         model_id="/tmp/tiny-gpt2-baseline",
+        format_version=PEFT_LORA_FIXTURE_FORMAT,
         rows=6,
         terms_per_row=5,
         seq_len=32,
@@ -69,18 +72,19 @@ def test_peft_lora_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
         summary,
         tmp_path,
         expected_model_id="/tmp/tiny-gpt2-baseline",
-        expected_format_version="peft-lora-fixture-v1",
+        expected_format_version=PEFT_LORA_FIXTURE_FORMAT,
     )
 
 
 def test_fine_tune_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_module(
-        FINE_TUNE_DIR / "materialize_tiny_fine_tune_subject.py",
-        "fine_tune_example",
+        TRAINING_FIXTURE_HELPER,
+        "training_fixture_fine_tune_example",
     )
     summary = helper.write_text_fixture(
         tmp_path,
         model_id="/tmp/tiny-gpt2-baseline",
+        format_version=FULL_FINE_TUNE_FIXTURE_FORMAT,
         rows=6,
         terms_per_row=5,
         seq_len=32,
@@ -92,25 +96,26 @@ def test_fine_tune_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
         summary,
         tmp_path,
         expected_model_id="/tmp/tiny-gpt2-baseline",
-        expected_format_version="tiny-fine-tune-fixture-v1",
+        expected_format_version=FULL_FINE_TUNE_FIXTURE_FORMAT,
     )
 
 
-def test_fine_tune_helper_rejects_non_finite_training_artifacts() -> None:
+def test_training_fixture_rejects_invalid_contract(tmp_path: Path) -> None:
     helper = _load_module(
-        FINE_TUNE_DIR / "materialize_tiny_fine_tune_subject.py",
-        "fine_tune_example_finite_guard",
+        TRAINING_FIXTURE_HELPER,
+        "training_fixture_contract_guard",
     )
 
-    helper._require_finite_training_artifacts(
-        loss_value=1.0,
-        delta={"max_abs_delta": 0.01, "by_tensor": {"w": 0.01}},
-    )
-
-    with pytest.raises(SystemExit, match="non-finite tensor deltas"):
-        helper._require_finite_training_artifacts(
-            loss_value=1.0,
-            delta={"max_abs_delta": float("inf"), "by_tensor": {"w": float("inf")}},
+    with pytest.raises(ValueError, match="rows must be at least"):
+        helper.write_text_fixture(
+            tmp_path,
+            model_id="sshleifer/tiny-gpt2",
+            format_version="fixture-v1",
+            rows=1,
+            terms_per_row=1,
+            seq_len=8,
+            preview_n=1,
+            final_n=1,
         )
 
 
@@ -137,87 +142,6 @@ def test_magnitude_prune_helper_writes_local_jsonl_and_preset(
         expected_model_id="/tmp/tiny-gpt2-baseline",
         expected_format_version="tiny-magnitude-prune-fixture-v1",
     )
-
-
-def test_peft_lora_helper_isolates_dense_lora_from_quantized_dispatch(
-    monkeypatch,
-) -> None:
-    helper = _load_module(
-        PEFT_DIR / "materialize_tiny_peft_lora_subject.py",
-        "peft_lora_example_dispatch",
-    )
-
-    class DenseModel:
-        config = object()
-        is_quantized = False
-
-    calls = {"count": 0}
-
-    def fake_get_peft_model(_model, _config):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise ImportError(
-                "cannot import name 'AwqGEMMQuantLinear' from "
-                "'gptqmodel.nn_modules.qlinear.gemm_awq'"
-            )
-        return "peft-model"
-
-    monkeypatch.setattr(
-        helper,
-        "_disable_quantized_peft_dispatch_for_dense_example",
-        lambda: True,
-    )
-
-    assert (
-        helper._get_dense_peft_model(DenseModel(), object(), fake_get_peft_model)
-        == "peft-model"
-    )
-    assert calls["count"] == 2
-
-
-def test_peft_lora_helper_disables_imported_gptqmodel_checks(
-    monkeypatch,
-) -> None:
-    helper = _load_module(
-        PEFT_DIR / "materialize_tiny_peft_lora_subject.py",
-        "peft_lora_example_dispatch_modules",
-    )
-    module_names = (
-        "peft.import_utils",
-        "peft.tuners.lora.awq",
-        "peft.tuners.lora.gptq",
-    )
-
-    def available() -> bool:
-        return True
-
-    for module_name in module_names:
-        module = types.ModuleType(module_name)
-        module.is_gptqmodel_available = available
-        monkeypatch.setitem(sys.modules, module_name, module)
-
-    class DenseModel:
-        config = object()
-        is_quantized = False
-
-    calls = {"count": 0}
-
-    def fake_get_peft_model(_model, _config):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise ImportError(
-                "gptqmodel requires optimum version `1.24.0` or higher to be installed."
-            )
-        for module_name in module_names:
-            if sys.modules[module_name].is_gptqmodel_available():
-                raise ImportError(f"{module_name} still reports GPTQModel support")
-        return "peft-model"
-
-    assert (
-        helper._get_dense_peft_model(DenseModel(), object(), fake_get_peft_model)
-        == "peft-model"
-    )
-    assert calls["count"] == 2
 
 
 def test_torchao_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:

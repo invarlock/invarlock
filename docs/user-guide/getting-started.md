@@ -47,24 +47,23 @@ conda activate invarlock
 pip install "invarlock[hf]"
 ```
 
-## Verify Installation
+## Verify Installation And Container Runtime
+
+The default strict path requires a running Docker or Podman engine that the
+current account can invoke. Check the engine directly, then use `doctor` for
+Python, dependency, and accelerator diagnostics:
 
 ```bash
+# Use `podman info` instead when Podman is your selected engine.
+docker info
 invarlock doctor
 ```
 
 ## Network Access
 
-InvarLock blocks outbound network by default. When you need to download models
-or datasets, opt in per command with `--allow-network`:
-
-```bash
-invarlock evaluate --allow-network \
-  --baseline gpt2 \
-  --subject distilgpt2 \
-  --baseline-adapter auto --subject-adapter auto \
-  --profile ci
-```
+InvarLock blocks outbound network by default. When the baseline, edited subject,
+or dataset must be downloaded, opt in on the evaluation command with
+`--allow-network`, as in the template below.
 
 For offline use, pre-download assets and enforce offline reads with
 `HF_DATASETS_OFFLINE=1`. You can also relocate your Hugging Face cache via
@@ -73,30 +72,67 @@ For offline use, pre-download assets and enforce offline reads with
 ## First Evaluation
 
 The default `evaluate` path runs model-loading steps inside the runtime
-container and emits `runtime.manifest.json` beside the evaluation report.
+container and emits `runtime.manifest.json` beside the evaluation report. Point
+the subject at the actual checkpoint produced by your external edit pipeline;
+the template does not manufacture an edited-checkpoint claim from two unrelated
+pretrained models.
 
 ```bash
+BASELINE_CHECKPOINT=/path/to/original-checkpoint
+EDITED_SUBJECT_CHECKPOINT=/path/to/checkpoint-produced-by-your-edit-pipeline
+
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
-  --baseline gpt2 \
-  --subject distilgpt2 \
+  --baseline "$BASELINE_CHECKPOINT" \
+  --subject "$EDITED_SUBJECT_CHECKPOINT" \
   --baseline-adapter auto --subject-adapter auto \
   --profile ci \
+  --assurance strict \
+  --verbose \
   --report-out reports/eval
 ```
 
-Repo maintainers can still add `--preset configs/...` when they intentionally
-want a repo-owned preset, but the wheel-first onboarding path should start with
-direct flags and the built-in adapter defaults.
+`--verbose` prints `Baseline report: ...`; the path is also recorded at
+`provenance.baseline.report_path` in `evaluation.report.json`. A report-local
+`Status: PASS` is provisional: a generated strict report remains
+`pending_verifier` until the separate strict verifier exits `0`.
+
+When either checkpoint is a remote model ID, add its immutable 40–64 character
+lowercase hexadecimal commit with `--baseline-revision` or
+`--subject-revision`. Local checkpoint directories are content-hashed
+automatically, so they do not take revision flags.
+
+From a repository checkout, add `--preset configs/...` when a checked-in preset
+is appropriate. The wheel-first onboarding path uses direct flags and built-in
+adapter defaults because repository preset paths are not included in wheels.
 
 ## Verify And Render
 
 ```bash
-invarlock verify reports/eval/evaluation.report.json
+: "${TRUSTED_RUNTIME_IMAGE_DIGEST:?Set this from independently reviewed policy}"
+BASELINE_RUN_REPORT=/path/to/baseline/run/report.json
+ACCEPTANCE_POLICY_PACK=/path/to/acceptance/policy-pack.json
+invarlock verify \
+  --profile ci \
+  --assurance strict \
+  --baseline "$BASELINE_RUN_REPORT" \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
 These commands validate the paired math, schema, and runtime provenance, then
 render a shareable HTML artifact from the same report.
+Obtain the policy pack and digest from reviewed policy channels independently
+of the report bundle and its runtime manifest.
+The submitted report cannot create an independent trust anchor by building the
+pack itself or copying the digest from the manifest. Policy build tooling
+serializes the caller's decision; it does not confer authorization. See
+[Policy packs](../reference/contracts.md#policy-packs) and the [Runtime
+Provenance Guide](../security/runtime-provenance-guide.md).
+Set `BASELINE_RUN_REPORT` to the retained raw `report.json` shown by
+`evaluate --verbose` or `provenance.baseline.report_path`; strict verification
+rejects reconstructed metric fragments.
 
 Artifact model:
 
@@ -119,7 +155,7 @@ Artifact model:
 | **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & evaluate](compare-and-evaluate.md) |
 | **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
-| **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Evidence Packs Internals](evidence-packs-internals.md) |
+| **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Public Contracts](../reference/contracts.md) |
 | **Integration author** | Getting Started → [Integration Examples](integrations.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | **Knowledge/self-edit workflow owner** | Getting Started → [Knowledge & self-edit workflows](knowledge-and-self-edit-workflows.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
@@ -138,7 +174,10 @@ Installed packages also include the evidence-pack verifier, so bundles can be
 inspected without cloning the repository:
 
 ```bash
-invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
+invarlock advanced evidence-pack verify <pack> \
+  --strict --report-assurance strict \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST"
 ```
 
 Optional adapter and backend installs use Python extras such as

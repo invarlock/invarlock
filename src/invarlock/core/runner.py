@@ -27,24 +27,24 @@ from .api import (
     RunReport,
 )
 from .auto_tuning import resolve_tier_policies
-from .bootstrap import compute_paired_delta_log_ci, logspace_to_ratio_ci
+from .bootstrap import compute_independent_delta_log_ci, logspace_to_ratio_ci
 from .checkpoint import CheckpointManager
 from .events import EventLogger
 from .exceptions import InvarlockError
-from .runner_eval_metrics import (
+from .runner_runtime.eval_metrics import (
     compute_real_metrics,
     measure_latency,
     samples_to_dataloader,
 )
-from .runner_eval_phase import eval_phase
-from .runner_finalize import finalize_phase, handle_error
-from .runner_guards import (
+from .runner_runtime.eval_phase import eval_phase
+from .runner_runtime.finalize import finalize_phase, handle_error
+from .runner_runtime.guards import (
     apply_guard_policy,
     guard_phase,
     prepare_guards_phase,
     resolve_guard_policies,
 )
-from .runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from .runner_runtime.pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from .types import LogLevel
 
 __all__ = ["CoreRunner"]
@@ -383,7 +383,7 @@ class CoreRunner:
         final_n: int | None = None,
     ) -> RunReport:
         """Execute the full InvarLock pipeline."""
-        from .runner_execution_plan import (
+        from .runner_runtime.execution_plan import (
             RunnerExecutionRequest,
             execute_runner_execution_plan,
         )
@@ -524,6 +524,8 @@ class CoreRunner:
         report: RunReport,
         *,
         guard_timings: dict[str, float] | None = None,
+        result_keys: list[str] | None = None,
+        result_stages: list[str | None] | None = None,
     ) -> dict[str, dict[str, Any]]:
         return guard_phase(
             self,
@@ -532,6 +534,8 @@ class CoreRunner:
             guards,
             report,
             guard_timings=guard_timings,
+            result_keys=result_keys,
+            result_stages=result_stages,
         )
 
     def _eval_phase(
@@ -573,7 +577,7 @@ class CoreRunner:
             preview_n,
             final_n,
             config,
-            compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci,
+            compute_independent_delta_log_ci_fn=compute_independent_delta_log_ci,
             logspace_to_ratio_ci_fn=logspace_to_ratio_ci,
             coverage_requirements=BOOTSTRAP_COVERAGE_REQUIREMENTS,
         )

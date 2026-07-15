@@ -12,7 +12,9 @@ import pytest
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
     common_ce_patches,
+    configure_guard_metric_impact_skip,
 )
 from tests.cli.run._support_run_common import (
     synthetic_provider_min as _provider_min,
@@ -33,7 +35,7 @@ def _runner_min():
     return SimpleNamespace(
         execute=lambda **k: SimpleNamespace(
             edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics=canonical_ppl_metrics(),
             guards={},
             context={"dataset_meta": {}},
             status="success",
@@ -46,7 +48,7 @@ def _runner_echo_context():
         cfg_ctx = getattr(kwargs.get("config"), "context", {})
         return SimpleNamespace(
             edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics=canonical_ppl_metrics(),
             guards={},
             context=cfg_ctx,
             evaluation_windows={},
@@ -61,14 +63,11 @@ def _runner_echo_context_with_eval(pre_ids, fin_ids):
         cfg_ctx = getattr(kwargs.get("config"), "context", {})
         return SimpleNamespace(
             edit={},
-            metrics={
-                "ppl_preview": 1.0,
-                "ppl_final": 1.0,
-                "ppl_ratio": 1.0,
-                "window_overlap_fraction": 0.0,
-                "window_match_fraction": 1.0,
-                "paired_windows": min(len(pre_ids or []), len(fin_ids or [])) or 1,
-            },
+            metrics=canonical_ppl_metrics(
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+                paired_windows=min(len(pre_ids or []), len(fin_ids or [])) or 1,
+            ),
             guards={},
             context=cfg_ctx,
             evaluation_windows={
@@ -107,7 +106,7 @@ def test_auto_tier_override_conservative(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -139,7 +138,7 @@ def test_auto_tier_override_aggressive(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -171,7 +170,7 @@ def test_auto_probes_override_zero(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -203,7 +202,7 @@ def test_auto_probes_override_three(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -260,7 +259,7 @@ def test_data_meta_has_tokenizer_name(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -291,7 +290,7 @@ def test_data_meta_has_tokenizer_hash(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -322,7 +321,7 @@ def test_data_meta_has_vocab_size_and_tokens(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -356,7 +355,7 @@ def test_data_meta_add_prefix_space_key_present(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -450,7 +449,7 @@ def test_preview_and_final_hash_and_dataset_hash_present(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", lambda: runner_eval)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -490,17 +489,37 @@ def test_window_plan_present_and_capacity_mirrored(tmp_path: Path):
                 SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
             )
 
+    class Runner:
+        def execute(self, **kwargs):
+            cfg_ctx = getattr(kwargs.get("config"), "context", {})
+            return SimpleNamespace(
+                edit={},
+                metrics=canonical_ppl_metrics(
+                    window_overlap_fraction=0.0,
+                    window_match_fraction=1.0,
+                    paired_windows=1,
+                ),
+                guards={},
+                context=cfg_ctx,
+                evaluation_windows={
+                    "final": {
+                        "window_ids": [1],
+                        "logloss": [0.0],
+                        "token_counts": [1],
+                    }
+                },
+                status="success",
+            )
+
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
-            patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
-        )
-        stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
@@ -518,7 +537,7 @@ def test_window_plan_present_and_capacity_mirrored(tmp_path: Path):
 
 
 def test_baseline_masked_counts_propagated(tmp_path: Path):
-    cfg = _base_cfg(tmp_path, 1, 1)
+    cfg = configure_guard_metric_impact_skip(_base_cfg(tmp_path, 1, 1))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -612,12 +631,12 @@ def test_baseline_masked_counts_propagated(tmp_path: Path):
             patch("invarlock.core.runner.CoreRunner", lambda: runner_eval)
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
             until_pass=False,
@@ -634,7 +653,7 @@ def test_baseline_masked_counts_propagated(tmp_path: Path):
 def test_labels_numpy_arrays_in_baseline(tmp_path: Path):
     import numpy as np
 
-    cfg = _base_cfg(tmp_path, 1, 1)
+    cfg = configure_guard_metric_impact_skip(_base_cfg(tmp_path, 1, 1))
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
         json.dumps(
@@ -671,7 +690,7 @@ def test_labels_numpy_arrays_in_baseline(tmp_path: Path):
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
             until_pass=False,

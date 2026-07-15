@@ -159,7 +159,7 @@ def test_spectral_guard_carries_measurement_fallback_diagnostics() -> None:
 
     sigmas = guard._capture_sigmas(model, phase="validate")
 
-    assert sigmas[""] == 0.0
+    assert sigmas == {}
     assert any(
         item["kind"] == "spectral_sigma_fallback_non_finite_weight"
         for item in guard.diagnostic_records
@@ -168,3 +168,10 @@ def test_spectral_guard_carries_measurement_fallback_diagnostics() -> None:
         item["kind"] == "spectral_sigma_fallback_non_finite_weight"
         for item in guard._measurement_diagnostics
     )
+    assert guard.measurement_inventory["validate"]["excluded_modules"] == [
+        {
+            "module": "",
+            "stage": "measurement",
+            "reason": "non_finite_weight",
+        }
+    ]

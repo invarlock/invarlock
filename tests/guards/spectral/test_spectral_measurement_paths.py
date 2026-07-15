@@ -239,7 +239,7 @@ def test_capture_sigmas_falls_back_for_invalid_estimator_and_power_iter_failure(
 
     sigmas = capture_sigmas(guard, _ModelWithWeight(), phase="after_edit")
 
-    assert sigmas == {"fragile": 1.0}
+    assert sigmas == {}
 
 
 def test_capture_sigmas_prefers_scoped_modules_and_handles_quantized_weights() -> None:

@@ -102,6 +102,12 @@ GUARD_FAULT_INJECTION_SEAMS: tuple[GuardFaultInjectionSeam, ...] = (
         "Exercises fallback cap lookup when policy caps are malformed or missing.",
     ),
     GuardFaultInjectionSeam(
+        "spectral_detection",
+        "_resolve_kappa_cap",
+        "default_family_caps_fn",
+        "Carries the caller-provided fallback cap provider through the extracted cap-resolution helper.",
+    ),
+    GuardFaultInjectionSeam(
         "spectral_measurement",
         "_compute_sigma_with_optional_diagnostics",
         "compute_sigma_max_fn",
@@ -150,6 +156,12 @@ GUARD_FAULT_INJECTION_SEAMS: tuple[GuardFaultInjectionSeam, ...] = (
         "Injects estimator behavior through the guard measurement contract while preserving guard state logging.",
     ),
     GuardFaultInjectionSeam(
+        "spectral_measurement",
+        "_measure_scoped_module",
+        "power_iter_sigma_max_fn",
+        "Carries the caller-provided estimator through scoped measurement while retaining diagnostic and exclusion handling.",
+    ),
+    GuardFaultInjectionSeam(
         "spectral_runtime",
         "prepare_guard",
         "apply_policy_overrides_fn",
@@ -192,6 +204,12 @@ GUARD_FAULT_INJECTION_SEAMS: tuple[GuardFaultInjectionSeam, ...] = (
         "Injects correction behavior after detected violations without mutating model weights in lifecycle tests.",
     ),
     GuardFaultInjectionSeam(
+        "spectral_correction",
+        "run_correction_lifecycle",
+        "apply_spectral_control_fn",
+        "Injects deterministic correction results while exercising the finding-bound action ledger and post-action replay.",
+    ),
+    GuardFaultInjectionSeam(
         "variance_evaluation",
         "_compute_delta_ci",
         "compute_paired_delta_log_ci_fn",
@@ -202,6 +220,12 @@ GUARD_FAULT_INJECTION_SEAMS: tuple[GuardFaultInjectionSeam, ...] = (
         "_handle_complete_calibration",
         "compute_paired_delta_log_ci_fn",
         "Injects CI outputs and failures while exercising complete calibration state updates.",
+    ),
+    GuardFaultInjectionSeam(
+        "variance_evaluation",
+        "_handle_no_scales_path",
+        "compute_paired_delta_log_ci_fn",
+        "Injects paired confidence intervals for the no-adjustment lifecycle without replacing the producer bootstrap globally.",
     ),
     GuardFaultInjectionSeam(
         "variance_evaluation",

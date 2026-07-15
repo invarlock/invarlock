@@ -32,8 +32,14 @@ def test_enrich_run_report_metrics_adds_classification_primary_metric_and_stats(
         },
         "data": {"preview_n": 2, "final_n": 2},
         "evaluation_windows": {
-            "preview": {"input_ids": [[1, 2], [3, 4]]},
-            "final": {"input_ids": [[5, 6], [7, 8]]},
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "example_correct": [True, True],
+            },
+            "final": {
+                "input_ids": [[5, 6], [7, 8]],
+                "example_correct": [True, True],
+            },
         },
     }
     core_report = SimpleNamespace(

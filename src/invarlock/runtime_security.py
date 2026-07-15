@@ -14,6 +14,7 @@ Typed request-scoped policy surface retained at the owner boundary:
 
 from __future__ import annotations
 
+import os as _os
 import sys
 from collections.abc import Iterable
 from pathlib import Path as _Path
@@ -35,6 +36,8 @@ from invarlock.runtime_security_helpers import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_MANIFEST_VERSION,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
+    SOURCE_BUNDLE_DIGEST_ENV,
+    SOURCE_BUNDLE_READ_ONLY_ENV,
     ContainerLaunchPlan,
     RuntimeManifestExecution,
     RuntimeManifestLoadIssueCode,
@@ -235,6 +238,10 @@ def normalize_delegated_argv(argv: list[str], *, cwd: _Path) -> ContainerLaunchP
         argv_mounts=tuple(_minimize_mounts(mounts)),
         needs_cwd_host_mirror=needs_cwd_host_mirror,
         gpu_passthrough=_needs_gpu_passthrough(rewritten),
+        workspace_read_only=(
+            _os.environ.get(SOURCE_BUNDLE_READ_ONLY_ENV, "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        ),
     )
 
 
@@ -274,6 +281,8 @@ __all__ = [
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
+    "SOURCE_BUNDLE_DIGEST_ENV",
+    "SOURCE_BUNDLE_READ_ONLY_ENV",
     "apply_runtime_allowances",
     "build_container_command",
     "build_container_python_module_command",

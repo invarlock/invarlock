@@ -10,39 +10,11 @@ from invarlock.core.exceptions import ValidationError as _ValErr
 from .data_support import EvaluationWindow
 
 
-def stratify_wikitext_candidates(
-    candidates: list[dict[str, Any]],
-    *,
-    preview_n: int,
-    final_n: int,
-    reserve: int,
-    batch_size_used: int,
-) -> tuple[EvaluationWindow, EvaluationWindow, dict[str, Any]]:
-    total_required = int(preview_n) + int(final_n)
-    if total_required <= 0:
-        raise _ValErr(
-            code="E302",
-            message="VALIDATION-FAILED: preview/final must be positive",
-        )
-    if len(candidates) < total_required:
-        raise _DataErr(
-            code="E305",
-            message="STRATIFY-FAILED: candidate pool insufficient",
-        )
-
-    def _mean_difficulty(items: list[dict[str, Any]]) -> float:
-        if not items:
-            return 0.0
-        return float(sum(item["difficulty"] for item in items) / len(items))
-
-    sorted_candidates = sorted(
-        candidates, key=lambda item: (item["difficulty"], item["dataset_index"])
-    )
-    total_candidates = len(sorted_candidates)
-    selection_count = total_required
+def _select_stratified_positions(
+    total_candidates: int, selection_count: int
+) -> list[int]:
     selected_positions: list[int] = []
     used_positions: set[int] = set()
-
     for k in range(selection_count):
         target_position = (k + 0.5) * total_candidates / selection_count
         base_idx = int(round(target_position))
@@ -62,82 +34,19 @@ def stratify_wikitext_candidates(
         if chosen is not None:
             used_positions.add(chosen)
             selected_positions.append(chosen)
+    return selected_positions
 
-    if len(selected_positions) < selection_count:
-        for candidate_idx in range(total_candidates):
-            if candidate_idx not in used_positions:
-                used_positions.add(candidate_idx)
-                selected_positions.append(candidate_idx)
-            if len(selected_positions) == selection_count:
-                break
-    if len(selected_positions) < selection_count:
-        raise _DataErr(
-            code="E305", message="STRATIFY-FAILED: candidate pool insufficient"
-        )
 
-    selected_candidates = [sorted_candidates[idx] for idx in selected_positions]
-    selected_candidates.sort(
-        key=lambda item: (item["difficulty"], item["dataset_index"])
-    )
-    preview_candidates: list[dict[str, Any]] = []
-    final_candidates: list[dict[str, Any]] = []
+def _mean_difficulty(items: list[dict[str, Any]]) -> float:
+    if not items:
+        return 0.0
+    return float(sum(item["difficulty"] for item in items) / len(items))
 
-    def assign_candidate(
-        candidate: dict[str, Any],
-        primary: list[dict[str, Any]],
-        secondary: list[dict[str, Any]],
-        primary_capacity: int,
-        secondary_capacity: int,
-    ) -> None:
-        if len(primary) < primary_capacity:
-            primary.append(candidate)
-        elif len(secondary) < secondary_capacity:
-            secondary.append(candidate)
 
-    for pair_start in range(0, len(selected_candidates), 2):
-        pair = selected_candidates[pair_start : pair_start + 2]
-        if not pair:
-            continue
-        if len(pair) == 2:
-            easy, hard = pair
-            pair_index = pair_start // 2
-            if pair_index % 2 == 0:
-                assign_candidate(
-                    easy, preview_candidates, final_candidates, preview_n, final_n
-                )
-                assign_candidate(
-                    hard, final_candidates, preview_candidates, final_n, preview_n
-                )
-            else:
-                assign_candidate(
-                    easy, final_candidates, preview_candidates, final_n, preview_n
-                )
-                assign_candidate(
-                    hard, preview_candidates, final_candidates, preview_n, final_n
-                )
-        else:
-            assign_candidate(
-                pair[0],
-                preview_candidates,
-                final_candidates,
-                preview_n,
-                final_n,
-            )
-
-    assigned_ids = {
-        id(candidate) for candidate in preview_candidates + final_candidates
-    }
-    remaining = [
-        candidate
-        for candidate in selected_candidates
-        if id(candidate) not in assigned_ids
-    ]
-    for candidate in remaining:
-        if len(preview_candidates) < preview_n:
-            preview_candidates.append(candidate)
-        elif len(final_candidates) < final_n:
-            final_candidates.append(candidate)
-
+def _balance_candidate_difficulty(
+    preview_candidates: list[dict[str, Any]],
+    final_candidates: list[dict[str, Any]],
+) -> None:
     for _ in range(100):
         if not preview_candidates or not final_candidates:
             break
@@ -165,6 +74,87 @@ def stratify_wikitext_candidates(
             preview_candidates.append(preview_candidate)
             final_candidates.append(final_candidate)
             break
+
+
+def stratify_wikitext_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    preview_n: int,
+    final_n: int,
+    reserve: int,
+    batch_size_used: int,
+) -> tuple[EvaluationWindow, EvaluationWindow, dict[str, Any]]:
+    total_required = int(preview_n) + int(final_n)
+    if total_required <= 0:
+        raise _ValErr(
+            code="E302",
+            message="VALIDATION-FAILED: preview/final must be positive",
+        )
+    if len(candidates) < total_required:
+        raise _DataErr(
+            code="E305",
+            message="STRATIFY-FAILED: candidate pool insufficient",
+        )
+
+    sorted_candidates = sorted(
+        candidates, key=lambda item: (item["difficulty"], item["dataset_index"])
+    )
+    total_candidates = len(sorted_candidates)
+    selection_count = total_required
+    selected_positions = _select_stratified_positions(total_candidates, selection_count)
+    if len(selected_positions) < selection_count:
+        raise _DataErr(
+            code="E305", message="STRATIFY-FAILED: candidate pool insufficient"
+        )
+
+    selected_candidates = [sorted_candidates[idx] for idx in selected_positions]
+    selected_candidates.sort(
+        key=lambda item: (item["difficulty"], item["dataset_index"])
+    )
+    preview_candidates: list[dict[str, Any]] = []
+    final_candidates: list[dict[str, Any]] = []
+
+    def assign_candidate(
+        candidate: dict[str, Any],
+        primary: list[dict[str, Any]],
+        secondary: list[dict[str, Any]],
+        primary_capacity: int,
+        secondary_capacity: int,
+    ) -> None:
+        if len(primary) < primary_capacity:
+            primary.append(candidate)
+        elif len(secondary) < secondary_capacity:
+            secondary.append(candidate)
+
+    for pair_start in range(0, len(selected_candidates), 2):
+        pair = selected_candidates[pair_start : pair_start + 2]
+        if len(pair) == 2:
+            easy, hard = pair
+            pair_index = pair_start // 2
+            if pair_index % 2 == 0:
+                assign_candidate(
+                    easy, preview_candidates, final_candidates, preview_n, final_n
+                )
+                assign_candidate(
+                    hard, final_candidates, preview_candidates, final_n, preview_n
+                )
+            else:
+                assign_candidate(
+                    easy, final_candidates, preview_candidates, final_n, preview_n
+                )
+                assign_candidate(
+                    hard, preview_candidates, final_candidates, preview_n, final_n
+                )
+        else:
+            assign_candidate(
+                pair[0],
+                preview_candidates,
+                final_candidates,
+                preview_n,
+                final_n,
+            )
+
+    _balance_candidate_difficulty(preview_candidates, final_candidates)
 
     if len(preview_candidates) != preview_n or len(final_candidates) != final_n:
         raise _DataErr(

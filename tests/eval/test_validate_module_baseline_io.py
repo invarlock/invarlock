@@ -3,19 +3,11 @@ Comprehensive test coverage for InvarLock validation module.
 Tests for validate.py to achieve 80%+ coverage.
 """
 
-import json
-import tempfile
-import warnings
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 
 from invarlock.reporting.validate import (
-    ValidationResult,
     create_baseline_from_report,
     validate_against_baseline,
-    validate_gpt2_small_wt2_baseline,
 )
 
 if __name__ == "__main__":
@@ -111,76 +103,6 @@ class TestValidateCreateBaseline:
         assert "ratio_vs_baseline" not in baseline
         assert baseline["param_reduction_ratio"] == 0.1
         assert baseline["layers_modified"] == 3
-
-
-class TestValidateGpt2Baseline:
-    """Test validate_gpt2_small_wt2_baseline function."""
-
-    @patch("invarlock.reporting.validate.load_baseline")
-    def test_gpt2_validation_with_baseline_file(self, mock_load):
-        """Test GPT-2 validation with existing baseline file."""
-        mock_baseline = {
-            "ratio_vs_baseline": 1.285,
-            "param_reduction_ratio": 0.022,
-            "heads_pruned": 16,
-            "neurons_pruned": 1024,
-            "layers_modified": 8,
-        }
-        mock_load.return_value = mock_baseline
-
-        run_report = {
-            "metrics": {
-                "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.285}
-            },
-            "param_reduction_ratio": 0.022,
-            "heads_pruned": 16,
-            "neurons_pruned": 1024,
-            "layers_modified": 8,
-        }
-
-        result = validate_gpt2_small_wt2_baseline(run_report)
-
-        assert result.passed is True
-        mock_load.assert_called_once()
-
-    @patch("invarlock.reporting.validate.load_baseline")
-    def test_gpt2_validation_missing_baseline(self, mock_load):
-        """Test GPT-2 validation with missing baseline file."""
-        mock_load.side_effect = FileNotFoundError("File not found")
-
-        run_report = {"ppl_ratio": 1.285, "param_reduction_ratio": 0.022}
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = validate_gpt2_small_wt2_baseline(run_report)
-
-            # Should use default baseline and show warning
-            assert len(w) == 1
-            assert "Baseline file not found" in str(w[0].message)
-
-        # Should still validate against default values
-        assert isinstance(result, ValidationResult)
-
-    def test_gpt2_validation_custom_baseline_path(self):
-        """Test GPT-2 validation with custom baseline path."""
-        test_baseline = {"ppl_ratio": 1.30, "param_reduction_ratio": 0.025}
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(test_baseline, f)
-            baseline_path = Path(f.name)
-
-        try:
-            run_report = {
-                "metrics": {
-                    "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.295}
-                },
-                "param_reduction_ratio": 0.024,
-            }
-            result = validate_gpt2_small_wt2_baseline(run_report, baseline_path)
-
-            assert isinstance(result, ValidationResult)
-        finally:
-            baseline_path.unlink()
 
 
 class TestValidateIntegration:

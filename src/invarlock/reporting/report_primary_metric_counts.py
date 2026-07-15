@@ -71,6 +71,7 @@ def _populate_stats_with_counts_and_coverage(
     paired_windows: int,
     paired_windows_explicit: bool,
 ) -> int:
+    _ = paired_windows_explicit
     try:
         stats_obj = ppl_analysis.get("stats", {})
         if isinstance(stats_obj, dict):
@@ -172,34 +173,10 @@ def _populate_stats_with_counts_and_coverage(
                     final_cov.setdefault("ok", act_fin >= req_fin)
                 coverage_summary_map["final"] = final_cov
 
-            if paired_windows <= 0 and not paired_windows_explicit:
-                if isinstance(act_prev, int) and act_prev > 0:
-                    if isinstance(act_fin, int) and act_fin > 0:
-                        paired_windows = min(act_prev, act_fin)
-                    else:
-                        paired_windows = act_prev
+            # Preview/final coverage does not prove baseline/subject pairing.
+            # Only the identical-ID pairing path may populate paired_windows.
             if paired_windows > 0:
                 stats_obj["paired_windows"] = paired_windows
-
-            match_fraction = stats_obj.get("window_match_fraction")
-            if (
-                not (
-                    isinstance(match_fraction, int | float)
-                    and math.isfinite(float(match_fraction))
-                )
-                and paired_windows > 0
-            ):
-                stats_obj["window_match_fraction"] = 1.0
-
-            overlap_fraction = stats_obj.get("window_overlap_fraction")
-            if (
-                not (
-                    isinstance(overlap_fraction, int | float)
-                    and math.isfinite(float(overlap_fraction))
-                )
-                and paired_windows > 0
-            ):
-                stats_obj["window_overlap_fraction"] = 0.0
 
             if "coverage_ok" not in stats_obj:
                 if (

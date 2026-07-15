@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from invarlock import __version__
+from invarlock.evidence_pack_json import load_json_object
 from invarlock.reporting import run_report_formatters as formatters
 from invarlock.reporting.report_types import create_empty_report
 
@@ -42,11 +44,16 @@ def _report(
     report["edit"]["deltas"]["layers_modified"] = 3
     report["metrics"]["latency_ms_per_tok"] = 1.25
     report["metrics"]["memory_mb_peak"] = 32.0
-    report["metrics"]["primary_metric"] = {"kind": pm_kind, "final": pm_final}
+    report["metrics"]["primary_metric"] = {
+        "kind": pm_kind,
+        "preview": pm_final if pm_preview is None else pm_preview,
+        "final": pm_final,
+    }
     if pm_preview is not None:
         report["metrics"]["primary_metric"]["preview"] = pm_preview
     if pm_ratio is not None:
-        report["metrics"]["primary_metric"]["ratio_vs_baseline"] = pm_ratio
+        field = "delta_vs_baseline_pp" if pm_kind == "accuracy" else "ratio_vs_baseline"
+        report["metrics"]["primary_metric"][field] = pm_ratio
     return report
 
 
@@ -54,7 +61,7 @@ def test_to_json_and_sanitize_cover_invalid_and_non_json_values() -> None:
     with pytest.raises(ValueError, match="Invalid RunReport structure"):
         formatters.to_json({})
 
-    report = _report(pm_preview=0.9, pm_final=1.0, pm_ratio=1.02)
+    report = _report(pm_preview=1.0, pm_final=1.0, pm_ratio=1.02)
     report["provenance"] = {
         "captured_at": datetime(2026, 3, 30, tzinfo=UTC),
         "owner": _Stringable(),
@@ -78,8 +85,34 @@ def test_to_json_and_sanitize_cover_invalid_and_non_json_values() -> None:
     }
 
 
+@pytest.mark.parametrize("nonfinite", [float("nan"), float("inf"), float("-inf")])
+def test_to_json_rejects_nonfinite_metrics_with_path(nonfinite: float) -> None:
+    report = _report(pm_preview=1.0, pm_final=1.0, pm_ratio=1.02)
+    report["metrics"]["diagnostic_probe"] = {"value": nonfinite}
+
+    with pytest.raises(
+        ValueError,
+        match=r"non-finite JSON number at \$\.metrics\.diagnostic_probe\.value",
+    ):
+        formatters.to_json(report)
+
+
+def test_hf_bnb_baseline_round_trips_through_strict_json_without_ratio(
+    tmp_path: Path,
+) -> None:
+    report = _report(pm_preview=10.0, pm_final=10.0)
+    report["meta"]["adapter"] = "hf_bnb"
+    path = tmp_path / "report.json"
+
+    path.write_text(formatters.to_json(report), encoding="utf-8")
+    loaded = load_json_object(path, label="hf_bnb baseline report")
+
+    assert loaded["meta"]["adapter"] == "hf_bnb"
+    assert "ratio_vs_baseline" not in loaded["metrics"]["primary_metric"]
+
+
 def test_coerce_run_reports_and_markdown_title_cover_validation_paths() -> None:
-    report = _report(pm_preview=0.9, pm_final=1.0, pm_ratio=1.02)
+    report = _report(pm_preview=1.0, pm_final=1.0, pm_ratio=1.02)
 
     rendered = formatters.to_markdown(dict(report), title="Custom Title")
 
@@ -257,7 +290,7 @@ def test_generate_comparison_markdown_handles_non_numeric_metrics_and_parse_fail
 
 
 def test_to_markdown_and_to_html_cover_top_level_single_and_comparison_paths() -> None:
-    report1 = _report(pm_preview=0.9, pm_final=1.0, pm_ratio=1.03)
+    report1 = _report(pm_preview=1.0, pm_final=1.0, pm_ratio=1.03)
     report2 = _report(pm_kind="accuracy", pm_final=0.95, pm_ratio=1.01)
     report1["guards"] = [
         {

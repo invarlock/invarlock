@@ -100,6 +100,9 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
             class_name="HF_CompressedTensors_Adapter",
             required_deps=("compressed_tensors",),
             support_tier="optional_backend_loader",
+            # A packed checkpoint can be loaded for diagnostic use, but strict
+            # assurance cannot establish packed-storage provenance yet.
+            strict_assurance_allowed=False,
         ),
     ),
     "edits": (

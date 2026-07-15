@@ -83,6 +83,27 @@ def test_gptq_missing_runtime_maps_to_dependency_error(
     assert "DEPENDENCY-MISSING" in str(err)
 
 
+def test_gptq_missing_public_model_class_maps_to_dependency_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.plugins as plugins
+    from invarlock.plugins import HF_GPTQ_Adapter
+
+    monkeypatch.setattr(
+        plugins,
+        "import_gptqmodel",
+        lambda **_kwargs: types.ModuleType("gptqmodel"),
+    )
+
+    with pytest.raises(Exception) as raised:
+        HF_GPTQ_Adapter().load_model("demo/model")
+
+    from invarlock.core.exceptions import DependencyError
+
+    assert isinstance(raised.value, DependencyError)
+    assert raised.value.code == "E203"
+
+
 def test_auto_quantization_probe_unexpected_loader_error_surfaces(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

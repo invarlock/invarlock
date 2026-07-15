@@ -3,7 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import assert_single_run_output_artifacts
+from tests.cli.run._support_run_common import (
+    assert_single_run_output_artifacts,
+    canonical_ppl_metrics,
+)
 
 _SNS = SimpleNamespace
 
@@ -94,14 +97,13 @@ def _common_min(monkeypatch, tmp_path):
                     "layers_modified": 0,
                 },
             },
-            metrics={
-                "ppl_preview": 10.0,
-                "ppl_final": 10.0,
-                "ppl_ratio": 1.0,
-                "window_overlap_fraction": 0.0,
-                "window_match_fraction": 1.0,
-                "loss_type": "ce",
-            },
+            metrics=canonical_ppl_metrics(
+                preview=10.0,
+                final=10.0,
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+                loss_type="ce",
+            ),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -134,18 +136,18 @@ def _common_min(monkeypatch, tmp_path):
         ),
     )
 
-    # guard overhead validator OK by default
+    # guard metric impact validator OK by default
     class _OverheadOK:
         def __init__(self):
             self.passed = True
             self.messages = []
             self.warnings = []
             self.errors = []
-            self.checks = {}
-            self.metrics = {"overhead_ratio": 1.0, "overhead_percent": 0.0}
+            self.checks = {"guard_metric_impact": True}
+            self.metrics = {"degradation": 1.0, "display_value": 0.0}
 
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+        "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
         lambda *args, **kwargs: _OverheadOK(),
     )
 
@@ -212,14 +214,14 @@ def _base_patches_gfm(monkeypatch):
     class _OverheadOK:
         def __init__(self):
             self.passed = True
-            self.metrics = {"overhead_ratio": 1.0, "overhead_percent": 0.0}
+            self.metrics = {"degradation": 1.0, "display_value": 0.0}
             self.messages = []
             self.warnings = []
             self.errors = []
-            self.checks = {}
+            self.checks = {"guard_metric_impact": True}
 
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+        "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
         lambda *a, **k: _OverheadOK(),
     )
 
@@ -229,14 +231,13 @@ def _std_core_report_gfm(ctx=None):
         ctx = {"dataset_meta": {}}
     return _SNS(
         edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
-        metrics={
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_ratio": 1.0,
-            "window_overlap_fraction": 0.0,
-            "window_match_fraction": 1.0,
-            "loss_type": "ce",
-        },
+        metrics=canonical_ppl_metrics(
+            preview=10.0,
+            final=10.0,
+            window_overlap_fraction=0.0,
+            window_match_fraction=1.0,
+            loss_type="ce",
+        ),
         guards={},
         context=ctx,
         evaluation_windows={},
@@ -577,13 +578,10 @@ def test_snapshot_cfg_bytes_fallback_to_chunked(monkeypatch, tmp_path):
     def _exec(**kwargs):
         return SimpleNamespace(
             edit={},
-            metrics={
-                "ppl_preview": 1.0,
-                "ppl_final": 1.0,
-                "ppl_ratio": 1.0,
-                "window_overlap_fraction": 0.0,
-                "window_match_fraction": 1.0,
-            },
+            metrics=canonical_ppl_metrics(
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+            ),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},
@@ -650,13 +648,10 @@ def test_snapshot_cfg_chunked_fallback_to_bytes(monkeypatch, tmp_path):
     def _exec(**kwargs):
         return SimpleNamespace(
             edit={},
-            metrics={
-                "ppl_preview": 1.0,
-                "ppl_final": 1.0,
-                "ppl_ratio": 1.0,
-                "window_overlap_fraction": 0.0,
-                "window_match_fraction": 1.0,
-            },
+            metrics=canonical_ppl_metrics(
+                window_overlap_fraction=0.0,
+                window_match_fraction=1.0,
+            ),
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={},

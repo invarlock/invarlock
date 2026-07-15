@@ -87,10 +87,9 @@ def test_spectral_finalize_fails_when_budget_exceeded() -> None:
 
 def test_spectral_finalize_allows_equal_caps_budget() -> None:
     model = TinyModel([TinyLayer()])
-    # Our TinyLayer yields family-alias module names (e.g., "attn.c_proj"), so a single
-    # underlying module may appear more than once in named_modules(). Use max_caps=2
-    # and assert the equality boundary (caps_applied == max_caps) passes.
-    guard = SpectralGuard(max_caps=2, degeneracy={"enabled": False})
+    # Alias paths to the same physical parameter are deduplicated. Assert the
+    # equality boundary for the one selected physical module.
+    guard = SpectralGuard(max_caps=1, degeneracy={"enabled": False})
     out = guard.prepare(model, adapter=None, calib=None, policy={})
     assert out["ready"] is True
 
@@ -103,8 +102,12 @@ def test_spectral_finalize_allows_equal_caps_budget() -> None:
 
     result = guard.finalize(model)
     assert result["passed"] is True
-    assert result["metrics"]["caps_applied"] == 2
+    assert result["metrics"]["caps_applied"] == 1
     assert result["metrics"]["caps_exceeded"] is False
+    assert any(
+        item["reason"] == "parameter_alias"
+        for item in result["measurement_inventory"]["finalize"]["excluded_modules"]
+    )
 
 
 def test_spectral_finalize_fails_on_max_spectral_norm() -> None:

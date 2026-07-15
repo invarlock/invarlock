@@ -72,7 +72,11 @@ def _default_cli_host_execution(
     yield
 
 
-def _write_test_runtime_manifest(report_path: Path) -> None:
+def _write_test_runtime_manifest(
+    report_path: Path,
+    *,
+    report_bytes: bytes | None = None,
+) -> None:
     payload = {
         "manifest_version": RUNTIME_MANIFEST_VERSION,
         "generated_at_utc": "2026-03-21T00:00:00+00:00",
@@ -80,7 +84,9 @@ def _write_test_runtime_manifest(report_path: Path) -> None:
         "report": {
             "path": str(report_path.resolve()),
             "filename": report_path.name,
-            "sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            "sha256": hashlib.sha256(
+                report_path.read_bytes() if report_bytes is None else report_bytes
+            ).hexdigest(),
         },
         "config": {
             "path": None,
@@ -120,12 +126,21 @@ def _auto_seed_verify_runtime_provenance(
         report_path: str | Path,
         *,
         allow_unverified: bool = False,
+        expected_image_digest: str | None = None,
+        report_bytes: bytes | None = None,
+        require_strict_runtime: bool = False,
     ):
         if not allow_unverified:
-            _write_test_runtime_manifest(Path(report_path))
+            _write_test_runtime_manifest(
+                Path(report_path),
+                report_bytes=report_bytes,
+            )
         return original_verify_runtime_provenance(
             report_path,
             allow_unverified=allow_unverified,
+            expected_image_digest=expected_image_digest,
+            report_bytes=report_bytes,
+            require_strict_runtime=require_strict_runtime,
         )
 
     monkeypatch.setattr(

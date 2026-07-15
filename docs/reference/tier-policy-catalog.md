@@ -7,7 +7,7 @@
 | **Purpose** | Explain each policy key in `tiers.yaml` and its rationale. |
 | **Audience** | Operators auditing tier defaults and guard thresholds. |
 | **Supported tiers** | `balanced`, `conservative` (aggressive is research-only). |
-| **Source of truth** | Packaged `runtime/tiers.yaml` (override via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`). |
+| **Source of truth** | Packaged resource: `runtime/tiers.yaml`; override: `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`. |
 
 ## Quick Start
 
@@ -29,16 +29,20 @@ invarlock report explain \
 | **RMT ε (all families)** | 0.01 | 0.01 |
 | **VE Predictive Gate** | One-sided CI | Two-sided CI |
 | **VE min_effect_lognll** | 0.0 | 0.016 |
-| **Bootstrap Replicates** | ≥ 1200 | ≥ 1500 |
-| **Min Windows** | 180/180 | 220/220 |
-| **Use Case** | Standard edits, dev/CI | High-stakes releases |
+| **Pairing floor** | 180/180 windows | 220/220 windows |
+| **Bootstrap floor** | 1200 replicates | 1500 replicates |
+| **Policy intent** | Standard strict policy | More restrictive strict policy |
 
-> Values are from the packaged `tiers.yaml`; inspect with `invarlock report explain`.
+> Guard and metric values are from the packaged tier resource. Pairing and
+> bootstrap floors are enforced by `src/invarlock/core/runner_runtime/pairing.py`, not
+> stored in `tiers.yaml`. Inspect the resolved report with
+> `invarlock report explain`.
 
 ## Concepts
 
-- **Calibrated vs policy keys**: calibrated values come from pilot runs; policy
-  keys define conservative margins and floors.
+- **Policy defaults vs run-local calibration**: packaged values are defaults.
+  The calibration CLI can recommend replacements from a named set of runs, but
+  that evidence remains scoped to those runs and is not embedded in this file.
 - **Resolved policies** are recorded in reports under `resolved_policy.*`.
 
 **Policy resolution order (highest → lowest)**
@@ -63,23 +67,26 @@ resolved from tier policies (tiers.yaml + defaults) and surfaced under
 
 ## Reference
 
-> **Plain language:** The packaged `runtime/tiers.yaml` is
-> the source of truth for tier defaults. Some values are **calibrated** from pilot/null runs (e.g.,
-> Spectral κ, RMT ε, VE min‑effect). The rest are **policies** (explicit design
-> choices like sample-size floors, dead bands, and caps). This page is the “why
-> map”: for every key in `tiers.yaml`, it explains what it controls and where to
-> point for the rationale.
+> **Plain language:** the packaged `runtime/tiers.yaml` resource is the source
+> resource for packaged tier defaults. Some defaults were initially informed by
+> pilot/null runs, but the checkout does not embed a complete calibration
+> study for each supported model/edit/dataset combination. Treat every value
+> as an explicit policy setting unless a release supplies the corresponding run
+> artifacts. This page maps each key to runtime behavior and rationale.
 
 ### Location
 
-- Packaged default: `runtime/tiers.yaml`
+- Logical packaged resource: `runtime/tiers.yaml`
+- Installed package resource: `invarlock/_data/runtime/tiers.yaml`
 - Override: set `INVARLOCK_CONFIG_ROOT` and provide `runtime/tiers.yaml` under it
   (see `docs/reference/env-vars.md`).
 
 ### Tier scope
 
-Balanced and Conservative are the supported published assurance tiers; Aggressive is
-research‑oriented and explicitly outside the assurance case (see
+Balanced and Conservative are the tiers allowed by the strict policy contract;
+that is a verifier-policy statement, not evidence that either tier is
+universally calibrated for a new workload. Aggressive is research‑oriented and
+explicitly outside the assurance case (see
 `docs/assurance/00-assurance-case.md`).
 
 ### Catalog (what + why)
@@ -154,11 +161,12 @@ schedule). It is additive to the mean/CI primary-metric gate.
 - `quantile` *(policy)* — which percentile to monitor (default 0.95 → P95).
   Quantiles are computed **unweighted** with deterministic linear interpolation
   on sorted ΔlogNLL values.
-- `quantile_max` *(policy/calibration target)* — maximum allowed ΔlogNLL at the
+- `quantile_max` *(policy; possible tuning target)* — maximum allowed ΔlogNLL at the
   selected quantile (e.g., `P95 ≤ 0.20`).
 - `epsilon` *(policy)* — deadband for “tail mass”: `tail_mass = Pr[ΔlogNLL > ε]`.
-- `mass_max` *(policy/calibration target)* — maximum allowed tail mass. Defaults
-  to 1.0 (non-binding) until calibrated.
+- `mass_max` *(policy; possible tuning target)* — maximum allowed tail mass.
+  The packaged value is 1.0 (non-binding); an operator may replace it only with
+  workload-scoped evidence.
 
 **Observability.**
 
@@ -195,15 +203,16 @@ monitoring.
 
 **Where documented.**
 
-- `docs/assurance/05-spectral-fpr-derivation.md` (policy + FPR control)
-- `docs/assurance/09-tier-v1-calibration.md` (pilot numbers + recalibration)
+- `docs/assurance/05-spectral-fpr-derivation.md` (selection arithmetic and its limits)
+- `docs/assurance/09-tier-v1-calibration.md` (run-local tuning procedure)
 
 **Keys.**
 
-- `sigma_quantile` *(calibrated)* — which baseline percentile defines the
+- `sigma_quantile` *(policy default)* — which baseline percentile defines the
   reference sigma target used for z-scoring.
-- `deadband` *(policy)* — z-score deadband δ to suppress flicker (see
-  `docs/assurance/05-spectral-fpr-derivation.md`).
+- `deadband` *(policy)* — relative-change tolerance used only when the recorded
+  spectral family standard deviation is zero. It does not suppress positive-
+  variance z-scores; see `docs/assurance/05-spectral-fpr-derivation.md`.
 - `scope` *(policy)* — which families are actively budgeted/monitored (e.g.,
   `all` vs `ffn`), described in `docs/assurance/05-spectral-fpr-derivation.md`.
 - `max_caps` *(policy)* — per-run WARN/cap budget; exceeding this aborts in
@@ -213,11 +222,12 @@ monitoring.
 - `max_spectral_norm` *(policy)* — optional absolute clamp. `null` means “no
   absolute clamp”; rely on relative z-caps and the WARN budget (see
   `docs/assurance/09-tier-v1-calibration.md` “Keep these fixed … no clamp”).
-- `family_caps` *(calibrated)* — per-family κ caps (stored as raw floats in
+- `family_caps` *(policy defaults; tunable from null runs)* — per-family κ caps (stored as raw floats in
   `tiers.yaml`; normalized to `{family: {kappa: ...}}` at runtime).
-- `multiple_testing` *(policy)* — the correction procedure used to interpret
-  κ across families (`bh`/`bonferroni`, α, m); see
-  `docs/assurance/05-spectral-fpr-derivation.md`.
+- `multiple_testing` *(policy)* — BH or Bonferroni selection arithmetic over the
+  guard's family tail scores (`method`, α, and `m`). The implementation does not
+  by itself establish FDR or FWER control: that would additionally require
+  calibrated p-values and assumptions supported for the deployed workload.
 
 **Observability.**
 
@@ -232,14 +242,14 @@ rule.
 
 **Where documented.**
 
-- `docs/assurance/06-rmt-epsilon-rule.md` (acceptance rule + calibration)
-- `docs/assurance/09-tier-v1-calibration.md` (recalibration recipe)
+- `docs/assurance/06-rmt-epsilon-rule.md` (acceptance rule and limitations)
+- `docs/assurance/09-tier-v1-calibration.md` (workload-scoped tuning recipe)
 
 **Keys.**
 
-- `epsilon_by_family` *(calibrated)* — ε(f) per family for the acceptance band:
+- `epsilon_by_family` *(policy default)* — ε(f) per family for the acceptance band:
   `edge_cur(f) ≤ (1 + ε(f)) · edge_base(f)`.
-- `epsilon_default` *(calibrated)* — fallback ε used when a family-specific
+- `epsilon_default` *(policy default)* — fallback ε used when a family-specific
   value is missing.
 - `deadband` *(policy)* — additional tolerance used by the RMT outlier
   diagnostics/correction path (separate from ε-band acceptance), aligning the
@@ -268,12 +278,13 @@ gate and min-effect semantics.
 
 - `predictive_gate` *(policy)* — when true, VE only enables if the predictive
   A/B gate passes (report records `variance.predictive_gate.*`).
-- `predictive_one_sided` *(calibrated policy)* — one-sided improvement gate
+- `predictive_one_sided` *(policy)* — one-sided improvement gate
   semantics (Balanced) vs two-sided CI (Conservative); see
   `docs/assurance/07-ve-gate-power.md`.
-- `min_effect_lognll` *(calibrated)* — minimum absolute improvement required for
-  VE enablement; derived from $z\,\hat{\sigma}/\sqrt{n}$ per tier, see
-  `docs/assurance/07-ve-gate-power.md`.
+- `min_effect_lognll` *(policy default; tunable from VE sweeps)* — minimum
+  absolute improvement required for VE enablement. A workload-specific sweep
+  can recommend a replacement; the packaged number is not a universal power
+  guarantee.
 - `deadband` *(policy)* — ignores small proposed adjustments (prevents
   “flicker”/tiny rescaling).
 - `min_abs_adjust` *(policy)* — absolute floor on per-module |scale − 1| before a

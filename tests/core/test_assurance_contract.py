@@ -14,22 +14,7 @@ from invarlock.core.assurance_contract import (
     strict_evaluate_policy_errors,
     strict_report_policy_errors,
 )
-
-
-def _strict_report() -> dict:
-    return {
-        "context": {
-            "profile": "ci",
-            "assurance": {"mode": "strict"},
-            "runtime": {"execution_mode": "container"},
-        },
-        "auto": {"tier": "balanced"},
-        "guards": [{"name": name} for name in CANONICAL_GUARD_CHAIN],
-        "spectral": {"supported": True},
-        "rmt": {"supported": True},
-        "variance": {"enabled": False, "supported": True},
-        "invariants": {"supported": True},
-    }
+from tests.core._support_assurance_contract import strict_report as _strict_report
 
 
 def test_build_assurance_section_passes_for_canonical_strict_report() -> None:
@@ -71,8 +56,8 @@ def test_build_assurance_section_rejects_invalid_runtime_status() -> None:
     assert section["runtime_provenance_verification_status"] == "failed"
     assert section["verdict"] == "fail"
     assert (
-        "strict assurance requires verified runtime provenance."
-        in section["blocking_reasons"]
+        "strict assurance requires report/manifest binding plus a "
+        "independently supplied runtime image digest." in section["blocking_reasons"]
     )
 
 
@@ -135,8 +120,8 @@ def test_build_assurance_section_uses_unknown_runtime_when_not_declared() -> Non
     assert section["runtime_provenance_declared"] == "unknown"
     assert section["verdict"] == "fail"
     assert (
-        "strict assurance requires verified container provenance."
-        in section["blocking_reasons"]
+        "strict assurance requires container execution mode and fail-closed "
+        "runtime provenance checks." in section["blocking_reasons"]
     )
 
 
@@ -169,7 +154,10 @@ def test_strict_report_policy_rejects_pending_report_when_verifier_fails() -> No
         runtime_provenance_verified=False,
     )
 
-    assert "strict assurance requires verified runtime provenance." in errors
+    assert (
+        "strict assurance requires report/manifest binding plus a "
+        "independently supplied runtime image digest." in errors
+    )
 
 
 def test_strict_report_policy_rejects_missing_guard_evidence() -> None:
@@ -197,7 +185,7 @@ def test_strict_report_policy_rejects_failed_report_local_pending_verdict() -> N
         runtime_provenance_verified=True,
     )
 
-    assert "strict assurance report-local verdict must be pass." in errors
+    assert "strict assurance.report_local_verdict must be pass." in errors
 
 
 def test_strict_report_policy_rejects_structured_report_build_events() -> None:
@@ -236,14 +224,11 @@ def test_strict_report_policy_allows_display_ci_computed_from_ci_event() -> None
         "repaired_fields": [],
         "fallback_fields": [],
     }
-    report["assurance"] = build_assurance_section(
-        report,
-        runtime_provenance_verified=True,
-    )
+    report["assurance"] = build_assurance_section(report)
 
     assert report_build_has_blocking_evidence_events(report) is False
     assert report["assurance"]["fallback_fields_used"] is False
-    assert report["assurance"]["verdict"] == "pass"
+    assert report["assurance"]["verdict"] == "pending_verifier"
     assert not strict_report_policy_errors(
         report,
         require_strict=True,
@@ -302,7 +287,8 @@ def test_strict_evaluate_policy_reports_all_blockers() -> None:
         "strict assurance requires profile ci or release.",
         "strict assurance requires tier balanced or conservative.",
         "strict assurance requires the canonical guard chain.",
-        "strict assurance requires verified container provenance.",
+        "strict assurance requires container execution mode and fail-closed "
+        "runtime provenance checks.",
     ]
 
 
@@ -405,7 +391,8 @@ def test_build_assurance_section_reads_tier_fallbacks() -> None:
     }
     section = build_assurance_section(report, mode="strict")
     assert section["tier"] == "balanced"
-    assert section["verdict"] == "pending_verifier"
+    assert section["verdict"] == "fail"
+    assert any("unsupported" in item for item in section["blocking_reasons"])
 
 
 def test_strict_report_policy_collects_report_level_failures() -> None:
@@ -433,14 +420,32 @@ def test_strict_report_policy_collects_report_level_failures() -> None:
 
     assert "strict assurance report has unknown claim_set." in errors
     assert "strict assurance report mode must be strict." in errors
-    assert "strict assurance verdict must be pass or pending_verifier." in errors
+    assert (
+        "strict assurance.verdict must be pending_verifier in submitted evidence."
+        in errors
+    )
     assert "strict assurance requires canonical_guard_chain_enforced=true." in errors
     assert "explicit blocker" in errors
-    assert "variance status monitor-only is not strict-assurance passing." in errors
+    assert "variance.status='monitor-only' is not passing." in errors
 
 
 def test_strict_report_policy_returns_empty_when_not_required() -> None:
     assert strict_report_policy_errors({}, require_strict=False) == []
+
+
+def test_strict_report_policy_rejects_report_controlled_tiny_relax() -> None:
+    report = _strict_report()
+    report["context"]["run"] = {"tiny_relax": True}
+
+    errors = strict_report_policy_errors(report, require_strict=True)
+
+    assert "strict assurance forbids development-only tiny_relax policy." in errors
+
+
+def test_non_strict_report_policy_preserves_tiny_relax_for_development() -> None:
+    report = {"context": {"run": {"tiny_relax": True}}}
+
+    assert strict_report_policy_errors(report, require_strict=False) == []
 
 
 def test_strict_report_policy_rejects_missing_assurance_section() -> None:

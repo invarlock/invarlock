@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,13 @@ INTERVENTION_SIGNALS: tuple[str, ...] = (
     "spectral_caps",
     "ve_signal",
 )
-SUMMARY_CATEGORIES: tuple[str, ...] = ("clean", "stress", "error_injection")
+SUMMARY_CATEGORIES: tuple[str, ...] = (
+    "clean",
+    "trained",
+    "deployable",
+    "stress",
+    "error_injection",
+)
 
 
 def _manifest_root() -> Path:
@@ -303,11 +310,15 @@ def _validation_snapshot(cert: dict[str, Any]) -> ValidationSnapshot:
     rmt_ok = _as_bool(validation.get("rmt_stable"), default=False)
     drift_ok = _as_bool(validation.get("preview_final_drift_acceptable"), default=False)
 
-    guard_overhead = cert.get("guard_overhead") or {}
+    guard_metric_impact = cert.get("guard_metric_impact") or {}
     overhead_evaluated = False
-    if isinstance(guard_overhead, dict):
-        overhead_evaluated = _as_bool(guard_overhead.get("evaluated"), default=False)
-    overhead_ok = _as_bool(validation.get("guard_overhead_acceptable"), default=False)
+    if isinstance(guard_metric_impact, dict):
+        overhead_evaluated = _as_bool(
+            guard_metric_impact.get("evaluated"), default=False
+        )
+    overhead_ok = _as_bool(
+        validation.get("guard_metric_impact_acceptable"), default=False
+    )
 
     primary_metric = cert.get("primary_metric") or {}
     pm_degraded = False
@@ -353,6 +364,69 @@ def _guard_flags(snapshot: ValidationSnapshot) -> dict[str, bool]:
         "drift": not snapshot.drift_ok,
         "overhead": snapshot.overhead_evaluated and (not snapshot.overhead_ok),
     }
+
+
+def _spectral_relative_detector_matches(
+    cert: dict[str, Any],
+    baseline_cert: dict[str, Any] | None,
+    detector: dict[str, Any],
+) -> bool:
+    if not isinstance(baseline_cert, dict):
+        return False
+    summary = _spectral_baseline_relative_summary(cert, baseline_cert)
+    min_new_modules = detector.get("min_new_modules")
+    min_delta_count = detector.get("min_delta_count")
+    if min_new_modules is None and min_delta_count is None:
+        min_new_modules = 1
+    if min_new_modules is not None:
+        try:
+            min_new = int(min_new_modules)
+        except (TypeError, ValueError, OverflowError):
+            return False
+        if _as_int(summary.get("new_caps_applied"), default=0) < max(min_new, 0):
+            return False
+    if min_delta_count is not None:
+        try:
+            min_delta = int(min_delta_count)
+        except (TypeError, ValueError, OverflowError):
+            return False
+        if _as_int(summary.get("delta_caps_applied"), default=0) < max(min_delta, 0):
+            return False
+    return True
+
+
+def _guard_relative_detector_matches(
+    cert: dict[str, Any],
+    baseline_cert: dict[str, Any] | None,
+    detector: dict[str, Any],
+) -> bool:
+    guard = detector.get("guard")
+    if not isinstance(guard, str) or not guard.strip():
+        return False
+    guard_name = guard.strip().lower()
+    if guard_name != "spectral":
+        summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
+        return bool(summary.get("relative_signal"))
+    if not isinstance(baseline_cert, dict):
+        return False
+    summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
+    min_new_modules = detector.get("min_new_modules")
+    min_delta_count = detector.get("min_delta_count")
+    if min_new_modules is None and min_delta_count is None:
+        return bool(summary.get("relative_signal"))
+    for key, minimum in (
+        ("new_caps_applied", min_new_modules),
+        ("delta_caps_applied", min_delta_count),
+    ):
+        if minimum is None:
+            continue
+        try:
+            required = max(int(minimum), 0)
+        except (TypeError, ValueError, OverflowError):
+            return False
+        if _as_int(summary.get(key), default=0) < required:
+            return False
+    return True
 
 
 def _detector_matches(
@@ -426,73 +500,10 @@ def _detector_matches(
         return _spectral_caps_applied(cert) >= min_val
 
     if kind == "spectral_caps_baseline_relative":
-        if not isinstance(baseline_cert, dict):
-            return False
-
-        summary = _spectral_baseline_relative_summary(cert, baseline_cert)
-
-        min_new_modules = detector.get("min_new_modules")
-        min_delta_count = detector.get("min_delta_count")
-        if min_new_modules is None and min_delta_count is None:
-            min_new_modules = 1
-
-        if min_new_modules is not None:
-            try:
-                min_new = int(min_new_modules)
-            except (TypeError, ValueError, OverflowError):
-                return False
-            if min_new < 0:
-                min_new = 0
-            if _as_int(summary.get("new_caps_applied"), default=0) < min_new:
-                return False
-
-        if min_delta_count is not None:
-            try:
-                min_delta = int(min_delta_count)
-            except (TypeError, ValueError, OverflowError):
-                return False
-            if min_delta < 0:
-                min_delta = 0
-            if _as_int(summary.get("delta_caps_applied"), default=0) < min_delta:
-                return False
-
-        return True
+        return _spectral_relative_detector_matches(cert, baseline_cert, detector)
 
     if kind == "guard_signal_baseline_relative":
-        guard = detector.get("guard")
-        if not isinstance(guard, str) or not guard.strip():
-            return False
-        guard_name = guard.strip().lower()
-        if guard_name == "spectral":
-            if not isinstance(baseline_cert, dict):
-                return False
-            summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
-            min_new_modules = detector.get("min_new_modules")
-            min_delta_count = detector.get("min_delta_count")
-            if min_new_modules is None and min_delta_count is None:
-                return bool(summary.get("relative_signal"))
-            if min_new_modules is not None:
-                try:
-                    min_new = int(min_new_modules)
-                except (TypeError, ValueError, OverflowError):
-                    return False
-                if min_new < 0:
-                    min_new = 0
-                if _as_int(summary.get("new_caps_applied"), default=0) < min_new:
-                    return False
-            if min_delta_count is not None:
-                try:
-                    min_delta = int(min_delta_count)
-                except (TypeError, ValueError, OverflowError):
-                    return False
-                if min_delta < 0:
-                    min_delta = 0
-                if _as_int(summary.get("delta_caps_applied"), default=0) < min_delta:
-                    return False
-            return True
-
-        summary = _guard_baseline_relative_summary(cert, baseline_cert, guard_name)
-        return bool(summary.get("relative_signal"))
+        return _guard_relative_detector_matches(cert, baseline_cert, detector)
 
     if kind == "ve_probe":
         field = detector.get("field")
@@ -508,13 +519,13 @@ def _detector_matches(
         if expected is not None:
             return _as_bool(probe.get(field), default=False) == bool(expected)
         if min_value is not None:
-            min_val = _as_float(min_value, default=None)
-            if min_val is None:
+            minimum_float = _as_float(min_value, default=None)
+            if minimum_float is None:
                 return False
             actual = _as_float(probe.get(field), default=None)
             if actual is None:
                 return False
-            return actual >= min_val
+            return actual >= minimum_float
         return False
 
     return False
@@ -570,7 +581,10 @@ def _edit_family(name: str) -> str:
 
 
 def _classify_report(
-    cert_path: Path, *, output_dir: Path
+    cert_path: Path,
+    *,
+    output_dir: Path,
+    scenario_index: Mapping[str, Mapping[str, object]] | None = None,
 ) -> tuple[str, str, str] | None:
     try:
         rel = cert_path.relative_to(output_dir)
@@ -592,15 +606,24 @@ def _classify_report(
         return None
 
     head = remainder[0]
+    scenario_id = remainder[1] if head == "errors" and len(remainder) > 1 else head
+    if scenario_index is not None:
+        scenario = scenario_index.get(scenario_id)
+        if isinstance(scenario, Mapping):
+            category = scenario.get("category")
+            if isinstance(category, str) and category in SUMMARY_CATEGORIES:
+                return model_name, category, scenario_id
+
     if head == "calibration":
         return model_name, "calibration", head
     if head == "errors":
-        error_type = remainder[1] if len(remainder) > 1 else "unknown"
-        return model_name, "error_injection", error_type
+        return model_name, "error_injection", scenario_id
 
-    edit_name = head
+    edit_name = scenario_id
     if edit_name.endswith("_clean"):
         return model_name, "clean", edit_name
+    if edit_name.endswith("_deployable"):
+        return model_name, "deployable", edit_name
     if edit_name.endswith("_stress"):
         return model_name, "stress", edit_name
     return model_name, "other", edit_name
@@ -802,7 +825,13 @@ def _build_scenario_signal_summary(
     *,
     scenario_index: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    category_order = {"clean": 0, "stress": 1, "error_injection": 2}
+    category_order = {
+        "clean": 0,
+        "trained": 1,
+        "deployable": 2,
+        "stress": 3,
+        "error_injection": 4,
+    }
     rows: list[dict[str, Any]] = []
 
     for scenario_id, spec in sorted(

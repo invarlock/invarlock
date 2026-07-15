@@ -2,9 +2,20 @@ import pytest
 
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
-def _ratio_report(preview: float, final: float, tier: str) -> dict:
+def _ratio_report(
+    preview: float,
+    final: float,
+    tier: str,
+    *,
+    edit_name: str = "structured",
+    target_pm_ratio: float | None = None,
+) -> dict:
     report = create_empty_report()
     report["meta"].update(
         {
@@ -16,12 +27,20 @@ def _ratio_report(preview: float, final: float, tier: str) -> dict:
                 "enabled": True,
                 "tier": tier,
                 "probes_used": 0,
-                "target_pm_ratio": None,
+                "target_pm_ratio": target_pm_ratio,
             },
         }
     )
+    report["context"] = {"profile": "dev"}
     report["data"].update(
-        {"dataset": "wikitext2", "split": "validation", "seq_len": 128, "stride": 128}
+        {
+            "dataset": "wikitext2",
+            "split": "validation",
+            "seq_len": 128,
+            "stride": 128,
+            "preview_n": 1,
+            "final_n": 1,
+        }
     )
     report["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
@@ -29,22 +48,22 @@ def _ratio_report(preview: float, final: float, tier: str) -> dict:
         "final": final,
         "ratio_vs_baseline": final / preview if preview else 1.0,
     }
-    report["edit"].update({"name": "structured"})
+    report["edit"].update({"name": edit_name})
     return report
 
 
 @pytest.mark.integration
 def test_ratio_gate_respects_tier_limits():
-    baseline = create_empty_report()
-    baseline["metrics"]["primary_metric"] = {
-        "kind": "ppl_causal",
-        "preview": 40.0,
-        "final": 40.0,
-        "ratio_vs_baseline": 1.0,
-    }
+    baseline = canonical_baseline(
+        _ratio_report(40.0, 40.0, tier="balanced", edit_name="noop")
+    )
 
-    balanced_fail = _ratio_report(40.0, 46.0, tier="balanced")  # 1.15x
-    conservative_pass = _ratio_report(40.0, 42.0, tier="conservative")  # 1.05x
+    balanced_fail = canonical_run_report(
+        _ratio_report(40.0, 46.0, tier="balanced")
+    )  # 1.15x
+    conservative_pass = canonical_run_report(
+        _ratio_report(40.0, 42.0, tier="conservative")
+    )  # 1.05x
 
     balanced_cert = make_report(balanced_fail, baseline)
     conservative_cert = make_report(conservative_pass, baseline)
@@ -55,16 +74,13 @@ def test_ratio_gate_respects_tier_limits():
 
 @pytest.mark.integration
 def test_ratio_gate_ignores_auto_target_pm_ratio_hint():
-    baseline = create_empty_report()
-    baseline["metrics"]["primary_metric"] = {
-        "kind": "ppl_causal",
-        "preview": 40.0,
-        "final": 40.0,
-        "ratio_vs_baseline": 1.0,
-    }
+    baseline = canonical_baseline(
+        _ratio_report(40.0, 40.0, tier="balanced", edit_name="noop")
+    )
 
-    subject = _ratio_report(40.0, 41.2, tier="balanced")  # 1.03x
-    subject["meta"]["auto"]["target_pm_ratio"] = 1.0
+    subject = canonical_run_report(
+        _ratio_report(40.0, 41.2, tier="balanced", target_pm_ratio=1.0)
+    )  # 1.03x
 
     cert = make_report(subject, baseline)
 

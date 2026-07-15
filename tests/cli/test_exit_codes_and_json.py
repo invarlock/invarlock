@@ -66,7 +66,7 @@ def test_verify_json_structured_error_envelope(
     def _boom(*a, **k):
         raise exc_factory()
 
-    monkeypatch.setattr(v, "_load_evaluation_report", _boom)
+    monkeypatch.setattr(v, "_load_evaluation_report_snapshot", _boom)
 
     cert_path = _touch_min_cert(tmp_path)
     with pytest.raises(typer.Exit) as ei:

@@ -169,6 +169,11 @@ fi
 source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
 effective_execution_mode="$(integration_effective_execution_mode "$lane" "$execution_mode")"
 effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
+integration_require_strict_acceptance_inputs \
+  "$effective_assurance" \
+  "${INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST:-}" \
+  "${INVARLOCK_ACCEPTANCE_BASELINE_REPORT:-}" \
+  "${INVARLOCK_ACCEPTANCE_POLICY_PACK:-}" || exit $?
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
@@ -249,7 +254,10 @@ if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
 fi
 if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
-  compare_cmd+=(--require-backend-inventory)
+  compare_cmd+=(
+    --require-backend-inventory
+    --require-runtime-quantization-proof
+  )
 fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)

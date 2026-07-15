@@ -268,11 +268,19 @@ def test_evidence_pack_remote_code_requests_are_explicit() -> None:
         text = path.read_text(encoding="utf-8")
         if "trust_remote_code" not in text:
             continue
+        occurrences = re.findall(r"\btrust_remote_code\b", text)
+        explicit_false = re.findall(
+            r"[\"']?trust_remote_code[\"']?\s*(?::|=)\s*False\b",
+            text,
+        )
+        if len(explicit_false) == len(occurrences):
+            continue
         if any(
             marker in text
             for marker in (
                 "INVARLOCK_ALLOW_REMOTE_CODE",
                 "require_remote_code_opt_in",
+                "_resolve_remote_code_request(",
                 "pack_remote_code_allowed",
                 "pack_model_trust_remote_code_yaml",
             )

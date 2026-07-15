@@ -1,7 +1,7 @@
 # hf_bnb Bitsandbytes Runtime-Load Integration Example
 
-Status: `runnable`; strict container evidence is verified on CUDA for this tiny
-bitsandbytes runtime-load example with the example-only bitsandbytes image.
+Status: `runnable`. A `cuda-container-strict` result requires independent
+acceptance inputs and the successful current run described below.
 
 This example shows how to attach InvarLock regression evidence to a subject
 loaded through the built-in `hf_bnb` adapter. By default it creates a tiny
@@ -54,7 +54,11 @@ CUDA host with that image configured:
 examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-bnb
 examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-bnb
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-bnb \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 uv run --extra hf --extra gpu \
   examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh \
   --allow-network \
@@ -62,8 +66,9 @@ uv run --extra hf --extra gpu \
   --lane cuda
 ```
 
-Strict container evidence should use the digest-pinned image reference recorded
-in `runtime.manifest.json` when the artifact is being shared externally.
+Obtain the trusted digest independently from reviewed build/release policy.
+The matching digest in `runtime.manifest.json` is a manifest claim, not the source of
+the verifier pin.
 
 This strict lane is scoped to the configured tiny runtime-loaded bitsandbytes
 subject and runtime image. Rerun the strict lane for the target runtime before
@@ -86,7 +91,8 @@ The default path uses `--execution-mode host --assurance off` because
 bitsandbytes runtime support is platform-dependent. Use this lane for local
 dependency setup; non-CUDA execution depends on the installed bitsandbytes
 backend. It still runs the InvarLock evaluator, verifier, backend inventory,
-and HTML renderer.
+and HTML renderer, but its output is diagnostic only and cannot serve as strict
+or release evidence.
 
 For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
@@ -104,6 +110,7 @@ The runner writes generated outputs under local output directories:
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/evaluation.html` | Human-readable report. |
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/backend_inventory.json` | bitsandbytes backend version, quantized module types, and smoke results. |
+| `reports/tiny-hf-bnb-8bit/<artifact-lane>/runtime_quantization_proof.json` | Strict-lane v1 process receipt listing recognized bitsandbytes runtime types; wrapper-side schema checks are not an independent runtime observation or checkpoint-artifact proof. |
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
 | `reports/tiny-hf-bnb-8bit/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
@@ -118,4 +125,9 @@ offline after fixture creation. `--allow-network` is only needed for the HF
 model files when they are not already cached.
 
 The shell runner relies on InvarLock report persistence to emit
-`backend_inventory.json` when adapter provenance is available.
+`backend_inventory.json` when adapter provenance is available and, for
+`cuda-container-strict`, requires `runtime_quantization_proof.json`. The shared
+wrapper validates the receipt's v1 schema, selected adapter/backend binding,
+allowed type-name surface, and matching backend inventory before `verify`.
+Those checks validate sidecars written by the evaluated process; they are not
+an independent runtime observation or checkpoint-artifact proof.

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report_with_tokens(
@@ -15,6 +17,7 @@ def _mk_report_with_tokens(
             "ts": "now",
             "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -80,7 +83,13 @@ def test_accuracy_hysteresis_and_min_examples():
         "preview": 0.80,
         "final": 0.85,
         # Slightly below threshold (-1.0) but within hysteresis (0.1)
-        "ratio_vs_baseline": -1.05,
+        "delta_vs_baseline_pp": -1.05,
+        "n_final": 250,
+    }
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "accuracy",
+        "preview": 0.86,
+        "final": 0.86,
         "n_final": 250,
     }
     cert = make_report(report, baseline)
@@ -93,7 +102,7 @@ def test_accuracy_hysteresis_and_min_examples():
         "kind": "accuracy",
         "preview": 0.80,
         "final": 0.85,
-        "ratio_vs_baseline": -0.5,
+        "delta_vs_baseline_pp": -0.5,
         "n_final": 100,  # below 200 floor
     }
     cert2 = make_report(report2, baseline)

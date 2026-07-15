@@ -1,7 +1,9 @@
 # Policy Provenance & Digest
 
-> **Plain language:** The report embeds the exact policy evaluated and a
-> short digest so auditors can recompute and verify there was no silent drift.
+> **Plain language:** The report embeds the policy it claims was evaluated and a
+> short digest so auditors can check internal consistency. Recomputing a digest
+> from the same report does not prove that the claimed policy was authorized;
+> that requires an expected policy snapshot or digest obtained independently.
 
 ## Overview
 
@@ -47,16 +49,32 @@ digest = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 ## Auditor Checklist
 
-1) Extract `resolved_policy` and the ordered `policy_provenance.overrides` list.
-2) Recompute the digest locally (see pseudocode).
-3) Confirm it matches `policy_provenance.policy_digest` and `auto.policy_digest`.
+1) Obtain the approved policy snapshot or digest from a separately controlled
+   release record, signed policy pack, or acceptance configuration.
+2) Extract `resolved_policy` and the ordered `policy_provenance.overrides` list.
+3) Recompute the digest locally (see pseudocode).
+4) Confirm the report mirrors agree **and** the resolved policy matches the
+   independently obtained expectation.
+
+For strict verification, this comparison is machine-enforced through
+`--policy-pack`: the pack must be structurally valid, authorize a Balanced or
+Conservative tier, and contain a `resolved_policy` exactly equal to the report's
+resolved policy. The report-local truncated digest is not used as a substitute
+for that exact policy comparison.
 
 If the digest does not match, treat the evidence as drifted or altered and
-rerun evaluation. For tamper-evident distribution, use signed evidence packs.
+rerun evaluation. A signed evidence pack authenticates the pack to a trusted
+signer, but does not prove that the signer chose the approved policy unless the
+verifier caller compares it with that external expectation.
 
 ## Notes
 
-- The digest guards against silent changes to thresholds/caps between runs.
+- The digest is a compact internal change detector, not a MAC, signature,
+  authorization decision, or independent provenance anchor. Its 16-hex-character
+  form is deliberately truncated and must not be treated as collision-resistant
+  security for adversarial inputs.
+- A malicious report author can alter both `resolved_policy` and its digest. External
+  pinning or a separately signed approval record is required to detect that case.
 - Keep tier tables and schema pages in sync when policy values change.
 
 ### Example (report fragment)

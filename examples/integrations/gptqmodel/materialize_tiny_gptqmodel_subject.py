@@ -173,10 +173,11 @@ def _require_dependencies() -> tuple[Any, Any, Any, Any, Any, Any]:
     try:
         import torch
 
-        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+        from invarlock.gptqmodel_runtime import import_gptqmodel
 
-        _patch_gptqmodel_transformers_hub_compat()
-        from gptqmodel import GPTQModel, QuantizeConfig
+        gptqmodel = import_gptqmodel()
+        GPTQModel = gptqmodel.GPTQModel
+        QuantizeConfig = gptqmodel.QuantizeConfig
         from transformers import AutoTokenizer, LlamaConfig, LlamaForCausalLM
     except (ImportError, ModuleNotFoundError) as exc:
         raise SystemExit(

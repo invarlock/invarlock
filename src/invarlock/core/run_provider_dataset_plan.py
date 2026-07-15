@@ -111,6 +111,7 @@ def _build_provider_kwargs(cfg_dataset: Any) -> dict[str, Any]:
         "src_field",
         "tgt_field",
         "cache_dir",
+        "revision",
         "max_samples",
         "file",
         "path",
@@ -228,13 +229,13 @@ def _vision_text_dataset_plan(
     seq_len = int(getattr(cfg_dataset, "seq_len", 0) or 0)
     calibration_data: list[dict[str, Any]] = []
     for arm, records in (("preview", preview_records), ("final", final_records)):
-        for index, record in enumerate(records):
+        for record in records:
             record["seq_len"] = seq_len
             record["example_id"] = str(
                 record.get("id") or record.get("example_id") or ""
             )
             entry = dict(record)
-            entry["window_id"] = f"{arm}::{index}"
+            entry["window_id"] = f"{arm}::{record['example_id']}"
             calibration_data.append(entry)
 
     preview_ids = [str(record["example_id"]) for record in preview_records]
@@ -278,6 +279,10 @@ def _vision_text_dataset_plan(
         "loss_type": resolved_loss_type,
         "window_plan": window_plan,
     }
+    for key in ("dataset_name", "config_name", "revision"):
+        value = getattr(data_provider, key, None)
+        if isinstance(value, str) and value:
+            dataset_meta[key] = value
 
     return ProviderDatasetPlanResult(
         data_provider=data_provider,
@@ -697,6 +702,41 @@ def materialize_run_dataset(
         calibration_data = harvested["calibration_data"]
         resolved_tokenizer = tokenizer
         resolved_tokenizer_hash = tokenizer_hash
+        provider_plan = None
+
+        preview_section = pairing_schedule.get("preview", {})
+        final_section = pairing_schedule.get("final", {})
+        multimodal_schedule = any(
+            isinstance(section.get("example_ids"), list)
+            or isinstance(section.get("records"), list)
+            for section in (preview_section, final_section)
+            if isinstance(section, dict)
+        )
+        if multimodal_schedule and cfg.dataset.provider:
+            provider_plan = build_provider_dataset_plan_fn(
+                cfg=cfg,
+                model_profile=model_profile,
+                resolved_device=resolved_device,
+                profile=profile,
+                profile_normalized=profile_normalized,
+                requested_preview=requested_preview,
+                requested_final=requested_final,
+                effective_preview=effective_preview,
+                effective_final=effective_final,
+                pairing_schedule_present=True,
+                use_mlm=use_mlm,
+                mask_prob=mask_prob,
+                mask_seed=mask_seed,
+                random_token_prob=random_token_prob,
+                original_token_prob=original_token_prob,
+                resolved_loss_type=resolved_loss_type,
+                tier=tier,
+            )
+            calibration_data = list(provider_plan.calibration_data)
+            current_dataset_meta = dict(provider_plan.dataset_meta)
+            current_dataset_meta.update(dataset_meta)
+            dataset_meta = current_dataset_meta
+            window_plan = window_plan or provider_plan.window_plan
 
         if use_mlm and resolved_tokenizer is None:
             resolved_tokenizer, resolved_tokenizer_hash = resolve_tokenizer_fn(
@@ -718,10 +758,18 @@ def materialize_run_dataset(
             profile=profile,
         )
         return RunDatasetContractResult(
-            resolved_split=None,
-            used_fallback_split=False,
-            tokenizer=resolved_tokenizer,
-            tokenizer_hash=resolved_tokenizer_hash,
+            resolved_split=(
+                provider_plan.resolved_split if provider_plan else resolved_split
+            ),
+            used_fallback_split=(
+                provider_plan.used_fallback_split if provider_plan else False
+            ),
+            tokenizer=provider_plan.tokenizer if provider_plan else resolved_tokenizer,
+            tokenizer_hash=(
+                provider_plan.tokenizer_hash
+                if provider_plan
+                else resolved_tokenizer_hash
+            ),
             calibration_data=materialized_baseline.calibration_data,
             dataset_meta=materialized_baseline.dataset_meta,
             window_plan=materialized_baseline.window_plan,
@@ -737,7 +785,7 @@ def materialize_run_dataset(
             final_records=list(
                 getattr(materialized_baseline, "final_records", []) or []
             ),
-            diagnostics=(),
+            diagnostics=(tuple(provider_plan.diagnostics) if provider_plan else ()),
         )
 
     if cfg.dataset.provider:

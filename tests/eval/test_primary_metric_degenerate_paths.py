@@ -99,7 +99,8 @@ def test_compute_primary_metric_from_report_counts_and_estimates():
     assert payload["n_final"] == 2
     assert payload["counts_source"] == "proxy"
     assert payload["estimated"] is True
-    assert isinstance(payload["ratio_vs_baseline"], float)
+    assert isinstance(payload["delta_vs_baseline_pp"], float)
+    assert "ratio_vs_baseline" not in payload
 
 
 def test_compute_primary_metric_baseline_family_match():
@@ -122,9 +123,9 @@ def test_compute_primary_metric_baseline_family_match():
     )
     assert payload["estimated"] is False
     assert payload["counts_source"] == "measured"
-    assert pytest.approx(payload["ratio_vs_baseline"]) == pytest.approx(
-        payload["final"] - 0.6
-    )
+    expected_delta_pp = 100.0 * (payload["final"] - 0.6)
+    assert payload["delta_vs_baseline_pp"] == pytest.approx(expected_delta_pp)
+    assert "ratio_vs_baseline" not in payload
 
 
 def test_ppl_paired_compare_defaults_weighted():

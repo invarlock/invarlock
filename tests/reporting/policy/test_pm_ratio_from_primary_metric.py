@@ -1,11 +1,23 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_pm_only(final_val: float) -> dict:
     return {
-        "meta": {"model_id": "model", "adapter": "hf_causal", "seed": 42},
+        "meta": {
+            "model_id": "model",
+            "adapter": "hf_causal",
+            "seed": 42,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "metrics": {
             # No ppl_* keys; only primary_metric present
             "primary_metric": {
@@ -15,14 +27,20 @@ def _mk_pm_only(final_val: float) -> dict:
                 "aggregation_scope": "token",
                 "paired": True,
                 "gating_basis": "upper",
+                "preview": float(final_val),
                 "final": float(final_val),
             }
         },
-        "dataset": {
-            "provider": "wikitext2",
+        "data": {
+            "dataset": "wikitext2",
+            "split": "validation",
             "seq_len": 128,
-            "windows": {"preview": 0, "final": 0},
+            "stride": 128,
+            "preview_n": 0,
+            "final_n": 0,
         },
+        "edit": {"name": "noop"},
+        "guards": [],
         "artifacts": {},
     }
 

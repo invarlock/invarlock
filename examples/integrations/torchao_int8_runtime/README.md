@@ -1,7 +1,7 @@
 # torchao Int8 Runtime Integration Example
 
-Status: `runnable`; strict container evidence is verified on CUDA for this tiny
-`hf_torchao` runtime-load example with the example-only TorchAO image.
+Status: `runnable`. A `cuda-container-strict` result requires independent
+acceptance inputs and the successful current run described below.
 
 This example shows how to attach InvarLock regression evidence to a Hugging Face
 causal checkpoint loaded through InvarLock's `hf_torchao` adapter. It creates a
@@ -55,7 +55,11 @@ host with that image configured:
 examples/integrations/_runtime_images/build_example_runtime_image.sh cuda-torchao
 examples/integrations/_runtime_images/smoke_example_runtime_image.sh cuda-torchao
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-torchao \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh \
   --allow-network \
   --force \
@@ -64,8 +68,9 @@ examples/integrations/torchao_int8_runtime/run_tiny_hf_torchao_int8.sh \
 
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
-Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared externally.
+Obtain the trusted digest independently from reviewed build/release policy.
+The matching digest in `runtime.manifest.json` is a manifest claim, not the source of
+the verifier pin.
 
 This strict lane is scoped to the configured tiny HF checkpoint loaded through
 the `hf_torchao` adapter. Rerun the strict lane for the target runtime before
@@ -101,6 +106,7 @@ The runner writes generated outputs under local output directories:
 | `reports/tiny-hf-torchao-int8/<artifact-lane>/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-hf-torchao-int8/<artifact-lane>/evaluation.html` | Human-readable report. |
 | `reports/tiny-hf-torchao-int8/<artifact-lane>/backend_inventory.json` | torchao backend version and quantized module inventory when adapter provenance is available. |
+| `reports/tiny-hf-torchao-int8/<artifact-lane>/runtime_quantization_proof.json` | Strict-lane v1 process receipt listing recognized torchao runtime types; wrapper-side schema checks are not an independent runtime observation or checkpoint-artifact proof. |
 | `reports/tiny-hf-torchao-int8/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-hf-torchao-int8/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
 | `reports/tiny-hf-torchao-int8/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
@@ -115,17 +121,9 @@ check the prerequisite message first, then inspect
 The preparer fails if `torchao` does not produce quantized tensor-backed weights
 or if runtime quantization has no measurable weight delta.
 The shell runner relies on InvarLock report persistence to emit
-`backend_inventory.json` when adapter provenance is available.
-
-## Public Evidence Anchor
-
-The repository also ships a small quantization-style public fixture:
-
-```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/real_runs/tiny_gpt2_quant_rtn/evidence_pack/reports/report-001/evaluation.report.json
-```
-
-Use that fixture as the stable public reference when the local example
-environment does not have `torchao` installed. It is a generic strict InvarLock
-quantization fixture, not TorchAO-specific integration evidence.
+`backend_inventory.json` when adapter provenance is available and, for
+`cuda-container-strict`, requires `runtime_quantization_proof.json`. The shared
+wrapper validates the receipt's v1 schema, selected adapter/backend binding,
+allowed type-name surface, and matching backend inventory before `verify`.
+Those checks validate sidecars written by the evaluated process; they are not
+an independent runtime observation or checkpoint-artifact proof.

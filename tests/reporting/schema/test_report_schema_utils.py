@@ -15,7 +15,12 @@ def _base_evaluation_report() -> dict:
             "seq_len": 16,
             "windows": {"preview": 2, "final": 2, "stats": {}},
         },
-        "primary_metric": {"kind": "accuracy", "final": 0.9},
+        "primary_metric": {
+            "kind": "accuracy",
+            "preview": 0.9,
+            "final": 0.9,
+            "delta_vs_baseline_pp": 0.0,
+        },
         "validation": {
             "primary_metric_acceptable": True,
             "preview_final_drift_acceptable": True,

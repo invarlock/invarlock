@@ -29,7 +29,10 @@ def check_adapter_aware_invariants(
     standard_checks: dict[str, dict[str, Any]] = check_standard_invariants(model)
     results["checks"].update(standard_checks)
     for check_name, check_result in standard_checks.items():
-        if not check_result.get("passed", True):
+        # An invariant result is authoritative only when it explicitly records
+        # a boolean pass.  A malformed or incomplete result must not silently
+        # become a successful check.
+        if check_result.get("passed") is not True:
             all_passed = False
             results["violations"].append(
                 {

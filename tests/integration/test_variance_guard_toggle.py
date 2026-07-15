@@ -6,6 +6,10 @@ from copy import deepcopy
 from typing import Any
 
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 BASELINE_PPL_FINAL = 46.5
 PPL_PREVIEW = 46.8
@@ -89,9 +93,11 @@ def _build_run_report(
                 "neurons_pruned": 0,
             },
         },
+        "context": {"profile": "dev"},
         "guards": [
             {
                 "name": "variance",
+                "passed": True,
                 "policy": {
                     "deadband": 0.02,
                     "min_abs_adjust": 0.012,
@@ -126,6 +132,7 @@ def _build_run_report(
 
 def _build_baseline_report() -> dict[str, Any]:
     baseline = _build_run_report("balanced", False, params_changed=0)
+    baseline["edit"]["name"] = "noop"
     baseline["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": PPL_PREVIEW,
@@ -140,13 +147,13 @@ def _build_baseline_report() -> dict[str, Any]:
 
 
 def test_variance_toggle_balanced_vs_conservative():
-    baseline = _build_baseline_report()
+    baseline = canonical_baseline(_build_baseline_report())
 
-    balanced_report = _build_run_report(
-        "balanced", ve_enabled=True, params_changed=2360064
+    balanced_report = canonical_run_report(
+        _build_run_report("balanced", ve_enabled=True, params_changed=2360064)
     )
-    conservative_report = _build_run_report(
-        "conservative", ve_enabled=False, params_changed=2360064
+    conservative_report = canonical_run_report(
+        _build_run_report("conservative", ve_enabled=False, params_changed=2360064)
     )
 
     balanced_cert = make_report(deepcopy(balanced_report), deepcopy(baseline))

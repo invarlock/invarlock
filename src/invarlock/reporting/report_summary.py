@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from invarlock.core.auto_tuning import get_tier_policies
+from invarlock.json_serialization import normalize_optional_nonfinite_json
 from invarlock.public_contracts import load_json_contract
 
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
 _CONSOLE_LABELS_DEFAULT = [
     "Primary Metric Acceptable",
     "Preview Final Drift Acceptable",
-    "Guard Overhead Acceptable",
+    "Guard Metric Impact Acceptable",
     "Invariants Pass",
     "Spectral Stable",
     "Rmt Stable",
@@ -45,8 +46,9 @@ def compute_console_validation_block(
 ) -> dict[str, Any]:
     """Produce a normalized console validation block from an evaluation report."""
     labels = load_console_labels()
-    validation = evaluation_report.get("validation", {}) or {}
-    guard_ctx = evaluation_report.get("guard_overhead", {}) or {}
+    validation_raw = evaluation_report.get("validation")
+    validation = validation_raw if isinstance(validation_raw, dict) else {}
+    guard_ctx = evaluation_report.get("guard_metric_impact", {}) or {}
     guard_evaluated = (
         bool(guard_ctx.get("evaluated")) if isinstance(guard_ctx, dict) else False
     )
@@ -59,14 +61,14 @@ def compute_console_validation_block(
     effective_labels: list[str] = []
     for label in labels:
         key = _to_key(label)
-        ok = bool(validation.get(key, False))
-        if key == "guard_overhead_acceptable" and not guard_evaluated:
+        ok = validation.get(key) is True
+        if key == "guard_metric_impact_acceptable" and not guard_evaluated:
             continue
         rows.append(
             {
                 "label": label,
                 "status": "✅ PASS" if ok else "❌ FAIL",
-                "evaluated": key != "guard_overhead_acceptable" or guard_evaluated,
+                "evaluated": key != "guard_metric_impact_acceptable" or guard_evaluated,
                 "ok": ok,
             }
         )
@@ -81,7 +83,7 @@ def compute_console_validation_block(
         "rmt_stable",
     ]
     if guard_evaluated:
-        keys_for_overall.append("guard_overhead_acceptable")
+        keys_for_overall.append("guard_metric_impact_acceptable")
 
     overall_pass = all(ok_map.get(key, False) for key in keys_for_overall)
     return {"labels": effective_labels, "rows": rows, "overall_pass": overall_pass}
@@ -91,7 +93,11 @@ def compute_report_hash(evaluation_report: dict[str, Any]) -> str:
     """Compute a stable integrity hash for an evaluation report."""
     cert_copy = dict(evaluation_report or {})
     cert_copy.pop("artifacts", None)
-    cert_str = json.dumps(cert_copy, sort_keys=True)
+    cert_str = json.dumps(
+        normalize_optional_nonfinite_json(cert_copy),
+        sort_keys=True,
+        allow_nan=False,
+    )
     import hashlib as _hash
 
     return _hash.sha256(cert_str.encode()).hexdigest()[:16]
@@ -177,6 +183,32 @@ def _coerce_finite_float(value: Any) -> float | None:
     return numeric if math.isfinite(numeric) else None
 
 
+def _guard_metric_impact_display(payload: dict[str, Any]) -> tuple[str, str]:
+    """Format canonical metric degradation and its policy limit."""
+
+    display_value = _coerce_finite_float(payload.get("display_value"))
+    degradation_limit = _coerce_finite_float(payload.get("degradation_limit"))
+    display_unit = payload.get("display_unit")
+    if display_value is None:
+        measured = "N/A"
+    elif display_unit == "percentage_points":
+        measured = f"{display_value:+.2f} pp"
+    elif display_unit == "percent":
+        measured = f"{display_value:+.2f}%"
+    else:
+        measured = "N/A"
+
+    if degradation_limit is None:
+        threshold = "N/A"
+    elif display_unit == "percentage_points":
+        threshold = f"≤ +{degradation_limit * 100.0:.1f} pp"
+    elif display_unit == "percent":
+        threshold = f"≤ +{degradation_limit * 100.0:.1f}%"
+    else:
+        threshold = "N/A"
+    return measured, threshold
+
+
 def _resolved_metrics_policy(evaluation_report: dict[str, Any]) -> dict[str, Any]:
     auto = _mapping(evaluation_report.get("auto"))
     tier = str(auto.get("tier") or "balanced").lower()
@@ -214,7 +246,7 @@ def _primary_metric_measured_and_threshold(
     basis = str(pm.get("gating_basis") or pm.get("basis") or "point")
     metrics_policy = {} if tiny_relax else _resolved_metrics_policy(evaluation_report)
     if kind == "accuracy":
-        delta = _coerce_finite_float(pm.get("ratio_vs_baseline"))
+        delta = _coerce_finite_float(pm.get("delta_vs_baseline_pp"))
         measured = f"{delta:+.2f} pp" if delta is not None else "N/A"
         acc_policy = _mapping(metrics_policy.get("accuracy"))
         delta_min = _coerce_finite_float(acc_policy.get("delta_min_pp"))
@@ -328,7 +360,8 @@ def _format_gate_status(
     elif key not in validation:
         ok = ok_default
     else:
-        ok = bool(validation.get(key))
+        value = validation.get(key)
+        ok = value if isinstance(value, bool) else None
     if ok is None:
         return "ℹ️ N/A"
     return "✅ PASS" if ok else "❌ FAIL"
@@ -344,11 +377,10 @@ def build_safety_dashboard_summary(
         f"{'✅' if overall_pass else '❌'} {'PASS' if overall_pass else 'FAIL'}"
     )
 
-    validation = evaluation_report.get("validation", {}) or {}
-    if isinstance(validation, dict) and "primary_metric_acceptable" in validation:
-        pm_ok: bool | None = bool(validation.get("primary_metric_acceptable"))
-    else:
-        pm_ok = None
+    validation_raw = evaluation_report.get("validation")
+    validation = validation_raw if isinstance(validation_raw, dict) else {}
+    pm_value = validation.get("primary_metric_acceptable")
+    pm_ok: bool | None = pm_value if isinstance(pm_value, bool) else None
     measured, threshold, pm_basis = _primary_metric_measured_and_threshold(
         evaluation_report
     )
@@ -359,10 +391,8 @@ def build_safety_dashboard_summary(
     else:
         pm_status = f"ℹ️ {measured}"
 
-    if isinstance(validation, dict) and "preview_final_drift_acceptable" in validation:
-        drift_ok: bool | None = bool(validation.get("preview_final_drift_acceptable"))
-    else:
-        drift_ok = None
+    drift_value = validation.get("preview_final_drift_acceptable")
+    drift_ok: bool | None = drift_value if isinstance(drift_value, bool) else None
     drift_val, drift_threshold, _drift_basis = (
         _primary_metric_drift_measured_and_threshold(evaluation_report)
     )
@@ -391,37 +421,25 @@ def build_safety_dashboard_summary(
         ),
     ]
 
-    overhead_ctx = evaluation_report.get("guard_overhead", {}) or {}
-    overhead_evaluated = (
-        bool(overhead_ctx.get("evaluated")) if isinstance(overhead_ctx, dict) else False
+    metric_impact_ctx = evaluation_report.get("guard_metric_impact", {}) or {}
+    metric_impact_evaluated = (
+        bool(metric_impact_ctx.get("evaluated"))
+        if isinstance(metric_impact_ctx, dict)
+        else False
     )
-    if overhead_evaluated:
-        overhead_pct = overhead_ctx.get("overhead_percent")
-        overhead_ratio = overhead_ctx.get("overhead_ratio")
-        if isinstance(overhead_pct, int | float) and math.isfinite(float(overhead_pct)):
-            overhead_measured = f"{float(overhead_pct):+.2f}%"
-        elif isinstance(overhead_ratio, int | float) and math.isfinite(
-            float(overhead_ratio)
-        ):
-            overhead_measured = f"{float(overhead_ratio):.3f}×"
-        else:
-            overhead_measured = "N/A"
-        threshold_pct = overhead_ctx.get("threshold_percent")
-        if isinstance(threshold_pct, int | float) and math.isfinite(
-            float(threshold_pct)
-        ):
-            threshold_str = f"≤ +{float(threshold_pct):.1f}%"
-        else:
-            threshold_str = "≤ +1.0%"
+    if metric_impact_evaluated:
+        metric_impact_measured, limit_str = _guard_metric_impact_display(
+            metric_impact_ctx
+        )
         rows.append(
             SafetyDashboardRow(
-                "Overhead",
+                "Guard Metric Impact",
                 (
-                    f"{'✅' if bool(validation.get('guard_overhead_acceptable', True)) else '❌'} {overhead_measured}"
+                    f"{'✅' if validation.get('guard_metric_impact_acceptable') is True else '❌'} {metric_impact_measured}"
                     if isinstance(validation, dict)
-                    else f"ℹ️ {overhead_measured}"
+                    else f"ℹ️ {metric_impact_measured}"
                 ),
-                threshold_str,
+                limit_str,
             )
         )
 
@@ -444,7 +462,8 @@ def build_quality_gates_summary(
 
     pm_block = evaluation_report.get("primary_metric", {}) or {}
     has_pm = isinstance(pm_block, dict) and bool(pm_block)
-    validation = evaluation_report.get("validation", {}) or {}
+    validation_raw = evaluation_report.get("validation")
+    validation = validation_raw if isinstance(validation_raw, dict) else {}
 
     rows: list[QualityGateRow] = []
     if has_pm:
@@ -452,8 +471,14 @@ def build_quality_gates_summary(
         measured, threshold, gating_basis = _primary_metric_measured_and_threshold(
             evaluation_report
         )
-        pm_ok = bool(validation.get("primary_metric_acceptable", True))
-        status = "✅ PASS" if pm_ok else "❌ FAIL"
+        pm_value = validation.get("primary_metric_acceptable")
+        status = (
+            "✅ PASS"
+            if pm_value is True
+            else "❌ FAIL"
+            if pm_value is False
+            else "ℹ️ NOT EVALUATED"
+        )
         if pm_kind == "accuracy":
             description = "Δ accuracy vs baseline"
         else:
@@ -469,14 +494,20 @@ def build_quality_gates_summary(
             )
         )
 
-        drift_ok = bool(validation.get("preview_final_drift_acceptable", True))
+        drift_value = validation.get("preview_final_drift_acceptable")
         measured, threshold, drift_basis = _primary_metric_drift_measured_and_threshold(
             evaluation_report
         )
         rows.append(
             QualityGateRow(
                 label="Preview Final Drift Acceptable",
-                status="✅ PASS" if drift_ok else "❌ FAIL",
+                status=(
+                    "✅ PASS"
+                    if drift_value is True
+                    else "❌ FAIL"
+                    if drift_value is False
+                    else "ℹ️ NOT EVALUATED"
+                ),
                 measured=measured,
                 threshold=threshold,
                 basis=drift_basis,
@@ -488,40 +519,21 @@ def build_quality_gates_summary(
             )
         )
 
-        guard_overhead = evaluation_report.get("guard_overhead", {}) or {}
-        evaluated = bool(guard_overhead.get("evaluated"))
+        guard_metric_impact = evaluation_report.get("guard_metric_impact", {}) or {}
+        evaluated = bool(guard_metric_impact.get("evaluated"))
         if evaluated:
-            overhead_ok = bool(validation.get("guard_overhead_acceptable", True))
-            overhead_pct = guard_overhead.get("overhead_percent")
-            overhead_ratio = guard_overhead.get("overhead_ratio")
-            if isinstance(overhead_pct, int | float) and math.isfinite(
-                float(overhead_pct)
-            ):
-                measured = f"{float(overhead_pct):+.2f}%"
-            elif isinstance(overhead_ratio, int | float) and math.isfinite(
-                float(overhead_ratio)
-            ):
-                measured = f"{float(overhead_ratio):.3f}x"
-            else:
-                measured = "N/A"
-            threshold_pct = guard_overhead.get("threshold_percent")
-            if not (
-                isinstance(threshold_pct, int | float)
-                and math.isfinite(float(threshold_pct))
-            ):
-                threshold_val = guard_overhead.get("overhead_threshold", 0.01)
-                try:
-                    threshold_pct = float(threshold_val) * 100.0
-                except _PARSE_EXCEPTIONS:
-                    threshold_pct = 1.0
+            metric_impact_ok = validation.get("guard_metric_impact_acceptable") is True
+            measured, degradation_limit = _guard_metric_impact_display(
+                guard_metric_impact
+            )
             rows.append(
                 QualityGateRow(
-                    label="Guard Overhead Acceptable",
-                    status="✅ PASS" if overhead_ok else "❌ FAIL",
+                    label="Guard Metric Impact Acceptable",
+                    status="✅ PASS" if metric_impact_ok else "❌ FAIL",
                     measured=measured,
-                    threshold=f"≤ +{float(threshold_pct):.1f}%",
-                    basis="point",
-                    description="Guarded vs bare PM overhead",
+                    threshold=degradation_limit,
+                    basis=str(guard_metric_impact.get("degradation_basis") or ""),
+                    description="Guarded-vs-bare primary metric degradation",
                 )
             )
 
@@ -529,7 +541,7 @@ def build_quality_gates_summary(
         if isinstance(pm_tail, dict) and pm_tail:
             evaluated = bool(pm_tail.get("evaluated", False))
             mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
-            passed = bool(pm_tail.get("passed", True))
+            passed = pm_tail.get("passed") is True
             warned = bool(pm_tail.get("warned", False))
 
             if not evaluated:
@@ -597,7 +609,7 @@ def build_quality_gates_summary(
         overall_pass=overall_pass,
         overall_status=overall_status,
         rows=tuple(rows),
-        hysteresis_applied=bool(validation.get("hysteresis_applied")),
+        hysteresis_applied=validation.get("hysteresis_applied") is True,
     )
 
 

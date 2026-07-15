@@ -7,7 +7,7 @@
       "apache-2.0",
       "mit"
     ],
-    "notes": "Support, candidate, and evidence-sweep lanes are explicit. User-supplied local checkpoints remain BYOE inputs."
+    "notes": "Support and candidate classifications are explicit. User-supplied local checkpoints remain BYOE inputs."
   },
   "classification_values": [
     "published",
@@ -31,12 +31,6 @@
       "support_matrix_lane_id": "gpt2-causal-hf",
       "catalog_family_ids": [
         "gpt2-causal-lm"
-      ],
-      "sweep_lane_ids": [
-        "published-gpt2-causal-hf"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -46,13 +40,6 @@
       "support_matrix_lane_id": "bert-mlm-hf",
       "catalog_family_ids": [
         "bert-roberta-mlm"
-      ],
-      "sweep_lane_ids": [
-        "published-bert-base-uncased-mlm-hf",
-        "published-roberta-base-mlm-hf"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -62,9 +49,6 @@
       "support_matrix_lane_id": "mistral-7b-causal-hf",
       "catalog_family_ids": [
         "mistral-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -74,9 +58,6 @@
       "support_matrix_lane_id": "ministral-3-8b-text-causal-hf",
       "catalog_family_ids": [
         "ministral-3-8b-text-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -86,9 +67,6 @@
       "support_matrix_lane_id": "ministral-3-14b-text-causal-hf",
       "catalog_family_ids": [
         "ministral-3-14b-text-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -98,9 +76,6 @@
       "support_matrix_lane_id": "qwen2-7b-causal-hf",
       "catalog_family_ids": [
         "qwen2-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -110,9 +85,6 @@
       "support_matrix_lane_id": "qwen2-5-7b-causal-hf",
       "catalog_family_ids": [
         "qwen2-5-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -122,9 +94,6 @@
       "support_matrix_lane_id": "qwen2-5-14b-causal-hf",
       "catalog_family_ids": [
         "qwen2-5-14b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -134,9 +103,6 @@
       "support_matrix_lane_id": "qwen3-causal-hf",
       "catalog_family_ids": [
         "qwen3-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -146,9 +112,6 @@
       "support_matrix_lane_id": "deepseek-r1-distill-qwen-causal-hf",
       "catalog_family_ids": [
         "deepseek-r1-distill-qwen-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -158,9 +121,6 @@
       "support_matrix_lane_id": "phi-4-text-causal-hf",
       "catalog_family_ids": [
         "phi-4-text-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -170,9 +130,6 @@
       "support_matrix_lane_id": "gemma4-e2b-text-causal-hf",
       "catalog_family_ids": [
         "gemma-4-e2b-text-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -182,9 +139,6 @@
       "support_matrix_lane_id": "tinyllama-1-1b-causal-hf",
       "catalog_family_ids": [
         "tinyllama-1-1b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -194,9 +148,6 @@
       "support_matrix_lane_id": "olmo-2-7b-causal-hf",
       "catalog_family_ids": [
         "olmo-2-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -206,9 +157,6 @@
       "support_matrix_lane_id": "olmo-2-13b-causal-hf",
       "catalog_family_ids": [
         "olmo-2-13b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -218,9 +166,6 @@
       "support_matrix_lane_id": "open-llama-7b-causal-hf",
       "catalog_family_ids": [
         "openllama-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -230,9 +175,6 @@
       "support_matrix_lane_id": "falcon-7b-causal-hf",
       "catalog_family_ids": [
         "falcon-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -242,9 +184,6 @@
       "support_matrix_lane_id": "qwen3-5-causal-hf",
       "catalog_family_ids": [
         "qwen3-5-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -254,9 +193,6 @@
       "support_matrix_lane_id": "granite-4-1-3b-causal-hf",
       "catalog_family_ids": [
         "granite-4-1-3b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -266,10 +202,6 @@
       "support_matrix_lane_id": "flan-t5-base-seq2seq-hf",
       "catalog_family_ids": [
         "flan-t5-base-seq2seq-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu",
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -279,9 +211,6 @@
       "support_matrix_lane_id": "gemma4-12b-any-to-any-hf",
       "catalog_family_ids": [
         "gemma-4-12b-any-to-any-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -291,9 +220,6 @@
       "support_matrix_lane_id": "gemma4-e4b-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-e4b-image-text-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -303,9 +229,6 @@
       "support_matrix_lane_id": "gemma4-e2b-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-e2b-image-text-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -315,9 +238,6 @@
       "support_matrix_lane_id": "qwen3-5-4b-image-text-hf",
       "catalog_family_ids": [
         "qwen3-5-4b-image-text-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -327,9 +247,6 @@
       "support_matrix_lane_id": "qwen3-5-2b-image-text-hf",
       "catalog_family_ids": [
         "qwen3-5-2b-image-text-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -339,9 +256,6 @@
       "support_matrix_lane_id": "qwen3-6-27b-image-text-scoped-hf",
       "catalog_family_ids": [
         "qwen-3-6-27b-image-text-scoped-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -351,9 +265,6 @@
       "support_matrix_lane_id": "qwen3-5-27b-image-text-scoped-hf",
       "catalog_family_ids": [
         "qwen-3-5-27b-image-text-scoped-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -363,9 +274,6 @@
       "support_matrix_lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-26b-a4b-moe-image-text-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -375,9 +283,6 @@
       "support_matrix_lane_id": "gemma4-31b-image-text-hf",
       "catalog_family_ids": [
         "gemma-4-31b-image-text-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -387,10 +292,6 @@
       "support_matrix_lane_id": "mixtral-8x7b-moe-causal-hf",
       "catalog_family_ids": [
         "mixtral"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu",
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -400,9 +301,6 @@
       "support_matrix_lane_id": "qwen3-30b-a3b-moe-causal-hf",
       "catalog_family_ids": [
         "qwen3-30b-a3b-moe-causal-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -412,9 +310,6 @@
       "support_matrix_lane_id": "olmoe-1b-7b-0924-causal-hf",
       "catalog_family_ids": [
         "olmoe-1b-7b-causal-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -424,9 +319,6 @@
       "support_matrix_lane_id": "ministral-3-3b-text-causal-hf",
       "catalog_family_ids": [
         "ministral-3-3b-text-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -436,9 +328,6 @@
       "support_matrix_lane_id": "granite-4-1-8b-causal-hf",
       "catalog_family_ids": [
         "granite-4-1-8b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -448,9 +337,6 @@
       "support_matrix_lane_id": "smollm3-3b-causal-hf",
       "catalog_family_ids": [
         "smollm3-3b-causal-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -460,9 +346,6 @@
       "support_matrix_lane_id": "phi-4-mini-causal-hf",
       "catalog_family_ids": [
         "phi-4-mini-causal-lm"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -472,9 +355,6 @@
       "support_matrix_lane_id": "deepseek-r1-distill-qwen-14b-causal-hf",
       "catalog_family_ids": [
         "deepseek-r1-distill-qwen-14b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
@@ -484,32 +364,17 @@
       "support_matrix_lane_id": "deepseek-r1-0528-qwen3-8b-causal-hf",
       "catalog_family_ids": [
         "deepseek-r1-0528-qwen3-8b-causal-lm"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
       ]
     },
     {
       "id": "smoke-tiny-gpt2-causal-hf",
       "classification": "smoke_canary",
-      "eligibility": "not_applicable",
-      "sweep_lane_ids": [
-        "smoke-tiny-gpt2-causal-hf"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
-      ]
+      "eligibility": "not_applicable"
     },
     {
       "id": "smoke-bert-tiny-mlm-hf",
       "classification": "smoke_canary",
-      "eligibility": "not_applicable",
-      "sweep_lane_ids": [
-        "smoke-bert-tiny-mlm-hf"
-      ],
-      "suite_roles": [
-        "repo-mentioned-gpu"
-      ]
+      "eligibility": "not_applicable"
     },
     {
       "id": "llama-family",
@@ -566,12 +431,6 @@
       "support_matrix_lane_id": "gpt-oss-20b-causal-hf",
       "catalog_family_ids": [
         "gpt-oss"
-      ],
-      "sweep_lane_ids": [
-        "gpt-oss-20b-causal-hf"
-      ],
-      "suite_roles": [
-        "support-matrix-backlog-gpu"
       ]
     },
     {
@@ -637,12 +496,6 @@
       "candidate_id": "broader-bert-like-mlms",
       "catalog_family_ids": [
         "broader-bert-like-mlms"
-      ],
-      "sweep_lane_ids": [
-        "published-basis-gap::distilbert_base_uncased"
-      ],
-      "suite_roles": [
-        "published-basis-gap-gpu"
       ],
       "blockers": [
         "approved calibration and evaluation evidence"

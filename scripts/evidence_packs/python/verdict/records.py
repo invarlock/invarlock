@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
+from invarlock.evidence_pack_contracts.probes import (
+    PROBE_FILENAMES,
+    ProbeValidationError,
+    load_probe_file,
+)
 
 from .generator_helpers import (
     CORE_GUARDS,
@@ -36,14 +44,10 @@ def _build_scenario_catalog(manifest: dict[str, Any]) -> ScenarioCatalog:
         scenario_index[scenario_id] = item
 
     expected_by_category: dict[str, set[str]] = {
-        "clean": set(),
-        "stress": set(),
-        "error_injection": set(),
+        category: set() for category in SUMMARY_CATEGORIES
     }
     gating_by_category: dict[str, set[str]] = {
-        "clean": set(),
-        "stress": set(),
-        "error_injection": set(),
+        category: set() for category in SUMMARY_CATEGORIES
     }
     catastrophic_required: set[str] = set()
     informational_stress: set[str] = set()
@@ -57,6 +61,7 @@ def _build_scenario_catalog(manifest: dict[str, Any]) -> ScenarioCatalog:
         expected_by_category[category].add(scenario_id)
         if (
             (category == "clean" and strictness == "must_pass")
+            or (category == "trained" and strictness == "must_pass")
             or (category == "stress" and strictness == "must_fail")
             or (
                 category == "error_injection"
@@ -84,10 +89,16 @@ def _build_scenario_catalog(manifest: dict[str, Any]) -> ScenarioCatalog:
 
 def _collect_latest_reports(
     output_dir: Path,
+    *,
+    scenario_index: Mapping[str, Mapping[str, object]] | None = None,
 ) -> dict[tuple[str, str, str], tuple[int, Path]]:
     latest: dict[tuple[str, str, str], tuple[int, Path]] = {}
     for cert_path in sorted(output_dir.glob("*/reports/**/evaluation.report.json")):
-        cls = _classify_report(cert_path, output_dir=output_dir)
+        cls = _classify_report(
+            cert_path,
+            output_dir=output_dir,
+            scenario_index=scenario_index,
+        )
         if cls is None:
             continue
         model_name, category, scenario_id = cls
@@ -114,10 +125,17 @@ def _load_report_with_probes(cert_path: Path) -> dict[str, Any] | None:
     if cert is None:
         return None
 
-    for probe_name in ("rmt_probe", "ve_probe"):
-        probe_payload = _load_json_object(cert_path.parent / f"{probe_name}.json")
-        if probe_payload is not None:
-            cert[probe_name] = probe_payload
+    probe_errors: list[str] = []
+    for filename in PROBE_FILENAMES:
+        probe_path = cert_path.parent / filename
+        if not probe_path.exists():
+            continue
+        try:
+            cert[filename.removesuffix(".json")] = load_probe_file(probe_path)
+        except ProbeValidationError as exc:
+            probe_errors.append(f"{filename}: {exc}")
+    if probe_errors:
+        cert["_probe_validation_errors"] = probe_errors
     return cert
 
 
@@ -264,6 +282,7 @@ def _build_record(
     output_dir: Path | None = None,
 ) -> dict[str, Any]:
     outcome = _evaluate_report(cert)
+    probe_errors = cert.get("_probe_validation_errors")
     spec = scenario_index.get(scenario_id, {})
     if not isinstance(spec, dict):
         spec = {}
@@ -298,10 +317,16 @@ def _build_record(
         "primary_guard": str(spec.get("primary_guard") or ""),
         "failure_class": str(spec.get("failure_class") or ""),
         "run_num": run_num,
-        "family": _edit_family(scenario_id) if category in {"clean", "stress"} else "",
+        "family": (
+            _edit_family(scenario_id)
+            if category in {"clean", "trained", "stress"}
+            else ""
+        ),
         "passed": outcome.passed,
         "reasons": list(outcome.reasons),
-        "detectors_hit": _detectors_hit(
+        "detectors_hit": False
+        if probe_errors
+        else _detectors_hit(
             cert,
             detectors_any,
             detectors_all,
@@ -321,7 +346,13 @@ def _build_record(
         ),
         "guard_baseline_relative": guard_baseline_relative,
         "path": _run_relative_path(cert_path, output_dir),
+        "report_sha256": hashlib.sha256(cert_path.read_bytes()).hexdigest(),
     }
+    if isinstance(probe_errors, list):
+        record["probe_validation_errors"] = list(probe_errors)
+    run_id = _report_run_id(cert)
+    if run_id is not None:
+        record["run_id"] = run_id
     if isinstance(baseline_cert, dict) and isinstance(
         baseline_cert.get("_baseline_report_path"),
         str,
@@ -331,6 +362,18 @@ def _build_record(
     record["primary_guard_hit"] = _record_primary_guard_hit(record)
     record["any_core_guard_flag"] = _core_signal_count(record) > 0
     return record
+
+
+def _report_run_id(cert: dict[str, Any]) -> str | None:
+    run_id = cert.get("run_id")
+    if isinstance(run_id, str) and run_id.strip():
+        return run_id.strip()
+    meta = cert.get("meta")
+    if isinstance(meta, dict):
+        run_id = meta.get("run_id")
+        if isinstance(run_id, str) and run_id.strip():
+            return run_id.strip()
+    return None
 
 
 def _collect_records(

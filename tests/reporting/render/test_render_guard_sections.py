@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from invarlock.reporting import render as render_mod
+from invarlock.reporting.rendering import markdown as render_mod
 
 
 def _base_evaluation_report() -> dict[str, object]:
@@ -31,11 +31,11 @@ def _base_evaluation_report() -> dict[str, object]:
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "policies": {"active": []},
         "auto": {"tier": "balanced", "probes_used": ["spectral"]},
-        "guard_overhead": {"evaluated": True, "ok": True},
+        "guard_metric_impact": {"evaluated": True, "ok": True},
     }
 
 
@@ -80,6 +80,15 @@ def test_render_report_markdown_includes_guard_sections():
     assert "RMT Guard" in report
     assert "Mode: `activation_edge_risk`" in report
     assert "| Family | ε_f" in report
+
+
+def test_missing_primary_metric_verdict_is_not_rendered_as_pass() -> None:
+    cert = deepcopy(_base_evaluation_report())
+    cert["validation"]["primary_metric_acceptable"] = "yes"
+
+    rendered = render_mod.render_report_markdown(cert)
+
+    assert "Catastrophic Spike Gate (hard stop) | ℹ️ NOT EVALUATED" in rendered
 
 
 def test_render_report_markdown_handles_sparse_spectral_sections():

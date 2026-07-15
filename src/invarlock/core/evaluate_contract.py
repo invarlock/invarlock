@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .checkpoint_identity import validated_model_identity
 from .exceptions import ConfigError, MetricsError, ValidationError
 from .report_inputs import (
     ReportInputError,
@@ -60,6 +61,7 @@ def load_validated_baseline_report(
     expected_adapter: str,
     expected_assurance_mode: str,
     expected_dataset: dict[str, Any] | None = None,
+    expected_model_identity: dict[str, str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Load and validate a reusable baseline report for `evaluate`."""
 
@@ -84,6 +86,7 @@ def load_validated_baseline_report(
         expected_adapter=expected_adapter,
         expected_assurance_mode=expected_assurance_mode,
         expected_dataset=expected_dataset,
+        expected_model_identity=expected_model_identity,
     )
     return resolved_report, payload
 
@@ -115,6 +118,7 @@ def _validate_baseline_report_payload(
     expected_adapter: str,
     expected_assurance_mode: str,
     expected_dataset: dict[str, Any] | None = None,
+    expected_model_identity: dict[str, str] | None = None,
 ) -> None:
     edit_block = payload.get("edit")
     edit_name = edit_block.get("name") if isinstance(edit_block, dict) else None
@@ -160,6 +164,18 @@ def _validate_baseline_report_payload(
             ),
             details={"path": str(resolved_report), "field": "meta.adapter"},
         )
+    if expected_model_identity is not None:
+        observed_identity = validated_model_identity(meta.get("model_identity"))
+        if observed_identity != expected_model_identity:
+            raise ValidationError(
+                code="E222",
+                message=(
+                    "Baseline report model identity mismatch. "
+                    f"Expected {expected_model_identity!r}, got {observed_identity!r} "
+                    f"in {resolved_report}"
+                ),
+                details={"path": str(resolved_report), "field": "meta.model_identity"},
+            )
 
     context = payload.get("context")
     if not isinstance(context, dict):
@@ -182,7 +198,7 @@ def _validate_baseline_report_payload(
             ),
             details={"path": str(resolved_report), "field": "context.profile"},
         )
-    baseline_tier = _baseline_report_tier(payload, context)
+    baseline_tier = _baseline_report_tier(context)
     if not isinstance(baseline_tier, str) or baseline_tier != expected_tier:
         raise ValidationError(
             code="E222",
@@ -196,7 +212,7 @@ def _validate_baseline_report_payload(
                 "field": "context.auto.tier",
             },
         )
-    baseline_assurance = _baseline_report_assurance_mode(payload, context)
+    baseline_assurance = _baseline_report_assurance_mode(context)
     if (
         not isinstance(baseline_assurance, str)
         or baseline_assurance.strip().lower() != expected_assurance_mode.strip().lower()
@@ -336,43 +352,21 @@ def _model_ids_equivalent(actual: str, expected: str) -> bool:
 
 
 def _baseline_report_tier(
-    payload: dict[str, Any],
     context: dict[str, Any],
 ) -> str | None:
     auto_ctx = context.get("auto")
     tier = auto_ctx.get("tier") if isinstance(auto_ctx, dict) else None
-    if isinstance(tier, str):
-        return tier
-    tier = context.get("tier")
-    if isinstance(tier, str):
-        return tier
-    auto_top = payload.get("auto")
-    tier = auto_top.get("tier") if isinstance(auto_top, dict) else None
-    if isinstance(tier, str):
-        return tier
-    meta = payload.get("meta")
-    auto_meta = meta.get("auto") if isinstance(meta, dict) else None
-    tier = auto_meta.get("tier") if isinstance(auto_meta, dict) else None
-    if isinstance(tier, str):
-        return tier
-    return None
+    return tier if isinstance(tier, str) else None
 
 
 def _baseline_report_assurance_mode(
-    payload: dict[str, Any],
     context: dict[str, Any],
 ) -> str | None:
     context_assurance = context.get("assurance")
     mode = (
         context_assurance.get("mode") if isinstance(context_assurance, dict) else None
     )
-    if isinstance(mode, str):
-        return mode
-    report_assurance = payload.get("assurance")
-    mode = report_assurance.get("mode") if isinstance(report_assurance, dict) else None
-    if isinstance(mode, str):
-        return mode
-    return None
+    return mode if isinstance(mode, str) else None
 
 
 def _validate_baseline_dataset(

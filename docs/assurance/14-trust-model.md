@@ -16,17 +16,32 @@
 ## Quick Start
 
 ```bash
-# Require every input report to claim and satisfy strict assurance.
-invarlock verify --assurance strict reports/eval/evaluation.report.json
+# The expected digest must come from reviewed policy, not the submitted manifest.
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+BASELINE_RUN_REPORT='/path/to/retained/baseline/report.json'
+ACCEPTANCE_POLICY_PACK='/path/to/acceptance/policy-pack.json'
+invarlock verify --profile release --assurance strict \
+  --baseline "$BASELINE_RUN_REPORT" \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 ```
 
-Strict verification also expects the sibling `runtime.manifest.json` for
-container-backed evidence. See [Runtime Provenance Guide](../security/runtime-provenance-guide.md)
-for the manifest contract.
+Strict verification also expects a policy pack supplied independently by the
+verifier caller and the sibling `runtime.manifest.json` for container-backed evidence.
+The policy pack must exactly match the policy resolved in the report; the
+pack's digest also binds its compatibility metadata. Strict verification
+requires `compatibility.dataset_identity` and reconciles those caller-selected
+provider, dataset, configuration, revision, and split coordinates with the
+report. The submitted report cannot authorize itself. See
+[Runtime Provenance Guide](../security/runtime-provenance-guide.md) for the
+manifest contract.
 
 Evidence-pack verification is separate from report verification. A signed
 evidence pack validates manifest integrity; signer authenticity requires pinning
-with `--expected-fingerprint` or a local trust store.
+with `--expected-fingerprint` or a local trust store. Signer pinning does not pin
+the runtime image: strict nested report verification additionally requires
+`--expected-runtime-image-digest`.
 
 Release exports such as `invarlock report export --format release-review-md`
 are presentation wrappers around the report and verifier result. They do not
@@ -35,8 +50,9 @@ the runtime/evidence-pack checks described here.
 
 ## What A Strict Pass Means
 
-A strict pass means one configured edited checkpoint comparison did not
-violate the InvarLock weight-edit regression contract for the selected
+A strict pass means one submitted, configured edited-checkpoint comparison is
+internally consistent with and did not report a violation of the InvarLock
+weight-edit regression contract for the selected
 baseline, subject, dataset windows, tier, profile, and runtime policy.
 The result is scoped to that configured comparison and its report/provenance
 evidence.
@@ -52,11 +68,19 @@ The current strict assurance contract requires:
   single `invariants` evidence block covers both pre/post invariant stages in
   the current report contract
 - zero synthesized, repaired, fallback, degraded, or monitor-only evidence
-- strict paired-window counts and zero overlap
+- strict paired-window counts, disjoint preview/final IDs, and zero configured
+  sliding-window overlap
 - primary metric log-space/display-space CI identity
-- tokenizer/provider parity
-- verified runtime provenance
-- zero unsupported guard/model statuses with `assurance_blocking = true`
+- a complete independently supplied noop baseline run report, with raw metric
+  replay and tokenizer/provider/model/dataset parity
+- a report-bound runtime manifest and an independently supplied expected image
+  digest matching the manifest declaration
+- no unsupported guard status accepted as passing evidence
+- measured, passing guard-metric-impact evidence; an explicit skip does not satisfy
+  current strict assurance
+- current guard outcome requirements: invariant findings block, selected
+  external-baseline spectral violations block, RMT epsilon violations block,
+  and the VE predictive gate must be evaluated and passing
 
 ## Strict Pass Scope
 
@@ -65,22 +89,33 @@ A strict pass covers the configured evidence surface:
 - the selected baseline, subject, dataset windows, tier, profile, and runtime
   policy
 - the report-local strict-assurance shape and guard evidence
-- verified runtime provenance for the generated report
-- signer authenticity when the signer fingerprint is pinned or matched through a
-  trusted local store
-- the published support tier for the model family or adapter lane under review
+- report/manifest binding plus an independently supplied expected runtime-image digest
+  that matches the manifest's **claimed** image identity
+
+Evidence-pack signer authentication and support-matrix classification are
+separate review results. Report verification does not authenticate an
+evidence-pack signer, and it does not establish that a model or adapter lane is
+in the published support basis.
 
 Adjacent review domains include content safety, alignment, prompt-security,
 deployment security, host isolation, dependency isolation, and model families
 outside the published support basis.
+
+The external image pin does **not** cryptographically attest actual container
+execution. A compromised evaluation environment can fabricate an internally consistent report
+and manifest that name the caller's expected digest without running that
+image. Execution truth requires a separately trusted rerun, transparency-backed
+build/deployment provenance, remote attestation, or an equivalent external
+control. Signer authentication identifies who signed the bundle; it does not
+make the submitted bundle's factual assertions true.
 
 ## Report Statuses
 
 Strict reports include a top-level `assurance` section. Generated reports record
 the intended strict claim and leave runtime provenance verification pending
 until `invarlock verify` checks the sibling `runtime.manifest.json`. Readers
-should require the combination of report-local strict shape and a verified
-runtime-provenance result.
+should require the combination of report-local strict shape, manifest binding,
+and an independently pinned image digest.
 
 | Report field | Required strict value |
 | --- | --- |
@@ -96,7 +131,15 @@ runtime-provenance result.
 | `blocking_reasons` | empty list |
 
 The verifier JSON result must then include
-`results[*].verification.runtime_provenance.status = "verified"`.
+`results[*].verification.runtime_provenance.status = "expected_image_digest_matched"`,
+`binding_verified = true`, and `expected_digest_matched = true`. A valid manifest
+without an external pin is reported as `manifest_bound` and does not satisfy
+strict assurance.
+
+`expected_digest_matched` states only that a value supplied by the verifier
+caller matched the manifest. It does not establish where that value came from
+or mean the verifier independently observed or attested execution. Likewise, the report-side
+`runtime_provenance_verified` field is status plumbing, not an execution claim.
 
 ## Evidence Pack Signer Authenticity
 
@@ -106,15 +149,19 @@ signing-key fingerprint when a signature is present. That check provides
 tamper evidence for the manifest and checksum chain.
 
 Authenticity is stronger: readers must decide which signing keys they accept.
-For distributable evidence, require one of:
+Set `TRUSTED_SIGNER_FINGERPRINT` from an independently controlled publisher-key
+record, not by extracting the fingerprint from the submitted pack. For
+distributable evidence, require one of:
 
-- `invarlock advanced evidence-pack verify <dir> --expected-fingerprint sha256:<64-hex-chars>`
+- `invarlock advanced evidence-pack verify <dir> --expected-fingerprint "$TRUSTED_SIGNER_FINGERPRINT"`
 - `invarlock advanced evidence-pack verify <dir> --trust-store <json>`
 - `~/.config/invarlock/trusted-signers.json` containing accepted fingerprints
 
 An unpinned signature should be treated as trust-on-first-use evidence for
 integrity review. Publisher authenticity requires an accepted fingerprint from
 `--expected-fingerprint`, `--trust-store`, or the local trusted-signers file.
+This authenticates the evidence publisher, not the runtime image. Verifier callers
+must establish both anchors separately.
 
 ### Example (report fragment)
 
@@ -143,8 +190,11 @@ integrity review. Publisher authenticity requires an accepted fingerprint from
     {
       "verification": {
         "runtime_provenance": {
-          "status": "verified",
+          "status": "expected_image_digest_matched",
           "verified": true,
+          "binding_verified": true,
+          "expected_digest_matched": true,
+          "trust_status": "expected_image_digest_matched",
           "skipped": false,
           "issues": []
         }
@@ -157,8 +207,10 @@ integrity review. Publisher authenticity requires an accepted fingerprint from
 ## Development Reports
 
 Development and exploratory reports may still be useful for debugging. Reports
-become assurance-grade when they claim and verify strict assurance. Common
-non-strict shapes are catalogued in [Failure Examples](../user-guide/failure-examples.md).
+become eligible for strict acceptance only after the report, baseline, policy,
+and runtime-provenance checks succeed; external trust limits above still apply.
+Common non-strict shapes are catalogued in
+[Failure Examples](../user-guide/failure-examples.md).
 
 ## Related Documentation
 

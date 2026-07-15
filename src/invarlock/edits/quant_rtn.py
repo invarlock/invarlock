@@ -395,7 +395,12 @@ class RTNQuantEdit(ModelEdit):
 
         # Apply quantization to each unique physical target parameter
         quantization_results = []
-        total_params_quantized = 0
+        total_params_processed = 0
+        total_params_changed = 0
+        total_value_changed_elements = 0
+        total_byte_changed_elements = 0
+        total_bytes_changed = 0
+        changed_module_names: list[str] = []
 
         for target in physically_quantized_targets:
             quant_result = active_edit._apply_rtn_quantization(
@@ -408,9 +413,74 @@ class RTNQuantEdit(ModelEdit):
             quant_result["selection_reason"] = target.selection_reason
             quant_result["matched_pattern"] = target.matched_pattern
             quant_result["module_type"] = target.module_type
+
+            # The kernel is the sole writer and records exact post-write
+            # changes.  Treat missing or malformed change accounting as no
+            # change rather than inferring success from the selected tensor size.
+            processed = quant_result.get(
+                "params_processed", quant_result.get("params_quantized", 0)
+            )
+            if (
+                not isinstance(processed, int)
+                or isinstance(processed, bool)
+                or processed < 0
+            ):
+                processed = 0
+            changed = quant_result.get("params_changed", 0)
+            if not isinstance(changed, int) or isinstance(changed, bool) or changed < 0:
+                changed = 0
+            value_changed = quant_result.get("value_changed_elements", 0)
+            if (
+                not isinstance(value_changed, int)
+                or isinstance(value_changed, bool)
+                or value_changed < 0
+            ):
+                value_changed = 0
+            byte_changed = quant_result.get("byte_changed_elements", 0)
+            if (
+                not isinstance(byte_changed, int)
+                or isinstance(byte_changed, bool)
+                or byte_changed < 0
+            ):
+                byte_changed = 0
+            bytes_changed = quant_result.get("bytes_changed", 0)
+            if (
+                not isinstance(bytes_changed, int)
+                or isinstance(bytes_changed, bool)
+                or bytes_changed < 0
+            ):
+                bytes_changed = 0
+            element_size = int(target.module.weight.element_size())
+            if (
+                changed > processed
+                or value_changed > changed
+                or byte_changed > changed
+                or bytes_changed < byte_changed
+                or bytes_changed > byte_changed * element_size
+            ):
+                # Inconsistent counts cannot substantiate a successful edit.
+                # Preserve the processed total for diagnostics, but fail closed
+                # on the claimed effect.
+                changed = 0
+                value_changed = 0
+                byte_changed = 0
+                bytes_changed = 0
+
+            quant_result["params_processed"] = processed
+            quant_result["params_changed"] = changed
+            quant_result["value_changed_elements"] = value_changed
+            quant_result["byte_changed_elements"] = byte_changed
+            quant_result["bytes_changed"] = bytes_changed
+            quant_result["tensor_changed"] = changed > 0
             quantization_results.append(quant_result)
-            total_params_quantized += quant_result["params_quantized"]
-        if not quantization_results or total_params_quantized <= 0:
+            total_params_processed += processed
+            total_params_changed += changed
+            total_value_changed_elements += value_changed
+            total_byte_changed_elements += byte_changed
+            total_bytes_changed += bytes_changed
+            if changed > 0:
+                changed_module_names.append(target.name)
+        if not quantization_results or total_params_changed <= 0:
             raise EditError(
                 code="E322",
                 message="RTN dequantized simulation completed without changing any parameters.",
@@ -419,6 +489,13 @@ class RTNQuantEdit(ModelEdit):
                     "bitwidth": active_plan.bitwidth,
                     "max_modules": active_plan.max_modules,
                     "identified_modules": total_identified,
+                    "total_modules_processed": len(quantization_results),
+                    "total_modules_changed": len(changed_module_names),
+                    "params_processed": total_params_processed,
+                    "params_changed": total_params_changed,
+                    "value_changed_elements": total_value_changed_elements,
+                    "byte_changed_elements": total_byte_changed_elements,
+                    "bytes_changed": total_bytes_changed,
                 },
             )
 
@@ -438,7 +515,13 @@ class RTNQuantEdit(ModelEdit):
         for result in quantization_results:
             bitwidth_map[result["module_name"]] = {
                 "bitwidth": active_plan.bitwidth,
-                "params": result["params_quantized"],
+                "params": result["params_processed"],
+                "params_processed": result["params_processed"],
+                "params_changed": result["params_changed"],
+                "value_changed_elements": result["value_changed_elements"],
+                "byte_changed_elements": result["byte_changed_elements"],
+                "bytes_changed": result["bytes_changed"],
+                "tensor_changed": result["tensor_changed"],
                 "scale_stats": result.get("scale_stats", {}),
                 "error_metrics": result.get("error_metrics", {}),
                 "selection_reason": result.get("selection_reason"),
@@ -453,6 +536,8 @@ class RTNQuantEdit(ModelEdit):
         # Identify modified layers
         modified_layers = []
         for result in quantization_results:
+            if not result["tensor_changed"]:
+                continue
             layer_name = self._layer_label_from_module_name(result["module_name"])
             if layer_name is not None and layer_name not in modified_layers:
                 modified_layers.append(layer_name)
@@ -490,8 +575,12 @@ class RTNQuantEdit(ModelEdit):
             {
                 "total_modules_selected": len(selected_modules),
                 "total_modules_quantized": len(physical_module_names),
-                "total_params_quantized": total_params_quantized,
+                "total_modules_changed": len(changed_module_names),
+                "total_params_quantized": total_params_processed,
+                "total_params_processed": total_params_processed,
+                "total_params_changed": total_params_changed,
                 "physically_quantized_modules": physical_module_names,
+                "changed_modules": changed_module_names,
             }
         )
 
@@ -501,7 +590,11 @@ class RTNQuantEdit(ModelEdit):
             "plan_digest": edit_plan["plan_digest"],
             "plan": edit_plan,  # Include the plan for evaluation report generation
             "deltas": {
-                "params_changed": total_params_quantized,
+                "params_changed": total_params_changed,
+                "params_processed": total_params_processed,
+                "value_changed_elements": total_value_changed_elements,
+                "byte_changed_elements": total_byte_changed_elements,
+                "bytes_changed": total_bytes_changed,
                 "sparsity": None,  # Quantization doesn't create sparsity
                 "bitwidth_map": bitwidth_map,
                 "layers_modified": len(modified_layers),

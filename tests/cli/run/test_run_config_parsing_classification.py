@@ -214,7 +214,7 @@ def _run_with_common_patches(
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
         patch(
-            "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
+            "invarlock.core.orchestration.execute._should_measure_metric_impact_impl",
             lambda *_a: (False, False, None),
         ),
         patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
@@ -304,7 +304,7 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             ),
             patch(
-                "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
+                "invarlock.core.orchestration.execute._should_measure_metric_impact_impl",
                 lambda *_a: (False, False, None),
             ),
             patch(
@@ -433,7 +433,7 @@ def test_run_command_export_saves_tokenizer_artifacts(
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             ),
             patch(
-                "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
+                "invarlock.core.orchestration.execute._should_measure_metric_impact_impl",
                 lambda *_a: (False, False, None),
             ),
             patch(

@@ -334,7 +334,7 @@ def test_report_builder_support_tail_evaluator_exception_falls_back() -> None:
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("tail failed")),
     )
 
-    assert result == {"mode": "warn", "evaluated": False, "passed": True}
+    assert result == {"mode": "warn", "evaluated": False, "passed": False}
 
 
 def test_validate_retry_evaluation_report_loads_baseline_path_and_validation_edges(

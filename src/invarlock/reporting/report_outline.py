@@ -57,7 +57,9 @@ def _status_bool(value: Any, *, default: bool | None = None) -> tuple[str, str]:
         if default is None:
             return "N/A", "info"
         value = default
-    ok = bool(value)
+    if not isinstance(value, bool):
+        return "N/A", "info"
+    ok = value
     return ("PASS", "pass") if ok else ("FAIL", "fail")
 
 
@@ -92,7 +94,8 @@ def _format_ci(primary_metric: dict[str, Any], kind: str) -> str:
 
 def _format_baseline_comparison(primary_metric: dict[str, Any]) -> str:
     kind = str(primary_metric.get("kind") or "").lower()
-    value = primary_metric.get("ratio_vs_baseline")
+    field = "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+    value = primary_metric.get(field)
     if not isinstance(value, int | float):
         return "N/A"
     numeric = float(value)
@@ -106,16 +109,18 @@ def _format_baseline_comparison(primary_metric: dict[str, Any]) -> str:
 
 
 def _assurance_mode(evaluation_report: dict[str, Any]) -> str:
+    """Describe only what the report declares, never independent verification.
+
+    HTML and Markdown render one report object and do not receive a verified
+    receipt or a trust anchor.  In particular, a report-authored
+    ``verified_assurance_verdict`` cannot turn a renderer into a verifier.
+    """
+
     assurance = _mapping(evaluation_report.get("assurance"))
     mode = str(assurance.get("mode") or "").strip().lower()
-    verdict = str(
-        assurance.get("verified_assurance_verdict") or assurance.get("verdict") or ""
-    ).strip()
-    if mode == "strict":
-        return f"strict {verdict}".strip()
     if mode:
-        return mode
-    return "non-assurance"
+        return f"declared in report: {mode}"
+    return "no declaration in report"
 
 
 def _guard_warning_count(evaluation_report: dict[str, Any]) -> int:
@@ -146,14 +151,28 @@ def _baseline_summary(evaluation_report: dict[str, Any]) -> str:
 def _build_decision_section(evaluation_report: dict[str, Any]) -> ReportSection:
     block = compute_console_validation_block(evaluation_report)
     overall_pass = bool(block.get("overall_pass"))
-    status_value, status = _status_bool(overall_pass)
+    status_value, _status = _status_bool(overall_pass)
     meta = _mapping(evaluation_report.get("meta"))
     primary_metric = _mapping(evaluation_report.get("primary_metric"))
     warning_count = _guard_warning_count(evaluation_report)
+    warning_evidence_present = isinstance(evaluation_report.get("guard_warnings"), dict)
     facts = (
-        ReportFact("Overall", status_value, status, source="validation"),
         ReportFact(
-            "Evidence Mode", _assurance_mode(evaluation_report), source="assurance"
+            "Report-local Gates",
+            status_value,
+            "info",
+            source="validation",
+        ),
+        ReportFact(
+            "Independent Verification",
+            "NOT EMBEDDED",
+            "warn",
+            source="renderer",
+        ),
+        ReportFact(
+            "Declared Assurance Mode",
+            _assurance_mode(evaluation_report),
+            source="assurance",
         ),
         ReportFact(
             "Model", str(meta.get("model_id") or "unknown"), source="meta.model_id"
@@ -178,8 +197,8 @@ def _build_decision_section(evaluation_report: dict[str, Any]) -> ReportSection:
         ),
         ReportFact(
             "Guard Warnings",
-            str(warning_count),
-            "warn" if warning_count else "pass",
+            str(warning_count) if warning_evidence_present else "N/A",
+            "warn" if warning_count else "pass" if warning_evidence_present else "info",
             source="guard_warnings.warning_count",
         ),
     )
@@ -204,14 +223,12 @@ def _build_primary_metric_section(evaluation_report: dict[str, Any]) -> ReportSe
     primary_metric = _mapping(evaluation_report.get("primary_metric"))
     validation = _mapping(evaluation_report.get("validation"))
     kind = str(primary_metric.get("kind") or "unknown")
-    pm_status, pm_tone = _status_bool(
-        validation.get("primary_metric_acceptable"), default=True
-    )
+    pm_status, pm_tone = _status_bool(validation.get("primary_metric_acceptable"))
     tail = _mapping(evaluation_report.get("primary_metric_tail"))
     tail_fact = ReportFact("Tail Gate", "N/A", source="primary_metric_tail")
     if tail:
         if bool(tail.get("evaluated", False)):
-            tail_status, tail_tone = _status_bool(tail.get("passed"), default=True)
+            tail_status, tail_tone = _status_bool(tail.get("passed"))
             tail_fact = ReportFact(
                 "Tail Gate",
                 tail_status,
@@ -244,7 +261,11 @@ def _build_primary_metric_section(evaluation_report: dict[str, Any]) -> ReportSe
         ReportFact(
             "Baseline Comparison",
             _format_baseline_comparison(primary_metric),
-            source="primary_metric.ratio_vs_baseline",
+            source=(
+                "primary_metric.delta_vs_baseline_pp"
+                if kind.lower() == "accuracy"
+                else "primary_metric.ratio_vs_baseline"
+            ),
         ),
         ReportFact(
             "CI", _format_ci(primary_metric, kind), source="primary_metric.display_ci"
@@ -300,6 +321,7 @@ def _build_guard_signals_section(evaluation_report: dict[str, Any]) -> ReportSec
     variance = _mapping(evaluation_report.get("variance"))
     moe = _mapping(evaluation_report.get("moe"))
     warning_count = _guard_warning_count(evaluation_report)
+    warning_evidence_present = isinstance(evaluation_report.get("guard_warnings"), dict)
     spectral_value = "N/A"
     if spectral:
         caps = spectral.get("caps_applied")
@@ -316,26 +338,26 @@ def _build_guard_signals_section(evaluation_report: dict[str, Any]) -> ReportSec
     facts = (
         ReportFact(
             "Guard Warnings",
-            str(warning_count),
-            "warn" if warning_count else "pass",
+            str(warning_count) if warning_evidence_present else "N/A",
+            "warn" if warning_count else "pass" if warning_evidence_present else "info",
             source="guard_warnings",
         ),
         ReportFact(
             "Invariants",
-            _status_bool(validation.get("invariants_pass"), default=True)[0],
-            _status_bool(validation.get("invariants_pass"), default=True)[1],
+            _status_bool(validation.get("invariants_pass"))[0],
+            _status_bool(validation.get("invariants_pass"))[1],
             source="validation.invariants_pass",
         ),
         ReportFact(
             "Spectral",
             spectral_value,
-            _status_bool(validation.get("spectral_stable"), default=True)[1],
+            _status_bool(validation.get("spectral_stable"))[1],
             source="spectral",
         ),
         ReportFact(
             "RMT",
             rmt_value,
-            _status_bool(validation.get("rmt_stable"), default=True)[1],
+            _status_bool(validation.get("rmt_stable"))[1],
             source="rmt",
         ),
         ReportFact("Variance", variance_value, source="variance"),
@@ -375,7 +397,7 @@ def _build_benchmark_section(evaluation_report: dict[str, Any]) -> ReportSection
     total = len(scenarios)
     skipped = 0
     passed = 0
-    pm_overheads: list[float] = []
+    pm_impacts: list[float] = []
     time_overheads: list[float] = []
     mem_overheads: list[float] = []
     rmt_pairs: list[str] = []
@@ -389,9 +411,9 @@ def _build_benchmark_section(evaluation_report: dict[str, Any]) -> ReportSection
         if isinstance(pass_block, dict) and pass_block and all(pass_block.values()):
             passed += 1
         for key, target in (
-            ("primary_metric_overhead", pm_overheads),
-            ("guard_overhead_time", time_overheads),
-            ("guard_overhead_mem", mem_overheads),
+            ("guard_primary_metric_impact", pm_impacts),
+            ("guard_runtime_overhead", time_overheads),
+            ("guard_memory_overhead", mem_overheads),
         ):
             value = scenario.get(key)
             if isinstance(value, int | float) and math.isfinite(float(value)):
@@ -415,19 +437,19 @@ def _build_benchmark_section(evaluation_report: dict[str, Any]) -> ReportSection
             source="benchmark.scenarios",
         ),
         ReportFact(
-            "Primary Metric Overhead",
-            _format_percent_range(pm_overheads),
-            source="benchmark.scenarios.primary_metric_overhead",
+            "Primary Metric Impact",
+            _format_percent_range(pm_impacts),
+            source="benchmark.scenarios.guard_primary_metric_impact",
         ),
         ReportFact(
             "Time Overhead",
             _format_percent_range(time_overheads),
-            source="benchmark.scenarios.guard_overhead_time",
+            source="benchmark.scenarios.guard_runtime_overhead",
         ),
         ReportFact(
             "Memory Overhead",
             _format_percent_range(mem_overheads),
-            source="benchmark.scenarios.guard_overhead_mem",
+            source="benchmark.scenarios.guard_memory_overhead",
         ),
         ReportFact(
             "RMT Outliers",

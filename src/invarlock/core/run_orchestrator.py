@@ -211,9 +211,9 @@ class RunGuardChainResolvedEvent(RunContextEvent):
 
 
 @dataclass(frozen=True)
-class RunGuardOverheadSummaryEvent(RunAggregateEvent):
-    guard_overhead_info: dict[str, Any]
-    default_threshold: float
+class RunGuardMetricImpactSummaryEvent(RunAggregateEvent):
+    guard_metric_impact_info: dict[str, Any]
+    default_limit: float
 
 
 @dataclass(frozen=True)
@@ -289,7 +289,7 @@ def execute_run_request(
     services: RunExecutionServices,
     observer: RunExecutionObserver | None = None,
 ) -> RunExecutionOutcome:
-    from invarlock.core.run_orchestrator_execute import execute_run_request_impl
+    from invarlock.core.orchestration.execute import execute_run_request_impl
 
     return execute_run_request_impl(
         request,
@@ -325,7 +325,7 @@ __all__ = [
     "RunExecutionServices",
     "RunFailureEvent",
     "RunGuardChainResolvedEvent",
-    "RunGuardOverheadSummaryEvent",
+    "RunGuardMetricImpactSummaryEvent",
     "RunLoadModelOnceEvent",
     "RunMaskedTokensDebugEvent",
     "RunOutputDirectoryReadyEvent",

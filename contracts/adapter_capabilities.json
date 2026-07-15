@@ -169,7 +169,8 @@
       ],
       "required_extra": "compressed-tensors",
       "degraded_modes": [
-        "metadata_only_without_runtime_stack"
+        "metadata_only_without_runtime_stack",
+        "strict_assurance_unavailable_pending_packed_storage_proof"
       ]
     }
   ]

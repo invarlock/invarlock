@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from fnmatch import fnmatchcase
 from typing import Any
 
 import numpy as np
@@ -10,6 +11,16 @@ from ._estimators import power_iter_sigma_max
 from .quantized_weights import is_quantized_weight
 
 _SPECTRAL_MEASUREMENT_ERRORS = (RuntimeError, TypeError, ValueError)
+
+_DIAGNOSTIC_EXCLUSION_REASONS = {
+    "spectral_sigma_fallback_non_finite_weight": "non_finite_weight",
+    "spectral_sigma_fallback_estimator_error": "estimator_error",
+    "spectral_sigma_fallback_custom_estimator_error": "estimator_error",
+    "spectral_sigma_fallback_non_finite_estimate": "non_finite_estimate",
+    "spectral_sigma_fallback_non_tensor": "non_tensor_weight",
+    "spectral_sigma_fallback_invalid_shape": "non_matrix_weight",
+    "spectral_sigma_fallback_quantized_weight": "quantized_weight_without_dense_view",
+}
 
 
 def _is_real_number(value: Any) -> bool:
@@ -415,6 +426,91 @@ def scan_model_gains(
         }
 
 
+def _selection_exclusion_reason(
+    *,
+    name: str,
+    module: Any,
+    module_aliases: dict[str, str],
+    adapter_excluded_names: set[str],
+    include_patterns: tuple[str, ...],
+    exclude_patterns: tuple[str, ...],
+    scope: str,
+) -> str:
+    weight = getattr(module, "weight", None)
+    if name in module_aliases:
+        return "parameter_alias"
+    if name in adapter_excluded_names:
+        return "not_selected_by_adapter"
+    if include_patterns and not any(
+        fnmatchcase(name, pattern) for pattern in include_patterns
+    ):
+        return "include_pattern_miss"
+    if exclude_patterns and any(
+        fnmatchcase(name, pattern) for pattern in exclude_patterns
+    ):
+        return "exclude_pattern_match"
+    if weight is None:
+        return "missing_weight"
+    if not isinstance(weight, torch.Tensor):
+        return "non_tensor_weight"
+    if weight.ndim != 2:
+        return "non_matrix_weight"
+    lowered = name.lower()
+    if scope == "attn" and not any(
+        keyword in lowered for keyword in ("attn", "attention", "self_attn")
+    ):
+        return "scope_mismatch"
+    if scope == "ffn" and not any(
+        keyword in lowered for keyword in ("mlp", "ffn", "feed_forward", "fc")
+    ):
+        return "scope_mismatch"
+    return "not_selected_by_adapter"
+
+
+def _measure_scoped_module(
+    *,
+    guard: Any,
+    phase: str,
+    name: str,
+    module: Any,
+    iters: int,
+    init: str,
+    power_iter_sigma_max_fn: Any,
+) -> tuple[float | None, str | None]:
+    weight = getattr(module, "weight", None)
+    if not isinstance(weight, torch.Tensor):
+        return None, "non_tensor_weight"
+    if weight.ndim != 2:
+        return None, "non_matrix_weight"
+    if is_quantized_weight(weight):
+        _record_unmeasurable_quantized_weight(
+            guard,
+            phase=phase,
+            module_name=name,
+            weight=weight,
+        )
+        return None, "quantized_weight_without_dense_view"
+    diagnostics: list[dict[str, Any]] = []
+    sigma = compute_sigma_max(
+        weight,
+        iters=iters,
+        init=init,
+        power_iter_sigma_max_fn=power_iter_sigma_max_fn,
+        diagnostics=diagnostics,
+        module_name=name,
+    )
+    _record_guard_measurement_diagnostics(guard, diagnostics, phase=phase)
+    exclusion_reason = next(
+        (
+            _DIAGNOSTIC_EXCLUSION_REASONS.get(str(item.get("kind")))
+            for item in diagnostics
+            if _DIAGNOSTIC_EXCLUSION_REASONS.get(str(item.get("kind")))
+        ),
+        None,
+    )
+    return (None, exclusion_reason) if exclusion_reason is not None else (sigma, None)
+
+
 def capture_sigmas(
     guard: Any,
     model: Any,
@@ -443,37 +539,137 @@ def capture_sigmas(
     if init not in {"ones", "e0"}:
         init = "ones"
 
+    named_modules_fn = getattr(model, "named_modules", None)
+    named_modules = tuple(named_modules_fn()) if callable(named_modules_fn) else ()
     if hasattr(guard, "_get_scoped_modules"):
-        module_iter = guard._get_scoped_modules(model)
+        module_iter = tuple(guard._get_scoped_modules(model))
     else:
         module_iter = tuple(
             (name, module)
-            for name, module in model.named_modules()
+            for name, module in named_modules
             if guard._should_check_module(name, module)
         )
 
+    enumerated: dict[str, Any] = {str(name): module for name, module in named_modules}
     for name, module in module_iter:
-        weight = getattr(module, "weight", None)
-        if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
+        enumerated.setdefault(str(name), module)
+    event_records = getattr(guard, "_event_records", ()) or ()
+    adapter_excluded_names = {
+        str((event.get("details") or {}).get("module"))
+        for event in event_records
+        if isinstance(event, dict)
+        and event.get("kind") == "adapter_layer_module_excluded"
+        and isinstance((event.get("details") or {}).get("module"), str)
+    }
+    for name in adapter_excluded_names:
+        enumerated.setdefault(name, None)
+    module_aliases = dict(getattr(guard, "_module_aliases", {}) or {})
+    scoped_names = {str(name) for name, _module in module_iter}
+    eligible_modules = sorted(scoped_names)
+    excluded: dict[str, dict[str, str]] = {}
+    baseline_identities = getattr(guard, "_baseline_module_identities", None)
+    if not isinstance(baseline_identities, dict):
+        baseline_identities = {}
+    if phase == "prepare":
+        baseline_identities.clear()
+        baseline_identities.update(
+            {
+                name: (module, getattr(module, "weight", None))
+                for name, module in enumerated.items()
+            }
+        )
+    identity_changed_modules = sorted(
+        name
+        for name, module in enumerated.items()
+        if phase != "prepare"
+        and name in baseline_identities
+        and (
+            module is not baseline_identities[name][0]
+            or getattr(module, "weight", None) is not baseline_identities[name][1]
+        )
+    )
+
+    include_patterns = tuple(getattr(guard, "module_include_patterns", ()) or ())
+    exclude_patterns = tuple(getattr(guard, "module_exclude_patterns", ()) or ())
+    scope = str(getattr(guard, "scope", "all") or "all").lower()
+
+    for name, module in enumerated.items():
+        if name in scoped_names:
             continue
-        if is_quantized_weight(weight):
-            _record_unmeasurable_quantized_weight(
-                guard,
-                phase=phase,
-                module_name=name,
-                weight=weight,
-            )
-            continue
-        diagnostics: list[dict[str, Any]] = []
-        sigmas[name] = compute_sigma_max(
-            weight,
+        reason = _selection_exclusion_reason(
+            name=name,
+            module=module,
+            module_aliases=module_aliases,
+            adapter_excluded_names=adapter_excluded_names,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
+            scope=scope,
+        )
+        excluded[name] = {
+            "module": name,
+            "stage": "selection",
+            "reason": reason,
+        }
+        if name in module_aliases:
+            excluded[name]["alias_of"] = module_aliases[name]
+
+    for name, module in module_iter:
+        name = str(name)
+        sigma, exclusion_reason = _measure_scoped_module(
+            guard=guard,
+            phase=phase,
+            name=name,
+            module=module,
             iters=iters,
             init=init,
             power_iter_sigma_max_fn=power_iter_sigma_max_fn,
-            diagnostics=diagnostics,
-            module_name=name,
         )
-        _record_guard_measurement_diagnostics(guard, diagnostics, phase=phase)
+        if exclusion_reason is not None:
+            excluded[name] = {
+                "module": name,
+                "stage": "measurement",
+                "reason": exclusion_reason,
+            }
+            continue
+        assert sigma is not None
+        sigmas[name] = sigma
+
+    inventory_store = getattr(guard, "measurement_inventory", None)
+    if isinstance(inventory_store, dict):
+        discovery_error_kinds = sorted(
+            {
+                str(event.get("kind"))
+                for event in event_records
+                if isinstance(event, dict)
+                and str(event.get("kind"))
+                in {
+                    "adapter_describe_error",
+                    "adapter_fallback_no_layers",
+                    "adapter_layer_modules_error",
+                    "adapter_layer_modules_invalid",
+                    "adapter_layer_module_key_invalid",
+                }
+            }
+        )
+        enumerated_names = sorted(enumerated)
+        measured_names = sorted(sigmas)
+        excluded_entries = [excluded[name] for name in sorted(excluded)]
+        inventory_store[str(phase)] = {
+            "schema_version": 1,
+            "phase": str(phase),
+            "enumerated_modules": enumerated_names,
+            "eligible_modules": eligible_modules,
+            "measured_modules": measured_names,
+            "excluded_modules": excluded_entries,
+            "identity_changed_modules": identity_changed_modules,
+            "discovery_errors": discovery_error_kinds,
+            "enumerated_count": len(enumerated_names),
+            "eligible_count": len(eligible_modules),
+            "measured_count": len(measured_names),
+            "excluded_count": len(excluded_entries),
+            "identity_changed_count": len(identity_changed_modules),
+            "discovery_error_count": len(discovery_error_kinds),
+        }
     return sigmas
 
 

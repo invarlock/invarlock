@@ -170,7 +170,7 @@ jobs:
       - name: Build wheel/sdist
         run: |
           rm -rf build dist
-          python -m build
+          python -m build --no-isolation
       - name: Twine check
         run: python -m twine check dist/*
       - name: Install smoke from wheel

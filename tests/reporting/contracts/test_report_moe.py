@@ -5,8 +5,12 @@ from copy import deepcopy
 import pytest
 
 import invarlock.reporting.report_normalization as report_normalization_mod
-import invarlock.reporting.report_validation as report_validation_mod
+import invarlock.reporting.validation.report as report_validation_mod
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_run_report,
+    make_canonical_report,
+)
 
 
 def _mk_base_report() -> dict:
@@ -17,7 +21,9 @@ def _mk_base_report() -> dict:
             "device": "cpu",
             "seed": 42,
             "ts": "now",
+            "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -60,6 +66,7 @@ def test_evaluation_report_includes_moe_families_when_present():
     report["guards"].append(
         {
             "name": "spectral",
+            "passed": True,
             "metrics": {
                 "family_stats": {
                     "router": {
@@ -88,6 +95,7 @@ def test_evaluation_report_includes_moe_families_when_present():
     report["guards"].append(
         {
             "name": "rmt",
+            "passed": True,
             "metrics": {
                 "outliers_per_family": {"router": 1, "expert_ffn": 2},
                 "baseline_outliers_per_family": {"router": 0, "expert_ffn": 1},
@@ -99,7 +107,7 @@ def test_evaluation_report_includes_moe_families_when_present():
         }
     )
 
-    evaluation_report = make_report(report, baseline)
+    evaluation_report = make_canonical_report(report, baseline)
     # Spectral families include MoE
     spectral_families = set(
         evaluation_report.get("spectral", {}).get("families", {}).keys()
@@ -119,6 +127,7 @@ def test_evaluation_report_moe_section_uses_normalized_baseline(monkeypatch):
         "utilization": [0.8, 0.9],
     }
     baseline["metrics"].pop("moe", None)
+    report = canonical_run_report(report)
     normalized_baseline = {
         "run_id": "baseline-norm",
         "moe": {
@@ -130,7 +139,7 @@ def test_evaluation_report_moe_section_uses_normalized_baseline(monkeypatch):
 
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -151,7 +160,7 @@ def test_evaluation_report_moe_section_uses_normalized_baseline(monkeypatch):
         tier,
         _ppl_metrics=None,
         target_ratio=None,
-        guard_overhead=None,
+        guard_metric_impact=None,
         primary_metric=None,
         moe=None,
         dataset_capacity=None,

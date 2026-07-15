@@ -25,6 +25,10 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert (
+        '"${WORKFLOW_DIR}/training-profile.in" \\\n'
+        '    "${WORKFLOW_DIR}/training-profile-py312.txt"'
+    ) in text
+    assert (
         '"${EVIDENCE_PACK_DIR}/accelerate.in" \\\n'
         '    "${EVIDENCE_PACK_DIR}/accelerate.txt" \\\n'
         "    --no-deps"
@@ -39,7 +43,7 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
         '    "${EVIDENCE_PACK_DIR}/flash-attn.txt" \\\n'
         "    --no-deps"
     ) in text
-    assert text.count("--torch-backend cpu") == 2
+    assert text.count("--torch-backend cpu") == 3
     assert text.count("--torch-backend cu128") == 2
 
 
@@ -71,16 +75,20 @@ def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
 def test_runtime_image_locks_are_the_explicit_torch_backend_surface() -> None:
     workflow_dir = Path.cwd() / "requirements" / "workflows"
     runtime_locks = {
-        "runtime-image-py312.txt": "+cpu",
-        "runtime-image-py312-aarch64.txt": "+cpu",
-        "runtime-image-py312-cu128.txt": "+cu128",
-        "runtime-image-quant-py312-cu128.txt": "+cu128",
+        "runtime-image-py312.txt": ("2.13.0+cpu", "0.28.0+cpu"),
+        "runtime-image-py312-aarch64.txt": ("2.11.0+cpu", "0.26.0+cpu"),
+        "runtime-image-py312-cu128.txt": ("2.11.0+cu128", "0.26.0+cu128"),
+        "runtime-image-quant-py312-cu128.txt": (
+            "2.11.0+cu128",
+            "0.26.0+cu128",
+        ),
+        "training-profile-py312.txt": ("2.11.0+cpu", "0.26.0+cpu"),
     }
 
-    for filename, backend_suffix in runtime_locks.items():
+    for filename, (torch_version, torchvision_version) in runtime_locks.items():
         text = (workflow_dir / filename).read_text(encoding="utf-8")
-        assert f"torch==2.11.0{backend_suffix}" in text
-        assert "torchvision==0.26.0" in text
+        assert f"torch=={torch_version}" in text
+        assert f"torchvision=={torchvision_version}" in text
         assert "cu13" not in text
 
 

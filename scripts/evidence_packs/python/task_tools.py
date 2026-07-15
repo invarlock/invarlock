@@ -5,12 +5,15 @@ import json
 import sys
 from pathlib import Path
 
+_REPO_SRC = Path(__file__).resolve().parents[3] / "src"
+if _REPO_SRC.is_dir() and str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
+
 try:
     from .editing.implementations import resolve_edit_spec
     from .task_tools_errors import _create_error_model
     from .task_tools_model import (
         _download_baseline,
-        _repair_missing_tensors_config,
         _write_model_profile,
         download_snapshot,
         model_supports_flash_attention,
@@ -41,7 +44,6 @@ except ImportError:  # pragma: no cover - direct script execution
     from task_tools_errors import _create_error_model
     from task_tools_model import (
         _download_baseline,
-        _repair_missing_tensors_config,
         _write_model_profile,
         download_snapshot,
         model_supports_flash_attention,
@@ -127,6 +129,21 @@ def _model_revision(args: argparse.Namespace) -> int:
     return 0
 
 
+def _checkpoint_identity(args: argparse.Namespace) -> int:
+    from invarlock.core.checkpoint_identity import resolve_model_identity
+
+    identity = resolve_model_identity(
+        str(args.model_path),
+        revision=None,
+        strict=True,
+        side="baseline",
+    )
+    if identity is None:
+        return 1
+    print(json.dumps(identity, sort_keys=True))
+    return 0
+
+
 def _evaluation_report(args: argparse.Namespace) -> int:
     report_path = Path(args.report)
     out_path = Path(args.out)
@@ -177,7 +194,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     normalize_parser.add_argument("--stride", type=int)
     normalize_parser.add_argument("--preview-n", type=int)
     normalize_parser.add_argument("--final-n", type=int)
-    normalize_parser.add_argument("--skip-overhead-check", action="store_true")
+    normalize_parser.add_argument(
+        "--skip-guard-metric-impact-check", action="store_true"
+    )
     normalize_parser.set_defaults(func=_normalize_staged_preset)
 
     schedule_parser = subparsers.add_parser(
@@ -220,6 +239,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     revision_parser.add_argument("model_id")
     revision_parser.set_defaults(func=_model_revision)
 
+    identity_parser = subparsers.add_parser(
+        "checkpoint-identity",
+        help="Compute a fail-closed local checkpoint-tree identity.",
+    )
+    identity_parser.add_argument("model_path")
+    identity_parser.set_defaults(func=_checkpoint_identity)
+
     report_parser = subparsers.add_parser(
         "evaluation-report",
         help="Generate evaluation.report.json from report.json.",
@@ -239,6 +265,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     baseline_parser.add_argument("expected_assurance", nargs="?", default="off")
     baseline_parser.add_argument("--expected-preview-n", type=int, default=None)
     baseline_parser.add_argument("--expected-final-n", type=int, default=None)
+    baseline_parser.add_argument("--expected-model-identity-json", default="")
     baseline_parser.set_defaults(func=_validate_baseline_report)
 
     stamp_seed_parser = subparsers.add_parser(
@@ -256,14 +283,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     profile_parser.add_argument("baseline_dir")
     profile_parser.add_argument("model_id")
     profile_parser.set_defaults(func=_write_model_profile)
-
-    repair_parser = subparsers.add_parser(
-        "repair-missing-tensors-config",
-        help="Repair legacy missing_tensors layer-drop config metadata.",
-    )
-    repair_parser.add_argument("baseline_config")
-    repair_parser.add_argument("error_config")
-    repair_parser.set_defaults(func=_repair_missing_tensors_config)
 
     plan_parser = subparsers.add_parser(
         "plan-effective-windows",

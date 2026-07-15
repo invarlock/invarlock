@@ -31,7 +31,7 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 
 **Precedence (conflict cases)**
 
-1. CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, overhead skip).
+1. CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, guard metric comparison skip).
 2. Env overrides only for explicitly env-scoped toggles (for example, downloads, calibration materialization, and tiny-relax smoke behavior).
 3. Packaged defaults when no explicit setting exists.
 
@@ -40,7 +40,7 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 | Setting | Env var | Config/CLI | Winner rule | How to confirm |
 | --- | --- | --- | --- | --- |
 | Calibration materialize | `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | `context.eval.materialize_calibration` / `context.eval.allow_iterable_calibration` | Env wins. | Config shows in `report.context`; env is not recorded. |
-| Tiny relax | `INVARLOCK_TINY_RELAX` | `context.run.tiny_relax` | Either opt-in enables tiny-relax run/report policy. | Recorded in run context and surfaced through report validation. |
+| Tiny relax | `INVARLOCK_TINY_RELAX` | `context.run.tiny_relax` | Either opt-in enables development-only relaxed run/report policy. | Recorded in run context; strict and Release verification reject it. |
 | Network downloads | `INVARLOCK_ALLOW_NETWORK` | — | Env-only toggle. | Not recorded; rely on env. |
 | Offline datasets | `HF_DATASETS_OFFLINE` | — | Env-only toggle. | Not recorded; rely on env. |
 
@@ -48,8 +48,8 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 
 | Scenario | Result | Fix |
 | --- | --- | --- |
-| `context.run.skip_overhead_check: true` in `--profile release` | Overhead check is skipped and recorded in `guard_overhead.source`. | Set `context.run.skip_overhead_check: false` for full overhead enforcement. |
-| `context.run.tiny_relax: true` | Tiny-relax gating is enabled from config and recorded in `auto.tiny_relax`. | Remove or set to `false` for full policy strictness. |
+| `context.run.skip_guard_metric_impact_check: true` in `--profile release` | Configuration is rejected before evidence production. | Remove the setting or set it to `false`; release requires measured guard metric impact. |
+| `context.run.tiny_relax: true` | Development gating is relaxed and the choice is recorded in `auto.tiny_relax`; strict and Release verification fail. | Remove or set to `false` before producing assurance evidence. |
 
 ## Reference
 
@@ -90,6 +90,7 @@ tier policy, and report policy. There is no public env var that forces BCa.
 | `INVARLOCK_CAPACITY_FAST` | unset | Approximate capacity estimation for quick runs. |
 | `INVARLOCK_DEDUP_TEXTS` | unset | Exact-text dedupe before tokenization. |
 | `INVARLOCK_HF_DATASETS_CACHE` | unset | Override the writable fallback cache used when HF dataset loads hit a shared-cache lock/permission error. |
+| `INVARLOCK_HF_DATASET_REVISION` | unset | Optional immutable hosted-dataset revision used by local preset helpers. Catalog-bound evidence records the resolved revision explicitly. |
 
 ### Determinism & performance
 
@@ -98,20 +99,6 @@ tier policy, and report policy. There is no public env var that forces BCa.
 | `INVARLOCK_OMP_THREADS` | `1` | Thread caps for determinism preset. |
 | `INVARLOCK_DEBUG_TRACE` | unset | Verbose debug traces for data/eval paths. |
 | `INVARLOCK_LIGHT_IMPORT` | unset | Avoid heavy imports for docs/tests. |
-| `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/evidence rendering during evaluation. |
-| `PACK_DEFER_OPTIONAL_REPORT_RENDERING` | unset | Alias for `PACK_DEFER_REPORT_RENDERING`. |
-| `PACK_EVALUATE_ASSURANCE` | `off` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to `invarlock evaluate` for generated reports. |
-| `PACK_FLASH_ATTN_ALLOW_SOURCE_BUILD` | `0` | Evidence-pack dependency toggle. Set to `1` only when intentionally allowing a local Flash Attention source build; default FA2 install attempts use wheels only and fall back to eager attention if unavailable. |
-| `PACK_REPORT_ASSURANCE` | `report` (`strict` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle forwarded to nested `invarlock verify` during pack verification. |
-| `PACK_RETRY_FAILED_ON_RESUME` | unset | Evidence-pack resume toggle. Set to `1` to explicitly move failed queue tasks back to pending during `--resume`; otherwise failed tasks abort resume so they can be inspected first. |
-
-Evidence-pack evaluation-loop toggles are repo-wrapper controls, not public
-`invarlock evaluate` defaults. Required JSON reports and sidecars are still
-written; `PACK_DEFER_REPORT_RENDERING=1` skips optional rendered review files in
-the evaluation hot path. Release-review mode requires strict evaluation
-assurance, strict nested report verification, runtime manifests, model revision
-metadata, and a non-empty scenarios manifest so pack verification cannot be
-stricter or less contextual than the reports it is asked to verify.
 
 ### Checkpointing & snapshots
 
@@ -135,11 +122,12 @@ stricter or less contextual than the reports it is asked to verify.
 | `INVARLOCK_ASSERT_GUARDS` | unset | Enable guard runtime assertions. |
 | `INVARLOCK_EVIDENCE_DEBUG` | unset | Emit `guards_evidence.json` for audit. |
 
-Primary-metric gate bounds are profile/config settings (`primary_metric.acceptance_range`
-and `primary_metric.drift_band`), not environment overrides.
-Strictness/tiny-relax/overhead-skip are also config/profile policy:
+Primary-metric gate bounds are profile/config settings
+(`primary_metric.acceptance_range`, `primary_metric.drift_band`, and
+`primary_metric.degradation_limit`), not environment overrides.
+Strictness, tiny-relax, and guard-metric-comparison skip are also config/profile policy:
 `context.eval.strict` / `context.eval.strict_errors`, `context.run.strict_guard_prepare`,
-`context.run.tiny_relax`, `context.run.skip_overhead_check`.
+`context.run.tiny_relax`, `context.run.skip_guard_metric_impact_check`.
 
 ### Config loading
 
@@ -170,7 +158,6 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 | `INVARLOCK_CONTAINER_ENGINE` | unset | Force the OCI engine used for default runtime-container execution (`podman` or `docker`). |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
-| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote evidence-pack setup helper image selector. Use `quant` on CUDA hosts to build/use `invarlock-runtime:cuda-quant` for containerized `hf_bnb`, `hf_gptq`, `hf_awq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, and `hf_ct` evidence. The quant image uses a pinned CUDA devel base so GPTQModel can JIT-compile kernels with `nvcc`; strict custom-image evidence still requires `INVARLOCK_RUNTIME_IMAGE_DIGEST`. |
 
 ### Docs build
 

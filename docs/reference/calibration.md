@@ -2,15 +2,16 @@
 
 > Scope note: this page covers **Tier Policy Tuning** via `invarlock advanced calibrate ...`.
 > It outputs `tiers_patch_*.yaml` recommendations for a reviewed tier-policy
-> override or the packaged source tier file (`runtime/tiers.yaml`).
-> For evidence-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
-> see [Evidence Pack Internals](../user-guide/evidence-packs-internals.md).
+> override or the packaged source tier file
+> (`runtime/tiers.yaml`, the logical packaged-resource path).
+> Catalog-bound evidence packs retain the exact preset and resolved runtime
+> config used by evaluation; see [Evidence Packs](../user-guide/evidence-packs.md).
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Run policy-tuning sweeps to empirically derive guard thresholds and tier policy recommendations. |
+| **Purpose** | Run policy-tuning sweeps that produce workload-scoped candidate thresholds for review. |
 | **Audience** | Operators recalibrating tier policies for additional model families or revised guard contracts. |
 | **Primary commands** | `invarlock advanced calibrate null-sweep`, `invarlock advanced calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
@@ -18,10 +19,15 @@
 | **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration.py`. |
 
 Smoke-sized configs are also shipped for maintainers who want to exercise the
-calibration command surface without a full policy-tuning campaign:
+calibration command surface without a full policy-tuning exercise:
 `configs/calibration/null_sweep_smoke.yaml` and
 `configs/calibration/rmt_ve_sweep_smoke.yaml`. These are intended for smoke
 coverage and operational validation, not for published calibration evidence.
+
+The command is a recommendation harness, not a certification procedure. Its
+output describes the supplied models, edits, datasets, devices, and seeds; it
+does not establish population-level false-positive, FDR, FWER, or power
+guarantees for other workloads.
 
 ## Quick Start
 
@@ -30,7 +36,7 @@ The commands below use the runtime container by default. Add
 intentionally bypass that boundary.
 
 ```bash
-# Run spectral null-sweep (noop edit) to calibrate κ/alpha
+# Run a spectral null sweep to recommend candidate κ/alpha settings
 invarlock advanced calibrate null-sweep \
   --allow-network \
   --config configs/calibration/null_sweep_ci.yaml \
@@ -38,7 +44,7 @@ invarlock advanced calibrate null-sweep \
   --tier balanced --tier conservative \
   --n-seeds 10
 
-# Run VE sweep (quant_rtn simulation edit) to calibrate min_effect_lognll
+# Run a VE sweep to recommend a candidate min_effect_lognll
 invarlock advanced calibrate ve-sweep \
   --allow-network \
   --config configs/calibration/rmt_ve_sweep_ci.yaml \
@@ -66,39 +72,31 @@ invarlock advanced calibrate ve-sweep \
 
 - **Policy-tuning sweeps**: Run multiple seeds/tiers to build empirical distributions
   for threshold recommendations.
-- **Null sweep**: Uses a no-op edit to measure baseline spectral behavior and
-  derive false-positive-controlled κ caps and α levels.
+- **Null sweep**: Uses no-op runs to measure observed spectral warnings and
+  recommend κ caps and an α setting for that run set. The target is an observed
+  run-level rate, not a proof of false-positive control.
 - **VE sweep**: Uses a real model modification (e.g., `quant_rtn`
   quantize/dequantize simulation) to measure variance guard
   predictive gate behavior and recommend `min_effect_lognll`.
 - **Artifacts**: Each sweep emits JSON (machine), CSV (spreadsheet), Markdown
   (human), and a `tiers_patch_*.yaml` recommendation file.
-- **Artifact contract**: The file names above are treated as stable public
-  outputs and may be consumed directly by verification, review, and policy-pack
-  workflows.
+- **Artifact names**: The current experimental command emits the names below.
+  Review tooling may consume them, but the calibration command is outside the
+  stable public CLI contract.
 
-## Published Basis vs Included Configs
+## Catalog Lanes and Included Configs
 
-The published assurance basis is the set of `published_basis` rows in
-`contracts/support_matrix.json`, with the readable grouping in
-`docs/README.md#support-matrix`. The repo also includes pilot calibration
-configs for prepared candidate lanes under `configs/calibration/`, but those
-configs are not part of the published assurance basis until supporting artifacts
-are attached. Multimodal calibration configs that use `vision_text` expect the
-referenced local manifest to be materialized before the sweep runs.
+The maintained evaluation lanes are the `published_basis` rows in
+`contracts/support_matrix.json`, with the readable table in
+`docs/README.md#support-matrix`. Each lane has an included preset and calibration
+configuration. Multimodal configurations using `vision_text` materialize their
+pinned manifest before evaluation.
 
-The empirical guard manifest also indexes no-op published-basis reports for the
-modern published-basis families as null-behavior evidence. Those reports are useful
-calibration inputs, but they do not update the packaged tier constants by
-themselves. Until a family-specific null sweep re-derives κ, transferred
-attention caps should be interpreted as budgeted sentinels rather than
-Gaussian-tail FPR claims for that family.
-
-Guard-value evidence is a separate claim from calibration. The Mistral 7B
-package at `public_evidence/published_basis/mistral_7b/guard_value_demo/`
-publishes PM-pass, baseline-relative spectral, RMT, and variance/VE cases from
-clean confirmation reruns. That package demonstrates added guard value for the
-selected edits, but it does not by itself re-derive tier constants.
+`public_evidence/published_basis_index.json` lists current empirical artifacts.
+The initial status is **Evidence not yet created**; completed lanes move to
+**Available** as their current run and verification artifacts are published.
+Family-specific calibration evidence can then be reviewed alongside the tier
+configuration it supports.
 
 ### Policy-Tuning Sweep → Tier Policy Flow
 
@@ -122,7 +120,7 @@ selected edits, but it does not by itself re-derive tier constants.
            ▼
   ┌──────────────────┐      ┌─────────────────────┐
   │ Sweep artifacts  │ ───► │ tiers_patch_*.yaml  │
-  │ (JSON/CSV/MD)    │      │ (copy → tiers.yaml) │
+  │ (JSON/CSV/MD)    │      │ (review + merge)    │
   └──────────────────┘      └─────────────────────┘
 ```
 
@@ -132,12 +130,13 @@ selected edits, but it does not by itself re-derive tier constants.
 
 | Command | Purpose | Key outputs |
 | --- | --- | --- |
-| `invarlock advanced calibrate null-sweep` | Calibrate spectral κ/alpha from null (noop) runs. | `null_sweep_report.json`, `tiers_patch_spectral_null.yaml` |
-| `invarlock advanced calibrate ve-sweep` | Calibrate VE min_effect_lognll from real edit runs. | `ve_sweep_report.json`, `tiers_patch_variance_ve.yaml` |
+| `invarlock advanced calibrate null-sweep` | Recommend spectral κ/alpha from supplied null runs. | `null_sweep_report.json`, `tiers_patch_spectral_null.yaml` |
+| `invarlock advanced calibrate ve-sweep` | Recommend VE min_effect_lognll from supplied edit runs. | `ve_sweep_report.json`, `tiers_patch_variance_ve.yaml` |
 
 ### null-sweep
 
-Runs a null (no-op edit) sweep and calibrates spectral κ/alpha empirically.
+Runs a null (no-op edit) sweep and recommends spectral κ/alpha from the
+observed run set.
 
 **Usage:** `invarlock advanced calibrate null-sweep --config <CONFIG> --out <OUT> [options]`
 
@@ -191,8 +190,9 @@ Runs VE predictive-gate sweeps and recommends `min_effect_lognll` per tier.
 
 ### Applying recommendations
 
-After a sweep, merge the `tiers_patch_*.yaml` into a reviewed
-`runtime/tiers.yaml` override or the source tier policy:
+After a sweep, review its scope and merge the `tiers_patch_*.yaml` into an
+`INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` override or the source policy at
+`runtime/tiers.yaml`:
 
 ```bash
 # Review recommendations
@@ -214,7 +214,8 @@ cat reports/calibration/null_sweep/tiers_patch_spectral_null.yaml
 
 ## Observability
 
-- Sweep artifacts include full provenance (config, profile, tiers, run count).
+- Sweep artifacts record config, profile, tiers, and run count. Those are
+  report-recorded fields, not authenticated provenance or execution attestation.
 - Per-run reports are preserved under `<out>/runs/` for debugging.
 - Power curves (VE sweep) help assess sample size requirements.
 

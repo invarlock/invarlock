@@ -34,5 +34,6 @@ def test_extract_spectral_analysis_aggressive_tier_and_coercions():
     }
     out = _extract_spectral_analysis(report, baseline)
     assert out["caps_applied"] == 2 and out["summary"]["max_caps"] == 5
+    assert out["summary"]["caps_applied"] == 2
     assert out["summary"]["modules_checked"] == 10
     assert out["summary"]["status"] in {"capped", "stable"}

@@ -17,6 +17,8 @@ PACKAGE_PUBLIC_EVIDENCE_ROOT = importlib.resources.files("invarlock").joinpath(
 
 REPORT_SCHEMA_VERSION = "v1"
 EVIDENCE_PACK_FORMAT_VERSION = "evidence-pack-v1"
+EVIDENCE_CATALOG_FORMAT_VERSION = "invarlock/evidence-catalog-v1"
+EVIDENCE_CATALOG_VALIDATE_OUTPUT_FORMAT_VERSION = "evidence-catalog-validate-v1"
 PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v1"
 RUNTIME_MANIFEST_CONTRACT_VERSION = "runtime-manifest-v1"
 DOCTOR_OUTPUT_FORMAT_VERSION = "doctor-v1"
@@ -38,6 +40,9 @@ STABLE_CLI_JSON_SURFACES: dict[str, str] = {
     "invarlock advanced policy verify --json": POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION,
     "invarlock advanced evidence-pack verify --json": (
         EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION
+    ),
+    "invarlock advanced evidence-catalog validate --json": (
+        EVIDENCE_CATALOG_VALIDATE_OUTPUT_FORMAT_VERSION
     ),
 }
 
@@ -230,6 +235,17 @@ def load_evidence_pack_manifest_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("evidence_pack_manifest.schema.json")
 
 
+def load_evidence_catalog() -> dict[str, Any]:
+    data = _load_object_contract_or_raise("evidence_catalog_v1.json")
+    if data.get("format_version") != EVIDENCE_CATALOG_FORMAT_VERSION:
+        raise ContractLoadError(
+            "evidence_catalog_v1.json",
+            reason=f"format_version must be {EVIDENCE_CATALOG_FORMAT_VERSION}",
+        )
+    data.setdefault("entries", [])
+    return data
+
+
 def load_runtime_manifest_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("runtime_manifest.schema.json")
 
@@ -296,6 +312,11 @@ def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
             "version": EVIDENCE_PACK_FORMAT_VERSION,
             "source": "contracts/evidence_pack_manifest.schema.json",
             "compatibility": "strict_format_match",
+        },
+        "evidence_catalog": {
+            "version": EVIDENCE_CATALOG_FORMAT_VERSION,
+            "source": "contracts/evidence_catalog_v1.json",
+            "compatibility": "closed_versioned_catalog",
         },
         "verifier_output": {
             "version": VERIFY_OUTPUT_FORMAT_VERSION,
@@ -375,12 +396,15 @@ def contract_catalog() -> dict[str, Any]:
         "evidence_pack_manifest": contract_reference(
             "evidence_pack_manifest.schema.json"
         ),
+        "evidence_catalog": contract_reference("evidence_catalog_v1.json"),
         "policy_pack": contract_reference("policy_pack.schema.json"),
     }
 
 
 __all__ = [
     "CONTRACTS_ROOT",
+    "EVIDENCE_CATALOG_FORMAT_VERSION",
+    "EVIDENCE_CATALOG_VALIDATE_OUTPUT_FORMAT_VERSION",
     "PACKAGE_CONTRACTS_ROOT",
     "PACKAGE_PUBLIC_EVIDENCE_ROOT",
     "ADAPTER_SUPPORT_TIER_POLICY_VERSION",
@@ -412,6 +436,7 @@ __all__ = [
     "load_plugin_compatibility",
     "load_policy_pack_schema",
     "load_evidence_pack_manifest_schema",
+    "load_evidence_catalog",
     "load_runtime_manifest_schema",
     "load_verify_output_schema",
     "load_support_matrix",

@@ -1,4 +1,5 @@
 -r ../../../../requirements/workflows/runtime-image.in
 torchvision>=0.23.0
-gptqmodel>=7.0.0
+# PEFT 0.19's AWQ dispatcher imports AwqGEMMQuantLinear, renamed in GPTQModel 7.
+gptqmodel==6.0.3
 triton>=2.3.0

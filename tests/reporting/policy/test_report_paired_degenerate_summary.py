@@ -1,26 +1,45 @@
+from copy import deepcopy
 from unittest.mock import patch
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
+from tests.reporting._support_primary_metric import independent_slice_summary
 
 
-def test_paired_delta_summary_degenerate_skips_ratio_from_delta():
+def test_preview_final_slice_delta_summary_degenerate_skips_ratio_identity():
     report = {
-        "meta": {"model_id": "m", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 1,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "metrics": {
-            "ppl_preview": 10.0,
-            "ppl_final": 10.1,
-            "ppl_ratio": 1.01,
-            "ppl_preview_ci": (9.5, 10.5),
-            "ppl_final_ci": (9.8, 10.8),
-            "ppl_ratio_ci": (0.98, 1.06),
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.1,
+                "ratio_vs_baseline": 1.01,
+                "display_ci": (0.98, 1.06),
+            },
             "bootstrap": {
                 "method": "percentile",
                 "replicates": 0,
                 "alpha": 0.1,
                 "seed": 0,
             },
-            # Degenerate paired summary forces ratio_from_delta to remain NaN
-            "paired_delta_summary": {"mean": 0.01, "degenerate": True},
+            "preview_final_slice_delta_summary": independent_slice_summary(
+                0.01,
+                preview_windows=2,
+                final_windows=2,
+                degenerate=True,
+            ),
         },
         "data": {
             "dataset": "dummy",
@@ -42,13 +61,16 @@ def test_paired_delta_summary_degenerate_skips_ratio_from_delta():
         },
         "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 9.9,
-        "evaluation_windows": {
-            "final": {"window_ids": [1, 2], "logloss": [0.09, 0.19]}
-        },
+    baseline = deepcopy(report)
+    baseline["run_id"] = "b"
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 9.9,
+        "final": 9.9,
+    }
+    baseline["evaluation_windows"] = {
+        "final": {"window_ids": [1, 2], "logloss": [0.09, 0.19]}
     }
 
     with patch(
@@ -56,6 +78,6 @@ def test_paired_delta_summary_degenerate_skips_ratio_from_delta():
     ):
         cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
-    # With replicates=0, pairing remains run_metrics; degenerate path still valid
-    assert stats.get("pairing") == "run_metrics"
+    # The canonical evidence explicitly identifies disjoint preview/final slices.
+    assert stats.get("pairing") == "independent_preview_final"
     assert stats.get("paired_windows") == 2

@@ -4,9 +4,16 @@
     {
       "advisory": "CVE-2025-3000",
       "owner": "security-maintainers",
-      "expires": "2026-07-13",
+      "expires": "2026-08-13",
       "tracking_issue": "https://github.com/invarlock/invarlock/issues/72",
       "reason": "pip-audit reports the advisory against torch 2.11.0 in optional HF and advanced install surfaces and currently lists no fixed torch release; remove when upstream publishes a fixed version."
+    },
+    {
+      "advisory": "PYSEC-2026-3447",
+      "owner": "security-maintainers",
+      "expires": "2026-08-13",
+      "tracking_issue": "https://github.com/invarlock/invarlock/issues/142",
+      "reason": "The pinned torch 2.11.0+cu128 wheel requires setuptools below 82; retain the runtime-only lock until a validated Torch/CUDA pairing permits setuptools 83 or later."
     }
   ]
 }

@@ -100,6 +100,56 @@ def test_policy_build_rejects_non_mapping_resolved_policy(tmp_path: Path) -> Non
     assert "must decode to an object" in normalized_output
 
 
+def test_policy_build_reports_structured_input_parse_failure(tmp_path: Path) -> None:
+    resolved_policy = tmp_path / "resolved_policy.json"
+    resolved_policy.write_text('{"metrics": ', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "policy",
+            "build",
+            "--resolved-policy",
+            str(resolved_policy),
+            "--out",
+            str(tmp_path / "policy-pack.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    normalized_output = " ".join(_ANSI_RE.sub("", result.output).split())
+    assert "Invalid value" in normalized_output
+    assert "resolved_policy.json" in normalized_output or "decode" in normalized_output
+
+
+def test_policy_build_rejects_non_mapping_compatibility(tmp_path: Path) -> None:
+    resolved_policy = tmp_path / "resolved_policy.json"
+    resolved_policy.write_text(json.dumps({"metrics": {}}), encoding="utf-8")
+    compatibility = tmp_path / "compatibility.json"
+    compatibility.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "policy",
+            "build",
+            "--resolved-policy",
+            str(resolved_policy),
+            "--compatibility",
+            str(compatibility),
+            "--out",
+            str(tmp_path / "policy-pack.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "compatibility must decode to an object" in " ".join(
+        _ANSI_RE.sub("", result.output).split()
+    )
+
+
 def test_policy_build_records_optional_approval_metadata(tmp_path: Path) -> None:
     resolved_policy = tmp_path / "resolved_policy.json"
     resolved_policy.write_text(
@@ -198,3 +248,47 @@ def test_policy_verify_reports_human_and_json_failures(tmp_path: Path) -> None:
     assert payload["ok"] is False
     assert payload["resolution"]["exit_code"] == 2
     assert any("policy digest mismatch" in error for error in payload["errors"])
+
+
+def test_policy_verify_cli_rejects_duplicate_json_members(tmp_path: Path) -> None:
+    policy = tmp_path / "ambiguous.json"
+    policy.write_text(
+        '{"format":"policy-pack-v1","format":"policy-pack-v2"}',
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app, ["advanced", "policy", "verify", str(policy), "--json"]
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["ok"] is False
+    assert any("duplicate key" in error for error in payload["errors"])
+
+
+def test_policy_build_cli_rejects_mapping_override_normalization(
+    tmp_path: Path,
+) -> None:
+    resolved = tmp_path / "resolved.json"
+    resolved.write_text("{}", encoding="utf-8")
+    overrides = tmp_path / "overrides.json"
+    overrides.write_text('{"metrics.threshold":1}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "policy",
+            "build",
+            "--resolved-policy",
+            str(resolved),
+            "--overrides",
+            str(overrides),
+            "--out",
+            str(tmp_path / "policy.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "exact path/value objects" in result.output

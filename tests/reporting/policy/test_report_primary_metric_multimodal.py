@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from invarlock.reporting.validation.report import compute_validation_flags
 
 
 def test_primary_metric_accuracy_gating_and_render():
@@ -9,11 +9,10 @@ def test_primary_metric_accuracy_gating_and_render():
     spectral = {"caps_applied": 0, "max_caps": 5}
     rmt = {"stable": True}
     invariants = {"status": "pass"}
-    # Alias kind should be accepted for gating as accuracy
     pm = {
         "kind": "accuracy",
         "final": 0.92,
-        "ratio_vs_baseline": +0.02,
+        "delta_vs_baseline_pp": +0.02,
         "n_final": 400,
     }
 
@@ -25,7 +24,7 @@ def test_primary_metric_accuracy_gating_and_render():
         tier="balanced",
         _ppl_metrics=None,
         target_ratio=None,
-        guard_overhead=None,
+        guard_metric_impact=None,
         primary_metric=pm,
     )
     assert flags["primary_metric_acceptable"] is True
@@ -71,9 +70,9 @@ def test_primary_metric_accuracy_gating_and_render():
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         "primary_metric": pm,
     }
@@ -90,12 +89,12 @@ def test_accuracy_zero_to_zero_preview_final_drift_passes():
         tier="balanced",
         _ppl_metrics=None,
         target_ratio=None,
-        guard_overhead=None,
+        guard_metric_impact=None,
         primary_metric={
             "kind": "accuracy",
             "preview": 0.0,
             "final": 0.0,
-            "ratio_vs_baseline": 0.0,
+            "delta_vs_baseline_pp": 0.0,
             "counts_source": "measured",
             "n_final": 400,
         },
@@ -114,12 +113,12 @@ def test_accuracy_preview_final_split_delta_uses_accuracy_tolerance():
         tier="balanced",
         _ppl_metrics=None,
         target_ratio=None,
-        guard_overhead=None,
+        guard_metric_impact=None,
         primary_metric={
             "kind": "accuracy",
             "preview": 0.0125,
             "final": 0.035,
-            "ratio_vs_baseline": 1.0,
+            "delta_vs_baseline_pp": 1.0,
             "counts_source": "measured",
             "n_final": 400,
         },

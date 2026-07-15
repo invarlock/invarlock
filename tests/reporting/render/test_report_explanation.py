@@ -39,7 +39,7 @@ def test_report_explanation_formats_raw_policy_and_guard_edges(monkeypatch) -> N
             "hysteresis_applied": True,
             "spectral_stable": False,
             "rmt_stable": False,
-            "guard_overhead_acceptable": False,
+            "guard_metric_impact_acceptable": False,
         },
         "resolved_policy": {
             "metrics": {
@@ -78,10 +78,12 @@ def test_report_explanation_formats_raw_policy_and_guard_edges(monkeypatch) -> N
                 {"guard": "spectral", "kind": "z_shift", "policy_gate": "pass"},
             ]
         },
-        "guard_overhead": {
-            "threshold_percent": "bad",
-            "overhead_threshold": 0.02,
-            "overhead_percent": 3.5,
+        "guard_metric_impact": {
+            "evaluated": True,
+            "degradation_limit": 0.02,
+            "degradation": 0.035,
+            "display_value": 3.5,
+            "display_unit": "percent",
         },
     }
 
@@ -126,7 +128,7 @@ def test_report_explanation_tail_fail_and_rmt_na(monkeypatch) -> None:
             "preview_final_drift_acceptable": True,
             "rmt_stable": True,
         },
-        "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": 0.0},
+        "primary_metric": {"kind": "accuracy", "delta_vs_baseline_pp": 0.0},
         "primary_metric_tail": {
             "evaluated": True,
             "passed": False,
@@ -135,7 +137,13 @@ def test_report_explanation_tail_fail_and_rmt_na(monkeypatch) -> None:
             "stats": {},
         },
         "rmt": {"edge_risk": 0.1},
-        "guard_overhead": {"threshold_percent": 4.0, "overhead_ratio": 1.01},
+        "guard_metric_impact": {
+            "evaluated": True,
+            "degradation_limit": 0.04,
+            "degradation": 0.01,
+            "display_value": 1.0,
+            "display_unit": "percent",
+        },
     }
 
     text = "\n".join(

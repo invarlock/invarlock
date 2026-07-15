@@ -55,11 +55,11 @@ def test_assurance_cross_reference_samples_do_not_require_runtime_builder(
 def test_assurance_cross_reference_regex_accepts_bare_file_and_pytest_node() -> None:
     module = _load_linter_module()
     text = (
-        "See tests/core/test_runner_pairing.py and "
+        "See tests/core/runner/test_runner_pairing.py and "
         "tests/eval/test_assurance_contracts.py::test_seed_bundle_contract."
     )
 
     refs = module.TEST_REF_RE.findall(text)
 
-    assert "tests/core/test_runner_pairing.py" in refs
+    assert "tests/core/runner/test_runner_pairing.py" in refs
     assert "tests/eval/test_assurance_contracts.py::test_seed_bundle_contract" in refs

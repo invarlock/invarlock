@@ -1,22 +1,23 @@
-"""Tests for tier_config loader functionality."""
+"""Fail-closed tests for the packaged tier policy authority."""
 
 from __future__ import annotations
 
-import warnings
 from copy import deepcopy
 from unittest import mock
 
+import pytest
+
+from invarlock.core.auto_tuning import resolve_tier_policies
 from invarlock.guards.policies import (
-    check_policy_drift,
     get_rmt_policy,
     get_spectral_policy,
     get_variance_policy,
 )
+from invarlock.guards.rmt_policy import get_rmt_policy as get_direct_rmt_policy
 from invarlock.guards.tier_config import (
-    _FALLBACK_CONFIG,
-    _deep_merge,
-    _find_drifts,
-    check_drift,
+    TierConfigError,
+    _load_yaml,
+    _validate_tier_config,
     clear_tier_config_cache,
     get_rmt_epsilon,
     get_spectral_caps,
@@ -26,413 +27,239 @@ from invarlock.guards.tier_config import (
 )
 
 
-class TestTierConfigLoader:
-    """Tests for the tier configuration loader."""
-
-    def setup_method(self) -> None:
-        """Clear cache before each test."""
-        clear_tier_config_cache()
-
-    def test_load_tier_config_returns_dict(self) -> None:
-        """load_tier_config() returns a dict with tier names as keys."""
-        config = load_tier_config()
-        assert isinstance(config, dict)
-        assert "balanced" in config
-        assert "conservative" in config
-
-    def test_fallback_config_has_all_guards(self) -> None:
-        """Fallback config includes all guard types for each tier."""
-        for tier in ("balanced", "conservative"):
-            tier_config = _FALLBACK_CONFIG.get(tier, {})
-            assert "spectral_guard" in tier_config
-            assert "rmt_guard" in tier_config
-            assert "variance_guard" in tier_config
-
-    def test_get_tier_guard_config_spectral(self) -> None:
-        """get_tier_guard_config returns spectral config."""
-        config = get_tier_guard_config("balanced", "spectral_guard")
-        assert isinstance(config, dict)
-        assert "sigma_quantile" in config
-        assert "family_caps" in config
-
-    def test_get_tier_guard_config_rmt(self) -> None:
-        """get_tier_guard_config returns RMT config."""
-        config = get_tier_guard_config("balanced", "rmt_guard")
-        assert isinstance(config, dict)
-        assert "epsilon_by_family" in config
-        assert "margin" in config
-
-    def test_get_tier_guard_config_variance(self) -> None:
-        """get_tier_guard_config returns variance config."""
-        config = get_tier_guard_config("balanced", "variance_guard")
-        assert isinstance(config, dict)
-        assert "min_effect_lognll" in config
-        assert "deadband" in config
-
-
-class TestConvenienceAccessors:
-    """Tests for convenience accessor functions."""
-
-    def test_get_spectral_caps_balanced(self) -> None:
-        """get_spectral_caps returns family caps for balanced tier."""
-        caps = get_spectral_caps("balanced")
-        assert isinstance(caps, dict)
-        assert "ffn" in caps
-        assert "attn" in caps
-        assert "embed" in caps
-        # Balanced tier values from tiers.yaml
-        assert caps["ffn"] == 3.849
-        assert caps["attn"] == 3.018
-        assert caps["embed"] == 1.05
-
-    def test_get_spectral_caps_conservative(self) -> None:
-        """get_spectral_caps returns tighter caps for conservative tier."""
-        caps = get_spectral_caps("conservative")
-        assert caps["ffn"] == 3.849
-        assert caps["attn"] == 2.6
-
-    def test_get_rmt_epsilon_balanced(self) -> None:
-        """get_rmt_epsilon returns per-family epsilon for balanced tier."""
-        epsilon = get_rmt_epsilon("balanced")
-        assert isinstance(epsilon, dict)
-        # Values from tiers.yaml
-        assert epsilon["ffn"] == 0.01
-        assert epsilon["attn"] == 0.01
-        assert epsilon["embed"] == 0.01
-        assert epsilon["other"] == 0.01
-
-    def test_get_rmt_epsilon_conservative(self) -> None:
-        """get_rmt_epsilon returns tighter epsilon for conservative tier."""
-        epsilon = get_rmt_epsilon("conservative")
-        assert epsilon["ffn"] == 0.01
-        assert epsilon["attn"] == 0.01
-
-    def test_get_tier_guard_config_returns_isolated_nested_copy(self) -> None:
-        """Mutating a returned guard config must not leak back into cache."""
-        first = get_tier_guard_config("balanced", "spectral_guard")
-        first["family_caps"]["ffn"] = 9.99
-
-        second = get_tier_guard_config("balanced", "spectral_guard")
-        assert second["family_caps"]["ffn"] == 3.849
-
-    def test_get_variance_min_effect_balanced(self) -> None:
-        """get_variance_min_effect returns calibrated min_effect_lognll."""
-        min_effect = get_variance_min_effect("balanced")
-        assert min_effect == 0.0
-
-    def test_get_variance_min_effect_conservative(self) -> None:
-        """get_variance_min_effect is higher for conservative tier."""
-        min_effect = get_variance_min_effect("conservative")
-        assert min_effect == 0.016
-
-
-class TestPolicyIntegration:
-    """Tests for policy functions using tier_config loader."""
-
-    def setup_method(self) -> None:
-        """Clear cache before each test."""
-        clear_tier_config_cache()
-
-    def test_get_spectral_policy_uses_yaml(self) -> None:
-        """get_spectral_policy loads values from tiers.yaml."""
-        policy = get_spectral_policy("balanced", use_yaml=True)
-        # Should have values from tiers.yaml
-        assert policy["sigma_quantile"] == 0.95
-        assert policy["deadband"] == 0.10
-        assert policy["max_caps"] == 5
-
-    def test_get_spectral_policy_without_yaml(self) -> None:
-        """get_spectral_policy can skip YAML loading."""
-        policy = get_spectral_policy("balanced", use_yaml=False)
-        # Should still work with hardcoded fallbacks
-        assert "sigma_quantile" in policy
-        assert "deadband" in policy
-
-    def test_get_rmt_policy_uses_yaml(self) -> None:
-        """get_rmt_policy loads epsilon values from tiers.yaml."""
-        policy = get_rmt_policy("balanced", use_yaml=True)
-        epsilon = policy.get("epsilon_by_family", {})
-        # Should have per-family epsilon from tiers.yaml
-        assert policy.get("epsilon_default") == 0.01
-        assert epsilon.get("ffn") == 0.01
-        assert epsilon.get("attn") == 0.01
-        assert epsilon.get("embed") == 0.01
-
-    def test_get_rmt_policy_conservative_uses_yaml(self) -> None:
-        """get_rmt_policy conservative tier uses tighter epsilon."""
-        policy = get_rmt_policy("conservative", use_yaml=True)
-        epsilon = policy.get("epsilon_by_family", {})
-        # Conservative has tighter values
-        assert policy.get("epsilon_default") == 0.01
-        assert epsilon.get("ffn") == 0.01
-        assert epsilon.get("attn") == 0.01
-
-    def test_get_variance_policy_uses_yaml(self) -> None:
-        """get_variance_policy loads min_effect_lognll from tiers.yaml."""
-        policy = get_variance_policy("balanced", use_yaml=True)
-        assert policy.get("min_effect_lognll") == 0.0
-        assert policy["deadband"] == 0.02
-
-
-class TestDriftDetection:
-    """Tests for drift detection between YAML and hardcoded values."""
-
-    def setup_method(self) -> None:
-        """Clear cache before each test."""
-        clear_tier_config_cache()
-
-    def test_check_drift_returns_dict(self) -> None:
-        """check_drift() returns a dict (empty if no drift)."""
-        drift = check_drift(silent=True)
-        assert isinstance(drift, dict)
-
-    def test_check_drift_no_yaml_returns_empty(self) -> None:
-        """check_drift returns {} when tiers.yaml cannot be loaded."""
-        import invarlock.guards.tier_config as tc
-
-        with mock.patch.object(tc, "_load_yaml", return_value=None):
-            drift = tc.check_drift(silent=False)
-        assert drift == {}
-
-    def test_check_policy_drift_alias(self) -> None:
-        """check_policy_drift() is an alias for check_drift()."""
-        drift = check_policy_drift(silent=True)
-        assert isinstance(drift, dict)
-
-    def test_drift_detection_finds_differences(self) -> None:
-        """Drift detection can identify value mismatches."""
-        # This is a structural test - we can't easily mock the YAML
-        # but we verify the function runs without error
-        drift = check_drift(silent=True)
-        assert isinstance(drift, dict)
-
-    def test_check_drift_warns_when_not_silent(self) -> None:
-        with (
-            mock.patch(
-                "invarlock.guards.tier_config._load_yaml",
-                return_value={"balanced": {}, "conservative": {}, "aggressive": {}},
-            ),
-            mock.patch(
-                "invarlock.guards.tier_config._find_drifts",
-                side_effect=[
-                    ["a", "b", "c", "d"],
-                    [],
-                    [],
-                    [],
-                    [],
-                    [],
-                    [],
-                    [],
-                    [],
-                ],
-            ),
-            warnings.catch_warnings(record=True) as caught,
-        ):
-            warnings.simplefilter("always")
-            drift = check_drift(silent=False)
-
-        assert drift["balanced"] == ["a", "b", "c", "d"]
-        assert caught
-
-
-class TestCaching:
-    """Tests for configuration caching behavior."""
-
-    def test_cache_clear_works(self) -> None:
-        """clear_tier_config_cache clears the LRU cache."""
-        # Load once to populate cache
-        config1 = load_tier_config()
-
-        # Clear and reload
-        clear_tier_config_cache()
-        config2 = load_tier_config()
-
-        # Both should be equal (content-wise)
-        assert config1.keys() == config2.keys()
-
-    def test_config_is_cached(self) -> None:
-        """Subsequent calls return the same cached object."""
-        config1 = load_tier_config()
-        config2 = load_tier_config()
-        # Same object due to caching
-        assert config1 is config2
-
-
-class TestEdgeCases:
-    """Tests for edge cases and error handling."""
-
-    def test_unknown_tier_falls_back(self) -> None:
-        """Unknown tier falls back gracefully."""
-        # get_tier_guard_config should handle unknown tiers
-        config = get_tier_guard_config("balanced", "spectral_guard")
-        assert config is not None
-
-    def test_get_spectral_caps_default(self) -> None:
-        """get_spectral_caps uses balanced as default."""
-        caps_default = get_spectral_caps()
-        caps_balanced = get_spectral_caps("balanced")
-        assert caps_default == caps_balanced
-
-    def test_get_rmt_epsilon_default(self) -> None:
-        """get_rmt_epsilon uses balanced as default."""
-        eps_default = get_rmt_epsilon()
-        eps_balanced = get_rmt_epsilon("balanced")
-        assert eps_default == eps_balanced
-
-
-class TestYAMLLoadingEdgeCases:
-    """Tests for YAML loading error handling."""
-
-    def setup_method(self) -> None:
-        """Clear cache before each test."""
-        clear_tier_config_cache()
-
-    def test_yaml_import_error_uses_fallback(self) -> None:
-        """If PyYAML is not installed, fallback config is used."""
-        # Simulate PyYAML not installed by mocking import
-        with mock.patch.dict("sys.modules", {"yaml": None}):
-            clear_tier_config_cache()
-            # Can't easily force ImportError, but we test the fallback path exists
-            config = load_tier_config()
-            assert "balanced" in config
-            assert "conservative" in config
-
-    def test_yaml_file_not_found_uses_fallback(self) -> None:
-        """If tiers.yaml doesn't exist, fallback config is used."""
-        import invarlock.guards.tier_config as tc
-
-        original_path = tc._TIERS_YAML_PATH
-        try:
-            tc._TIERS_YAML_PATH = tc.Path("/nonexistent/path/tiers.yaml")
-            clear_tier_config_cache()
-            result = tc._load_yaml()
-            assert result is None  # Falls back
-        finally:
-            tc._TIERS_YAML_PATH = original_path
-            clear_tier_config_cache()
-
-    def test_yaml_parse_non_dict_uses_fallback(self) -> None:
-        """If tiers.yaml doesn't parse as dict, fallback is used."""
-        import invarlock.guards.tier_config as tc
-
-        with mock.patch.object(tc.Path, "exists", return_value=True):
-            with mock.patch("builtins.open", mock.mock_open(read_data="just a string")):
-                # Should return None since "just a string" is not a dict
-                # Note: depends on yaml parsing - a bare string might parse as string
-                assert tc._load_yaml() is None
-
-    def test_yaml_exception_uses_fallback(self) -> None:
-        """If yaml.safe_load raises, fallback is used."""
-        import invarlock.guards.tier_config as tc
-
-        with mock.patch.object(tc.Path, "exists", return_value=True):
-            with mock.patch("builtins.open", side_effect=OSError("test error")):
-                result = tc._load_yaml()
-                assert result is None
-
-    def test_deep_merge_nested_dicts(self) -> None:
-        """_deep_merge handles nested dictionaries."""
-        base = {"a": 1, "nested": {"x": 10, "y": 20}}
-        override = {"b": 2, "nested": {"y": 30, "z": 40}}
-        result = _deep_merge(base, override)
-        assert result["a"] == 1
-        assert result["b"] == 2
-        assert result["nested"]["x"] == 10
-        assert result["nested"]["y"] == 30
-        assert result["nested"]["z"] == 40
-
-    def test_deep_merge_override_non_dict(self) -> None:
-        """_deep_merge handles override with non-dict value replacing dict."""
-        base = {"nested": {"x": 10}}
-        override = {"nested": "replaced"}
-        result = _deep_merge(base, override)
-        assert result["nested"] == "replaced"
-
-
-class TestFindDrifts:
-    """Tests for the _find_drifts helper function."""
-
-    def test_find_drifts_empty(self) -> None:
-        """No drift when data matches."""
-        yaml = {"a": 1, "b": 2}
-        fallback = {"a": 1, "b": 2}
-        drifts = _find_drifts(yaml, fallback)
-        assert drifts == []
-
-    def test_find_drifts_value_mismatch(self) -> None:
-        """Drift detected when values differ."""
-        yaml = {"a": 1, "b": 3}
-        fallback = {"a": 1, "b": 2}
-        drifts = _find_drifts(yaml, fallback)
-        assert len(drifts) == 1
-        assert "b:" in drifts[0]
-
-    def test_find_drifts_yaml_only_key_ignored(self) -> None:
-        """YAML-only keys (not in fallback) are not flagged as drift."""
-        yaml = {"a": 1, "yaml_only": 99}
-        fallback = {"a": 1}
-        drifts = _find_drifts(yaml, fallback)
-        # yaml_only is not considered drift since fallback doesn't have it
-        assert drifts == []
-
-    def test_find_drifts_nested(self) -> None:
-        """Drift in nested dicts is detected."""
-        yaml = {"nested": {"x": 100}}
-        fallback = {"nested": {"x": 10, "y": 20}}
-        drifts = _find_drifts(yaml, fallback)
-        # Should find drift in nested.x and nested.y (yaml missing y)
-        assert len(drifts) == 2
-        drift_text = " ".join(drifts)
-        assert "nested.x:" in drift_text
-        assert "nested.y:" in drift_text
-
-
-class TestCheckDriftWarning:
-    """Tests for check_drift warning behavior."""
-
-    def setup_method(self) -> None:
-        """Clear cache before each test."""
-        clear_tier_config_cache()
-
-    def test_check_drift_emits_warning_when_not_silent(self) -> None:
-        """check_drift emits warnings when silent=False and drift exists."""
-        import invarlock.guards.tier_config as tc
-
-        yaml_data = deepcopy(tc._FALLBACK_CONFIG)
-        yaml_data["balanced"]["variance_guard"]["deadband"] = (
-            yaml_data["balanced"]["variance_guard"]["deadband"] + 0.001
-        )
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with mock.patch.object(tc, "_load_yaml", return_value=yaml_data):
-                drift = tc.check_drift(silent=False)
-
-        assert drift
-        user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
-        assert len(user_warnings) == 1
-
-    def test_check_drift_no_warning_when_silent(self) -> None:
-        """check_drift doesn't emit warnings when silent=True."""
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _ = check_drift(silent=True)
-            # No warnings should be emitted
-            user_warnings = [x for x in w if "drift" in str(x.message).lower()]
-            assert len(user_warnings) == 0
-
-    def test_check_drift_silent_true_suppresses_warning_even_when_drift_exists(
-        self,
-    ) -> None:
-        import invarlock.guards.tier_config as tc
-
-        yaml_data = deepcopy(tc._FALLBACK_CONFIG)
-        yaml_data["balanced"]["spectral_guard"]["deadband"] = 0.123
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with mock.patch.object(tc, "_load_yaml", return_value=yaml_data):
-                drift = tc.check_drift(silent=True)
-
-        assert drift["balanced"]
-        assert not [x for x in w if issubclass(x.category, UserWarning)]
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    clear_tier_config_cache()
+
+
+def test_packaged_tier_policy_loads_all_current_tiers_and_guards() -> None:
+    config = load_tier_config()
+
+    assert set(config) == {"balanced", "conservative", "aggressive"}
+    for tier in config.values():
+        assert set(tier) == {"spectral_guard", "rmt_guard", "variance_guard"}
+
+
+def test_packaged_accessors_return_current_values_and_isolated_copies() -> None:
+    caps = get_spectral_caps("balanced")
+    epsilon = get_rmt_epsilon("conservative")
+
+    assert caps == {"ffn": 3.849, "attn": 3.018, "embed": 1.05, "other": 0.0}
+    assert epsilon == {"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01}
+    assert get_variance_min_effect("conservative") == 0.016
+
+    caps["ffn"] = 99.0
+    assert get_spectral_caps("balanced")["ffn"] == 3.849
+
+
+def test_load_tier_config_is_cached_and_cache_can_be_cleared() -> None:
+    first = load_tier_config()
+    assert load_tier_config() is first
+
+    clear_tier_config_cache()
+    second = load_tier_config()
+
+    assert second == first
+    assert second is not first
+
+
+@pytest.mark.parametrize("tier", ["none", "unknown", "", None])
+def test_unknown_and_none_tiers_fail_instead_of_selecting_balanced(
+    tier: object,
+) -> None:
+    with pytest.raises(ValueError, match="Unknown tier"):
+        get_tier_guard_config(tier, "spectral_guard")  # type: ignore[arg-type]
+
+
+def test_unknown_guard_fails_instead_of_returning_empty_policy() -> None:
+    with pytest.raises(ValueError, match="Unknown guard"):
+        get_tier_guard_config("balanced", "unknown")  # type: ignore[arg-type]
+
+
+def test_missing_packaged_policy_file_fails_explicitly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.guards.tier_config as tier_config
+
+    monkeypatch.setattr(
+        tier_config, "_TIERS_YAML_PATH", tier_config.Path("/missing/tiers.yaml")
+    )
+
+    with pytest.raises(TierConfigError, match="missing"):
+        _load_yaml()
+
+
+def test_missing_yaml_dependency_fails_explicitly() -> None:
+    with mock.patch.dict("sys.modules", {"yaml": None}):
+        with pytest.raises(TierConfigError, match="PyYAML is required"):
+            _load_yaml()
+
+
+def test_non_mapping_yaml_fails_explicitly(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    import invarlock.guards.tier_config as tier_config
+
+    policy = tmp_path / "tiers.yaml"
+    policy.write_text("just a string\n", encoding="utf-8")
+    monkeypatch.setattr(tier_config, "_TIERS_YAML_PATH", policy)
+
+    with pytest.raises(TierConfigError, match="must be a mapping"):
+        _load_yaml()
+
+
+def test_yaml_read_or_parse_failure_fails_explicitly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.guards.tier_config as tier_config
+
+    monkeypatch.setattr(tier_config.Path, "is_file", lambda _self: True)
+    monkeypatch.setattr(
+        tier_config.Path,
+        "read_text",
+        lambda _self, **_kwargs: "balanced: [",
+    )
+
+    with pytest.raises(TierConfigError, match="Failed to load"):
+        _load_yaml()
+
+
+def test_policy_inventory_rejects_missing_or_unknown_tiers() -> None:
+    valid = _load_yaml()
+
+    missing = deepcopy(valid)
+    missing.pop("balanced")
+    with pytest.raises(TierConfigError, match="missing=.*balanced"):
+        _validate_tier_config(missing)
+
+    unknown = deepcopy(valid)
+    unknown["none"] = deepcopy(valid["balanced"])
+    with pytest.raises(TierConfigError, match="unknown=.*none"):
+        _validate_tier_config(unknown)
+
+
+def test_policy_inventory_rejects_missing_guard_or_required_key() -> None:
+    valid = _load_yaml()
+
+    missing_guard = deepcopy(valid)
+    missing_guard["balanced"].pop("spectral_guard")
+    with pytest.raises(TierConfigError, match="invalid section inventory"):
+        _validate_tier_config(missing_guard)
+
+    missing_key = deepcopy(valid)
+    missing_key["balanced"]["rmt_guard"].pop("margin")
+    with pytest.raises(TierConfigError, match="invalid key inventory"):
+        _validate_tier_config(missing_key)
+
+    unknown_key = deepcopy(valid)
+    unknown_key["balanced"]["rmt_guard"]["legacy_default"] = 0.1
+    with pytest.raises(TierConfigError, match="invalid key inventory"):
+        _validate_tier_config(unknown_key)
+
+
+def test_policy_inventory_rejects_non_mapping_tier_and_guard() -> None:
+    valid = _load_yaml()
+
+    invalid_tier = deepcopy(valid)
+    invalid_tier["balanced"] = []
+    with pytest.raises(TierConfigError, match="Tier 'balanced' must be a mapping"):
+        _validate_tier_config(invalid_tier)
+
+    invalid_guard = deepcopy(valid)
+    invalid_guard["balanced"]["spectral_guard"] = []
+    with pytest.raises(TierConfigError, match="must be a mapping"):
+        _validate_tier_config(invalid_guard)
+
+
+def _set_nested(data: dict, path: tuple[str, ...], value: object) -> None:
+    target = data
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        (("spectral_guard", "sigma_quantile"), True, "must be numeric"),
+        (("spectral_guard", "scope"), "weights", "invalid scope"),
+        (("spectral_guard", "correction_enabled"), 1, "must be boolean"),
+        (("spectral_guard", "ignore_preview_inflation"), 0, "must be boolean"),
+        (("spectral_guard", "max_spectral_norm"), "unbounded", "numeric or null"),
+        (("spectral_guard", "max_caps"), True, "must be an integer"),
+        (("spectral_guard", "family_caps"), {"ffn": 1.0}, "invalid inventory"),
+        (
+            ("spectral_guard", "family_caps", "ffn"),
+            "wide",
+            "values must be numeric",
+        ),
+        (("spectral_guard", "multiple_testing"), [], "must be a mapping"),
+        (
+            ("spectral_guard", "multiple_testing", "method"),
+            "none",
+            "multiple_testing is invalid",
+        ),
+        (("rmt_guard", "q"), object(), "q must be 'auto' or numeric"),
+        (("rmt_guard", "margin"), False, "must be numeric"),
+        (("rmt_guard", "correct"), 1, "must be boolean"),
+        (("rmt_guard", "epsilon_by_family"), {}, "invalid inventory"),
+        (("rmt_guard", "epsilon_by_family", "ffn"), True, "values must be numeric"),
+        (("variance_guard", "alpha"), False, "must be numeric"),
+        (("variance_guard", "max_calib"), True, "must be an integer"),
+        (("variance_guard", "scope"), "all", "invalid scope"),
+        (("variance_guard", "mode"), "estimate", "invalid mode"),
+        (("variance_guard", "predictive_gate"), 1, "must be boolean"),
+        (("variance_guard", "clamp"), [0.5], "two numeric bounds"),
+        (("variance_guard", "tap"), [], "string or string list"),
+        (("variance_guard", "calibration"), {}, "invalid inventory"),
+        (
+            ("variance_guard", "calibration", "windows"),
+            True,
+            "values must be integers",
+        ),
+    ],
+)
+def test_packaged_policy_rejects_semantically_invalid_guard_values(
+    path: tuple[str, ...], value: object, message: str
+) -> None:
+    """Invalid policy values must fail before they can authorize a run."""
+
+    invalid = deepcopy(_load_yaml())
+    _set_nested(invalid["balanced"], path, value)
+
+    with pytest.raises(TierConfigError, match=message):
+        _validate_tier_config(invalid)
+
+
+@pytest.mark.parametrize("metrics", [{}, [], None])
+def test_packaged_policy_requires_nonempty_metric_authority(metrics: object) -> None:
+    invalid = deepcopy(_load_yaml())
+    invalid["balanced"]["metrics"] = metrics
+
+    with pytest.raises(TierConfigError, match="metrics must be a non-empty mapping"):
+        _validate_tier_config(invalid)
+
+
+def test_guard_policy_resolvers_propagate_packaged_policy_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.guards.policies as policies
+
+    def _fail(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise TierConfigError("packaged policy unavailable")
+
+    monkeypatch.setattr(policies, "get_tier_guard_config", _fail)
+
+    for resolver in (get_spectral_policy, get_rmt_policy, get_variance_policy):
+        with pytest.raises(TierConfigError, match="Failed to resolve packaged"):
+            resolver("balanced")
+
+
+def test_all_runtime_policy_resolution_paths_agree() -> None:
+    for tier in ("balanced", "conservative", "aggressive"):
+        resolved = resolve_tier_policies(tier)
+
+        assert resolved["spectral"] == get_spectral_policy(tier)
+        assert resolved["rmt"] == get_rmt_policy(tier)
+        assert resolved["rmt"] == get_direct_rmt_policy(tier)
+        assert resolved["variance"] == get_variance_policy(tier)

@@ -158,7 +158,7 @@ def test_cli_runtime_helpers_do_not_hide_snapshot_reuse_failures() -> None:
 
 def test_core_summary_helpers_do_not_embed_display_strings() -> None:
     expectations = {
-        REPO_ROOT / "src/invarlock/reporting/report_overhead.py": (
+        REPO_ROOT / "src/invarlock/reporting/report_metric_impact.py": (
             'status = "PASS"',
             "threshold_display",
             "overhead_display",
@@ -238,8 +238,8 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/core/events.py": 0,
         REPO_ROOT / "src/invarlock/core/plugins_inventory.py": 0,
         REPO_ROOT / "src/invarlock/core/registry.py": 2,
-        REPO_ROOT / "src/invarlock/core/runner_eval_metrics.py": 0,
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempt_results.py": 0,
+        REPO_ROOT / "src/invarlock/core/runner_runtime/eval_metrics.py": 0,
+        REPO_ROOT / "src/invarlock/core/orchestration/attempt_results.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_causal.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_causal_specs.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_mlm.py": 0,
@@ -263,13 +263,13 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/reporting/report_builder_telemetry.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_seq2seq.py": 0,
         REPO_ROOT / "src/invarlock/utils/__init__.py": 0,
-        REPO_ROOT / "src/invarlock/core/runner_eval_phase.py": 0,
+        REPO_ROOT / "src/invarlock/core/runner_runtime/eval_phase.py": 0,
         REPO_ROOT / "src/invarlock/cli/app.py": 0,
         REPO_ROOT / "src/invarlock/cli/commands/plugins.py": 0,
         REPO_ROOT / "src/invarlock/cli/commands/plugins_rendering.py": 0,
         REPO_ROOT / "src/invarlock/cli/commands/report.py": 0,
         REPO_ROOT / "src/invarlock/cli/run_runtime_warnings.py": 0,
-        REPO_ROOT / "src/invarlock/cli/run_overhead.py": 0,
+        REPO_ROOT / "src/invarlock/cli/run_metric_impact.py": 0,
     }
     offenders: list[str] = []
     for path, budget in budgets.items():
@@ -302,7 +302,7 @@ def test_hardened_followup_paths_have_no_local_type_ignore_escapes() -> None:
         REPO_ROOT / "src/invarlock/eval/data_hf_providers.py",
         REPO_ROOT / "src/invarlock/eval/metrics_runtime_resources.py",
         REPO_ROOT / "src/invarlock/eval/primary_metric.py",
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
+        REPO_ROOT / "src/invarlock/core/orchestration/attempt_results.py",
         REPO_ROOT / "src/invarlock/cli/commands/plugins.py",
         REPO_ROOT / "src/invarlock/cli/commands/plugins_rendering.py",
         REPO_ROOT / "src/invarlock/cli/run_runtime_warnings.py",

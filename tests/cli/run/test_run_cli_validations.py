@@ -7,7 +7,7 @@ import typer
 from invarlock.cli.commands.run import (
     run_command,
 )
-from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
+from invarlock.core.run_policy import GUARD_METRIC_DEGRADATION_LIMIT
 
 
 def test_run_command_file_not_found():
@@ -131,17 +131,17 @@ def test_run_command_invalid_probes(mock_load):
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.cli.run_runtime_exec.validate_guard_overhead")
+@patch("invarlock.cli.run_runtime_exec.validate_guard_metric_impact")
 @patch("invarlock.core.config_loader.load_config")
 @patch("invarlock.core.config_loader.apply_profile")
 @patch("invarlock.cli.device.resolve_device", return_value="cpu")
 @patch("invarlock.cli.device.validate_device_for_config", return_value=(True, ""))
 @patch("invarlock.core.registry.get_registry")
 @patch("invarlock.core.runner.CoreRunner")
-@patch("invarlock.reporting.report_files.save_report")
+@patch("invarlock.reporting.report_bundle.save_report")
 @patch("invarlock.eval.data.get_provider")
 @patch("pathlib.Path.mkdir")
-def test_run_command_fails_when_guard_overhead_exceeds_budget(
+def test_run_command_fails_when_guard_metric_impact_exceeds_budget(
     mock_mkdir,
     mock_get_provider,
     mock_save_report,
@@ -151,7 +151,7 @@ def test_run_command_fails_when_guard_overhead_exceeds_budget(
     mock_resolve_device,
     mock_apply_profile,
     mock_load,
-    mock_validate_guard_overhead,
+    mock_validate_guard_metric_impact,
 ):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -231,11 +231,11 @@ def test_run_command_fails_when_guard_overhead_exceeds_budget(
     main_runner_instance.execute.return_value = guarded_report
     mock_runner.side_effect = [bare_runner_instance, main_runner_instance]
 
-    mock_validate_guard_overhead.return_value = Mock(
+    mock_validate_guard_metric_impact.return_value = Mock(
         passed=False,
-        overhead_ratio=1.1,
-        overhead_percent=10.0,
-        threshold=GUARD_OVERHEAD_THRESHOLD,
+        degradation=1.1,
+        display_value=10.0,
+        degradation_limit=GUARD_METRIC_DEGRADATION_LIMIT,
         errors=["too slow"],
     )
 

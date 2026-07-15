@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-06-29",
+  "as_of": "2026-07-13",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -16,12 +16,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
-        "docs/reference/model-adapters.md"
+        "docs/reference/model-adapters.md",
+        "public_evidence/published_basis/gpt2-causal-hf"
       ],
-      "notes": "Evidence maps to support_matrix lane gpt2-causal-hf.",
+      "notes": "Maintained catalog lane gpt2-causal-hf.",
       "support_groups": [
         "baseline_reference"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "bert-roberta-mlm",
@@ -38,12 +41,15 @@
       "repo_evidence": [
         "contracts/support_matrix.json",
         "docs/README.md",
-        "docs/reference/model-adapters.md"
+        "docs/reference/model-adapters.md",
+        "public_evidence/published_basis/bert-mlm-hf"
       ],
-      "notes": "Evidence maps to support_matrix lane bert-mlm-hf.",
+      "notes": "Maintained catalog lane bert-mlm-hf.",
       "support_groups": [
         "baseline_reference"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "mistral-7b-causal-lm",
@@ -60,15 +66,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/mistral_7b_512.yaml",
         "configs/calibration/null_sweep_mistral_7b.yaml",
-        "public_evidence/published_basis/mistral_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/mistral_7b/runtime.manifest.json",
-        "public_evidence/published_basis/mistral_7b/evidence_pack"
+        "public_evidence/published_basis/mistral-7b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane mistral-7b-causal-hf.",
       "support_groups": [
         "published_modern",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "ministral-3-8b-text-causal-lm",
@@ -85,17 +91,17 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_8b_512.yaml",
         "configs/calibration/null_sweep_ministral3_8b.yaml",
-        "public_evidence/published_basis/ministral3_8b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/ministral3_8b/runtime.manifest.json",
-        "public_evidence/published_basis/ministral3_8b/evidence_pack"
+        "public_evidence/published_basis/ministral-3-8b-text-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included. The separate 14B Ministral lane has its own published evidence fixture.",
+      "notes": "Maintained catalog lane ministral-3-8b-text-causal-hf.",
       "support_groups": [
         "published_modern",
         "practical_shortlist",
         "small_local",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "ministral-3-14b-text-causal-lm",
@@ -112,16 +118,16 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_14b_512.yaml",
         "configs/calibration/null_sweep_ministral3_14b.yaml",
-        "public_evidence/published_basis/ministral3_14b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/ministral3_14b/runtime.manifest.json",
-        "public_evidence/published_basis/ministral3_14b/evidence_pack"
+        "public_evidence/published_basis/ministral-3-14b-text-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane ministral-3-14b-text-causal-hf.",
       "support_groups": [
         "published_modern",
         "practical_shortlist",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen2-7b-causal-lm",
@@ -138,14 +144,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_7b_512.yaml",
         "configs/calibration/null_sweep_qwen2_7b.yaml",
-        "public_evidence/published_basis/qwen2_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen2_7b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen2_7b/evidence_pack"
+        "public_evidence/published_basis/qwen2-7b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane qwen2-7b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen2-5-7b-causal-lm",
@@ -162,14 +168,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
         "configs/calibration/null_sweep_qwen2_5_7b.yaml",
-        "public_evidence/published_basis/qwen2_5_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen2_5_7b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen2_5_7b/evidence_pack"
+        "public_evidence/published_basis/qwen2-5-7b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane qwen2-5-7b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen2-5-14b-causal-lm",
@@ -186,14 +192,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
         "configs/calibration/null_sweep_qwen2_5_14b.yaml",
-        "public_evidence/published_basis/qwen2_5_14b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen2_5_14b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen2_5_14b/evidence_pack"
+        "public_evidence/published_basis/qwen2-5-14b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane qwen2-5-14b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-causal-lm",
@@ -210,15 +216,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_8b_512.yaml",
         "configs/calibration/null_sweep_qwen3_8b.yaml",
-        "public_evidence/published_basis/qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_8b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_8b/evidence_pack"
+        "public_evidence/published_basis/qwen3-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane qwen3-causal-hf.",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "deepseek-r1-distill-qwen-causal-lm",
@@ -235,15 +241,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_7b_512.yaml",
         "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/runtime.manifest.json",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack"
+        "public_evidence/published_basis/deepseek-r1-distill-qwen-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane deepseek-r1-distill-qwen-causal-hf.",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "phi-4-text-causal-lm",
@@ -260,15 +266,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
         "configs/calibration/null_sweep_phi4_reasoning_plus.yaml",
-        "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/phi4_reasoning_plus/runtime.manifest.json",
-        "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack"
+        "public_evidence/published_basis/phi-4-text-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included. The public fixture is text-only and skips guard-overhead measurement by preset policy.",
+      "notes": "Maintained catalog lane phi-4-text-causal-hf.",
       "support_groups": [
         "published_modern",
         "reasoning_focused"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "gemma-4-e2b-text-causal-lm",
@@ -285,16 +291,16 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/gemma4_e2b_512.yaml",
         "configs/calibration/null_sweep_gemma4_e2b.yaml",
-        "public_evidence/published_basis/gemma4_e2b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_e2b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_e2b/evidence_pack"
+        "public_evidence/published_basis/gemma4-e2b-text-causal-hf"
       ],
-      "notes": "Release-profile container-backed public report, runtime manifest, and evidence pack are included. Public support is text-only; image-text evaluation remains on the explicit hf_multimodal + vision_text path.",
+      "notes": "Maintained catalog lane gemma4-e2b-text-causal-hf.",
       "support_groups": [
         "published_modern",
         "small_local",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "tinyllama-1-1b-causal-lm",
@@ -311,15 +317,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/tinyllama_1_1b_512.yaml",
         "configs/calibration/null_sweep_tinyllama_1_1b.yaml",
-        "public_evidence/published_basis/tinyllama_1_1b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/tinyllama_1_1b/runtime.manifest.json",
-        "public_evidence/published_basis/tinyllama_1_1b/evidence_pack"
+        "public_evidence/published_basis/tinyllama-1-1b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane tinyllama-1-1b-causal-hf.",
       "support_groups": [
         "published_modern",
         "small_local"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "olmo-2-7b-causal-lm",
@@ -336,14 +342,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_7b_512.yaml",
         "configs/calibration/null_sweep_olmo2_7b.yaml",
-        "public_evidence/published_basis/olmo2_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/olmo2_7b/runtime.manifest.json",
-        "public_evidence/published_basis/olmo2_7b/evidence_pack"
+        "public_evidence/published_basis/olmo-2-7b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane olmo-2-7b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "olmo-2-13b-causal-lm",
@@ -360,14 +366,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmo2_13b_512.yaml",
         "configs/calibration/null_sweep_olmo2_13b.yaml",
-        "public_evidence/published_basis/olmo2_13b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/olmo2_13b/runtime.manifest.json",
-        "public_evidence/published_basis/olmo2_13b/evidence_pack"
+        "public_evidence/published_basis/olmo-2-13b-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane olmo-2-13b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "openllama-7b-causal-lm",
@@ -384,14 +390,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/open_llama_7b_512.yaml",
         "configs/calibration/null_sweep_open_llama_7b.yaml",
-        "public_evidence/published_basis/open_llama_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/open_llama_7b/runtime.manifest.json",
-        "public_evidence/published_basis/open_llama_7b/evidence_pack"
+        "public_evidence/published_basis/open-llama-7b-causal-hf"
       ],
-      "notes": "Release-profile container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane open-llama-7b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "falcon-7b-causal-lm",
@@ -408,14 +414,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/falcon_7b_512.yaml",
         "configs/calibration/null_sweep_falcon_7b.yaml",
-        "public_evidence/published_basis/falcon_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/falcon_7b/runtime.manifest.json",
-        "public_evidence/published_basis/falcon_7b/evidence_pack"
+        "public_evidence/published_basis/falcon-7b-causal-hf"
       ],
-      "notes": "Release-profile container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane falcon-7b-causal-hf.",
       "support_groups": [
         "published_modern"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-5-causal-lm",
@@ -432,16 +438,16 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/qwen3_5_9b_512.yaml",
         "configs/calibration/null_sweep_qwen3_5_9b.yaml",
-        "public_evidence/published_basis/qwen3_5_9b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_9b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_5_9b/evidence_pack"
+        "public_evidence/published_basis/qwen3-5-causal-hf"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included.",
+      "notes": "Maintained catalog lane qwen3-5-causal-hf.",
       "support_groups": [
         "published_modern",
         "practical_shortlist",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "granite-4-1-3b-causal-lm",
@@ -458,16 +464,16 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_3b_512.yaml",
         "configs/calibration/null_sweep_granite4_1_3b.yaml",
-        "public_evidence/published_basis/granite4_1_3b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/granite4_1_3b/runtime.manifest.json",
-        "public_evidence/published_basis/granite4_1_3b/evidence_pack"
+        "public_evidence/published_basis/granite-4-1-3b-causal-hf"
       ],
       "support_groups": [
         "published_modern",
         "small_local",
         "enterprise_permissive"
       ],
-      "notes": "Release-profile container-backed public report, runtime manifest, and evidence pack are included."
+      "notes": "Maintained catalog lane granite-4-1-3b-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "flan-t5-base-seq2seq-lm",
@@ -484,15 +490,15 @@
         "contracts/support_matrix.json",
         "configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml",
         "configs/calibration/null_sweep_flan_t5_base.yaml",
-        "public_evidence/published_basis/flan_t5_base/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/flan_t5_base/runtime.manifest.json",
-        "public_evidence/published_basis/flan_t5_base/evidence_pack"
+        "public_evidence/published_basis/flan-t5-base-seq2seq-hf"
       ],
       "support_groups": [
         "published_modern",
         "seq2seq"
       ],
-      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and pinned CNN/DailyMail validation data through hf_seq2seq."
+      "notes": "Maintained catalog lane flan-t5-base-seq2seq-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "gemma-4-12b-any-to-any-lm",
@@ -514,10 +520,7 @@
         "configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "src/invarlock/adapters/hf_loading.py",
-        "public_evidence/published_basis/gemma4_12b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_12b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_12b/evidence_pack"
+        "src/invarlock/adapters/hf_loading.py"
       ],
       "support_groups": [
         "published_modern",
@@ -525,7 +528,9 @@
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.565 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. Gemma 4 12B uses the explicit hf_multimodal path and requires the multimodal runtime stack (transformers>=5.12.0 and torchvision>=0.26.0). This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Maintained catalog lane gemma4-12b-any-to-any-hf.",
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "gemma-4-e4b-image-text-lm",
@@ -544,12 +549,10 @@
         "configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_e4b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/gemma4_e4b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_e4b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_e4b/evidence_pack"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/gemma4-e4b-image-text-hf"
       ],
       "support_groups": [
         "published_modern",
@@ -557,7 +560,9 @@
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.500 final accuracy over 400 examples, ratio_vs_baseline 1.010, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Maintained catalog lane gemma4-e4b-image-text-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "gemma-4-e2b-image-text-lm",
@@ -576,12 +581,10 @@
         "configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_e2b_image_text.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_e2b_image_text/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/gemma4-e2b-image-text-hf"
       ],
       "support_groups": [
         "published_modern",
@@ -589,7 +592,9 @@
         "enterprise_permissive",
         "multimodal_candidate"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.388 final accuracy over 400 examples, ratio_vs_baseline 1.013, and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader multimodal behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Maintained catalog lane gemma4-e2b-image-text-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-5-4b-image-text-lm",
@@ -608,21 +613,21 @@
         "configs/presets/multimodal/qwen3_5_4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_4b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/qwen3_5_4b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_4b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_5_4b/evidence_pack"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/qwen3-5-4b-image-text-hf"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.855 final accuracy over 400 examples, ratio_vs_baseline 1.036, and no guard warnings. This is no-op preservation/null-behavior evidence; it is not guard-value proof.",
+      "notes": "Maintained catalog lane qwen3-5-4b-image-text-hf.",
       "support_groups": [
         "published_modern",
         "small_local",
         "multimodal_candidate",
         "practical_shortlist",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen3-5-2b-image-text-lm",
@@ -641,20 +646,20 @@
         "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_2b.yaml",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "public_evidence/published_basis/qwen3_5_2b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_2b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_5_2b/evidence_pack"
+        "tests/core/test_public_evidence_catalog.py",
+        "public_evidence/published_basis/qwen3-5-2b-image-text-hf"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence, runtime manifest, and signed evidence pack. This is no-op preservation/null-behavior evidence, not guard-value proof.",
+      "notes": "Maintained catalog lane qwen3-5-2b-image-text-hf.",
       "support_groups": [
         "published_modern",
         "small_local",
         "multimodal_candidate",
         "enterprise_permissive"
-      ]
+      ],
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "qwen-3-5-27b-image-text-scoped-lm",
@@ -680,16 +685,14 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_27b_scoped.yaml",
-        "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_27b_scoped/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_5_27b_scoped/evidence_pack",
-        "public_evidence/larger_model_validation_findings/lane_outcomes.json",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/core/test_public_evidence_catalog.py"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8975 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in the categorized larger-model lane outcomes; this is no-op preservation/null-behavior evidence and not guard-value proof."
+      "notes": "Maintained catalog lane qwen3-5-27b-image-text-scoped-hf.",
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "qwen-3-6-27b-image-text-scoped-lm",
@@ -715,16 +718,14 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_6_27b_scoped.yaml",
-        "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_6_27b_scoped/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_6_27b_scoped/evidence_pack",
-        "public_evidence/larger_model_validation_findings/lane_outcomes.json",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/core/test_public_evidence_catalog.py"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence using scoped self-attention and MLP guard scans. The no-op report passes strict policy with 0.8825 final accuracy over 400 examples and no guard warnings. Linear-attention module coverage remains captured as strict spectral-cap findings in the categorized larger-model lane outcomes; this is no-op preservation/null-behavior evidence and not guard-value proof."
+      "notes": "Maintained catalog lane qwen3-6-27b-image-text-scoped-hf.",
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "gemma-4-26b-a4b-moe-image-text-lm",
@@ -744,22 +745,21 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/core/test_public_evidence_catalog.py"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.555 final accuracy over 400 examples, ratio_vs_baseline 1.009, and no guard warnings. This is no-op preservation/null-behavior evidence; audio, exhaustive expert-bank behavior, and MoE routing quality remain out of scope, and it is not guard-value proof.",
+      "notes": "Maintained catalog lane gemma4-26b-a4b-moe-image-text-hf.",
       "support_groups": [
         "published_modern",
         "enterprise_permissive",
         "multimodal_candidate",
         "moe_candidate",
         "large_model_candidate"
-      ]
+      ],
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "gemma-4-31b-image-text-lm",
@@ -785,15 +785,14 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_gemma4_31b.yaml",
-        "public_evidence/published_basis/gemma4_31b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_31b/runtime.manifest.json",
-        "public_evidence/published_basis/gemma4_31b/evidence_pack",
         "scripts/model_evidence/materialize_vision_text_dataset.py",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_multimodal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/core/test_public_evidence_catalog.py"
       ],
-      "notes": "Evidence includes release-profile container-backed public VQAv2 image-text evidence. The no-op report passes strict policy with 0.610 final accuracy over 400 examples and no guard warnings. This is no-op preservation/null-behavior evidence; audio and broader any-to-any behavior remain out of scope, and it is not guard-value proof."
+      "notes": "Maintained catalog lane gemma4-31b-image-text-hf.",
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "mixtral",
@@ -813,19 +812,18 @@
         "src/invarlock/adapters/auto.py",
         "configs/presets/causal_lm/mixtral_8x7b_512.yaml",
         "configs/calibration/null_sweep_mixtral_8x7b.yaml",
-        "public_evidence/published_basis/mixtral_8x7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/mixtral_8x7b/runtime.manifest.json",
-        "public_evidence/published_basis/mixtral_8x7b/evidence_pack",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/core/test_model_profiles.py",
         "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/core/test_public_evidence_catalog.py"
       ],
-      "notes": "Evidence includes a Mixtral MoE causal LM published basis with explicit hf_causal preset, release-profile public report, runtime manifest, and signed evidence pack. The preset keeps the full guard scan surface while using BF16, automatic device placement, low-CPU-memory loading, disabled optional HF loading-info collection, and a skipped optional guard-overhead check for large-model resource discipline.",
+      "notes": "Maintained catalog lane mixtral-8x7b-moe-causal-hf.",
       "support_groups": [
         "moe_candidate",
         "large_model_candidate"
-      ]
+      ],
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "qwen3-30b-a3b-moe-causal-lm",
@@ -843,19 +841,18 @@
         "src/invarlock/adapters/hf_loading.py",
         "configs/presets/causal_lm/qwen3_30b_a3b_instruct_2507_512.yaml",
         "configs/calibration/null_sweep_qwen3_30b_a3b_instruct_2507.yaml",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py",
-        "contracts/support_matrix.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/runtime.manifest.json",
-        "public_evidence/published_basis/qwen3_30b_a3b/evidence_pack"
+        "tests/core/test_public_evidence_catalog.py",
+        "contracts/support_matrix.json"
       ],
-      "notes": "Evidence includes a recent Qwen3 MoE causal LM published basis with explicit hf_causal preset, public WikiText-103 release-profile report, runtime manifest, and signed evidence pack. The fixture uses BF16/low-CPU-memory loading, disabled optional Hugging Face loading-info collection, automatic device placement, and scoped attention/router/shared-expert guard scans. This is no-op preservation evidence; it is not a benchmark-quality, fine-tuning, deployment, exhaustive expert-bank, or MoE routing-quality claim.",
+      "notes": "Maintained catalog lane qwen3-30b-a3b-moe-causal-hf.",
       "support_groups": [
         "moe_candidate",
         "large_model_candidate"
-      ]
+      ],
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "gpt-oss",
@@ -880,15 +877,14 @@
         "src/invarlock/adapters/auto.py",
         "configs/presets/causal_lm/gpt_oss_20b_512.yaml",
         "configs/calibration/null_sweep_gpt_oss_20b.yaml",
-        "public_evidence/published_basis/gpt_oss_20b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gpt_oss_20b/runtime.manifest.json",
-        "public_evidence/published_basis/gpt_oss_20b/evidence_pack",
-        "scripts/model_evidence/model_evidence_sweep.py",
+        "contracts/evidence_catalog_v1.json",
         "tests/core/test_model_profiles.py",
         "tests/cli/test_preset_causal_presets.py",
-        "tests/scripts/test_model_evidence_sweep_catalog.py"
+        "tests/core/test_public_evidence_catalog.py"
       ],
-      "notes": "Evidence includes release-profile container-backed public WikiText-2 validation evidence for the pinned fixture. The no-op report passes strict policy with final perplexity 86.273 over 400 paired windows and no guard warnings. This is no-op preservation evidence; it is not a fine-tuning, benchmark-quality, deployment, safety, or alternate-seed/window robustness claim."
+      "notes": "Maintained catalog lane gpt-oss-20b-causal-hf.",
+      "evidence_status": "not_created",
+      "evidence_status_label": "Evidence not yet created"
     },
     {
       "family_id": "olmoe-1b-7b-causal-lm",
@@ -905,15 +901,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/olmoe_1b_7b_0924_512.yaml",
         "configs/calibration/null_sweep_olmoe_1b_7b_0924.yaml",
-        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/olmoe_1b_7b/runtime.manifest.json",
-        "public_evidence/published_basis/olmoe_1b_7b/evidence_pack"
+        "public_evidence/published_basis/olmoe-1b-7b-0924-causal-hf"
       ],
       "support_groups": [
         "moe_candidate",
         "small_local"
       ],
-      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, and signed evidence pack. This fixture is the smaller MoE validation basis; larger MoE assurance is covered by Mixtral, Qwen3 30B-A3B, and Gemma 4 26B-A4B published bases. Gemma 4 26B-A4B is image-text preservation/null-behavior evidence, not audio, exhaustive expert-bank, or MoE routing-quality evidence."
+      "notes": "Maintained catalog lane olmoe-1b-7b-0924-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "ministral-3-3b-text-causal-lm",
@@ -930,16 +926,16 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/ministral3_3b_512.yaml",
         "configs/calibration/null_sweep_ministral3_3b.yaml",
-        "public_evidence/published_basis/ministral3_3b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/ministral3_3b/runtime.manifest.json",
-        "public_evidence/published_basis/ministral3_3b/evidence_pack"
+        "public_evidence/published_basis/ministral-3-3b-text-causal-hf"
       ],
       "support_groups": [
         "published_modern",
         "small_local",
         "enterprise_permissive"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included."
+      "notes": "Maintained catalog lane ministral-3-3b-text-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "granite-4-1-8b-causal-lm",
@@ -956,15 +952,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/granite4_1_8b_512.yaml",
         "configs/calibration/null_sweep_granite4_1_8b.yaml",
-        "public_evidence/published_basis/granite4_1_8b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/granite4_1_8b/runtime.manifest.json",
-        "public_evidence/published_basis/granite4_1_8b/evidence_pack"
+        "public_evidence/published_basis/granite-4-1-8b-causal-hf"
       ],
       "support_groups": [
         "practical_shortlist",
         "enterprise_permissive"
       ],
-      "notes": "Public release-profile container-backed evidence fixture is included."
+      "notes": "Maintained catalog lane granite-4-1-8b-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "smollm3-3b-causal-lm",
@@ -981,14 +977,14 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/smollm3_3b_512.yaml",
         "configs/calibration/null_sweep_smollm3_3b.yaml",
-        "public_evidence/published_basis/smollm3_3b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/smollm3_3b/runtime.manifest.json",
-        "public_evidence/published_basis/smollm3_3b/evidence_pack"
+        "public_evidence/published_basis/smollm3-3b-causal-hf"
       ],
       "support_groups": [
         "small_local"
       ],
-      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence. The preset explicitly skips guard-overhead measurement, so this is preservation evidence and not guard-overhead evidence."
+      "notes": "Maintained catalog lane smollm3-3b-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "phi-4-mini-causal-lm",
@@ -1005,15 +1001,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/phi4_mini_512.yaml",
         "configs/calibration/null_sweep_phi4_mini.yaml",
-        "public_evidence/published_basis/phi4_mini/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/phi4_mini/runtime.manifest.json",
-        "public_evidence/published_basis/phi4_mini/evidence_pack"
+        "public_evidence/published_basis/phi-4-mini-causal-hf"
       ],
       "support_groups": [
         "small_local",
         "reasoning_focused"
       ],
-      "notes": "Evidence includes release-profile container-backed public report, runtime manifest, signed evidence pack, and recorded 400-window preservation evidence."
+      "notes": "Maintained catalog lane phi-4-mini-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "deepseek-r1-distill-qwen-14b-causal-lm",
@@ -1030,15 +1026,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_distill_qwen_14b_512.yaml",
         "configs/calibration/null_sweep_deepseek_r1_distill_qwen_14b.yaml",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/runtime.manifest.json",
-        "public_evidence/published_basis/deepseek_r1_distill_qwen_14b/evidence_pack"
+        "public_evidence/published_basis/deepseek-r1-distill-qwen-14b-causal-hf"
       ],
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included; the fixture uses baseline-report reuse recovery."
+      "notes": "Maintained catalog lane deepseek-r1-distill-qwen-14b-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     },
     {
       "family_id": "deepseek-r1-0528-qwen3-8b-causal-lm",
@@ -1055,15 +1051,15 @@
         "contracts/support_matrix.json",
         "configs/presets/causal_lm/deepseek_r1_0528_qwen3_8b_512.yaml",
         "configs/calibration/null_sweep_deepseek_r1_0528_qwen3_8b.yaml",
-        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/runtime.manifest.json",
-        "public_evidence/published_basis/deepseek_r1_0528_qwen3_8b/evidence_pack"
+        "public_evidence/published_basis/deepseek-r1-0528-qwen3-8b-causal-hf"
       ],
       "support_groups": [
         "published_modern",
         "reasoning_focused"
       ],
-      "notes": "Container-backed public report, runtime manifest, and evidence pack are included."
+      "notes": "Maintained catalog lane deepseek-r1-0528-qwen3-8b-causal-hf.",
+      "evidence_status": "available",
+      "evidence_status_label": "Available"
     }
   ],
   "implemented_coverage": [
@@ -1108,16 +1104,12 @@
         "configs/presets/multimodal/qwen3_5_2b_public_vqav2_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_4b.yaml",
         "configs/calibration/null_sweep_qwen3_5_2b.yaml",
-        "public_evidence/published_basis/qwen3_5_2b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_2b/evidence_pack",
-        "public_evidence/published_basis/qwen3_5_4b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/qwen3_5_4b/evidence_pack",
         "configs/presets/multimodal/qwen3_5_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_5_27b_scoped.yaml",
         "configs/presets/multimodal/qwen3_6_27b_public_vqav2_scoped_256.yaml",
         "configs/calibration/null_sweep_qwen3_6_27b_scoped.yaml"
       ],
-      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Qwen3.5 2B, Qwen3.5 4B, and scoped Qwen3.5/Qwen3.6 27B have published image-text evidence through hf_multimodal and pinned public VQAv2 materialization."
+      "notes": "Shared qwen-family heuristics cover aliases beyond the declared text-only Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 9B public lanes. Maintained image-text lanes cover Qwen3.5 2B, Qwen3.5 4B, and scoped Qwen3.5/Qwen3.6 27B through hf_multimodal with pinned VQAv2 input definitions."
     },
     {
       "family_id": "yi",
@@ -1187,20 +1179,10 @@
         "configs/calibration/null_sweep_gemma4_e4b.yaml",
         "configs/calibration/null_sweep_gemma4_12b.yaml",
         "configs/calibration/null_sweep_gemma4_26b_a4b.yaml",
-        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_e2b_image_text/evidence_pack",
-        "public_evidence/published_basis/gemma4_e4b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_e4b/evidence_pack",
-        "public_evidence/published_basis/gemma4_12b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_12b/evidence_pack",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_26b_a4b/evidence_pack",
         "configs/presets/multimodal/gemma4_31b_public_vqav2_256.yaml",
-        "configs/calibration/null_sweep_gemma4_31b.yaml",
-        "public_evidence/published_basis/gemma4_31b/evidence_pack/reports/report-001/evaluation.report.json",
-        "public_evidence/published_basis/gemma4_31b/evidence_pack"
+        "configs/calibration/null_sweep_gemma4_31b.yaml"
       ],
-      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Repo-declared published Gemma support includes Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, 26B-A4B, and 31B image-text published-basis evidence."
+      "notes": "Gemma-family selectors and loaders are first-class for compatible local or user-supplied checkpoints. Maintained Gemma catalog lanes include Gemma 4 E2B text-only plus Gemma 4 E2B, E4B, 12B, 26B-A4B, and 31B image-text evaluation."
     },
     {
       "family_id": "opt-neox-gptj",
@@ -1309,44 +1291,7 @@
       "notes": "Concrete loader families exist beyond the public FLAN-T5 base seq2seq basis; mBART/PEGASUS/Marian still need dedicated presets and public evidence before they become declared support lanes."
     }
   ],
-  "usage_only": [
-    {
-      "family_id": "qwen2-5-32b",
-      "display_name": "Qwen2.5 32B",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "usage_only",
-      "representative_models": [
-        "Qwen/Qwen2.5-32B"
-      ],
-      "repo_evidence": [
-        "docs/user-guide/evidence-packs-internals.md",
-        "scripts/evidence_packs/run_suite.sh",
-        "scripts/evidence_packs/lib/validation/validation_suite.sh"
-      ],
-      "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
-    },
-    {
-      "family_id": "yi-34b",
-      "display_name": "Yi 34B",
-      "modalities": [
-        "text"
-      ],
-      "task_role": "causal_lm",
-      "state": "usage_only",
-      "representative_models": [
-        "01-ai/Yi-34B"
-      ],
-      "repo_evidence": [
-        "docs/user-guide/evidence-packs-internals.md",
-        "scripts/evidence_packs/run_suite.sh",
-        "scripts/evidence_packs/tuned_edit_params.json"
-      ],
-      "notes": "Used in workshop and full evidence-pack suites without a public support lane."
-    }
-  ],
+  "usage_only": [],
   "published_basis_candidates_text_le_14b": {
     "format_version": "published-basis-candidates-text-le-14b-v1",
     "wave_label": "<=14B text-only published-basis candidate set",
@@ -1364,14 +1309,14 @@
         "display_name": "Qwen2.5 7B causal LM",
         "representative_model": "Qwen/Qwen2.5-7B",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
@@ -1379,26 +1324,26 @@
           "configs/calibration/null_sweep_qwen2_5_7b.yaml",
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence/model_evidence_sweep.py",
+          "tests/core/test_public_evidence_catalog.py",
+          "contracts/evidence_catalog_v1.json",
           "scripts/evidence_packs/lib/validation/validation_suite.sh"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes container-backed Qwen2.5 7B public report, runtime manifest, and signed evidence pack."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "qwen2-5-14b-causal-lm",
         "display_name": "Qwen2.5 14B causal LM",
         "representative_model": "Qwen/Qwen2.5-14B",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
@@ -1406,27 +1351,25 @@
           "configs/calibration/null_sweep_qwen2_5_14b.yaml",
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/qwen2_5_14b/evidence_pack/reports/report-001/evaluation.report.json",
-          "public_evidence/published_basis/qwen2_5_14b/evidence_pack"
+          "tests/core/test_public_evidence_catalog.py",
+          "contracts/evidence_catalog_v1.json"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes container-backed Qwen2.5 14B public report, runtime manifest, and signed evidence pack."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "qwen3-8b-causal-lm",
         "display_name": "Qwen3 8B causal LM",
         "representative_model": "Qwen/Qwen3-8B",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
@@ -1434,27 +1377,25 @@
           "configs/calibration/null_sweep_qwen3_8b.yaml",
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/qwen3_8b/evidence_pack/reports/report-001/evaluation.report.json",
-          "public_evidence/published_basis/qwen3_8b/evidence_pack"
+          "tests/core/test_public_evidence_catalog.py",
+          "contracts/evidence_catalog_v1.json"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes container-backed Qwen3 8B public report, runtime manifest, and signed evidence pack."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "deepseek-r1-distill-qwen-causal-lm",
         "display_name": "DeepSeek-R1-Distill-Qwen causal LM",
         "representative_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
@@ -1462,27 +1403,25 @@
           "configs/calibration/null_sweep_deepseek_r1_distill_qwen_7b.yaml",
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack/reports/report-001/evaluation.report.json",
-          "public_evidence/published_basis/deepseek_r1_distill_qwen_7b/evidence_pack"
+          "tests/core/test_public_evidence_catalog.py",
+          "contracts/evidence_catalog_v1.json"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes container-backed DeepSeek-R1-Distill-Qwen 7B public report, runtime manifest, and signed evidence pack."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "phi-4-reasoning-plus-causal-lm",
         "display_name": "Phi-4 reasoning-plus causal LM",
         "representative_model": "microsoft/Phi-4-reasoning-plus",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
@@ -1490,27 +1429,25 @@
           "configs/calibration/null_sweep_phi4_reasoning_plus.yaml",
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence/model_evidence_sweep.py",
-          "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack/reports/report-001/evaluation.report.json",
-          "public_evidence/published_basis/phi4_reasoning_plus/evidence_pack"
+          "tests/core/test_public_evidence_catalog.py",
+          "contracts/evidence_catalog_v1.json"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes container-backed Phi-4 reasoning-plus public report, runtime manifest, and signed evidence pack. This fixture is text-only and skips guard-overhead measurement by preset policy."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "openllama-7b-causal-lm",
         "display_name": "OpenLLaMA 7B causal LM",
         "representative_model": "openlm-research/open_llama_7b",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "configs/presets/causal_lm/open_llama_7b_512.yaml",
@@ -1519,12 +1456,10 @@
           "src/invarlock/adapters/hf_loading.py",
           "src/invarlock/adapters/auto.py",
           "tests/core/test_model_profiles.py",
-          "tests/cli/test_preset_causal_presets.py",
-          "public_evidence/published_basis/open_llama_7b/evidence_pack/reports/report-001/evaluation.report.json",
-          "public_evidence/published_basis/open_llama_7b/evidence_pack"
+          "tests/cli/test_preset_causal_presets.py"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes release-profile container-backed public report, runtime manifest, and signed evidence pack."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "phi-3-mini-4k-instruct-causal-lm",
@@ -1548,33 +1483,31 @@
           "tests/core/test_model_profile_local_config.py"
         ],
         "missing_artifacts": [],
-        "notes": "The public Phi surface remains the shipped Phi-4 text-only lane for this wave."
+        "notes": "The declared public Phi surface is the Phi-4 text-only lane. Phi-3 Mini remains out of scope until it satisfies the publication criteria."
       },
       {
         "candidate_id": "falcon-7b-causal-lm",
         "display_name": "Falcon 7B causal LM",
         "representative_model": "tiiuae/falcon-7b",
         "current_catalog_state": "published_basis",
-        "decision": "published_basis_complete",
+        "decision": "cataloged",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "not_created"
         },
         "repo_evidence": [
           "configs/presets/causal_lm/falcon_7b_512.yaml",
           "configs/calibration/null_sweep_falcon_7b.yaml",
           "src/invarlock/adapters/auto.py",
           "tests/adapters/test_hf_causal_variant_paths.py",
-          "tests/cli/test_preset_causal_presets.py",
-          "public_evidence/published_basis/falcon_7b/evidence_pack/reports/report-001/evaluation.report.json",
-          "public_evidence/published_basis/falcon_7b/evidence_pack"
+          "tests/cli/test_preset_causal_presets.py"
         ],
         "missing_artifacts": [],
-        "notes": "Evidence includes release-profile container-backed public report, runtime manifest, and signed evidence pack."
+        "notes": "Maintained catalog definition and evaluation configuration are available."
       },
       {
         "candidate_id": "broader-bert-like-mlms",
@@ -1599,12 +1532,12 @@
           "tests/adapters/test_hf_loading_helpers.py",
           "tests/adapters/test_hf_mlm_variant_paths.py",
           "tests/cli/test_preset_masked_lm_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py"
+          "tests/core/test_public_evidence_catalog.py"
         ],
         "missing_artifacts": [
           "approved calibration/evaluation evidence"
         ],
-        "notes": "Loader and adapter tests exist for representative DistilBERT and DeBERTa checkpoints, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
+        "notes": "Loader and adapter tests exist for representative DistilBERT and DeBERTa checkpoints. A lane preset, calibration config, and dry-run sweep coverage are present, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "mbart-large-50-seq2seq",

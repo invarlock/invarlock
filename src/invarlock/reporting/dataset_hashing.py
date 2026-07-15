@@ -141,7 +141,8 @@ def _compute_actual_window_hashes(report: dict[str, Any]) -> dict[str, Any]:
             "final": f"sha256:{final_hash}",
             "preview_tokens": preview_tokens,
             "final_tokens": final_tokens,
-            "dataset": None,
+            "dataset": data_config.get("dataset_hash")
+            or data_config.get("provider_hash"),
             "total_tokens": preview_tokens + final_tokens,
             "source": "explicit_token_ids",
         }
@@ -178,7 +179,7 @@ def _extract_dataset_info(report: dict[str, Any]) -> dict[str, Any]:
     seq_len = int(data_config.get("seq_len", 0) or 0)
     stride = int(data_config.get("stride", 0) or 0)
 
-    dataset = str(data_config.get("dataset", "unknown"))
+    dataset = str(data_config.get("provider") or data_config.get("dataset", "unknown"))
     split = str(data_config.get("split", data_config.get("dataset_split", "val")))
 
     # Prefer actual window hashes when explicit token IDs are present
@@ -219,7 +220,7 @@ def _extract_dataset_info(report: dict[str, Any]) -> dict[str, Any]:
         "add_prefix_space": data_config.get("add_prefix_space"),
     }
 
-    return {
+    dataset_info = {
         "provider": dataset,
         "split": split,
         "seq_len": seq_len,
@@ -232,6 +233,11 @@ def _extract_dataset_info(report: dict[str, Any]) -> dict[str, Any]:
         "hash": window_hash,
         "tokenizer": tokenizer_info,
     }
+    for key in ("dataset_name", "config_name", "revision"):
+        value = data_config.get(key)
+        if isinstance(value, str) and value.strip():
+            dataset_info[key] = value if key == "revision" else value.strip()
+    return dataset_info
 
 
 __all__ = [

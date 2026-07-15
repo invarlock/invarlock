@@ -164,7 +164,7 @@ def test_public_docs_do_not_mention_removed_trusted_local_mode() -> None:
 
 def test_evidence_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_surface():
     text = _read("docs/user-guide/evidence-packs.md")
-    assert "repo-only" in text
+    assert "scripts/evidence_packs/verify_pack.sh" in text
     assert "invarlock advanced evidence-pack verify" in text
     assert "invarlock evidence-pack verify" not in text
     assert REMOVED_RUN_COMMAND not in text
@@ -226,9 +226,9 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     assert 'format_version: "runtime-verify-v1"' in text
     assert 'format_version: "evidence-pack-verify-v1"' in text
     assert 'verify.format_version: "verify-v1"' in text
-    assert "public_evidence/published_basis/" in text
     assert "invarlock/_data/public_evidence/published_basis_index.json" in text
-    assert "compact generated index" in text
+    assert "Evidence not yet created" in text
+    assert "empty index" in text
     assert "maintained public contract carriers" in normalized
     assert "make_public_contract_bundle.py" not in text
 

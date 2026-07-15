@@ -4,13 +4,13 @@ from invarlock.reporting.policy_utils import _build_resolved_policies
 
 
 def test_resolved_policies_balanced_vs_aggressive():
-    # Balanced tier: correction disabled, max_spectral_norm None
+    # Reporting preserves the runtime policy for both tiers.
     spectral_bal = {"family_caps": {"ffn": {"kappa": 2.5}}, "policy": {}}
     rmt_bal = {"epsilon_by_family": {"ffn": 0.1}}
     variance_bal = {"predictive_gate": {}}
     res_bal = _build_resolved_policies("balanced", spectral_bal, rmt_bal, variance_bal)
     spb = res_bal.get("spectral", {})
-    assert spb.get("correction_enabled") is False
+    assert spb.get("correction_enabled") is True
     assert spb.get("max_spectral_norm") is None
 
     # Aggressive: policy turns on correction and sets max_spectral_norm; epsilon map preserved

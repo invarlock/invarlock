@@ -78,12 +78,47 @@ def test_verify_evidence_pack_skip_verify_allows_explicit_unverified_provenance_
 
     result = evidence_pack_mod.verify_evidence_pack(pack_dir, skip_verify=True)
 
-    assert result.status == evidence_pack_mod.EvidencePackStatus.OK
-    assert result.payload["ok"] is True
+    assert result.status == evidence_pack_mod.EvidencePackStatus.INTEGRITY_ONLY
+    assert result.payload["ok"] is False
+    assert result.payload["integrity_ok"] is True
+    assert result.payload["reports_verified"] is False
+    assert result.payload["verification_scope"] == "integrity_only"
+    assert result.payload["assurance_status"] == "not_verified"
     assert "verify" not in result.payload
     assert result.payload["warnings"] == [
         "manifest.signature.json missing; pack is unsigned."
     ]
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "label"),
+    [
+        ({"strict": True}, "--strict"),
+        ({"report_assurance": "strict"}, "--report-assurance strict"),
+        ({"profile": "ci"}, "--profile ci"),
+        ({"profile": "release"}, "--profile release"),
+    ],
+)
+def test_verify_evidence_pack_skip_verify_rejects_assurance_contexts(
+    tmp_path: Path,
+    kwargs: dict[str, object],
+    label: str,
+) -> None:
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+
+    result = evidence_pack_mod.verify_evidence_pack(
+        pack_dir,
+        skip_verify=True,
+        **kwargs,
+    )
+
+    assert result.status == evidence_pack_mod.EvidencePackStatus.USAGE
+    assert result.payload["ok"] is False
+    assert result.payload["integrity_ok"] is False
+    assert result.payload["reports_verified"] is False
+    assert result.payload["verification_scope"] == "not_verified"
+    assert label in result.payload["errors"][0]
 
 
 def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) -> None:
@@ -101,39 +136,6 @@ def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) 
 
     assert payload.payload["signer_fingerprint"] == "ABC123"
     assert payload.payload["verify"] == {"ok": False}
-
-
-def test_evidence_pack_helper_paths_cover_counts_low_evidence_and_failed_readme() -> (
-    None
-):
-    assert evidence_pack_mod._evidence_pack_counts_from_verification(
-        {
-            "clean_reports": 2,
-            "error_injection_reports": 1,
-            "failed_reports": 0,
-        }
-    ) == (2, 1, 0)
-    assert (
-        evidence_pack_mod._derive_evidence_pack_evidence_level(
-            subject_present=False,
-            checksums_bound=True,
-            clean_reports=0,
-            failed_reports=1,
-            has_source_repo_ref=False,
-            has_environment_ref=False,
-        )
-        == "low"
-    )
-    readme = evidence_pack_mod._render_evidence_pack_readme(
-        evidence_level="low",
-        clean_reports=2,
-        error_reports=1,
-        failed_reports=1,
-        policy_profile="release",
-        strict_ready=False,
-        signer_fingerprint=None,
-    )
-    assert "Unexpected report verification failures" in readme
 
 
 def test_build_verify_result_handles_invalid_manifest_json(tmp_path: Path) -> None:

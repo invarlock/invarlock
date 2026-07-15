@@ -32,19 +32,33 @@ pip install "invarlock[hf]"
 invarlock doctor
 ```
 
+The default strict evaluation path also needs a running Docker or Podman engine
+that the current account can invoke. Check it with `docker info` or `podman
+info`; `invarlock doctor` covers Python, dependency, and accelerator
+diagnostics rather than replacing the engine check.
+
 Wheel-only verification path:
-`invarlock verify /path/to/evaluation.report.json`,
+`invarlock verify --profile release --assurance strict --baseline /path/to/baseline/report.json --policy-pack /path/to/acceptance/policy-pack.json --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" /path/to/evaluation.report.json`,
 `invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
 and `invarlock report explain --evaluation-report /path/to/evaluation.report.json`.
 
 ### 2. Evaluate a baseline against a subject
 
+Set the subject to a checkpoint actually produced by your external edit
+pipeline. This production template intentionally does not label two unrelated
+pretrained checkpoints as a baseline/edit pair.
+
 ```bash
+BASELINE_CHECKPOINT=/path/to/original-checkpoint
+EDITED_SUBJECT_CHECKPOINT=/path/to/checkpoint-produced-by-your-edit-pipeline
+
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
-  --baseline gpt2 \
-  --subject distilgpt2 \
+  --baseline "$BASELINE_CHECKPOINT" \
+  --subject "$EDITED_SUBJECT_CHECKPOINT" \
   --baseline-adapter auto --subject-adapter auto \
   --profile ci \
+  --assurance strict \
+  --verbose \
   --report-out reports/eval
 ```
 
@@ -53,19 +67,39 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 `reports/eval/runtime.manifest.json` next to `evaluation.report.json`. For a
 host-side bypass, verify the resulting report with
 `invarlock verify --runtime-provenance host --assurance off ...`.
+With `--verbose`, evaluation prints `Baseline report: ...`; the same path is
+recorded at `provenance.baseline.report_path`. Its report-local `Status: PASS`
+remains provisional when `assurance.verdict=pending_verifier`.
+
+For a remote model ID, strict evaluation requires the corresponding
+`--baseline-revision` or `--subject-revision` as an immutable 40–64 character
+lowercase hexadecimal commit. Local checkpoint directories are bound by an
+automatic content-tree digest.
 
 Evidence-pack verification works from an installed wheel and does not require a
 repo checkout:
 
 ```bash
-invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+ACCEPTANCE_POLICY_PACK='/path/to/acceptance/policy-pack.json'
+invarlock advanced evidence-pack verify <pack> \
+  --strict --report-assurance strict \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST"
 ```
 
 ### 3. Verify the evaluation report
 
 ```bash
 # Container/default evaluate output
-invarlock verify reports/eval/evaluation.report.json
+BASELINE_RUN_REPORT=/path/to/baseline/run/report.json
+invarlock verify \
+  --profile ci \
+  --assurance strict \
+  --baseline "$BASELINE_RUN_REPORT" \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 
 # Host evaluate output
 invarlock verify --runtime-provenance host --assurance off reports/eval/evaluation.report.json
@@ -74,6 +108,17 @@ invarlock verify --runtime-provenance host --assurance off reports/eval/evaluati
 The verifier re-checks schema, paired math, gate results, and the adjacent
 runtime manifest before you promote results. Use the host form only
 when the evaluation itself ran with `--execution-mode host`.
+Obtain `ACCEPTANCE_POLICY_PACK` and `TRUSTED_RUNTIME_IMAGE_DIGEST` from reviewed
+policy channels, not from the report bundle being verified. The submitted bundle cannot
+make those independent trust anchors by building the pack itself or copying the
+manifest digest; policy tooling serializes an authorized decision but does not
+grant authorization. See [Policy packs](../reference/contracts.md#policy-packs)
+and the [Runtime Provenance Guide](../security/runtime-provenance-guide.md).
+Use the complete baseline run `report.json` emitted by `evaluate`; strict mode
+requires it for PPL and accuracy and rejects hand-written metric fragments.
+
+Only a strict verifier exit `0` is strict acceptance. It is distinct from the
+report-local policy `PASS` emitted during evaluation.
 
 Artifact model:
 
@@ -105,8 +150,10 @@ If you only have the run reports, the lower-level form remains:
 
 ## Advanced And Demo Flows
 
-The built-in `quant_rtn` edit ships for demos and smoke tests, but the primary
-onboarding path is the default evaluate flow shown above.
+The built-in `quant_rtn` edit is a dequantized-weight synthetic edit fixture for
+demos and smoke tests. It is not evidence that an external quantizer produced a
+deployable quantized checkpoint; the production onboarding path is BYOE as
+shown above.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -114,6 +161,8 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --subject gpt2 \
   --baseline-adapter auto --subject-adapter auto \
   --profile ci \
+  --execution-mode host \
+  --assurance off \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
   --report-out reports/demo
@@ -123,7 +172,10 @@ Advanced commands live under `invarlock advanced`:
 
 ```bash
 invarlock advanced plugins list
-invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
+invarlock advanced evidence-pack verify <pack> \
+  --strict --report-assurance strict \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST"
 invarlock advanced policy --help
 invarlock advanced calibrate --help
 ```

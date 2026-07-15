@@ -406,6 +406,9 @@ class TestDetectQuantizationFromConfig:
         mock_quant_cfg.config_groups = {
             "group_0": {"weights": {"num_bits": 4}},
         }
+        mock_quant_cfg.to_dict.return_value = {
+            "config_groups": mock_quant_cfg.config_groups,
+        }
 
         mock_config = MagicMock()
         mock_config.quantization_config = mock_quant_cfg
@@ -413,6 +416,19 @@ class TestDetectQuantizationFromConfig:
         cfg = detect_quantization_from_config(mock_config)
         assert cfg.method == QuantizationMethod.COMPRESSED_TENSORS
         assert cfg.bits == 4
+
+    def test_dynamic_nested_config_fails_closed_without_unbounded_recursion(self):
+        mock_quant_cfg = MagicMock()
+        mock_quant_cfg.__class__.__name__ = "CompressedTensorsConfig"
+        mock_quant_cfg.to_dict.return_value = None
+
+        mock_config = MagicMock()
+        mock_config.quantization_config = mock_quant_cfg
+
+        cfg = detect_quantization_from_config(mock_config)
+
+        assert cfg.method == QuantizationMethod.COMPRESSED_TENSORS
+        assert cfg.bits is None
 
 
 class TestDetectCapabilitiesFromModel:

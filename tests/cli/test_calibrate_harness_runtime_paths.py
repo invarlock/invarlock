@@ -52,18 +52,18 @@ def test_calibrate_helpers_cover_defaults_and_errors(tmp_path: Path) -> None:
     assert specs_w[0].windows == 6
 
     csv_path = tmp_path / "empty.csv"
-    calibrate_mod._dump_csv(csv_path, [])
+    calibrate_mod.dump_csv(csv_path, [])
     assert csv_path.read_text(encoding="utf-8") == ""
 
 
 def test_mark_calibration_context_repairs_non_mapping_state() -> None:
     cfg = {"context": "bad"}
     calibrate_mod._mark_calibration_context(cfg)
-    assert cfg["context"]["run"]["skip_overhead_check"] is True
+    assert cfg["context"]["run"]["skip_guard_metric_impact_check"] is True
 
     cfg2 = {"context": {"run": "bad"}}
     calibrate_mod._mark_calibration_context(cfg2)
-    assert cfg2["context"]["run"]["skip_overhead_check"] is True
+    assert cfg2["context"]["run"]["skip_guard_metric_impact_check"] is True
 
 
 def test_get_tier_guard_config_missing_optional_deps_and_reraise(
@@ -437,7 +437,7 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
 
     def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         loaded = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
-        assert loaded["context"]["run"]["skip_overhead_check"] is True
+        assert loaded["context"]["run"]["skip_guard_metric_impact_check"] is True
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -643,7 +643,7 @@ def test_ve_sweep_emits_json_csv_power_curve_and_tier_patch(tmp_path: Path) -> N
 
     def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         loaded = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
-        assert loaded["context"]["run"]["skip_overhead_check"] is True
+        assert loaded["context"]["run"]["skip_guard_metric_impact_check"] is True
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         # Vary CI width by window size to exercise branches and power curve.

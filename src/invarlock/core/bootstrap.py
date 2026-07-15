@@ -4,15 +4,14 @@ InvarLock Core Bootstrap Utilities
 
 Numerically stable bootstrap helpers for evaluation metrics.
 
-This module provides bias-corrected and accelerated (BCa) confidence
-intervals tailored for paired log-loss statistics used by the runner
-and evaluation reports.
+This module provides paired BCa intervals for baseline/subject comparisons and
+an independent two-slice percentile interval for disjoint preview/final data.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from statistics import NormalDist
 
 import numpy as np
@@ -20,6 +19,11 @@ import numpy as np
 from invarlock.core.exceptions import ValidationError
 
 __all__ = [
+    "INDEPENDENT_SLICE_BOOTSTRAP_METHOD",
+    "INDEPENDENT_SLICE_BOOTSTRAP_SEED_OFFSET",
+    "PAIRED_BASELINE_BOOTSTRAP_METHOD",
+    "PAIRED_BASELINE_BOOTSTRAP_SEED_OFFSET",
+    "compute_independent_delta_log_ci",
     "compute_logloss_ci",
     "compute_paired_delta_log_ci",
     "logspace_to_ratio_ci",
@@ -28,6 +32,15 @@ __all__ = [
 
 
 Normal = NormalDist()
+
+# Report generation records the external method name while the numerical helper
+# accepts the shorter implementation name.  Keep the external name and seed
+# derivation centralized so strict verification can replay the exact producer
+# algorithm without copying magic values.
+PAIRED_BASELINE_BOOTSTRAP_METHOD = "bca_paired_delta_log"
+PAIRED_BASELINE_BOOTSTRAP_SEED_OFFSET = 503
+INDEPENDENT_SLICE_BOOTSTRAP_METHOD = "independent_percentile_delta_log"
+INDEPENDENT_SLICE_BOOTSTRAP_SEED_OFFSET = 97
 
 
 def _ensure_array(samples: Iterable[float]) -> np.ndarray:
@@ -85,6 +98,75 @@ def _weighted_mean(samples: np.ndarray, weights: np.ndarray) -> float:
     return float(np.dot(samples, weights) / total)
 
 
+_BOOTSTRAP_CHUNK_BYTES = 16 * 1024 * 1024
+
+
+def _bootstrap_chunk_rows(
+    sample_width: int,
+    replicates: int,
+    *,
+    arrays_per_index: int,
+) -> int:
+    """Bound temporary bootstrap index/value matrices to a fixed memory budget."""
+
+    bytes_per_row = max(sample_width, 1) * 8 * max(arrays_per_index, 1)
+    return max(1, min(replicates, _BOOTSTRAP_CHUNK_BYTES // bytes_per_row))
+
+
+def _resampled_mean_statistics(
+    samples: np.ndarray,
+    *,
+    weights: np.ndarray | None,
+    replicates: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Compute bootstrap means in bounded chunks while preserving RNG draw order."""
+
+    size = int(samples.size)
+    statistics = np.empty(replicates, dtype=float)
+    rows = _bootstrap_chunk_rows(
+        size,
+        replicates,
+        arrays_per_index=3 if weights is not None else 2,
+    )
+    for start in range(0, replicates, rows):
+        stop = min(start + rows, replicates)
+        selected = rng.integers(0, size, size=(stop - start, size))
+        selected_values = samples[selected]
+        if weights is None:
+            statistics[start:stop] = np.mean(selected_values, axis=1)
+            continue
+        selected_weights = weights[selected]
+        denominators = np.sum(selected_weights, axis=1)
+        numerators = np.sum(selected_values * selected_weights, axis=1)
+        chunk_statistics = np.mean(selected_values, axis=1)
+        np.divide(
+            numerators,
+            denominators,
+            out=chunk_statistics,
+            where=denominators > 0.0,
+        )
+        statistics[start:stop] = chunk_statistics
+    return statistics
+
+
+def _constant_within_subtraction_roundoff(
+    delta: np.ndarray,
+    final: np.ndarray,
+    baseline: np.ndarray,
+) -> bool:
+    """Distinguish arithmetic roundoff from small but real paired variation."""
+
+    spread = float(np.max(delta) - np.min(delta))
+    operand_scale = max(
+        1.0,
+        float(np.max(np.abs(final))),
+        float(np.max(np.abs(baseline))),
+    )
+    roundoff_limit = 8.0 * np.finfo(np.float64).eps * operand_scale
+    return bool(spread <= roundoff_limit)
+
+
 def _percentile_interval(stats: np.ndarray, alpha: float) -> tuple[float, float]:
     """Return lower/upper bounds from an array of bootstrap statistics."""
     lower_q = 100.0 * (alpha / 2.0)
@@ -100,17 +182,25 @@ def _bca_interval_weighted(
     alpha: float,
     rng: np.random.Generator,
 ) -> tuple[float, float]:
-    """Compute a BCa interval for the mean under weighted resampling."""
+    """Compute a BCa interval for a token-weighted mean over window clusters.
+
+    Windows are the independent resampling units.  Each bootstrap replicate
+    samples windows uniformly and then recomputes the token-weighted statistic
+    from the sampled window values and weights.  Sampling windows with
+    probability proportional to token count and then taking an unweighted mean
+    would change both the estimand and its sampling variance.
+    """
     n = samples.size
     if n < 2:
         stat = _weighted_mean(samples, weights)
         return float(stat), float(stat)
 
-    prob = weights / float(weights.sum())
-    stats = np.empty(replicates, dtype=float)
-    for i in range(replicates):
-        idx = rng.choice(n, size=n, replace=True, p=prob)
-        stats[i] = float(np.mean(samples[idx]))
+    stats = _resampled_mean_statistics(
+        samples,
+        weights=weights,
+        replicates=replicates,
+        rng=rng,
+    )
 
     stats.sort()
     stat_hat = _weighted_mean(samples, weights)
@@ -150,7 +240,6 @@ def _bca_interval_weighted(
 def _bca_interval(
     samples: np.ndarray,
     *,
-    stat_fn: Callable[[np.ndarray], float],
     replicates: int,
     alpha: float,
     rng: np.random.Generator,
@@ -164,17 +253,18 @@ def _bca_interval(
     """
     n = samples.size
     if n < 2:
-        stat = stat_fn(samples)
+        stat = float(np.mean(samples))
         return float(stat), float(stat)
 
-    # Bootstrap replicates of the statistic
-    stats = np.empty(replicates, dtype=float)
-    for i in range(replicates):
-        idx = rng.integers(0, n, size=n)
-        stats[i] = stat_fn(samples[idx])
+    stats = _resampled_mean_statistics(
+        samples,
+        weights=None,
+        replicates=replicates,
+        rng=rng,
+    )
 
     stats.sort()
-    stat_hat = stat_fn(samples)
+    stat_hat = float(np.mean(samples))
 
     # Bias-correction
     prop = np.clip((stats < stat_hat).mean(), 1e-6, 1.0 - 1e-6)
@@ -184,7 +274,7 @@ def _bca_interval(
     jack = np.empty(n, dtype=float)
     for i in range(n):
         jack_sample = np.delete(samples, i)
-        jack[i] = stat_fn(jack_sample)
+        jack[i] = float(np.mean(jack_sample))
 
     jack_mean = jack.mean()
     numerator = np.sum((jack_mean - jack) ** 3)
@@ -221,12 +311,12 @@ def _bootstrap_mean_ci_weighted(
 
     rng = np.random.default_rng(seed)
     if method == "percentile":
-        stats = np.empty(replicates, dtype=float)
-        n = samples.size
-        prob = weights / float(weights.sum())
-        for i in range(replicates):
-            idx = rng.choice(n, size=n, replace=True, p=prob)
-            stats[i] = float(np.mean(samples[idx]))
+        stats = _resampled_mean_statistics(
+            samples,
+            weights=weights,
+            replicates=replicates,
+            rng=rng,
+        )
         stats.sort()
         return _percentile_interval(stats, alpha)
     if method == "bca":
@@ -244,7 +334,6 @@ def _bootstrap_mean_ci_weighted(
 def _bootstrap_interval(
     samples: np.ndarray,
     *,
-    stat_fn: Callable[[np.ndarray], float],
     method: str,
     replicates: int,
     alpha: float,
@@ -258,17 +347,17 @@ def _bootstrap_interval(
 
     rng = np.random.default_rng(seed)
     if method == "percentile":
-        stats = np.empty(replicates, dtype=float)
-        n = samples.size
-        for i in range(replicates):
-            idx = rng.integers(0, n, size=n)
-            stats[i] = stat_fn(samples[idx])
+        stats = _resampled_mean_statistics(
+            samples,
+            weights=None,
+            replicates=replicates,
+            rng=rng,
+        )
         stats.sort()
         return _percentile_interval(stats, alpha)
     if method == "bca":
         return _bca_interval(
             samples,
-            stat_fn=stat_fn,
             replicates=replicates,
             alpha=alpha,
             rng=rng,
@@ -292,17 +381,97 @@ def compute_logloss_ci(
     """
     samples = _ensure_array(logloss_samples)
 
-    def stat_fn(data: np.ndarray) -> float:
-        return float(np.mean(data))
-
     return _bootstrap_interval(
         samples,
-        stat_fn=stat_fn,
         method=method,
         replicates=replicates,
         alpha=alpha,
         seed=seed,
     )
+
+
+def _independent_arm_weights(
+    weights: Iterable[float] | None,
+    size: int,
+    *,
+    arm: str,
+) -> np.ndarray:
+    if weights is None:
+        return np.ones(size, dtype=float)
+    values = np.asarray(list(weights), dtype=float)
+    if values.ndim != 1:
+        raise ValueError(f"{arm}_weights must be 1-dimensional")
+    if values.size != size:
+        raise ValueError(f"{arm}_weights length must match {arm} samples")
+    if not np.all(np.isfinite(values)):
+        raise ValueError(f"{arm}_weights must be finite")
+    if np.any(values < 0.0):
+        raise ValueError(f"{arm}_weights must be non-negative")
+    if float(values.sum()) <= 0.0:
+        raise ValueError(f"{arm}_weights must have a positive sum")
+    return values
+
+
+def compute_independent_delta_log_ci(
+    final_logloss: Iterable[float],
+    preview_logloss: Iterable[float],
+    *,
+    final_weights: Iterable[float] | None = None,
+    preview_weights: Iterable[float] | None = None,
+    method: str = "percentile",
+    replicates: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 0,
+) -> tuple[float, float]:
+    """Bootstrap the difference between two independent log-loss slices.
+
+    Preview and final windows are separate sampling units with disjoint IDs.
+    Each replicate therefore resamples each arm independently and subtracts
+    the two token-weighted arm means.  This function intentionally does not
+    offer paired resampling or BCa under a paired-data interpretation.
+    """
+
+    if method != "percentile":
+        raise ValueError("independent slice delta supports only the percentile method")
+    if replicates <= 0:
+        raise ValueError("replicates must be positive")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be between 0 and 1")
+
+    final_values = _ensure_array(final_logloss)
+    preview_values = _ensure_array(preview_logloss)
+    final_sample_weights = _independent_arm_weights(
+        final_weights,
+        final_values.size,
+        arm="final",
+    )
+    preview_sample_weights = _independent_arm_weights(
+        preview_weights,
+        preview_values.size,
+        arm="preview",
+    )
+
+    rng = np.random.default_rng(seed)
+    stats = np.empty(replicates, dtype=float)
+    for index in range(replicates):
+        final_indices = rng.integers(
+            0,
+            final_values.size,
+            size=final_values.size,
+        )
+        preview_indices = rng.integers(
+            0,
+            preview_values.size,
+            size=preview_values.size,
+        )
+        stats[index] = _weighted_mean(
+            final_values[final_indices],
+            final_sample_weights[final_indices],
+        ) - _weighted_mean(
+            preview_values[preview_indices],
+            preview_sample_weights[preview_indices],
+        )
+    return _percentile_interval(stats, alpha)
 
 
 def compute_paired_delta_log_ci(
@@ -319,14 +488,15 @@ def compute_paired_delta_log_ci(
     """
     Compute a confidence interval over the paired mean delta of log-loss.
 
-    This implementation uses token-weighted resampling when window weights are
-    provided. When all weights are equal, the weighted bootstrap reduces to the
-    simple mean. See docs/assurance/01-eval-math-derivation.md for the derivation.
+    This implementation resamples paired windows as clusters and recomputes the
+    token-weighted mean within each replicate when window weights are provided.
+    When all weights are equal, it reduces to the ordinary paired bootstrap. See
+    docs/assurance/01-eval-math-derivation.md for the derivation.
 
     Args:
         final_logloss: Iterable of per-window log-loss values after the edit/guard.
         baseline_logloss: Iterable of paired per-window log-loss values (before edit).
-        weights: Optional token counts per window; used for weighted resampling.
+        weights: Optional token counts used in the replicate statistic.
 
     Returns:
         (lo, hi) bounds of Δlog-loss such that ratio CI = exp(bounds).
@@ -352,8 +522,14 @@ def compute_paired_delta_log_ci(
         return 0.0, 0.0
 
     delta = final_arr - base_arr
-    if np.allclose(delta, delta[0]):
-        mean_delta = float(delta.mean())
+    if not np.all(np.isfinite(delta)):
+        raise ValueError("paired log-loss deltas must be finite")
+    if _constant_within_subtraction_roundoff(delta, final_arr, base_arr):
+        mean_delta = (
+            _weighted_mean(delta, weight_arr)
+            if weight_arr is not None
+            else float(delta.mean())
+        )
         return mean_delta, mean_delta
 
     if weight_arr is not None:
@@ -366,12 +542,8 @@ def compute_paired_delta_log_ci(
             seed=seed,
         )
 
-    def stat_fn(data: np.ndarray) -> float:
-        return float(np.mean(data))
-
     return _bootstrap_interval(
         delta,
-        stat_fn=stat_fn,
         method=method,
         replicates=replicates,
         alpha=alpha,

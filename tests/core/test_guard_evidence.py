@@ -43,6 +43,7 @@ def test_guard_evidence_clean_pass_has_no_blocking_reason() -> None:
             "passed": True,
             "decision": "allow",
             "final_z_scores": {"linear": 0.1},
+            "final_degeneracy": {"linear": {"stable_rank": 2.0, "norm_collapse": 0.8}},
             "module_family_map": {"layer": "linear"},
         },
     )
@@ -50,6 +51,9 @@ def test_guard_evidence_clean_pass_has_no_blocking_reason() -> None:
     assert evidence is not None
     entry = evidence.as_report_entry()
     assert entry["final_z_scores"] == {"linear": 0.1}
+    assert entry["final_degeneracy"] == {
+        "linear": {"stable_rank": 2.0, "norm_collapse": 0.8}
+    }
     assert entry["module_family_map"] == {"layer": "linear"}
     assert evidence.strict_blocking_reasons() == ()
 

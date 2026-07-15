@@ -24,6 +24,7 @@ class HFTextProvider:
         config_name: str | None = None,
         text_field: str = "text",
         cache_dir: str | None = None,
+        revision: str | None = None,
         trust_remote_code: bool = False,
         max_samples: int = 2000,
     ):
@@ -34,6 +35,7 @@ class HFTextProvider:
         self.config_name = config_name or None
         self.text_field = text_field
         self.cache_dir = cache_dir
+        self.revision = revision or None
         self.trust_remote_code = bool(trust_remote_code)
         self.max_samples = int(max_samples)
         self._texts_cache: dict[str, list[str]] = {}
@@ -47,6 +49,7 @@ class HFTextProvider:
             name=self.config_name,
             split=split,
             cache_dir=self.cache_dir,
+            revision=self.revision,
             trust_remote_code=self.trust_remote_code,
         )
         texts: list[str] = []

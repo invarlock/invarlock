@@ -1,10 +1,13 @@
+import pytest
+
 from invarlock.reporting.policy_utils import (
     _extract_policy_overrides,
     _format_epsilon_map,
     _format_family_caps,
     _resolve_policy_tier,
 )
-from invarlock.reporting.report_overhead import prepare_guard_overhead_section
+from invarlock.reporting.report_metric_impact import prepare_guard_metric_impact_section
+from tests.reporting._support_guard_metric_impact import ppl_guard_context
 
 
 def test_extract_policy_overrides_dedup_and_sources():
@@ -31,15 +34,15 @@ def test_format_family_caps_and_epsilon_map_variants():
     assert out_eps == {"ffn": 0.1, "attn": 0.12}
 
 
-def test_resolve_policy_tier_from_context_auto_and_guard_overhead_ratio_compute():
-    report = {"context": {"auto": {"tier": "AGGRESSIVE"}}, "meta": {}}
+def test_resolve_policy_tier_from_canonical_meta_and_guard_metric_degradation_compute():
+    report = {"meta": {"auto": {"tier": "AGGRESSIVE"}}}
     assert _resolve_policy_tier(report) == "aggressive"
 
-    # Guard overhead: compute from bare/guarded
-    raw = {"bare_ppl": 10.0, "guarded_ppl": 10.5, "overhead_threshold": 0.01}
-    payload, passed = prepare_guard_overhead_section(raw)
+    # Guard metric impact: compute from bare/guarded
+    raw = ppl_guard_context(10.0, 10.5, degradation_limit=0.01)
+    payload, passed = prepare_guard_metric_impact_section(raw)
     assert (
         payload["evaluated"] is True
-        and payload["overhead_ratio"] == 1.05
+        and payload["degradation"] == pytest.approx(0.05)
         and passed is False
     )

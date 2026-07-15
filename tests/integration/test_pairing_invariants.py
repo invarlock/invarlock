@@ -2,12 +2,28 @@ import pytest
 
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
-def _build_report(match: float = 1.0, overlap: float = 0.0):
+def _build_report(
+    match: float = 1.0,
+    overlap: float = 0.0,
+    *,
+    edit_name: str = "structured",
+):
     report = create_empty_report()
-    report["meta"]["model_id"] = "dummy-model"
-    report["meta"]["adapter"] = "dummy"
+    report["meta"].update(
+        {
+            "model_id": "dummy-model",
+            "adapter": "dummy",
+            "auto": {"tier": "balanced"},
+        }
+    )
+    report["context"] = {"profile": "ci"}
+    report["edit"]["name"] = edit_name
     report["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": 10.0,
@@ -44,8 +60,8 @@ def _build_report(match: float = 1.0, overlap: float = 0.0):
 
 @pytest.mark.integration
 def test_pairing_invariants_ci_profile():
-    baseline_report = _build_report()
-    run_report = _build_report()
+    baseline_report = canonical_baseline(_build_report(edit_name="noop"))
+    run_report = canonical_run_report(_build_report())
 
     evaluation_report = make_report(run_report, baseline_report)
     stats = evaluation_report.get("dataset", {}).get("windows", {}).get("stats", {})

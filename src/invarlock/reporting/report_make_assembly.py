@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable
 from typing import Any
 
 from invarlock.core import auto_tuning as auto_tuning_mod
@@ -11,13 +10,14 @@ from . import guard_warnings as guard_warnings_mod
 from . import policy_utils as report_policy_utils_mod
 from . import report_builder_support as report_builder_support_mod
 from . import report_edit_summary as report_edit_summary_mod
+from . import report_metric_impact as report_metric_impact_mod
 from . import report_normalization as report_normalization_mod
-from . import report_overhead as report_overhead_mod
 from . import report_policy as report_policy_mod
 from . import report_provenance as report_provenance_mod
-from . import report_validation as report_validation_mod
 from .report_schema import load_validation_allowlist
 from .report_types import RunReport
+from .runtime_policy_receipt import runtime_policy_from_report
+from .validation import report as report_validation_mod
 
 
 def _copy_meta_provenance_fields(
@@ -35,7 +35,7 @@ def _copy_meta_provenance_fields(
             else None
         )
         if isinstance(env_flags, dict) and env_flags:
-            meta["env_flags"] = env_flags
+            meta["env_flags"] = copy.deepcopy(env_flags)
     except non_fatal_exceptions:  # pragma: no cover
         record_blocking_diagnostic(
             code="meta.env_flags_unavailable",
@@ -49,7 +49,7 @@ def _copy_meta_provenance_fields(
             else None
         )
         if isinstance(det, dict) and det:
-            meta["determinism"] = det
+            meta["determinism"] = copy.deepcopy(det)
     except non_fatal_exceptions:  # pragma: no cover
         record_blocking_diagnostic(
             code="meta.determinism_unavailable",
@@ -81,11 +81,15 @@ def _copy_meta_provenance_fields(
 
     model_profile_meta = report["meta"].get("model_profile")
     if isinstance(model_profile_meta, dict) and model_profile_meta:
-        meta["model_profile"] = model_profile_meta
+        meta["model_profile"] = copy.deepcopy(model_profile_meta)
+
+    model_identity = report["meta"].get("model_identity")
+    if isinstance(model_identity, dict) and model_identity:
+        meta["model_identity"] = copy.deepcopy(model_identity)
 
     cuda_flags = report["meta"].get("cuda_flags")
     if isinstance(cuda_flags, dict) and cuda_flags:
-        meta["cuda_flags"] = cuda_flags
+        meta["cuda_flags"] = copy.deepcopy(cuda_flags)
 
 
 def _resolve_policy_inputs(
@@ -93,9 +97,8 @@ def _resolve_policy_inputs(
     build_diagnostics: list[dict[str, Any]],
     *,
     non_fatal_exceptions: tuple[type[BaseException], ...],
-) -> tuple[str | None, dict[str, Any] | None]:
+) -> str | None:
     profile = None
-    explicit_overrides: dict[str, Any] | None = None
     try:
         ctx = report.get("context") if isinstance(report, dict) else None
         if isinstance(ctx, dict) and ctx.get("profile"):
@@ -128,27 +131,7 @@ def _resolve_policy_inputs(
             message="Window-plan profile extraction failed; policy resolution fell back to context/default profile handling.",
             severity="error",
         )
-    try:
-        meta_cfg = (
-            report.get("meta", {}).get("config")
-            if isinstance(report.get("meta"), dict)
-            else None
-        )
-        if isinstance(meta_cfg, dict) and isinstance(meta_cfg.get("guards"), dict):
-            explicit_overrides = meta_cfg.get("guards")
-        cfg2 = report.get("config")
-        if explicit_overrides is None and isinstance(cfg2, dict):
-            if isinstance(cfg2.get("guards"), dict):
-                explicit_overrides = cfg2.get("guards")
-    except non_fatal_exceptions:
-        explicit_overrides = None
-        report_builder_support_mod.append_build_diagnostic(
-            build_diagnostics,
-            code="policy.explicit_overrides_unavailable",
-            message="Explicit guard overrides could not be extracted from the run configuration.",
-            severity="error",
-        )
-    return profile, explicit_overrides
+    return profile
 
 
 def _resolve_policy_edit_and_telemetry_context(
@@ -163,25 +146,49 @@ def _resolve_policy_edit_and_telemetry_context(
     variance_policy_digest: str,
     build_diagnostics: list[dict[str, Any]],
     *,
-    record_blocking_diagnostic: Callable[[str, str], None],
     non_fatal_exceptions: tuple[type[BaseException], ...],
 ) -> dict[str, Any]:
     load_validation_allowlist()
     validation_allowlist_source = "contracts"
-    profile, explicit_overrides = _resolve_policy_inputs(
+    profile = _resolve_policy_inputs(
         report,
         build_diagnostics,
         non_fatal_exceptions=non_fatal_exceptions,
     )
 
-    resolved_policy = report_policy_utils_mod._build_resolved_policies(
-        auto.get("tier", "balanced"),
-        spectral,
-        rmt,
-        variance,
-        profile=profile,
-        explicit_overrides=explicit_overrides,
+    resolved_policy, receipt_errors = runtime_policy_from_report(report)
+    if resolved_policy is None:
+        raise ValueError(
+            "Run report is missing its runtime policy receipt; policy "
+            "reconstruction is not supported."
+        )
+    if receipt_errors:
+        raise ValueError(
+            "Runtime policy receipt is invalid: " + "; ".join(receipt_errors)
+        )
+    else:
+        raw_resolution = report.get("policy_resolution")
+        policy_resolution = (
+            copy.deepcopy(raw_resolution) if isinstance(raw_resolution, dict) else {}
+        )
+    receipt_profile = str(policy_resolution.get("profile") or "").strip().lower()
+    declared_profile = str(profile or "").strip().lower()
+    if declared_profile and declared_profile != receipt_profile:
+        raise ValueError("Runtime policy receipt profile does not match run context.")
+    profile = receipt_profile
+    receipt_tier = str(policy_resolution.get("tier") or "").strip().lower()
+    declared_tier = str(auto.get("tier") or "").strip().lower()
+    if declared_tier and declared_tier != receipt_tier:
+        raise ValueError("Runtime policy receipt tier does not match run metadata.")
+    edit_section = report.get("edit")
+    declared_edit = (
+        str(edit_section.get("name") or "").strip()
+        if isinstance(edit_section, dict)
+        else ""
     )
+    receipt_edit = policy_resolution.get("edit_name")
+    if declared_edit != str(receipt_edit or "").strip():
+        raise ValueError("Runtime policy receipt edit does not match run edit.")
     overrides_list = report_policy_utils_mod._extract_policy_overrides(report)
     resolved_digest = report_policy_utils_mod._compute_policy_digest(
         {
@@ -194,6 +201,7 @@ def _resolve_policy_edit_and_telemetry_context(
         "overrides": overrides_list,
         "policy_digest": resolved_digest,
         "validation_allowlist_source": validation_allowlist_source,
+        "source": "runtime",
     }
     auto["policy_digest"] = resolved_digest
 
@@ -208,7 +216,7 @@ def _resolve_policy_edit_and_telemetry_context(
     if isinstance(meta_plugins, dict):
         raw_plugin_provenance = meta_plugins.get("plugins")
         if isinstance(raw_plugin_provenance, dict):
-            plugin_provenance = raw_plugin_provenance
+            plugin_provenance = copy.deepcopy(raw_plugin_provenance)
 
     edit_metadata = report_edit_summary_mod.extract_edit_metadata(
         report, plugin_provenance
@@ -228,6 +236,7 @@ def _resolve_policy_edit_and_telemetry_context(
         "profile": profile,
         "resolved_policy": resolved_policy,
         "policy_provenance": policy_provenance,
+        "policy_resolution": policy_resolution,
         "plugin_provenance": plugin_provenance,
         "edit_metadata": edit_metadata,
         "edit_name": edit_name,
@@ -264,12 +273,12 @@ def _build_report_assembly_context(
     )
 
     artifacts_payload = report_builder_support_mod.build_artifacts_payload(report)
-    raw_guard_ctx = report.get("guard_overhead")
-    guard_overhead_section, _ = report_overhead_mod.prepare_guard_overhead_section(
-        raw_guard_ctx
+    raw_guard_ctx = report.get("guard_metric_impact")
+    guard_metric_impact_section, _ = (
+        report_metric_impact_mod.prepare_guard_metric_impact_section(raw_guard_ctx)
     )
     schedule_digest = report_builder_support_mod.attach_schedule_digest(
-        report, guard_overhead_section
+        report, guard_metric_impact_section
     )
 
     policy_provenance["resolved_at"] = artifacts_payload["generated_at"]
@@ -289,6 +298,29 @@ def _build_report_assembly_context(
         compute_edit_digest_fn=report_provenance_mod.compute_edit_digest,
         env_flags_payload=provenance_env_flags,
     )
+    baseline_binding = provenance.get("baseline")
+    if isinstance(baseline_binding, dict):
+        report_hash = baseline_binding.get("report_hash")
+        if isinstance(report_hash, str) and report_hash:
+            baseline_ref["report_hash"] = report_hash
+    baseline_provenance = (
+        baseline_raw_map.get("provenance")
+        if isinstance(baseline_raw_map.get("provenance"), dict)
+        else None
+    )
+    baseline_provider_digest = (
+        baseline_provenance.get("provider_digest")
+        if isinstance(baseline_provenance, dict)
+        else None
+    )
+    if isinstance(baseline_provider_digest, dict) and baseline_provider_digest:
+        baseline_ref["provider_digest"] = copy.deepcopy(baseline_provider_digest)
+    baseline_meta = baseline_raw_map.get("meta")
+    baseline_identity = (
+        baseline_meta.get("model_identity") if isinstance(baseline_meta, dict) else None
+    )
+    if isinstance(baseline_identity, dict) and baseline_identity:
+        baseline_ref["model_identity"] = copy.deepcopy(baseline_identity)
 
     moe_section = report_builder_support_mod.build_moe_section(
         report, baseline_raw, baseline_normalized
@@ -327,7 +359,7 @@ def _build_report_assembly_context(
         tier=str(auto.get("tier", "balanced")),
         _ppl_metrics=ppl_metrics if isinstance(ppl_metrics, dict) else None,
         target_ratio=target_ratio,
-        guard_overhead=guard_overhead_section,
+        guard_metric_impact=guard_metric_impact_section,
         primary_metric=(
             report_map.get("metrics", {}).get("primary_metric")
             if isinstance(report_map.get("metrics"), dict)
@@ -376,7 +408,7 @@ def _build_report_assembly_context(
     return {
         "artifacts_payload": artifacts_payload,
         "raw_guard_ctx": raw_guard_ctx,
-        "guard_overhead_section": guard_overhead_section,
+        "guard_metric_impact_section": guard_metric_impact_section,
         "current_run_id": current_run_id,
         "provenance": provenance,
         "moe_section": moe_section,

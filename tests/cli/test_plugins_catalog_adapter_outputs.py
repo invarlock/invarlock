@@ -130,7 +130,8 @@ def test_plugins_adapters_json_with_explicit_filters(monkeypatch, capsys):
     needs_extra_items = [
         i for i in payload["items"] if i.get("status") == "needs_extra"
     ]
-    assert len(needs_extra_items) >= 1 or len(payload["items"]) >= 0
+    assert [item["name"] for item in needs_extra_items] == ["hf_bnb"]
+    assert {item["status"] for item in payload["items"]} == {"needs_extra"}
 
 
 def test_plugins_adapters_json_statuses(monkeypatch, capsys):
@@ -475,6 +476,20 @@ def test_check_plugin_extras_missing(monkeypatch):
     assert "invarlock[quanto]" in result
     result = plugins_mod._check_plugin_extras("hf_ct", "adapters")
     assert "invarlock[compressed-tensors]" in result
+
+
+def test_gptqmodel_plugin_extra_uses_named_runtime_boundary(monkeypatch) -> None:
+    from invarlock.cli.commands import plugins_extras
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        plugins_extras,
+        "require_gptqmodel_runtime",
+        lambda: calls.append("runtime"),
+    )
+
+    assert plugins_extras._plugin_package_importable("gptqmodel") is True
+    assert calls == ["runtime"]
 
 
 def test_check_plugin_extras_flags_old_multimodal_stack(monkeypatch):

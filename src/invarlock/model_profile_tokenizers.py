@@ -16,7 +16,7 @@ _TOKENIZER_LOAD_ERRORS = (ImportError, OSError, RuntimeError, TypeError, ValueEr
 
 
 class PreTrainedTokenizerBase:
-    """Lightweight stub used when transformers is not installed."""
+    """Failing sentinel used when the optional transformers package is absent."""
 
     pad_token: Any = None
     eos_token: Any = None

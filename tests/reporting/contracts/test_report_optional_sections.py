@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 
 import pytest
 
 from invarlock.reporting import report_normalization as report_normalization_mod
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _optional_sections_report() -> tuple[dict, dict]:
@@ -20,6 +23,7 @@ def _optional_sections_report() -> tuple[dict, dict]:
             "seed": 5,
             "auto": {"tier": "balanced", "probes_used": ["spectral"]},
         },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "demo-ds",
             "split": "eval",
@@ -32,12 +36,12 @@ def _optional_sections_report() -> tuple[dict, dict]:
         "evaluation_windows": {
             "preview": {
                 "window_ids": window_ids,
-                "logloss": [0.1, 0.12, 0.14],
+                "logloss": [math.log(10.0)] * 3,
                 "token_counts": token_counts,
             },
             "final": {
                 "window_ids": window_ids,
-                "logloss": [0.11, 0.13, 0.15],
+                "logloss": [math.log(10.4)] * 3,
                 "token_counts": token_counts,
             },
         },
@@ -55,7 +59,10 @@ def _optional_sections_report() -> tuple[dict, dict]:
                 "ratio_vs_baseline": 1.04,
                 "display_ci": [10.2, 10.6],
             },
-            "paired_delta_summary": {"mean": 0.0, "degenerate": False},
+            "preview_final_slice_delta_summary": {
+                "mean": math.log(1.04),
+                "degenerate": False,
+            },
             "bootstrap": {"replicates": 300, "coverage": {"preview": {"used": 3}}},
             "window_plan": {"profile": "dev"},
             "window_overlap_fraction": 0.5,
@@ -90,8 +97,12 @@ def _optional_sections_report() -> tuple[dict, dict]:
     }
     baseline = deepcopy(base_report)
     baseline["run_id"] = "baseline-run"
+    baseline["edit"]["name"] = "noop"
     baseline["metrics"]["primary_metric"]["final"] = 10.0
     baseline["metrics"]["primary_metric"]["ratio_vs_baseline"] = 1.0
+    baseline["metrics"]["preview_final_slice_delta_summary"]["mean"] = 0.0
+    baseline["evaluation_windows"]["preview"]["logloss"] = [math.log(10.0)] * 3
+    baseline["evaluation_windows"]["final"]["logloss"] = [math.log(10.0)] * 3
     baseline["metrics"]["secondary_metrics"][0]["final"] = 0.89
     baseline["metrics"]["secondary_metrics"][0]["ratio_vs_baseline"] = 1.0
     baseline["metrics"]["secondary_metrics"].pop()  # Drop invalid entry to keep diff
@@ -109,7 +120,7 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     # ensure normalization helpers do not short-circuit rich payload
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -137,14 +148,19 @@ def test_make_evaluation_report_policy_digest_marks_changed(monkeypatch):
     report, baseline = _optional_sections_report()
     report = deepcopy(report)
     report["guards"] = [
-        {"name": "spectral", "policy": {"max_caps": 5}, "metrics": {"caps_applied": 1}}
+        {
+            "name": "spectral",
+            "passed": True,
+            "policy": {"max_caps": 5},
+            "metrics": {"caps_applied": 1},
+        }
     ]
     baseline = deepcopy(baseline)
     baseline["meta"]["auto"]["tier"] = "conservative"
 
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )

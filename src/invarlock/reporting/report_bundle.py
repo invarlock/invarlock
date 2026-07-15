@@ -13,9 +13,13 @@ from invarlock.core.guard_evidence import (
     maybe_dump_guard_evidence,
 )
 from invarlock.core.report_inputs import ReportInputError, resolve_report_input_path
+from invarlock.core.runtime_quantization_proof import (
+    RUNTIME_QUANTIZATION_PROOF_FILENAME,
+)
+from invarlock.json_serialization import dumps_finite_json
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
-from .render_markdown import render_report_markdown
+from .rendering.markdown import render_report_markdown
 from .report_outline import build_evaluation_report_outline
 from .report_schema import validate_report
 from .report_summary import (
@@ -31,7 +35,7 @@ _NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
 
 def _serialize_evaluation_report_json(evaluation_report: dict[str, Any]) -> str:
     return (
-        json.dumps(
+        dumps_finite_json(
             evaluation_report,
             ensure_ascii=False,
             separators=(",", ":"),
@@ -176,7 +180,7 @@ def write_report_manifest(
 
         manifest_path = output_path / "manifest.json"
         manifest_path.write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+            dumps_finite_json(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         saved_files["manifest"] = manifest_path
     except _NON_FATAL_EXCEPTIONS:
@@ -268,6 +272,25 @@ def save_evaluation_bundle(
                     shutil.copy2(run_inventory_path, copied_inventory_path)
                 saved_files["backend_inventory"] = copied_inventory_path
 
+            run_quantization_proof_path = (
+                resolved_run_path.parent / RUNTIME_QUANTIZATION_PROOF_FILENAME
+            )
+            if run_quantization_proof_path.is_file():
+                copied_quantization_proof_path = (
+                    output_path / RUNTIME_QUANTIZATION_PROOF_FILENAME
+                )
+                if (
+                    run_quantization_proof_path.resolve()
+                    != copied_quantization_proof_path.resolve()
+                ):
+                    shutil.copy2(
+                        run_quantization_proof_path,
+                        copied_quantization_proof_path,
+                    )
+                saved_files["runtime_quantization_proof"] = (
+                    copied_quantization_proof_path
+                )
+
             runtime_manifest_path = resolved_run_path.parent / RUNTIME_MANIFEST_FILENAME
             if runtime_manifest_path.is_file():
                 copied_manifest_path = output_path / RUNTIME_MANIFEST_FILENAME
@@ -285,13 +308,15 @@ def save_evaluation_bundle(
                         else {}
                     )
                     report_payload["filename"] = report_json_path.name
-                    report_payload["path"] = str(report_json_path)
+                    report_payload["path"] = report_json_path.name
                     report_payload["sha256"] = hashlib.sha256(
                         report_json_path.read_bytes()
                     ).hexdigest()
                     manifest_payload["report"] = report_payload
                     copied_manifest_path.write_text(
-                        json.dumps(manifest_payload, indent=2, ensure_ascii=False),
+                        dumps_finite_json(
+                            manifest_payload, indent=2, ensure_ascii=False
+                        ),
                         encoding="utf-8",
                     )
                 elif runtime_manifest_path.resolve() != copied_manifest_path.resolve():

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
@@ -28,7 +28,7 @@ def _cert_with_pm(kind: str, basis: str) -> dict:
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": True,
         },
         "primary_metric": {
             "kind": kind,
@@ -42,7 +42,7 @@ def _cert_with_pm(kind: str, basis: str) -> dict:
         "policies": {},
         "resolved_policy": {},
         "policy_provenance": {},
-        "guard_overhead": {},
+        "guard_metric_impact": {},
     }
 
 

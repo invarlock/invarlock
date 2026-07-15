@@ -122,6 +122,7 @@ def apply_relative_spectral_cap(
     should_process_module_fn: Any | None = None,
     capture_baseline_sigmas_fn: Any | None = None,
     compute_sigma_max_fn: Any | None = None,
+    selected_modules: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     """Apply relative spectral capping to model weights."""
     if should_process_module_fn is None:
@@ -142,9 +143,16 @@ def apply_relative_spectral_cap(
                 model, scope=scope, should_process_module_fn=should_process_module_fn
             )
 
+        selected_names = (
+            {str(name) for name in selected_modules}
+            if selected_modules is not None
+            else None
+        )
         capped_modules = []
         failed_modules = []
         for name, module in model.named_modules():
+            if selected_names is not None and name not in selected_names:
+                continue
             if not should_process_module_fn(name, module, scope):
                 continue
             try:
@@ -210,8 +218,13 @@ def apply_spectral_control(
         baseline_sigmas = policy.get("baseline_sigmas")
         cap_ratio = policy.get("cap_ratio", 2.0)
         cap_result = apply_relative_spectral_cap_fn(
-            model, cap_ratio=cap_ratio, scope=scope, baseline_sigmas=baseline_sigmas
+            model,
+            cap_ratio=cap_ratio,
+            scope=scope,
+            baseline_sigmas=baseline_sigmas,
+            selected_modules=policy.get("selected_modules"),
         )
+        results["cap_result"] = cap_result
         if cap_result["applied"]:
             results["capping_applied"] = True
             results["corrections"].extend(cap_result["capped_modules"])

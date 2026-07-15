@@ -4,9 +4,13 @@ import invarlock.reporting.policy_utils as policy_utils
 import invarlock.reporting.report_normalization as report_normalization
 from invarlock.reporting.guards_invariants import _extract_invariants
 from invarlock.reporting.policy_utils import _build_resolved_policies
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.utils import _infer_scope_from_modules, _pair_logloss_windows
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def test_infer_scope_from_modules_no_family_match():
@@ -79,11 +83,19 @@ def test_extract_invariants_ignores_non_dict_violations_and_non_dict_values():
     )  # only dict violations kept
 
 
-def test_render_report_markdown_guard_overhead_na(monkeypatch):
+def test_render_report_markdown_guard_metric_impact_na(monkeypatch):
     # Minimal valid report/baseline to build a evaluation_report
     report = {
-        "meta": {"model_id": "m", "seed": 1},
-        "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf_causal",
+            "seed": 1,
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
+        "metrics": {
+            "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.0}
+        },
         "data": {
             "dataset": "d",
             "split": "val",
@@ -105,19 +117,14 @@ def test_render_report_markdown_guard_overhead_na(monkeypatch):
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 10.0,
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
-    }
+    baseline = {**report, "edit": {"name": "noop"}}
     monkeypatch.setattr(report_normalization, "validate_report", lambda _: True)
-    cert = make_report(report, baseline)
-    # Inject a guard_overhead section with None/NaN values; renderer should not crash
-    cert["guard_overhead"] = {
-        "overhead_percent": None,
-        "overhead_ratio": float("nan"),
-        "threshold_percent": 1.0,
+    cert = make_report(canonical_run_report(report), canonical_baseline(baseline))
+    # Inject a guard_metric_impact section with None/NaN values; renderer should not crash
+    cert["guard_metric_impact"] = {
+        "display_value": None,
+        "degradation": float("nan"),
+        "display_limit": 1.0,
     }
     md = render_report_markdown(cert)
     assert isinstance(md, str) and "Guard Observability" in md

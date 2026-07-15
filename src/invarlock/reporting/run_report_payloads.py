@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
+from invarlock.core.checkpoint_identity import validated_model_identity
 from invarlock.core.guard_evidence import GuardEvidence
 
 
@@ -25,6 +26,7 @@ def build_run_report_context(
     assurance_section = run_context.get("assurance")
     runtime_section = run_context.get("runtime")
     guard_chain_observed = run_context.get("guard_chain_observed")
+    evaluation_inputs = run_context.get("evaluation_inputs")
     context = {
         "profile": profile_normalized,
         "auto": dict(auto_config),
@@ -41,6 +43,8 @@ def build_run_report_context(
         isinstance(item, str) for item in guard_chain_observed
     ):
         context["guard_chain_observed"] = list(guard_chain_observed)
+    if isinstance(evaluation_inputs, Mapping):
+        context["evaluation_inputs"] = dict(evaluation_inputs)
     return context
 
 
@@ -52,8 +56,9 @@ def build_run_report_meta(
     commit_value: str,
     seed_bundle: Mapping[str, Any],
     auto_config: Mapping[str, Any],
-    guard_overhead_threshold: float,
+    guard_metric_degradation_limit: float,
     model_profile: Any,
+    model_identity: Mapping[str, Any] | None = None,
     timestamp: str | None = None,
     invarlock_version: str | None = None,
     env_flags: Mapping[str, object] | None = None,
@@ -76,7 +81,7 @@ def build_run_report_meta(
         "seeds": dict(seed_bundle),
         "ts": timestamp or datetime.now().isoformat(),
         "auto": dict(auto_config),
-        "guard_overhead_threshold": guard_overhead_threshold,
+        "guard_metric_degradation_limit": guard_metric_degradation_limit,
         "model_profile": {
             "family": getattr(model_profile, "family", ""),
             "default_loss": getattr(model_profile, "default_loss", ""),
@@ -85,6 +90,11 @@ def build_run_report_meta(
             "cert_lints": cert_lints,
         },
     }
+    if model_identity is not None:
+        validated_identity = validated_model_identity(model_identity)
+        if validated_identity is None:
+            raise ValueError("model identity is malformed")
+        meta_payload["model_identity"] = validated_identity
     if invarlock_version:
         meta_payload["invarlock_version"] = invarlock_version
     if env_flags:
@@ -269,7 +279,7 @@ def build_metrics_payload(
         "window_pairing_preview",
         "window_pairing_final",
         "paired_windows",
-        "paired_delta_summary",
+        "preview_final_slice_delta_summary",
         "primary_metric_tail",
         "preview_total_tokens",
         "final_total_tokens",
@@ -315,7 +325,19 @@ def build_guard_entries(core_guards: Mapping[str, Any] | None) -> list[dict[str,
     for guard_name, guard_result in core_guards.items():
         evidence = GuardEvidence.from_result(guard_name, guard_result)
         if evidence is not None:
-            entries.append(evidence.as_report_entry())
+            entry = evidence.as_report_entry()
+            canonical_name = str(guard_name).strip().lower()
+            if canonical_name == "invariants_post":
+                canonical_name = "invariants"
+            if (
+                canonical_name in {"spectral", "rmt", "variance", "invariants"}
+                and "supported" not in entry
+                and isinstance(entry.get("passed"), bool)
+            ):
+                # Successful built-in guard execution is positive support evidence;
+                # unsupported paths already emit an explicit false + reason.
+                entry["supported"] = True
+            entries.append(entry)
     return entries
 
 
@@ -323,7 +345,7 @@ def build_flags_payload(core_guards: Mapping[str, Any] | None) -> dict[str, Any]
     guard_values = core_guards.values() if isinstance(core_guards, Mapping) else ()
     return {
         "guard_recovered": any(
-            not guard.get("passed", True)
+            guard.get("passed") is not True
             for guard in guard_values
             if isinstance(guard, Mapping)
         ),

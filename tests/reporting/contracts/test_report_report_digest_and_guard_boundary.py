@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_overhead import prepare_guard_overhead_section
+from invarlock.reporting.report_metric_impact import prepare_guard_metric_impact_section
 from invarlock.reporting.report_provenance import compute_report_digest
+from tests.reporting._support_guard_metric_impact import ppl_guard_context
 
 
 def test_compute_report_digest_minimal():
@@ -11,19 +12,17 @@ def test_compute_report_digest_minimal():
         "metrics": {"spectral": {"caps_applied": 0}, "rmt": {"outliers": 0}},
     }
     h = compute_report_digest(rep)
-    assert isinstance(h, str) and len(h) == 16
+    assert isinstance(h, str) and len(h) == 64
 
 
-def test_prepare_guard_overhead_threshold_boundary():
+def test_prepare_guard_metric_degradation_limit_boundary():
     # Ratio equals 1 + threshold should PASS
-    payload = {"bare_ppl": 100.0, "guarded_ppl": 101.5, "overhead_threshold": 0.015}
-    out, passed = prepare_guard_overhead_section(payload)
+    payload = ppl_guard_context(100.0, 101.5, degradation_limit=0.015)
+    out, passed = prepare_guard_metric_impact_section(payload)
     assert out.get("evaluated") is True and passed is True
-    # Diagnostics should flow through unchanged
+    # Caller-supplied diagnostics are not trusted over validator diagnostics.
     payload2 = {
-        "bare_ppl": 100.0,
-        "guarded_ppl": 101.5,
-        "overhead_threshold": 0.015,
+        **ppl_guard_context(100.0, 101.5, degradation_limit=0.015),
         "diagnostics": [
             {
                 "kind": "validation_info",
@@ -39,6 +38,6 @@ def test_prepare_guard_overhead_threshold_boundary():
             },
         ],
     }
-    out2, _ = prepare_guard_overhead_section(payload2)
-    assert out2["diagnostics"][0]["message"] == "note"
-    assert out2["diagnostics"][1]["severity"] == "warning"
+    out2, _ = prepare_guard_metric_impact_section(payload2)
+    assert all(item["message"] != "note" for item in out2["diagnostics"])
+    assert any("PASSED" in item["message"] for item in out2["diagnostics"])

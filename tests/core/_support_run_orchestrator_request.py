@@ -35,34 +35,34 @@ def _install_common_monkeypatches(
     monkeypatch,
     *,
     adapter: object | None = None,
-    should_measure_overhead=(False, False, None),
+    should_measure_metric_impact=(False, False, None),
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._build_run_context_payload_impl",
+        "invarlock.core.orchestration.execute._build_run_context_payload_impl",
         lambda **_kwargs: {"dataset": {}, "eval": {"loss": {"resolved_type": "ce"}}},
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._build_run_execution_config_payloads_impl",
+        "invarlock.core.orchestration.execute._build_run_execution_config_payloads_impl",
         lambda **_kwargs: SimpleNamespace(auto_config={}, edit_config={}),
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._resolve_pm_acceptance_range_impl",
+        "invarlock.core.orchestration.execute._resolve_pm_acceptance_range_impl",
         lambda _cfg: None,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._resolve_pm_drift_band_impl",
+        "invarlock.core.orchestration.execute._resolve_pm_drift_band_impl",
         lambda _cfg: None,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._resolve_guard_overhead_threshold_impl",
+        "invarlock.core.orchestration.execute._resolve_guard_metric_degradation_limit_impl",
         lambda _cfg: 0.01,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
-        lambda _profile, _cfg: should_measure_overhead,
+        "invarlock.core.orchestration.execute._should_measure_metric_impact_impl",
+        lambda _profile, _cfg: should_measure_metric_impact,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator_execute._resolve_retry_validation_transition_impl",
+        "invarlock.core.orchestration.execute._resolve_retry_validation_transition_impl",
         lambda *_args, **_kwargs: SimpleNamespace(
             action="passed",
             disposition="passed",
@@ -153,7 +153,7 @@ def _make_services(
             skip_model_load=False,
             snapshot_tmpdir=None,
             snapshot_provenance={"restore_failed": False, "reload_path_used": False},
-            emitted_skip_overhead_warning=False,
+            emitted_skip_guard_metric_impact_warning=False,
             snapshot_enabled=False,
             diagnostics=(),
         ),
@@ -190,7 +190,7 @@ def _make_services(
         resolve_snapshot_config=lambda _context: {},
         resolve_snapshot_retry_transition=lambda **_kwargs: SimpleNamespace(
             skip_model_load=False,
-            emitted_skip_overhead_warning=False,
+            emitted_skip_guard_metric_impact_warning=False,
             diagnostics=(),
         ),
         run_bare_control=lambda **_kwargs: None,

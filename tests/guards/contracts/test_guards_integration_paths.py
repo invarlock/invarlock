@@ -145,27 +145,32 @@ class TestIntegrationScenarios:
 
     def test_baseline_capture_and_comparison(self):
         """Test baseline capture and comparison across guards."""
-        # Capture spectral baselines (simple signature - no scope parameter)
         spectral_baselines = capture_baseline_sigmas(self.model)
-        assert isinstance(spectral_baselines, dict)
-        # May be empty for the placeholder implementation, which is fine
-
-        # Capture RMT baselines
         rmt_baselines = capture_baseline_mp_stats(self.model)
-        assert isinstance(rmt_baselines, dict)
-        # May be empty if no linear layers match the allowed suffixes
-
-        # Both functions should return dictionaries
-        assert isinstance(spectral_baselines, dict)
-        assert isinstance(rmt_baselines, dict)
-
-        # If both have data, there should be some overlap (both capture linear layers)
-        if spectral_baselines and rmt_baselines:
-            spectral_modules = set(spectral_baselines.keys())
-            rmt_modules = set(rmt_baselines.keys())
-            # Test that at least the functions work, overlap is not guaranteed with placeholders
-            assert len(spectral_modules) >= 0
-            assert len(rmt_modules) >= 0
+        expected_modules = {
+            f"transformer.h.{layer}.{family}.{projection}"
+            for layer in range(3)
+            for family, projections in {
+                "attn": ("c_attn", "c_proj"),
+                "mlp": ("c_fc", "c_proj"),
+            }.items()
+            for projection in projections
+        }
+        assert set(spectral_baselines) == expected_modules | {
+            "transformer.wte",
+            "lm_head",
+        }
+        assert set(rmt_baselines) == expected_modules
+        assert all(value > 0.0 for value in spectral_baselines.values())
+        for module_name, stats in rmt_baselines.items():
+            # Spectral capture uses a fixed four-step power iteration, while RMT
+            # computes the exact leading singular value. The estimate must be a
+            # meaningful lower bound, not merely a populated field.
+            estimate = spectral_baselines[module_name]
+            exact = stats["sigma_base"]
+            assert 0.5 * exact < estimate <= exact * (1.0 + 1e-6)
+            assert stats["mp_bulk_edge_base"] > 0.0
+            assert stats["r_mp_base"] > 0.0
 
 
 class TestSpectralGuardEdgeCases:

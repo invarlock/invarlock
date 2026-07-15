@@ -18,7 +18,7 @@ def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
 
     monkeypatch.setattr(
         report_normalization,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -41,7 +41,6 @@ def test_make_evaluation_report_preserves_nullable_provenance(monkeypatch):
     report["meta"]["model_id"] = None
     report["meta"]["adapter"] = ""
     report["meta"]["device"] = None
-    report["edit"]["name"] = None
     baseline["meta"].pop("model_id", None)
     baseline.pop("model_id", None)
     baseline.pop("run_id", None)
@@ -58,8 +57,7 @@ def test_make_evaluation_report_preserves_nullable_provenance(monkeypatch):
     assert evaluation_report["meta"]["model_id"] is None
     assert evaluation_report["meta"]["adapter"] is None
     assert evaluation_report["meta"]["device"] is None
-    assert "edit_name" not in evaluation_report
-    assert "name" not in evaluation_report["edit"]
+    assert evaluation_report["edit_name"] == report["edit"]["name"]
     assert evaluation_report["baseline_ref"]["model_id"] is None
     assert evaluation_report["baseline_ref"]["run_id"] is None
     diagnostics = evaluation_report["meta"].get("build_diagnostics", [])
@@ -69,3 +67,30 @@ def test_make_evaluation_report_preserves_nullable_provenance(monkeypatch):
         "meta.adapter_unavailable",
         "meta.device_unavailable",
     }.issubset(codes)
+
+
+def test_make_evaluation_report_surfaces_hosted_dataset_identity(monkeypatch):
+    report = _base_report()
+    baseline = _base_baseline()
+    revision = "a" * 40
+    report["data"].update(
+        {
+            "dataset": "hf_text",
+            "provider": "hf_text",
+            "dataset_name": "Salesforce/wikitext",
+            "config_name": "wikitext-2-raw-v1",
+            "revision": revision,
+        }
+    )
+    extract_dataset_info = dataset_hashing._extract_dataset_info
+
+    _patch_common(monkeypatch, report, baseline)
+    _stub_evaluation_report_extractors(monkeypatch)
+    monkeypatch.setattr(dataset_hashing, "_extract_dataset_info", extract_dataset_info)
+
+    evaluation_report = make_report(report, baseline)
+
+    assert evaluation_report["dataset"]["provider"] == "hf_text"
+    assert evaluation_report["dataset"]["dataset_name"] == "Salesforce/wikitext"
+    assert evaluation_report["dataset"]["config_name"] == "wikitext-2-raw-v1"
+    assert evaluation_report["dataset"]["revision"] == revision

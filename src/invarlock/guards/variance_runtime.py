@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, cast
 
 import torch.nn as nn
 
@@ -88,10 +88,12 @@ def validate_guard(
     warnings = result.get("warnings", []) or []
     passed = result.get("passed", False)
 
-    if passed:
+    if guard._monitor_only:
+        decision = "monitor"
+    elif passed:
         decision = "monitor" if warnings else "allow"
     else:
-        decision = "monitor" if guard._monitor_only else "block"
+        decision = "block"
 
     violations = tuple(
         {
@@ -216,6 +218,27 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         reason=gate_reason,
         current_enabled=enabled_after_ab,
     )
+
+    # A verifier must measure the supplied subject checkpoint, not silently
+    # replace it with a guard-adjusted in-memory variant before primary-metric
+    # evaluation. VE may be enabled transiently to prove the A/B result and
+    # applicability, but exact snapshot restoration is required before this
+    # guard returns.
+    enabled_during_validation = bool(enabled_after_ab)
+    subject_restored_after_ab = True
+    restore_error: str | None = None
+    if enabled_during_validation:
+        disable_result = guard.disable(model)
+        subject_restored_after_ab = bool(
+            disable_result is not False
+            and not guard._enabled
+            and getattr(guard, "_last_restore_exact", True)
+        )
+        if not subject_restored_after_ab:
+            restore_error = (
+                "Variance A/B mitigation could not exactly restore the subject model"
+            )
+
     required_gain_with_deadband = guard._policy["min_gain"] + float(
         guard._policy.get("tie_breaker_deadband", guard.TIE_BREAKER_DEADBAND)
     )
@@ -236,10 +259,14 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         required_gain_with_deadband=required_gain_with_deadband,
         absolute_floor=guard.ABSOLUTE_FLOOR,
         calibration_status=str(guard._calibration_stats.get("status")),
+        no_adjustment_required=bool(getattr(guard, "_explicit_noop_no_change", False)),
     )
     passed = bool(finalize_state["passed"])
     warnings = list(finalize_state["warnings"])
     errors = list(finalize_state["errors"])
+    if restore_error is not None:
+        errors.append(restore_error)
+        passed = False
 
     quantized_mutation_unsupported = list(
         guard._stats.get("quantized_mutation_unsupported", [])
@@ -274,6 +301,9 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         raw_scales_pre_edit=guard._raw_scales_pre_edit,
         raw_scales_post_edit=guard._raw_scales_post_edit,
     )
+    final_metrics["ve_enabled_during_validation"] = enabled_during_validation
+    final_metrics["ve_enabled"] = bool(guard._enabled)
+    final_metrics["subject_restored_after_ab"] = subject_restored_after_ab
 
     guard._log_event(
         "finalize_complete",
@@ -297,13 +327,19 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         policy=guard._policy,
     )
     result["decision"] = (
-        "allow"
-        if passed and not warnings
-        else ("monitor" if passed or guard._monitor_only else "block")
+        "monitor"
+        if guard._monitor_only
+        else (
+            "allow" if passed and not warnings else ("monitor" if passed else "block")
+        )
     )
     result["diagnostics"] = _diagnostics_to_dicts(
         _build_diagnostics(warnings=warnings, errors=errors)
     )
+    result_details = cast(dict[str, Any], result.setdefault("details", {}))
+    result_details["ve_tested"] = enabled_during_validation
+    result_details["ve_applied"] = bool(guard._enabled)
+    result_details["subject_restored_after_ab"] = subject_restored_after_ab
 
     return result
 

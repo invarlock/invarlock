@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import AutoConfig, create_empty_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
@@ -15,10 +17,15 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
         probes_used=0,
         target_pm_ratio=None,
     )
+    report["context"] = {"profile": "dev"}
     report["data"]["dataset"] = "unit"
     report["data"]["split"] = "validation"
     report["data"]["seq_len"] = 8
     report["data"]["stride"] = 8
+    report["data"]["preview_n"] = 2
+    report["data"]["final_n"] = 2
+    report["guards"] = []
+    report["edit"]["name"] = "noop"
     report["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": 10.0,
@@ -27,7 +34,7 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
     report["evaluation_windows"] = {
         "final": {
             "window_ids": [1, 2],
-            "logloss": [2.3, 2.31],
+            "logloss": [2.3, 2.3],
             "token_counts": [100, 100],
         }
     }
@@ -35,7 +42,12 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
     baseline = {
         "run_id": "base",
         "model_id": "m",
-        "meta": {"model_id": "m", "tokenizer_hash": "tokhash-abc"},
+        "meta": {
+            "adapter": "hf",
+            "model_id": "m",
+            "tokenizer_hash": "tokhash-abc",
+            "auto": {"tier": "balanced"},
+        },
         "evaluation_windows": {
             "final": {
                 "window_ids": [1, 2],
@@ -43,6 +55,7 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
                 "token_counts": [100, 100],
             }
         },
+        "context": {"profile": "dev"},
         "data": {
             "seq_len": 8,
             "preview_n": 2,
@@ -52,7 +65,7 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
             "stride": 8,
         },
         "edit": {
-            "name": "none",
+            "name": "noop",
             "plan_digest": "0",
             "deltas": {
                 "params_changed": 0,
@@ -62,7 +75,13 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
             },
         },
         "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
@@ -84,10 +103,15 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
         probes_used=0,
         target_pm_ratio=None,
     )
+    report["context"] = {"profile": "dev"}
     report["data"]["dataset"] = "unit"
     report["data"]["split"] = "validation"
     report["data"]["seq_len"] = 8
     report["data"]["stride"] = 8
+    report["data"]["preview_n"] = 200
+    report["data"]["final_n"] = 200
+    report["guards"] = []
+    report["edit"]["name"] = "noop"
     report["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": 10.0,
@@ -112,7 +136,12 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
     baseline = {
         "run_id": "base",
         "model_id": "m",
-        "meta": {"seed": 0, "model_id": "m"},
+        "meta": {
+            "adapter": "hf",
+            "seed": 0,
+            "model_id": "m",
+            "auto": {"tier": "balanced"},
+        },
         "evaluation_windows": {
             "final": {
                 "window_ids": window_ids,
@@ -120,6 +149,7 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
                 "token_counts": [100] * 200,
             }
         },
+        "context": {"profile": "dev"},
         "data": {
             "seq_len": 8,
             "preview_n": 200,
@@ -129,7 +159,7 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
             "stride": 8,
         },
         "edit": {
-            "name": "none",
+            "name": "noop",
             "plan_digest": "0",
             "deltas": {
                 "params_changed": 0,
@@ -139,7 +169,13 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
             },
         },
         "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }

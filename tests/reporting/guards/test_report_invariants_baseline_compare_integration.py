@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _base_report() -> dict:
@@ -13,6 +15,7 @@ def _base_report() -> dict:
             "seed": 1,
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "demo-ds",
             "split": "eval",
@@ -24,9 +27,9 @@ def _base_report() -> dict:
         },
         "artifacts": {"events_path": "", "logs_path": "", "generated_at": ""},
         "guards": [],
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "edit": {
-            "name": "baseline",
+            "name": "noop",
             "plan_digest": "baseline_noop",
             "deltas": {"params_changed": 0},
         },
@@ -38,7 +41,10 @@ def _base_report() -> dict:
                 "ratio_vs_baseline": 1.0,
                 "display_ci": [10.0, 10.0],
             },
-            "paired_delta_summary": {"mean": 0.0, "degenerate": False},
+            "preview_final_slice_delta_summary": {
+                "mean": 0.0,
+                "degenerate": False,
+            },
             "logloss_delta_ci": (0.0, 0.0),
             "bootstrap": {"replicates": 400, "coverage": {"preview": {"used": 0}}},
             "window_plan": {"profile": "dev"},
@@ -87,6 +93,7 @@ def test_make_evaluation_report_compares_invariants_against_baseline_report() ->
     baseline["guards"] = [
         {
             "name": "invariants",
+            "passed": True,
             "metrics": {
                 "checks_performed": 3,
                 "violations_found": 0,
@@ -103,6 +110,7 @@ def test_make_evaluation_report_compares_invariants_against_baseline_report() ->
     report["guards"] = [
         {
             "name": "invariants",
+            "passed": False,
             "metrics": {
                 "checks_performed": 3,
                 "violations_found": 0,

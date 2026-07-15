@@ -24,17 +24,17 @@ from invarlock.core.exceptions import (
     InvarlockError,
     ValidationError,
 )
-from invarlock.core.run_policy import choose_dataset_split, should_measure_overhead
+from invarlock.core.run_policy import choose_dataset_split, should_measure_metric_impact
 
 
-def test_should_measure_overhead_respects_config_and_profile() -> None:
-    assert should_measure_overhead("ci", {}) == (True, False, None)
-    assert should_measure_overhead("release", {}) == (True, False, None)
-    assert should_measure_overhead("dev", {}) == (False, False, None)
+def test_should_measure_metric_impact_respects_config_and_profile() -> None:
+    assert should_measure_metric_impact("ci", {}) == (True, False, None)
+    assert should_measure_metric_impact("release", {}) == (True, False, None)
+    assert should_measure_metric_impact("dev", {}) == (False, False, None)
 
-    assert should_measure_overhead(
-        "ci", {"context": {"run": {"skip_overhead_check": True}}}
-    ) == (False, True, "config:context.run.skip_overhead_check")
+    assert should_measure_metric_impact(
+        "ci", {"context": {"run": {"skip_guard_metric_impact_check": True}}}
+    ) == (False, True, "config:context.run.skip_guard_metric_impact_check")
 
 
 def test_persist_ref_masks_writes_artifact_when_present(tmp_path: Path) -> None:

@@ -11,6 +11,7 @@ from .assurance_contract import (
     normalize_assurance_mode,
     strict_evaluate_policy_errors,
 )
+from .checkpoint_identity import LEGACY_MODEL_IDENTITY_FIELDS, resolve_model_identity
 
 _TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
 
@@ -40,6 +41,8 @@ class EvaluateCommandPlan:
     source_model_id: str
     subject_model_id: str
     baseline_config: dict[str, Any]
+    baseline_identity: dict[str, str] | None
+    subject_identity: dict[str, str] | None
     baseline_label: str
     subject_label: str | None
     tmp_dir: Path
@@ -211,11 +214,25 @@ def deep_merge_dicts(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str,
     return merged
 
 
+def _reject_legacy_model_identity(config: dict[str, Any], *, label: str) -> None:
+    model = config.get("model")
+    if not isinstance(model, dict):
+        return
+    legacy_fields = sorted(
+        field for field in LEGACY_MODEL_IDENTITY_FIELDS if field in model
+    )
+    if legacy_fields:
+        raise ValueError(
+            f"{label} uses legacy model identity field(s): " + ", ".join(legacy_fields)
+        )
+
+
 def build_baseline_run_config(
     preset_data: dict[str, Any],
     *,
     model_id: str,
     adapter_name: str,
+    model_identity: dict[str, str] | None = None,
     output_dir: str,
     profile: str,
     tier: str,
@@ -223,13 +240,17 @@ def build_baseline_run_config(
     assurance_mode: str = "off",
     execution_mode: str = "unknown",
 ) -> dict[str, Any]:
+    _reject_legacy_model_identity(preset_data, label="Preset config")
+    model_config: dict[str, Any] = {
+        "id": model_id,
+        "adapter": adapter_name,
+    }
+    if model_identity is not None:
+        model_config["model_identity"] = deepcopy(model_identity)
     return deep_merge_dicts(
         preset_data,
         {
-            "model": {
-                "id": model_id,
-                "adapter": adapter_name,
-            },
+            "model": model_config,
             "edit": {"name": "noop", "plan": {}},
             "eval": {},
             "guards": {"order": guards_order},
@@ -254,6 +275,7 @@ def build_subject_noop_run_config(
     *,
     model_id: str,
     adapter_name: str,
+    model_identity: dict[str, str] | None = None,
     output_dir: str,
     profile: str,
     tier: str,
@@ -265,6 +287,7 @@ def build_subject_noop_run_config(
         preset_data,
         model_id=model_id,
         adapter_name=adapter_name,
+        model_identity=model_identity,
         output_dir=output_dir,
         profile=profile,
         tier=tier,
@@ -280,6 +303,7 @@ def build_subject_edit_run_config(
     *,
     subject_model_id: str,
     adapter_name: str,
+    model_identity: dict[str, str] | None = None,
     output_dir: str,
     profile: str,
     tier: str,
@@ -287,7 +311,9 @@ def build_subject_edit_run_config(
     assurance_mode: str = "off",
     execution_mode: str = "unknown",
 ) -> dict[str, Any]:
+    _reject_legacy_model_identity(preset_data, label="Preset config")
     cfg_loaded = deepcopy(loaded_edit_config)
+    _reject_legacy_model_identity(cfg_loaded, label="Edit config")
     model_block = dict(cfg_loaded.get("model") or {})
     raw_model_id = model_block.get("id")
     if not isinstance(raw_model_id, str) or raw_model_id.startswith("<"):
@@ -298,6 +324,9 @@ def build_subject_edit_run_config(
         "adapter"
     ):
         model_block["adapter"] = adapter_name
+    model_block.pop("model_identity", None)
+    if model_identity is not None:
+        model_block["model_identity"] = deepcopy(model_identity)
     cfg_loaded["model"] = model_block
 
     merged = deep_merge_dicts(
@@ -346,12 +375,15 @@ def build_evaluate_command_plan(
     edit_label: str | None,
     resolve_auto_adapter_fn: Any,
     load_yaml_fn: Any,
+    baseline_revision: str | None = None,
+    subject_revision: str | None = None,
     baseline_adapter: str = "auto",
     subject_adapter: str = "auto",
     tmp_dir_candidate: str | None = None,
     assurance_mode: str = "strict",
     execution_mode: str = "container",
     allow_unverified_provenance: bool = False,
+    evaluation_input_binding: dict[str, object] | None = None,
 ) -> EvaluateCommandPlan:
     profile_name = stable_text(profile, "dev")
     tier_name = stable_text(tier, "balanced")
@@ -379,6 +411,12 @@ def build_evaluate_command_plan(
         preset=preset,
         load_yaml_fn=load_yaml_fn,
     )
+    if evaluation_input_binding is not None:
+        preset_data = deepcopy(preset_data)
+        context = preset_data.setdefault("context", {})
+        if not isinstance(context, dict):
+            raise ValueError("Preset context must be an object")
+        context["evaluation_inputs"] = deepcopy(evaluation_input_binding)
     guards_order = resolve_guards_order(
         preset_data,
         require_canonical=normalized_assurance_mode == "strict",
@@ -399,10 +437,23 @@ def build_evaluate_command_plan(
     normalized_subject_model_id = normalize_model_id(
         subject_model_id, subject_adapter_name
     )
+    baseline_identity = resolve_model_identity(
+        normalized_source_model_id,
+        revision=baseline_revision,
+        strict=normalized_assurance_mode == "strict",
+        side="baseline",
+    )
+    subject_identity = resolve_model_identity(
+        normalized_subject_model_id,
+        revision=subject_revision,
+        strict=normalized_assurance_mode == "strict",
+        side="subject",
+    )
     baseline_config = build_baseline_run_config(
         preset_data,
         model_id=normalized_source_model_id,
         adapter_name=str(baseline_adapter_name),
+        model_identity=baseline_identity,
         output_dir=str(Path(out) / "source"),
         profile=profile_name,
         tier=tier_name,
@@ -424,6 +475,8 @@ def build_evaluate_command_plan(
         source_model_id=normalized_source_model_id,
         subject_model_id=normalized_subject_model_id,
         baseline_config=baseline_config,
+        baseline_identity=baseline_identity,
+        subject_identity=subject_identity,
         baseline_label="noop",
         subject_label=determine_subject_label(
             edit_label=edit_label,

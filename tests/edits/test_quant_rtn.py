@@ -223,6 +223,9 @@ def test_quant_rtn_counts_layers_modified_for_qwen_style_module_names(
 ) -> None:
     module_0 = torch.nn.Linear(2, 2, bias=False)
     module_1 = torch.nn.Linear(2, 2, bias=False)
+    with torch.no_grad():
+        module_0.weight.copy_(torch.tensor([[1.0, 0.2], [-0.7, 0.4]]))
+        module_1.weight.copy_(torch.tensor([[0.9, -0.3], [0.2, -0.8]]))
     model = torch.nn.Sequential(module_0, module_1)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 2}})()
     edit = RTNQuantEdit(scope="attn", max_modules=2)
@@ -235,19 +238,10 @@ def test_quant_rtn_counts_layers_modified_for_qwen_style_module_names(
             _target("model.layers.1.self_attn.k_proj", module_1),
         ],
     )
-    monkeypatch.setattr(
-        RTNQuantEdit,
-        "_apply_rtn_quantization",
-        lambda self, *_args, **_kwargs: {
-            "params_quantized": 16,
-            "scale_stats": {},
-            "error_metrics": {},
-        },
-    )
-
     result = edit.apply(model, adapter, plan={"scope": "attn", "max_modules": 2})
 
-    assert result["deltas"]["params_changed"] == 32
+    assert result["deltas"]["params_processed"] == 8
+    assert result["deltas"]["params_changed"] > 0
     assert result["deltas"]["layers_modified"] == 2
 
 
@@ -395,6 +389,53 @@ def test_quant_rtn_target_selector_explains_user_and_default_matches() -> None:
 
     all_targets = QuantTargetSelector(scope="all", min_params=100).select(model)
     assert {target.name for target in all_targets} == {"attn.c_attn", "mlp.c_fc"}
+
+
+def test_quant_rtn_default_bert_ffn_scope_excludes_attention_output_projections() -> (
+    None
+):
+    class BertEncoderLayer(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.attention = torch.nn.Module()
+            self.attention.self = torch.nn.Module()
+            self.attention.self.query = torch.nn.Linear(16, 16, bias=False)
+            self.attention.output = torch.nn.Module()
+            self.attention.output.dense = torch.nn.Linear(16, 16, bias=False)
+            self.intermediate = torch.nn.Module()
+            self.intermediate.dense = torch.nn.Linear(16, 64, bias=False)
+            self.output = torch.nn.Module()
+            self.output.dense = torch.nn.Linear(64, 16, bias=False)
+
+    class BertAndRobertaModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.bert = torch.nn.Module()
+            self.bert.encoder = torch.nn.Module()
+            self.bert.encoder.layer = torch.nn.ModuleList([BertEncoderLayer()])
+            self.roberta = torch.nn.Module()
+            self.roberta.encoder = torch.nn.Module()
+            self.roberta.encoder.layer = torch.nn.ModuleList([BertEncoderLayer()])
+
+    model = BertAndRobertaModel()
+    ffn_names = {
+        target.name for target in QuantTargetSelector(scope="ffn").select(model)
+    }
+    attn_names = {
+        target.name for target in QuantTargetSelector(scope="attn").select(model)
+    }
+
+    assert ffn_names == {
+        "bert.encoder.layer.0.intermediate.dense",
+        "bert.encoder.layer.0.output.dense",
+        "roberta.encoder.layer.0.intermediate.dense",
+        "roberta.encoder.layer.0.output.dense",
+    }
+    assert {
+        "bert.encoder.layer.0.attention.output.dense",
+        "roberta.encoder.layer.0.attention.output.dense",
+    } <= attn_names
+    assert ffn_names.isdisjoint(attn_names)
 
 
 def test_quant_rtn_target_selector_covers_empty_weight_and_duplicate_patterns() -> None:
@@ -631,7 +672,7 @@ def test_quant_rtn_apply_runs_guard_chain_hooks() -> None:
     assert guard_chain.calls == ["prepare", "before", "after", "finalize", "all_passed"]
 
 
-def test_quant_rtn_apply_rejects_zero_param_quantization(
+def test_quant_rtn_apply_rejects_processed_but_unchanged_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     model = torch.nn.Linear(16, 16, bias=False)
@@ -641,8 +682,75 @@ def test_quant_rtn_apply_rejects_zero_param_quantization(
     monkeypatch.setattr(
         RTNQuantEdit,
         "_apply_rtn_quantization",
-        lambda *_args, **_kwargs: {"params_quantized": 0, "error_metrics": {}},
+        lambda *_args, **_kwargs: {
+            "params_quantized": 256,
+            "params_processed": 256,
+            "params_changed": 0,
+            "value_changed_elements": 0,
+            "byte_changed_elements": 0,
+            "bytes_changed": 0,
+            "error_metrics": {},
+        },
     )
 
     with pytest.raises(EditError, match="without changing any parameters"):
         edit.apply(model, adapter)
+
+
+@pytest.mark.parametrize(
+    "weight",
+    [
+        torch.zeros((16, 16), dtype=torch.float32),
+        torch.tensor([-1.0, 0.0, 1.0, 0.0] * 4, dtype=torch.float32).repeat(16, 1),
+    ],
+    ids=["all_zero", "representable_int8_grid"],
+)
+def test_quant_rtn_apply_fails_closed_for_byte_identical_output(
+    weight: torch.Tensor,
+) -> None:
+    model = torch.nn.Linear(16, 16, bias=False)
+    with torch.no_grad():
+        model.weight.copy_(weight)
+    original = model.weight.detach().clone()
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    with pytest.raises(EditError, match="without changing any parameters") as raised:
+        edit.apply(model, adapter, plan={"scope": "all", "max_modules": 1})
+
+    assert raised.value.code == "E322"
+    assert raised.value.details is not None
+    assert raised.value.details["params_processed"] == 256
+    assert raised.value.details["params_changed"] == 0
+    assert raised.value.details["byte_changed_elements"] == 0
+    assert torch.equal(model.weight.detach(), original)
+
+
+def test_quant_rtn_apply_reports_processed_and_actual_change_counts() -> None:
+    class Model(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.layers = torch.nn.ModuleList([torch.nn.Linear(16, 16, bias=False)])
+
+    model = Model()
+    row = torch.tensor([-1.0, -0.37, -0.11, 0.13] * 4, dtype=torch.float32)
+    with torch.no_grad():
+        model.layers[0].weight.copy_(row.repeat(16, 1))
+    original = model.layers[0].weight.detach().clone()
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    result = edit.apply(model, adapter, plan={"scope": "all", "max_modules": 1})
+    module_name = result["plan"]["physically_quantized_modules"][0]
+    module_entry = result["deltas"]["bitwidth_map"][module_name]
+
+    assert result["plan"]["total_params_quantized"] == 256
+    assert result["plan"]["total_params_processed"] == 256
+    assert 0 < result["plan"]["total_params_changed"] <= 256
+    assert result["deltas"]["params_processed"] == 256
+    assert result["deltas"]["params_changed"] == result["plan"]["total_params_changed"]
+    assert result["deltas"]["layers_modified"] == 1
+    assert module_entry["params"] == 256
+    assert 0 < module_entry["params_changed"] <= 256
+    assert module_entry["byte_changed_elements"] >= module_entry["params_changed"]
+    assert not torch.equal(model.layers[0].weight.detach(), original)

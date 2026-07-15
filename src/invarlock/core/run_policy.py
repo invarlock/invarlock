@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -35,7 +36,7 @@ from invarlock.core.run_policy_windows import (
     serialize_evaluation_windows as serialize_evaluation_windows,
 )
 
-GUARD_OVERHEAD_THRESHOLD = 0.01
+GUARD_METRIC_DEGRADATION_LIMIT = 0.01
 
 ToSerialisableDictFn = Callable[[Any], dict[str, Any]]
 
@@ -136,6 +137,7 @@ class RunExecutionRequest:
     tiny_relax_enabled: bool = False
     export_model_requested: bool = False
     export_dir: str | None = None
+    resolved_config_out: str | None = None
 
 
 @dataclass(frozen=True)
@@ -163,6 +165,7 @@ class SupportsRunExecutionRequest(Protocol):
     progress: bool
     telemetry: bool
     prefer_local_files_only: bool
+    resolved_config_out: str | None
 
 
 def _coerce_optional_float(value: Any) -> float | None:
@@ -360,30 +363,30 @@ def resolve_pm_drift_band(
     return {"min": float(min_val), "max": float(max_val)}
 
 
-def resolve_guard_overhead_threshold(
+def resolve_guard_metric_degradation_limit(
     cfg: object | None,
     *,
-    default_threshold: float = GUARD_OVERHEAD_THRESHOLD,
+    default_limit: float = GUARD_METRIC_DEGRADATION_LIMIT,
     coerce_mapping_fn=coerce_mapping,
 ) -> float:
-    """Resolve guard-overhead threshold from config with safe default fallback."""
-    threshold = float(default_threshold)
+    """Resolve the guard primary-metric degradation limit from configuration."""
+    limit = float(default_limit)
     cfg_map = coerce_mapping_fn(cfg) if cfg is not None else {}
     pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
     pm_map = coerce_mapping_fn(pm_section)
-    candidate = pm_map.get("overhead_threshold") if isinstance(pm_map, dict) else None
+    candidate = pm_map.get("degradation_limit") if isinstance(pm_map, dict) else None
     if candidate is None:
-        return float(threshold)
+        return float(limit)
     parsed = _coerce_optional_float(candidate)
     if parsed is None or not math.isfinite(parsed) or parsed < 0.0:
         _raise_config_error(
-            "primary_metric.overhead_threshold",
+            "primary_metric.degradation_limit",
             candidate,
-            "primary_metric.overhead_threshold must be a non-negative finite number.",
+            "primary_metric.degradation_limit must be a non-negative finite number.",
         )
     assert parsed is not None
-    threshold = float(parsed)
-    return float(threshold)
+    limit = float(parsed)
+    return float(limit)
 
 
 def coerce_bool_like(value: Any) -> bool | None:
@@ -401,7 +404,7 @@ def coerce_bool_like(value: Any) -> bool | None:
     return None
 
 
-def resolve_skip_overhead_policy(
+def resolve_skip_guard_metric_impact_policy(
     cfg: object | None,
     *,
     coerce_mapping_fn=coerce_mapping,
@@ -414,32 +417,41 @@ def resolve_skip_overhead_policy(
     run_ctx = coerce_mapping_fn(ctx.get("run")) if isinstance(ctx, dict) else {}
     eval_ctx = coerce_mapping_fn(ctx.get("eval")) if isinstance(ctx, dict) else {}
 
-    run_val = coerce_bool_like(run_ctx.get("skip_overhead_check"))
+    run_val = coerce_bool_like(run_ctx.get("skip_guard_metric_impact_check"))
     if run_val is not None:
-        return bool(run_val), "config:context.run.skip_overhead_check"
+        return bool(run_val), "config:context.run.skip_guard_metric_impact_check"
 
-    eval_val = coerce_bool_like(eval_ctx.get("skip_overhead_check"))
+    eval_val = coerce_bool_like(eval_ctx.get("skip_guard_metric_impact_check"))
     if eval_val is not None:
-        return bool(eval_val), "config:context.eval.skip_overhead_check"
+        return bool(eval_val), "config:context.eval.skip_guard_metric_impact_check"
 
     return False, None
 
 
-def should_measure_overhead(
+def should_measure_metric_impact(
     profile_normalized: str,
     cfg: object | None,
     *,
     coerce_mapping_fn=coerce_mapping,
 ) -> tuple[bool, bool, str | None]:
-    """Return overhead check policy resolved from profile + config context."""
-    skip_overhead_cfg, skip_source = resolve_skip_overhead_policy(
+    """Return guard metric impact policy, rejecting release-mode bypasses."""
+    skip_guard_metric_impact_cfg, skip_source = resolve_skip_guard_metric_impact_policy(
         cfg, coerce_mapping_fn=coerce_mapping_fn
     )
+    if profile_normalized == "release" and skip_guard_metric_impact_cfg:
+        _raise_config_error(
+            str(
+                skip_source or "context.run.skip_guard_metric_impact_check"
+            ).removeprefix("config:"),
+            True,
+            "Release runs require measured guard metric impact; "
+            "skip_guard_metric_impact_check must be false or omitted.",
+        )
     enforce_profile = profile_normalized in {"ci", "release"}
-    skip_overhead = bool(skip_overhead_cfg and enforce_profile)
-    measure_guard_overhead = bool(enforce_profile and not skip_overhead)
-    source = skip_source if skip_overhead else None
-    return measure_guard_overhead, skip_overhead, source
+    skip_guard_metric_impact = bool(skip_guard_metric_impact_cfg and enforce_profile)
+    measure_guard_metric_impact = bool(enforce_profile and not skip_guard_metric_impact)
+    source = skip_source if skip_guard_metric_impact else None
+    return measure_guard_metric_impact, skip_guard_metric_impact, source
 
 
 def resolve_pm_min_tokens_target(
@@ -526,14 +538,12 @@ def build_run_execution_request(
         telemetry=bool(request.telemetry),
         prefer_local_files_only=bool(request.prefer_local_files_only),
         eval_device_override=env_text("INVARLOCK_EVAL_DEVICE", environ=environ),
-        determinism_mode=env_text("PACK_DETERMINISM", environ=environ)
-        or env_text("INVARLOCK_DETERMINISM", environ=environ),
-        determinism_warn_only=env_flag(
-            "INVARLOCK_DETERMINISM_WARN_ONLY", environ=environ
-        ),
+        determinism_mode=env_text("PACK_DETERMINISM", environ=environ),
+        determinism_warn_only=False,
         tiny_relax_enabled=env_flag("INVARLOCK_TINY_RELAX", environ=environ),
         export_model_requested=env_flag("INVARLOCK_EXPORT_MODEL", environ=environ),
         export_dir=env_text("INVARLOCK_EXPORT_DIR", environ=environ),
+        resolved_config_out=request.resolved_config_out,
     )
 
 
@@ -594,6 +604,41 @@ def _baseline_eval_windows(
     return payload
 
 
+def _baseline_guard_evidence(
+    baseline_report_data: Mapping[str, Any] | None,
+) -> dict[str, dict[str, Any]] | None:
+    """Extract guard measurements needed for a baseline-relative subject run.
+
+    The run report is the hand-off boundary between the independently executed
+    baseline and subject processes.  Preserve the complete Spectral and RMT
+    entries here: their per-module measurements are decision inputs, not merely
+    display telemetry.
+    """
+
+    if not isinstance(baseline_report_data, Mapping):
+        return None
+    guards = baseline_report_data.get("guards")
+    extracted: dict[str, dict[str, Any]] = {}
+    raw_entries: list[Mapping[str, Any]]
+    if isinstance(guards, Mapping):
+        raw_entries = [
+            {**dict(value), "name": str(name)}
+            for name, value in guards.items()
+            if isinstance(value, Mapping)
+        ]
+    elif isinstance(guards, list):
+        raw_entries = [entry for entry in guards if isinstance(entry, Mapping)]
+    else:
+        return None
+    for raw_entry in raw_entries:
+        entry = dict(raw_entry)
+        name = str(entry.get("name", "")).strip().lower()
+        if name not in {"spectral", "rmt"}:
+            continue
+        extracted[name] = deepcopy(entry)
+    return extracted or None
+
+
 def build_run_context_payload(
     *,
     cfg: Any,
@@ -605,12 +650,13 @@ def build_run_context_payload(
     baseline_report_data: Mapping[str, Any] | None,
     pm_acceptance_range: Mapping[str, float] | tuple[float, float] | None,
     pm_drift_band: Mapping[str, float] | tuple[float, float] | None,
-    guard_overhead_threshold: float,
+    guard_metric_degradation_limit: float,
     model_profile: Any,
     resolved_loss_type: str,
     tiny_relax_enabled: bool,
     to_serialisable_dict_fn: ToSerialisableDictFn,
 ) -> dict[str, Any]:
+    model_section = _section_dict(cfg, "model")
     guards_section = _section_dict(cfg, "guards")
     eval_section = _section_dict(cfg, "eval")
     guard_overrides = {
@@ -653,6 +699,15 @@ def build_run_context_payload(
     if baseline_eval is not None:
         run_context["baseline_eval_windows"] = baseline_eval
 
+    if isinstance(baseline_report_data, Mapping):
+        # A caller supplied a baseline report, so baseline-relative guard
+        # evidence is mandatory even when the older report lacks it.  Guards
+        # turn a missing/incompatible payload into explicit unsupported,
+        # assurance-blocking evidence instead of silently self-baselining.
+        run_context["baseline_guard_evidence_required"] = True
+        guard_evidence = _baseline_guard_evidence(baseline_report_data)
+        run_context["baseline_guard_evidence"] = guard_evidence or {}
+
     primary_metric: dict[str, Any] = {}
     run_context["primary_metric"] = primary_metric
     primary_metric["acceptance_range"] = pm_acceptance_range
@@ -660,8 +715,8 @@ def build_run_context_payload(
     if pm_drift_band:
         primary_metric["drift_band"] = pm_drift_band
         run_context["pm_drift_band"] = pm_drift_band
-    primary_metric["overhead_threshold"] = guard_overhead_threshold
-    run_context["guard_overhead_threshold"] = guard_overhead_threshold
+    primary_metric["degradation_limit"] = guard_metric_degradation_limit
+    run_context["guard_metric_degradation_limit"] = guard_metric_degradation_limit
     run_context["model_profile"] = {
         "family": getattr(model_profile, "family", ""),
         "default_loss": getattr(model_profile, "default_loss", ""),
@@ -671,7 +726,16 @@ def build_run_context_payload(
     }
     extra_context = to_serialisable_dict_fn(_section_dict(cfg, "context"))
     if isinstance(extra_context, dict):
+        extra_run = extra_context.get("run")
+        existing_run = run_context.get("run")
+        if isinstance(extra_run, dict) and isinstance(existing_run, dict):
+            extra_context = dict(extra_context)
+            extra_context["run"] = {**existing_run, **extra_run}
         run_context.update(extra_context)
+    run_context.pop("model_id", None)
+    model_id = model_section.get("id")
+    if isinstance(model_id, str) and model_id:
+        run_context["model_id"] = model_id
     assurance_section = to_serialisable_dict_fn(_section_dict(cfg, "assurance"))
     if isinstance(assurance_section, dict) and assurance_section:
         run_context["assurance"] = assurance_section

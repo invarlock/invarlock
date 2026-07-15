@@ -62,7 +62,7 @@ def _emit_plugins_json(
     }
     if extra:
         payload.update(extra)
-    typer.echo(json.dumps(payload, ensure_ascii=False))
+    typer.echo(json.dumps(payload, ensure_ascii=False, allow_nan=False))
 
 
 def _filter_only_rows(

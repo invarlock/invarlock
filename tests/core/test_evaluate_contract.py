@@ -111,6 +111,27 @@ def test_load_validated_baseline_report_accepts_valid_explicit_file(
     assert payload["edit"] == {"name": "noop"}
 
 
+def test_reused_baseline_report_must_match_expected_model_identity(
+    tmp_path: Path,
+) -> None:
+    payload = _baseline_payload()
+    payload["meta"]["model_identity"] = {
+        "kind": "remote_revision",
+        "revision": "a" * 40,
+    }
+    report = _write_json(tmp_path / "report.json", payload)
+
+    with pytest.raises(ValidationError, match="model identity mismatch"):
+        load_validated_baseline_report(
+            report,
+            **_baseline_validation_kwargs(),
+            expected_model_identity={
+                "kind": "remote_revision",
+                "revision": "b" * 40,
+            },
+        )
+
+
 def test_expected_baseline_value_matches_provider_kind_edge_cases() -> None:
     matcher = evaluate_contract_mod._baseline_dataset_value_matches  # noqa: SLF001
 
@@ -172,65 +193,48 @@ def test_load_validated_baseline_report_rejects_context_without_tier(
         load_validated_baseline_report(report, **_baseline_validation_kwargs())
 
 
-def test_load_validated_baseline_report_accepts_legacy_identity_locations(
-    tmp_path: Path,
-) -> None:
-    kwargs = _baseline_validation_kwargs()
-
-    context_tier = _write_json(
-        tmp_path / "context-tier.json",
-        {
-            **_baseline_payload(),
-            "context": {
+@pytest.mark.parametrize(
+    ("context", "extra"),
+    [
+        (
+            {
                 "profile": "dev",
                 "tier": "balanced",
                 "assurance": {"mode": "off"},
             },
-        },
-    )
-    resolved, payload = load_validated_baseline_report(context_tier, **kwargs)
-    assert resolved == context_tier.resolve()
-    assert payload["context"]["tier"] == "balanced"
+            {},
+        ),
+        (
+            {"profile": "dev", "assurance": {"mode": "off"}},
+            {"auto": {"tier": "balanced"}},
+        ),
+        (
+            {"profile": "dev", "assurance": {"mode": "off"}},
+            {"meta": {"auto": {"tier": "balanced"}}},
+        ),
+        (
+            {"profile": "dev", "auto": {"tier": "balanced"}},
+            {"assurance": {"mode": "off"}},
+        ),
+    ],
+)
+def test_load_validated_baseline_report_rejects_noncanonical_context_locations(
+    tmp_path: Path,
+    context: dict[str, object],
+    extra: dict[str, object],
+) -> None:
+    kwargs = _baseline_validation_kwargs()
+    payload = _baseline_payload()
+    payload["context"] = context
+    for key, value in extra.items():
+        if key == "meta" and isinstance(value, dict):
+            payload["meta"].update(value)
+        else:
+            payload[key] = value
+    report = _write_json(tmp_path / "noncanonical.json", payload)
 
-    top_level_auto = _write_json(
-        tmp_path / "top-level-auto.json",
-        {
-            **_baseline_payload(),
-            "context": {"profile": "dev", "assurance": {"mode": "off"}},
-            "auto": {"tier": "balanced"},
-        },
-    )
-    resolved, payload = load_validated_baseline_report(top_level_auto, **kwargs)
-    assert resolved == top_level_auto.resolve()
-    assert payload["auto"]["tier"] == "balanced"
-
-    meta_auto = _write_json(
-        tmp_path / "meta-auto.json",
-        {
-            **_baseline_payload(),
-            "meta": {
-                "model_id": "baseline-model",
-                "adapter": "hf_causal",
-                "auto": {"tier": "balanced"},
-            },
-            "context": {"profile": "dev", "assurance": {"mode": "off"}},
-        },
-    )
-    resolved, payload = load_validated_baseline_report(meta_auto, **kwargs)
-    assert resolved == meta_auto.resolve()
-    assert payload["meta"]["auto"]["tier"] == "balanced"
-
-    top_level_assurance = _write_json(
-        tmp_path / "top-level-assurance.json",
-        {
-            **_baseline_payload(),
-            "context": {"profile": "dev", "auto": {"tier": "balanced"}},
-            "assurance": {"mode": "off"},
-        },
-    )
-    resolved, payload = load_validated_baseline_report(top_level_assurance, **kwargs)
-    assert resolved == top_level_assurance.resolve()
-    assert payload["assurance"]["mode"] == "off"
+    with pytest.raises(ValidationError, match="tier mismatch|assurance mode mismatch"):
+        load_validated_baseline_report(report, **kwargs)
 
 
 def test_load_validated_baseline_report_accepts_path_equivalent_model_ids(
@@ -491,6 +495,54 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
         load_validated_baseline_report(
             missing_records,
             **_baseline_validation_kwargs("hf_multimodal"),
+        )
+
+
+def test_load_validated_baseline_report_rejects_missing_text_window_payloads(
+    tmp_path: Path,
+) -> None:
+    missing_windows_payload = _baseline_payload()
+    missing_windows_payload["evaluation_windows"] = None
+    missing_windows = _write_json(
+        tmp_path / "missing-windows.json", missing_windows_payload
+    )
+    with pytest.raises(ValidationError, match="missing evaluation window payloads"):
+        load_validated_baseline_report(
+            missing_windows,
+            **_baseline_validation_kwargs(),
+        )
+
+    missing_preview = _write_json(
+        tmp_path / "missing-preview.json",
+        _baseline_payload(
+            evaluation_windows={
+                "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]}
+            }
+        ),
+    )
+    with pytest.raises(
+        ValidationError, match="missing evaluation_windows.preview payloads"
+    ):
+        load_validated_baseline_report(
+            missing_preview,
+            **_baseline_validation_kwargs(),
+        )
+
+    missing_input_ids = _write_json(
+        tmp_path / "missing-input-ids.json",
+        _baseline_payload(
+            evaluation_windows={
+                "preview": {"window_ids": ["preview-0"]},
+                "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]},
+            }
+        ),
+    )
+    with pytest.raises(
+        ValidationError, match="missing evaluation_windows.preview.input_ids"
+    ):
+        load_validated_baseline_report(
+            missing_input_ids,
+            **_baseline_validation_kwargs(),
         )
 
     inconsistent_records = _write_json(

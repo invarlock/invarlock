@@ -149,18 +149,6 @@ def evaluate_ab_gate(guard: Any) -> tuple[bool, str]:
 
     predictive_enabled = bool(guard._policy.get("predictive_gate", True))
     gate_state = getattr(guard, "_predictive_gate_state", {}) or {}
-    if (
-        predictive_enabled
-        and not gate_state.get("evaluated")
-        and guard._ratio_ci is not None
-    ):
-        gate_state = {
-            **gate_state,
-            "evaluated": True,
-            "passed": True,
-            "reason": gate_state.get("reason", "synthetic_ab_gate"),
-        }
-        guard._predictive_gate_state = gate_state
 
     if guard._ab_gain is None:
         return False, "no_ab_results"

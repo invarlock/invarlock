@@ -5,18 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from scripts.evidence_packs.python import preset_generator
+from scripts.evidence_packs.python import preset_calibration, preset_generator
 
 
-def test_default_preset_edit_types_include_generated_lora_and_fine_tune() -> None:
+def test_default_preset_edit_types_only_include_active_edit_families() -> None:
     assert preset_generator.DEFAULT_PRESET_EDIT_TYPES == (
         "quant_rtn",
-        "fp8_quant",
         "magnitude_prune",
-        "lowrank_svd",
-        "lora_merge",
-        "fine_tune",
+        "synthetic_lowrank_delta",
+        "synthetic_dense_update",
     )
+
+
+def test_spectral_caps_do_not_special_case_retired_edit_families() -> None:
+    assert preset_calibration._spectral_max_caps_for_edit_type("quant_rtn") == 15
+    assert preset_calibration._spectral_max_caps_for_edit_type("fp8_quant") == 10
+    assert preset_calibration._spectral_max_caps_for_edit_type("lowrank_svd") == 10
 
 
 def test_dataset_provider_spec_resolves_json_yaml_hf_and_local_overrides(
@@ -24,6 +28,13 @@ def test_dataset_provider_spec_resolves_json_yaml_hf_and_local_overrides(
 ) -> None:
     assert preset_generator._resolve_dataset_provider_spec("") == "wikitext2"
     assert preset_generator._resolve_dataset_provider_spec("wikitext2") == "wikitext2"
+
+    monkeypatch.setenv("INVARLOCK_HF_DATASET_REVISION", "release-candidate")
+    assert preset_generator._resolve_dataset_provider_spec("wikitext2") == {
+        "kind": "wikitext2",
+        "revision": "release-candidate",
+    }
+    monkeypatch.delenv("INVARLOCK_HF_DATASET_REVISION")
 
     monkeypatch.setenv(
         "INVARLOCK_DATASET_PROVIDER_JSON",
@@ -64,12 +75,29 @@ def test_dataset_provider_spec_resolves_json_yaml_hf_and_local_overrides(
         monkeypatch.delenv("INVARLOCK_DATASET_PROVIDER_YAML")
 
     monkeypatch.setenv("INVARLOCK_HF_DATASET", "c4")
+    with pytest.raises(SystemExit, match="INVARLOCK_HF_DATASET is unsupported"):
+        preset_generator._resolve_dataset_provider_spec("hf_text")
+    monkeypatch.delenv("INVARLOCK_HF_DATASET")
+
+    monkeypatch.setenv("INVARLOCK_HF_DATASET_CONFIG_NAME", "en")
+    with pytest.raises(
+        SystemExit, match="INVARLOCK_HF_DATASET_CONFIG_NAME is unsupported"
+    ):
+        preset_generator._resolve_dataset_provider_spec("hf_text")
+    monkeypatch.delenv("INVARLOCK_HF_DATASET_CONFIG_NAME")
+
+    monkeypatch.setenv("INVARLOCK_HF_DATASET_NAME", "c4")
+    with pytest.raises(SystemExit, match="dataset_name=c4 is unsupported"):
+        preset_generator._resolve_dataset_provider_spec("hf_text")
+    monkeypatch.setenv("INVARLOCK_HF_DATASET_NAME", "allenai/c4")
+    monkeypatch.setenv("INVARLOCK_HF_DATASET_REVISION", "main")
     monkeypatch.setenv("INVARLOCK_HF_MAX_SAMPLES", "bad")
     monkeypatch.setenv("INVARLOCK_HF_TRUST_REMOTE_CODE", "false")
     provider = preset_generator._resolve_dataset_provider_spec("hf_text")
     assert provider["kind"] == "hf_text"
     assert provider["dataset_name"] == "allenai/c4"
     assert provider["config_name"] == "en"
+    assert provider["revision"] == "main"
     assert provider["max_samples"] == 2000
     assert provider["trust_remote_code"] is False
 
@@ -81,7 +109,8 @@ def test_dataset_provider_spec_resolves_json_yaml_hf_and_local_overrides(
     provider = preset_generator._resolve_dataset_provider_spec("hf_text")
     assert provider["trust_remote_code"] is True
 
-    monkeypatch.delenv("INVARLOCK_HF_DATASET")
+    monkeypatch.delenv("INVARLOCK_HF_DATASET_NAME")
+    monkeypatch.delenv("INVARLOCK_HF_DATASET_REVISION")
     monkeypatch.delenv("INVARLOCK_HF_MAX_SAMPLES")
     monkeypatch.delenv("INVARLOCK_HF_TRUST_REMOTE_CODE")
     monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE")

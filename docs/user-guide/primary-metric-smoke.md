@@ -92,9 +92,9 @@ report = {"metrics": {"classification": {
   "preview": {"correct_total": 8,  "total": 10},
   "final":   {"correct_total": 18, "total": 20},
 }}}
-baseline = {"metrics": {"accuracy": 0.85}}
+baseline = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.85}}}
 pm = compute_primary_metric_from_report(report, kind="accuracy", baseline=baseline)
-print(pm)  # preview=0.80, final=0.90, ratio_vs_baseline=0.05 (delta)
+print(pm)  # preview=0.80, final=0.90, delta_vs_baseline_pp=5.0
 ```
 
 ## Multimodal Accuracy
@@ -104,9 +104,10 @@ rep = {"metrics": {"classification": {
   "preview": {"correct_total": 80,  "total": 100},
   "final":   {"correct_total": 190, "total": 200},
 }}}
-base = {"metrics": {"accuracy": 0.90}}
+base = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.90}}}
 pm = compute_primary_metric_from_report(rep, kind="accuracy", baseline=base)
-assert pm["ratio_vs_baseline"] == 0.05
+assert pm["delta_vs_baseline_pp"] == 5.0
+assert "ratio_vs_baseline" not in pm
 ```
 
 ---

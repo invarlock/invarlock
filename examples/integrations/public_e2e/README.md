@@ -2,7 +2,7 @@
 
 Status: `reference-pattern`
 
-Script: runnable against checked-in public evidence.
+Script: requires caller-supplied current evidence.
 
 This example turns an existing external-edit evidence run into the artifacts a
 release or registry workflow usually needs:
@@ -14,26 +14,34 @@ release or registry workflow usually needs:
 - release-review Markdown
 - CI summary Markdown
 
-The source evidence is
-`public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/`. That run uses
-`sshleifer/tiny-gpt2` as the baseline and a locally materialized subject
-checkpoint produced by `external_edit_recipe.py`. The subject checkpoint is not
-vendored in the repository; `checkpoint_refs.json` and
-`external_edit_summary.json` record the external edit type and subject file
-hashes.
+The script accepts a current evaluation report, its complete retained raw
+baseline, an independently maintained acceptance policy pack, and an
+independently obtained runtime-image digest.
 
 ## Run
 
 From the repository root:
 
 ```bash
-examples/integrations/public_e2e/run_public_e2e_release_review.sh --force
+examples/integrations/public_e2e/run_public_e2e_release_review.sh \
+  --report /path/to/evaluation.report.json \
+  --baseline /path/to/raw-baseline-report.json \
+  --policy-pack /path/to/acceptance-policy-pack.json \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" \
+  --force
 ```
+
+The default mode is strict verification with the `ci` profile. All four trust
+inputs are required. Do not reconstruct the baseline from the subject, generate
+the policy pack as part of the submitted bundle, or copy the trusted digest from
+the submitted runtime manifest. A caller may explicitly select
+`--assurance off --profile dev` for non-assurance inspection, but that result is
+not a release acceptance.
 
 By default, generated files are written under:
 
 ```text
-examples/integrations/public_e2e/reports/tiny-gpt2-external-magnitude-prune/
+examples/integrations/public_e2e/reports/release-review/
 ```
 
 That path is ignored by git. To write elsewhere:
@@ -48,7 +56,9 @@ examples/integrations/public_e2e/run_public_e2e_release_review.sh \
 | Artifact | Role |
 | --- | --- |
 | `evaluation.report.json` | Local copy of the canonical verifier input. |
-| `runtime.manifest.json` | Runtime provenance sidecar copied beside the report for strict verification. |
+| `runtime.manifest.json` | Runtime provenance sidecar copied beside the report for verification. |
+| `baseline.report.json` | Strict runs only: independently supplied raw baseline copied for replay. |
+| `acceptance-policy-pack.json` | Strict runs only: independently supplied policy copied for replay. |
 | `checkpoint_refs.json` | Baseline, subject, and evidence-pack references. |
 | `external_edit_summary.json` | External edit metadata and subject file hashes. |
 | `invarlock-verify.json` | Machine-readable verifier result for this local report copy. |
@@ -69,11 +79,17 @@ checked out:
 ```yaml
 - uses: ./.github/actions/invarlock-report-gate
   with:
-    report: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
-    profile: release
+    report: path/to/evaluation.report.json
+    baseline: path/to/raw-baseline-report.json
+    policy-pack: path/to/acceptance-policy-pack.json
+    profile: ci
     assurance: strict
     runtime-provenance: container
+    expected-runtime-image-digest: ${{ env.TRUSTED_RUNTIME_IMAGE_DIGEST }}
 ```
+
+The `baseline`, `policy-pack`, and expected image digest must come from sources
+independent of the submitted report.
 
 The `uses: ./.github/actions/invarlock-report-gate` line is repo-local. Outside
 this source tree, copy/vendor `.github/actions/invarlock-report-gate/` into the
@@ -83,6 +99,7 @@ target repository until a tagged remote action reference is published.
 
 This example is an evidence handoff. It does not regenerate the subject
 checkpoint, push to MLflow, update Hugging Face Hub, or approve a deployment.
-The canonical evidence remains the checked-in report, runtime manifest,
-checkpoint references, external edit summary, and signed evidence pack under
-`public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/`.
+The canonical evidence is the caller-supplied report, sibling runtime manifest,
+retained raw baseline, acceptance policy pack, and independently pinned runtime
+image identity. Optional checkpoint references and external-edit summaries are
+copied when present.

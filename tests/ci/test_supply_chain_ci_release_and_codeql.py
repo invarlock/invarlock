@@ -12,6 +12,7 @@ TRANSFORMERS_LOCKFILES = (
     Path("requirements/workflows/hf-py313.txt"),
     Path("requirements/workflows/runtime-image-py312.txt"),
     Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
+    Path("requirements/workflows/training-profile-py312.txt"),
 )
 TRANSFORMERS_512_HASHES = {
     "500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c",
@@ -293,7 +294,7 @@ def test_codeql_workflow_uses_repo_config():
     analyze_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/analyze@"
     )
-    expected_pin = "8aad20d150bbac5944a9f9d289da16a4b0d87c1e"
+    expected_pin = "99df26d4f13ea111d4ec1a7dddef6063f76b97e9"
 
     assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
     assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
@@ -337,42 +338,6 @@ def test_codeql_config_scopes_analysis_to_shipped_python():
     excluded_ids = set(config["query-filters"][0]["exclude"]["id"])
     assert "py/empty-except" in excluded_ids
     assert "py/unused-local-variable" in excluded_ids
-
-
-def test_model_evidence_workflow_is_configured() -> None:
-    workflow = _load_workflow(Path(".github/workflows/model-evidence-sweep.yml"))
-
-    triggers = workflow["on"]
-    assert "workflow_dispatch" in triggers
-    assert "schedule" not in triggers
-    assert workflow["permissions"] == {"contents": "read"}
-
-    job = workflow["jobs"]["model-evidence-sweep"]
-    assert job["runs-on"] == ["self-hosted", "linux", "gpu"]
-    assert job["timeout-minutes"] == 1440
-
-    env = job["env"]
-    assert env["PYTHONPATH"] == "${{ github.workspace }}/src"
-    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
-
-    steps = job["steps"]
-    checkout = _find_step_by_name(steps, "Checkout repository")
-    assert checkout["uses"].startswith("actions/checkout@")
-
-    install = _find_step_by_name(steps, "Install (core + hf)")
-    assert (
-        install["run"]
-        == "python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt"
-    )
-
-    sweep = _find_step_by_name(steps, "Run shipped-model evidence sweep")
-    assert "scripts/model_evidence/model_evidence_sweep.py" in sweep["run"]
-    assert "--profile ci" in sweep["run"]
-    assert "reports/model_evidence/${{ github.run_id }}" in sweep["run"]
-
-    upload = _find_step_by_uses_prefix(steps, "actions/upload-artifact@")
-    assert upload["with"]["name"] == "model-evidence-${{ github.run_id }}"
-    assert upload["with"]["path"] == "reports/model_evidence/${{ github.run_id }}/"
 
 
 def test_gpt2_smoke_workflow_is_configured() -> None:

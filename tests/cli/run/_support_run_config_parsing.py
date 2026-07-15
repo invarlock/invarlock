@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from tests.cli.run._support_run_common import canonical_ppl_metrics
+
 
 def config_parsing_detect_profile(model_id: str, adapter: str) -> SimpleNamespace:
     return SimpleNamespace(
@@ -30,15 +32,14 @@ def config_parsing_core_report(
 ) -> SimpleNamespace:
     return SimpleNamespace(
         edit={"plan_digest": "abcd", "deltas": {"heads_pruned": 0}},
-        metrics={
-            "ppl_preview": 10.0,
-            "ppl_final": 10.0,
-            "ppl_ratio": 1.0,
-            "window_overlap_fraction": 0.0,
-            "window_match_fraction": 1.0,
-            "paired_windows": 1,
-            "loss_type": "ce",
-        },
+        metrics=canonical_ppl_metrics(
+            preview=10.0,
+            final=10.0,
+            window_overlap_fraction=0.0,
+            window_match_fraction=1.0,
+            paired_windows=1,
+            loss_type="ce",
+        ),
         guards={},
         context={"dataset_meta": {}},
         evaluation_windows=evaluation_windows,

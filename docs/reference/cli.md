@@ -41,16 +41,24 @@ fresh install or wheel-only environment:
 # Install the Hugging Face-backed evaluation stack
 pip install "invarlock[hf]"
 
-# Compare a baseline against a subject
+# Compare a local baseline against its externally edited subject
+BASELINE_CHECKPOINT=/path/to/original-checkpoint
+EDITED_SUBJECT_CHECKPOINT=/path/to/edited-checkpoint
 invarlock evaluate --allow-network \
-  --baseline gpt2 \
-  --subject distilgpt2 \
+  --baseline "$BASELINE_CHECKPOINT" \
+  --subject "$EDITED_SUBJECT_CHECKPOINT" \
   --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --assurance strict
 
-# Validate the container-backed evaluation bundle
-invarlock verify --assurance strict reports/eval/evaluation.report.json
+# Validate the bundle using a digest pinned in an independent policy channel
+BASELINE_RUN_REPORT=/path/to/baseline/run/report.json
+ACCEPTANCE_POLICY_PACK=/path/to/acceptance/policy-pack.json
+invarlock verify --profile ci --assurance strict \
+  --baseline "$BASELINE_RUN_REPORT" \
+  --policy-pack "$ACCEPTANCE_POLICY_PACK" \
+  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
@@ -63,13 +71,17 @@ invarlock report export -i reports/eval/evaluation.report.json --format mlflow-t
 - `evaluate` defaults to `--execution-mode container`, which delegates model-loading work
   into the runtime container.
 - `evaluate` defaults to `--assurance strict`, which requires CI/release profile,
-  balanced/conservative tier, canonical guard order, complete evidence, and
-  verified runtime provenance.
+  balanced/conservative tier, canonical guard order, and complete run evidence.
+  The emitted strict report remains `pending_verifier` until a later `verify`
+  call supplies the retained baseline report, acceptance policy pack, and
+  independent runtime-image pin.
 - Use `--execution-mode host` only for host-side workflows that intentionally
   bypass the container boundary. Host mode is non-assurance unless
   `--assurance off` is explicit.
-- `verify` expects `runtime.manifest.json` beside container-backed evaluation outputs
-  and fails closed when required runtime provenance is missing.
+- `verify` expects `runtime.manifest.json` beside container-backed evaluation
+  outputs. Strict mode also requires an independently supplied `--policy-pack` and
+  `--expected-runtime-image-digest` from independent policy channels, and fails
+  closed when a required input is missing.
 - `verify --assurance report` is the default: strict is enforced when the report
   claims strict. Use `verify --assurance strict` to require strict on every
   report input.
@@ -107,7 +119,7 @@ invarlock report export -i reports/eval/evaluation.report.json --format mlflow-t
 | Command | Purpose |
 | --- | --- |
 | `invarlock evaluate` | Compare baseline and subject checkpoints with deterministic pairing |
-| `invarlock verify` | Verify evaluation reports against schema, pairing, and runtime provenance rules |
+| `invarlock verify` | Verify evaluation reports against schema, pairing, gates, report/manifest binding, and runtime-image claim rules |
 | `invarlock report` | Explain, render, and validate existing report artifacts |
 | `invarlock doctor` | Diagnose environment and configuration issues |
 | `invarlock advanced` | Advanced evidence-pack, policy, plugin, and calibration workflows |
@@ -115,15 +127,18 @@ invarlock report export -i reports/eval/evaluation.report.json --format mlflow-t
 | `invarlock advanced runtime-verify` | Verify an evaluation report against its sibling `runtime.manifest.json` |
 
 Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
-`3=hard abort` for profile-aware fail-closed paths.
+`3=hard abort` for profile-aware fail-closed paths. Advanced evidence-pack
+verification also uses `4-7` for package failure classes and `8` for a
+non-assurance integrity-only diagnostic; `8` is never report-verification
+success.
 
 ## Stable vs Experimental Commands
 
 | Stability class | Commands | Contract |
 | --- | --- | --- |
 | Stable core workflow | `invarlock evaluate`, `invarlock verify`, `invarlock report html`, `invarlock report explain`, `invarlock report export`, `invarlock report validate`, `invarlock doctor`, `invarlock version` | Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy. |
-| Stable JSON automation | `invarlock doctor --json`, `invarlock verify --json`, `invarlock advanced runtime-verify --json`, `invarlock advanced plugins list --json`, `invarlock advanced plugins adapters --json`, `invarlock advanced evidence-pack verify --json`, `invarlock advanced policy verify --json` | Required envelope fields and `format_version` values are stable; optional fields are additive. |
-| Stable advanced verifiers | `invarlock advanced runtime-verify`, `invarlock advanced evidence-pack inspect`, `invarlock advanced evidence-pack verify`, `invarlock advanced policy build`, `invarlock advanced policy verify`, `invarlock advanced plugins list`, `invarlock advanced plugins adapters` | Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster. |
+| Stable JSON automation | `invarlock doctor --json`, `invarlock verify --json`, `invarlock advanced runtime-verify --json`, `invarlock advanced plugins list --json`, `invarlock advanced plugins adapters --json`, `invarlock advanced evidence-pack verify --json`, `invarlock advanced evidence-catalog validate --json`, `invarlock advanced policy verify --json` | Required envelope fields and `format_version` values are stable; optional fields are additive. |
+| Stable advanced verifiers | `invarlock advanced runtime-verify`, `invarlock advanced evidence-pack inspect`, `invarlock advanced evidence-pack verify`, `invarlock advanced evidence-catalog validate`, `invarlock advanced policy build`, `invarlock advanced policy verify`, `invarlock advanced plugins list`, `invarlock advanced plugins adapters` | Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster. |
 | Experimental or maintainer-only | `invarlock advanced calibrate`, repo scripts under `scripts/`, package-internal config runners, undocumented flags, and local harness entrypoints | Useful for development, calibration, and release work; not covered by the public CLI stability contract until documented as stable here. |
 
 ## `invarlock evaluate`
@@ -134,6 +149,27 @@ Common options:
 
 - `--baseline`: baseline checkpoint path or model ID
 - `--subject`: subject checkpoint path or model ID
+- `--baseline-revision`: immutable 40–64 character lowercase hexadecimal
+  commit for a remote baseline. Strict evaluation requires this when
+  `--baseline` is not a local checkpoint directory.
+- `--subject-revision`: immutable 40–64 character lowercase hexadecimal commit
+  for a remote subject. Strict evaluation requires this when `--subject` is not
+  a local checkpoint directory. Local checkpoint directories are bound by a
+  deterministic content-tree SHA-256 identity instead.
+
+Strict local identity intentionally performs three full checkpoint-tree reads:
+one during command planning to bind the requested input, then one immediately
+before and one immediately after model loading to detect substitution. This can
+add material storage I/O for large checkpoints; immutable remote revisions avoid
+local content hashing. Throughput depends on the checkpoint layout, filesystem,
+cache state, and storage device; benchmark the target environment rather than
+relying on a published host-specific estimate:
+
+```bash
+python scripts/checks/benchmark_checkpoint_identity.py \
+  /path/to/local-checkpoint --repeat 3 --json
+```
+
 - `--baseline-report`: reuse a stored baseline report by passing the explicit
   `report.json` file path that captured the baseline windows. Reused reports
   must match the requested baseline model, profile, tier, adapter family,
@@ -161,15 +197,18 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --subject distilgpt2 \
   --baseline-adapter auto --subject-adapter auto \
   --profile ci \
+  --execution-mode host \
+  --assurance off \
   --report-out reports/eval
 ```
 
 ## `invarlock verify`
 
-Purpose: verify existing evaluation report JSON files end to end. This command
+Purpose: verify existing evaluation report JSON files against the implemented
+artifact and policy contracts. This command
 checks report schema, primary-metric recomputation, paired-window consistency,
-policy gates, strict-assurance claims when requested, and runtime provenance
-through the report's sibling `runtime.manifest.json`.
+policy gates, strict-assurance claims when requested, and report/manifest
+binding through the sibling `runtime.manifest.json`.
 
 Arguments:
 
@@ -178,30 +217,48 @@ Arguments:
 
 Common options:
 
-- `--baseline`: optional baseline report for comparison flows
-- `--tolerance`: float tolerance for recompute checks
+- `--baseline`: required whenever strict assurance is enforced (explicitly or
+  because the input report claims strict). Supply the complete baseline
+  `report.json` emitted by the noop baseline run; metric-only and evaluation
+  report fragments are rejected. It is optional only when strict assurance is
+  not being enforced.
+- `--policy-pack`: required whenever strict assurance is enforced. Supply the
+  independently maintained `policy-pack-v1` JSON/YAML artifact; strict verification
+  rejects thresholds authorized only by the submitted report.
+- `--tolerance`: finite recompute tolerance in `[0, 1e-9]`; larger, negative,
+  NaN, and infinite values are rejected so callers cannot disable recomputation
 - `--profile`: profile-aware validation mode
 - `--assurance report|strict|off`: `report` enforces strict only for reports
   claiming strict; `strict` requires every input to claim and pass strict;
   `off` skips strict assurance policy checks.
 - `--warning-policy pass|fail`: keep guard warnings advisory (`pass`, default)
   or fail verification when baseline-relative guard warnings are present (`fail`).
-- `--fail-on-warnings`: alias for `--warning-policy fail`.
 - `--runtime-provenance container|host`: runtime provenance policy for
   the supplied report artifacts
+- `--expected-runtime-image-digest sha256:...`: compare the manifest's claimed
+  image digest to a value obtained independently. Required by strict assurance.
+  This is image-identity claim matching, not proof that the image ran.
 - `--json`: emit a single JSON envelope
+
+Each result's `verification.receipt` identifies the exact subject and baseline
+bytes by SHA-256, their provider digests, the verifier version, normalized
+profile/assurance inputs, and the expected runtime-image digest. The receipt
+sets `signed=false`; authenticate or sign the containing evidence pack when an
+authenticated receipt is required.
 
 Example:
 
 ```bash
-invarlock verify --json reports/eval/evaluation.report.json
+invarlock verify --json \
+  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST" \
+  reports/eval/evaluation.report.json
 ```
 
 Use strict warning mode when you want to fail an otherwise policy-passing edit
 because a guard signal changed relative to the baseline:
 
 ```bash
-invarlock verify --fail-on-warnings reports/eval/evaluation.report.json
+invarlock verify --warning-policy fail reports/eval/evaluation.report.json
 ```
 
 ## `invarlock report`
@@ -228,7 +285,10 @@ Core subcommands:
     `--policy-profile`, `--report-url`, `--evidence-url`, `--verify-result`,
     `--force`
   - `--verify-result` uses only the verifier result item whose `id` matches
-    the resolved evaluation report path; stale verifier JSON is rejected.
+    the resolved evaluation report path, requires a strict `verify-v1` receipt
+    bound to the exact exported report bytes, and rejects stale or malformed
+    verifier JSON. Current unsigned receipts are exported only as
+    `receipt_bound_untrusted` metadata, never as a verified pass.
 - `invarlock report validate`
   - Validate a report JSON against the v1 schema
 - Directory inputs are command-specific:
@@ -289,7 +349,9 @@ listed below.
 Subcommands:
 
 - `invarlock advanced evidence-pack`
-  - Inspect, build, sign/keygen, and verify evidence packs
+  - Inspect and verify evidence packs, including exact catalog-bound sets
+- `invarlock advanced evidence-catalog`
+  - Validate the checked public evidence catalog
 - `invarlock advanced policy`
   - Build and verify policy-pack artifacts
 - `invarlock advanced plugins`
@@ -302,12 +364,27 @@ Subcommands:
 Examples:
 
 ```bash
-invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
+invarlock advanced evidence-pack verify <pack> \
+  --strict \
+  --report-assurance strict \
+  --policy-pack acceptance-policy-pack.json \
+  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST"
+invarlock advanced evidence-pack inspect <pack> --json
+invarlock advanced evidence-pack verify-set --help
+invarlock advanced evidence-catalog validate \
+  contracts/evidence_catalog_v1.json \
+  --json
 invarlock advanced policy verify policy-pack.json --json
 invarlock advanced plugins list --json
 invarlock advanced calibrate --help
 invarlock advanced runtime-verify --report reports/eval/evaluation.report.json --manifest reports/eval/runtime.manifest.json
 ```
+
+`advanced evidence-pack verify --skip-verify` is a diagnostic-only integrity
+inspection. It returns the distinct nonzero status `8`, with
+`integrity_ok=true`, `reports_verified=false`, and `ok=false` when integrity
+checks complete. It is rejected with `--strict`, strict report assurance, or
+CI/release profiles; use normal report verification for assurance.
 
 ## Plugins & Entry Points
 
@@ -333,16 +410,20 @@ Plugin install and uninstall commands are not part of the CLI surface.
 
 ## `invarlock advanced runtime-verify`
 
-Purpose: low-level runtime provenance verification for an existing evaluation
+Purpose: low-level runtime evidence verification for an existing evaluation
 report and runtime manifest. This command validates the manifest contract,
-container execution fields, image digest presence, and the report SHA-256
-binding. It is scoped to runtime provenance; `invarlock verify` owns
-primary-metric gates, paired-window math, and strict-assurance report policy.
+declared container fields, image-digest presence, and report SHA-256 binding.
+With `--expected-runtime-image-digest`, it also compares the declared image
+identity with a caller-supplied pin. Without that pin, a successful result is
+`manifest_bound`, not independently anchored. Neither mode attests actual
+container execution; `invarlock verify` separately owns primary-metric gates,
+paired-window math, and strict-assurance report policy.
 
 Common options:
 
 - `--report`: path to `evaluation.report.json`
 - `--manifest`: path to `runtime.manifest.json`
+- `--expected-runtime-image-digest`: optional independent `sha256:...` image pin
 - `--json`: emit a machine-readable `runtime-verify-v1` envelope
 
 Example:
@@ -350,8 +431,13 @@ Example:
 ```bash
 invarlock advanced runtime-verify \
   --report reports/eval/evaluation.report.json \
-  --manifest reports/eval/runtime.manifest.json
+  --manifest reports/eval/runtime.manifest.json \
+  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST"
 ```
+
+The JSON envelope distinguishes `binding_verified`,
+`expected_digest_matched`, and `trust_status`. The latter two describe a
+caller-supplied digest comparison only; they are not execution attestation.
 
 ## JSON Output
 
@@ -365,6 +451,7 @@ Stable machine-readable output is available on these surfaces:
 | `invarlock advanced plugins list --json` | `plugins-v1` | Plugin catalog envelope and contract catalog keys are stable. |
 | `invarlock advanced plugins adapters --json` | `plugins-v1` | Adapter rows and contract catalog keys are stable. |
 | `invarlock advanced evidence-pack verify --json` | `evidence-pack-verify-v1` | Evidence-pack verification envelope is stable. |
+| `invarlock advanced evidence-catalog validate --json` | `evidence-catalog-validate-v1` | Catalog validation envelope is stable. |
 | `invarlock advanced policy verify --json` | `policy-pack-verify-v1` | Policy-pack verification envelope is stable. |
 
 These commands emit a single JSON object suitable for CI parsing. Within a

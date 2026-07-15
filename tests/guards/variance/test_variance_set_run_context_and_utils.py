@@ -1,10 +1,14 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance import (
+    VarianceGuard,
+    _bind_multimodal_processor_identity,
+)
 
 
 class Tiny(nn.Module):
@@ -39,6 +43,103 @@ def test_set_run_context_pairing_and_monitor_only():
     report2 = SimpleNamespace(meta={}, context={}, edit={})
     g.set_run_context(report2)
     assert "pairing_reference" not in g._stats
+
+
+def test_set_run_context_uses_multimodal_example_ids_for_pairing():
+    guard = VarianceGuard()
+    guard.set_run_context(
+        SimpleNamespace(
+            meta={"model_id": "m", "seed": 7},
+            context={
+                "dataset_meta": {"dataset_hash": "h"},
+                "pairing_baseline": {
+                    "preview": {"example_ids": ["ex-1", "ex-2"]},
+                    "final": {"example_ids": ["ex-3"]},
+                },
+            },
+            edit={"name": "structured", "deltas": {"params_changed": 1}},
+        )
+    )
+
+    assert guard._pairing_reference == [
+        "preview::ex-1",
+        "preview::ex-2",
+        "final::ex-3",
+    ]
+    assert guard._stats["pairing_reference"]["count"] == 3
+
+
+def test_bind_multimodal_processor_identity_updates_run_dataset_meta():
+    guard = VarianceGuard()
+    dataset_meta = {"dataset_hash": "h"}
+    guard.set_run_context(
+        SimpleNamespace(
+            meta={},
+            context={"dataset_meta": dataset_meta},
+            edit={},
+        )
+    )
+
+    _bind_multimodal_processor_identity(
+        guard,
+        SimpleNamespace(processor_identity={"tokenizer_sha256": "sha256:" + "a" * 64}),
+    )
+
+    assert dataset_meta["tokenizer_hash"] == "sha256:" + "a" * 64
+    assert guard._stats["dataset_meta"]["tokenizer_hash"] == "sha256:" + "a" * 64
+
+
+def test_bind_multimodal_processor_identity_rejects_identity_mismatch():
+    guard = VarianceGuard()
+    guard.set_run_context(
+        SimpleNamespace(
+            meta={},
+            context={
+                "dataset_meta": {
+                    "dataset_hash": "h",
+                    "tokenizer_hash": "sha256:" + "a" * 64,
+                }
+            },
+            edit={},
+        )
+    )
+
+    with pytest.raises(ValueError, match="tokenizer identity mismatch"):
+        _bind_multimodal_processor_identity(
+            guard,
+            SimpleNamespace(
+                processor_identity={"tokenizer_sha256": "sha256:" + "b" * 64}
+            ),
+        )
+
+
+def test_set_run_context_accepts_only_verified_explicit_noop_as_no_change():
+    verified = VarianceGuard()
+    verified.set_run_context(
+        SimpleNamespace(
+            meta={},
+            context={},
+            edit={"name": "noop", "deltas": {"params_changed": 0}},
+        )
+    )
+    assert verified._explicit_noop_no_change is True
+    assert verified._monitor_only is False
+    assert any(
+        event["kind"] == "no_adjustment_required"
+        for event in verified.diagnostic_records
+    )
+
+    rejected_edits = (
+        {"name": "structured", "deltas": {"params_changed": 0}},
+        {"name": "noop", "deltas": {"params_changed": False}},
+        {"name": "noop", "deltas": {"params_changed": 0.0}},
+        {"name": "noop", "deltas": {"params_changed": "0"}},
+        {"name": "noop", "deltas": {}},
+    )
+    for edit in rejected_edits:
+        guard = VarianceGuard()
+        guard.set_run_context(SimpleNamespace(meta={}, context={}, edit=edit))
+        assert guard._explicit_noop_no_change is False
 
 
 def test_tensorize_and_extract_window_ids():

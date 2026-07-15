@@ -309,6 +309,16 @@ def _sanitize_token_ids_for_model(
     return input_ids, attention_mask, labels
 
 
+def _causal_batch_stats(nll: torch.Tensor, valid: torch.Tensor) -> tuple[float, int]:
+    """Return causal NLL sum and token count with one CUDA synchronization."""
+    nll_sum = nll[valid].sum()
+    token_count = valid.sum()
+    if nll.device.type == "cuda":
+        stats = torch.stack((nll_sum.to(torch.float64), token_count)).cpu()
+        return float(stats[0]), int(stats[1])
+    return float(nll_sum.item()), int(token_count.item())
+
+
 @torch.no_grad()
 def compute_perplexity_strict(
     model: nn.Module, dataloader, device: str | torch.device | None = None
@@ -399,19 +409,17 @@ def compute_perplexity_strict(
         valid = shift_labels != -100
         if shift_mask is not None:
             valid = valid & shift_mask.bool()
-        if not valid.any():
-            continue
-
-        log_probs = shift_logits.log_softmax(dim=-1)
         vocab_size = int(shift_logits.size(-1))
         valid = valid & (shift_labels >= 0) & (shift_labels < vocab_size)
         if not valid.any():
             continue
+        log_probs = shift_logits.log_softmax(dim=-1)
         tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)
         nll = -log_probs.gather(-1, tgt).squeeze(-1)
 
-        nll_sum += nll[valid].sum().item()
-        tok_count += int(valid.sum().item())
+        batch_nll_sum, batch_tok_count = _causal_batch_stats(nll, valid)
+        nll_sum += batch_nll_sum
+        tok_count += batch_tok_count
 
     if tok_count == 0:
         raise ValidationError(
@@ -491,14 +499,11 @@ def compute_perplexity(
         valid = shift_labels != -100
         if shift_mask is not None:
             valid = valid & shift_mask.bool()
-        if not valid.any():
-            continue
-
-        log_probs = shift_logits.log_softmax(dim=-1)
         vocab_size = int(shift_logits.size(-1))
         valid = valid & (shift_labels >= 0) & (shift_labels < vocab_size)
         if not valid.any():
             continue
+        log_probs = shift_logits.log_softmax(dim=-1)
         tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)
 
         if str(device).startswith("mps"):
@@ -509,8 +514,9 @@ def compute_perplexity(
         else:
             nll = -log_probs.gather(-1, tgt).squeeze(-1)
 
-        nll_sum += nll[valid].sum().item()
-        tok_count += int(valid.sum().item())
+        batch_nll_sum, batch_tok_count = _causal_batch_stats(nll, valid)
+        nll_sum += batch_nll_sum
+        tok_count += batch_tok_count
         batch_count += 1
 
     if tok_count == 0:
@@ -585,14 +591,11 @@ def compute_ppl(
         shift_mask = attention_mask_tensor[:, 1:]
 
         valid = (shift_labels != -100) & shift_mask.bool()
-        if not valid.any():
-            continue
-
-        log_probs = shift_logits.log_softmax(dim=-1)
         vocab_size = int(shift_logits.size(-1))
         valid = valid & (shift_labels >= 0) & (shift_labels < vocab_size)
         if not valid.any():
             continue
+        log_probs = shift_logits.log_softmax(dim=-1)
         tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)
 
         if str(device).startswith("mps"):
@@ -603,8 +606,9 @@ def compute_ppl(
         else:
             nll = -log_probs.gather(-1, tgt).squeeze(-1)
 
-        nll_sum += nll[valid].sum().item()
-        tok_count += int(valid.sum().item())
+        batch_nll_sum, batch_tok_count = _causal_batch_stats(nll, valid)
+        nll_sum += batch_nll_sum
+        tok_count += batch_tok_count
 
     if tok_count == 0:
         raise ValidationError(

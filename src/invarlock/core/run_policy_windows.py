@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
+from pathlib import PurePosixPath
 from typing import Any
+
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _is_sequence_payload(value: Any) -> bool:
@@ -26,6 +30,51 @@ def _nested_list_payload(value: Any) -> list[list[Any]]:
     return payload
 
 
+def _portable_reference(value: Any) -> str | None:
+    if not isinstance(value, str) or not value or value != value.strip():
+        return None
+    if value.startswith("~") or "\\" in value:
+        return None
+    candidate = PurePosixPath(value)
+    parts = candidate.parts
+    if (
+        candidate.is_absolute()
+        or not parts
+        or parts[0].endswith(":")
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        return None
+    return candidate.as_posix()
+
+
+def _portable_multimodal_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    payload = dict(record)
+    runtime_image_path = payload.pop("image_path", None)
+    payload.pop("source_file", None)
+
+    image_ref = _portable_reference(payload.get("image_ref"))
+    if image_ref is None:
+        image_ref = _portable_reference(runtime_image_path)
+    image_sha256 = payload.get("image_sha256")
+    if (
+        image_ref is None
+        and isinstance(image_sha256, str)
+        and _SHA256_HEX_RE.fullmatch(image_sha256)
+    ):
+        image_ref = f"sha256:{image_sha256}"
+    if image_ref is None:
+        payload.pop("image_ref", None)
+    else:
+        payload["image_ref"] = image_ref
+
+    source_ref = _portable_reference(payload.get("source_ref"))
+    if source_ref is None:
+        payload.pop("source_ref", None)
+    else:
+        payload["source_ref"] = source_ref
+    return payload
+
+
 def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
     window_map = dict(window or {})
     payload: dict[str, Any] = {
@@ -44,16 +93,37 @@ def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
     records = window_map.get("records", [])
     if isinstance(records, list):
         payload["records"] = [
-            dict(record) for record in records if isinstance(record, Mapping)
+            _portable_multimodal_record(record)
+            for record in records
+            if isinstance(record, Mapping)
         ]
     input_records = window_map.get("input_records")
     if isinstance(input_records, list):
         payload["input_records"] = [
-            dict(record) for record in input_records if isinstance(record, Mapping)
+            _portable_multimodal_record(record)
+            for record in input_records
+            if isinstance(record, Mapping)
         ]
     processor_sha = window_map.get("processor_sha256")
     if isinstance(processor_sha, str) and processor_sha:
         payload["processor_sha256"] = processor_sha
+    processor_identity = window_map.get("processor_identity")
+    if isinstance(processor_identity, Mapping):
+        payload["processor_identity"] = dict(processor_identity)
+    is_multimodal = bool(payload["example_ids"]) and bool(
+        payload.get("records") or payload.get("input_records")
+    )
+    if is_multimodal:
+        for key in (
+            "window_ids",
+            "input_ids",
+            "attention_masks",
+            "masked_token_counts",
+            "actual_token_counts",
+            "labels",
+        ):
+            if not payload[key]:
+                payload.pop(key)
     return payload
 
 
@@ -92,7 +162,7 @@ def _fallback_window_payload(
     mask_counts: Sequence[int] | None,
 ) -> dict[str, Any]:
     multimodal_records = [
-        dict(record)
+        _portable_multimodal_record(record)
         for record in records
         if "image_path" in record or "example_id" in record or "answers" in record
     ]
@@ -115,6 +185,16 @@ def _fallback_window_payload(
         )
         if processor_sha:
             multimodal_payload["processor_sha256"] = processor_sha
+        processor_identity = next(
+            (
+                record.get("processor_identity")
+                for record in multimodal_records
+                if isinstance(record.get("processor_identity"), Mapping)
+            ),
+            None,
+        )
+        if isinstance(processor_identity, Mapping):
+            multimodal_payload["processor_identity"] = dict(processor_identity)
         return multimodal_payload
 
     sequence_payload: dict[str, Any] = {

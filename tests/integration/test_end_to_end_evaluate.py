@@ -112,13 +112,8 @@ def test_gpt2_user_journey_smoke_script_declares_execution_plan(
         "report validate",
         "report html",
         "report explain",
-        "advanced evidence-pack keygen",
-        "advanced evidence-pack build",
-        "advanced evidence-pack inspect",
-        "advanced evidence-pack verify",
     }
     assert set(plan["helper_contracts"]) == {
-        "run_evidence_pack_journey",
         "run_eval_journey",
         "run_negative_journey",
         "write_strict_bundle_fixture",
@@ -155,10 +150,6 @@ def test_tiny_container_smoke_script_declares_runtime_plan(tmp_path: Path) -> No
         "report validate",
         "report html",
         "report explain",
-        "advanced evidence-pack keygen",
-        "advanced evidence-pack build",
-        "advanced evidence-pack inspect",
-        "advanced evidence-pack verify",
     }
 
 
@@ -180,7 +171,6 @@ def test_cli_smoke_fast_declares_repo_python_and_command_groups(
         "plugins",
         "fixture_report",
         "report_generation",
-        "evidence_pack",
         "policy",
         "offline_evaluate",
         "network_evaluate",

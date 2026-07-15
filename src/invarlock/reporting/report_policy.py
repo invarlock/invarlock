@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from invarlock.core.assurance_contract import report_tiny_relax_enabled
+
 TIER_RATIO_LIMITS: dict[str, float] = {
     "conservative": 1.05,
     "balanced": 1.10,
@@ -36,20 +38,6 @@ def _coerce_finite_float_local(value: Any) -> float | None:
     except _PARSE_EXCEPTIONS:
         return None
     return parsed
-
-
-def coerce_bool_like(value: Any) -> bool | None:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int) and value in {0, 1}:
-        return bool(value)
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off"}:
-            return False
-    return None
 
 
 def _primary_metric_policy_source(
@@ -168,33 +156,4 @@ def resolve_pm_drift_band_from_report(
 
 def resolve_tiny_relax_from_report(report: dict[str, Any] | None) -> bool:
     """Resolve tiny-relax mode from report context policy fields."""
-
-    if not isinstance(report, dict):
-        return False
-
-    ctx = report.get("context")
-    if isinstance(ctx, dict):
-        run_ctx = ctx.get("run")
-        if isinstance(run_ctx, dict):
-            run_val = coerce_bool_like(run_ctx.get("tiny_relax"))
-            if run_val is not None:
-                return bool(run_val)
-        eval_ctx = ctx.get("eval")
-        if isinstance(eval_ctx, dict):
-            eval_val = coerce_bool_like(eval_ctx.get("tiny_relax"))
-            if eval_val is not None:
-                return bool(eval_val)
-
-    auto = report.get("auto")
-    if isinstance(auto, dict):
-        auto_val = coerce_bool_like(auto.get("tiny_relax"))
-        if auto_val is not None:
-            return bool(auto_val)
-
-    provenance = report.get("provenance")
-    if isinstance(provenance, dict):
-        flags = provenance.get("flags")
-        if isinstance(flags, list):
-            return "tiny_relax" in {str(flag).strip().lower() for flag in flags}
-
-    return False
+    return report_tiny_relax_enabled(report)

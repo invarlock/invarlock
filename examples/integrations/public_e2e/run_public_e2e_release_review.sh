@@ -5,16 +5,21 @@ usage() {
   cat <<'USAGE'
 Usage: run_public_e2e_release_review.sh [options]
 
-Build a local review bundle from the checked-in external-edit public evidence.
+Build a local review bundle from caller-supplied current evidence.
 
 Options:
-  --report PATH                Source evaluation report.
-                               Default: public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json
+  --report PATH                Source evaluation report. Required.
+  --baseline PATH              Independent raw baseline report required when
+                               --assurance strict is selected.
+  --policy-pack PATH           Independent acceptance policy pack required when
+                               --assurance strict is selected.
   --output-dir DIR             Output directory for generated handoff artifacts.
-                               Default: examples/integrations/public_e2e/reports/tiny-gpt2-external-magnitude-prune
-  --profile NAME               InvarLock verification profile. Default: release
-  --assurance MODE             Verification assurance mode. Default: strict
+                               Default: examples/integrations/public_e2e/reports/release-review
+  --profile NAME               InvarLock verification profile. Default: ci.
+  --assurance MODE             Verification assurance mode. Default: strict.
   --runtime-provenance MODE    Runtime provenance expectation. Default: container
+  --expected-runtime-image-digest DIGEST
+                               Independent image pin for strict verification.
   --report-url URL             Optional public URL for the model-card block.
   --evidence-url URL           Optional evidence-pack URL for the model-card block.
   --force                      Accepted for scripted parity; outputs are overwritten.
@@ -29,11 +34,14 @@ USAGE
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 
-report="$REPO_ROOT/public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack/reports/report-001/evaluation.report.json"
-output_dir="$SCRIPT_DIR/reports/tiny-gpt2-external-magnitude-prune"
-profile="release"
+report=""
+output_dir="$SCRIPT_DIR/reports/release-review"
+profile="ci"
 assurance="strict"
+baseline=""
+policy_pack=""
 runtime_provenance="container"
+expected_runtime_image_digest=""
 report_url=""
 evidence_url=""
 original_args=("$@")
@@ -48,6 +56,14 @@ while [[ $# -gt 0 ]]; do
       output_dir="${2:-}"
       shift 2
       ;;
+    --baseline)
+      baseline="${2:-}"
+      shift 2
+      ;;
+    --policy-pack)
+      policy_pack="${2:-}"
+      shift 2
+      ;;
     --profile)
       profile="${2:-}"
       shift 2
@@ -58,6 +74,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runtime-provenance)
       runtime_provenance="${2:-}"
+      shift 2
+      ;;
+    --expected-runtime-image-digest)
+      expected_runtime_image_digest="${2:-}"
       shift 2
       ;;
     --report-url)
@@ -89,8 +109,35 @@ if [[ -z "$report" || -z "$output_dir" || -z "$profile" || -z "$assurance" ]]; t
   exit 2
 fi
 
+if [[ "$assurance" == "strict" ]]; then
+  if [[ "$profile" != "ci" && "$profile" != "release" ]]; then
+    echo "Strict assurance requires --profile ci or --profile release." >&2
+    exit 2
+  fi
+  if [[ -z "$expected_runtime_image_digest" ]]; then
+    echo "Strict assurance requires --expected-runtime-image-digest." >&2
+    exit 2
+  fi
+  if [[ -z "$baseline" ]]; then
+    echo "Strict assurance requires --baseline with independent raw evidence." >&2
+    exit 2
+  fi
+  if [[ -z "$policy_pack" ]]; then
+    echo "Strict assurance requires --policy-pack from an independent source." >&2
+    exit 2
+  fi
+fi
+
 if [[ ! -f "$report" ]]; then
   echo "Evaluation report not found: $report" >&2
+  exit 2
+fi
+if [[ -n "$baseline" && ! -f "$baseline" ]]; then
+  echo "Baseline report not found: $baseline" >&2
+  exit 2
+fi
+if [[ -n "$policy_pack" && ! -f "$policy_pack" ]]; then
+  echo "Policy pack not found: $policy_pack" >&2
   exit 2
 fi
 
@@ -137,6 +184,8 @@ copy_first_sidecar() {
 }
 
 bundle_report="$output_dir/evaluation.report.json"
+bundle_baseline="$output_dir/baseline.report.json"
+bundle_policy_pack="$output_dir/acceptance-policy-pack.json"
 verify_out="$output_dir/invarlock-verify.json"
 html_out="$output_dir/evaluation.html"
 mlflow_out="$output_dir/mlflow-tags.json"
@@ -146,6 +195,12 @@ ci_summary_out="$output_dir/ci-summary.md"
 run_summary_out="$output_dir/run_summary.txt"
 
 cp "$report" "$bundle_report"
+if [[ -n "$baseline" ]]; then
+  cp "$baseline" "$bundle_baseline"
+fi
+if [[ -n "$policy_pack" ]]; then
+  cp "$policy_pack" "$bundle_policy_pack"
+fi
 for sidecar in runtime.manifest.json checkpoint_refs.json external_edit_summary.json evidence.meta.json; do
   copy_first_sidecar "$sidecar" "$output_dir/$sidecar" || true
 done
@@ -162,11 +217,30 @@ run_command_out="$output_dir/run_command.txt"
   printf '\n'
 } > "$run_command_out"
 
+expected_digest_args=()
+if [[ -n "$expected_runtime_image_digest" ]]; then
+  expected_digest_args=(
+    --expected-runtime-image-digest
+    "$expected_runtime_image_digest"
+  )
+fi
+baseline_args=()
+if [[ -n "$baseline" ]]; then
+  baseline_args=(--baseline "$bundle_baseline")
+fi
+policy_args=()
+if [[ -n "$policy_pack" ]]; then
+  policy_args=(--policy-pack "$bundle_policy_pack")
+fi
+
 "$PYTHON_BIN" -m invarlock verify \
   "$bundle_report" \
   --profile "$profile" \
   --assurance "$assurance" \
   --runtime-provenance "$runtime_provenance" \
+  "${baseline_args[@]}" \
+  "${policy_args[@]}" \
+  "${expected_digest_args[@]}" \
   --json > "$verify_out"
 
 "$PYTHON_BIN" -m invarlock report html \

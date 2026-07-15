@@ -1,7 +1,13 @@
 import math
 from unittest.mock import patch
 
+import pytest
+
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def test_evaluation_report_raises_on_drift_ratio_inconsistency():
@@ -15,7 +21,9 @@ def test_evaluation_report_raises_on_drift_ratio_inconsistency():
             "ts": "2025-01-01T00:00:00",
             "commit": "dead",
             "seed": 42,
+            "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "ci", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -45,8 +53,11 @@ def test_evaluation_report_raises_on_drift_ratio_inconsistency():
                 "ci": (-0.01, 0.01),
                 "display_ci": (math.exp(-0.01), math.exp(0.01)),
             },
-            # Paired delta summary mean mismatched intentionally
-            "paired_delta_summary": {"mean": 0.1, "degenerate": False},
+            # Preview/final slice delta mean mismatched intentionally
+            "preview_final_slice_delta_summary": {
+                "mean": 0.1,
+                "degenerate": False,
+            },
             "logloss_delta_ci": (-0.01, 0.01),
             "bootstrap": {
                 "method": "percentile",
@@ -75,8 +86,20 @@ def test_evaluation_report_raises_on_drift_ratio_inconsistency():
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
     baseline = {
-        "run_id": "b",
-        "model_id": "gpt2",
+        "meta": {
+            "model_id": "gpt2",
+            "adapter": "hf_causal",
+            "auto": {"tier": "balanced"},
+        },
+        "context": {"profile": "ci", "assurance": {"mode": "off"}},
+        "data": {
+            "dataset": "dummy",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 8,
+            "preview_n": 180,
+            "final_n": 180,
+        },
         "metrics": {
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -85,7 +108,7 @@ def test_evaluation_report_raises_on_drift_ratio_inconsistency():
             }
         },
         "edit": {
-            "name": "structured",
+            "name": "noop",
             "plan_digest": "baseline",
             "deltas": {
                 "params_changed": 0,
@@ -97,15 +120,23 @@ def test_evaluation_report_raises_on_drift_ratio_inconsistency():
         "evaluation_windows": {
             "final": {"window_ids": window_ids, "logloss": logloss_vals}
         },
+        "guards": [],
+        "artifacts": {"events_path": "", "logs_path": ""},
+        "flags": {"guard_recovered": False, "rollback_reason": None},
     }
 
-    # After normalization, this inconsistency is tolerated; evaluation_report still returned
+    # CI and release reports fail closed when the summary and ratio disagree.
     report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
         {"profile": "ci", "preview_n": 180, "final_n": 180}
     )
-    with patch(
-        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
-        return_value=(-0.01, 0.01),
+    with (
+        patch(
+            "invarlock.core.bootstrap.compute_paired_delta_log_ci",
+            return_value=(-0.01, 0.01),
+        ),
+        pytest.raises(
+            ValueError,
+            match="Preview/final ΔlogNLL mean is inconsistent",
+        ),
     ):
-        cert = make_report(report, baseline)
-    assert isinstance(cert, dict)
+        make_report(canonical_run_report(report), canonical_baseline(baseline))

@@ -1,11 +1,26 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
+import copy
+
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report_with_stats() -> tuple[dict, dict]:
     report = {
-        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf",
+            "device": "cpu",
+            "seed": 1,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "ci"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -62,10 +77,14 @@ def _mk_report_with_stats() -> tuple[dict, dict]:
             },
         },
         "artifacts": {"events_path": "", "logs_path": ""},
+        "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    baseline = {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+    baseline = copy.deepcopy(report)
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
     }
     return report, baseline
 

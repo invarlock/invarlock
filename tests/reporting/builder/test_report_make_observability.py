@@ -21,9 +21,10 @@ def test_make_evaluation_report_marks_tiny_relax() -> None:
     assert evaluation_report["auto"]["tiny_relax"] is True
     stats = evaluation_report["dataset"]["windows"]["stats"]
     assert "coverage" in stats and "window_match_fraction" in stats
-    qo = evaluation_report.get("quality_overhead")
-    if qo:
-        assert qo["basis"] in {"ratio", "delta_pp"}
+    metric_impact = evaluation_report["guard_metric_impact"]
+    assert metric_impact["evaluated"] is True
+    assert metric_impact["passed"] is True
+    assert metric_impact["degradation"] == pytest.approx(0.01)
 
 
 def test_make_evaluation_report_embeds_telemetry_summary(monkeypatch):
@@ -71,7 +72,7 @@ def test_make_evaluation_report_marks_broken_profile_provenance_unhealthy(
     )
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda payload: payload,
         raising=True,
     )
@@ -111,7 +112,7 @@ def test_make_report_assurance_ignores_diagnostic_code_text_for_fallback_fields(
     report["meta"] = _BrokenMeta(report["meta"])
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda payload: payload,
         raising=True,
     )
@@ -167,7 +168,7 @@ def test_make_evaluation_report_marks_broken_env_flag_provenance_unhealthy(
     )
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda payload: payload,
         raising=True,
     )

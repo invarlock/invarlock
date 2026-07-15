@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_validation as validation_mod
+from invarlock.reporting.validation import report as validation_mod
 
 
 def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
@@ -32,8 +32,12 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
     spectral = {"caps_applied": 4, "caps_exceeded": True, "summary": {}}
     rmt = {"stable": True}
     invariants = {"status": "ok"}
-    guard_overhead = {"overhead_ratio": 1.12, "overhead_threshold": 0.05}
-    primary_metric = {"kind": "accuracy", "ratio_vs_baseline": 0.2, "n_final": 10}
+    guard_metric_impact = {"degradation": 1.12, "degradation_limit": 0.05}
+    primary_metric = {
+        "kind": "accuracy",
+        "delta_vs_baseline_pp": 0.2,
+        "n_final": 10,
+    }
     dataset_capacity = {"examples_available": 40}
     ppl_metrics = {"preview_total_tokens": 60, "final_total_tokens": 60}
 
@@ -44,7 +48,7 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
         invariants,
         tier="balanced",
         _ppl_metrics=ppl_metrics,
-        guard_overhead=guard_overhead,
+        guard_metric_impact=guard_metric_impact,
         primary_metric=primary_metric,
         dataset_capacity=dataset_capacity,
         get_tier_policies_fn=lambda: dict(fake_policies),
@@ -54,7 +58,7 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
     assert flags["invariants_pass"] is True
     assert flags["rmt_stable"] is True
     assert flags["spectral_stable"] is False
-    assert flags["guard_overhead_acceptable"] is False
+    assert flags["guard_metric_impact_acceptable"] is False
     assert flags["primary_metric_acceptable"] is False
     assert flags["hysteresis_applied"] is True
     assert flags["primary_metric_tail_acceptable"] is True
@@ -75,7 +79,7 @@ def test_compute_validation_flags_accuracy_uses_default_preview_final_limit(
             "kind": "accuracy",
             "preview": 0.9,
             "final": 0.75,
-            "ratio_vs_baseline": 1.0,
+            "delta_vs_baseline_pp": 1.0,
             "n_final": 20,
         },
         dataset_capacity={"examples_available": 20},
@@ -117,7 +121,7 @@ def test_compute_validation_flags_accuracy_uses_configured_preview_final_limit(
             "kind": "accuracy",
             "preview": 0.9,
             "final": 0.75,
-            "ratio_vs_baseline": 1.0,
+            "delta_vs_baseline_pp": 1.0,
             "n_final": 20,
         },
         dataset_capacity={"examples_available": 20},
@@ -171,7 +175,7 @@ def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
         {"stable": False},
         {"status": "fail"},
         tier="balanced",
-        guard_overhead={"overhead_ratio": 1.20, "overhead_threshold": 0.0},
+        guard_metric_impact={"degradation": 1.20, "degradation_limit": 0.0},
         pm_tail={"mode": "fail", "evaluated": True, "passed": False},
         get_tier_policies_fn=lambda: dict(fake_policies),
     )
@@ -181,7 +185,7 @@ def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
     assert flags["invariants_pass"] is False
     assert flags["spectral_stable"] is False
     assert flags["rmt_stable"] is False
-    assert flags["guard_overhead_acceptable"] is False
+    assert flags["guard_metric_impact_acceptable"] is False
     assert flags["primary_metric_tail_acceptable"] is False
 
 
@@ -222,7 +226,45 @@ def test_compute_validation_flags_tail_gate_fail_closes_on_broken_payload(
     assert flags["primary_metric_tail_acceptable"] is False
 
 
-def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeypatch):
+def test_optional_tail_flag_requires_exact_outcome_shape() -> None:
+    invalid = (
+        {},
+        {"mode": "warn", "evaluated": True},
+        {"mode": "warn", "evaluated": True, "passed": 1},
+        {"mode": "WARN", "evaluated": True, "passed": True},
+    )
+    for payload in invalid:
+        flags: dict[str, bool] = {}
+        validation_mod._apply_optional_observability_flags(  # noqa: SLF001
+            flags,
+            moe=None,
+            pm_tail=payload,
+            tail_required=True,
+        )
+        assert flags["primary_metric_tail_acceptable"] is False
+
+    flags = {}
+    validation_mod._apply_optional_observability_flags(  # noqa: SLF001
+        flags,
+        moe=None,
+        pm_tail={"mode": "warn", "evaluated": True, "passed": False},
+        tail_required=True,
+    )
+    assert flags["primary_metric_tail_acceptable"] is True
+
+    flags = {}
+    validation_mod._apply_optional_observability_flags(  # noqa: SLF001
+        flags,
+        moe=None,
+        pm_tail=None,
+        tail_required=True,
+    )
+    assert flags["primary_metric_tail_acceptable"] is False
+
+
+def test_compute_validation_flags_tiny_relax_rejects_unevaluated_metric_impact(
+    monkeypatch,
+):
     fake_policies = {
         "balanced": {
             "metrics": {
@@ -241,12 +283,12 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
             "spectral": {"max_caps": 5},
         }
     }
-    guard_overhead = {
+    guard_metric_impact = {
         "passed": False,
         "evaluated": False,
         "diagnostics": [
             {
-                "kind": "guard_overhead_error",
+                "kind": "guard_metric_impact_error",
                 "severity": "error",
                 "message": "missing",
                 "details": {},
@@ -259,7 +301,7 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead=guard_overhead,
+        guard_metric_impact=guard_metric_impact,
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
         _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
         dataset_capacity={"tokens_available": 0},
@@ -267,10 +309,10 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
         get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
-    assert flags["guard_overhead_acceptable"] is True
+    assert flags["guard_metric_impact_acceptable"] is False
 
 
-def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
+def test_compute_validation_flags_guard_metric_degradation_failure(monkeypatch):
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
     fake_policies = {
         "balanced": {
@@ -290,24 +332,24 @@ def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
+    guard_metric_impact = {"degradation": 1.05, "degradation_limit": 0.01}
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead=guard_overhead,
+        guard_metric_impact=guard_metric_impact,
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
         get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
-    assert flags["guard_overhead_acceptable"] is False
+    assert flags["guard_metric_impact_acceptable"] is False
 
 
-def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
+def test_compute_validation_flags_guard_metric_degradation_fails_with_tiny_relax(
     monkeypatch,
 ):
     fake_policies = {
@@ -328,14 +370,14 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
             "spectral": {"max_caps": 3},
         }
     }
-    guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
+    guard_metric_impact = {"degradation": 1.05, "degradation_limit": 0.01}
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.2},
         {"caps_applied": 0},
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead=guard_overhead,
+        guard_metric_impact=guard_metric_impact,
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.2},
         _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
         dataset_capacity={"tokens_available": 0},
@@ -343,10 +385,12 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
         get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
-    assert flags["guard_overhead_acceptable"] is True
+    assert flags["guard_metric_impact_acceptable"] is False
 
 
-def test_compute_validation_flags_guard_overhead_passes_when_ratio_missing(monkeypatch):
+def test_compute_validation_flags_guard_metric_impact_fails_when_degradation_missing(
+    monkeypatch,
+):
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
     fake_policies = {
         "balanced": {
@@ -366,21 +410,21 @@ def test_compute_validation_flags_guard_overhead_passes_when_ratio_missing(monke
             "spectral": {"max_caps": 3},
         }
     }
-    guard_overhead = {"overhead_threshold": 0.01}
+    guard_metric_impact = {"degradation_limit": 0.01}
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.9},
         {"caps_applied": 0},
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead=guard_overhead,
+        guard_metric_impact=guard_metric_impact,
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 0.9},
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
         get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
-    assert flags["guard_overhead_acceptable"] is True
+    assert flags["guard_metric_impact_acceptable"] is False
 
 
 def test_compute_validation_flags_accuracy_fails_low_examples(monkeypatch):
@@ -404,14 +448,14 @@ def test_compute_validation_flags_accuracy_fails_low_examples(monkeypatch):
     }
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
-    primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -0.1, "n_final": 50}
+    primary_metric = {"kind": "accuracy", "delta_vs_baseline_pp": -0.1, "n_final": 50}
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead={"passed": True},
+        guard_metric_impact={"passed": True},
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
@@ -442,7 +486,7 @@ def test_compute_validation_flags_accuracy_respects_dataset_fraction_floor(monke
     }
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
-    primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -0.3, "n_final": 15}
+    primary_metric = {"kind": "accuracy", "delta_vs_baseline_pp": -0.3, "n_final": 15}
     dataset_capacity = {"examples_available": 80}
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
@@ -450,7 +494,7 @@ def test_compute_validation_flags_accuracy_respects_dataset_fraction_floor(monke
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead={"passed": True},
+        guard_metric_impact={"passed": True},
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity=dataset_capacity,
@@ -481,14 +525,14 @@ def test_compute_validation_flags_accuracy_passes_with_hysteresis(monkeypatch):
     }
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
-    primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -1.2, "n_final": 80}
+    primary_metric = {"kind": "accuracy", "delta_vs_baseline_pp": -1.2, "n_final": 80}
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead={"passed": True},
+        guard_metric_impact={"passed": True},
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"examples_available": 200},
@@ -507,7 +551,7 @@ def test_compute_validation_flags_marks_moe_observed():
         {"status": "ok"},
         tier="balanced",
         moe={"top_k": 1},
-        guard_overhead={"passed": True},
+        guard_metric_impact={"passed": True},
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
@@ -543,7 +587,7 @@ def test_compute_validation_flags_reconciles_ppl_primary_metric_ratio(monkeypatc
         {"stable": True},
         {"status": "ok"},
         tier="balanced",
-        guard_overhead={"passed": True},
+        guard_metric_impact={"passed": True},
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},

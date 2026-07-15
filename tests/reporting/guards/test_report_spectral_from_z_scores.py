@@ -3,6 +3,7 @@ from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 
 def test_extract_spectral_analysis_from_z_scores_fallback():
     report = {
+        "meta": {"auto": {"tier": "balanced"}},
         "guards": [
             {
                 "name": "spectral",
@@ -12,7 +13,7 @@ def test_extract_spectral_analysis_from_z_scores_fallback():
                     "module_family_map": {"m1": "ffn", "m2": "ffn", "m3": "attn"},
                 },
             }
-        ]
+        ],
     }
     baseline = {"metrics": {}}
     out = _extract_spectral_analysis(report, baseline)

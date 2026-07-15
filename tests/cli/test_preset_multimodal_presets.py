@@ -22,6 +22,8 @@ def _assert_public_vqav2_image_text_config(
     model_id: str,
     output_dir: str | None = None,
     requires_sdpa: bool = False,
+    expected_windows: int = 400,
+    expect_metric_impact_skip: bool = False,
 ) -> None:
     root = _repo_root()
     cfg = load_config(root / rel_path)
@@ -40,15 +42,19 @@ def _assert_public_vqav2_image_text_config(
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
     )
-    assert dataset["preview_n"] == 16
-    assert dataset["final_n"] == 16
+    assert dataset["preview_n"] == expected_windows
+    assert dataset["final_n"] == expected_windows
     assert eval_section["metric"]["kind"] == "accuracy"
     assert eval_section["loss"]["type"] == "classification"
     assert cfg.require_section("primary_metric")["drift_band"] == {
         "min": 0.8,
         "max": 1.2,
     }
-    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    context = cfg.data.get("context", {})
+    skip_guard_metric_impact = context.get("run", {}).get(
+        "skip_guard_metric_impact_check", False
+    )
+    assert skip_guard_metric_impact is expect_metric_impact_skip
     assert guards["order"] == [
         "invariants",
         "spectral",
@@ -147,8 +153,8 @@ def test_gemma4_12b_public_vqav2_preset_uses_materialized_manifest_path() -> Non
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
     )
-    assert dataset["preview_n"] == 16
-    assert dataset["final_n"] == 16
+    assert dataset["preview_n"] == 400
+    assert dataset["final_n"] == 400
     assert eval_section["metric"]["kind"] == "accuracy"
     assert eval_section["loss"]["type"] == "classification"
     assert guards["order"] == [
@@ -180,11 +186,11 @@ def test_gemma4_26b_a4b_public_vqav2_preset_declares_moe_candidate() -> None:
     assert dataset["provider"]["path"].endswith(
         "public_datasets/vqav2_sample_validation_800/manifest.jsonl"
     )
-    assert dataset["preview_n"] == 16
-    assert dataset["final_n"] == 16
+    assert dataset["preview_n"] == 400
+    assert dataset["final_n"] == 400
     assert eval_section["metric"]["kind"] == "accuracy"
     assert eval_section["loss"]["type"] == "classification"
-    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    assert cfg.data.get("context", {}) == {}
     assert guards["spectral"]["module_include_patterns"]
     assert guards["spectral"]["family_caps"]["router"] == 5.0
     assert guards["rmt"]["module_include_patterns"]
@@ -245,7 +251,9 @@ def test_gemma4_12b_null_sweep_calibration_config_uses_public_manifest() -> None
         "min": 0.8,
         "max": 1.2,
     }
-    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    assert (
+        cfg.require_section("context")["run"]["skip_guard_metric_impact_check"] is True
+    )
     assert guards["spectral"]["module_include_patterns"]
     assert guards["rmt"]["module_include_patterns"]
 
@@ -275,7 +283,9 @@ def test_gemma4_26b_a4b_null_sweep_calibration_config_uses_public_manifest() -> 
         "min": 0.8,
         "max": 1.2,
     }
-    assert cfg.require_section("context")["run"]["skip_overhead_check"] is True
+    assert (
+        cfg.require_section("context")["run"]["skip_guard_metric_impact_check"] is True
+    )
     assert guards["spectral"]["module_include_patterns"]
     assert guards["spectral"]["family_caps"]["router"] == 5.0
     assert guards["rmt"]["module_include_patterns"]
@@ -313,4 +323,6 @@ def test_small_multimodal_candidate_null_sweeps_use_public_manifest() -> None:
             model_id=model_id,
             output_dir=output_dir,
             requires_sdpa=requires_sdpa,
+            expected_windows=16,
+            expect_metric_impact_skip=True,
         )

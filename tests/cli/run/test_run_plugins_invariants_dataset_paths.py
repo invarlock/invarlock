@@ -9,6 +9,7 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import configure_guard_metric_impact_skip
 from tests.cli.run._support_run_common import (
     synthetic_provider_min as _provider_min,
 )
@@ -66,8 +67,8 @@ def test_dedupe_reduction_raises_when_below_floor(tmp_path: Path):
             )
 
 
-def test_release_no_estimate_capacity_uses_default_window_plan(tmp_path: Path):
-    cfg = _write_cfg(tmp_path, preview=1, final=1)
+def test_ci_no_estimate_capacity_uses_default_window_plan(tmp_path: Path):
+    cfg = configure_guard_metric_impact_skip(_write_cfg(tmp_path, preview=1, final=1))
 
     class Provider:
         def windows(self, **kwargs):
@@ -85,7 +86,7 @@ def test_release_no_estimate_capacity_uses_default_window_plan(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
@@ -110,15 +111,15 @@ def test_release_no_estimate_capacity_uses_default_window_plan(tmp_path: Path):
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             out=str(tmp_path / "runs"),
             until_pass=False,
         )
-    assert captured["r"]["data"]["window_plan"]["profile"] == "release"
+    assert captured["r"]["data"]["window_plan"]["profile"] == "ci"
 
 
 def test_dataset_hash_constructed_when_missing(tmp_path: Path):
-    cfg = _write_cfg(tmp_path, 1, 1)
+    cfg = configure_guard_metric_impact_skip(_write_cfg(tmp_path, 1, 1))
     meta = {
         "tokenizer_hash": "tokhash123",
         "preview_hash": "a" * 32,
@@ -165,7 +166,7 @@ def test_dataset_hash_constructed_when_missing(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
@@ -174,7 +175,7 @@ def test_dataset_hash_constructed_when_missing(tmp_path: Path):
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="release",
+            profile="ci",
             baseline=str(baseline),
             out=str(tmp_path / "runs"),
             until_pass=False,
@@ -205,7 +206,7 @@ def test_loss_type_from_dataset_meta_when_missing_in_metrics(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
@@ -272,6 +273,13 @@ def test_snapshot_auto_prefers_bytes_when_supported(tmp_path: Path):
                         },
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            }
+                        },
                         status="success",
                     )
                 ),

@@ -98,14 +98,14 @@ def test_quantized_mutation_marker_returns_module_for_markerless_packed_class() 
     assert variance_ops._quantized_mutation_marker(module) is module
 
 
-def test_pop_checkpoint_ignores_missing_targets_and_missing_weight() -> None:
+def test_pop_checkpoint_fails_closed_for_missing_targets_and_weight() -> None:
     guard = _guard()
     weight = torch.ones((2, 2))
     guard._checkpoint_stack = [{"missing": weight.clone(), "noweight": weight.clone()}]
     guard._target_modules = {"noweight": _Module()}
 
-    assert pop_checkpoint(guard, model=None) is True
-    assert guard._checkpoint_stack == []
+    assert pop_checkpoint(guard, model=None) is False
+    assert len(guard._checkpoint_stack) == 1
 
 
 def test_commit_checkpoint_pops_latest_snapshot_and_logs() -> None:
@@ -122,7 +122,7 @@ def test_commit_checkpoint_pops_latest_snapshot_and_logs() -> None:
     assert any(event[0] == "checkpoint_committed" for event in guard._events)
 
 
-def test_disable_guard_falls_back_when_checkpoint_restore_fails(monkeypatch) -> None:
+def test_disable_guard_fails_when_exact_checkpoint_restore_fails(monkeypatch) -> None:
     guard = _guard()
     module = _Module(torch.ones((2, 2)))
     guard._checkpoint_stack = [{"layer": module.weight.clone()}]
@@ -135,8 +135,9 @@ def test_disable_guard_falls_back_when_checkpoint_restore_fails(monkeypatch) -> 
         lambda *_args, **_kwargs: False,
     )
 
-    assert disable_guard(guard, model=None) is True
-    assert guard._enabled is False
+    assert disable_guard(guard, model=None) is False
+    assert guard._enabled is True
+    assert guard._last_restore_exact is False
     assert any(event[0] == "disable_checkpoint_failed" for event in guard._events)
 
 
@@ -151,22 +152,20 @@ def test_enable_guard_uses_mps_scaling_path() -> None:
     assert torch.allclose(weight.data, torch.full((2, 2), 2.0))
 
 
-def test_enable_guard_logs_catastrophic_failure_when_commit_raises(
-    monkeypatch,
-) -> None:
+def test_enable_guard_retains_snapshot_for_exact_disable() -> None:
     guard = _guard()
     guard._enabled = False
-    guard._target_modules = {"layer": _Module(torch.ones((2, 2)))}
+    module = _Module(torch.ones((2, 2)))
+    guard._target_modules = {"layer": module}
     guard._scales = {"layer": 1.5}
+    original = module.weight.clone()
 
-    monkeypatch.setattr(
-        variance_ops,
-        "commit_checkpoint",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
+    assert enable_guard(guard, model=None) is True
+    assert len(guard._checkpoint_stack) == 1
+    assert disable_guard(guard, model=None) is True
 
-    assert enable_guard(guard, model=None) is False
-    assert any(event[0] == "enable_catastrophic_failure" for event in guard._events)
+    assert torch.equal(module.weight, original)
+    assert guard._last_restore_exact is True
 
 
 def test_enable_guard_rolls_back_late_quantized_mutation_detection(monkeypatch) -> None:

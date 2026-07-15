@@ -1,8 +1,7 @@
 # Magnitude-Prune Integration Example
 
-Status: `runnable`; strict container evidence is verified on CUDA for this tiny
-magnitude-pruned checkpoint example with the standard InvarLock CUDA runtime
-image.
+Status: `runnable`. A `cuda-container-strict` result requires independent
+acceptance inputs and the successful current run described below.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 created by an external pruning workflow. It zeros a deterministic low-magnitude
@@ -50,7 +49,11 @@ host with that image configured:
 ```bash
 make runtime-image-cuda
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 uv run --extra hf \
 examples/integrations/magnitude_prune/run_tiny_magnitude_prune.sh \
   --allow-network \
@@ -59,9 +62,10 @@ examples/integrations/magnitude_prune/run_tiny_magnitude_prune.sh \
 ```
 
 The runner defaults to the `release` profile so the strict verification path has
-enough evaluation tokens for a stable primary-metric verdict. Use the
-digest-pinned image reference recorded in `runtime.manifest.json` when the
-strict container artifact will be shared externally.
+enough evaluation tokens for a stable primary-metric verdict. Obtain the
+trusted digest independently from reviewed build/release policy. The matching
+digest in `runtime.manifest.json` is a manifest claim, not the source of the
+verifier pin.
 
 This strict lane is scoped to the configured tiny magnitude-pruned checkpoint
 and runtime image. Rerun the strict lane for the target runtime before using the
@@ -120,15 +124,3 @@ check the prerequisite message first, then inspect
 
 The subject materializer writes a non-zero pruning delta and fails if the
 pruning step does not change any floating tensors.
-
-## Public Evidence Anchor
-
-The repository also ships a small public magnitude-prune BYOE fixture:
-
-```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/byoe_examples/magnitude_prune_byoe/evaluation.report.json
-```
-
-Use that fixture as the stable public reference when the local example
-environment cannot materialize a fresh magnitude-pruned subject.

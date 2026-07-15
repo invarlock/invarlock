@@ -18,6 +18,10 @@ DEMO_RUNTIME_MANIFEST_FIXTURE = (
 )
 
 
+class DemoInputBuildError(RuntimeError):
+    """Raised when live demo inputs cannot be built honestly."""
+
+
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -41,138 +45,28 @@ def _write_runtime_manifest_for_report(report_path: Path) -> None:
 def _build_demo_evaluation_report(
     run_report: dict[str, object],
     baseline_report: dict[str, object],
-) -> dict[str, object] | None:
-    def _fallback_demo_report() -> dict[str, object]:
-        return {
-            "schema_version": "v1",
-            "run_id": "docs-demo",
-            "artifacts": {"generated_at": "2026-04-16T00:00:00+00:00"},
-            "plugins": {},
-            "meta": {"seed": 42},
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": math.exp(2.30),
-                "final": math.exp(2.30),
-                "ratio_vs_baseline": 1.0,
-                "display_ci": [1.0, 1.01],
-            },
-            "dataset": {
-                "provider": "unit",
-                "seq_len": 8,
-                "windows": {
-                    "preview": 1,
-                    "final": 1,
-                    "stats": {
-                        "window_match_fraction": 1.0,
-                        "window_overlap_fraction": 0.0,
-                        "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
-                        "paired_windows": 1,
-                    },
-                },
-            },
-            "baseline_ref": {"primary_metric": {"final": math.exp(2.30)}},
-            "validation": {"primary_metric_acceptable": True},
-            "resolved_policy": {
-                "metrics": {
-                    "pm_ratio": {
-                        "ratio_limit_base": 1.1,
-                        "min_tokens": 1,
-                        "min_token_fraction": 0.0,
-                        "hysteresis_ratio": 0.0,
-                    }
-                }
-            },
-            "policy_digest": {
-                "policy_version": "policy-v1",
-                "tier_policy_name": "balanced",
-                "thresholds_hash": "docs-demo-policy",
-                "changed": False,
-            },
-            "provenance": {"provider_digest": {"ids_sha256": "docs-demo-provider"}},
-        }
-
+) -> dict[str, object]:
     src_root = ROOT / "src"
     if not (src_root / "invarlock").is_dir():
-        return _fallback_demo_report()
+        raise DemoInputBuildError(
+            "Cannot build markdown demo inputs: src/invarlock is unavailable."
+        )
     src_path = str(src_root)
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
     try:
         from invarlock.reporting.report_make import make_report
-    except Exception:
-        return _fallback_demo_report()
+    except Exception as exc:
+        raise DemoInputBuildError(
+            "Cannot build markdown demo inputs: report builder import failed."
+        ) from exc
 
     try:
         evaluation_report = make_report(run_report, baseline_report)
-    except Exception:
-        return _fallback_demo_report()
-    validation = evaluation_report.get("validation")
-    if isinstance(validation, dict):
-        validation["primary_metric_acceptable"] = True
-    evaluation_report["resolved_policy"] = {
-        "metrics": {
-            "pm_ratio": {
-                "ratio_limit_base": 1.1,
-                "min_tokens": 1,
-                "min_token_fraction": 0.0,
-                "hysteresis_ratio": 0.0,
-            }
-        }
-    }
-    return evaluation_report
-
-
-def _prepare_demo_evaluation_report_for_replay(
-    evaluation_report: dict[str, object],
-) -> dict[str, object]:
-    canonical_guards = ["invariants", "spectral", "rmt", "variance", "invariants"]
-    context = evaluation_report.get("context")
-    if not isinstance(context, dict):
-        context = {}
-    context.update(
-        {
-            "profile": "ci",
-            "tier": "balanced",
-            "assurance": {"mode": "strict"},
-            "runtime": {"execution_mode": "container"},
-            "guard_chain_observed": canonical_guards,
-        }
-    )
-    evaluation_report["context"] = context
-    evaluation_report["guards"] = [{"name": name} for name in canonical_guards]
-    evaluation_report["invariants"] = {"supported": True, "passed": True}
-    evaluation_report["spectral"] = {"supported": True, "passed": True}
-    evaluation_report["rmt"] = {"supported": True, "passed": True}
-    evaluation_report["variance"] = {
-        "enabled": False,
-        "supported": True,
-        "status": "disabled",
-    }
-    evaluation_report["report_build"] = {
-        "synthesized_fields": [],
-        "repaired_fields": [],
-        "fallback_fields": [],
-    }
-    provenance = evaluation_report.get("provenance")
-    if not isinstance(provenance, dict):
-        provenance = {}
-    provenance["edited"] = {"report_path": "../../runs/subject/report.json"}
-    provenance["baseline"] = {"report_path": "../../runs/baseline/report.json"}
-    evaluation_report["provenance"] = provenance
-    evaluation_report["assurance"] = {
-        "claim_set": "invarlock-weight-edit-regression-v1",
-        "mode": "strict",
-        "verdict": "pending_verifier",
-        "report_local_verdict": "pass",
-        "verified_assurance_verdict": "pending",
-        "canonical_guard_chain_enforced": True,
-        "guard_chain_observed": canonical_guards,
-        "fallback_fields_used": False,
-        "runtime_provenance_declared": "container",
-        "runtime_provenance_verified": False,
-        "runtime_provenance_verification_status": "pending",
-        "blocking_reasons": [],
-    }
+    except Exception as exc:
+        raise DemoInputBuildError(
+            "Cannot build markdown demo inputs: report builder failed."
+        ) from exc
     return evaluation_report
 
 
@@ -202,7 +96,41 @@ def _demo_window_summary(section: dict[str, object]) -> tuple[float, float, int]
     return mean_logloss, math.exp(mean_logloss), total_tokens
 
 
-def _seed_demo_inputs(workspace: Path) -> None:
+def _bind_demo_runtime_policy_receipt(report: dict[str, object]) -> None:
+    """Attach the same effective-policy receipt required from a real run."""
+
+    src_path = str(ROOT / "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    from invarlock.core.auto_tuning import resolve_tier_policies
+    from invarlock.reporting.runtime_policy_receipt import (
+        build_runtime_policy_receipt,
+    )
+
+    meta = report["meta"]
+    edit = report["edit"]
+    guards = report["guards"]
+    assert isinstance(meta, dict)
+    assert isinstance(edit, dict)
+    assert isinstance(guards, list)
+    auto = meta.get("auto")
+    auto = auto if isinstance(auto, dict) else {}
+    tier = str(auto.get("tier") or "balanced")
+    edit_name = str(edit["name"])
+    profile = "dev"
+    policies = resolve_tier_policies(tier, edit_name, profile=profile)
+    resolved, receipt = build_runtime_policy_receipt(
+        policies,
+        guards,
+        tier=tier,
+        profile=profile,
+        edit_name=edit_name,
+    )
+    report["resolved_policy"] = resolved
+    report["policy_resolution"] = receipt
+
+
+def _seed_demo_inputs(workspace: Path, *, fixture_mode: bool = False) -> None:
     evaluation_targets = (
         workspace / "reports" / "eval" / "evaluation.report.json",
         workspace / "reports" / "quant8_demo" / "evaluation.report.json",
@@ -272,7 +200,18 @@ def _seed_demo_inputs(workspace: Path) -> None:
                     "final": {"used": 2},
                 },
             },
-            "paired_delta_summary": {"mean": 0.0},
+            "preview_final_slice_delta_summary": {
+                "mean": 0.0,
+                "ci": [0.0, 0.0],
+                "basis": "independent_disjoint_slices",
+                "paired": False,
+                "ci_method": "none",
+                "ci_reason": "constant_demo_slices",
+                "preview_windows": 2,
+                "final_windows": 2,
+                "degenerate": True,
+                "degenerate_reason": "constant_demo_slices",
+            },
             "preview_total_tokens": 50000,
             "final_total_tokens": 50000,
             "logloss_delta": 0.0,
@@ -288,23 +227,44 @@ def _seed_demo_inputs(workspace: Path) -> None:
             "rollback_reason": None,
         },
         "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
+            "preview": {
+                "window_ids": [0, 1],
                 "logloss": [2.30, 2.30],
                 "token_counts": [100, 100],
-            }
+            },
+            "final": {
+                "window_ids": [2, 3],
+                "logloss": [2.30, 2.30],
+                "token_counts": [100, 100],
+            },
         },
     }
     baseline_report = {
         "run_id": "docs-demo-base",
         "model_id": "docs-demo-model",
-        "meta": {"seed": 0, "model_id": "docs-demo-model"},
+        "meta": {
+            "seed": 0,
+            "model_id": "docs-demo-model",
+            "adapter": "hf_causal",
+            "auto": {
+                "enabled": False,
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "context": {"profile": "dev"},
         "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
+            "preview": {
+                "window_ids": [0, 1],
                 "logloss": [2.30, 2.30],
                 "token_counts": [100, 100],
-            }
+            },
+            "final": {
+                "window_ids": [2, 3],
+                "logloss": [2.30, 2.30],
+                "token_counts": [100, 100],
+            },
         },
         "data": {
             "seq_len": 8,
@@ -315,7 +275,7 @@ def _seed_demo_inputs(workspace: Path) -> None:
             "stride": 8,
         },
         "edit": {
-            "name": "none",
+            "name": "noop",
             "plan_digest": "0",
             "deltas": {
                 "params_changed": 0,
@@ -325,7 +285,13 @@ def _seed_demo_inputs(workspace: Path) -> None:
             },
         },
         "guards": [],
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "artifacts": {
             "events_path": "",
             "logs_path": "",
@@ -342,10 +308,12 @@ def _seed_demo_inputs(workspace: Path) -> None:
     subject_final_summary = _demo_window_summary(
         run_report["evaluation_windows"]["final"]
     )
+    subject_preview_summary = _demo_window_summary(
+        run_report["evaluation_windows"]["preview"]
+    )
     if baseline_final_summary is not None:
-        baseline_mean_logloss, baseline_ppl, baseline_tokens = baseline_final_summary
-        run_report["metrics"]["primary_metric"]["preview"] = baseline_ppl
-        run_report["metrics"]["preview_total_tokens"] = baseline_tokens
+        baseline_mean_logloss, baseline_ppl, _ = baseline_final_summary
+        baseline_report["metrics"]["primary_metric"]["preview"] = baseline_ppl
         baseline_report["metrics"]["primary_metric"]["final"] = baseline_ppl
     else:
         baseline_mean_logloss = None
@@ -355,10 +323,18 @@ def _seed_demo_inputs(workspace: Path) -> None:
         run_report["metrics"]["final_total_tokens"] = subject_tokens
     else:
         subject_mean_logloss = None
+    if subject_preview_summary is not None:
+        _, subject_preview_ppl, subject_preview_tokens = subject_preview_summary
+        run_report["metrics"]["primary_metric"]["preview"] = subject_preview_ppl
+        run_report["metrics"]["preview_total_tokens"] = subject_preview_tokens
     if baseline_mean_logloss is not None and subject_mean_logloss is not None:
         delta_mean_logloss = subject_mean_logloss - baseline_mean_logloss
-        run_report["metrics"]["paired_delta_summary"]["mean"] = delta_mean_logloss
+        run_report["metrics"]["preview_final_slice_delta_summary"]["mean"] = (
+            delta_mean_logloss
+        )
         run_report["metrics"]["logloss_delta"] = delta_mean_logloss
+    _bind_demo_runtime_policy_receipt(run_report)
+    _bind_demo_runtime_policy_receipt(baseline_report)
     for target in (
         workspace / "runs" / "baseline" / "report.json",
         workspace / "runs" / "source" / "report.json",
@@ -367,11 +343,33 @@ def _seed_demo_inputs(workspace: Path) -> None:
         _write_json(target, baseline_report)
     _write_json(workspace / "runs" / "subject" / "report.json", run_report)
 
-    evaluation_report = _build_demo_evaluation_report(run_report, baseline_report)
-    if evaluation_report is not None:
-        evaluation_report = _prepare_demo_evaluation_report_for_replay(
-            evaluation_report
+    if fixture_mode:
+        if not DEMO_EVALUATION_REPORT_FIXTURE.is_file():
+            raise DemoInputBuildError(
+                "Explicit fixture mode requested, but the demo report fixture is missing."
+            )
+        fixture_payload = json.loads(
+            DEMO_EVALUATION_REPORT_FIXTURE.read_text(encoding="utf-8")
         )
+        if not isinstance(fixture_payload, dict):
+            raise DemoInputBuildError("The explicit demo report fixture is invalid.")
+        fixture_meta = fixture_payload.get("meta")
+        if not isinstance(fixture_meta, dict):
+            fixture_meta = {}
+        fixture_meta["demo_input_mode"] = "explicit_fixture"
+        fixture_payload["meta"] = fixture_meta
+        for target in evaluation_targets:
+            _write_json(target, fixture_payload)
+            _write_runtime_manifest_for_report(target)
+        _write_json(
+            workspace / "demo_input_mode.json",
+            {
+                "mode": "explicit_fixture",
+                "source": "tests/artifacts/golden_runs/gpt2/evaluation.report.json",
+            },
+        )
+    else:
+        evaluation_report = _build_demo_evaluation_report(run_report, baseline_report)
         target_payloads = {
             workspace / "reports" / "baseline_cpu" / "evaluation.report.json": {
                 **evaluation_report,
@@ -384,11 +382,6 @@ def _seed_demo_inputs(workspace: Path) -> None:
         }
         for target in evaluation_targets:
             _write_json(target, target_payloads.get(target, evaluation_report))
-            _write_runtime_manifest_for_report(target)
-    elif DEMO_EVALUATION_REPORT_FIXTURE.is_file():
-        for target in evaluation_targets:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(DEMO_EVALUATION_REPORT_FIXTURE, target)
             _write_runtime_manifest_for_report(target)
 
     _write_json(
@@ -408,9 +401,9 @@ def _seed_demo_inputs(workspace: Path) -> None:
 __all__ = [
     "DEMO_EVALUATION_REPORT_FIXTURE",
     "DEMO_RUNTIME_MANIFEST_FIXTURE",
+    "DemoInputBuildError",
     "_build_demo_evaluation_report",
     "_demo_window_summary",
-    "_prepare_demo_evaluation_report_for_replay",
     "_seed_demo_inputs",
     "_write_json",
     "_write_runtime_manifest_for_report",

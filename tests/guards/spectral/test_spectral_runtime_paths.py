@@ -250,8 +250,10 @@ def test_after_edit_guard_applies_control_when_enabled() -> None:
         "scope": guard.scope,
         "baseline_sigmas": guard.baseline_sigmas,
         "target_sigma": guard.target_sigma,
+        "cap_ratio": 2.0,
+        "selected_modules": ["module"],
     }
-    assert any(event == "spectral_control_applied" for event, _details in guard.logs)
+    assert any(event == "spectral_control_attempted" for event, _details in guard.logs)
     assert guard.logs[-1][0] == "after_edit"
 
 

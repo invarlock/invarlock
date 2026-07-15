@@ -11,7 +11,7 @@ def test_schema_accepts_counts_source_and_estimated():
         "gating_basis": "point",
         "preview": 1.0,
         "final": 1.0,
-        "ratio_vs_baseline": 0.0,
+        "delta_vs_baseline_pp": 0.0,
         "counts_source": "pseudo_config",
         "estimated": True,
     }

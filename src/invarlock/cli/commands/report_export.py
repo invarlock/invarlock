@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -10,8 +9,9 @@ from rich.console import Console
 from invarlock.cli.output import make_command_event_emitter, print_command_detail
 from invarlock.core.report_inputs import (
     ReportInputError,
-    load_evaluation_report_input_json,
+    resolve_report_input_path,
 )
+from invarlock.evidence_pack_json import StrictJsonError, read_json_object_snapshot
 
 console = Console()
 _REPORT_RENDER_ERRORS = (
@@ -21,7 +21,7 @@ _REPORT_RENDER_ERRORS = (
     RuntimeError,
     TypeError,
 )
-_JSON_INPUT_ERRORS = (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError)
+_JSON_INPUT_ERRORS = (OSError, StrictJsonError)
 _EXPORT_OUTPUT_ERRORS = (OSError, UnicodeEncodeError)
 _EXPORT_IMPORT_ERRORS = _REPORT_RENDER_ERRORS + (ImportError,)
 
@@ -46,8 +46,24 @@ def export_report_command(
     """Export an evaluation report for CI and registry handoff surfaces."""
     emit = make_command_event_emitter(console)
     try:
-        input_path, payload = load_evaluation_report_input_json(evaluation_report)
-    except ReportInputError as exc:
+        input_path = resolve_report_input_path(
+            evaluation_report,
+            expected_kind="evaluation",
+        )
+        report_bytes, payload = read_json_object_snapshot(
+            input_path,
+            label="Evaluation report",
+        )
+        if not isinstance(payload.get("validation"), dict):
+            raise ReportInputError(
+                "expected_evaluation_payload",
+                input_path,
+                detail=(
+                    "pass the evaluation.report.json artifact emitted by "
+                    "invarlock evaluate or invarlock report generate"
+                ),
+            )
+    except (ReportInputError, StrictJsonError) as exc:
         _raise_report_input_failure(str(exc))
 
     try:
@@ -64,13 +80,13 @@ def export_report_command(
     if verify_result:
         try:
             verify_path = Path(str(verify_result))
-            raw_verify_payload = json.loads(verify_path.read_text(encoding="utf-8"))
+            _verify_bytes, raw_verify_payload = read_json_object_snapshot(
+                verify_path,
+                label="Verify result",
+            )
         except _JSON_INPUT_ERRORS as exc:
             emit("FAIL", f"Failed to read verify result: {exc}")
             raise typer.Exit(2) from exc
-        if not isinstance(raw_verify_payload, dict):
-            emit("FAIL", "Verify result must decode to a JSON object")
-            raise typer.Exit(2)
         verify_payload = raw_verify_payload
 
     try:
@@ -81,6 +97,7 @@ def export_report_command(
             report_url=report_url,
             evidence_url=evidence_url,
             verify_result=verify_payload,
+            report_bytes=report_bytes,
         )
         rendered = render_report_export(str(format), context, payload)
         text = serialize_report_export(rendered)

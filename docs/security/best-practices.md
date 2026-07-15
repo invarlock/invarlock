@@ -13,7 +13,9 @@ Recommended practices for research and production deployments.
   locations and implicit directory creation.
 - Treat models/datasets from untrusted sources as potentially malicious; avoid
   unsafe deserialization.
-- Always run `invarlock verify` on reports before publication.
+- Always run `invarlock verify` on reports before publication, supplying the
+  retained canonical baseline run report, independently maintained policy pack, and
+  independently reviewed runtime-image digest for strict assurance.
 
 ## Production Deployment Checklist
 
@@ -41,7 +43,11 @@ Copy-paste checklist for production or CI deployments:
 
 ## Evaluation & Verification
 - [ ] `invarlock evaluate` completed with `--profile release`
-- [ ] `invarlock verify` passes on generated report bundle
+- [ ] `invarlock verify --profile release --assurance strict --baseline <baseline report.json> --policy-pack <acceptance policy-pack.json> --expected-runtime-image-digest ...` passes on the generated report bundle
+- [ ] The policy pack came from an independently supplied channel independent of
+      the submitted report
+- [ ] Expected runtime-image digest came from a channel independent of the
+      report and runtime manifest
 - [ ] `runtime.manifest.json` archived with `evaluation.report.json`
 - [ ] report + baseline report archived together
 - [ ] Evidence artifacts retained per retention policy

@@ -92,6 +92,22 @@ fixture_append() {
     printf "%s" "${content}" >> "${path}"
 }
 
+write_minimal_dataset_provider_snapshot() {
+    local path="$1"
+    mkdir -p "$(dirname "${path}")"
+    cat > "${path}" <<'JSON'
+{
+  "provider": {
+    "config_name": "wikitext-2-raw-v1",
+    "dataset_name": "Salesforce/wikitext",
+    "kind": "wikitext2"
+  },
+  "provider_sha256": "sha256:de9053b24c68f273c7bf880ad6f960d9b27461b86d9969c861a3d129fe24dfbe",
+  "schema": "invarlock.dataset-provider-input.v1"
+}
+JSON
+}
+
 mock_reset() {
     rm -rf "${TEST_TMPDIR}/fixtures"
     mkdir -p "${TEST_TMPDIR}/fixtures"
@@ -480,8 +496,10 @@ push_active_python_bin() {
         TEST_PREV_PYTHON_BIN_WAS_SET="0"
     fi
 
-    local active_python=""
-    active_python="$(command -v python 2>/dev/null || command -v python3 2>/dev/null || true)"
+    local active_python="${TEST_REAL_PYTHON3:-}"
+    if [[ -z "${active_python}" ]]; then
+        active_python="$(command -v python 2>/dev/null || command -v python3 2>/dev/null || true)"
+    fi
     [[ -n "${active_python}" ]] || t_fail "python executable not found for PYTHON_BIN override"
     export PYTHON_BIN="${active_python}"
 }

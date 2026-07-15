@@ -68,7 +68,13 @@ def hash_bytes(b: bytes, *, salt: bytes | None = None) -> str:
 
 
 def hash_json(obj: Any, *, salt: str | None = None) -> str:
-    s = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    s = json.dumps(
+        obj,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
     return hash_bytes(s.encode(_ENC), salt=salt.encode(_ENC) if salt else None)
 
 

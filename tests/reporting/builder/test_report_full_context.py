@@ -10,6 +10,8 @@ import invarlock.eval.primary_metric as primary_metric_mod
 from invarlock.reporting import report_make as cert
 from invarlock.reporting import report_normalization as report_normalization_mod
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import canonical_run_report
+from tests.reporting._support_guard_metric_impact import ppl_guard_context
 from tests.reporting.builder._support_full_context import _rich_run_report
 
 
@@ -24,21 +26,30 @@ def test_make_evaluation_report_rich_context_generates_diagnostics(monkeypatch):
         fake_compute,
     )
     monkeypatch.setattr(
-        primary_metric_mod, "get_metric", lambda *_: SimpleNamespace(direction="lower")
+        primary_metric_mod,
+        "get_metric",
+        lambda *_: SimpleNamespace(
+            direction="lower", guard_degradation_basis="relative_increase"
+        ),
     )
     monkeypatch.setattr(
-        cert.report_overhead_mod,
-        "compute_quality_overhead_from_guard",
+        cert.report_metric_impact_mod,
+        "compute_guard_metric_impact_from_guard",
         lambda *_args, **_kwargs: {
-            "basis": "ratio",
-            "value": 1.01,
-            "kind": "ppl_causal",
+            "metric_kind": "ppl_causal",
+            "direction": "lower",
+            "bare_value": 10.0,
+            "guarded_value": 10.1,
+            "degradation_basis": "relative_increase",
+            "degradation": 0.01,
+            "display_value": 1.0,
+            "display_unit": "percent",
         },
     )
 
     report, baseline = _rich_run_report()
     cert_obj = make_report(report, baseline)
-    assert cert_obj["quality_overhead"]["basis"] == "ratio"
+    assert cert_obj["guard_metric_impact"]["degradation_basis"] == "relative_increase"
     stats = cert_obj["dataset"]["windows"]["stats"]
     assert stats["paired_windows"] >= 1
     structure = cert_obj["structure"]["compression_diagnostics"]
@@ -62,7 +73,7 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
 ):
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -79,6 +90,7 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
     report["guards"] = [
         {
             "name": "spectral",
+            "passed": False,
             "metrics": {
                 "caps_applied": 10,
                 "caps_exceeded": True,
@@ -90,6 +102,7 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
         },
         {
             "name": "rmt",
+            "passed": False,
             "metrics": {
                 "stable": False,
                 "flagged_rate": 0.8,
@@ -152,22 +165,16 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
         "utilization": [0.7, 0.8],
     }
 
-    report["guard_overhead"] = {
-        "overhead_threshold": 0.01,
-        "bare_report": {
-            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}
-        },
-        "guarded_report": {
-            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.05}}
-        },
-    }
+    report["guard_metric_impact"] = ppl_guard_context(
+        10.0, 10.05, degradation_limit=0.01
+    )
 
     report["metrics"]["spectral"]["caps_applied"] = 10
     report["metrics"]["spectral"]["max_caps"] = 3
     report["metrics"]["spectral"]["caps_exceeded"] = True
     report["metrics"]["rmt"]["stable"] = False
 
-    evaluation_report = make_report(report, baseline)
+    evaluation_report = make_report(canonical_run_report(report), baseline)
 
     stats = evaluation_report["dataset"]["windows"]["stats"]
     assert stats["pairing"]
@@ -201,11 +208,11 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
     assert validation.get("moe_observed") is True
     assert validation.get("moe_identity_ok") is True
 
-    guard = evaluation_report["guard_overhead"]
+    guard = evaluation_report["guard_metric_impact"]
     assert guard["evaluated"] is True
     assert guard["passed"] is True
-    assert guard["bare_ppl"] == pytest.approx(10.0)
-    assert guard["guarded_ppl"] == pytest.approx(10.05)
+    assert guard["bare_value"] == pytest.approx(10.0)
+    assert guard["guarded_value"] == pytest.approx(10.05)
 
 
 def test_make_evaluation_report_policy_digest_changes_when_policy_override_differs(
@@ -213,7 +220,7 @@ def test_make_evaluation_report_policy_digest_changes_when_policy_override_diffe
 ):
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -227,12 +234,17 @@ def test_make_evaluation_report_policy_digest_changes_when_policy_override_diffe
     report = deepcopy(report)
     baseline = deepcopy(baseline)
     report["guards"].append(
-        {"name": "spectral", "policy": {"max_caps": 10}, "metrics": {"caps_applied": 0}}
+        {
+            "name": "spectral",
+            "passed": True,
+            "policy": {"max_caps": 10},
+            "metrics": {"caps_applied": 0},
+        }
     )
     baseline["guards"] = []
     baseline["meta"]["auto"]["tier"] = "conservative"
 
-    evaluation_report = make_report(report, baseline)
+    evaluation_report = make_report(canonical_run_report(report), baseline)
 
     assert evaluation_report["policy_digest"]["changed"] is True
 
@@ -240,7 +252,7 @@ def test_make_evaluation_report_policy_digest_changes_when_policy_override_diffe
 def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypatch):
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )
@@ -255,16 +267,16 @@ def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypat
     baseline = deepcopy(baseline)
     report["provenance"] = {}
     report["evaluation_windows"]["final"]["window_ids"] = [11, 12, 13]
-    report["guard_overhead"] = {}
+    report["guard_metric_impact"] = {}
     report["metrics"]["window_plan"]["profile"] = "dev"
 
-    evaluation_report = make_report(report, baseline)
+    evaluation_report = make_report(canonical_run_report(report), baseline)
 
     prov = evaluation_report["provenance"]
     assert "provider_digest" in prov
     assert (
         prov.get("window_ids_digest")
-        == evaluation_report["guard_overhead"]["schedule_digest"]
+        == evaluation_report["guard_metric_impact"]["schedule_digest"]
         == prov["provider_digest"]["ids_sha256"]
     )
 
@@ -272,7 +284,7 @@ def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypat
 def test_make_evaluation_report_embeds_telemetry_summary(monkeypatch):
     monkeypatch.setattr(
         report_normalization_mod,
-        "normalize_and_validate_run_report",
+        "validated_run_report_view",
         lambda value: value,
         raising=False,
     )

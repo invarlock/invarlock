@@ -1,45 +1,35 @@
 # PEFT LoRA-Merge Integration Example
 
-Status: `runnable`; strict container evidence is verified on CUDA for this tiny
-PEFT LoRA-merge example with the standard InvarLock CUDA runtime image.
+Status: `runnable`. A `cuda-container-strict` result requires independent
+acceptance inputs and the successful current run described below.
 
-This example shows how to attach InvarLock regression evidence to a checkpoint
-created by an external PEFT LoRA merge. It materializes a tiny deterministic
-LoRA adapter for `sshleifer/tiny-gpt2`, merges it into a HF-loadable subject
-directory, and then compares that subject against the baseline with the shared
-integration wrapper.
+This example executes the repository's immutable tiny PEFT LoRA training
+profile, serializes and reloads the trained adapter, merges it into a
+HF-loadable subject, independently recomputes the artifact evidence, and then
+compares that subject against its pinned baseline revision.
 
 The example keeps PEFT in the example environment rather than the core
 InvarLock install.
 
 ## Prerequisites
 
-Install InvarLock with the Hugging Face stack and add PEFT to the same example
-environment:
+Install InvarLock with the training dependencies:
 
 ```bash
-python -m pip install "invarlock[hf]" peft
+python -m pip install "invarlock[training]"
 ```
 
 From a repository checkout, an existing `.venv` with `invarlock[hf]` is also
 fine:
 
 ```bash
-.venv/bin/python -m pip install peft
+uv sync --extra training
 ```
 
-If the checkout environment was created by `uv sync`, install PEFT into that
-environment with:
+From a source checkout, keep the optional dependency scoped to the command:
 
 ```bash
-uv pip install --python .venv/bin/python peft
-```
-
-From a source checkout, you can also keep the optional dependency scoped to the
-example command:
-
-```bash
-uv run --extra hf --with peft \
+uv run --extra training \
   examples/integrations/peft_lora/run_tiny_peft_lora.sh --help
 ```
 
@@ -53,8 +43,9 @@ uv run --extra hf --with peft \
 | `cuda-host-off` | `--lane host --device cuda` | Secondary local CUDA comparison path without strict container evidence. |
 | `cpu-host-off` | `--lane host --device cpu` | Secondary local non-CUDA bring-up for the merged dense checkpoint. |
 
-Host lanes run prerequisite preflight before materialization and evaluation. The
-`cuda-host-off` lane checks `torch.cuda.is_available()` before the backend run.
+The selected training profile runs in the host Python environment before
+container or host evaluation. CUDA training profiles fail before training when
+that environment does not expose `torch.cuda`.
 
 ### cuda-container-strict lane
 
@@ -65,8 +56,12 @@ does not need the quant example images.
 ```bash
 make runtime-image-cuda
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
-uv run --extra hf --with peft \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
+uv run --extra training \
 examples/integrations/peft_lora/run_tiny_peft_lora.sh \
   --allow-network \
   --force \
@@ -75,8 +70,9 @@ examples/integrations/peft_lora/run_tiny_peft_lora.sh \
 
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
-Use the digest-pinned image reference recorded in `runtime.manifest.json` when
-the strict container artifact will be shared externally.
+Obtain the trusted digest independently from reviewed build/release policy.
+The matching digest in `runtime.manifest.json` is a manifest claim, not the source of
+the verifier pin.
 This strict lane is scoped to the configured tiny merged dense checkpoint and
 runtime image. Rerun the strict lane for the target runtime before using the
 artifact as shared integration evidence.
@@ -86,7 +82,7 @@ artifact as shared integration evidence.
 From the repository root:
 
 ```bash
-uv run --extra hf --with peft \
+uv run --extra training \
 examples/integrations/peft_lora/run_tiny_peft_lora.sh \
   --allow-network \
   --force \
@@ -100,11 +96,20 @@ For `cuda-host-off` evaluation, use the same command with `--device cuda`.
 
 ## Evidence Boundary
 
-The subject checkpoint is materialized before the InvarLock comparison. The
+The runner invokes its immutable profile before the InvarLock comparison. The
 strict lane covers the configured baseline-vs-subject evaluation, `hf_causal`
 adapter load, guard evidence, runtime manifest, and verifier result for that
-produced subject. The LoRA merge step is represented by
-`external_edit_summary.json` and checkpoint hashes.
+produced subject. `training_receipt.json` binds the immutable profile, pinned
+training data, baseline state, serialized adapter, merged subject, and measured
+deltas. `training_evidence_proof.json` verifies the receipt-bound saved state
+and reload behavior for that subject; its backend label is a profile-specific
+constrained runtime declaration, not independent proof of training execution. The
+profile pins the exact Python version, exact Torch build string
+(including the CUDA local-version suffix for CUDA profiles), and exact
+Transformers and PEFT versions. CUDA driver and host-OS identity remain observed
+provenance rather than independent trust anchors. Artifact recomputation does
+not independently prove optimizer-history execution; trusted execution or an
+independent rerun is still required.
 
 ## Outputs
 
@@ -113,6 +118,7 @@ The runner writes generated outputs under local output directories:
 | Path | Role |
 | --- | --- |
 | `models/tiny-gpt2-peft-lora-merged/` | HF-loadable merged subject checkpoint. |
+| `models/tiny-gpt2-peft-lora-merged/training_receipt.json` | Immutable profile and recomputable training-artifact evidence. |
 | `artifacts/tiny-peft-lora-fixture/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
 | `artifacts/tiny-peft-lora-fixture/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-peft-lora-fixture/fixture_summary.json` | Fixture parameters and file hashes. |
@@ -122,27 +128,18 @@ The runner writes generated outputs under local output directories:
 | `reports/tiny-peft-lora/<artifact-lane>/lane_artifact.json` | Canonical artifact-lane label and effective runtime settings. |
 | `reports/tiny-peft-lora/<artifact-lane>/run_command.txt` | Wrapper, evaluate, verify, and render commands. |
 | `reports/tiny-peft-lora/<artifact-lane>/run_summary.txt` | Concise success or failure status, lane label, verifier status, runtime provenance status, and primary output paths. |
-| `reports/tiny-peft-lora/<artifact-lane>/checkpoint_refs.json` | Baseline and subject checkpoint references. |
-| `reports/tiny-peft-lora/<artifact-lane>/external_edit_summary.json` | PEFT merge metadata and checkpoint file hashes. |
+| `reports/tiny-peft-lora/<artifact-lane>/training_receipt.json` | Copy of the verified training receipt used for the lane. |
+| `reports/tiny-peft-lora/<artifact-lane>/training_binding.json` | Post-evaluation binding of the subject tree to the copied training receipt. |
+| `reports/tiny-peft-lora/<artifact-lane>/training_evidence_proof.json` | Receipt-bound artifact replay and reload proof for the evaluated subject. |
+| `reports/tiny-peft-lora/<artifact-lane>/training_profile_snapshot.json` | Immutable reviewed training profile and explicit `attn` validation scope. |
 
 A successful run ends with the shared completion block documented in
 `examples/integrations/_shared/README.md#expected-run-output`. If a run fails,
 check the prerequisite message first, then inspect
 `reports/tiny-peft-lora/<artifact-lane>/run_command.txt`.
 
-The subject materializer writes a non-zero LoRA delta and fails if the merged
-checkpoint does not change the target attention weights.
-When PEFT is installed into a broad quantization environment, the materializer
-keeps this dense LoRA path isolated from optional GPTQModel/AWQ dispatch.
-
-## Public Evidence Anchor
-
-The repository also ships a small public LoRA-merge BYOE fixture:
-
-```bash
-invarlock verify --profile release --assurance strict \
-  public_evidence/byoe_examples/lora_merge_byoe/evaluation.report.json
-```
-
-Use that fixture as the stable public reference when the local example
-environment does not have PEFT installed.
+The local profile requires forward/backward/AdamW steps, LoRA-only
+trainable parameters, a changed serialized adapter, a pristine frozen base,
+and a merged checkpoint whose recomputed delta matches the receipt. The
+artifact-replay verifier confirms the resulting state and reload behavior, not
+the recorded optimizer execution itself.

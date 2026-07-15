@@ -25,6 +25,7 @@ def test_main_all_runs_curated_live_checks_but_not_full_live(
     monkeypatch.setattr(module, "check_build", lambda: calls.append("build"))
     monkeypatch.setattr(module, "check_links", lambda: calls.append("links"))
     monkeypatch.setattr(module, "check_references", lambda: calls.append("refs"))
+    monkeypatch.setattr(module, "check_api_refs", lambda: calls.append("api_refs") or 0)
     monkeypatch.setattr(module, "check_examples", lambda: calls.append("examples"))
     monkeypatch.setattr(
         module, "check_consistency", lambda: calls.append("consistency")
@@ -39,6 +40,7 @@ def test_main_all_runs_curated_live_checks_but_not_full_live(
         "build",
         "links",
         "refs",
+        "api_refs",
         "examples",
         "consistency",
         "live_fast",

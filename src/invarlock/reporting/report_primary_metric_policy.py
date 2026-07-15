@@ -4,7 +4,7 @@ import math
 from typing import Any
 
 from invarlock.core.metric_kind_contract import is_ppl_metric_kind
-from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from invarlock.core.runner_runtime.pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 
 from .report_build_evidence import record_report_build_event
 
@@ -19,19 +19,6 @@ _NON_FATAL_EXCEPTIONS = (
 
 def is_ppl_kind(name: Any) -> bool:
     return is_ppl_metric_kind(name)
-
-
-def fallback_paired_windows(
-    paired_windows: int, coverage_summary: dict[str, Any]
-) -> int:
-    if paired_windows > 0 or not isinstance(coverage_summary, dict):
-        return paired_windows
-    preview = coverage_summary.get("preview")
-    if isinstance(preview, dict):
-        used = preview.get("used")
-        if isinstance(used, int | float) and used >= 0:
-            return int(used)
-    return paired_windows
 
 
 def propagate_pairing_stats(
@@ -64,7 +51,11 @@ def propagate_pairing_stats(
         ):
             if key in ppl_stats:
                 stats[key] = ppl_stats[key]
-        for key in ("coverage", "bootstrap", "paired_delta_summary"):
+        for key in (
+            "coverage",
+            "bootstrap",
+            "preview_final_slice_delta_summary",
+        ):
             value = ppl_stats.get(key)
             if isinstance(value, dict) and value:
                 stats[key] = value
@@ -107,7 +98,7 @@ def enforce_drift_ratio_identity(
         profile = (window_plan_profile or "dev").lower()
         if profile in {"ci", "release"}:
             raise ValueError(
-                "Paired ΔlogNLL mean is inconsistent with reported drift ratio."
+                "Preview/final ΔlogNLL mean is inconsistent with reported drift ratio."
             )
     return ratio_from_delta
 

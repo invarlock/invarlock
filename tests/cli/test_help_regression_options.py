@@ -73,14 +73,18 @@ def test_groups_help_list_subcommands(monkeypatch):
             assert token in out
 
 
-def test_evidence_pack_build_help_mentions_explicit_report_files(monkeypatch):
+def test_evidence_pack_help_is_verifier_only(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
-    res = runner.invoke(app, ["advanced", "evidence-pack", "build", "--help"])
+    res = runner.invoke(app, ["advanced", "evidence-pack", "--help"])
     assert res.exit_code == 0, res.output
     out = strip_ansi(res.stdout)
-    assert "evaluation.report.json" in out
-    assert "runtime.manifest.json" in out
+    assert "verify" in out
+    assert "inspect" in out
+    assert "verify-set" in out
+    assert "build" not in out
+    assert "keygen" not in out
+    assert "seal" not in out
 
 
 def test_report_explain_help_mentions_evaluation_bundle(monkeypatch):

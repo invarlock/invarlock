@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from invarlock.reporting.html import render_report_html
@@ -51,6 +52,7 @@ def test_structural_failure_report_marks_structural_detection(
                         "supports_bootstrap": True,
                         "preview": 9.429,
                         "final": 8.893,
+                        "ratio_vs_baseline": 1.0105681818181818,
                         "drift_band": {"min": 0.8878, "max": 1.0859},
                     }
                 },
@@ -105,7 +107,8 @@ def test_structural_failure_report_marks_structural_detection(
 
     subprocess.run(
         [
-            "python3",
+            sys.executable,
+            "-I",
             str(script),
             "structural-failure-report",
             "--error-type",
@@ -127,6 +130,9 @@ def test_structural_failure_report_marks_structural_detection(
     assert validate_report(payload)
     assert payload["validation"]["invariants_pass"] is False
     assert payload["validation"]["primary_metric_acceptable"] is False
+    assert payload["validation"]["guard_metric_impact_acceptable"] is False
+    assert payload["guard_metric_impact"]["evaluated"] is False
+    assert payload["guard_metric_impact"]["passed"] is False
     assert payload["primary_metric"]["invalid"] is True
     assert payload["primary_metric"]["degraded"] is True
     assert payload["invariants"]["status"] == "fail"

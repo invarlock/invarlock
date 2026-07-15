@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -75,8 +76,65 @@ def test_write_runtime_manifest_records_runtime_context(
     assert payload["runtime"]["image_digest"] == "sha256:container"
     assert payload["runtime"]["container_execution"] is True
     assert payload["config"]["source"] == "file"
+    assert payload["config"]["path"] == "config.yaml"
+    assert payload["report"]["path"] == "evaluation.report.json"
     assert payload["context"]["note"] == "demo"
     assert payload["context"]["path"] == str(report_path)
+
+
+def test_write_runtime_manifest_binds_source_bundle_from_delegated_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    digest = "sha256:" + "a" * 64
+    monkeypatch.setenv(runtime_security.SOURCE_BUNDLE_DIGEST_ENV, digest)
+    monkeypatch.setenv(runtime_security.SOURCE_BUNDLE_READ_ONLY_ENV, "1")
+
+    manifest_path = runtime_security.write_runtime_manifest(
+        report_path,
+        execution=runtime_security.RuntimeManifestExecution(
+            execution_mode="container",
+            container_execution=True,
+            image_ref="sha256:" + "b" * 64,
+            image_digest="sha256:" + "b" * 64,
+            allow_network=True,
+            allow_remote_code=False,
+            allow_third_party_plugins=False,
+        ),
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["context"]["source_bundle"] == {
+        "read_only": True,
+        "sha256": digest,
+    }
+
+
+def test_write_runtime_manifest_rejects_unenforced_source_bundle(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    monkeypatch.setenv(
+        runtime_security.SOURCE_BUNDLE_DIGEST_ENV,
+        "sha256:" + "a" * 64,
+    )
+    monkeypatch.setenv(runtime_security.SOURCE_BUNDLE_READ_ONLY_ENV, "0")
+
+    with pytest.raises(RuntimeError, match="read-only delegated workspace"):
+        runtime_security.write_runtime_manifest(
+            report_path,
+            execution=runtime_security.RuntimeManifestExecution(
+                execution_mode="container",
+                container_execution=True,
+                image_ref="sha256:" + "b" * 64,
+                image_digest="sha256:" + "b" * 64,
+                allow_network=True,
+                allow_remote_code=False,
+                allow_third_party_plugins=False,
+            ),
+        )
 
 
 def test_write_runtime_manifest_omits_context_for_empty_extra(
@@ -233,3 +291,18 @@ def test_write_runtime_manifest_honors_execution_override(
         payload["runtime"]["image_ref"]
         == "ghcr.io/invarlock/invarlock-runtime:test@sha256:container"
     )
+
+
+def test_runtime_manifest_hashing_streams_report_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report = tmp_path / "evaluation.report.json"
+    report.write_bytes(b"x" * (4 * 1024 * 1024))
+    expected = hashlib.sha256(b"x" * (4 * 1024 * 1024)).hexdigest()
+
+    def reject_full_file_copy(_path: Path) -> bytes:
+        raise AssertionError("report hashing must not make a full-file bytes copy")
+
+    monkeypatch.setattr(Path, "read_bytes", reject_full_file_copy)
+
+    assert runtime_security_helpers._sha256_path(report) == expected

@@ -9,9 +9,14 @@ Supports both automated CI testing and flexible user validation.
 from __future__ import annotations
 
 import json
-import warnings
+import math
 from pathlib import Path
 from typing import Any
+
+from invarlock.eval.guard_metric_impact import (
+    compute_guard_metric_impact,
+    degradation_within_limit,
+)
 
 _VALIDATION_EXCEPTIONS = (
     AttributeError,
@@ -25,7 +30,7 @@ _VALIDATION_EXCEPTIONS = (
 __all__ = [
     "validate_against_baseline",
     "validate_drift_gate",
-    "validate_guard_overhead",
+    "validate_guard_metric_impact",
     "ValidationResult",
     "load_baseline",
     "save_baseline",
@@ -40,7 +45,7 @@ class ValidationResult:
         self,
         passed: bool,
         checks: dict[str, bool],
-        metrics: dict[str, float],
+        metrics: dict[str, Any],
         messages: list[str],
         warnings: list[str] | None = None,
         errors: list[str] | None = None,
@@ -54,7 +59,7 @@ class ValidationResult:
 
     @property
     def diagnostics(self) -> list[dict[str, Any]]:
-        """Typed diagnostic view over legacy validation text buckets."""
+        """Return typed diagnostics for the result's messages, warnings, and errors."""
         diagnostics: list[dict[str, Any]] = []
         for message in self.messages:
             diagnostics.append(
@@ -163,8 +168,9 @@ def validate_against_baseline(
     errors: list[str] = []
 
     try:
-        # Extract primary metric ratio (canonical)
+        # Extract the kind-specific baseline comparison.
         current_ratio = None
+        current_delta_pp = None
         pm_kind = None
         pm = (
             (run_report.get("metrics") or {}).get("primary_metric")
@@ -172,14 +178,22 @@ def validate_against_baseline(
             else None
         )
         if isinstance(pm, dict) and pm:
-            val = pm.get("ratio_vs_baseline")
-            if isinstance(val, int | float):
-                current_ratio = float(val)
             try:
                 pm_kind = str(pm.get("kind") or "").lower()
             except _VALIDATION_EXCEPTIONS:
                 pm_kind = None
-        if current_ratio is None:
+            comparison_field = (
+                "delta_vs_baseline_pp" if pm_kind == "accuracy" else "ratio_vs_baseline"
+            )
+            val = pm.get(comparison_field)
+            if isinstance(val, int | float):
+                if pm_kind == "accuracy":
+                    current_delta_pp = float(val)
+                else:
+                    current_ratio = float(val)
+        if pm_kind == "accuracy" and current_delta_pp is None:
+            errors.append("Cannot extract delta_vs_baseline_pp from run report")
+        elif pm_kind != "accuracy" and current_ratio is None:
             errors.append("Cannot extract ratio_vs_baseline from run report")
 
         if "param_reduction_ratio" in run_report:
@@ -196,7 +210,7 @@ def validate_against_baseline(
         baseline_ratio = baseline.get("ratio_vs_baseline")
         baseline_param_ratio = baseline.get("param_reduction_ratio")
 
-        if baseline_ratio is None:
+        if pm_kind != "accuracy" and baseline_ratio is None:
             errors.append("Baseline missing ratio_vs_baseline")
         if baseline_param_ratio is None:
             errors.append("Baseline missing param_reduction_ratio")
@@ -244,11 +258,10 @@ def validate_against_baseline(
             checks["param_ratio_tolerance"] = False
 
         # Bounds check
-        if current_ratio is not None:
-            if pm_kind == "accuracy":
-                # Interpret current_ratio as delta proportion; compare in pp when bounds provided
+        if pm_kind == "accuracy":
+            if current_delta_pp is not None:
                 if isinstance(delta_bounds_pp, tuple) and len(delta_bounds_pp) == 2:
-                    delta_pp = 100.0 * float(current_ratio)
+                    delta_pp = current_delta_pp
                     lo_pp, hi_pp = float(delta_bounds_pp[0]), float(delta_bounds_pp[1])
                     checks["delta_bounds_pp"] = lo_pp <= delta_pp <= hi_pp
                     if not checks["delta_bounds_pp"]:
@@ -260,6 +273,9 @@ def validate_against_baseline(
                             f"Δpp {delta_pp:+.2f} within acceptable bounds {delta_bounds_pp}"
                         )
             else:
+                checks["delta_bounds_pp"] = False
+        elif current_ratio is not None:
+            if pm_kind != "accuracy":
                 checks["ratio_bounds"] = (
                     ratio_bounds[0] <= current_ratio <= ratio_bounds[1]
                 )
@@ -272,10 +288,7 @@ def validate_against_baseline(
                         f"Ratio {current_ratio:.3f} within acceptable bounds {ratio_bounds}"
                     )
         else:
-            if pm_kind == "accuracy":
-                checks["delta_bounds_pp"] = False
-            else:
-                checks["ratio_bounds"] = False
+            checks["ratio_bounds"] = False
 
         # Structural count validation
         if structural_exact:
@@ -283,15 +296,14 @@ def validate_against_baseline(
             checks.update(structural_checks["checks"])
             messages.extend(structural_checks["messages"])
             warnings_list.extend(structural_checks["warnings"])
-        else:
-            checks["structural_counts"] = True  # Skip structural validation
+        # An explicitly disabled structural comparison is omitted rather than
+        # represented as a successful evidence-backed check.
 
         # Invariants validation (if present in report)
         invariants_passed = _validate_invariants(run_report)
-        if invariants_passed is not None:
-            checks["invariants"] = invariants_passed
-            if not invariants_passed:
-                errors.append("Model invariants validation failed")
+        checks["invariants"] = invariants_passed
+        if not invariants_passed:
+            errors.append("Model invariants evidence is missing or failed")
 
         # Overall pass/fail
         passed = all(checks.values()) and len(errors) == 0
@@ -397,21 +409,21 @@ def validate_drift_gate(
         )
 
 
-def validate_guard_overhead(
+def validate_guard_metric_impact(
     bare_report: dict[str, Any],
     guarded_report: dict[str, Any],
-    overhead_threshold: float = 0.01,
+    degradation_limit: float = 0.01,
 ) -> ValidationResult:
     """
-    Validate guard overhead using primary_metric: final(guarded)/final(bare) ≤ 1%.
+    Validate guard impact for a supported direction-aware primary metric.
 
     Args:
         bare_report: Report from bare (no guards) run (expects metrics.primary_metric)
         guarded_report: Report from guarded run (expects metrics.primary_metric)
-        overhead_threshold: Maximum allowed overhead (default 0.01 = 1%)
+        degradation_limit: Maximum allowed degradation in the metric-owned basis.
 
     Returns:
-        ValidationResult with guard overhead check
+        ValidationResult with guard metric impact check
     """
     checks = {}
     metrics = {}
@@ -420,55 +432,79 @@ def validate_guard_overhead(
     errors = []
 
     try:
-        # Extract primary metric final from both reports
+        if (
+            isinstance(degradation_limit, bool)
+            or not isinstance(degradation_limit, int | float)
+            or not math.isfinite(float(degradation_limit))
+            or float(degradation_limit) < 0.0
+        ):
+            return ValidationResult(
+                passed=False,
+                checks={"guard_metric_impact": False},
+                metrics={},
+                messages=[],
+                warnings=[],
+                errors=[
+                    "Cannot calculate guard metric impact: invalid degradation_limit"
+                ],
+            )
+        threshold = float(degradation_limit)
+
+        # Extract matching primary metric finals from both reports.
         bare_pm = (
             (bare_report.get("metrics") or {}).get("primary_metric")
             if isinstance(bare_report.get("metrics"), dict)
-            else None
+            else bare_report.get("primary_metric")
         )
         guarded_pm = (
             (guarded_report.get("metrics") or {}).get("primary_metric")
             if isinstance(guarded_report.get("metrics"), dict)
+            else guarded_report.get("primary_metric")
+        )
+
+        bare_value = None
+        guarded_value = None
+        bare_kind = None
+        guarded_kind = None
+        if isinstance(bare_pm, dict):
+            bare_value = bare_pm.get("final")
+            bare_kind = bare_pm.get("kind")
+        if isinstance(guarded_pm, dict):
+            guarded_value = guarded_pm.get("final")
+            guarded_kind = guarded_pm.get("kind")
+
+        measurement = (
+            compute_guard_metric_impact(bare_kind, bare_value, guarded_value)
+            if isinstance(bare_kind, str) and bare_kind == guarded_kind
             else None
         )
 
-        bare_ppl = None
-        guarded_ppl = None
-        if isinstance(bare_pm, dict):
-            bare_ppl = bare_pm.get("final")
-        if isinstance(guarded_pm, dict):
-            guarded_ppl = guarded_pm.get("final")
+        if measurement is not None:
+            metrics.update(measurement.to_metrics())
+            checks["metric_kind_matches"] = True
+            checks["measurements_valid"] = True
+            checks["guard_metric_impact"] = degradation_within_limit(
+                degradation=measurement.degradation,
+                degradation_limit=threshold,
+            )
 
-        if (
-            isinstance(bare_ppl, (int | float))
-            and bare_ppl > 0
-            and isinstance(guarded_ppl, (int | float))
-        ):
-            overhead_ratio = float(guarded_ppl) / float(bare_ppl)
-            overhead_percent = (overhead_ratio - 1.0) * 100
-
-            metrics["overhead_ratio"] = overhead_ratio
-            metrics["overhead_percent"] = overhead_percent
-            metrics["bare_ppl"] = float(bare_ppl)
-            metrics["guarded_ppl"] = float(guarded_ppl)
-
-            # Apply overhead gate
-            checks["guard_overhead"] = overhead_ratio <= (1.0 + overhead_threshold)
-
-            if checks["guard_overhead"]:
-                messages.append(
-                    f"Guard overhead PASSED: {overhead_percent:+.2f}% ≤ {overhead_threshold * 100:.1f}%"
-                )
+            if checks["guard_metric_impact"]:
+                messages.append("Guard metric impact PASSED for retained measurements")
             else:
                 errors.append(
-                    f"Guard overhead FAILED: {overhead_percent:+.2f}% > {overhead_threshold * 100:.1f}% "
-                    f"(guards add too much primary-metric overhead)"
+                    "Guard metric impact FAILED: retained primary-metric degradation "
+                    "exceeds the configured threshold"
                 )
         else:
             errors.append(
-                "Cannot calculate guard overhead: missing primary_metric data"
+                "Cannot calculate guard metric impact: expected matching finite "
+                "supported primary metrics"
             )
-            checks["guard_overhead"] = False
+            checks["metric_kind_matches"] = bool(
+                isinstance(bare_kind, str) and bare_kind == guarded_kind
+            )
+            checks["measurements_valid"] = False
+            checks["guard_metric_impact"] = False
 
         # Overall pass/fail
         passed = all(checks.values()) and len(errors) == 0
@@ -485,11 +521,11 @@ def validate_guard_overhead(
     except _VALIDATION_EXCEPTIONS as e:
         return ValidationResult(
             passed=False,
-            checks={"guard_overhead_error": False},
+            checks={"guard_metric_impact_error": False},
             metrics={},
             messages=[],
             warnings=[],
-            errors=[f"Guard overhead validation failed: {str(e)}"],
+            errors=[f"Guard metric impact validation failed: {str(e)}"],
         )
 
 
@@ -519,29 +555,35 @@ def _validate_structural_counts(
             )
     else:
         warnings.append("Cannot validate layers count - missing data")
-        checks["layers_count_exact"] = True  # Don't fail on missing data
+        checks["layers_count_exact"] = False
 
     return {"checks": checks, "messages": messages, "warnings": warnings}
 
 
-def _validate_invariants(run_report: dict[str, Any]) -> bool | None:
+def _validate_invariants(run_report: dict[str, Any]) -> bool:
     """Check if model invariants passed."""
     # Look for invariants check in guard reports
-    guard_reports = run_report.get("guard_reports", {})
+    guard_reports = run_report.get("guard_reports")
 
-    for guard_name, guard_report in guard_reports.items():
-        if "invariants" in guard_name.lower():
-            passed = guard_report.get("passed", True)
-            return bool(passed) if passed is not None else True
+    if isinstance(guard_reports, dict):
+        invariant_reports = [
+            guard_report
+            for guard_name, guard_report in guard_reports.items()
+            if isinstance(guard_name, str) and "invariants" in guard_name.lower()
+        ]
+        if invariant_reports:
+            return all(
+                type(guard_report) is dict and guard_report.get("passed") is True
+                for guard_report in invariant_reports
+            )
 
     # Look for validation results in metrics
-    metrics = run_report.get("metrics", {})
-    if "invariants_passed" in metrics:
-        passed = metrics["invariants_passed"]
-        return bool(passed) if passed is not None else None
+    metrics = run_report.get("metrics")
+    if isinstance(metrics, dict) and "invariants_passed" in metrics:
+        return metrics["invariants_passed"] is True
 
     # No invariants check found
-    return None
+    return False
 
 
 def load_baseline(baseline_path: Path) -> dict[str, Any]:
@@ -564,7 +606,7 @@ def save_baseline(baseline: dict[str, Any], baseline_path: Path) -> None:
     """Save baseline metrics to JSON file."""
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
     with open(baseline_path, "w") as f:
-        json.dump(baseline, f, indent=2)
+        json.dump(baseline, f, indent=2, allow_nan=False)
 
 
 def create_baseline_from_report(run_report: dict[str, Any]) -> dict[str, Any]:
@@ -578,8 +620,13 @@ def create_baseline_from_report(run_report: dict[str, Any]) -> dict[str, Any]:
             if isinstance(run_report.get("metrics"), dict)
             else None
         )
-        if isinstance(pm, dict) and pm.get("ratio_vs_baseline") is not None:
-            baseline["ratio_vs_baseline"] = float(pm["ratio_vs_baseline"])
+        if isinstance(pm, dict):
+            kind = str(pm.get("kind") or "").strip().lower()
+            field = (
+                "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+            )
+            if pm.get(field) is not None:
+                baseline[field] = float(pm[field])
     except _VALIDATION_EXCEPTIONS:
         pass
 
@@ -609,48 +656,3 @@ def create_baseline_from_report(run_report: dict[str, Any]) -> dict[str, Any]:
     baseline["source"] = "run_report"
 
     return baseline
-
-
-def validate_gpt2_small_wt2_baseline(
-    run_report: dict[str, Any], baseline_path: Path | None = None
-) -> ValidationResult:
-    """
-    Validate against the canonical GPT-2 small + WikiText-2 baseline.
-
-    This is the CI validation function that uses the pinned baseline.
-    """
-    if baseline_path is None:
-        # Use default baseline path
-        baseline_path = (
-            Path(__file__).parent.parent.parent
-            / "benchmarks"
-            / "baselines"
-            / "gpt2_small_wt2.json"
-        )
-
-    try:
-        baseline = load_baseline(baseline_path)
-    except FileNotFoundError:
-        # Create a default baseline if file doesn't exist
-        warnings.warn(
-            f"Baseline file not found: {baseline_path}. Using default values.",
-            stacklevel=2,
-        )
-        baseline = {
-            "ratio_vs_baseline": 1.285,  # Target: ~1.25-1.32
-            "param_reduction_ratio": 0.022,  # Target: ~2.2%
-            "heads_pruned": 16,  # Example values
-            "neurons_pruned": 1024,
-            "layers_modified": 8,
-            "head_sparsity": 0.1,
-            "neuron_sparsity": 0.1,
-        }
-
-    return validate_against_baseline(
-        run_report,
-        baseline,
-        tol_ratio=0.02,
-        tol_param_ratio=0.02,
-        ratio_bounds=(1.25, 1.32),
-        structural_exact=True,
-    )

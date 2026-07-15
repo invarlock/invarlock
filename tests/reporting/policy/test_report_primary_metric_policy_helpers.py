@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import report_overhead as overhead_mod
+from invarlock.reporting import report_metric_impact as metric_impact_mod
 from invarlock.reporting import report_primary_metric_policy as pm_policy
 from invarlock.reporting import report_provenance as provenance_mod
 
@@ -14,7 +14,7 @@ from invarlock.reporting import report_provenance as provenance_mod
 def test_enforce_drift_ratio_identity_raises_for_ci_profile():
     with pytest.raises(
         ValueError,
-        match="Paired ΔlogNLL mean is inconsistent with reported drift ratio",
+        match="Preview/final ΔlogNLL mean is inconsistent with reported drift ratio",
     ):
         pm_policy.enforce_drift_ratio_identity(
             paired_windows=1,
@@ -327,14 +327,6 @@ def test_enforce_pairing_and_coverage_raises_on_missing_stats():
         )
 
 
-def test_fallback_paired_windows_uses_coverage_preview():
-    coverage = {"preview": {"used": 7}}
-    assert pm_policy.fallback_paired_windows(0, coverage) == 7
-    assert pm_policy.fallback_paired_windows(2, coverage) == 2
-    assert pm_policy.fallback_paired_windows(0, {"preview": "bad"}) == 0
-    assert pm_policy.fallback_paired_windows(0, {"preview": {"used": -1}}) == 0
-
-
 def test_propagate_pairing_stats_ignores_non_mapping_ppl_stats() -> None:
     report = {"dataset": {"windows": {"stats": {}}}}
 
@@ -343,43 +335,89 @@ def test_propagate_pairing_stats_ignores_non_mapping_ppl_stats() -> None:
     assert report == {"dataset": {"windows": {"stats": {}}}}
 
 
-def test_prepare_guard_overhead_section_ratio_threshold():
+def test_prepare_guard_metric_impact_section_degradation_limit():
     payload = {
-        "bare_ppl": 10.0,
-        "guarded_ppl": 10.5,
+        "metric_kind": "ppl_causal",
+        "direction": "lower",
+        "bare_value": 10.0,
+        "guarded_value": 10.5,
+        "degradation_basis": "relative_increase",
+        "degradation": 0.05,
+        "display_value": 5.0,
+        "display_unit": "percent",
+        "bare_facts": {
+            "weighted_logloss_sum": math.log(10.0),
+            "token_count": 1,
+            "example_ids_digest": "shared",
+        },
+        "guarded_facts": {
+            "weighted_logloss_sum": math.log(10.5),
+            "token_count": 1,
+            "example_ids_digest": "shared",
+        },
         "warnings": ["slow"],
         "messages": ["note"],
         "checks": {"ratio": True},
-        "overhead_threshold": 0.01,
+        "degradation_limit": 0.01,
     }
-    sanitized, passed = overhead_mod.prepare_guard_overhead_section(payload)
+    sanitized, passed = metric_impact_mod.prepare_guard_metric_impact_section(payload)
     assert sanitized["evaluated"] is True
-    assert sanitized["overhead_ratio"] == pytest.approx(1.05)
+    assert sanitized["degradation"] == pytest.approx(0.05)
     assert passed is False
     assert sanitized["diagnostics"] == []
     assert sanitized["checks"] == {"ratio": True}
 
 
-def test_prepare_guard_overhead_section_soft_pass_when_ratio_missing():
-    sanitized, passed = overhead_mod.prepare_guard_overhead_section({"messages": ["x"]})
+def test_prepare_guard_metric_impact_section_fails_closed_when_degradation_missing():
+    sanitized, passed = metric_impact_mod.prepare_guard_metric_impact_section(
+        {"messages": ["x"]}
+    )
     assert sanitized["evaluated"] is False
-    assert sanitized["passed"] is True
+    assert sanitized["passed"] is False
+    assert passed is False
     assert sanitized["diagnostics"] == [
         {
-            "kind": "guard_overhead_unavailable",
+            "kind": "guard_metric_impact_unavailable",
             "severity": "warning",
-            "message": "Guard overhead ratio unavailable",
+            "message": "Guard metric impact measurements unavailable",
             "details": {},
         }
     ]
 
 
-def test_compute_quality_overhead_ratio_basis():
+def test_prepare_guard_metric_impact_section_fails_closed_when_validator_omits_degradation():
+    bare = {"metrics": {"primary_metric": {"final": 10.0}}}
+    guarded = {"metrics": {"primary_metric": {"final": 10.1}}}
+
+    def _validator(_bare, _guarded, *, degradation_limit):
+        return SimpleNamespace(
+            passed=True,
+            metrics={},
+            checks={"guard_metric_impact": True},
+            diagnostics=[],
+        )
+
+    sanitized, passed = metric_impact_mod.prepare_guard_metric_impact_section(
+        {
+            "bare_report": bare,
+            "guarded_report": guarded,
+            "degradation_limit": 0.01,
+        },
+        validate_guard_metric_impact_fn=_validator,
+    )
+
+    assert sanitized["degradation"] is None
+    assert sanitized["evaluated"] is False
+    assert sanitized["passed"] is False
+    assert passed is False
+
+
+def test_compute_guard_metric_degradation_basis():
     bare = {"metrics": {"primary_metric": {"final": 10.0}}}
     guarded = {"metrics": {"primary_metric": {"final": 11.0}}}
     raw = {"bare_report": bare, "guarded_report": guarded}
 
-    result = overhead_mod.compute_quality_overhead_from_guard(
+    result = metric_impact_mod.compute_guard_metric_impact_from_guard(
         raw,
         "ppl_causal",
         compute_primary_metric_from_report_fn=lambda report, kind=None: report[
@@ -388,18 +426,23 @@ def test_compute_quality_overhead_ratio_basis():
         get_metric_fn=lambda kind: SimpleNamespace(direction="lower"),
     )
     assert result == {
-        "basis": "ratio",
-        "value": pytest.approx(1.1),
-        "kind": "ppl_causal",
+        "metric_kind": "ppl_causal",
+        "direction": "lower",
+        "bare_value": 10.0,
+        "guarded_value": 11.0,
+        "degradation_basis": "relative_increase",
+        "degradation": pytest.approx(0.1),
+        "display_value": pytest.approx(10.0),
+        "display_unit": "percent",
     }
 
 
-def test_compute_quality_overhead_accuracy_delta():
+def test_compute_guard_metric_impact_accuracy_delta():
     bare = {"metrics": {"primary_metric": {"final": 0.7}}}
     guarded = {"metrics": {"primary_metric": {"final": 0.8}}}
     raw = {"bare_report": bare, "guarded_report": guarded}
 
-    result = overhead_mod.compute_quality_overhead_from_guard(
+    result = metric_impact_mod.compute_guard_metric_impact_from_guard(
         raw,
         "accuracy",
         compute_primary_metric_from_report_fn=lambda report, kind=None: report[
@@ -407,9 +450,10 @@ def test_compute_quality_overhead_accuracy_delta():
         ]["primary_metric"],
         get_metric_fn=lambda kind: SimpleNamespace(direction="higher"),
     )
-    assert result["basis"] == "delta_pp"
-    assert result["kind"] == "accuracy"
-    assert result["value"] == pytest.approx(10.0)
+    assert result["degradation_basis"] == "absolute_drop"
+    assert result["metric_kind"] == "accuracy"
+    assert result["degradation"] == pytest.approx(-0.1)
+    assert result["display_value"] == pytest.approx(-10.0)
 
 
 def test_collect_backend_versions_with_fake_torch(monkeypatch):

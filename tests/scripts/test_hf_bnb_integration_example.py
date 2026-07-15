@@ -41,17 +41,19 @@ def test_hf_bnb_runner_has_expected_adapter_contract() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
+    assert "--require-runtime-quantization-proof" in text
 
 
 def test_hf_bnb_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     text = README.read_text(encoding="utf-8")
 
-    assert "strict container evidence is verified" in text
-    assert "this tiny\nbitsandbytes runtime-load example" in text
+    assert "`cuda-container-strict` result requires" in text
+    assert "strict container evidence is verified" not in text
     assert "scoped to the configured tiny runtime-loaded bitsandbytes" in text
     assert "shared integration evidence" in text
     assert "The shell runner relies on InvarLock report persistence to emit" in text
     assert "`backend_inventory.json` when adapter provenance is available" in text
+    assert "`runtime_quantization_proof.json`" in text
 
 
 def test_prepare_tiny_hf_bnb_fixture_writes_local_jsonl_and_preset(

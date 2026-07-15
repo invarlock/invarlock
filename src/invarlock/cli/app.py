@@ -73,7 +73,15 @@ class OrderedGroup(TyperGroup):
 
 class AdvancedGroup(TyperGroup):
     def list_commands(self, ctx: click.Context) -> list[str]:
-        return ["evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"]
+        return [
+            "evidence-catalog",
+            "evidence-pack",
+            "policy",
+            "plugins",
+            "calibrate",
+            "runtime-verify",
+            "inputs",
+        ]
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         command = super().get_command(ctx, cmd_name)
@@ -97,7 +105,9 @@ app = typer.Typer(
         "  0=success\n"
         "  1=generic failure\n"
         "  2=schema invalid\n"
-        "  3=hard abort with structured error code."
+        "  3=hard abort with structured error code\n"
+        "  4-7=advanced evidence-pack failure classes\n"
+        "  8=advanced evidence-pack integrity-only diagnostic (not report verification)."
     ),
     no_args_is_help=True,
     cls=OrderedGroup,
@@ -221,6 +231,16 @@ def _evaluate_lazy(
             "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
         ),
     ),
+    baseline_revision: str | None = typer.Option(
+        None,
+        "--baseline-revision",
+        help="Immutable 40-64 character lowercase hexadecimal revision for a remote baseline.",
+    ),
+    subject_revision: str | None = typer.Option(
+        None,
+        "--subject-revision",
+        help="Immutable 40-64 character lowercase hexadecimal revision for a remote subject.",
+    ),
     baseline_adapter: str = typer.Option(
         "auto",
         "--baseline-adapter",
@@ -244,6 +264,11 @@ def _evaluate_lazy(
             "based on the subject adapter)"
         ),
     ),
+    evaluation_input_binding: str | None = typer.Option(
+        None,
+        "--evaluation-input-binding",
+        help="Closed catalog/input binding to propagate into evaluation provenance.",
+    ),
     out: str = typer.Option("runs", "--out", help="Base output directory"),
     report_out: str = typer.Option(
         "reports/eval", "--report-out", help="Evaluation report output directory"
@@ -258,6 +283,56 @@ def _evaluate_lazy(
             "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
             "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
         ),
+    ),
+    clean_selection_config: str | None = typer.Option(
+        None,
+        "--clean-selection-config",
+        help="Frozen clean-transformation selection config for a candidate evaluation.",
+    ),
+    clean_selection_execution_receipt: str | None = typer.Option(
+        None,
+        "--clean-selection-execution-receipt",
+        help="Pre-evaluation candidate execution receipt (required with clean selection).",
+    ),
+    clean_selection_replay: str | None = typer.Option(
+        None,
+        "--clean-selection-replay",
+        help="Independent candidate transformation replay sidecar.",
+    ),
+    clean_selection_runtime_proof: str | None = typer.Option(
+        None,
+        "--clean-selection-runtime-proof",
+        help="Two-reload candidate runtime proof sidecar.",
+    ),
+    clean_selection_repeat_index: int | None = typer.Option(
+        None,
+        "--clean-selection-repeat-index",
+        help="Zero-based repeat index in the frozen clean-selection schedule.",
+    ),
+    clean_pruning_selection_config: str | None = typer.Option(
+        None,
+        "--clean-pruning-selection-config",
+        help="Frozen clean-pruning selection config for a candidate evaluation.",
+    ),
+    clean_pruning_selection_execution_receipt: str | None = typer.Option(
+        None,
+        "--clean-pruning-selection-execution-receipt",
+        help="Pre-evaluation pruning candidate receipt (required with clean pruning selection).",
+    ),
+    clean_pruning_selection_replay: str | None = typer.Option(
+        None,
+        "--clean-pruning-selection-replay",
+        help="Independent exact pruning candidate replay sidecar.",
+    ),
+    clean_pruning_selection_runtime_proof: str | None = typer.Option(
+        None,
+        "--clean-pruning-selection-runtime-proof",
+        help="Two-reload pruning candidate runtime proof sidecar.",
+    ),
+    clean_pruning_selection_repeat_index: int | None = typer.Option(
+        None,
+        "--clean-pruning-selection-repeat-index",
+        help="Zero-based repeat index in the frozen clean-pruning schedule.",
     ),
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
@@ -317,16 +392,31 @@ def _evaluate_lazy(
         baseline=baseline,
         subject=subject,
         baseline_report=baseline_report,
+        baseline_revision=baseline_revision,
+        subject_revision=subject_revision,
         baseline_adapter=baseline_adapter,
         subject_adapter=subject_adapter,
         device=device,
         profile=profile,
         tier=tier,
         preset=preset,
+        evaluation_input_binding=evaluation_input_binding,
         out=out,
         report_out=report_out,
         edit_config=edit_config,
         edit_label=edit_label,
+        clean_selection_config=clean_selection_config,
+        clean_selection_execution_receipt=clean_selection_execution_receipt,
+        clean_selection_replay=clean_selection_replay,
+        clean_selection_runtime_proof=clean_selection_runtime_proof,
+        clean_selection_repeat_index=clean_selection_repeat_index,
+        clean_pruning_selection_config=clean_pruning_selection_config,
+        clean_pruning_selection_execution_receipt=(
+            clean_pruning_selection_execution_receipt
+        ),
+        clean_pruning_selection_replay=clean_pruning_selection_replay,
+        clean_pruning_selection_runtime_proof=clean_pruning_selection_runtime_proof,
+        clean_pruning_selection_repeat_index=clean_pruning_selection_repeat_index,
         quiet=quiet,
         verbose=verbose,
         banner=banner,
@@ -382,6 +472,10 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
         from .commands.evidence_pack import evidence_pack_app
 
         return _register(name, evidence_pack_app)
+    if name == "evidence-catalog":
+        from .commands.evidence_catalog import evidence_catalog_app
+
+        return _register(name, evidence_catalog_app)
     if name == "policy":
         from .commands.policy import policy_app
 
@@ -401,6 +495,10 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
         from invarlock.cli.commands.verify import runtime_verify_app
 
         return _register_command(name, runtime_verify_app)
+    if name == "inputs":
+        from .commands.inputs import inputs_app
+
+        return _register(name, inputs_app)
     return False
 
 
@@ -486,21 +584,35 @@ def _verify_typed(
             "canonical evaluation.report.json to verify."
         ),
     ),
+    policy_pack: str | None = typer.Option(
+        None,
+        "--policy-pack",
+        help=(
+            "Independently supplied policy-pack-v1 JSON/YAML authorization. Required "
+            "for strict verification so the report cannot choose its own thresholds."
+        ),
+    ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
         help=(
-            "Optional baseline report JSON file or directory containing canonical "
-            "report.json or evaluation.report.json to enforce provider parity."
+            "Baseline report JSON file or directory containing canonical report.json. "
+            "Required for strict verification of every primary metric. It must be the "
+            "complete independent noop baseline run report with matching provenance "
+            "and recomputable raw metric evidence."
         ),
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
     ),
     profile: str | None = typer.Option(
-        "dev",
+        None,
         "--profile",
-        help="Execution profile affecting parity enforcement and exit codes (dev|ci|release).",
+        help=(
+            "Execution profile affecting parity enforcement and exit codes "
+            "(dev|ci|release). Strict verification requires explicit ci/release "
+            "and exact agreement with the report."
+        ),
     ),
     json_out: bool = typer.Option(
         False,
@@ -512,6 +624,14 @@ def _verify_typed(
         "--runtime-provenance",
         help="Runtime provenance mode for verification (container|host).",
     ),
+    expected_runtime_image_digest: str | None = typer.Option(
+        None,
+        "--expected-runtime-image-digest",
+        help=(
+            "Independent sha256:... trust anchor for the runtime image. "
+            "Required for strict assurance; do not copy it from the submitted manifest."
+        ),
+    ),
     assurance: str = typer.Option(
         "report",
         "--assurance",
@@ -521,11 +641,6 @@ def _verify_typed(
         "pass",
         "--warning-policy",
         help="Guard-warning handling mode (pass|fail).",
-    ),
-    fail_on_warnings: bool = typer.Option(
-        False,
-        "--fail-on-warnings",
-        help="Alias for --warning-policy fail.",
     ),
 ):
     from pathlib import Path as _Path
@@ -542,18 +657,27 @@ def _verify_typed(
             if isinstance(baseline, str)
             else None
         )
+        policy_pack_path = (
+            _Path(policy_pack).expanduser().resolve()
+            if isinstance(policy_pack, str)
+            else None
+        )
+        if policy_pack_path is not None and not policy_pack_path.is_file():
+            raise ReportInputError("not_found", policy_pack_path)
     except ReportInputError as exc:
         console.print(f"FAIL {exc}")
         raise typer.Exit(2) from exc
     return _verify(
         reports=report_paths,
         baseline=baseline_path,
+        policy_pack=policy_pack_path,
         tolerance=tolerance,
         profile=profile,
         json_out=json_out,
         runtime_provenance=runtime_provenance.value,
         assurance=assurance,
-        warning_policy="fail" if fail_on_warnings else warning_policy,
+        warning_policy=warning_policy,
+        expected_runtime_image_digest=expected_runtime_image_digest,
     )
 
 

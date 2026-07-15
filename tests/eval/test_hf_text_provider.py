@@ -66,9 +66,55 @@ def test_get_provider_hf_text_kwargs(monkeypatch):
         config_name="cnf",
         text_field="field",
         cache_dir="/tmp",
+        revision="a" * 40,
         max_samples=10,
     )
     assert isinstance(prov, data_mod.HFTextProvider)
+    assert prov.revision == "a" * 40
+
+
+def test_hf_text_provider_forwards_pinned_revision_to_dataset_loader(monkeypatch):
+    import invarlock.eval.data as data_mod
+    import invarlock.eval.data_providers as data_providers_mod
+
+    revision = "96df5e686bee6baa90b8bee7c28b81fa3fa6223d"
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        data_providers_mod,
+        "_require_load_dataset",
+        lambda message: None,
+    )
+
+    def capture_load_dataset(**kwargs):
+        calls.append(kwargs)
+        return [{"text": "pinned sample"}]
+
+    monkeypatch.setattr(
+        data_providers_mod,
+        "load_dataset_with_cache_fallback",
+        capture_load_dataset,
+    )
+
+    provider = data_mod.get_provider(
+        "hf_text",
+        dataset_name="Salesforce/wikitext",
+        config_name="wikitext-2-raw-v1",
+        revision=revision,
+        text_field="text",
+    )
+
+    assert provider.load(split="test") == ["pinned sample"]
+    assert calls == [
+        {
+            "path": "Salesforce/wikitext",
+            "name": "wikitext-2-raw-v1",
+            "split": "test",
+            "cache_dir": None,
+            "revision": revision,
+            "trust_remote_code": False,
+        }
+    ]
 
 
 def test_hf_text_provider_windows_respects_seeded_sampling(monkeypatch):

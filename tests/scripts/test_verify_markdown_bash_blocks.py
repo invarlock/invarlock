@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import math
 import shlex
@@ -10,18 +9,7 @@ from types import ModuleType
 
 import pytest
 
-
-def _load_script_module() -> ModuleType:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "docs" / "verify_markdown_bash_blocks.py"
-    spec = importlib.util.spec_from_file_location(
-        "tests_verify_markdown_bash_blocks", script_path
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from tests.scripts._support_verify_markdown_bash_blocks import _load_script_module
 
 
 def test_extract_bash_blocks_only_keeps_invarlock_blocks(tmp_path: Path) -> None:
@@ -460,7 +448,7 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
 
-    module._seed_demo_inputs(workspace)
+    module._seed_demo_inputs(workspace, fixture_mode=True)
 
     assert (workspace / "reports" / "eval" / "evaluation.report.json").is_file()
     assert (workspace / "report_bundle" / "evaluation.report.json").is_file()
@@ -477,6 +465,49 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
     ).is_file()
     assert (workspace / "resolved_policy.json").is_file()
     assert (workspace / "compatibility.json").is_file()
+    assert (
+        json.loads((workspace / "demo_input_mode.json").read_text(encoding="utf-8"))[
+            "mode"
+        ]
+        == "explicit_fixture"
+    )
+
+
+def test_demo_report_builder_failure_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script_module()
+    failing_builder = ModuleType("invarlock.reporting.report_make")
+
+    def _raise_builder_error(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("builder failed")
+
+    failing_builder.make_report = _raise_builder_error  # type: ignore[attr-defined]
+    monkeypatch.setitem(
+        sys.modules,
+        "invarlock.reporting.report_make",
+        failing_builder,
+    )
+
+    with pytest.raises(
+        module._demo_inputs.DemoInputBuildError,
+        match="report builder failed",
+    ):
+        module._build_demo_evaluation_report({}, {})
+
+
+def test_demo_report_missing_source_does_not_fabricate_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_script_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+
+    with pytest.raises(
+        module._demo_inputs.DemoInputBuildError,
+        match="src/invarlock is unavailable",
+    ):
+        module._build_demo_evaluation_report({}, {})
 
 
 def test_seed_demo_inputs_writes_self_consistent_demo_report(tmp_path: Path) -> None:
@@ -503,6 +534,11 @@ def test_seed_demo_inputs_writes_self_consistent_demo_report(tmp_path: Path) -> 
         math.exp(2.30)
     )
     assert report["primary_metric"]["ratio_vs_baseline"] == pytest.approx(1.0)
+    assert report["context"] == {}
+    assert report["guards"] == []
+    assert report["spectral"]["evaluated"] is False
+    assert report["rmt"]["evaluated"] is False
+    assert report["assurance"]["mode"] == "off"
 
 
 def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:
@@ -572,6 +608,7 @@ def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
         return 0, "ok\n"
 
     monkeypatch.setattr(module, "_run_logged_script", _fake_run_logged_script)
+    monkeypatch.setattr(module, "_seed_demo_inputs", lambda *_args, **_kwargs: None)
 
     out_root = tmp_path / "out"
     assert module.run_blocks([block], output_root=out_root) == 0
@@ -587,6 +624,58 @@ def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
     assert records[0]["status"] == "ok"
     assert records[0]["stdout"] == "ok\n"
     assert records[0]["stderr"] == ""
+
+
+@pytest.mark.parametrize(
+    ("returncode", "output", "expected_run_status", "expected_record_status"),
+    [
+        (1, "expected failure output\n", 0, "ok"),
+        (1, "wrong failure output\n", 1, "failed"),
+        (0, "expected failure output\n", 1, "failed"),
+    ],
+)
+def test_run_blocks_enforces_documented_expected_failures(
+    tmp_path: Path,
+    monkeypatch,
+    returncode: int,
+    output: str,
+    expected_run_status: int,
+    expected_record_status: str,
+) -> None:
+    module = _load_script_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "README.md").write_text("# test\n", encoding="utf-8")
+    (repo_root / "src").mkdir()
+    module.ROOT = repo_root
+    module.TMP = repo_root / "tmp"
+    block = module.BashBlock(
+        file=str(repo_root / "README.md"),
+        line=1,
+        block_index=1,
+        text=(
+            "# docs-live: expect-failure: expected failure\n"
+            "invarlock verify report.json"
+        ),
+    )
+    observed_cmd: list[str] = []
+
+    def _fake_run_logged_script(**kwargs):
+        observed_cmd.extend(kwargs["cmd"])
+        return returncode, output
+
+    monkeypatch.setattr(module, "_run_logged_script", _fake_run_logged_script)
+    monkeypatch.setattr(module, "_seed_demo_inputs", lambda *_args, **_kwargs: None)
+    out_root = tmp_path / "out"
+
+    assert module.run_blocks([block], output_root=out_root) == expected_run_status
+    record = json.loads(
+        (out_root / "results.jsonl").read_text(encoding="utf-8").strip()
+    )
+    assert record["expected_failure"] is True
+    assert record["expected_failure_output"] == "expected failure"
+    assert record["status"] == expected_record_status
+    assert observed_cmd[1] == "-uo"
 
 
 def test_run_blocks_clears_stale_output_root(tmp_path: Path, monkeypatch) -> None:
@@ -612,6 +701,7 @@ def test_run_blocks_clears_stale_output_root(tmp_path: Path, monkeypatch) -> Non
         return 0, "ok\n"
 
     monkeypatch.setattr(module, "_run_logged_script", _fake_run_logged_script)
+    monkeypatch.setattr(module, "_seed_demo_inputs", lambda *_args, **_kwargs: None)
 
     out_root = tmp_path / "out"
     out_root.mkdir()

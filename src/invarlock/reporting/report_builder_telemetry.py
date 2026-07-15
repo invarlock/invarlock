@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import json
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from invarlock.json_serialization import dumps_finite_json
 
 
 def build_telemetry_payload(report: dict[str, Any]) -> dict[str, Any]:
@@ -82,7 +83,9 @@ def save_telemetry_report(
         raise ValueError("telemetry filename must be a plain file name")
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / filename_path.name
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        dumps_finite_json(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return path
 
 

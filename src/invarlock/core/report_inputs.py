@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Literal
+
+from invarlock.evidence_pack_json import (
+    StrictJsonError,
+    parse_json_bytes,
+    read_regular_file_bytes,
+)
 
 RUN_REPORT_FILENAME = "report.json"
 EVALUATION_REPORT_FILENAME = "evaluation.report.json"
@@ -103,6 +108,8 @@ def resolve_report_input_path(
     candidate = Path(path_value).expanduser()
     if not candidate.exists():
         raise ReportInputError("not_found", candidate)
+    if candidate.is_symlink():
+        raise ReportInputError("non_regular", candidate)
     if candidate.is_file():
         return candidate.resolve()
     if candidate.is_dir():
@@ -111,7 +118,7 @@ def resolve_report_input_path(
         canonical_matches = [
             candidate / name
             for name in CANONICAL_REPORT_FILENAMES
-            if (candidate / name).is_file()
+            if (candidate / name).is_file() and not (candidate / name).is_symlink()
         ]
         if len(canonical_matches) > 1:
             raise ReportInputError("ambiguous_directory", candidate)
@@ -145,11 +152,12 @@ def load_report_input_json(
         expected_kind=expected_kind,
     )
     try:
-        with resolved.open("r", encoding="utf-8") as handle:
-            payload = json.load(handle)
-    except OSError as exc:
+        raw = read_regular_file_bytes(resolved, label="report input")
+    except StrictJsonError as exc:
         raise ReportInputError("unreadable", resolved, detail=str(exc)) from exc
-    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+    try:
+        payload = parse_json_bytes(raw, label="report input")
+    except StrictJsonError as exc:
         raise ReportInputError("invalid_json", resolved, detail=str(exc)) from exc
     if not isinstance(payload, dict):
         raise ReportInputError("non_object", resolved)
@@ -215,6 +223,8 @@ def _resolve_linked_report_path(
     candidate = Path(path_value).expanduser()
     if not candidate.is_absolute():
         candidate = base_dir / candidate
+    if candidate.is_symlink():
+        raise ReportInputError("non_regular", candidate)
     resolved = candidate.resolve()
     if not resolved.exists():
         raise ReportInputError("not_found", resolved)

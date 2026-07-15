@@ -47,6 +47,7 @@ def _run_case(method: str, *, max_caps: int = 10) -> dict[str, object]:
 
     guard = SpectralGuard(
         scope="all",
+        correction_enabled=False,
         deadband=0.0,
         max_caps=max_caps,
         family_caps={"ffn": 1.0, "attn": 1.0, "embed": 1.0, "other": 1.0},

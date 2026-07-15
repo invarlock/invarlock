@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -10,16 +9,41 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts.evidence_workflows.workflow_state import (
-        WorkflowVerificationSummary,
+    from scripts.evidence_packs.python.verify_pack_cli import parse_args
+except ImportError:  # pragma: no cover - direct script execution path
+    from verify_pack_cli import parse_args
+
+try:
+    from invarlock.evidence_pack_json import (
+        StrictJsonError,
+        load_json_object,
+        parse_json_bytes,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    _REPO_SRC = Path(__file__).resolve().parents[3] / "src"
+    if str(_REPO_SRC) not in sys.path:
+        sys.path.insert(0, str(_REPO_SRC))
+    from invarlock.evidence_pack_json import (
+        StrictJsonError,
+        load_json_object,
+        parse_json_bytes,
+    )
+
+try:
+    from scripts.evidence_packs.python import (
+        verify_pack_report_classification as _report_classification,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    import verify_pack_report_classification as _report_classification
+
+try:
+    from scripts.evidence_packs.python.artifact_io import (
+        VerificationSummary,
         write_verification_summary,
     )
 except ImportError:  # pragma: no cover - direct script execution path
-    _SCRIPTS_DIR = Path(__file__).resolve().parents[2]
-    if str(_SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(_SCRIPTS_DIR))
-    from evidence_workflows.workflow_state import (
-        WorkflowVerificationSummary,
+    from artifact_io import (
+        VerificationSummary,
         write_verification_summary,
     )
 
@@ -38,9 +62,20 @@ CONTROL_FILE_MIRRORS = {
 }
 
 
-def _load_json(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+def _parse_json_object(raw: bytes, *, label: str) -> dict[str, Any]:
+    """Apply the package's canonical strict JSON parser to an output stream."""
+
+    payload = parse_json_bytes(raw, label=label)
+    if not isinstance(payload, dict):
+        raise StrictJsonError(f"{label} must be a JSON object")
+    return payload
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    return load_json_object(
+        path,
+        label=f"JSON input {path}",
+    )
 
 
 def _normalize_pack_path(value: str) -> str:
@@ -92,8 +127,6 @@ def _actual_pack_files(pack_dir: Path) -> set[str]:
 
 def cmd_manifest_field(args: argparse.Namespace) -> int:
     payload = _load_json(args.manifest)
-    if not isinstance(payload, dict):
-        return 1
     value = payload.get(args.field)
     if value is None:
         return 1
@@ -115,7 +148,9 @@ def cmd_path_within(args: argparse.Namespace) -> int:
 
 
 def cmd_scenario_strictness(args: argparse.Namespace) -> int:
-    strictness = _scenario_strictness(args.scenarios, args.scenario_id)
+    strictness = _report_classification.scenario_strictness(
+        args.scenarios, args.scenario_id
+    )
     if strictness:
         print(strictness)
         return 0
@@ -166,10 +201,11 @@ def _control_file_mirror_errors(pack_dir: Path) -> list[str]:
 
 
 def cmd_json_object(args: argparse.Namespace) -> int:
-    payload = _load_json(args.path)
-    if not isinstance(payload, dict):
+    try:
+        _load_json(args.path)
+    except StrictJsonError as exc:
         print(
-            f"ERROR: {args.label} must be a JSON object: {args.path}",
+            f"ERROR: {args.label} must be a valid JSON object: {args.path} ({exc})",
             file=sys.stderr,
         )
         return 1
@@ -177,10 +213,11 @@ def cmd_json_object(args: argparse.Namespace) -> int:
 
 
 def cmd_scenarios_manifest(args: argparse.Namespace) -> int:
-    payload = _load_json(args.path)
-    if not isinstance(payload, dict):
+    try:
+        payload = _load_json(args.path)
+    except StrictJsonError as exc:
         print(
-            f"ERROR: scenarios manifest must be a JSON object: {args.path}",
+            f"ERROR: scenarios manifest must be a valid JSON object: {args.path} ({exc})",
             file=sys.stderr,
         )
         return 1
@@ -220,6 +257,11 @@ def _run_manifest_check(path: Path, check: Callable[[Path], list[str]]) -> int:
 
 
 def cmd_validate_manifest(args: argparse.Namespace) -> int:
+    try:
+        _load_json(args.manifest)
+    except StrictJsonError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
     from invarlock.evidence_pack import validate_manifest
 
@@ -227,10 +269,79 @@ def cmd_validate_manifest(args: argparse.Namespace) -> int:
 
 
 def cmd_verify_manifest_provenance(args: argparse.Namespace) -> int:
+    manifest_path = args.pack_dir / "manifest.json"
+    try:
+        _load_json(manifest_path)
+    except StrictJsonError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
     from invarlock.evidence_pack import verify_manifest_provenance
 
     return _run_manifest_check(args.pack_dir, verify_manifest_provenance)
+
+
+def cmd_final_verdict_binding(args: argparse.Namespace) -> int:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack import verify_final_verdict_report_binding
+
+    errors = verify_final_verdict_report_binding(
+        args.pack_dir,
+        require_binding=args.require_binding,
+    )
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _validated_baseline_mapping(
+    pack_dir: Path,
+    *,
+    report_assurance: str,
+) -> tuple[dict[Path, Path], list[str]]:
+    if not (pack_dir / "manifest.json").is_file():
+        if report_assurance == "strict":
+            return {}, [
+                "strict report verification requires a signed manifest baseline declaration"
+            ]
+        return {}, []
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack_baselines import verify_baseline_materials
+
+    result = verify_baseline_materials(
+        pack_dir,
+        report_assurance=report_assurance,
+    )
+    return result.baseline_by_report, list(result.errors)
+
+
+def _staged_baseline_mapping(
+    pack_dir: Path,
+    *,
+    report_assurance: str,
+) -> tuple[dict[Path, Path], list[str]]:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack_baselines import discover_staged_baseline_materials
+
+    result = discover_staged_baseline_materials(
+        pack_dir,
+        report_assurance=report_assurance,
+    )
+    return result.baseline_by_report, list(result.errors)
+
+
+def cmd_baseline_materials(args: argparse.Namespace) -> int:
+    _mapping, errors = _validated_baseline_mapping(
+        args.pack_dir,
+        report_assurance=args.report_assurance,
+    )
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def cmd_verify_signature(args: argparse.Namespace) -> int:
@@ -239,6 +350,15 @@ def cmd_verify_signature(args: argparse.Namespace) -> int:
         normalize_expected_fingerprint,
         verify_signature,
     )
+
+    signature_path = args.pack_dir / "manifest.signature.json"
+    if signature_path.exists() or signature_path.is_symlink():
+        try:
+            _load_json(args.pack_dir / "manifest.json")
+            _load_json(signature_path)
+        except StrictJsonError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
 
     expected_fingerprints = None
     if args.expected_fingerprint:
@@ -266,148 +386,17 @@ def cmd_verify_signature(args: argparse.Namespace) -> int:
     return 0
 
 
-def _report_scenario_id(pack_dir: Path, report: Path) -> str | None:
-    try:
-        rel = report.resolve().relative_to((pack_dir / "reports").resolve())
-    except ValueError:
-        return None
-    parts = rel.parts
-    if len(parts) < 3:
-        return None
-    if parts[1] == "errors" and len(parts) >= 4:
-        scenario = parts[2].strip()
-        return scenario or None
-    scenario = parts[1].strip()
-    return scenario or None
-
-
-def _scenario_strictness(scenarios_path: Path, scenario_id: str) -> str | None:
-    payload = _load_json(scenarios_path)
-    if not isinstance(payload, dict):
-        return None
-    scenarios = payload.get("scenarios")
-    if not isinstance(scenarios, list):
-        return None
-    for scenario in scenarios:
-        if not isinstance(scenario, dict) or scenario.get("id") != scenario_id:
-            continue
-        strictness = scenario.get("strictness")
-        if isinstance(strictness, str) and strictness:
-            return strictness
-    return None
-
-
-def _report_expects_verify_failure(pack_dir: Path, report: Path) -> bool:
-    scenario_id = _report_scenario_id(pack_dir, report)
-    is_error = _is_error_injection_report(report)
-    scenarios_path = pack_dir / "metadata" / "scenarios.json"
-    if scenario_id is not None and scenarios_path.is_file():
-        strictness = _scenario_strictness(scenarios_path, scenario_id)
-        return strictness == "must_fail"
-
-    # Legacy packs did not always carry scenario metadata. Preserve the old
-    # hard-fault behavior for unclassified reports under errors/.
-    return is_error
-
-
-def _is_error_injection_report(report: Path) -> bool:
-    return "errors" in report.parts and report.name == "evaluation.report.json"
-
-
-def _report_counts_as_clean_pass(pack_dir: Path, report: Path) -> bool:
-    return not _is_error_injection_report(
-        report
-    ) and not _report_expects_verify_failure(pack_dir, report)
-
-
-def _truthy(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
-    return bool(value)
-
-
-def _summary_evaluate_assurance() -> str | None:
-    return os.environ.get("PACK_EVALUATE_ASSURANCE_USED") or os.environ.get(
-        "PACK_EVALUATE_ASSURANCE"
-    )
-
-
-def _summary_release_review() -> bool | None:
-    raw = os.environ.get("PACK_RELEASE_REVIEW_USED") or os.environ.get(
-        "PACK_RELEASE_REVIEW"
-    )
-    if raw is None:
-        return None
-    return raw == "1"
-
-
-def _expected_failure_signal(report: Path) -> bool:
-    try:
-        payload = _load_json(report)
-    except (OSError, json.JSONDecodeError):
-        return False
-    if not isinstance(payload, dict):
-        return False
-
-    validation = payload.get("validation")
-    if isinstance(validation, dict):
-        for flag in (
-            "primary_metric_acceptable",
-            "preview_final_drift_acceptable",
-            "invariants_pass",
-            "spectral_stable",
-            "rmt_stable",
-            "guard_overhead_acceptable",
-        ):
-            if flag in validation and _truthy(validation.get(flag)) is False:
-                return True
-
-    primary_metric = payload.get("primary_metric")
-    if isinstance(primary_metric, dict) and (
-        _truthy(primary_metric.get("invalid"))
-        or _truthy(primary_metric.get("degraded"))
-    ):
-        return True
-
-    invariants = payload.get("invariants")
-    if isinstance(invariants, dict):
-        status = str(invariants.get("status") or "").strip().lower()
-        if status in {"fail", "error", "warn"}:
-            return True
-
-    spectral = payload.get("spectral")
-    if isinstance(spectral, dict):
-        try:
-            if int(spectral.get("caps_applied") or 0) > 0:
-                return True
-        except (TypeError, ValueError, OverflowError):
-            pass
-        summary = spectral.get("summary")
-        if isinstance(summary, dict):
-            status = str(summary.get("status") or "").strip().lower()
-            if status in {"capped", "fail", "failed", "warn"}:
-                return True
-
-    return False
-
-
-def _report_paths(pack_dir: Path) -> list[Path]:
-    reports_root = pack_dir / "reports"
-    if not reports_root.is_dir():
-        return []
-    return sorted(reports_root.rglob("evaluation.report.json"))
-
-
 def _verify_command(
     reports: list[Path],
     *,
     profile: str,
     report_assurance: str,
+    baseline: Path | None = None,
+    policy_pack: Path | None = None,
+    expected_runtime_image_digest: str | None = None,
     stdout_path: Path | None = None,
     stdout_to_null: bool = False,
-) -> int:
+) -> tuple[int, dict[str, Any] | None]:
     cmd = [
         "invarlock",
         "verify",
@@ -416,19 +405,125 @@ def _verify_command(
         profile,
         "--assurance",
         report_assurance,
-        *[str(path) for path in reports],
     ]
+    if expected_runtime_image_digest is not None:
+        cmd.extend(["--expected-runtime-image-digest", expected_runtime_image_digest])
+    if baseline is not None:
+        cmd.extend(["--baseline", str(baseline)])
+    if policy_pack is not None:
+        cmd.extend(["--policy-pack", str(policy_pack)])
+    cmd.extend(str(path) for path in reports)
+    completed = subprocess.run(
+        cmd,
+        check=False,
+        stdout=subprocess.PIPE,
+    )
+    stdout_bytes = completed.stdout or b""
+    try:
+        stdout = stdout_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        if stdout_path is not None:
+            stdout_path.parent.mkdir(parents=True, exist_ok=True)
+            stdout_path.write_bytes(stdout_bytes)
+        print(
+            "ERROR: invarlock verify did not emit UTF-8 JSON output.",
+            file=sys.stderr,
+        )
+        return 1, None
     if stdout_path is not None:
         stdout_path.parent.mkdir(parents=True, exist_ok=True)
-        with stdout_path.open("w", encoding="utf-8") as handle:
-            return subprocess.run(cmd, check=False, stdout=handle).returncode
-    if stdout_to_null:
-        return subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL).returncode
-    return subprocess.run(cmd, check=False).returncode
+        stdout_path.write_text(stdout, encoding="utf-8")
+    elif not stdout_to_null and stdout:
+        print(stdout, end="")
+    try:
+        payload = _parse_json_object(stdout_bytes, label="invarlock verify output")
+    except StrictJsonError:
+        payload = None
+    if payload is None and completed.returncode == 0:
+        print(
+            "ERROR: invarlock verify exited successfully without a strict JSON object.",
+            file=sys.stderr,
+        )
+        return 1, None
+    return completed.returncode, payload
+
+
+def _write_portable_verify_payload(
+    path: Path,
+    payload: dict[str, Any] | None,
+    *,
+    pack_dir: Path,
+) -> None:
+    if payload is None:
+        return
+    results = payload.get("results")
+    if isinstance(results, list):
+        for item in results:
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+                continue
+            try:
+                relative = Path(item["id"]).resolve().relative_to(pack_dir.resolve())
+            except (OSError, ValueError):
+                continue
+            item["id"] = relative.as_posix()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _expected_failure_contract_errors(
+    pack_dir: Path,
+    report: Path,
+    *,
+    returncode: int,
+    payload: dict[str, Any] | None,
+    expected_runtime_image_digest: str | None,
+) -> list[str]:
+    if payload is None:
+        return [
+            f"expected-failure report verification did not emit a JSON object: {report}"
+        ]
+    summary = payload.get("summary")
+    reason = summary.get("reason") if isinstance(summary, dict) else None
+    if returncode == 0:
+        outcome_name = "ok"
+    elif reason == "policy_fail":
+        outcome_name = "policy_fail"
+    elif reason == "malformed" or returncode == 2:
+        outcome_name = "malformed"
+    else:
+        return [
+            "expected-failure report verification JSON lacks a recognized outcome: "
+            f"{report}"
+        ]
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack import _expected_failure_result_errors
+    from invarlock.reporting.verify_contract import (
+        VerifyExecutionResult,
+        VerifyOutcome,
+    )
+
+    result = VerifyExecutionResult(
+        outcome=VerifyOutcome(outcome_name),
+        payload=payload,
+        diagnostics=(),
+    )
+    contract_errors = _expected_failure_result_errors(
+        pack_dir,
+        report,
+        result,
+        expected_runtime_image_digest=expected_runtime_image_digest,
+    )
+    if not isinstance(contract_errors, list):
+        return [f"expected-failure contract returned invalid errors: {report}"]
+    return [str(error) for error in contract_errors]
 
 
 def cmd_report_scenario_id(args: argparse.Namespace) -> int:
-    scenario_id = _report_scenario_id(args.pack_dir, args.report)
+    scenario_id = _report_classification.report_scenario_id(args.pack_dir, args.report)
     if scenario_id is None:
         return 1
     print(scenario_id)
@@ -436,7 +531,13 @@ def cmd_report_scenario_id(args: argparse.Namespace) -> int:
 
 
 def cmd_report_expects_verify_failure(args: argparse.Namespace) -> int:
-    return 0 if _report_expects_verify_failure(args.pack_dir, args.report) else 1
+    return (
+        0
+        if _report_classification.report_expects_verify_failure(
+            args.pack_dir, args.report
+        )
+        else 1
+    )
 
 
 def _verify_reports_with_sidecars(
@@ -445,8 +546,22 @@ def _verify_reports_with_sidecars(
     pack_dir: Path,
     profile: str,
     report_assurance: str,
+    expected_runtime_image_digest: str | None,
     summary_out: Path | None,
+    baseline_by_report: dict[Path, Path],
+    policy_pack: Path | None,
 ) -> int:
+    if (pack_dir / "metadata" / "scenarios.json").is_file():
+        unclassified = _report_classification.unclassified_reports(pack_dir, reports)
+        if unclassified:
+            for report in unclassified:
+                print(
+                    "ERROR: Report is not classified by the current scenario "
+                    f"manifest: {report}",
+                    file=sys.stderr,
+                )
+            return 1
+
     count_clean = 0
     count_error = 0
     count_expected_failure = 0
@@ -454,12 +569,19 @@ def _verify_reports_with_sidecars(
 
     for report in reports:
         verify_out = report.parent / "verify.json"
-        if _report_expects_verify_failure(pack_dir, report):
-            rc = _verify_command(
+        baseline = baseline_by_report.get(report.resolve())
+        if _report_classification.report_expects_verify_failure(pack_dir, report):
+            rc, verify_payload = _verify_command(
                 [report],
                 profile=profile,
                 report_assurance=report_assurance,
+                baseline=baseline,
+                policy_pack=policy_pack,
+                expected_runtime_image_digest=expected_runtime_image_digest,
                 stdout_path=verify_out,
+            )
+            _write_portable_verify_payload(
+                verify_out, verify_payload, pack_dir=pack_dir
             )
             if rc == 0:
                 print(
@@ -467,20 +589,41 @@ def _verify_reports_with_sidecars(
                     file=sys.stderr,
                 )
                 count_failed += 1
-            elif _is_error_injection_report(report):
-                count_error += 1
             else:
-                count_expected_failure += 1
+                contract_errors = _expected_failure_contract_errors(
+                    pack_dir,
+                    report,
+                    returncode=rc,
+                    payload=verify_payload,
+                    expected_runtime_image_digest=expected_runtime_image_digest,
+                )
+                if contract_errors:
+                    for error in contract_errors:
+                        print(f"ERROR: {error}", file=sys.stderr)
+                    count_failed += 1
+                elif _report_classification.is_error_injection_report(report):
+                    count_error += 1
+                else:
+                    count_expected_failure += 1
             continue
 
-        rc = _verify_command(
+        rc, verify_payload = _verify_command(
             [report],
             profile=profile,
             report_assurance=report_assurance,
+            baseline=baseline,
+            policy_pack=policy_pack,
+            expected_runtime_image_digest=expected_runtime_image_digest,
             stdout_path=verify_out,
         )
+        _write_portable_verify_payload(verify_out, verify_payload, pack_dir=pack_dir)
         if rc == 0:
-            if _is_error_injection_report(report):
+            if _report_classification.is_error_injection_report(report):
+                count_error += 1
+            else:
+                count_clean += 1
+        elif _report_classification.report_is_informational(pack_dir, report):
+            if _report_classification.is_error_injection_report(report):
                 count_error += 1
             else:
                 count_clean += 1
@@ -496,15 +639,13 @@ def _verify_reports_with_sidecars(
     if summary_out is not None:
         write_verification_summary(
             summary_out,
-            summary=WorkflowVerificationSummary(
+            summary=VerificationSummary(
                 clean_reports=count_clean,
                 error_injection_reports=count_error,
                 expected_failure_reports=count_expected_failure,
                 failed_reports=count_failed,
                 policy_profile=profile,
                 report_assurance=report_assurance,
-                evaluate_assurance=_summary_evaluate_assurance(),
-                release_review=_summary_release_review(),
             ),
         )
 
@@ -525,21 +666,37 @@ def _verify_reports_aggregate(
     pack_dir: Path,
     profile: str,
     report_assurance: str,
+    expected_runtime_image_digest: str | None,
     json_out: Path | None,
     require_clean: bool,
+    baseline_by_report: dict[Path, Path],
+    policy_pack: Path | None,
 ) -> int:
+    if (pack_dir / "metadata" / "scenarios.json").is_file():
+        unclassified = _report_classification.unclassified_reports(pack_dir, reports)
+        if unclassified:
+            for report in unclassified:
+                print(
+                    "ERROR: Report is not classified by the current scenario "
+                    f"manifest: {report}",
+                    file=sys.stderr,
+                )
+            return 1
+
     expected_pass_reports = [
         report
         for report in reports
-        if not _report_expects_verify_failure(pack_dir, report)
+        if not _report_classification.report_expects_verify_failure(pack_dir, report)
     ]
     clean_reports = [
         report
         for report in expected_pass_reports
-        if _report_counts_as_clean_pass(pack_dir, report)
+        if _report_classification.report_counts_as_clean_pass(pack_dir, report)
     ]
     expected_failure_reports = [
-        report for report in reports if _report_expects_verify_failure(pack_dir, report)
+        report
+        for report in reports
+        if _report_classification.report_expects_verify_failure(pack_dir, report)
     ]
     if not reports:
         print("ERROR: No reports found in pack.", file=sys.stderr)
@@ -553,20 +710,51 @@ def _verify_reports_aggregate(
         return 1
 
     if expected_pass_reports:
-        rc = _verify_command(
-            expected_pass_reports,
-            profile=profile,
-            report_assurance=report_assurance,
-            stdout_path=json_out,
-        )
-        if rc != 0:
-            return 1
+        groups: dict[Path | None, list[Path]] = {}
+        for report in expected_pass_reports:
+            baseline = baseline_by_report.get(report.resolve())
+            groups.setdefault(baseline, []).append(report)
+        group_payloads: list[dict[str, Any]] = []
+        for baseline, grouped_reports in groups.items():
+            rc, verify_payload = _verify_command(
+                grouped_reports,
+                profile=profile,
+                report_assurance=report_assurance,
+                baseline=baseline,
+                policy_pack=policy_pack,
+                expected_runtime_image_digest=expected_runtime_image_digest,
+                stdout_to_null=len(groups) > 1,
+                stdout_path=json_out if len(groups) == 1 else None,
+            )
+            if rc != 0:
+                return 1
+            if verify_payload is not None:
+                group_payloads.append(verify_payload)
+            if json_out is not None and len(groups) == 1:
+                _write_portable_verify_payload(
+                    json_out, verify_payload, pack_dir=pack_dir
+                )
+        if json_out is not None and len(groups) > 1:
+            combined_results: list[Any] = []
+            for payload in group_payloads:
+                results = payload.get("results")
+                if isinstance(results, list):
+                    combined_results.extend(results)
+            combined = dict(group_payloads[0]) if group_payloads else {}
+            combined["summary"] = {"ok": True, "reason": "ok"}
+            combined["evaluation_report"] = {"count": len(expected_pass_reports)}
+            combined["results"] = combined_results
+            json_out.parent.mkdir(parents=True, exist_ok=True)
+            _write_portable_verify_payload(json_out, combined, pack_dir=pack_dir)
 
     for report in expected_failure_reports:
-        rc = _verify_command(
+        rc, verify_payload = _verify_command(
             [report],
             profile=profile,
             report_assurance=report_assurance,
+            baseline=baseline_by_report.get(report.resolve()),
+            policy_pack=policy_pack,
+            expected_runtime_image_digest=expected_runtime_image_digest,
             stdout_to_null=True,
         )
         if rc == 0:
@@ -575,118 +763,93 @@ def _verify_reports_aggregate(
                 file=sys.stderr,
             )
             return 1
+        contract_errors = _expected_failure_contract_errors(
+            pack_dir,
+            report,
+            returncode=rc,
+            payload=verify_payload,
+            expected_runtime_image_digest=expected_runtime_image_digest,
+        )
+        if contract_errors:
+            for error in contract_errors:
+                print(f"ERROR: {error}", file=sys.stderr)
+            return 1
     return 0
 
 
 def cmd_verify_reports(args: argparse.Namespace) -> int:
-    reports = _report_paths(args.pack_dir)
+    reports = _report_classification.report_paths(args.pack_dir)
+    mapping_fn = (
+        _staged_baseline_mapping
+        if args.staged_baselines
+        else _validated_baseline_mapping
+    )
+    baseline_by_report, baseline_errors = mapping_fn(
+        args.pack_dir, report_assurance=args.report_assurance
+    )
+    if baseline_errors:
+        for error in baseline_errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     if args.write_sidecars:
         return _verify_reports_with_sidecars(
             reports,
             pack_dir=args.pack_dir,
             profile=args.profile,
             report_assurance=args.report_assurance,
+            expected_runtime_image_digest=args.expected_runtime_image_digest,
             summary_out=args.summary_out,
+            baseline_by_report=baseline_by_report,
+            policy_pack=args.policy_pack,
         )
     return _verify_reports_aggregate(
         reports,
         pack_dir=args.pack_dir,
         profile=args.profile,
         report_assurance=args.report_assurance,
+        expected_runtime_image_digest=args.expected_runtime_image_digest,
         json_out=args.json_out,
         require_clean=args.require_clean,
+        baseline_by_report=baseline_by_report,
+        policy_pack=args.policy_pack,
     )
 
 
-def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Structured JSON/path checks for evidence-pack shell entrypoints."
+def cmd_policy_materials(args: argparse.Namespace) -> int:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack_policy import verify_policy_material
+
+    result = verify_policy_material(
+        args.pack_dir,
+        report_assurance=args.report_assurance,
+        acceptance_policy_path=args.policy_pack,
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    manifest_field = subparsers.add_parser("manifest-field")
-    manifest_field.add_argument("manifest", type=Path)
-    manifest_field.add_argument("field")
-    manifest_field.set_defaults(func=cmd_manifest_field)
-
-    path_within = subparsers.add_parser("path-within")
-    path_within.add_argument("root", type=Path)
-    path_within.add_argument("candidate", type=Path)
-    path_within.set_defaults(func=cmd_path_within)
-
-    scenario_strictness = subparsers.add_parser("scenario-strictness")
-    scenario_strictness.add_argument("scenarios", type=Path)
-    scenario_strictness.add_argument("scenario_id")
-    scenario_strictness.set_defaults(func=cmd_scenario_strictness)
-
-    report_scenario_id = subparsers.add_parser("report-scenario-id")
-    report_scenario_id.add_argument("pack_dir", type=Path)
-    report_scenario_id.add_argument("report", type=Path)
-    report_scenario_id.set_defaults(func=cmd_report_scenario_id)
-
-    report_expects_verify_failure = subparsers.add_parser(
-        "report-expects-verify-failure"
-    )
-    report_expects_verify_failure.add_argument("pack_dir", type=Path)
-    report_expects_verify_failure.add_argument("report", type=Path)
-    report_expects_verify_failure.set_defaults(func=cmd_report_expects_verify_failure)
-
-    verify_reports = subparsers.add_parser("verify-reports")
-    verify_reports.add_argument("pack_dir", type=Path)
-    verify_reports.add_argument("--json-out", type=Path)
-    verify_reports.add_argument("--profile", default="dev")
-    verify_reports.add_argument(
-        "--report-assurance",
-        default="report",
-        choices=("report", "strict", "off"),
-    )
-    verify_reports.add_argument("--require-clean", action="store_true")
-    verify_reports.add_argument("--write-sidecars", action="store_true")
-    verify_reports.add_argument("--summary-out", type=Path)
-    verify_reports.set_defaults(func=cmd_verify_reports)
-
-    json_object = subparsers.add_parser("json-object")
-    json_object.add_argument("path", type=Path)
-    json_object.add_argument("--label", default="metadata file")
-    json_object.set_defaults(func=cmd_json_object)
-
-    scenarios_manifest = subparsers.add_parser("scenarios-manifest")
-    scenarios_manifest.add_argument("path", type=Path)
-    scenarios_manifest.set_defaults(func=cmd_scenarios_manifest)
-
-    extra_files = subparsers.add_parser("extra-files")
-    extra_files.add_argument("pack_dir", type=Path)
-    extra_files.add_argument("--strict", action="store_true")
-    extra_files.set_defaults(func=cmd_extra_files)
-
-    validate_manifest = subparsers.add_parser("validate-manifest")
-    validate_manifest.add_argument("manifest", type=Path)
-    validate_manifest.set_defaults(func=cmd_validate_manifest)
-
-    manifest_provenance = subparsers.add_parser("manifest-provenance")
-    manifest_provenance.add_argument("pack_dir", type=Path)
-    manifest_provenance.set_defaults(func=cmd_verify_manifest_provenance)
-
-    signature = subparsers.add_parser(
-        "signature", help="Verify a package-native evidence-pack signature bundle."
-    )
-    signature.add_argument("pack_dir", type=Path)
-    signature.add_argument(
-        "--strict",
-        action="store_true",
-        help="Fail closed when manifest.signature.json is missing.",
-    )
-    signature.add_argument(
-        "--expected-fingerprint",
-        help="Require the signer to match this sha256:... key fingerprint.",
-    )
-    signature.set_defaults(func=cmd_verify_signature)
-
-    return parser.parse_args(argv)
+    for error in result.errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    return 1 if result.errors else 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(argv)
+    args = parse_args(
+        argv,
+        handlers={
+            "manifest-field": cmd_manifest_field,
+            "path-within": cmd_path_within,
+            "scenario-strictness": cmd_scenario_strictness,
+            "report-scenario-id": cmd_report_scenario_id,
+            "report-expects-verify-failure": cmd_report_expects_verify_failure,
+            "verify-reports": cmd_verify_reports,
+            "policy-materials": cmd_policy_materials,
+            "json-object": cmd_json_object,
+            "scenarios-manifest": cmd_scenarios_manifest,
+            "extra-files": cmd_extra_files,
+            "validate-manifest": cmd_validate_manifest,
+            "manifest-provenance": cmd_verify_manifest_provenance,
+            "final-verdict-binding": cmd_final_verdict_binding,
+            "baseline-materials": cmd_baseline_materials,
+            "signature": cmd_verify_signature,
+        },
+    )
     try:
         return int(args.func(args))
     except (OSError, json.JSONDecodeError, RuntimeError, TypeError, ValueError):

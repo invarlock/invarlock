@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:
@@ -14,6 +16,7 @@ def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:
             "ts": "2024-01-01T00:00:00",
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -49,10 +52,7 @@ def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:
 def test_policy_digest_unchanged_same_tier_thresholds() -> None:
     # Subject and baseline share the same tier and thresholds → changed=False
     rep = _mk_pm_report(ratio=1.0)
-    base = {
-        "meta": {"auto": {"tier": "balanced"}},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-    }
+    base = {**rep, "edit": {"name": "noop"}}
     cert = make_report(rep, base)
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict) and pd.get("changed") is False
@@ -75,7 +75,7 @@ def test_ci_upper_bound_gating_from_ratio_ci() -> None:
         tier="balanced",
         _ppl_metrics=ppl_metrics,
         target_ratio=None,
-        guard_overhead={},
+        guard_metric_impact={},
         primary_metric=None,
         moe={},
         dataset_capacity={"tokens_available": 2000},

@@ -169,21 +169,29 @@ def _prepare_output_dirs(paths: Sequence[Path], *, force: bool) -> None:
         path.mkdir(parents=True, exist_ok=True)
 
 
-def _require_dependencies() -> tuple[Any, Any, Any, Any, Any, Any, Any]:
+def _require_dependencies(
+    *,
+    require_jit_toolchain: bool,
+) -> tuple[Any, Any, Any, Any, Any, Any, Any]:
     try:
         import torch
 
-        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
+        from invarlock.gptqmodel_runtime import import_gptqmodel
 
-        _patch_gptqmodel_transformers_hub_compat()
-        from gptqmodel import AWQConfig, GPTQModel
+        gptqmodel = import_gptqmodel(
+            require_jit_toolchain=require_jit_toolchain,
+        )
+        AWQConfig = gptqmodel.AWQConfig
+        GPTQModel = gptqmodel.GPTQModel
         from transformers import (
             AutoModelForCausalLM,
             AutoTokenizer,
             LlamaConfig,
             LlamaForCausalLM,
         )
-    except (ImportError, ModuleNotFoundError) as exc:
+    except RuntimeError as exc:
+        raise SystemExit(f"GPTQModel CUDA runtime preparation failed: {exc}") from exc
+    except (AttributeError, ImportError, ModuleNotFoundError) as exc:
         raise SystemExit(
             "Missing example dependency. Install GPTQModel in your example "
             "environment, for example: python -m pip install 'invarlock[awq]'"
@@ -356,7 +364,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         auto_tokenizer,
         llama_config,
         llama_model,
-    ) = _require_dependencies()
+    ) = _require_dependencies(require_jit_toolchain=True)
 
     if not torch.cuda.is_available():
         raise SystemExit(

@@ -4,7 +4,9 @@ model:
   id: "google/flan-t5-base"
   adapter: "hf_seq2seq"
   device: "auto"
-  revision: "7bcac572ce56db69c1ea7c8af255c5d7c9672fc2"
+  model_identity:
+    kind: "remote_revision"
+    revision: "7bcac572ce56db69c1ea7c8af255c5d7c9672fc2"
 
 dataset:
   provider:

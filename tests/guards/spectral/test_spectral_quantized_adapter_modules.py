@@ -87,7 +87,7 @@ def test_spectral_guard_uses_adapter_modules_when_model_graph_is_opaque() -> Non
     assert guard.module_family_map["adapter.layers.0.mlp.down_proj"] == "ffn"
 
 
-def test_spectral_guard_does_not_block_on_unmeasurable_quantized_weight() -> None:
+def test_spectral_guard_blocks_on_unmeasurable_quantized_weight() -> None:
     dense_model = _SingleModuleModel(_TensorWeightModule(torch.eye(4)))
     guard = SpectralGuard(scope="all", correction_enabled=False)
     guard.prepare(dense_model, adapter=None, calib=None, policy={})
@@ -98,9 +98,11 @@ def test_spectral_guard_does_not_block_on_unmeasurable_quantized_weight() -> Non
 
     result = guard.finalize(quantized_model)
 
-    assert result["passed"] is True
+    assert result["passed"] is False
+    assert result["decision"] == "block"
     assert result["violations"] == []
     assert result["final_metrics"] == {}
+    assert result["metrics"]["measurement_exclusions"]
     assert any(
         item["kind"] == "spectral_sigma_unavailable_quantized_weight"
         for item in result["diagnostics"]

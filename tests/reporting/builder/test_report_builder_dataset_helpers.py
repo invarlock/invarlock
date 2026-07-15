@@ -8,29 +8,14 @@ class TestNormalizationAndDataset:
     """Coverage for normalization helpers and dataset hashing."""
 
     def test_normalize_baseline_invalid_ppl_raises(self):
-        baseline = {
-            "run_id": "r1",
-            "model_id": "m",
-            "ppl_final": 0.0,
-            "ppl_preview": 0.4,
-        }
-        with pytest.raises(ValueError, match="Invalid baseline"):
+        baseline = create_mock_baseline(model_id="m")
+        baseline["metrics"]["primary_metric"]["final"] = 0.0
+        with pytest.raises(ValueError, match="Invalid canonical RunReport structure"):
             _normalize_baseline(baseline)
 
-    def test_normalize_baseline_schema_v1(self):
-        baseline = {
-            "schema_version": "baseline-v1",
-            "meta": {"model_id": "m", "commit_sha": "abc"},
-            "metrics": {
-                "ppl_final": 9.5,
-                "ppl_preview": 9.4,
-                "spectral": {"sigma_ratios": [1.0]},
-                "bootstrap": {"replicates": 1000},
-            },
-            "spectral_base": {"sigma_ratios": [1.0]},
-            "rmt_base": {"outliers": 1},
-            "invariants": {"weight_norm": {"passed": True}},
-        }
+    def test_normalize_baseline_canonical_schema(self):
+        baseline = create_mock_baseline(model_id="m", ppl_final=9.5)
+        baseline["metrics"]["ppl_preview"] = 9.4
         normalized = _normalize_baseline(baseline)
         assert normalized["ppl_final"] == 9.5
         assert "spectral" in normalized

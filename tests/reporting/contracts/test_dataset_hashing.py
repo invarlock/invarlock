@@ -68,14 +68,16 @@ def test_compute_actual_window_hashes_config_fallback(monkeypatch):
 
 def test_compute_actual_window_hashes_from_sequences():
     report = {
+        "data": {"dataset_hash": "source-dataset-digest"},
         "evaluation_windows": {
             "preview": {"input_ids": [[1, 2], [3, 4, 5]]},
             "final": {"input_ids": [[6], [7, 8]]},
-        }
+        },
     }
     result = hashing_mod._compute_actual_window_hashes(report)
     assert result["preview"].startswith("sha256:")
     assert result["final_tokens"] == 3
+    assert result["dataset"] == "source-dataset-digest"
     assert result["total_tokens"] == 8
     assert result["source"] == "explicit_token_ids"
 
@@ -99,6 +101,33 @@ def test_extract_dataset_info_prefers_actual_hash(monkeypatch):
     assert info["hash"] == fake_hash
     assert info["provider"] == "demo"
     assert info["windows"]["seed"] is None
+
+
+def test_extract_dataset_info_surfaces_hosted_dataset_identity(monkeypatch):
+    revision = "a" * 40
+    monkeypatch.setattr(
+        hashing_mod,
+        "_compute_actual_window_hashes",
+        lambda _report: {"preview": "p", "final": "f", "total_tokens": 2},
+    )
+    report = {
+        "data": {
+            "dataset": "hf_text",
+            "provider": "hf_text",
+            "dataset_name": "Salesforce/wikitext",
+            "config_name": "wikitext-2-raw-v1",
+            "revision": revision,
+            "split": "validation",
+            "seq_len": 8,
+        }
+    }
+
+    identity = hashing_mod._extract_dataset_info(report)
+
+    assert identity["provider"] == "hf_text"
+    assert identity["dataset_name"] == "Salesforce/wikitext"
+    assert identity["config_name"] == "wikitext-2-raw-v1"
+    assert identity["revision"] == revision
 
 
 def test_compute_actual_window_hashes_handles_non_dict_windows():

@@ -75,20 +75,64 @@ class TestValidationGates:
             ValidationGates.validate_rmt_outliers(comparison, 0.5) is False
         )  # ceil(2 * 1.5) = 3, got 4
 
-    def test_validate_primary_metric_overhead_nan_handling(self):
-        """Test primary metric overhead validation with NaN."""
-        comparison = {"primary_metric_overhead": float("nan")}
-        assert ValidationGates.validate_primary_metric_overhead(comparison) is True
+    def test_validate_primary_metric_impact_nan_fails_closed(self):
+        comparison = {"guard_primary_metric_impact": float("nan")}
+        assert ValidationGates.validate_guard_primary_metric_impact(comparison) is False
 
-    def test_validate_time_overhead_nan_handling(self):
-        """Test time overhead validation with NaN."""
-        comparison = {"guard_overhead_time": float("nan")}
-        assert ValidationGates.validate_time_overhead(comparison) is True
+    def test_validate_time_impact_nan_fails_closed(self):
+        comparison = {"guard_runtime_overhead": float("nan")}
+        assert ValidationGates.validate_runtime_overhead(comparison) is False
 
-    def test_validate_memory_overhead_nan_handling(self):
-        """Test memory overhead validation with NaN."""
-        comparison = {"guard_overhead_mem": float("nan")}
-        assert ValidationGates.validate_memory_overhead(comparison) is True
+    def test_validate_memory_impact_nan_fails_closed(self):
+        comparison = {"guard_memory_overhead": float("nan")}
+        assert ValidationGates.validate_memory_overhead(comparison) is False
+
+    @pytest.mark.parametrize(
+        "value",
+        [None, float("nan"), float("inf"), float("-inf"), "0.0", True, object()],
+    )
+    @pytest.mark.parametrize(
+        ("key", "validator"),
+        [
+            (
+                "guard_primary_metric_impact",
+                ValidationGates.validate_guard_primary_metric_impact,
+            ),
+            ("guard_runtime_overhead", ValidationGates.validate_runtime_overhead),
+            ("guard_memory_overhead", ValidationGates.validate_memory_overhead),
+        ],
+    )
+    def test_assurance_bearing_impact_gates_reject_unavailable_values(
+        self, key, validator, value
+    ):
+        assert validator({key: value}) is False
+
+    @pytest.mark.parametrize(
+        "threshold", [None, float("nan"), float("inf"), -0.01, "0.01", True]
+    )
+    def test_impact_gate_rejects_invalid_threshold(self, threshold):
+        assert (
+            ValidationGates.validate_guard_primary_metric_impact(
+                {"guard_primary_metric_impact": 0.0}, threshold=threshold
+            )
+            is False
+        )
+
+    def test_validate_all_gates_cannot_pass_without_impact_measurements(self):
+        comparison = {
+            "catastrophic_spike": False,
+            "tying_violations_post": 0,
+            "rmt_outliers_bare": 0,
+            "rmt_outliers_guarded": 0,
+        }
+        config = BenchmarkConfig(edits=["quant_rtn"], tiers=["balanced"], probes=[0])
+
+        gates = ValidationGates.validate_all_gates(comparison, config, epsilon=0.1)
+
+        assert gates["quality"] is False
+        assert gates["time"] is False
+        assert gates["mem"] is False
+        assert all(gates.values()) is False
 
 
 class TestResolveEpsilonFromRuntimeEdgeCases:
@@ -102,25 +146,28 @@ class TestResolveEpsilonFromRuntimeEdgeCases:
         epsilon = resolve_epsilon_from_runtime(report)
         assert epsilon == 0.10
 
-    def test_validate_primary_metric_overhead_thresholds(self):
-        comparison = {"primary_metric_overhead": 0.009}
-        assert ValidationGates.validate_primary_metric_overhead(
+    def test_validate_primary_metric_degradation_limits(self):
+        comparison = {"guard_primary_metric_impact": 0.009}
+        assert ValidationGates.validate_guard_primary_metric_impact(
             comparison, threshold=0.01
         )
-        comparison["primary_metric_overhead"] = 0.02
+        comparison["guard_primary_metric_impact"] = 0.02
         assert (
-            ValidationGates.validate_primary_metric_overhead(comparison, threshold=0.01)
+            ValidationGates.validate_guard_primary_metric_impact(
+                comparison, threshold=0.01
+            )
             is False
         )
 
-    def test_validate_time_and_memory_overhead_thresholds(self):
-        comparison = {"guard_overhead_time": 0.14, "guard_overhead_mem": 0.09}
-        assert ValidationGates.validate_time_overhead(comparison, threshold=0.15)
+    def test_validate_time_and_memory_degradation_limits(self):
+        comparison = {"guard_runtime_overhead": 0.14, "guard_memory_overhead": 0.09}
+        assert ValidationGates.validate_runtime_overhead(comparison, threshold=0.15)
         assert ValidationGates.validate_memory_overhead(comparison, threshold=0.10)
-        comparison["guard_overhead_time"] = 0.2
-        comparison["guard_overhead_mem"] = 0.11
+        comparison["guard_runtime_overhead"] = 0.2
+        comparison["guard_memory_overhead"] = 0.11
         assert (
-            ValidationGates.validate_time_overhead(comparison, threshold=0.15) is False
+            ValidationGates.validate_runtime_overhead(comparison, threshold=0.15)
+            is False
         )
         assert (
             ValidationGates.validate_memory_overhead(comparison, threshold=0.10)
@@ -134,9 +181,9 @@ class TestResolveEpsilonFromRuntimeEdgeCases:
             "tying_violations_post": 0,
             "rmt_outliers_bare": 2,
             "rmt_outliers_guarded": 2,
-            "primary_metric_overhead": 0.005,  # 0.5%
-            "guard_overhead_time": 0.10,  # 10%
-            "guard_overhead_mem": 0.08,  # 8%
+            "guard_primary_metric_impact": 0.005,  # 0.5%
+            "guard_runtime_overhead": 0.10,  # 10%
+            "guard_memory_overhead": 0.08,  # 8%
         }
 
         config = BenchmarkConfig(edits=["structured"], tiers=["balanced"], probes=[0])
@@ -214,7 +261,7 @@ class TestOutputGeneration:
             config=config,
             bare_result=bare_result,
             guarded_result=guarded_result,
-            metrics={"primary_metric_overhead": 0.01},
+            metrics={"guard_primary_metric_impact": 0.01},
             gates={"spike": True, "quality": True},
             probes_used=2,
             epsilon_used=0.1,

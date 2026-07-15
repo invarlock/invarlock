@@ -175,6 +175,11 @@ fi
 source "$REPO_ROOT/examples/integrations/_shared/preflight.sh"
 effective_execution_mode="$(integration_effective_execution_mode "$lane" "$execution_mode")"
 effective_assurance="$(integration_effective_assurance "$lane" "$assurance")"
+integration_require_strict_acceptance_inputs \
+  "$effective_assurance" \
+  "${INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST:-}" \
+  "${INVARLOCK_ACCEPTANCE_BASELINE_REPORT:-}" \
+  "${INVARLOCK_ACCEPTANCE_POLICY_PACK:-}" || exit $?
 device="$(integration_default_host_device "$effective_execution_mode" "$device")"
 effective_device="$(integration_effective_device "$lane" "$device")"
 lane_artifact_label="$(integration_lane_artifact_label "$effective_execution_mode" "$effective_assurance" "$effective_device")"
@@ -207,7 +212,7 @@ fi
 
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
-if ! "$PYTHON_BIN" -c 'from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat; _patch_gptqmodel_transformers_hub_compat(); import gptqmodel' >/dev/null 2>&1; then
+if ! "$PYTHON_BIN" -c 'from invarlock.gptqmodel_runtime import require_gptqmodel_runtime; require_gptqmodel_runtime()' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
 Missing example dependency: GPTQModel
 
@@ -221,7 +226,8 @@ MSG
 fi
 
 integration_preflight_host_cuda_device "$PYTHON_BIN" "$effective_execution_mode" "$effective_device" "AWQ" || exit $?
-integration_preflight_gptqmodel_host_runtime "$PYTHON_BIN" "$effective_execution_mode" || exit $?
+integration_preflight_gptqmodel_host_runtime \
+  "$PYTHON_BIN" "$effective_execution_mode" "$effective_device" || exit $?
 
 if ! "$PYTHON_BIN" -c 'import torch; raise SystemExit(0 if torch.cuda.is_available() else 1)' >/dev/null 2>&1; then
   cat >&2 <<'MSG'
@@ -291,7 +297,10 @@ if [[ -n "$device" ]]; then
   compare_cmd+=(--device "$device")
 fi
 if [[ "$lane_artifact_label" == "cuda-container-strict" ]]; then
-  compare_cmd+=(--require-backend-inventory)
+  compare_cmd+=(
+    --require-backend-inventory
+    --require-runtime-quantization-proof
+  )
 fi
 if [[ "$allow_network" -eq 1 ]]; then
   compare_cmd+=(--allow-network)

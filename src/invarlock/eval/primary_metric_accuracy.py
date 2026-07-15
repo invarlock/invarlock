@@ -33,7 +33,12 @@ def infer_binary_label_from_ids(input_ids: list[int]) -> int:
 
 
 def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
-    """Compute accuracy counts from explicit correctness or input IDs."""
+    """Compute accuracy counts only from measured correctness evidence.
+
+    Token IDs alone do not contain a model prediction or a ground-truth label, so
+    they cannot establish correctness.  Callers that only have inputs must leave
+    accuracy unavailable instead of manufacturing a perfect score.
+    """
     correct = 0
     total = 0
     for rec in records:
@@ -42,10 +47,4 @@ def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
             correct += int(explicit_correct)
             total += 1
             continue
-        seq = rec.get("input_ids") if isinstance(rec, dict) else None
-        if not isinstance(seq, list) or not seq:
-            continue
-        infer_binary_label_from_ids(seq)
-        correct += 1
-        total += 1
     return correct, total

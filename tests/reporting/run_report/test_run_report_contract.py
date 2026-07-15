@@ -4,9 +4,10 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import invarlock.reporting.report_files as report_files
+import invarlock.reporting.report_bundle as report_bundle_module
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_contract import (
+    _detect_commit_value,
     assemble_run_report,
     build_run_report_context,
     persist_run_report_outputs,
@@ -14,7 +15,18 @@ from invarlock.reporting.run_report_contract import (
 
 
 def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
+    plugin_provenance = {
+        "adapter": {"name": "hf_causal", "module": "invarlock.adapters.hf_causal"},
+        "edit": {"name": "noop", "module": "invarlock.edits.noop"},
+        "guards": [{"name": "invariants", "module": "invarlock.guards.invariants"}],
+    }
     core_report = SimpleNamespace(
+        meta={
+            "tier_policies": {
+                "invariants": {"strict_mode": True},
+                "metrics": {"accuracy": {"min_examples": 400}},
+            }
+        },
         context={
             "dataset_meta": {"source": "wikitext2"},
             "window_plan": {"kind": "fixed"},
@@ -32,12 +44,16 @@ def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
     result = assemble_run_report(
         core_report=core_report,
         cfg=cfg,
-        run_context={"profile": "dev"},
+        run_context={
+            "profile": "dev",
+            "plugins": plugin_provenance,
+            "run_id": "source-20260713_160110",
+        },
         profile_normalized="dev",
         auto_config={"enabled": True},
         resolved_device="cpu",
         seed_bundle={"python": 43},
-        guard_overhead_threshold=0.01,
+        guard_metric_degradation_limit=0.01,
         model_profile=SimpleNamespace(name="causal"),
         determinism_meta={"deterministic": True},
         pm_acceptance_range=(0.9, 1.1),
@@ -53,7 +69,7 @@ def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
         run_config=SimpleNamespace(event_path=tmp_path / "events.jsonl"),
         resolved_loss_type="causal",
         timings={"load_model": 1.0},
-        guard_overhead_payload={"passed": True, "evaluated": False},
+        guard_metric_impact_payload={"passed": True, "evaluated": False},
         baseline=None,
         preview_records=[],
         final_records=[],
@@ -109,7 +125,7 @@ def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
         build_metrics_payload_fn=lambda **kwargs: {
             "primary_metric": {"kind": "ppl_causal", "final": 1.0}
         },
-        prepare_guard_overhead_report_fn=lambda payload, **kwargs: payload,
+        prepare_guard_metric_impact_report_fn=lambda payload, **kwargs: payload,
         finalize_run_provenance_fn=lambda **kwargs: SimpleNamespace(
             missing_evaluation_windows_for_baseline=False
         ),
@@ -123,11 +139,36 @@ def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
     )
 
     assert result.report["meta"]["model_id"] == "gpt2"
+    assert result.report["meta"]["run_id"] == "source-20260713_160110"
+    assert result.report["meta"]["plugins"] == plugin_provenance
+    assert result.report["meta"]["plugins"] is not plugin_provenance
+    assert result.report["meta"]["plugins"]["guards"] is not plugin_provenance["guards"]
     assert result.report["data"]["preview_n"] == 8
     assert result.report["edit"]["name"] == "noop"
     assert result.report["artifacts"]["mask_artifact_path"].endswith("ref_masks.json")
     assert result.report["flags"]["all_passed"] is True
+    assert result.report["resolved_policy"] == core_report.meta["tier_policies"]
+    assert result.report["resolved_policy"] is not core_report.meta["tier_policies"]
+    assert result.report["policy_resolution"]["source"] == "runtime"
     assert result.timings["latency_s"] == 1.5
+
+
+def test_assemble_run_report_uses_valid_source_commit_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_SOURCE_COMMIT", "a" * 40)
+    cfg = SimpleNamespace(meta=SimpleNamespace(commit=""))
+
+    assert _detect_commit_value(cfg) == "a" * 40
+
+
+def test_assemble_run_report_rejects_invalid_source_commit_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_SOURCE_COMMIT", "not-a-commit")
+    cfg = SimpleNamespace(meta=SimpleNamespace(commit=""))
+
+    assert _detect_commit_value(cfg) == ""
 
 
 def test_persist_run_report_outputs_adds_telemetry_and_saved_paths(
@@ -144,7 +185,7 @@ def test_persist_run_report_outputs_adds_telemetry_and_saved_paths(
         out.write_text("{}", encoding="utf-8")
         return {"json": out}
 
-    monkeypatch.setattr(report_files, "save_report", _save_report)
+    monkeypatch.setattr(report_bundle_module, "save_report", _save_report)
 
     report = create_empty_report()
     result = persist_run_report_outputs(
@@ -170,7 +211,7 @@ def test_persist_run_report_outputs_preserves_existing_backend_inventory(
         out.write_text("{}", encoding="utf-8")
         return {"json": out}
 
-    monkeypatch.setattr(report_files, "save_report", _save_report)
+    monkeypatch.setattr(report_bundle_module, "save_report", _save_report)
     existing_inventory = {
         "schema": "invarlock/backend-inventory-v1",
         "adapter": "hf_bnb",
@@ -214,7 +255,7 @@ def test_persist_run_report_outputs_ignores_corrupt_backend_inventory(
         out.write_text("{}", encoding="utf-8")
         return {"json": out}
 
-    monkeypatch.setattr(report_files, "save_report", _save_report)
+    monkeypatch.setattr(report_bundle_module, "save_report", _save_report)
     (tmp_path / "backend_inventory.json").write_text("[", encoding="utf-8")
 
     report = create_empty_report()
@@ -238,7 +279,7 @@ def test_persist_run_report_outputs_marks_context_inventory_inference_smoke(
         out.write_text("{}", encoding="utf-8")
         return {"json": out}
 
-    monkeypatch.setattr(report_files, "save_report", _save_report)
+    monkeypatch.setattr(report_bundle_module, "save_report", _save_report)
     inventory = {
         "schema": "invarlock/backend-inventory-v1",
         "adapter": "hf_bnb",
@@ -299,7 +340,7 @@ def test_assemble_run_report_preserves_primary_metric_context() -> None:
         auto_config={"enabled": True},
         resolved_device="cpu",
         seed_bundle={"python": 43},
-        guard_overhead_threshold=0.01,
+        guard_metric_degradation_limit=0.01,
         model_profile=SimpleNamespace(name="causal"),
         determinism_meta={},
         pm_acceptance_range=(0.95, 1.1),
@@ -315,7 +356,7 @@ def test_assemble_run_report_preserves_primary_metric_context() -> None:
         run_config=SimpleNamespace(event_path=Path("events.jsonl")),
         resolved_loss_type="causal",
         timings={},
-        guard_overhead_payload=None,
+        guard_metric_impact_payload=None,
         baseline=None,
         preview_records=[],
         final_records=[],
@@ -342,7 +383,7 @@ def test_assemble_run_report_preserves_primary_metric_context() -> None:
         build_artifacts_payload_fn=lambda **kwargs: {},
         merge_core_timing_metrics_fn=lambda timings, metrics: timings,
         build_metrics_payload_fn=lambda **kwargs: {},
-        prepare_guard_overhead_report_fn=lambda payload, **kwargs: payload,
+        prepare_guard_metric_impact_report_fn=lambda payload, **kwargs: payload,
         finalize_run_provenance_fn=lambda **kwargs: SimpleNamespace(
             missing_evaluation_windows_for_baseline=False
         ),

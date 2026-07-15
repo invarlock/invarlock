@@ -4,8 +4,10 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _write_tiers_yaml(root, *, ratio_limit_base: float) -> None:
@@ -71,6 +73,8 @@ def _make_min_report(*, tier: str, ratio_vs_baseline: float) -> dict:
     report["meta"]["commit"] = "deadbeef"
     report["meta"]["seed"] = 1
     report["meta"]["auto"] = {"enabled": True, "tier": tier}
+    report["context"] = {"profile": "dev"}
+    report["edit"]["name"] = "structured"
     report["data"].update(
         {"dataset": "d", "split": "validation", "seq_len": 8, "stride": 8}
     )
@@ -95,15 +99,13 @@ def test_tiers_yaml_changes_gate_resolved_policy_and_digest(
     _write_tiers_yaml(case_tight, ratio_limit_base=1.10)
 
     report = _make_min_report(tier="balanced", ratio_vs_baseline=1.12)
-    baseline = {
-        "run_id": "b",
-        "model_id": "m",
-        "ppl_final": 40.0,
-        "primary_metric": {
-            "kind": "ppl_causal",
-            "final": 40.0,
-        },
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
+    baseline = deepcopy(report)
+    baseline["run_id"] = "b"
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 40.0,
+        "final": 40.0,
     }
 
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(case_loose))

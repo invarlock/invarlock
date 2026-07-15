@@ -1,6 +1,7 @@
 # ruff: noqa: F405
 from __future__ import annotations
 
+from tests.reporting._support_guard_metric_impact import canonical_ppl_impact
 from tests.reporting._support_report_builder import *  # noqa: F401,F403,F405
 
 
@@ -9,6 +10,7 @@ class TestEffectivePoliciesAndResolution:
 
     def test_extract_effective_policies_fills_from_metrics(self):
         report = {
+            "meta": {"auto": {"tier": "balanced"}},
             "guards": [
                 {
                     "name": "spectral",
@@ -48,7 +50,7 @@ class TestEffectivePoliciesAndResolution:
                         "violations_found": 1,
                     },
                 },
-            ]
+            ],
         }
 
         policies = _extract_effective_policies(report)
@@ -96,7 +98,7 @@ class TestEffectivePoliciesAndResolution:
             "metrics": {"ppl_preview": 10.0, "ppl_final": 11.0, "ppl_ratio": 1.1},
         }
         report_digest = _compute_report_digest(report)
-        assert isinstance(report_digest, str) and len(report_digest) == 16
+        assert isinstance(report_digest, str) and len(report_digest) == 64
 
     def test_compute_validation_flags_variants(self):
         ppl = {
@@ -107,7 +109,7 @@ class TestEffectivePoliciesAndResolution:
         spectral = {"caps_applied": 6, "max_caps": 5}
         rmt = {"stable": False}
         invariants = {"status": "fail"}
-        guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.02}
+        guard_metric_impact = {"degradation": 1.05, "degradation_limit": 0.02}
 
         flags = _compute_validation_flags(
             ppl,
@@ -115,7 +117,7 @@ class TestEffectivePoliciesAndResolution:
             rmt,
             invariants,
             tier="balanced",
-            guard_overhead=guard_overhead,
+            guard_metric_impact=guard_metric_impact,
         )
 
         assert flags["preview_final_drift_acceptable"] is False
@@ -123,7 +125,7 @@ class TestEffectivePoliciesAndResolution:
         assert flags["spectral_stable"] is False
         assert flags["rmt_stable"] is False
         assert flags["invariants_pass"] is False
-        assert flags["guard_overhead_acceptable"] is False
+        assert flags["guard_metric_impact_acceptable"] is False
 
     def test_compute_validation_flags_target_ratio(self):
         ppl = {
@@ -134,11 +136,7 @@ class TestEffectivePoliciesAndResolution:
         spectral = {"caps_applied": 2, "max_caps": 5}
         rmt = {"stable": True}
         invariants = {"status": "pass"}
-        guard_overhead = {
-            "overhead_ratio": 1.01,
-            "overhead_threshold": 0.02,
-            "evaluated": True,
-        }
+        guard_metric_impact = canonical_ppl_impact(10.0, 10.1, degradation_limit=0.02)
 
         flags = _compute_validation_flags(
             ppl,
@@ -147,12 +145,12 @@ class TestEffectivePoliciesAndResolution:
             invariants,
             tier="balanced",
             target_ratio=1.05,
-            guard_overhead=guard_overhead,
+            guard_metric_impact=guard_metric_impact,
         )
 
         assert flags["primary_metric_acceptable"] is True
         assert flags["spectral_stable"] is True
-        assert flags["guard_overhead_acceptable"] is True
+        assert flags["guard_metric_impact_acceptable"] is True
 
 
 class TestExtractStructuralDeltas:

@@ -28,8 +28,8 @@ Model-loading commands use the runtime container by default unless a
 host-side `invarlock evaluate --execution-mode host` workflow explicitly
 bypasses it.
 
-Repo-owned presets under `configs/` remain available for maintainers, but the
-quick-start path above stays wheel-compatible by using direct flags only.
+Checked-in presets under `configs/` are available from a repository checkout.
+The quick-start path above stays wheel-compatible by using direct flags only.
 
 ## Concepts
 
@@ -38,8 +38,11 @@ quick-start path above stays wheel-compatible by using direct flags only.
   for audit, plus any HTML or evidence-pack outputs you distribute.
 - evaluation bundles may reference baseline/subject report artifacts; keep them
   together when you want regeneration, deeper provenance review, or low-level
-  run telemetry, but `evaluation.report.json` is the canonical portable artifact
-  for verification, rendering, validation, and explanation.
+  run telemetry. `evaluation.report.json` is the canonical report input for
+  verification, rendering, validation, and explanation. Strict verification
+  also requires its matching runtime manifest, the exact retained raw baseline,
+  an independently maintained policy pack, and an independently supplied runtime-image
+  digest.
 
 ### Command outputs
 

@@ -7,8 +7,10 @@ Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 """
 
 import importlib
+import importlib.util
 import os
 import platform
+import sys
 from typing import Any
 
 import typer
@@ -50,13 +52,54 @@ plugins_app = typer.Typer(
 )
 _plugin_package_importable = _plugins_extras._plugin_package_importable
 _package_version_at_least = _plugins_extras._package_version_at_least
+_DEFAULT_PLUGIN_PACKAGE_IMPORTABLE = _plugin_package_importable
+_DEFAULT_BITSANDBYTES_RUNTIME_AVAILABLE = bitsandbytes_runtime_available
+
+
+def _light_import_enabled() -> bool:
+    return os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def _package_present_without_import(package_name: str) -> bool:
+    try:
+        spec = importlib.util.find_spec(package_name)
+    except (AttributeError, ImportError, ModuleNotFoundError, ValueError) as error:
+        raise ImportError(f"{package_name} not available") from error
+    if spec is None:
+        raise ImportError(f"{package_name} not available")
+    return True
+
+
+def _bitsandbytes_present_without_import() -> bool:
+    try:
+        return _package_present_without_import("bitsandbytes")
+    except ImportError:
+        return False
+
+
+def _bitsandbytes_inventory_available() -> bool:
+    if (
+        _light_import_enabled()
+        and bitsandbytes_runtime_available is _DEFAULT_BITSANDBYTES_RUNTIME_AVAILABLE
+    ):
+        return _bitsandbytes_present_without_import()
+    return bitsandbytes_runtime_available()
 
 
 def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     original_importable = _plugins_extras._plugin_package_importable
     original_version_check = _plugins_extras._package_version_at_least
     try:
-        _plugins_extras._plugin_package_importable = _plugin_package_importable
+        _plugins_extras._plugin_package_importable = (
+            _package_present_without_import
+            if _light_import_enabled()
+            and _plugin_package_importable is _DEFAULT_PLUGIN_PACKAGE_IMPORTABLE
+            else _plugin_package_importable
+        )
         _plugins_extras._package_version_at_least = _package_version_at_least
         return _plugins_extras.check_plugin_extras(plugin_name, plugin_type)
     finally:
@@ -77,13 +120,13 @@ def _is_minimal_plugins_enabled() -> bool:
 
 
 def _detect_current_cuda() -> bool:
-    try:
-        import torch as _torch
-
-        torch_mod: Any = _torch
-        return detect_cuda_available(torch_mod)
-    except ImportError:
+    # Inventory must not import the runtime it is describing. If a caller has
+    # already loaded torch, querying its CUDA state is cheap; otherwise report
+    # the conservative metadata-only value and leave runtime probing to doctor.
+    torch_mod = sys.modules.get("torch")
+    if torch_mod is None:
         return False
+    return detect_cuda_available(torch_mod)
 
 
 def _gather_adapter_rows(registry: Any) -> list[dict[str, Any]]:
@@ -93,7 +136,7 @@ def _gather_adapter_rows(registry: Any) -> list[dict[str, Any]]:
         has_cuda=_detect_current_cuda(),
         is_linux=platform.system().lower() == "linux",
         extras_checker=_check_plugin_extras,
-        bitsandbytes_runtime_available=bitsandbytes_runtime_available,
+        bitsandbytes_runtime_available=_bitsandbytes_inventory_available,
     )
 
 

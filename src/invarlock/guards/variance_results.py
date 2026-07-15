@@ -76,6 +76,7 @@ def evaluate_finalize_state(
     required_gain_with_deadband: float,
     absolute_floor: float,
     calibration_status: str,
+    no_adjustment_required: bool = False,
 ) -> dict[str, Any]:
     passed = True
     warnings: list[str] = []
@@ -131,7 +132,10 @@ def evaluate_finalize_state(
             )
             passed = False
 
-    if calibration_status != "complete":
+    adequate_no_adjustment = bool(
+        no_adjustment_required and calibration_status == "no_scaling_required"
+    )
+    if calibration_status != "complete" and not adequate_no_adjustment:
         warnings.append(
             "Variance calibration coverage insufficient; operating in monitor mode"
         )
@@ -185,6 +189,7 @@ def build_finalize_metrics(
         "predictive_gate": predictive_gate_state.copy(),
         "ab_provenance": copy.deepcopy(stats.get("ab_provenance", {})),
         "ab_point_estimates": copy.deepcopy(stats.get("ab_point_estimates", {})),
+        "ab_measurements": copy.deepcopy(stats.get("ab_measurements", {})),
         "raw_scales_pre_edit": copy.deepcopy(raw_scales_pre_edit),
         "raw_scales_post_edit": copy.deepcopy(raw_scales_post_edit),
         "proposed_scales_pre_edit": stats.get("proposed_scales_pre_edit", {}),
@@ -215,7 +220,9 @@ def build_finalize_result(
             "guard_type": "variance",
             "ve_applied": enabled_after_ab,
             "ab_test_performed": ppl_no_ve is not None,
-            "proposed_scales": scales,
+            "proposed_scales": copy.deepcopy(
+                metrics.get("proposed_scales_post_edit", scales)
+            ),
             "stats": stats,
             "policy": policy,
         },

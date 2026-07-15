@@ -32,7 +32,8 @@ def _is_bare_control(kwargs: dict[str, object]) -> bool:
         return False
     validation = context.get("validation")
     return (
-        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+        isinstance(validation, dict)
+        and validation.get("guard_metric_impact_mode") == "bare"
     )
 
 
@@ -253,6 +254,13 @@ def test_snapshot_mode_bytes_restore_called(tmp_path: Path, monkeypatch):
                         },
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            }
+                        },
                         status="success",
                     )
                 ),
@@ -270,8 +278,9 @@ def test_snapshot_mode_bytes_restore_called(tmp_path: Path, monkeypatch):
             until_pass=False,
         )
 
-    # restore() should be used twice (bare + guarded)
-    assert adapter.restored >= 2
+    # The just-snapshotted model is already pristine for the first bare run;
+    # only the guarded run needs to restore after the bare edit.
+    assert adapter.restored == 1
 
 
 def test_snapshot_mode_bytes_falls_back_to_chunked_on_failure(
@@ -343,6 +352,13 @@ def test_snapshot_mode_bytes_falls_back_to_chunked_on_failure(
                         },
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            }
+                        },
                         status="success",
                     )
                 ),
@@ -364,7 +380,7 @@ def test_snapshot_mode_bytes_falls_back_to_chunked_on_failure(
     assert adapter.snapshot_calls == 1
     assert adapter.snapshot_chunked_calls == 1
     assert adapter.restore_calls == 0
-    assert adapter.restore_chunked_calls >= 2
+    assert adapter.restore_chunked_calls == 1
 
 
 def test_snapshot_mode_chunked_restore_called(tmp_path: Path, monkeypatch):
@@ -423,6 +439,13 @@ def test_snapshot_mode_chunked_restore_called(tmp_path: Path, monkeypatch):
                         },
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            }
+                        },
                         status="success",
                     )
                 ),
@@ -440,7 +463,7 @@ def test_snapshot_mode_chunked_restore_called(tmp_path: Path, monkeypatch):
             until_pass=False,
         )
 
-    assert adapter.restored >= 2
+    assert adapter.restored == 1
 
 
 def test_snapshot_mode_reload_loads_each_attempt(tmp_path: Path, monkeypatch):
@@ -490,6 +513,13 @@ def test_snapshot_mode_reload_loads_each_attempt(tmp_path: Path, monkeypatch):
                         },
                         guards={},
                         context={"dataset_meta": {}},
+                        evaluation_windows={
+                            "final": {
+                                "window_ids": [1],
+                                "logloss": [0.0],
+                                "token_counts": [1],
+                            }
+                        },
                         status="success",
                     )
                 ),
@@ -512,7 +542,7 @@ def test_snapshot_mode_reload_loads_each_attempt(tmp_path: Path, monkeypatch):
     assert adapter.loaded >= 2
 
 
-def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
+def test_guard_metric_impact_bare_failure_prevents_report_assembly(tmp_path: Path):
     cfg = _base_cfg(tmp_path, 1, 1)
 
     class Runner:
@@ -543,55 +573,32 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        # Patch validator to avoid exit; we only inspect warnings/errors aggregated pre-validation
-        for target in (
-            "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-        ):
-            stack.enter_context(
-                patch(
-                    target,
-                    lambda *a, **k: SimpleNamespace(
-                        passed=True,
-                        messages=[],
-                        warnings=[],
-                        errors=[],
-                        checks={},
-                        metrics={"overhead_ratio": 0.0, "overhead_percent": 0.0},
-                    ),
-                )
+        from invarlock.reporting.validate import validate_guard_metric_impact
+
+        stack.enter_context(
+            patch(
+                "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+                validate_guard_metric_impact,
             )
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
         )
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
-        # Ensure profile that measures overhead (ci)
-        run_command(
-            config=str(cfg),
-            device="cpu",
-            profile="ci",
-            out=str(tmp_path / "runs"),
-            until_pass=False,
-        )
+        with pytest.raises(click.exceptions.Exit) as exc_info:
+            run_command(
+                config=str(cfg),
+                device="cpu",
+                profile="ci",
+                out=str(tmp_path / "runs"),
+                until_pass=False,
+            )
 
-    gh = captured["r"].get("guard_overhead", {})
-    assert (
-        isinstance(gh, dict)
-        and gh.get("evaluated") is True
-        and gh.get("passed") is True
-    )
-    diagnostics = gh.get("diagnostics", [])
-    assert any(
-        isinstance(item, dict)
-        and item.get("severity") == "warning"
-        and item.get("message")
-        == "Bare control primary metric unavailable for overhead diagnostics."
-        for item in diagnostics
-    )
+    assert exc_info.value.exit_code == 3
+    assert captured == {}
 
 
 def test_evaluation_window_parity_mismatch_exit(tmp_path: Path):
@@ -677,7 +684,7 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
         # Capture save but don't need to inspect
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },

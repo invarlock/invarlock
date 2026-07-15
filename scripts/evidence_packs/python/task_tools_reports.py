@@ -95,14 +95,21 @@ def _first_deployable_validation_by_scenario(
     pack_dir: Path,
 ) -> dict[str, dict[str, Any]]:
     observed: dict[str, dict[str, Any]] = {}
-    for validation_path in sorted(
-        pack_dir.glob("reports/**/deployable_artifact_validation.json")
-    ):
+    runtime_paths = sorted(
+        pack_dir.glob("reports/**/runtime_deployability_validation.json")
+    )
+    # The generator's structural receipt binds its sidecars, but cannot stand in
+    # for an independent reload/inference proof in public summary output.
+    for validation_path in runtime_paths:
         scenario_id = _scenario_from_report_metadata(pack_dir, validation_path)
         if not scenario_id or scenario_id in observed:
             continue
         payload = _load_json_object(validation_path)
-        if payload:
+        if (
+            payload.get("validation_scope") == "runtime_reproof"
+            and payload.get("runtime_proof_authoritative") is True
+            and isinstance(payload.get("runtime_proof"), dict)
+        ):
             observed[scenario_id] = payload
     return observed
 
@@ -166,6 +173,9 @@ def build_edit_artifact_summary(pack_dir: Path, scenarios_path: Path) -> dict[st
         validation = deployable_validation.get(scenario_id, {})
         if validation:
             record["deployable_validation_ok"] = validation.get("ok")
+            record["runtime_proof_authoritative"] = validation.get(
+                "runtime_proof_authoritative"
+            )
             record["load_smoke"] = validation.get("load_smoke")
             record["inference_smoke"] = validation.get("inference_smoke")
             if "backend" not in record and validation.get("backend"):
@@ -196,10 +206,16 @@ def build_edit_artifact_summary(pack_dir: Path, scenarios_path: Path) -> dict[st
                 }
             ),
             "all_reload_smokes_passed": bool(deployable_records)
-            and all(record.get("load_smoke") is True for record in deployable_records),
+            and all(
+                record.get("runtime_proof_authoritative") is True
+                and record.get("load_smoke") is True
+                for record in deployable_records
+            ),
             "all_inference_smokes_passed": bool(deployable_records)
             and all(
-                record.get("inference_smoke") is True for record in deployable_records
+                record.get("runtime_proof_authoritative") is True
+                and record.get("inference_smoke") is True
+                for record in deployable_records
             ),
         },
         "by_scenario": by_scenario,
@@ -252,6 +268,16 @@ def _structural_metric_section(
     drift_band = primary_metric.get("drift_band")
     if isinstance(drift_band, dict):
         payload["drift_band"] = drift_band
+
+    kind = payload["kind"]
+    comparison_field = (
+        "delta_vs_baseline_pp" if kind == "accuracy" else "ratio_vs_baseline"
+    )
+    comparison_value = primary_metric.get(comparison_field)
+    if isinstance(comparison_value, int | float) and not isinstance(
+        comparison_value, bool
+    ):
+        payload[comparison_field] = float(comparison_value)
 
     return payload
 
@@ -364,17 +390,31 @@ def build_structural_failure_report(
             "spectral_stable": False,
             "rmt_stable": False,
             "preview_final_drift_acceptable": False,
-            "guard_overhead_acceptable": True,
+            "guard_metric_impact_acceptable": False,
             "primary_metric_tail_acceptable": False,
         }
     )
     payload["validation"] = validation
 
-    guard_overhead = payload.get("guard_overhead")
-    if not isinstance(guard_overhead, dict):
-        guard_overhead = {}
-    guard_overhead["evaluated"] = bool(guard_overhead.get("evaluated", True))
-    payload["guard_overhead"] = guard_overhead
+    payload["guard_metric_impact"] = {
+        "degradation_limit": 0.01,
+        "evaluated": False,
+        "passed": False,
+        "checks": {},
+        "diagnostics": [
+            {
+                "kind": "guard_metric_impact_unavailable",
+                "severity": "error",
+                "message": (
+                    "Guard metric impact is unavailable because report generation "
+                    "terminated on a structural failure"
+                ),
+                "details": {"error_type": error_type},
+            }
+        ],
+        "source": "structural_failure",
+        "mode": "unevaluated",
+    }
 
     primary_metric = payload.get("primary_metric")
     if not isinstance(primary_metric, dict):
@@ -383,7 +423,10 @@ def build_structural_failure_report(
     primary_metric["invalid"] = True
     primary_metric["degraded"] = True
     primary_metric["degraded_reason"] = "structural_failure"
-    primary_metric.pop("ratio_vs_baseline", None)
+    if primary_metric.get("kind") == "accuracy":
+        primary_metric.pop("ratio_vs_baseline", None)
+    else:
+        primary_metric.pop("delta_vs_baseline_pp", None)
     payload["primary_metric"] = primary_metric
 
     payload["_evidence_pack_structural_failure"] = {

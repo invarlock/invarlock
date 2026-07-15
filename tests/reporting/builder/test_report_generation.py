@@ -5,9 +5,8 @@ from pathlib import Path
 import pytest
 
 from invarlock.core.exceptions import ValidationError
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
+from invarlock.reporting.report_bundle import save_evaluation_bundle, save_report
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_formatters import (
@@ -16,6 +15,7 @@ from invarlock.reporting.run_report_formatters import (
     to_json,
     to_markdown,
 )
+from tests.reporting._support_canonical_reports import canonical_run_report
 
 
 def _minimal_report() -> dict:
@@ -27,8 +27,14 @@ def _minimal_report() -> dict:
             "device": "cpu",
             "commit": "deadbeefcafebabe",
             "ts": datetime.now().isoformat(),
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         }
     )
+    rep["context"] = {"profile": "dev"}
     rep["data"].update(
         {
             "dataset": "dummy",
@@ -59,10 +65,6 @@ def _minimal_report() -> dict:
                 "ratio_vs_baseline": 1.02,
                 "display_ci": (10.2, 10.2),
             },
-            # ppl_* fields may still be present in run report, not in cert
-            "ppl_preview": 10.0,
-            "ppl_final": 10.2,
-            "ppl_ratio": 1.02,
             "latency_ms_per_tok": 1.5,
             "memory_mb_peak": 123.4,
         }
@@ -70,6 +72,7 @@ def _minimal_report() -> dict:
     rep["guards"] = [
         {
             "name": "invariants",
+            "passed": False,
             "policy": {"strict": True},
             "metrics": {"count": 3},
             "actions": ["check"],
@@ -77,6 +80,7 @@ def _minimal_report() -> dict:
         },
         {
             "name": "spectral",
+            "passed": True,
             "policy": {"sigma_quantile": 0.95},
             "metrics": {"max_sigma": 3.2},
             "actions": ["cap"],
@@ -85,7 +89,7 @@ def _minimal_report() -> dict:
     ]
     rep["artifacts"].update({"events_path": "events.jsonl", "logs_path": "out.log"})
     rep["flags"].update({"guard_recovered": False, "rollback_reason": None})
-    return rep
+    return canonical_run_report(rep)
 
 
 def test_to_json_and_sanitize():
@@ -135,16 +139,12 @@ def test_evaluation_report_json_and_markdown_and_save(tmp_path: Path):
         save_report(rep, tmp_path, formats=["report"])
 
 
-def test_make_report_accepts_run_report_and_baseline_v1():
+def test_make_report_accepts_canonical_run_reports():
     rep = _minimal_report()
     assert make_report(rep, rep)["schema_version"] == "v1"
-    baseline = {
-        "schema_version": "baseline-v1",
-        "meta": {},
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.1}
-        },
-    }
+    baseline = _minimal_report()
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"].update({"preview": 10.0, "final": 10.1})
     assert make_report(rep, baseline)["schema_version"] == "v1"
     with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(rep, {"schema_version": "baseline-v1", "meta": {}})

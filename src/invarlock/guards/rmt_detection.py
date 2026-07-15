@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 
 from . import rmt_analysis
+from .exact_svd import exact_svdvals
 
 logger = logging.getLogger(__name__)
 _RMT_CORRECTION_ERRORS = (
@@ -64,6 +65,37 @@ def evaluate_step5_layer(
     if ratio > margin:
         return True, ratio, None
     return False, ratio, f"≤ margin (ratio={ratio:.2f} ≤ {margin:.2f})"
+
+
+def _evaluate_rmt_module_outlier(
+    stats: dict[str, Any],
+    *,
+    module_name: str,
+    threshold: float,
+    baseline_sigmas: dict[str, float] | None,
+    baseline_mp_stats: dict[str, dict[str, float]] | None,
+    deadband: float,
+) -> tuple[bool, str | None]:
+    if (
+        baseline_sigmas
+        and baseline_mp_stats
+        and module_name in baseline_sigmas
+        and module_name in baseline_mp_stats
+    ):
+        sigma_post = stats["sigma_max"]
+        bulk_edge_base = baseline_mp_stats[module_name].get("mp_bulk_edge_base", 1.0)
+        ratio = sigma_post / max(bulk_edge_base, 1e-12)
+        detection_threshold = (1.0 + deadband) * threshold
+    elif deadband > 0.0 and baseline_sigmas and module_name in baseline_sigmas:
+        sigma_post = stats["sigma_max"]
+        ratio = sigma_post / max(baseline_sigmas[module_name], 1e-12)
+        detection_threshold = (1.0 + deadband) * threshold
+    else:
+        ratio = stats["worst_ratio"]
+        detection_threshold = threshold
+    if ratio > detection_threshold:
+        return True, None
+    return False, f"≤ threshold (ratio={ratio:.2f} ≤ {detection_threshold:.2f})"
 
 
 def step5_detect_and_correct_modules(
@@ -231,43 +263,14 @@ def rmt_detect(
                 module_name,
             )
 
-            has_outlier = False
-            skip_reason = None
-
-            if (
-                baseline_sigmas
-                and baseline_mp_stats
-                and module_name in baseline_sigmas
-                and module_name in baseline_mp_stats
-            ):
-                sigma_post = stats["sigma_max"]
-                mp_stats = baseline_mp_stats[module_name]
-                bulk_edge_base = mp_stats.get("mp_bulk_edge_base", 1.0)
-                ratio = sigma_post / max(bulk_edge_base, 1e-12)
-                detection_threshold = (1.0 + deadband) * threshold
-                if ratio > detection_threshold:
-                    has_outlier = True
-                else:
-                    skip_reason = (
-                        f"≤ threshold (ratio={ratio:.2f} ≤ {detection_threshold:.2f})"
-                    )
-            elif deadband > 0.0 and baseline_sigmas and module_name in baseline_sigmas:
-                baseline_sigma = baseline_sigmas[module_name]
-                sigma_post = stats["sigma_max"]
-                ratio = sigma_post / max(baseline_sigma, 1e-12)
-                detection_threshold = (1.0 + deadband) * threshold
-                if ratio > detection_threshold:
-                    has_outlier = True
-                else:
-                    skip_reason = (
-                        f"≤ threshold (ratio={ratio:.2f} ≤ {detection_threshold:.2f})"
-                    )
-            else:
-                ratio = stats["worst_ratio"]
-                if ratio > threshold:
-                    has_outlier = True
-                else:
-                    skip_reason = f"≤ threshold (ratio={ratio:.2f} ≤ {threshold:.2f})"
+            has_outlier, skip_reason = _evaluate_rmt_module_outlier(
+                stats,
+                module_name=module_name,
+                threshold=threshold,
+                baseline_sigmas=baseline_sigmas,
+                baseline_mp_stats=baseline_mp_stats,
+                deadband=deadband,
+            )
 
             layer_info = {
                 "layer": idx,
@@ -534,7 +537,7 @@ def _apply_rmt_correction(
 
                     if not torch.isfinite(W).all():
                         continue
-                    s_vals = torch.linalg.svdvals(W.float().cpu())
+                    s_vals = exact_svdvals(W)
                     sigma_pre = s_vals[0].item()
 
                     if (
@@ -579,7 +582,7 @@ def _apply_rmt_correction(
                         W_after = param.detach()
                         if Conv1D is not None and isinstance(layer, Conv1D):
                             W_after = W_after.T
-                        s_vals_after = torch.linalg.svdvals(W_after.float().cpu())
+                        s_vals_after = exact_svdvals(W_after)
                         sigma_post = s_vals_after[0].item()
 
                         if verbose:

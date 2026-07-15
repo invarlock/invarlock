@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit model lifecycle classification across repo contracts and sweep lanes."""
+"""Audit model lifecycle classification across public static contracts."""
 
 from __future__ import annotations
 
@@ -13,21 +13,10 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MODEL_EVIDENCE_DIR = REPO_ROOT / "scripts" / "model_evidence"
+EVIDENCE_CATALOG_PATH = REPO_ROOT / "contracts" / "evidence_catalog_v1.json"
 MODEL_CLASSIFICATION_PATH = REPO_ROOT / "contracts" / "model_classification.json"
 MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json"
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
-
-if str(MODEL_EVIDENCE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODEL_EVIDENCE_DIR))
-
-from model_evidence_lanes import (  # noqa: E402
-    PUBLISHED_BASIS_GAP_GPU_SUITE,
-    REPO_MENTIONED_GPU_SUITE,
-    SUITES,
-    SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
-    EvidenceLane,
-)
 
 CLASSIFICATION_FORMAT = "model-classification-v1"
 AUDIT_FORMAT = "invarlock/model-classification-audit-v1"
@@ -42,10 +31,15 @@ CLASSIFICATIONS = {
 }
 ELIGIBILITY = {"eligible", "blocked", "not_applicable"}
 SUPPORT_MATRIX_CLASSIFICATIONS = {"published", "backlog", "blocked"}
-TARGETED_SUITES = {
-    REPO_MENTIONED_GPU_SUITE,
-    SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
-    PUBLISHED_BASIS_GAP_GPU_SUITE,
+EVIDENCE_CATALOG_FORMAT = "invarlock/evidence-catalog-v1"
+ENTRY_FIELDS = {
+    "id",
+    "classification",
+    "eligibility",
+    "support_matrix_lane_id",
+    "catalog_family_ids",
+    "candidate_id",
+    "blockers",
 }
 
 
@@ -176,25 +170,10 @@ def _support_rows(support_matrix: Mapping[str, Any]) -> dict[str, Mapping[str, A
     }
 
 
-def _lane_entry(
-    lane: EvidenceLane,
-    by_sweep_lane: Mapping[str, Mapping[str, Any]],
-    by_support_lane: Mapping[str, Mapping[str, Any]],
-) -> Mapping[str, Any] | None:
-    return by_sweep_lane.get(lane.lane_id) or by_support_lane.get(lane.lane_id)
-
-
-def _explicit_suite_lanes() -> list[tuple[str, EvidenceLane]]:
-    lanes: list[tuple[str, EvidenceLane]] = []
-    for suite_name in sorted(TARGETED_SUITES):
-        for lane in SUITES.get(suite_name, ()):
-            lanes.append((suite_name, lane))
-    return lanes
-
-
 def _collect_named_model_sources(
     *,
     catalog: Mapping[str, Any],
+    evidence_catalog: Mapping[str, Any],
     support_matrix: Mapping[str, Any],
 ) -> dict[str, set[str]]:
     sources: dict[str, set[str]] = defaultdict(set)
@@ -214,8 +193,17 @@ def _collect_named_model_sources(
         if isinstance(model_id, str) and model_id:
             sources[model_id].add(f"published_basis_candidate:{candidate_id}")
 
-    for suite_name, lane in _explicit_suite_lanes():
-        sources[lane.model_id].add(f"model_evidence:{suite_name}:{lane.slug}")
+    entries = evidence_catalog.get("entries")
+    if isinstance(entries, list):
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            lane_id = entry.get("lane_id", "<unknown>")
+            model = entry.get("model")
+            if isinstance(model, Mapping):
+                model_id = model.get("id")
+                if isinstance(model_id, str) and model_id:
+                    sources[model_id].add(f"evidence_catalog:{lane_id}")
 
     return sources
 
@@ -272,6 +260,16 @@ def _check_manifest_shape(
 
     for entry in entries:
         scope = f"model_classification:{_entry_id(entry)}"
+        unexpected = sorted(set(entry) - ENTRY_FIELDS)
+        if unexpected:
+            findings.append(
+                Finding(
+                    "error",
+                    scope,
+                    "entry contains fields outside the public classification "
+                    f"contract: {', '.join(unexpected)}",
+                )
+            )
         classification = entry.get("classification")
         eligibility = entry.get("eligibility")
         if classification not in CLASSIFICATIONS:
@@ -445,47 +443,84 @@ def _check_catalog(
     return findings
 
 
-def _check_suites(
-    entries: Sequence[Mapping[str, Any]],
-    by_sweep_lane: Mapping[str, Mapping[str, Any]],
+def _check_evidence_catalog(
+    evidence_catalog: Mapping[str, Any],
+    support_matrix: Mapping[str, Any],
     by_support_lane: Mapping[str, Mapping[str, Any]],
 ) -> list[Finding]:
     findings: list[Finding] = []
-    actual_by_suite: dict[str, set[str]] = defaultdict(set)
-    for suite_name, lane in _explicit_suite_lanes():
-        scope = f"model_evidence:{suite_name}:{lane.slug}"
-        entry = _lane_entry(lane, by_sweep_lane, by_support_lane)
-        if entry is None:
+    if evidence_catalog.get("format_version") != EVIDENCE_CATALOG_FORMAT:
+        findings.append(
+            Finding(
+                "error",
+                "evidence_catalog",
+                f"format_version must be {EVIDENCE_CATALOG_FORMAT!r}",
+            )
+        )
+    raw_entries = evidence_catalog.get("entries")
+    if not isinstance(raw_entries, list):
+        return [
+            *findings,
+            Finding("error", "evidence_catalog", "entries must be a list"),
+        ]
+
+    support_rows = _support_rows(support_matrix)
+    seen: set[str] = set()
+    for index, catalog_entry in enumerate(raw_entries):
+        scope = f"evidence_catalog:entries[{index}]"
+        if not isinstance(catalog_entry, Mapping):
+            findings.append(Finding("error", scope, "entry must be an object"))
+            continue
+        lane_id = catalog_entry.get("lane_id")
+        if not isinstance(lane_id, str) or not lane_id:
+            findings.append(Finding("error", scope, "lane_id is required"))
+            continue
+        scope = f"evidence_catalog:{lane_id}"
+        if lane_id in seen:
+            findings.append(Finding("error", scope, "lane_id is duplicated"))
+            continue
+        seen.add(lane_id)
+        support = support_rows.get(lane_id)
+        classification = by_support_lane.get(lane_id)
+        if support is None:
             findings.append(
-                Finding("error", scope, "missing model_classification entry")
+                Finding("error", scope, "lane is absent from the support matrix")
             )
             continue
-        roles = set(_string_list(entry.get("suite_roles")))
-        if suite_name not in roles:
+        if classification is None:
+            findings.append(Finding("error", scope, "lane lacks model classification"))
+        model = catalog_entry.get("model")
+        if not isinstance(model, Mapping):
+            findings.append(Finding("error", scope, "model must be an object"))
+            continue
+        if model.get("adapter") != support.get("adapter"):
             findings.append(
                 Finding(
                     "error",
                     scope,
-                    "model_classification entry does not list this suite role",
+                    "adapter disagrees with the support matrix",
                 )
             )
-        actual_by_suite[suite_name].add(lane.lane_id)
-
-    for entry in entries:
-        roles = set(_string_list(entry.get("suite_roles")))
-        sweep_ids = set(_string_list(entry.get("sweep_lane_ids")))
-        support_id = entry.get("support_matrix_lane_id")
-        if isinstance(support_id, str) and support_id:
-            sweep_ids.add(support_id)
-        for role in sorted(roles & TARGETED_SUITES):
-            if not (sweep_ids & actual_by_suite.get(role, set())):
-                findings.append(
-                    Finding(
-                        "error",
-                        f"model_classification:{_entry_id(entry)}",
-                        f"suite role {role!r} has no matching model-evidence lane",
-                    )
+        representatives = set(_string_list(support.get("representative_models")))
+        if representatives and model.get("id") not in representatives:
+            findings.append(
+                Finding(
+                    "error",
+                    scope,
+                    "model is not a support-matrix representative",
                 )
+            )
+
+    expected = set(support_rows)
+    if seen != expected:
+        findings.append(
+            Finding(
+                "error",
+                "evidence_catalog",
+                "lane IDs must exactly match the public support matrix: "
+                f"missing={sorted(expected - seen)!r} extra={sorted(seen - expected)!r}",
+            )
+        )
     return findings
 
 
@@ -493,11 +528,14 @@ def _check_blocked_named_checkpoints(
     classification: Mapping[str, Any],
     *,
     catalog: Mapping[str, Any],
+    evidence_catalog: Mapping[str, Any],
     support_matrix: Mapping[str, Any],
 ) -> list[Finding]:
     findings: list[Finding] = []
     sources = _collect_named_model_sources(
-        catalog=catalog, support_matrix=support_matrix
+        catalog=catalog,
+        evidence_catalog=evidence_catalog,
+        support_matrix=support_matrix,
     )
     blocked = classification.get("blocked_named_checkpoints")
     if not isinstance(blocked, list):
@@ -524,6 +562,7 @@ def audit() -> list[Finding]:
     classification = _load_json(MODEL_CLASSIFICATION_PATH)
     support_matrix = _load_json(SUPPORT_MATRIX_PATH)
     catalog = _load_json(MODEL_FAMILY_CATALOG_PATH)
+    evidence_catalog = _load_json(EVIDENCE_CATALOG_PATH)
     entries = _entries(classification)
 
     findings: list[Finding] = []
@@ -533,21 +572,28 @@ def audit() -> list[Finding]:
         entries, "support_matrix_lane_id"
     )
     by_candidate, candidate_index_findings = _index_one(entries, "candidate_id")
-    by_sweep_lane, sweep_index_findings = _index_many(entries, "sweep_lane_ids")
     by_catalog_family, catalog_index_findings = _index_many(
         entries, "catalog_family_ids"
     )
     findings.extend(support_index_findings)
     findings.extend(candidate_index_findings)
-    findings.extend(sweep_index_findings)
     findings.extend(catalog_index_findings)
 
     findings.extend(_check_support_matrix(support_matrix, by_support_lane))
     findings.extend(_check_catalog(catalog, by_catalog_family, by_candidate))
-    findings.extend(_check_suites(entries, by_sweep_lane, by_support_lane))
+    findings.extend(
+        _check_evidence_catalog(
+            evidence_catalog,
+            support_matrix,
+            by_support_lane,
+        )
+    )
     findings.extend(
         _check_blocked_named_checkpoints(
-            classification, catalog=catalog, support_matrix=support_matrix
+            classification,
+            catalog=catalog,
+            evidence_catalog=evidence_catalog,
+            support_matrix=support_matrix,
         )
     )
 

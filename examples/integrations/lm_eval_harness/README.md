@@ -74,7 +74,11 @@ subject and fixture:
 ```bash
 make runtime-image-cuda
 
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 uv run --extra hf --with peft \
 examples/integrations/peft_lora/run_tiny_peft_lora.sh \
   --allow-network \
@@ -86,12 +90,16 @@ Then run an InvarLock comparison for the same baseline, subject, and PEFT
 fixture when you want a paired report under the LM Eval example directory:
 
 ```bash
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-local \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 examples/integrations/_shared/run_invarlock_compare.sh \
   --baseline sshleifer/tiny-gpt2 \
   --subject ./examples/integrations/peft_lora/models/tiny-gpt2-peft-lora-merged \
   --report-out ./examples/integrations/lm_eval_harness/reports/tiny-invarlock-pair \
   --lane cuda \
+  --expected-runtime-image-digest "$TRUSTED_RUNTIME_IMAGE_DIGEST" \
   --profile release \
   --preset ./examples/integrations/peft_lora/artifacts/tiny-peft-lora-fixture/preset.yaml \
   --edit-label peft_lora_merge \
@@ -102,7 +110,7 @@ Use the InvarLock verifier result as the strict regression evidence, and use
 `lm_eval_sidecar_summary.json` for task-score context. For a host-side
 comparison, use the same command with `--lane host`. Do not use an identical
 baseline and subject as a placeholder for this paired run; the verifier can
-correctly fail that as a non-edit comparison instead of producing useful
+fail that as a non-edit comparison instead of producing useful
 regression evidence. For very small edits, a default `ci` profile comparison on
 an unrelated dataset can also fail policy because the measured delta is too close
 to the baseline.

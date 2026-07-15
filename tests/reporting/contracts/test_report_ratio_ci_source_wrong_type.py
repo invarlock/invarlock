@@ -1,6 +1,10 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    canonical_baseline,
+    canonical_run_report,
+)
 
 
 def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
@@ -17,7 +21,9 @@ def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
             "ts": "2025-01-01T00:00:00",
             "commit": "dead",
             "seed": 42,
+            "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -54,12 +60,7 @@ def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
         "flags": {"guard_recovered": False, "rollback_reason": None},
         "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [1.0, 2.0]}},
     }
-    baseline = {
-        "run_id": "b",
-        "model_id": "gpt2",
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [1.0, 2.0]}},
-    }
+    baseline = {**report, "edit": {"name": "noop"}}
 
     # Return a wrong type that doesn't raise immediately from the patched function,
     # but will cause conversion (logspace_to_ratio_ci) to raise inside the try.
@@ -67,6 +68,6 @@ def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         return_value="bad-type",
     ):
-        cert = make_report(report, baseline)
+        cert = make_report(canonical_run_report(report), canonical_baseline(baseline))
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     assert stats.get("pairing") == "run_metrics"

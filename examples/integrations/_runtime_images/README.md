@@ -41,16 +41,21 @@ and requires a visible CUDA device. Set
 Then run the matching example with:
 
 ```bash
+TRUSTED_RUNTIME_IMAGE_DIGEST='sha256:REPLACE_WITH_REVIEWED_64_HEX_DIGEST'
+INVARLOCK_ACCEPTANCE_BASELINE_REPORT=/path/to/raw-baseline-report.json \
+INVARLOCK_ACCEPTANCE_POLICY_PACK=/path/to/acceptance-policy-pack.json \
 INVARLOCK_RUNTIME_IMAGE=invarlock-example-runtime:cuda-hqq \
+INVARLOCK_EXPECTED_RUNTIME_IMAGE_DIGEST="$TRUSTED_RUNTIME_IMAGE_DIGEST" \
 examples/integrations/hqq/run_tiny_hf_hqq.sh --allow-network --force --lane cuda
 ```
 
-Strict shared artifacts should include the digest-pinned image reference recorded
-in `runtime.manifest.json`.
-Rebuilding an example image may produce a different image digest; shared strict
-artifacts should rely on the digest recorded in `runtime.manifest.json`.
+Obtain `TRUSTED_RUNTIME_IMAGE_DIGEST` from reviewed build output or release
+policy before accepting the report bundle. Rebuilding an example image may
+produce a different image digest, so update the reviewed pin intentionally.
+The generated `runtime.manifest.json` records the manifest's image claim; it is
+not itself an independent source for the verifier's trust anchor.
 
 The CUDA 12.8 backend compatibility summary for these split images lives at
-`public_evidence/runtime_backend_compat_cuda128/compatibility_summary.json`.
+`public_evidence/runtime_backend_compatibility_cuda128/compatibility_summary.json`.
 That summary records build/import-smoke outcomes only; strict example evidence
 still comes from the individual integration reports and runtime manifests.

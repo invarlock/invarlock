@@ -3,15 +3,16 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import math
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import torch
 from transformers import AutoModelForCausalLM
 
+from invarlock.evidence_pack_contracts.probes import build_probe_binding
 from invarlock.guards.rmt import RMTGuard
 
 try:
@@ -208,56 +209,6 @@ def _normalize_guard_result(
     return passed, action, metrics, norm_violations
 
 
-def _top_k_items(values: dict[str, Any], *, k: int) -> list[dict[str, Any]]:
-    if not isinstance(values, dict) or not values:
-        return []
-    rows: list[tuple[str, float]] = []
-    for key, raw in values.items():
-        v = _safe_float(raw)
-        if v is None:
-            continue
-        rows.append((str(key), v))
-    rows.sort(key=lambda kv: kv[1], reverse=True)
-    out: list[dict[str, Any]] = []
-    for name, val in rows[: max(int(k), 0)]:
-        out.append({"module": name, "value": float(val)})
-    return out
-
-
-def _top_k_deltas(
-    base: dict[str, Any], cur: dict[str, Any], *, k: int, eps: float = 1e-12
-) -> list[dict[str, Any]]:
-    if not isinstance(base, dict):
-        base = {}
-    if not isinstance(cur, dict):
-        cur = {}
-
-    rows: list[tuple[float, str, float, float]] = []
-    keys = set(base) | set(cur)
-    for key in keys:
-        b = _safe_float(base.get(key))
-        c = _safe_float(cur.get(key))
-        if b is None or c is None:
-            continue
-        delta = c - b
-        frac = delta / max(abs(b), eps)
-        rows.append((frac, str(key), b, c))
-
-    rows.sort(key=lambda t: t[0], reverse=True)
-    out: list[dict[str, Any]] = []
-    for frac, name, b, c in rows[: max(int(k), 0)]:
-        out.append(
-            {
-                "module": name,
-                "base": float(b),
-                "cur": float(c),
-                "delta": float(c - b),
-                "delta_frac": float(frac),
-            }
-        )
-    return out
-
-
 def _classify_family(module_name: str) -> str:
     """Mirror RMTGuard family assignment ({attn, ffn, embed, other})."""
     lower = module_name.lower()
@@ -342,9 +293,11 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     baseline_model_path = Path(args.baseline_model).resolve()
     subject_model_path = Path(args.subject_model).resolve()
     baseline_report_path = Path(args.baseline_report).resolve()
+    report_path = Path(args.report).resolve()
     output_path = Path(args.out).resolve()
 
     baseline_report = _load_json(baseline_report_path)
+    report = _load_json(report_path)
     batches = _extract_windows(
         baseline_report, max_windows=max(0, int(args.max_windows_per_split))
     )
@@ -413,7 +366,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
             epsilon_violations.append(
                 {
                     "family": family,
-                    "module": peak.get("module"),
+                    "module": str(peak.get("module") or family),
                     "edge_base": base_val,
                     "edge_cur": cur_val,
                     "delta": float(delta),
@@ -426,35 +379,34 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     if not stable:
         action = "abort"
 
+    normalized_violations = [
+        {
+            "code": str(item.get("family") or "rmt_guard"),
+            "message": str(item.get("message") or item),
+        }
+        for item in violations
+    ]
     payload: dict[str, Any] = {
-        "probe": "rmt_cross_model_v2",
-        "family_aggregation": "delta_max",
-        "timestamp_utc": datetime.now(UTC).isoformat(),
-        "baseline_model": str(baseline_model_path),
-        "subject_model": str(subject_model_path),
-        "baseline_report": str(baseline_report_path),
-        "profile": str(args.profile),
-        "tier": str(args.tier),
-        "activation_windows": int(args.activation_windows),
-        "calibration_windows_loaded": len(batches),
-        "policy": policy,
+        "schema": "invarlock/rmt-probe-v1",
+        "probe": "rmt_cross_model_v1",
         "passed": passed,
         "action": action,
         "stable": stable,
         "stable_guard": stable_guard,
-        "edge_risk_by_family_base": edge_family_base,
-        "edge_risk_by_family": edge_family_cur,
         "epsilon_by_family": epsilon_by_family,
         "epsilon_default": float(epsilon_default),
         "epsilon_violations": epsilon_violations,
-        "edge_risk_by_module_count": len(edge_by_module),
-        "edge_risk_by_module_base_top": _top_k_items(edge_by_module_base, k=25),
-        "edge_risk_by_module_top": _top_k_items(edge_by_module, k=25),
-        "edge_risk_by_module_delta_top": _top_k_deltas(
-            edge_by_module_base, edge_by_module, k=25
+        "violations": normalized_violations,
+        "metrics": {
+            "stable": stable_guard,
+            "epsilon_default": float(epsilon_default),
+            "epsilon_by_family": epsilon_by_family,
+            "edge_base_by_family": edge_family_base,
+            "edge_cur_by_family": edge_family_cur,
+        },
+        "binding": build_probe_binding(
+            report, "sha256:" + hashlib.sha256(report_path.read_bytes()).hexdigest()
         ),
-        "violations": violations,
-        "metrics": metrics,
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -477,6 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Path to baseline report.json containing evaluation_windows",
     )
+    parser.add_argument("--report", required=True, help="Adjacent canonical report")
     parser.add_argument(
         "--out", required=True, help="Output JSON path (rmt_probe.json)"
     )

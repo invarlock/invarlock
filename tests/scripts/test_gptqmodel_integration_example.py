@@ -44,24 +44,28 @@ def test_gptqmodel_runner_has_expected_adapter_contract() -> None:
     assert "integration_log_header" in text
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
-    assert "_patch_gptqmodel_transformers_hub_compat" in text
+    assert "--require-runtime-quantization-proof" in text
+    assert "require_gptqmodel_runtime" in text
+    assert "_patch_gptqmodel_transformers_hub_compat" not in text
 
 
 def test_gptqmodel_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     text = README.read_text(encoding="utf-8")
 
-    assert "strict container evidence is verified" in text
-    assert "this tiny\nGPTQModel example" in text
+    assert "`cuda-container-strict` result requires" in text
+    assert "strict container evidence is verified" not in text
     assert "scoped to the configured tiny GPTQ checkpoint" in text
     assert "shared integration evidence" in text
     assert "The shell runner relies on InvarLock report persistence to emit" in text
     assert "`backend_inventory.json` when adapter provenance is available" in text
+    assert "`runtime_quantization_proof.json`" in text
 
 
 def test_gptqmodel_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_helper_module()
     helper_text = HELPER.read_text(encoding="utf-8")
-    assert "_patch_gptqmodel_transformers_hub_compat" in helper_text
+    assert "import_gptqmodel" in helper_text
+    assert "_patch_gptqmodel_transformers_hub_compat" not in helper_text
 
     summary = helper.write_text_fixture(
         tmp_path,

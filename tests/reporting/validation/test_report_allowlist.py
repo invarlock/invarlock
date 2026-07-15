@@ -66,13 +66,6 @@ def test_is_ppl_kind_variants():
     assert not primary_metric_policy_mod.is_ppl_kind("accuracy")
 
 
-def test_fallback_paired_windows():
-    cov = {"preview": {"used": 7}}
-    assert primary_metric_policy_mod.fallback_paired_windows(0, cov) == 7
-    assert primary_metric_policy_mod.fallback_paired_windows(5, cov) == 5
-    assert primary_metric_policy_mod.fallback_paired_windows(0, {}) == 0
-
-
 def test_enforce_drift_ratio_identity_and_alignment():
     # Matching ratio should return computed ratio
     ratio = primary_metric_policy_mod.enforce_drift_ratio_identity(

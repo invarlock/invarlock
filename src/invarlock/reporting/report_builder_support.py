@@ -12,6 +12,7 @@ from typing import Any
 from invarlock.core.exceptions import MetricsError
 from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 from invarlock.core.retry import RetryDiagnostic
+from invarlock.eval.guard_metric_impact import guard_metric_schedule_digest
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
 from . import report_builder_telemetry as _report_builder_telemetry
@@ -213,25 +214,16 @@ def build_artifacts_payload(report: RunReport) -> dict[str, Any]:
 
 
 def attach_schedule_digest(
-    report: RunReport, guard_overhead_section: dict[str, Any]
+    report: RunReport, guard_metric_impact_section: dict[str, Any]
 ) -> str | None:
     schedule_digest = None
     try:
-        final_windows_ctx = (
-            report.get("evaluation_windows", {}).get("final", {})
-            if isinstance(report.get("evaluation_windows"), dict)
-            else {}
+        schedule_digest = guard_metric_schedule_digest(
+            report,
+            guard_metric_impact_section.get("metric_kind"),
         )
-        window_ids = final_windows_ctx.get("window_ids")
-        if isinstance(window_ids, list) and window_ids:
-            digest = hashlib.blake2s(digest_size=16)
-            for wid in window_ids:
-                try:
-                    digest.update(int(wid).to_bytes(8, "little", signed=True))
-                except _NON_FATAL_EXCEPTIONS:
-                    digest.update(str(wid).encode("utf-8", "ignore"))
-            schedule_digest = digest.hexdigest()
-            guard_overhead_section["schedule_digest"] = schedule_digest
+        if schedule_digest is not None:
+            guard_metric_impact_section["schedule_digest"] = schedule_digest
     except _NON_FATAL_EXCEPTIONS:
         schedule_digest = None
     return schedule_digest
@@ -449,7 +441,7 @@ def evaluate_primary_metric_tail(
         )
         pm_tail_result["source"] = "paired_baseline.final"
     except _NON_FATAL_EXCEPTIONS:
-        pm_tail_result = {"mode": "warn", "evaluated": False, "passed": True}
+        pm_tail_result = {"mode": "warn", "evaluated": False, "passed": False}
     return pm_tail_result
 
 
@@ -557,55 +549,33 @@ def _direct_baseline_metric(report: RunReport, payload: Any) -> dict[str, Any] |
     def _is_finite_number(value: Any) -> bool:
         return isinstance(value, (int, float)) and math.isfinite(float(value))
 
-    def _coerce_finite_float(value: Any) -> float | None:
-        if not _is_finite_number(value):
-            return None
-        return float(value)
-
     report_kind = (
         report.get("metrics", {}).get("primary_metric", {}).get("kind")
         if isinstance(report.get("metrics"), dict)
         else None
     )
-    default_kind = str(report_kind or "ppl_causal")
+    subject_kind = str(report_kind or "").strip().lower()
+    if not subject_kind:
+        return None
 
     direct_pm = payload.get("primary_metric")
-    if isinstance(direct_pm, dict) and _is_finite_number(direct_pm.get("final")):
+    if (
+        isinstance(direct_pm, dict)
+        and str(direct_pm.get("kind") or "").strip().lower() == subject_kind
+        and _is_finite_number(direct_pm.get("final"))
+    ):
         return copy.deepcopy(direct_pm)
-    if _is_finite_number(payload.get("ppl_final")):
-        preview_value_raw = payload.get("ppl_preview")
-        if not _is_finite_number(preview_value_raw):
-            preview_value_raw = payload.get("ppl_final")
-        preview_value = _coerce_finite_float(preview_value_raw)
-        final_value = _coerce_finite_float(payload.get("ppl_final"))
-        if preview_value is None or final_value is None:
-            return None
-        return {
-            "kind": default_kind,
-            "preview": preview_value,
-            "final": final_value,
-        }
 
     metrics_block = payload.get("metrics")
     if not isinstance(metrics_block, dict):
         return None
     block_pm = metrics_block.get("primary_metric")
-    if isinstance(block_pm, dict) and _is_finite_number(block_pm.get("final")):
+    if (
+        isinstance(block_pm, dict)
+        and str(block_pm.get("kind") or "").strip().lower() == subject_kind
+        and _is_finite_number(block_pm.get("final"))
+    ):
         return copy.deepcopy(block_pm)
-    ppl_final = metrics_block.get("ppl_final")
-    if _is_finite_number(ppl_final):
-        ppl_preview_raw = metrics_block.get("ppl_preview", ppl_final)
-        if not _is_finite_number(ppl_preview_raw):
-            ppl_preview_raw = ppl_final
-        ppl_preview = _coerce_finite_float(ppl_preview_raw)
-        ppl_final_value = _coerce_finite_float(ppl_final)
-        if ppl_preview is None or ppl_final_value is None:
-            return None
-        return {
-            "kind": default_kind,
-            "preview": ppl_preview,
-            "final": ppl_final_value,
-        }
     return None
 
 
@@ -619,6 +589,36 @@ def build_baseline_reference(
     baseline_raw_map: dict[str, Any] = (
         dict(baseline_raw) if isinstance(baseline_raw, dict) else {}
     )
+    report_pm = (
+        report.get("metrics", {}).get("primary_metric")
+        if isinstance(report.get("metrics"), dict)
+        else None
+    )
+    subject_kind = (
+        str(report_pm.get("kind") or "").strip().lower()
+        if isinstance(report_pm, dict)
+        else ""
+    )
+    raw_baseline_pm = baseline_raw_map.get("primary_metric")
+    if not isinstance(raw_baseline_pm, dict):
+        raw_metrics = baseline_raw_map.get("metrics")
+        raw_baseline_pm = (
+            raw_metrics.get("primary_metric") if isinstance(raw_metrics, dict) else None
+        )
+    declared_baseline_kind = (
+        str(raw_baseline_pm.get("kind") or "").strip().lower()
+        if isinstance(raw_baseline_pm, dict)
+        else ""
+    )
+    if declared_baseline_kind and declared_baseline_kind != subject_kind:
+        raise MetricsError(
+            code="E236",
+            message="Subject and baseline primary metrics must use the same kind.",
+            details={
+                "subject_kind": subject_kind,
+                "baseline_kind": declared_baseline_kind,
+            },
+        )
     baseline_pm = None
     try:
         raw_metrics = baseline_raw_map.get("metrics")
@@ -675,13 +675,41 @@ def build_baseline_reference(
             ),
             details={"baseline_primary_metric": baseline_pm},
         )
+    baseline_kind = str(baseline_pm.get("kind") or "").strip().lower()
+    if not subject_kind or baseline_kind != subject_kind:
+        raise MetricsError(
+            code="E236",
+            message="Subject and baseline primary metrics must use the same kind.",
+            details={"subject_kind": subject_kind, "baseline_kind": baseline_kind},
+        )
+    baseline_final_value = float(baseline_final)
+    if is_ppl_metric_kind(subject_kind):
+        if baseline_final_value < 1.0:
+            raise MetricsError(
+                code="E237",
+                message="PPL baseline final must be at least 1.0.",
+                details={"baseline_final": baseline_final_value},
+            )
+    elif subject_kind == "accuracy":
+        if not 0.0 <= baseline_final_value <= 1.0:
+            raise MetricsError(
+                code="E237",
+                message="Accuracy baseline final must be in [0, 1].",
+                details={"baseline_final": baseline_final_value},
+            )
+    else:
+        raise MetricsError(
+            code="E236",
+            message="Unsupported primary metric kind for baseline comparison.",
+            details={"subject_kind": subject_kind},
+        )
     baseline_ref: dict[str, Any] = {
         "run_id": optional_text(baseline_normalized.get("run_id")),
         "model_id": optional_text(baseline_normalized.get("model_id")),
         "adapter": optional_text(baseline_normalized.get("adapter")),
         "primary_metric": {
-            "kind": baseline_pm.get("kind", "ppl_causal"),
-            "final": float(baseline_final),
+            "kind": baseline_kind,
+            "final": baseline_final_value,
         },
     }
     baseline_metrics = (

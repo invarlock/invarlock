@@ -9,6 +9,7 @@ import torch.nn as nn
 from invarlock.edits.quant_rtn_plan import TargetModule
 
 _WeightRestorer = Callable[[torch.Tensor], torch.Tensor]
+_EXACT_CHANGE_COUNT_CHUNK_ELEMENTS = 8 * 1024 * 1024
 
 
 def population_std(tensor: torch.Tensor) -> float:
@@ -183,6 +184,76 @@ def quantization_error_metrics(
     }
 
 
+def exact_change_counts(
+    original: torch.Tensor,
+    edited: torch.Tensor,
+) -> dict[str, int | bool]:
+    """Count exact post-write changes without treating a processed tensor as changed.
+
+    RTN may legitimately map a tensor back to identical floating-point values
+    (for example, an all-zero tensor or values already on the per-channel INT8
+    grid).  The command must distinguish that no-op from a successful edit.
+    Byte comparison catches storage changes such as signed zero, while exact
+    value comparison makes the accounting explicit for report consumers.
+    """
+    if original.shape != edited.shape or original.dtype != edited.dtype:
+        raise ValueError(
+            "Cannot compare RTN changes when the original and edited tensors "
+            "have different shapes or dtypes."
+        )
+
+    original_values = original.detach().contiguous().reshape(-1)
+    edited_values = edited.detach().contiguous().reshape(-1)
+    if original_values.numel() == 0:
+        return {
+            "params_changed": 0,
+            "value_changed_elements": 0,
+            "byte_changed_elements": 0,
+            "bytes_changed": 0,
+            "tensor_changed": False,
+        }
+
+    element_size = original_values.element_size()
+    counts = torch.zeros(4, dtype=torch.int64, device=original_values.device)
+    for start in range(0, original_values.numel(), _EXACT_CHANGE_COUNT_CHUNK_ELEMENTS):
+        stop = min(start + _EXACT_CHANGE_COUNT_CHUNK_ELEMENTS, original_values.numel())
+        original_chunk = original_values[start:stop]
+        edited_chunk = edited_values[start:stop]
+
+        values_equal = torch.eq(original_chunk, edited_chunk)
+        if original_values.is_floating_point() or original_values.is_complex():
+            # Equal NaN payloads are unchanged storage.  Treat them as
+            # value-equal here; any changed payload is still caught by bytes.
+            values_equal = values_equal | (
+                torch.isnan(original_chunk) & torch.isnan(edited_chunk)
+            )
+        value_changed = ~values_equal
+
+        original_bytes = original_chunk.view(torch.uint8).reshape(-1, element_size)
+        edited_bytes = edited_chunk.view(torch.uint8).reshape(-1, element_size)
+        byte_difference = original_bytes != edited_bytes
+        byte_changed = byte_difference.any(dim=1)
+        changed = value_changed | byte_changed
+
+        counts[0].add_(changed.sum(dtype=torch.int64))
+        counts[1].add_(value_changed.sum(dtype=torch.int64))
+        counts[2].add_(byte_changed.sum(dtype=torch.int64))
+        counts[3].add_(byte_difference.sum(dtype=torch.int64))
+
+    raw_counts = counts.cpu().tolist()
+    params_changed = int(raw_counts[0])
+    value_changed_elements = int(raw_counts[1])
+    byte_changed_elements = int(raw_counts[2])
+    bytes_changed = int(raw_counts[3])
+    return {
+        "params_changed": params_changed,
+        "value_changed_elements": value_changed_elements,
+        "byte_changed_elements": byte_changed_elements,
+        "bytes_changed": bytes_changed,
+        "tensor_changed": params_changed > 0,
+    }
+
+
 def apply_rtn_quantization(
     module: nn.Module,
     bitwidth: int,
@@ -192,7 +263,7 @@ def apply_rtn_quantization(
     weight = cast(Any, module).weight
     original_weight = weight.detach().clone()
     original_shape = weight.shape
-    params_quantized = weight.numel()
+    params_processed = int(weight.numel())
     weight_2d, restore_weight = weight_to_channel_matrix(module, weight)
     pre_clip_weight = weight_2d
 
@@ -213,9 +284,12 @@ def apply_rtn_quantization(
     with torch.no_grad():
         cast(Any, module).weight.copy_(quantized_weight)
 
+    actual_weight = cast(Any, module).weight.detach()
+    change_counts = exact_change_counts(original_weight, actual_weight)
+
     error_metrics = quantization_error_metrics(
         original_weight,
-        quantized_weight,
+        actual_weight,
         clipped_fraction=clipped_fraction,
         quant_code_edge_fraction=float(
             scale_stats.get(
@@ -226,7 +300,12 @@ def apply_rtn_quantization(
     )
 
     return {
-        "params_quantized": params_quantized,
+        # ``params_quantized`` remains the number of target elements processed,
+        # not a claim that every one was changed.  ``params_changed`` below is
+        # the exact post-write change count used by the command outcome.
+        "params_quantized": params_processed,
+        "params_processed": params_processed,
+        **change_counts,
         "original_shape": original_shape,
         "bitwidth": bitwidth,
         "scale_stats": scale_stats,

@@ -1,5 +1,7 @@
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _make_report(preview: float, final: float, tier: str = "balanced"):
@@ -21,6 +23,7 @@ def _make_report(preview: float, final: float, tier: str = "balanced"):
     report["data"].update(
         {"dataset": "wikitext2", "split": "validation", "seq_len": 128, "stride": 64}
     )
+    report["context"] = {"profile": "dev", "assurance": {"mode": "off"}}
     report["edit"].update({"name": "structured"})
     report["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
@@ -39,8 +42,14 @@ def _make_baseline(ppl: float):
             "adapter": "hf_causal",
             "commit": "cafebabe",
             "device": "cpu",
+            "auto": {"tier": "balanced"},
         }
     )
+    base["context"] = {"profile": "dev", "assurance": {"mode": "off"}}
+    base["data"].update(
+        {"dataset": "wikitext2", "split": "validation", "seq_len": 128, "stride": 64}
+    )
+    base["edit"]["name"] = "noop"
     base["metrics"]["primary_metric"] = {
         "kind": "ppl_causal",
         "preview": ppl,

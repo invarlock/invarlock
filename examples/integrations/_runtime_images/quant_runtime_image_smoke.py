@@ -5,13 +5,11 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import shutil
 import sys
-import sysconfig
-from pathlib import Path
 
 CORE_RUNTIME_IMPORTS = (
     "datasets",
+    "peft",
     "safetensors",
     "torch",
     "transformers",
@@ -106,16 +104,34 @@ def _selected_adapters(raw_value: str) -> tuple[str, ...]:
     return selected
 
 
-def _apply_runtime_compat_patches() -> None:
-    try:
-        from invarlock.plugins import _patch_gptqmodel_transformers_hub_compat
-    except (ImportError, ModuleNotFoundError):
+_GPTQMODEL_ADAPTERS = frozenset({"hf_awq", "hf_gptq"})
+
+
+def _require_gptqmodel_runtime(
+    selected_adapters: tuple[str, ...],
+    *,
+    require_jit_toolchain: bool,
+) -> None:
+    if not _GPTQMODEL_ADAPTERS.intersection(selected_adapters):
         return
-    _patch_gptqmodel_transformers_hub_compat()
+    try:
+        from invarlock.gptqmodel_runtime import require_gptqmodel_runtime
+
+        require_gptqmodel_runtime(require_jit_toolchain=require_jit_toolchain)
+    except RuntimeError as exc:
+        # The named runtime boundary uses path-free diagnostic names such as
+        # ``Python.h missing``.  Preserve those actionable prerequisites rather
+        # than reducing a CUDA image failure to its exception type.
+        _fail(str(exc))
+    except OPTIONAL_IMPORT_ERRORS as exc:
+        _fail(f"GPTQModel runtime unavailable: {type(exc).__name__}")
 
 
 def _import_required_modules(selected_adapters: tuple[str, ...]) -> None:
-    _apply_runtime_compat_patches()
+    _require_gptqmodel_runtime(
+        selected_adapters,
+        require_jit_toolchain=False,
+    )
     backend_imports = {
         QUANT_BACKEND_IMPORTS[adapter_name] for adapter_name in selected_adapters
     }
@@ -132,7 +148,32 @@ def _import_required_modules(selected_adapters: tuple[str, ...]) -> None:
         _fail("missing quant runtime modules: " + ", ".join(sorted(missing)))
 
 
-def _check_cuda_runtime(*, require_cuda_toolchain: bool, require_gpu: bool) -> None:
+def _check_peft_awq_dispatcher(selected_adapters: tuple[str, ...]) -> None:
+    """Exercise PEFT's deferred GPTQModel AWQ import on a non-AWQ probe."""
+    if "hf_awq" not in selected_adapters:
+        return
+    import torch
+    from peft import LoraConfig
+    from peft.tuners.lora.awq import dispatch_awq
+
+    try:
+        replacement = dispatch_awq(
+            torch.nn.Linear(1, 1),
+            "default",
+            config=LoraConfig(r=1, target_modules=[]),
+        )
+    except OPTIONAL_IMPORT_ERRORS as exc:
+        _fail(f"PEFT AWQ runtime unavailable: {type(exc).__name__}")
+    if replacement is not None:
+        _fail("PEFT AWQ dispatcher replaced a non-AWQ probe")
+
+
+def _check_cuda_runtime(
+    *,
+    selected_adapters: tuple[str, ...],
+    require_cuda_toolchain: bool,
+    require_gpu: bool,
+) -> None:
     import torch
 
     if torch.version.cuda is None:
@@ -146,14 +187,12 @@ def _check_cuda_runtime(*, require_cuda_toolchain: bool, require_gpu: bool) -> N
 
     from torch.utils.cpp_extension import CUDA_HOME
 
-    if shutil.which("nvcc") is None:
-        _fail("nvcc missing")
     if not CUDA_HOME:
         _fail("CUDA_HOME missing")
-
-    include_path = Path(sysconfig.get_paths()["include"]) / "Python.h"
-    if not include_path.is_file():
-        _fail(f"Python.h missing at {include_path}")
+    _require_gptqmodel_runtime(
+        selected_adapters,
+        require_jit_toolchain=True,
+    )
 
 
 def _check_adapter_backend_contract(selected_adapters: tuple[str, ...]) -> None:
@@ -183,7 +222,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     selected_adapters = _selected_adapters(args.adapters)
     _import_required_modules(selected_adapters)
+    _check_peft_awq_dispatcher(selected_adapters)
     _check_cuda_runtime(
+        selected_adapters=selected_adapters,
         require_cuda_toolchain=args.require_cuda_toolchain,
         require_gpu=args.require_gpu,
     )

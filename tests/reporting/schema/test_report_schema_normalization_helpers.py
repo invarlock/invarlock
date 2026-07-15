@@ -6,10 +6,23 @@ from invarlock.reporting import report_normalization as normalization_mod
 from invarlock.reporting import report_primary_metric_policy as pm_policy
 from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting import report_schema as schema_mod
+from invarlock.reporting.report_types import create_empty_report
 
 
-def test_normalize_baseline_handles_schema_v1():
-    baseline = {
+def _canonical_baseline(*, final: float = 10.0, preview: float = 9.0) -> dict:
+    baseline = create_empty_report()
+    baseline["meta"].update({"model_id": "demo", "adapter": "hf_causal"})
+    baseline["edit"]["name"] = "noop"
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": preview,
+        "final": final,
+    }
+    return baseline
+
+
+def test_normalize_baseline_rejects_retired_schema():
+    legacy = {
         "schema_version": "baseline-v1",
         "meta": {"commit_sha": "abcdef1234567890", "model_id": "demo"},
         "metrics": {"ppl_final": 42.0},
@@ -17,29 +30,14 @@ def test_normalize_baseline_handles_schema_v1():
         "rmt_base": {"stable": True},
         "invariants": {"status": "ok"},
     }
-    normalized = normalization_mod.normalize_baseline(baseline)
-    assert normalized["run_id"] == "abcdef1234567890"
-    assert normalized["ppl_final"] == 42.0
-    assert normalized["spectral"] == {"caps": 1}
+    with pytest.raises(ValueError, match="legacy baseline"):
+        normalization_mod.normalize_baseline(legacy)
 
 
 def test_normalize_baseline_infers_primary_metric():
-    baseline = {
-        "meta": {"model_id": "demo", "adapter": "hf"},
-        "edit": {"name": "baseline", "deltas": {"params_changed": 0}, "plan": {}},
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 9.0,
-                "final": 10.0,
-            },
-            "bootstrap": {"coverage": {"used": 1}},
-            "spectral": {},
-            "rmt": {},
-            "invariants": {},
-        },
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.2]}},
-    }
+    baseline = _canonical_baseline()
+    baseline["metrics"]["bootstrap"] = {"coverage": {"used": 1}}
+    baseline["evaluation_windows"] = {"final": {"window_ids": [1], "logloss": [0.2]}}
     normalized = normalization_mod.normalize_baseline(baseline)
     assert normalized["ppl_final"] == 10.0
     assert normalized["ppl_preview"] == 9.0
@@ -47,18 +45,8 @@ def test_normalize_baseline_infers_primary_metric():
 
 
 def test_normalize_baseline_raises_on_invalid():
-    baseline = {
-        "meta": {"model_id": "demo"},
-        "edit": {"name": "quantize", "plan": {}, "deltas": {"params_changed": 5}},
-        "metrics": {
-            "ppl_final": 0.0,
-            "ppl_preview": 0.0,
-            "spectral": {},
-            "rmt": {},
-            "invariants": {},
-        },
-    }
-    with pytest.raises(ValueError, match="Invalid baseline"):
+    baseline = _canonical_baseline(final=0.0, preview=0.0)
+    with pytest.raises(ValueError, match="Invalid canonical RunReport structure"):
         normalization_mod.normalize_baseline(baseline)
 
 
@@ -94,14 +82,18 @@ def _minimal_schema_valid_report() -> dict:
             "seq_len": 8,
             "windows": {"preview": 1, "final": 1, "stats": {}},
         },
-        "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 1.0,
+            "final": 1.0,
+            "ratio_vs_baseline": 1.0,
+        },
         "validation": {"primary_metric_acceptable": True},
     }
 
 
 def test_report_schema_validates_primary_metric_tail_shape() -> None:
-    if schema_mod.jsonschema is None:
-        pytest.skip("jsonschema not installed")
+    assert schema_mod.jsonschema is not None, "jsonschema is a required dependency"
     evaluation_report = _minimal_schema_valid_report()
     evaluation_report["primary_metric_tail"] = {
         "evaluated": True,
@@ -116,8 +108,7 @@ def test_report_schema_validates_primary_metric_tail_shape() -> None:
 
 
 def test_report_schema_rejects_malformed_primary_metric_tail() -> None:
-    if schema_mod.jsonschema is None:
-        pytest.skip("jsonschema not installed")
+    assert schema_mod.jsonschema is not None, "jsonschema is a required dependency"
     evaluation_report = _minimal_schema_valid_report()
     evaluation_report["primary_metric_tail"] = {
         "evaluated": "yes",
@@ -125,6 +116,22 @@ def test_report_schema_rejects_malformed_primary_metric_tail() -> None:
         "stats": [],
     }
 
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        {},
+        {"mode": "warn", "evaluated": True},
+        {"mode": "WARN", "evaluated": True, "passed": True},
+        {"mode": "warn", "evaluated": 1, "passed": True},
+        {"mode": "warn", "evaluated": True, "passed": 1},
+    ],
+)
+def test_report_schema_rejects_tail_defaults_and_coercions(tail: object) -> None:
+    evaluation_report = _minimal_schema_valid_report()
+    evaluation_report["primary_metric_tail"] = tail
     assert schema_mod.validate_report(evaluation_report) is False
 
 
@@ -225,7 +232,11 @@ def test_validate_evaluation_report_rejects_non_mapping_validation_without_jsons
 
 
 def test_load_validation_allowlist_prefers_contracts_file(monkeypatch):
-    keys = ["primary_metric_acceptable", "guard_overhead_acceptable", "custom_flag"]
+    keys = [
+        "primary_metric_acceptable",
+        "guard_metric_impact_acceptable",
+        "custom_flag",
+    ]
     monkeypatch.setattr(allowlist_mod, "load_json_contract", lambda _filename: keys)
     loaded = allowlist_mod.load_validation_allowlist()
     assert loaded == {str(k) for k in keys}
@@ -298,54 +309,26 @@ def test_propagate_pairing_stats_ignores_missing_dataset():
     assert report == {"dataset": {"windows": {"stats": {}}}}
 
 
-def test_normalize_baseline_handles_v1_schema_structure():
-    baseline = {
-        "schema_version": "baseline-v1",
-        "meta": {"commit_sha": "abcdef1234567890", "model_id": "gpt2"},
-        "metrics": {"ppl_final": 25.0},
-        "spectral_base": {"caps": 1},
-        "rmt_base": {"stable": True},
-        "invariants": {"status": "ok"},
-    }
-    normalized = normalization_mod.normalize_baseline(baseline)
-    assert normalized["run_id"] == "abcdef1234567890"
-    assert normalized["model_id"] == "gpt2"
-    assert normalized["ppl_final"] == 25.0
-    assert normalized["spectral"] == {"caps": 1}
-
-
 def test_normalize_baseline_raises_for_invalid_ppl():
-    baseline = {
-        "meta": {"model_id": "demo"},
-        "edit": {"name": "baseline", "plan": {}, "deltas": {"params_changed": 0}},
-        "metrics": {"ppl_final": 0.0, "spectral": {}, "rmt": {}, "invariants": {}},
-        "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
-    }
-    with pytest.raises(ValueError, match="Invalid baseline"):
+    baseline = _canonical_baseline(final=0.0, preview=0.0)
+    with pytest.raises(ValueError, match="Invalid canonical RunReport structure"):
         normalization_mod.normalize_baseline(baseline)
 
 
 def test_normalize_baseline_extracts_runreport_payload():
-    baseline = {
-        "meta": {"model_id": "demo", "auto": {"tier": "balanced"}},
-        "edit": {
-            "name": "baseline",
-            "plan": {"target_sparsity": 0.0},
-            "plan_digest": "baseline_noop",
-            "deltas": {"params_changed": 0},
-        },
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 12.0, "preview": 11.0},
+    baseline = _canonical_baseline(final=12.0, preview=11.0)
+    baseline["metrics"].update(
+        {
             "spectral": {"caps_applied": 0},
             "rmt": {"stable": True},
             "invariants": {"status": "ok"},
             "bootstrap": {},
             "window_overlap_fraction": 0.4,
             "window_match_fraction": 1.0,
-        },
-        "evaluation_windows": {
-            "final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]},
-        },
+        }
+    )
+    baseline["evaluation_windows"] = {
+        "final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}
     }
     normalized = normalization_mod.normalize_baseline(baseline)
     assert normalized["run_id"] is not None

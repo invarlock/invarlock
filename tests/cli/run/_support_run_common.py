@@ -1,12 +1,83 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import yaml
+
 SNS = SimpleNamespace
+
+
+def configure_guard_metric_impact_skip(path: Path) -> Path:
+    """Declare metric-impact measurement out of scope for an unrelated CLI test."""
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    context = payload.setdefault("context", {})
+    assert isinstance(context, dict)
+    run = context.setdefault("run", {})
+    assert isinstance(run, dict)
+    run["skip_guard_metric_impact_check"] = True
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return path
+
+
+def canonical_ppl_metrics(
+    *, preview: float = 1.0, final: float = 1.0, **extra: object
+) -> dict[str, object]:
+    """Build finite CoreRunner PPL metrics for unrelated CLI success fixtures."""
+    ratio = final / preview
+    return {
+        "ppl_preview": preview,
+        "ppl_final": final,
+        "ppl_ratio": ratio,
+        "logloss_final": math.log(final),
+        "final_total_tokens": 1,
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": preview,
+            "final": final,
+            "invalid": False,
+            "degraded": False,
+            "degraded_reason": None,
+        },
+        **extra,
+    }
+
+
+def measured_guard_metric_impact_result(
+    *, degradation: float = 0.0, degradation_limit: float = 0.01
+) -> SimpleNamespace:
+    """Build canonical successful validator evidence for unrelated CLI tests."""
+    bare_value = 1.0
+    guarded_value = 1.0 + degradation
+    display_value = degradation * 100.0
+    return SimpleNamespace(
+        passed=True,
+        messages=[],
+        warnings=[],
+        errors=[],
+        diagnostics=[],
+        checks={
+            "metric_kind_matches": True,
+            "measurements_valid": True,
+            "guard_metric_impact": True,
+        },
+        metrics={
+            "metric_kind": "ppl_causal",
+            "direction": "lower",
+            "bare_value": bare_value,
+            "guarded_value": guarded_value,
+            "degradation_basis": "relative_increase",
+            "degradation": degradation,
+            "display_value": display_value,
+            "display_unit": "percent",
+        },
+    )
 
 
 def write_base_run_config(
@@ -96,12 +167,16 @@ def common_ce_patches(
                 "invarlock.cli.device.validate_device_for_config",
                 lambda d: (True, ""),
             ),
+            patch(
+                "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+                lambda *_args, **_kwargs: measured_guard_metric_impact_result(),
+            ),
         )
     )
     if include_save_report:
         patches.append(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },
@@ -180,7 +255,7 @@ def common_ce_detect_ce_patches():
             ),
         ),
         patch(
-            "invarlock.reporting.report_files.save_report",
+            "invarlock.reporting.report_bundle.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -201,7 +276,7 @@ def runner_success():
     return SimpleNamespace(
         execute=lambda **k: SimpleNamespace(
             edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics=canonical_ppl_metrics(),
             guards={},
             context={"dataset_meta": {}},
             status="success",

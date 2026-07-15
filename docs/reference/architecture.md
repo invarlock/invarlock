@@ -7,7 +7,7 @@
 | **Purpose** | Auditable strict-verification framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security auditors. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
-| **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, full provenance. |
+| **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, and reviewable report-recorded provenance. |
 | **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
@@ -20,7 +20,7 @@ the canonical guard chain, policy digest, and measurement contract.
 3. [Component Layers](#component-layers)
 4. [Pipeline Flow](#pipeline-flow)
 5. [Guard Chain Architecture](#guard-chain-architecture)
-6. [report Generation Flow](#report-generation-flow)
+6. [Report Generation Flow](#report-generation-flow)
 7. [Architecture Guardrails](#architecture-guardrails)
 8. [Key Design Decisions](#key-design-decisions)
 9. [Module Dependencies](#module-dependencies)
@@ -34,23 +34,21 @@ the canonical guard chain, policy digest, and measurement contract.
 │                        INVARLOCK SYSTEM OVERVIEW                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  USER INPUT                    PROCESSING                      OUTPUT       │
-│  ─────────                     ──────────                      ──────       │
-│                                                                             │
-│  ┌──────────┐    ┌────────────────────────────────┐    ┌──────────────┐     │
-│  │  Config  │───▶│            CLI LAYER           │───▶│    report    │     │
-│  │  (YAML)  │    │ evaluate | verify | report ... │    │    (JSON)    │     │
-│  └──────────┘    └───────────────┬────────────────┘    └──────────────┘     │
-│                                  │                                          │
-│  ┌──────────┐    ┌───────────────▼────────────────┐    ┌──────────────┐     │
-│  │  Model   │───▶│          CORE RUNTIME          │───▶│    report    │     │
-│  │  (HF ID) │    │   runner.py + adapters + edits │    │    (JSON)    │     │
-│  └──────────┘    └───────────────┬────────────────┘    └──────────────┘     │
-│                                  │                                          │
-│  ┌──────────┐    ┌───────────────▼────────────────┐    ┌──────────────┐     │
-│  │ Dataset  │───▶│          GUARD CHAIN           │───▶│    Events    │     │
-│  │(provider)│    │ inv(pre)→spectral→rmt→var→post │    │    (JSONL)   │     │
-│  └──────────┘    └────────────────────────────────┘    └──────────────┘     │
+│  baseline + subject + dataset/config                                       │
+│                    │                                                        │
+│                    ▼                                                        │
+│  invarlock evaluate → adapters/edit stage → canonical guard chain → eval   │
+│                    │                                                        │
+│                    ▼                                                        │
+│  raw report.json files → evaluation.report.json + runtime.manifest.json     │
+│                                      │                                      │
+│                  ┌───────────────────┴───────────────────┐                  │
+│                  ▼                                       ▼                  │
+│  independent inputs → invarlock verify            invarlock report html    │
+│  baseline + policy + image digest                  review rendering         │
+│                  │                                                          │
+│                  ▼                                                          │
+│          verified or rejected                                               │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -79,8 +77,8 @@ InvarLock follows a layered architecture with clear separation of concerns:
 │  ┌─────────────────────────────────────────────────────────────────┐        │
 │  │ runner.py + runner_*                                          │        │
 │  │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐     │        │
-│  │  │prepare │─▶│ guards │─▶│  edit  │─▶│ guards │─▶│  eval  │     │        │
-│  │  │ model  │  │(before)│  │ apply  │  │(after) │  │ final  │     │        │
+│  │  │prepare │─▶│inv(pre)│─▶│  edit  │─▶│ guards │─▶│  eval  │     │        │
+│  │  │+ guards│  │validate│  │ / noop │  │validate│  │+ final │     │        │
 │  │  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘     │        │
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                             │
@@ -94,8 +92,8 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          REPORTING / FILES LAYER                            │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────┐ ┌────────────┐            │
-│  │ report_make  │ │report_bundle │ │   render   │ │  schema    │            │
-│  │ + console    │ │ + evidence   │ │  (MD/HTML) │ │   (JSON)   │            │
+│  │ report_make  │ │report_bundle │ │ rendering  │ │report_schema│           │
+│  │ + console    │ │ + manifest   │ │  (MD/HTML) │ │   (JSON)   │            │
 │  └──────────────┘ └──────────────┘ └────────────┘ └────────────┘            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -110,16 +108,19 @@ modules should stay thin: parse arguments, call core/reporting owners, render
 output, and map failures to exit codes.
 
 Shell support modules such as `cli/config_execution.py`, `cli/run_execution.py`,
-`cli/run_config.py`, `cli/run_pairing.py`, and `cli/run_overhead.py` belong to
+`cli/run_config.py`, `cli/run_pairing.py`, and `cli/run_metric_impact.py` belong to
 this boundary layer as well. They can perform CLI-facing adaptation and
 console/event rendering; policy ownership stays in the core and reporting
 owners.
 
+Public model-loading commands use the runtime container by default.
+`invarlock evaluate --execution-mode host` is the explicit host-side path.
+
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
-| `evaluate` | Compare baseline vs subject with pinned windows | report JSON + MD |
+| `evaluate` | Compare baseline vs subject with pinned windows | Raw run reports plus canonical report/manifest bundle |
 | `verify` | Validate report against schema and pairing | Exit code + messages |
-| `report` | Render/compare reports and reports | MD/HTML/JSON artifacts |
+| `report` | Render, explain, validate, or export reports | MD/HTML/JSON artifacts |
 | `doctor` | Environment diagnostics | Health check output |
 | `advanced` | Maintenance workflows such as evidence packs, policy packs, plugins, and calibration | Exit code + workflow-specific artifacts |
 | `version` | Emit package and schema version information | Version string |
@@ -136,25 +137,32 @@ by the CLI and non-CLI entrypoints.
 | `report_inputs.py` | Canonical report path resolution and JSON-object validation |
 | `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
 | `verify_contract.py` | Structured report-verification service used by `verify` and evidence-pack flows |
-| `runtime_verify.py` + `runtime_provenance.py` | Authoritative runtime-manifest verification and runtime-provenance ownership for report verification |
+| `runtime_verify.py` + `runtime_provenance.py` | Report/manifest binding checks and optional caller-supplied runtime-image digest matching |
 | `run_policy.py` | Shared run policy helpers such as split choice, PM thresholds, and overhead policy |
 | `retry.py` | Retry controller, edit-parameter adjustment, attempt summaries, and retry state transitions |
 | `run_snapshot_contract.py` | Snapshot planning, restore behavior, and retry transitions |
 | `run_report_contract.py` | Run provenance finalization, payload shaping, and run-report assembly contracts |
 
-### Runtime Provenance Verification Ownership
+### Runtime Evidence Verification Ownership
 
-Runtime provenance uses a single verifier implementation:
+Runtime evidence uses a single verifier implementation:
 
 - `runtime_verify.py` is the authoritative programmatic verifier for
-  `runtime.manifest.json` plus report-digest binding checks.
+  `runtime.manifest.json`, report-digest binding, and comparison with an
+  optional caller-supplied expected image digest.
 - `cli/commands/verify.py` owns the CLI entrypoints for both report verification
   and advanced runtime-manifest verification.
 - `runtime_provenance.py` calls the same verifier when `invarlock verify`
-  enforces runtime provenance on container-backed reports.
+  enforces runtime evidence policy on container-backed reports.
 - Product behavior does not depend on finding an external verifier binary on
-  `PATH`; verifier semantics are package-native and deterministic across
-  installs.
+  `PATH`; verifier semantics are package-native and deterministic for the same
+  package version and input bytes.
+
+This boundary verifies artifact consistency and an image-identity claim. It is
+not remote attestation: a compromised evaluation environment can fabricate a consistent
+report and manifest that name an expected digest. The expected digest must come
+from an independent release/deployment channel, and isolated evaluation
+infrastructure is still required when the evaluation environment is outside the trust boundary.
 
 ### Core Runtime (`src/invarlock/core/`)
 
@@ -186,14 +194,14 @@ Report generation, validation, persistence, and rendering.
 | Module | Responsibility |
 | --- | --- |
 | `report_schema.py` | Evaluation report schema and structural validation |
-| `report_validation.py` | Canonical validation-flag computation |
+| `validation/report.py` | Canonical validation-flag computation |
 | `report_make.py` | Evaluation-report input normalization, build-section extraction, output shaping, and public report assembly |
 | `report_make_assembly.py` | Policy/provenance/guard assembly and report build-context composition |
 | `report_bundle.py` | Evaluation-bundle persistence, manifest writing, and evidence attachment |
 | `report_contract.py` | Input loading and report-generation planning |
-| `report_overhead.py` | Guard-overhead normalization, summary building, and report shaping |
+| `report_metric_impact.py` | Guard-metric-impact normalization, summary building, and report shaping |
 | `report_summary.py` | Console validation blocks and shared executive-summary/view-model derivation for reporting surfaces |
-| `render_markdown.py` | Markdown rendering for evaluation reports |
+| `rendering/markdown.py` | Markdown rendering for evaluation reports |
 | `html.py` | HTML export with styling |
 | `core/guard_evidence.py` | Canonical guard-evidence normalization before reporting assembly |
 | `report_builder_support.py` | Report build context, telemetry extraction, telemetry payloads, artifacts, and baseline references |
@@ -207,24 +215,18 @@ Report generation, validation, persistence, and rendering.
 │                                                                             │
 │   PHASE 1: BASELINE RUN                                                     │
 │   ─────────────────────                                                     │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐              │
-│   │  Load    │───▶│ Evaluate │───▶│  Record  │───▶│  Save    │              │
-│   │  Model   │    │  Windows │    │  Guards  │    │  Report  │              │
-│   └──────────┘    └──────────┘    └──────────┘    └──────────┘              │
+│   load baseline → prepare guards → guard validation (noop) → evaluate       │
+│                                                    → baseline/report.json    │
 │                                                                             │
 │   PHASE 2: SUBJECT RUN (with baseline window pinning)                       │
 │   ───────────────────────────────────────────────                           │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐              │
-│   │  Load    │───▶│  Apply   │───▶│ Evaluate │───▶│  Record  │              │
-│   │  Model   │    │  Edit    │    │  Paired  │    │  Guards  │              │
-│   └──────────┘    └──────────┘    └──────────┘    └──────────┘              │
+│   load subject → prepare guards → guard validation (edit/noop)              │
+│                → evaluate the same final windows → subject/report.json      │
 │                                                                             │
 │   PHASE 3: EVALUATION REPORT GENERATION                                     │
 │   ──────────────────────────────────────                                    │
-│   ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
-│   │ Normalize  │─▶│  Compare   │─▶│  Apply     │─▶│ Persist +  │            │
-│   │ inputs     │  │  metrics   │  │  policy    │  │ render     │            │
-│   └────────────┘  └────────────┘  └────────────┘  └────────────┘            │
+│   pair raw reports → recompute metrics → apply report-local policy          │
+│                    → evaluation.report.json + runtime.manifest.json          │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -238,56 +240,19 @@ Report generation, validation, persistence, and rendering.
 │                                                                             │
 │   CANONICAL ORDER: invariants → spectral → rmt → variance → invariants      │
 │                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────┐       │
-│   │                    BEFORE EDIT                                  │       │
-│   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │       │
-│   │  │  INVARIANTS  │  │   SPECTRAL   │  │     RMT      │           │       │
-│   │  │   prepare()  │  │   prepare()  │  │   prepare()  │           │       │
-│   │  │  ──────────  │  │  ──────────  │  │  ──────────  │           │       │
-│   │  │ • NaN check  │  │ • Baseline σ │  │ • Baseline ε │           │       │
-│   │  │ • Shape check│  │ • Family caps│  │ • Activation │           │       │
-│   │  │ • Tying check│  │ • z-scores   │  │ • Calibration│           │       │
-│   │  └──────────────┘  └──────────────┘  └──────────────┘           │       │
-│   └─────────────────────────────────────────────────────────────────┘       │
-│                               │                                             │
-│                               ▼                                             │
-│   ┌─────────────────────────────────────────────────────────────────┐       │
-│   │                      EDIT APPLIED                               │       │
-│   │          (quant_rtn, noop, or external BYOE checkpoint)         │       │
-│   └─────────────────────────────────────────────────────────────────┘       │
-│                               │                                             │
-│                               ▼                                             │
-│   ┌─────────────────────────────────────────────────────────────────┐       │
-│   │                     AFTER EDIT                                  │       │
-│   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │       │
-│   │  │  INVARIANTS  │  │   SPECTRAL   │  │     RMT      │           │       │
-│   │  │  validate()  │  │  validate()  │  │  validate()  │           │       │
-│   │  │  ──────────  │  │  ──────────  │  │  ──────────  │           │       │
-│   │  │ • Post-edit  │  │ • κ-check    │  │ • ε-band     │           │       │
-│   │  │   integrity  │  │ • Caps count │  │   compliance │           │       │
-│   │  │ • NaN detect │  │ • Stability  │  │ • Δ tracking │           │       │
-│   │  └──────────────┘  └──────────────┘  └──────────────┘           │       │
-│   │                                                                 │       │
-│   │  ┌──────────────┐                                               │       │
-│   │  │   VARIANCE   │  (A/B test: bare vs VE-enabled)               │       │
-│   │  │  validate()  │                                               │       │
-│   │  │  ──────────  │                                               │       │
-│   │  │ • Gain check │                                               │       │
-│   │  │ • CI overlap │                                               │       │
-│   │  │ • Enable/skip│                                               │       │
-│   │  └──────────────┘                                               │       │
-│   └─────────────────────────────────────────────────────────────────┘       │
-│                               │                                             │
-│                               ▼                                             │
-│   ┌─────────────────────────────────────────────────────────────────┐       │
-│   │                    GUARD RESULTS                                │       │
-│   │                                                                 │       │
-│   │  • validation.invariants_pass: bool                             │       │
-│   │  • validation.spectral_stable: bool                             │       │
-│   │  • validation.rmt_stable: bool                                  │       │
-│   │  • measurement_contract_hash: str (CI/Release verification)     │       │
-│   │                                                                 │       │
-│   └─────────────────────────────────────────────────────────────────┘       │
+│   prepare model + all guards                                                │
+│          │                                                                  │
+│          ▼                                                                  │
+│   invariants(pre).validate → edit/noop stage                                │
+│          │                                                                  │
+│          ▼                                                                  │
+│   spectral.validate → rmt.validate → variance.validate                      │
+│          │                                                                  │
+│          ▼                                                                  │
+│   invariants(post).validate → evaluate → finalize run report                │
+│                                                                             │
+│   Report evidence includes guard statuses plus spectral and RMT             │
+│   measurement-contract hashes.                                              │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -296,7 +261,7 @@ Report generation, validation, persistence, and rendering.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         report GENERATION                                   │
+│                         REPORT GENERATION                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   INPUTS                                                                    │
@@ -308,20 +273,20 @@ Report generation, validation, persistence, and rendering.
 │                                    │                                        │
 │                                    ▼                                        │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                         report BUILDER                              │   │
+│   │                         REPORT BUILDER                              │   │
 │   │  1. Pair baseline/subject windows                                   │   │
 │   │  2. Compute paired ΔlogNLL + BCa bootstrap                          │   │
 │   │  3. Apply policy gates (PM ratio, drift, guard checks)              │   │
 │   │  4. Emit validation flags + state                                   │   │
-│   │  5. Attach provenance (seeds)                                       │   │
+│   │  5. Attach provenance and mark verifier assurance pending           │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │                                    ▼                                        │
-│   OUTPUTS                                                                   │
-│   ┌────────────────────┐  ┌───────────────────┐  ┌────────────────────┐     │
-│   │ evaluation.report  │  │ evaluation_report │  │  evaluation.html   │     │
-│   │ .json              │  │ .md               │  │                    │     │
-│   └────────────────────┘  └───────────────────┘  └────────────────────┘     │
+│   BUNDLE OUTPUTS                                                            │
+│   evaluation.report.json + runtime.manifest.json + optional Markdown       │
+│                                    │                                        │
+│                                    ▼                                        │
+│   invarlock report html → evaluation.html (rebuildable review rendering)    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -331,20 +296,15 @@ Report generation, validation, persistence, and rendering.
 The shell/core split is enforced by design and by targeted architecture guard
 tests. The intended invariants are:
 
-- No lazy exports in package roots such as `adapters/__init__.py` or
-  `guards/__init__.py`. Package roots should expose only explicit canonical
-  exports.
-- No `rmt_legacy` references in production source. RMT ownership lives in
-  `rmt.py`, `rmt_analysis.py`, and `rmt_detection.py`.
-- No dependency-map orchestration in command shells. Public command owners stay
-  thin and avoid giant `deps` dictionaries or injected callables that recreate
-  removed indirection.
-- No compatibility-only command signatures once a canonical owner contract
-  exists. Example: lens-metric calculation takes a required `MetricsConfig`
-  instead of deprecated per-call overrides.
-- No CLI imports inside owner layers. Modules under `src/invarlock/core/` and
-  `src/invarlock/reporting/` must stay callable without importing
-  `invarlock.cli`.
+- Package roots such as `adapters/__init__.py` and `guards/__init__.py` expose
+  explicit canonical exports.
+- RMT ownership lives in `rmt.py`, `rmt_analysis.py`, and `rmt_detection.py`.
+- Public command shells stay thin; orchestration and typed dependencies live in
+  their canonical owner modules.
+- Canonical owner contracts use the current configuration objects. For example,
+  lens-metric calculation takes a required `MetricsConfig`.
+- Modules under `src/invarlock/core/` and `src/invarlock/reporting/` stay callable
+  independently of `invarlock.cli`.
 
 These guardrails keep the CLI as an imperative shell while policy, contracts,
 and verdict computation remain reusable from non-CLI flows such as evidence-pack
@@ -356,8 +316,8 @@ verification and programmatic execution.
 | --- | --- | --- |
 | **Torch-independent core** | `runner.py` coordinates without importing torch; adapters encapsulate torch-specific logic. | Adapter protocol in `core/api.py` |
 | **Edit-stack-neutral guards** | Guards work with subject checkpoints from quantization, pruning, LoRA merge, fine-tuning, or other weight-edit workflows. | Guard protocol validates model state, not edit toolchain |
-| **Tier-based policies** | Calibrated thresholds in `tiers.yaml` for balanced/conservative/aggressive safety profiles. | Policy resolution in `guards/policies.py` |
-| **Deterministic evaluation** | Seed bundle + window pairing schedules ensure reproducible metrics. | `meta.seeds`, `dataset.windows.stats` tracking |
+| **Tier-based policies** | Explicit packaged defaults in `runtime/tiers.yaml`; run-local sweeps may recommend reviewed overrides. | Policy resolution in `guards/policies.py` |
+| **Deterministic evaluation inputs** | Seed bundles and window schedules remove sampling drift; numerical results may still vary across devices, kernels, or dependency versions. | `meta.seeds`, `dataset.windows.stats` tracking |
 | **Functional-core / imperative-shell split** | Keep policy, artifact contracts, and verdict computation reusable outside the CLI while CLI modules stay thin. | `core/*.py` + `reporting/*.py` owners called from `cli/commands/*.py` |
 | **Single verifier ownership** | Runtime-manifest verification should not vary with host tooling, so it must use one product implementation. | `runtime_verify.py`, `runtime_provenance.py` |
 | **Plugin architecture** | Entry points for guards, adapters, edits enable extension without core changes. | `importlib.metadata` discovery in `core/registry.py` |
@@ -368,8 +328,12 @@ quantization tool, pruner, adapter merge, or fine-tuning pipeline produces the
 subject checkpoint, and InvarLock validates the resulting
 baseline-vs-subject evidence.
 The evaluator CLI keeps built-in editing to portable demo/smoke support. The
-repo evidence-pack harness has deterministic generated validation-subject lanes
-for quantization, pruning, LoRA merge, and fine-tune coverage.
+evidence-pack harness derives non-calibration active lanes from a scenario manifest; the
+current validation-subject lanes cover magnitude pruning and synthetic
+low-rank/dense perturbations, while compatible CUDA environments can opt into
+packed bitsandbytes deployable quantization scenarios. Validation-subject lanes
+represent deterministic perturbations rather than adapter training, adapter
+merging, or model fine-tuning.
 
 ## Module Dependencies
 
@@ -378,48 +342,21 @@ for quantization, pruning, LoRA merge, and fine-tune coverage.
 │                         MODULE DEPENDENCY GRAPH                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│                           ┌─────────────┐                                   │
-│                           │     CLI     │                                   │
-│                           │  commands/* │                                   │
-│                           └──────┬──────┘                                   │
-│                                  │                                          │
-│                                  ▼                                          │
-│                   ┌──────────────────────────────┐                           │
-│                   │ cli shell support modules    │                           │
-│                   │ run_config/run_pairing/      │                           │
-│                   │ run_execution/run_overhead   │                           │
-│                   └─────────────┬────────────────┘                           │
-│                                 │                                            │
-│                                 ▼                                            │
-│                     ┌───────────────────────────┐                            │
-│                     │ core/reporting contracts  │                            │
-│                     │ evaluate_plan,            │                            │
-│                     │ report_inputs,            │                            │
-│                     │ doctor_findings,          │                            │
-│                     │ verify_contract,          │                            │
-│                     │ run_policy, run_retry,    │                            │
-│                     │ run_snapshot, run_report  │                            │
-│                     └─────────────┬─────────────┘                            │
-│                                   │                                          │
-│              ┌────────────────────┼────────────────────┐                     │
-│              │                    │                    │                     │
-│              ▼                    ▼                    ▼                     │
-│       ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                │
-│       │ core/runner │────▶│  guards/*   │────▶│ reporting/* │                │
-│       │  + services │     │             │     │ build/files │                │
-│       └──────┬──────┘     └──────┬──────┘     └─────────────┘                │
-│              │                   │                                           │
-│              ▼                   ▼                                           │
-│       ┌─────────────┐     ┌─────────────┐                                    │
-│       │  adapters/  │     │   edits/    │                                    │
-│       │   hf_*.py   │     │ quant_rtn.py│                                    │
-│       └──────┬──────┘     └─────────────┘                                    │
-│              │                                                               │
-│              ▼                                                               │
-│       ┌─────────────┐                                                        │
-│       │    eval/    │  (metrics, datasets, tasks)                            │
-│       │  *.py       │                                                        │
-│       └─────────────┘                                                        │
+│   cli/commands/*                                                            │
+│          │                                                                  │
+│          ▼                                                                  │
+│   cli/run_config.py · run_pairing.py · run_execution.py                     │
+│   cli/run_metric_impact.py                                                  │
+│          │                                                                  │
+│          ▼                                                                  │
+│   core + reporting contracts                                                │
+│   evaluate_plan.py · run_policy.py · retry.py                               │
+│   run_snapshot_contract.py · verify_contract.py                             │
+│   reporting/run_report_contract.py                                          │
+│          │                                                                  │
+│          ├──▶ core/runner.py ──▶ adapters/* · edits/* · guards/* · eval/*   │
+│          │                                                                  │
+│          └──▶ reporting/report_make.py ──▶ report_bundle.py · rendering/*   │
 │                                                                             │
 │   KEY: ───▶ imports/depends on                                              │
 │                                                                             │

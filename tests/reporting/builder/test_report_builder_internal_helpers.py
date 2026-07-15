@@ -9,9 +9,7 @@ class TestPrivateHelperFunctions:
 
     def test_normalize_baseline_runreport(self):
         """Test _normalize_baseline with RunReport format."""
-        baseline = create_mock_run_report(model_id="baseline-model", ppl_final=8.5)
-        # Fix: make it a proper baseline
-        baseline["edit"]["name"] = "baseline"
+        baseline = create_mock_baseline(model_id="baseline-model", ppl_final=8.5)
 
         result = _normalize_baseline(baseline)
 
@@ -19,27 +17,31 @@ class TestPrivateHelperFunctions:
         assert result["ppl_final"] == 8.5
         assert "run_id" in result
 
-    def test_normalize_baseline_v1_schema(self):
-        """Test _normalize_baseline with baseline-v1 schema."""
-        baseline = create_mock_baseline(schema_type="baseline-v1", ppl_final=7.8)
+    def test_normalize_baseline_canonical_schema(self):
+        """Test _normalize_baseline with the canonical RunReport schema."""
+        baseline = create_mock_baseline(ppl_final=7.8)
 
         result = _normalize_baseline(baseline)
 
         assert result["model_id"] == "test-model"
         assert result["ppl_final"] == 7.8
-        assert result["run_id"] == "baseline123456789"[:16]
+        assert result["run_id"]
 
-    def test_normalize_baseline_normalized_format(self):
-        """Test _normalize_baseline with already normalized format."""
-        baseline = create_mock_baseline(schema_type="normalized")
-
-        result = _normalize_baseline(baseline)
-
-        assert result == baseline  # Should return as-is
+    def test_normalize_baseline_accepts_canonical_comparison_summary(self):
+        """Canonical comparison baselines remain valid builder inputs."""
+        baseline = {
+            "run_id": "r1",
+            "model_id": "m",
+            "primary_metric": {"kind": "ppl_causal", "final": 9.0},
+        }
+        normalized = _normalize_baseline(baseline)
+        assert normalized["primary_metric"] == baseline["primary_metric"]
+        assert normalized["ppl_final"] == 9.0
+        assert normalized["ppl_preview"] == 9.0
 
     def test_normalize_baseline_invalid_input(self):
         """Test _normalize_baseline with invalid input."""
-        with pytest.raises(ValueError, match="Baseline must be a RunReport dict"):
+        with pytest.raises(ValueError, match="canonical baseline"):
             _normalize_baseline("invalid_input")
 
     def test_extract_dataset_info(self):
@@ -123,6 +125,7 @@ class TestPrivateHelperFunctions:
         report.setdefault("guards", []).append(
             {
                 "name": "invariants",
+                "passed": True,
                 "metrics": {
                     "checks_performed": 3,
                     "violations_found": 1,
@@ -153,7 +156,9 @@ class TestPrivateHelperFunctions:
 
         result = _extract_invariants(report)
 
-        assert result["status"] == "pass"  # Empty treated as pass
+        assert result["status"] == "fail"
+        assert result["passed"] is False
+        assert result["decision"] == "block"
 
     def test_extract_spectral_analysis(self):
         """Test _extract_spectral_analysis function."""
@@ -186,9 +191,7 @@ class TestPrivateHelperFunctions:
     def test_extract_rmt_analysis(self):
         """Test _extract_rmt_analysis function."""
         report = create_mock_run_report()
-        baseline = create_mock_baseline(
-            schema_type="normalized"
-        )  # Use normalized format with RMT data
+        baseline = _normalize_baseline(create_mock_baseline())
 
         result = _extract_rmt_analysis(report, baseline)
 
@@ -229,6 +232,28 @@ class TestPrivateHelperFunctions:
 
         assert result["enabled"] is True
         assert result["gain"] == 1.8
+
+    def test_extract_variance_analysis_projects_restoration_contract(self):
+        report = create_mock_run_report()
+        variance_guard = next(
+            guard for guard in report["guards"] if guard["name"] == "variance"
+        )
+        variance_guard["metrics"].update(
+            ve_enabled=False,
+            ve_enabled_during_validation=True,
+            subject_restored_after_ab=True,
+            met_threshold=True,
+            ab_gain=0.02,
+            ppl_no_ve=100.0,
+            ppl_with_ve=98.0,
+        )
+
+        result = _extract_variance_analysis(report)
+
+        assert result["enabled"] is False
+        assert result["ve_enabled_during_validation"] is True
+        assert result["subject_restored_after_ab"] is True
+        assert result["met_threshold"] is True
 
     def test_extract_variance_analysis_disabled(self):
         """Test _extract_variance_analysis with variance disabled."""

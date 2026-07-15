@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_overhead as report_overhead_mod
+import pytest
+
+from invarlock.reporting import report_metric_impact as report_metric_impact_mod
 from invarlock.reporting import report_policy as report_policy_mod
-from invarlock.reporting import report_validation as report_validation_mod
+from invarlock.reporting.validation import report as report_validation_mod
+from tests.reporting._support_guard_metric_impact import ppl_guard_context
 
 
 def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
@@ -39,7 +42,7 @@ def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
         tier=tier,
         _ppl_metrics=_ppl_metrics,
         target_ratio=None,
-        guard_overhead=None,
+        guard_metric_impact=None,
         primary_metric=primary_metric,
         moe=None,
         dataset_capacity=dataset_capacity,
@@ -282,18 +285,19 @@ def test_resolve_tiny_relax_from_report_context_and_auto_fields() -> None:
     )
 
 
-def test_prepare_guard_overhead_section_fallback_paths():
+def test_prepare_guard_metric_impact_section_fallback_paths():
     # Direct ratio computation path
-    payload = {"bare_ppl": 100.0, "guarded_ppl": 101.0, "overhead_threshold": 0.02}
-    out, passed = report_overhead_mod.prepare_guard_overhead_section(payload)
-    assert out.get("evaluated") is True and out.get("overhead_ratio") == 1.01
+    payload = ppl_guard_context(100.0, 101.0, degradation_limit=0.02)
+    out, passed = report_metric_impact_mod.prepare_guard_metric_impact_section(payload)
+    assert out.get("evaluated") is True
+    assert out.get("degradation") == pytest.approx(0.01)
     assert passed is True
 
-    # Unavailable ratio path → not evaluated and soft-pass
-    out2, passed2 = report_overhead_mod.prepare_guard_overhead_section(
+    # Unavailable ratio path is not evaluated and fails closed.
+    out2, passed2 = report_metric_impact_mod.prepare_guard_metric_impact_section(
         {"source": "unit"}
     )
-    assert out2.get("evaluated") is False and out2.get("passed") is True
+    assert out2.get("evaluated") is False and out2.get("passed") is False
     assert any(
         "unavailable" in item.get("message", "").lower()
         for item in out2.get("diagnostics", [])

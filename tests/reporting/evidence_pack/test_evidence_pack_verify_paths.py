@@ -25,14 +25,42 @@ def _write_pack_scaffold(pack_dir: Path) -> tuple[Path, Path, Path]:
 
     final_verdict = pack_dir / "results" / "final_verdict.json"
     environment = pack_dir / "metadata" / "environment.json"
-    _write_json(final_verdict, {"verdict": "PASS"})
+    _write_json(
+        final_verdict,
+        {
+            "verdict": "PASS",
+            "report_sha256": evidence_pack_mod._sha256_bytes(report_path.read_bytes()),
+        },
+    )
     _write_json(environment, {"platform": "test"})
+    scenarios = pack_dir / "metadata/scenarios.json"
+    _write_json(
+        scenarios,
+        {
+            "scenarios": [
+                {
+                    "id": "clean",
+                    "strictness": "must_pass",
+                    "artifact_class": "evidence_only_pack",
+                    "generation": {"kind": "evidence_only"},
+                },
+                {
+                    "id": "noop",
+                    "strictness": "must_fail",
+                    "primary_guard": "primary_metric",
+                    "artifact_class": "evidence_only_pack",
+                    "generation": {"kind": "evidence_only"},
+                },
+            ]
+        },
+    )
 
     checksum_lines = [
         f"{evidence_pack_mod._sha256_bytes(final_verdict.read_bytes())}  results/final_verdict.json",
         f"{evidence_pack_mod._sha256_bytes(environment.read_bytes())}  metadata/environment.json",
         f"{evidence_pack_mod._sha256_bytes(report_path.read_bytes())}  reports/model/clean/noop/evaluation.report.json",
         f"{evidence_pack_mod._sha256_bytes((report_path.parent / RUNTIME_MANIFEST_FILENAME).read_bytes())}  reports/model/clean/noop/{RUNTIME_MANIFEST_FILENAME}",
+        f"{evidence_pack_mod._sha256_bytes(scenarios.read_bytes())}  metadata/scenarios.json",
     ]
     checksums_path = pack_dir / "checksums.sha256"
     checksums_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
@@ -137,7 +165,11 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
     _write_pack_scaffold(pack_dir)
     error_dir = pack_dir / "reports" / "model" / "errors" / "noop"
     error_dir.mkdir(parents=True, exist_ok=True)
-    (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+    error_report = error_dir / "evaluation.report.json"
+    _write_json(
+        error_report,
+        {"validation": {"primary_metric_acceptable": False}},
+    )
     json_out = tmp_path / "verify.json"
 
     def _fake_run_verify(
@@ -149,7 +181,23 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
         if "errors" in reports[0].as_posix():
             return VerifyExecutionResult(
                 outcome=VerifyOutcome.POLICY_FAIL,
-                payload={"ok": False},
+                payload={
+                    "summary": {"ok": False, "reason": "policy_fail"},
+                    "results": [
+                        {
+                            "id": str(error_report),
+                            "ok": False,
+                            "reason": "policy_fail",
+                            "verification": {
+                                "runtime_provenance": {
+                                    "binding_verified": True,
+                                    "expected_digest_matched": False,
+                                    "trust_status": "manifest_bound",
+                                }
+                            },
+                        }
+                    ],
+                },
                 diagnostics=(),
             )
         return VerifyExecutionResult(
@@ -174,7 +222,25 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
 
     assert errors == []
     assert payload is not None
-    assert payload["expected_failures"]["verify"] == [{"ok": False}]
+    assert payload["expected_failures"]["verify"] == [
+        {
+            "summary": {"ok": False, "reason": "policy_fail"},
+            "results": [
+                {
+                    "id": str(error_report),
+                    "ok": False,
+                    "reason": "policy_fail",
+                    "verification": {
+                        "runtime_provenance": {
+                            "binding_verified": True,
+                            "expected_digest_matched": False,
+                            "trust_status": "manifest_bound",
+                        }
+                    },
+                }
+            ],
+        }
+    ]
     assert json.loads(json_out.read_text(encoding="utf-8")) == payload
 
 
@@ -257,19 +323,18 @@ def test_verify_evidence_pack_covers_success_integrity_and_report_failure_paths(
     assert result.payload["strict"] is True
     assert result.payload["signer_fingerprint"] == "ABC123"
     assert result.payload["verify"] == {"ok": True}
-    assert seen == {
-        "pack_dir": pack_success,
-        "json_out_path": json_out,
-        "profile": "release",
-        "report_assurance": "report",
-    }
+    assert seen["pack_dir"] != pack_success
+    assert Path(seen["pack_dir"]).name.startswith("invarlock-pack-snapshot-")
+    assert seen["json_out_path"] == json_out
+    assert seen["profile"] == "release"
+    assert seen["report_assurance"] == "report"
 
     pack_integrity = tmp_path / "integrity"
     _write_pack_scaffold(pack_integrity)
     (pack_integrity / "extra.bin").write_text("extra", encoding="utf-8")
     integrity_result = evidence_pack_mod.verify_evidence_pack(
         pack_integrity,
-        skip_verify=True,
+        skip_verify=False,
         strict=True,
     )
     assert integrity_result.status == evidence_pack_mod.EvidencePackStatus.INTEGRITY

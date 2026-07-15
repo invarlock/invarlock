@@ -22,6 +22,10 @@ from invarlock.core.run_orchestrator import (
 )
 from tests.cli._support_console import RecordingConsole
 from tests.cli.run._internal_cli import internal_run_app as cli
+from tests.cli.run._support_run_common import (
+    configure_guard_metric_impact_skip,
+    measured_guard_metric_impact_result,
+)
 
 
 def _cfg(tmp_path: Path, *, provider: str = "synthetic") -> str:
@@ -56,7 +60,7 @@ output:
   dir: runs
 """.replace("__PROVIDER__", provider)
     )
-    return str(p)
+    return str(configure_guard_metric_impact_skip(p))
 
 
 def _common_stubs(monkeypatch) -> None:
@@ -86,7 +90,15 @@ def _common_stubs(monkeypatch) -> None:
         lambda: SimpleNamespace(
             execute=lambda **k: SimpleNamespace(
                 edit={"deltas": {"params_changed": 0}},
-                metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+                metrics={
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    },
+                    "window_overlap_fraction": 0.0,
+                    "window_match_fraction": 1.0,
+                },
                 guards={},
                 context={"dataset_meta": {}},
                 evaluation_windows={},
@@ -125,6 +137,10 @@ def _common_stubs(monkeypatch) -> None:
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",
         ),
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+        lambda *_args, **_kwargs: measured_guard_metric_impact_result(),
     )
 
 
@@ -649,3 +665,23 @@ def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) 
     assert "Configuration file not found: /tmp/missing.yaml" in output
     assert "Schema invalid: run report structure failed validation" in output
     assert "Pipeline execution failed: core pipeline failure" in output
+
+
+def test_guard_metric_budget_failure_uses_accuracy_drop_wording() -> None:
+    console = RecordingConsole()
+    console._invarlock_output_style = output_mod.OutputStyle(name="audit")
+
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(
+                code="guard_metric_impact_budget_exceeded",
+                context={
+                    "degradation_limit": 0.01,
+                    "degradation_basis": "absolute_drop",
+                },
+            )
+        ),
+    )
+
+    assert "(>1.0 pp drop)" in console.joined()

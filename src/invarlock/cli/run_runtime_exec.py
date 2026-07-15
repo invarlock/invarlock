@@ -6,15 +6,21 @@ import builtins
 import copy
 import gc
 import inspect
-import json
 import math
 import os
 import shutil
 from ctypes import CDLL, c_int, c_size_t
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from invarlock.cli.run_runtime_evidence import (
+    capture_backend_inventory,
+    capture_runtime_quantization_proof,
+)
+from invarlock.cli.run_runtime_snapshot import (
+    SnapshotRestoreFailed,
+    require_snapshot_reuse_model,
+)
 from invarlock.cli.run_runtime_warnings import (
     FilteredWarningStream,
     _apply_warning_filters,
@@ -26,7 +32,7 @@ from invarlock.core.backend_inventory import (
     build_backend_inventory_for_adapter,
 )
 from invarlock.core.exceptions import InvarlockError
-from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
+from invarlock.core.run_policy import GUARD_METRIC_DEGRADATION_LIMIT
 from invarlock.core.run_snapshot_contract import (
     build_snapshot_execution_plan as _build_snapshot_execution_plan_impl,
 )
@@ -35,6 +41,10 @@ from invarlock.core.run_snapshot_contract import (
 )
 from invarlock.core.run_snapshot_contract import (
     estimate_model_bytes as _estimate_model_bytes_impl,
+)
+from invarlock.core.runtime_quantization_proof import (
+    build_runtime_quantization_proof,
+    write_runtime_quantization_proof_sidecar,
 )
 
 
@@ -115,12 +125,12 @@ def resolve_tokenizer(profile: Any) -> tuple[Any, str]:
     return _resolve_tokenizer(profile)
 
 
-def validate_guard_overhead(*args: Any, **kwargs: Any) -> Any:
+def validate_guard_metric_impact(*args: Any, **kwargs: Any) -> Any:
     from invarlock.reporting.validate import (
-        validate_guard_overhead as _validate_guard_overhead,
+        validate_guard_metric_impact as _validate_guard_metric_impact,
     )
 
-    return _validate_guard_overhead(*args, **kwargs)
+    return _validate_guard_metric_impact(*args, **kwargs)
 
 
 def free_model_memory(model: object | None) -> None:
@@ -135,10 +145,6 @@ def free_model_memory(model: object | None) -> None:
         return
 
 
-class SnapshotRestoreFailed(RuntimeError):
-    """Internal signal for snapshot restore failures during retries."""
-
-
 _SNAPSHOT_RESTORE_EXCEPTIONS = (
     AttributeError,
     KeyError,
@@ -148,14 +154,6 @@ _SNAPSHOT_RESTORE_EXCEPTIONS = (
 )
 
 
-def _require_snapshot_reuse_model(*, model: Any, phase: str) -> Any:
-    if model is None:
-        raise SnapshotRestoreFailed(
-            f"Snapshot reuse requested for {phase} without a live model instance."
-        )
-    return model
-
-
 def _capture_backend_inventory(
     *,
     adapter: Any,
@@ -163,43 +161,33 @@ def _capture_backend_inventory(
     model: Any,
     run_config: Any,
 ) -> None:
-    try:
-        from invarlock.cli.run_config import extract_model_load_kwargs
+    from invarlock.cli.run_config import extract_model_load_kwargs
 
-        load_kwargs = extract_model_load_kwargs(
-            cfg,
-            invarlock_error_cls=InvarlockError,
-        )
-    except (AttributeError, KeyError, TypeError, ValueError, InvarlockError):
-        load_kwargs = {}
-    quantization_config = load_kwargs.get("quantization_config")
-    adapter_name = str(getattr(adapter, "name", "") or "")
-    inventory = build_backend_inventory_for_adapter(
-        adapter=adapter_name,
-        quantization_config=(
-            quantization_config if isinstance(quantization_config, dict) else {}
-        ),
+    capture_backend_inventory(
+        adapter=adapter,
+        cfg=cfg,
         model=model,
-        load_smoke=True,
-        inference_smoke=False,
+        run_config=run_config,
+        extract_load_kwargs=extract_model_load_kwargs,
+        error_type=InvarlockError,
+        build_inventory=build_backend_inventory_for_adapter,
+        filename=BACKEND_INVENTORY_FILENAME,
     )
-    if inventory is None:
-        return
-    context = getattr(run_config, "context", None)
-    if isinstance(context, dict):
-        context["_backend_inventory"] = inventory
-    event_path = getattr(run_config, "event_path", None)
-    if event_path is None:
-        return
-    try:
-        output_dir = Path(event_path).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / BACKEND_INVENTORY_FILENAME).write_text(
-            json.dumps(inventory, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-    except (OSError, TypeError, ValueError):
-        return
+
+
+def _capture_runtime_quantization_proof(
+    *,
+    adapter: Any,
+    model: Any,
+    run_config: Any,
+) -> None:
+    capture_runtime_quantization_proof(
+        adapter=adapter,
+        model=model,
+        run_config=run_config,
+        build_proof=build_runtime_quantization_proof,
+        write_sidecar=write_runtime_quantization_proof_sidecar,
+    )
 
 
 def build_snapshot_execution_plan(
@@ -208,14 +196,14 @@ def build_snapshot_execution_plan(
     model: Any,
     cfg_snapshot: dict[str, Any] | None,
     direct_reuse_loaded_model: bool,
-    skip_overhead_source: str | None,
+    skip_guard_metric_impact_source: str | None,
 ) -> Any:
     return _build_snapshot_execution_plan_impl(
         adapter=adapter,
         model=model,
         cfg_snapshot=cfg_snapshot,
         direct_reuse_loaded_model=direct_reuse_loaded_model,
-        skip_overhead_source=skip_overhead_source,
+        skip_guard_metric_impact_source=skip_guard_metric_impact_source,
         choose_snapshot_mode_fn=_choose_snapshot_mode_impl,
         estimate_model_bytes_fn=_estimate_model_bytes_impl,
         psutil_module=get_psutil(),
@@ -246,6 +234,59 @@ def load_model_with_cfg(
     if not isinstance(model_id, str) or not model_id:
         raise ValueError("Missing model.id in config")
 
+    from invarlock.core.checkpoint_identity import (
+        LEGACY_MODEL_IDENTITY_FIELDS,
+        CheckpointIdentityError,
+        checkpoint_tree_observation,
+        validated_model_identity,
+    )
+
+    try:
+        model_section = cfg.model_dump().get("model") or {}
+    except (AttributeError, TypeError, ValueError):
+        model_section = {}
+    raw_identity = (
+        model_section.get("model_identity") if isinstance(model_section, dict) else None
+    )
+    legacy_identity_fields = (
+        sorted(
+            field for field in LEGACY_MODEL_IDENTITY_FIELDS if field in model_section
+        )
+        if isinstance(model_section, dict)
+        else []
+    )
+    if legacy_identity_fields:
+        raise CheckpointIdentityError(
+            "configured model uses legacy model identity field(s): "
+            + ", ".join(legacy_identity_fields)
+        )
+    model_identity = validated_model_identity(raw_identity)
+    if raw_identity is not None and model_identity is None:
+        raise CheckpointIdentityError("configured model identity is malformed")
+    expected_local_digest: str | None = None
+    pre_load_observation: Any | None = None
+    if model_identity is not None:
+        if model_identity["kind"] == "local_checkpoint_tree":
+            expected_local_digest = model_identity["sha256"]
+            pre_load_observation = checkpoint_tree_observation(model_id)
+            if pre_load_observation.digest != expected_local_digest:
+                raise CheckpointIdentityError(
+                    "local checkpoint tree identity mismatch before model loading"
+                )
+
+    def _verify_loaded_identity(model: Any) -> Any:
+        if expected_local_digest is None:
+            return model
+        post_load_observation = checkpoint_tree_observation(model_id)
+        if (
+            post_load_observation.digest != expected_local_digest
+            or post_load_observation != pre_load_observation
+        ):
+            raise CheckpointIdentityError(
+                "local checkpoint tree changed during model loading"
+            )
+        return model
+
     from invarlock.cli.run_config import extract_model_load_kwargs
 
     extra = extract_model_load_kwargs(cfg, invarlock_error_cls=InvarlockError)
@@ -270,41 +311,24 @@ def load_model_with_cfg(
                 allowed = dict(extra)
                 if prefer_local_files_only:
                     allowed["prefer_local_files_only"] = True
-                return adapter.load_model(model_id, device=device, **allowed)
+                return _verify_loaded_identity(
+                    adapter.load_model(model_id, device=device, **allowed)
+                )
             allowed = {k: v for k, v in extra.items() if k in sig.parameters}
             if prefer_local_files_only and strict_accepts_local_files_only:
                 allowed["prefer_local_files_only"] = True
             if allowed:
-                return adapter.load_model(model_id, device=device, **allowed)
-            if prefer_local_files_only and strict_accepts_local_files_only:
-                return adapter.load_model(
-                    model_id, device=device, prefer_local_files_only=True
+                return _verify_loaded_identity(
+                    adapter.load_model(model_id, device=device, **allowed)
                 )
 
         if prefer_local_files_only and sig is None:
-            return adapter.load_model(
-                model_id, device=device, prefer_local_files_only=True
+            return _verify_loaded_identity(
+                adapter.load_model(
+                    model_id, device=device, prefer_local_files_only=True
+                )
             )
-        return adapter.load_model(model_id, device=device)
-
-
-def init_retry_controller(
-    *,
-    until_pass: bool,
-    max_attempts: int,
-    timeout: int | None,
-    baseline: str | None,
-) -> Any:
-    """Initialize RetryController for owner-managed retry handling."""
-    del baseline
-    retry_controller = None
-    if until_pass:
-        from invarlock.core.retry import RetryController
-
-        retry_controller = RetryController(
-            max_attempts=max_attempts, timeout=timeout, verbose=True
-        )
-    return retry_controller
+        return _verify_loaded_identity(adapter.load_model(model_id, device=device))
 
 
 def run_bare_control(
@@ -323,17 +347,24 @@ def run_bare_control(
     resolved_device: str,
     restore_fn: Any | None,
     resolved_loss_type: str,
-    overhead_threshold: float = GUARD_OVERHEAD_THRESHOLD,
+    restore_before_run: bool = True,
+    degradation_limit: float = GUARD_METRIC_DEGRADATION_LIMIT,
     profile_normalized: str | None = None,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
     prefer_local_files_only: bool = False,
 ) -> dict[str, Any] | None:
-    """Execute the bare-control run for overhead estimation and return payload."""
-    from invarlock.cli.run_overhead import _extract_pm_snapshot_for_overhead
+    """Execute the bare-control run for guard metric impact and return its payload."""
+    from invarlock.cli.run_metric_impact import _extract_pm_snapshot_for_metric_impact
     from invarlock.core.api import EditRuntime
     from invarlock.core.determinism_policy import set_seed
     from invarlock.core.runner import CoreRunner
+    from invarlock.eval.guard_metric_impact import (
+        build_guard_metric_bare_report,
+        extract_guard_metric_arm_facts,
+        guard_metric_execution_status_is_successful,
+        metric_value_from_arm_facts,
+    )
 
     python_seed = seed_bundle.get("python")
     if isinstance(python_seed, int):
@@ -343,7 +374,7 @@ def run_bare_control(
     bare_config = copy.deepcopy(run_config)
     bare_config.event_path = None
     bare_context = copy.deepcopy(run_config.context)
-    bare_context.setdefault("validation", {})["guard_overhead_mode"] = "bare"
+    bare_context.setdefault("validation", {})["guard_metric_impact_mode"] = "bare"
     bare_config.context = bare_context
     edit_runtime = EditRuntime(
         profile=profile_normalized,
@@ -360,13 +391,14 @@ def run_bare_control(
     bare_target_model = None
     try:
         if restore_fn and model is not None:
-            try:
-                restore_fn()
-            except _SNAPSHOT_RESTORE_EXCEPTIONS as exc:
-                raise SnapshotRestoreFailed(str(exc)) from exc
+            if restore_before_run:
+                try:
+                    restore_fn()
+                except _SNAPSHOT_RESTORE_EXCEPTIONS as exc:
+                    raise SnapshotRestoreFailed(str(exc)) from exc
             bare_target_model = model
         elif skip_model_load:
-            bare_target_model = _require_snapshot_reuse_model(
+            bare_target_model = require_snapshot_reuse_model(
                 model=model,
                 phase="bare control",
             )
@@ -385,7 +417,7 @@ def run_bare_control(
         with suppress_noisy_warnings(
             profile_normalized,
             event_path=getattr(run_config, "event_path", None),
-            context={"phase": "guard_overhead_bare"},
+            context={"phase": "guard_metric_impact_bare"},
         ):
             bare_report = bare_runner.execute(
                 model=bare_target_model,
@@ -406,15 +438,35 @@ def run_bare_control(
         else:
             release_process_memory()
 
-    bare_ppl_final = None
-    bare_ppl_preview = None
+    if not guard_metric_execution_status_is_successful(
+        getattr(bare_report, "status", None)
+    ):
+        bare_error = getattr(bare_report, "error", None)
+        error_suffix = (
+            f" Reason: {bare_error}"
+            if isinstance(bare_error, str) and bare_error
+            else ""
+        )
+        raise InvarlockError(
+            code="E009",
+            message=(
+                "GUARD-METRIC-BARE-CONTROL-FAILED: bare control did not complete "
+                f"successfully (status: {getattr(bare_report, 'status', 'unknown')!s})."
+                f"{error_suffix}"
+            ),
+        )
+
+    bare_metric_final = None
+    bare_metric_preview = None
     if hasattr(bare_report, "metrics") and bare_report.metrics:
         bare_pm = bare_report.metrics.get("primary_metric", {})
-        bare_ppl_final = bare_pm.get("final") if isinstance(bare_pm, dict) else None
-        bare_ppl_preview = bare_pm.get("preview") if isinstance(bare_pm, dict) else None
+        bare_metric_final = bare_pm.get("final") if isinstance(bare_pm, dict) else None
+        bare_metric_preview = (
+            bare_pm.get("preview") if isinstance(bare_pm, dict) else None
+        )
 
     payload: dict[str, Any] = {
-        "overhead_threshold": float(overhead_threshold),
+        "degradation_limit": float(degradation_limit),
         "diagnostics": [],
         "checks": {},
         "source": f"{profile_normalized or 'ci'}_profile",
@@ -429,10 +481,10 @@ def run_bare_control(
             except (TypeError, ValueError):
                 return False
 
-        if not (_finite(bare_ppl_preview) and _finite(bare_ppl_final)):
+        if not (_finite(bare_metric_preview) and _finite(bare_metric_final)):
             payload["diagnostics"].append(
                 {
-                    "kind": "guard_overhead_warning",
+                    "kind": "guard_metric_impact_warning",
                     "severity": "warning",
                     "message": (
                         "Primary metric non-finite during bare control; continuing with "
@@ -442,32 +494,36 @@ def run_bare_control(
                 }
             )
 
-    if getattr(bare_report, "status", "").lower() not in {"success", "completed", "ok"}:
-        payload["diagnostics"].append(
-            {
-                "kind": "guard_overhead_warning",
-                "severity": "warning",
-                "message": f"Bare run status: {getattr(bare_report, 'status', 'unknown')}",
-                "details": {},
-            }
-        )
-
     lk = str(resolved_loss_type or "causal").lower()
-    if lk == "mlm":
+    if lk in {"classification", "accuracy"}:
+        pm_kind_bare = "accuracy"
+    elif lk == "mlm":
         pm_kind_bare = "ppl_mlm"
     elif lk in {"seq2seq", "s2s", "t5"}:
         pm_kind_bare = "ppl_seq2seq"
     else:
         pm_kind_bare = "ppl_causal"
-    pm_bare = _extract_pm_snapshot_for_overhead(bare_report, kind=pm_kind_bare)
+    pm_bare = _extract_pm_snapshot_for_metric_impact(bare_report, kind=pm_kind_bare)
     if isinstance(pm_bare, dict) and pm_bare:
-        payload["bare_report"] = {"metrics": {"primary_metric": pm_bare}}
+        bare_facts = extract_guard_metric_arm_facts(bare_report, pm_kind_bare)
+        if bare_facts is not None:
+            payload["bare_facts"] = bare_facts
+            replayed = metric_value_from_arm_facts(pm_kind_bare, bare_facts)
+            if replayed is not None:
+                pm_bare = dict(pm_bare)
+                pm_bare["final"] = replayed
+        bare_report_envelope = build_guard_metric_bare_report(
+            bare_report,
+            pm_kind_bare,
+        )
+        if bare_report_envelope is not None:
+            payload["bare_report"] = bare_report_envelope
     else:
         payload["diagnostics"].append(
             {
-                "kind": "guard_overhead_warning",
+                "kind": "guard_metric_impact_warning",
                 "severity": "warning",
-                "message": "Bare control primary metric unavailable for overhead diagnostics.",
+                "message": "Bare control primary metric unavailable for impact diagnostics.",
                 "details": {},
             }
         )
@@ -507,7 +563,7 @@ def execute_guarded_run(
         except _SNAPSHOT_RESTORE_EXCEPTIONS as exc:
             raise SnapshotRestoreFailed(str(exc)) from exc
     elif skip_model_load:
-        model = _require_snapshot_reuse_model(
+        model = require_snapshot_reuse_model(
             model=model,
             phase="guarded execution",
         )
@@ -542,6 +598,11 @@ def execute_guarded_run(
         model=model,
         run_config=run_config,
     )
+    _capture_runtime_quantization_proof(
+        adapter=adapter,
+        model=model,
+        run_config=run_config,
+    )
 
     try:
         with suppress_noisy_warnings(
@@ -569,8 +630,7 @@ def execute_guarded_run(
 
 __all__ = [
     "FilteredWarningStream",
-    "GUARD_OVERHEAD_THRESHOLD",
-    "SnapshotRestoreFailed",
+    "GUARD_METRIC_DEGRADATION_LIMIT",
     "_apply_warning_filters",
     "_resolve_warning_suppression",
     "build_snapshot_execution_plan",
@@ -579,12 +639,11 @@ __all__ = [
     "free_model_memory",
     "get_psutil",
     "get_torch",
-    "init_retry_controller",
     "load_model_with_cfg",
     "release_process_memory",
     "reset_optional_runtime_caches",
     "resolve_tokenizer",
     "run_bare_control",
     "suppress_noisy_warnings",
-    "validate_guard_overhead",
+    "validate_guard_metric_impact",
 ]

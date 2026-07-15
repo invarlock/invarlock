@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.assurance_guard_validation import guard_evidence_policy_errors
 from invarlock.core.metric_kind_contract import (
     MetricKindContractError,
     is_ppl_metric_kind,
@@ -26,6 +27,12 @@ from .verify_check_helpers_metrics import (
     _validate_report_schema_strict,
     resolve_tiny_relax_from_report,
     validate_report,
+)
+from .verify_variance_consistency import (
+    _collect_provenance_window_ids as _collect_provenance_window_ids,
+)
+from .verify_variance_consistency import (
+    _validate_variance_enablement as _validate_variance_enablement,
 )
 
 
@@ -315,119 +322,6 @@ def _validate_measurement_contracts(
     return errors
 
 
-def _collect_provenance_window_ids(node: Any) -> list[Any]:
-    if isinstance(node, dict):
-        window_ids = node.get("window_ids")
-        if isinstance(window_ids, list):
-            return list(window_ids)
-        collected: list[Any] = []
-        for value in node.values():
-            collected.extend(_collect_provenance_window_ids(value))
-        return collected
-    if isinstance(node, list):
-        collected = []
-        for value in node:
-            collected.extend(_collect_provenance_window_ids(value))
-        return collected
-    return []
-
-
-def _validate_variance_enablement(report: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    variance = report.get("variance") or {}
-    if not isinstance(variance, dict) or not bool(variance.get("enabled", False)):
-        return errors
-
-    resolved_policy = report.get("resolved_policy") or {}
-    variance_policy = (
-        resolved_policy.get("variance") if isinstance(resolved_policy, dict) else {}
-    )
-    min_effect = 0.0
-    if isinstance(variance_policy, dict):
-        parsed_min_effect = _coerce_float(variance_policy.get("min_effect_lognll"))
-        if parsed_min_effect is not None:
-            min_effect = max(0.0, parsed_min_effect)
-    improvement_threshold = -min_effect
-
-    predictive_gate = variance.get("predictive_gate")
-    if not isinstance(predictive_gate, dict) or not predictive_gate:
-        errors.append(
-            "variance.enabled=true requires variance.predictive_gate evidence."
-        )
-    else:
-        if predictive_gate.get("passed") is not True:
-            errors.append(
-                "variance.enabled=true requires variance.predictive_gate.passed == true."
-            )
-
-        mean_delta = _coerce_float(predictive_gate.get("mean_delta"))
-        if mean_delta is None:
-            errors.append(
-                "variance.enabled=true requires finite variance.predictive_gate.mean_delta."
-            )
-        elif mean_delta >= 0.0:
-            errors.append(
-                "variance.predictive_gate.mean_delta must be negative when VE is enabled."
-            )
-        elif mean_delta > improvement_threshold:
-            errors.append(
-                "variance.predictive_gate.mean_delta does not meet "
-                f"-min_effect_lognll ({improvement_threshold:.6g})."
-            )
-
-        delta_ci = predictive_gate.get("delta_ci")
-        if delta_ci is None:
-            delta_ci = predictive_gate.get("ci")
-        lower = upper = None
-        if isinstance(delta_ci, tuple | list) and len(delta_ci) == 2:
-            lower = _coerce_float(delta_ci[0])
-            upper = _coerce_float(delta_ci[1])
-        if lower is None or upper is None:
-            errors.append(
-                "variance.enabled=true requires finite variance.predictive_gate.delta_ci."
-            )
-        elif lower > upper:
-            errors.append(
-                "variance.predictive_gate.delta_ci lower bound exceeds upper bound."
-            )
-        elif upper >= 0.0:
-            errors.append(
-                "variance.predictive_gate.delta_ci must exclude zero when VE is enabled."
-            )
-        elif upper > improvement_threshold:
-            errors.append(
-                "variance.predictive_gate.delta_ci upper bound does not meet "
-                f"-min_effect_lognll ({improvement_threshold:.6g})."
-            )
-
-    ab_test = variance.get("ab_test")
-    if not isinstance(ab_test, dict) or not ab_test:
-        errors.append("variance.enabled=true requires variance.ab_test evidence.")
-        return errors
-
-    provenance = ab_test.get("provenance")
-    seed = ab_test.get("seed")
-    if seed in (None, "") and isinstance(provenance, dict):
-        seed = provenance.get("seed")
-    if seed in (None, ""):
-        errors.append("variance.enabled=true requires variance.ab_test.seed.")
-
-    windows_used = _coerce_int(ab_test.get("windows_used"))
-    if windows_used is None or windows_used <= 0:
-        errors.append(
-            "variance.enabled=true requires positive variance.ab_test.windows_used."
-        )
-
-    if not isinstance(provenance, dict) or not provenance:
-        errors.append("variance.enabled=true requires variance.ab_test.provenance.")
-    elif not _collect_provenance_window_ids(provenance):
-        errors.append(
-            "variance.enabled=true requires variance.ab_test.provenance.window_ids."
-        )
-
-    return errors
-
-
 def _apply_profile_lints(report: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     meta = report.get("meta", {})
@@ -485,6 +379,7 @@ def _validate_evaluation_report_payload(
     path: Path,
     *,
     profile: str | None = None,
+    report_payload: dict[str, Any] | None = None,
     load_evaluation_report_fn: Callable[
         [Path], dict[str, Any]
     ] = _load_evaluation_report,
@@ -520,7 +415,11 @@ def _validate_evaluation_report_payload(
     ] = _validate_variance_enablement,
 ) -> list[str]:
     errors: list[str] = []
-    report = load_evaluation_report_fn(path)
+    report = (
+        report_payload
+        if isinstance(report_payload, dict)
+        else load_evaluation_report_fn(path)
+    )
     try:
         prof = (
             (profile or "").strip().lower()
@@ -538,11 +437,17 @@ def _validate_evaluation_report_payload(
         errors.append("report schema validation failed.")
         return errors
 
+    if prof == "release" and resolve_tiny_relax_from_report(report):
+        errors.append(
+            "Release verification forbids development-only tiny_relax policy."
+        )
+
     errors.extend(validate_primary_metric_fn(report))
     errors.extend(validate_pairing_fn(report))
     errors.extend(validate_counts_fn(report))
     errors.extend(validate_logspace_ci_identity_fn(report, profile=profile))
     if prof in {"ci", "release"}:
+        errors.extend(guard_evidence_policy_errors(report, require_complete=False))
         errors.extend(validate_drift_band_fn(report))
         errors.extend(validate_primary_metric_policy_fn(report, profile=prof))
     errors.extend(apply_profile_lints_fn(report))
@@ -553,28 +458,33 @@ def _validate_evaluation_report_payload(
 
     if prof == "release":
         errors.extend(_validate_release_gate_outcomes(report))
-        go = report.get("guard_overhead")
+        go = report.get("guard_metric_impact")
         if not isinstance(go, dict) or not go:
             errors.append(
-                "Release verification requires guard_overhead (missing). "
-                "Set context.run.skip_overhead_check=true in the run config to explicitly skip during evaluation."
+                "Release verification requires guard_metric_impact (missing)."
             )
         else:
             skipped = bool(go.get("skipped", False)) or (
                 str(go.get("mode", "")).strip().lower() == "skipped"
             )
-            if not skipped:
-                evaluated = go.get("evaluated")
-                if evaluated is not True:
-                    errors.append(
-                        "Release verification requires evaluated guard_overhead (not evaluated). "
-                        "Set context.run.skip_overhead_check=true in the run config to explicitly skip during evaluation."
-                    )
-                ratio = go.get("overhead_ratio")
-                if ratio is None:
-                    errors.append(
-                        "Release verification requires guard_overhead.overhead_ratio (missing)."
-                    )
+            if skipped:
+                errors.append(
+                    "Release verification does not allow skipped guard_metric_impact evidence."
+                )
+            evaluated = go.get("evaluated")
+            if evaluated is not True:
+                errors.append(
+                    "Release verification requires evaluated guard_metric_impact (not evaluated)."
+                )
+            degradation = go.get("degradation")
+            if degradation is None:
+                errors.append(
+                    "Release verification requires guard_metric_impact.degradation (missing)."
+                )
+            if go.get("passed") is not True:
+                errors.append(
+                    "Release verification requires guard_metric_impact.passed == true."
+                )
     return errors
 
 

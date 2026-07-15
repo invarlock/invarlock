@@ -6,8 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.reporting import report_edit_summary as report_edit_summary_mod
-from invarlock.reporting import report_overhead as report_overhead_mod
-from invarlock.reporting import report_validation as report_validation_mod
+from invarlock.reporting import report_metric_impact as report_metric_impact_mod
 from invarlock.reporting.report_enrichment import (
     compute_confidence_label as _compute_confidence_label,
 )
@@ -18,10 +17,22 @@ from invarlock.reporting.report_provenance import (
 from invarlock.reporting.report_provenance import (
     compute_report_digest as _compute_report_digest,
 )
+from invarlock.reporting.validation import report as report_validation_mod
 
 
 def _basic_pm(final: float) -> dict[str, object]:
-    return {"metrics": {"primary_metric": {"final": final}}}
+    return {
+        "metrics": {
+            "primary_metric": {"kind": "ppl_causal", "final": final},
+        },
+        "evaluation_windows": {
+            "final": {
+                "window_ids": ["shared"],
+                "logloss": [math.log(final)],
+                "token_counts": [1],
+            }
+        },
+    }
 
 
 def test_compute_edit_digest_quantization_and_fallback():
@@ -69,22 +80,22 @@ def test_compute_report_digest_changes_with_inputs():
     assert digest1 != digest2
 
 
-def test_prepare_guard_overhead_section_with_reports():
+def test_prepare_guard_metric_impact_section_with_reports():
     bare = _basic_pm(10.0)
     guarded = _basic_pm(10.05)
-    payload, passed = report_overhead_mod.prepare_guard_overhead_section(
+    payload, passed = report_metric_impact_mod.prepare_guard_metric_impact_section(
         {"bare_report": bare, "guarded_report": guarded, "source": "unit"}
     )
     assert passed is True
     assert payload["evaluated"] is True
-    assert "overhead_ratio" in payload
+    assert "degradation" in payload
 
 
-def test_prepare_guard_overhead_section_ratio_fallback():
-    payload, passed = report_overhead_mod.prepare_guard_overhead_section(
+def test_prepare_guard_metric_impact_section_measurement_fallback():
+    payload, passed = report_metric_impact_mod.prepare_guard_metric_impact_section(
         {
-            "bare_ppl": 10.0,
-            "guarded_ppl": 11.0,
+            "bare_value": 10.0,
+            "guarded_value": 11.0,
             "diagnostics": [
                 {
                     "kind": "validation_info",
@@ -96,41 +107,47 @@ def test_prepare_guard_overhead_section_ratio_fallback():
         }
     )
     assert passed is False
-    assert payload["guarded_ppl"] == 11.0
+    assert payload["guarded_value"] == 11.0
     assert payload["diagnostics"][0]["message"] == "note"
 
 
-def test_compute_quality_overhead_from_guard_handles_ratio(monkeypatch):
+def test_compute_guard_metric_impact_from_guard_handles_relative_increase(monkeypatch):
     bare = {"value": 10.0}
     guarded = {"value": 11.0}
 
     def fake_compute(report, *, kind, baseline=None):
         return {"final": report["value"], "direction": "lower"}
 
-    info = report_overhead_mod.compute_quality_overhead_from_guard(
+    info = report_metric_impact_mod.compute_guard_metric_impact_from_guard(
         {"bare_report": bare, "guarded_report": guarded},
         pm_kind_hint="ppl_causal",
         compute_primary_metric_from_report_fn=fake_compute,
         get_metric_fn=lambda *_: SimpleNamespace(direction="lower"),
     )
-    assert info == {"basis": "ratio", "value": pytest.approx(1.1), "kind": "ppl_causal"}
+    assert info is not None
+    assert info["metric_kind"] == "ppl_causal"
+    assert info["degradation_basis"] == "relative_increase"
+    assert info["degradation"] == pytest.approx(0.1)
+    assert info["display_value"] == pytest.approx(10.0)
 
 
-def test_compute_quality_overhead_from_guard_accuracy_delta(monkeypatch):
+def test_compute_guard_metric_impact_from_guard_accuracy_delta(monkeypatch):
     bare = {"value": 0.9}
     guarded = {"value": 0.95}
 
     def fake_compute(report, *, kind, baseline=None):
         return {"final": report["value"], "direction": "higher"}
 
-    info = report_overhead_mod.compute_quality_overhead_from_guard(
+    info = report_metric_impact_mod.compute_guard_metric_impact_from_guard(
         {"bare_report": bare, "guarded_report": guarded},
         pm_kind_hint="accuracy",
         compute_primary_metric_from_report_fn=fake_compute,
         get_metric_fn=lambda *_: SimpleNamespace(direction="higher"),
     )
-    assert info["basis"] == "delta_pp"
-    assert math.isclose(info["value"], 5.0)
+    assert info is not None
+    assert info["degradation_basis"] == "absolute_drop"
+    assert math.isclose(info["degradation"], -0.05)
+    assert math.isclose(info["display_value"], -5.0)
 
 
 def test_generate_run_id_uses_existing_and_hashes_otherwise():
@@ -225,10 +242,11 @@ def test_extract_compression_diagnostics_quant(monkeypatch):
     assert inference["flags"]["scope"] is True
 
 
-def test_prepare_guard_overhead_section_empty_returns_pass():
-    payload, passed = report_overhead_mod.prepare_guard_overhead_section({})
-    assert payload == {}
-    assert passed is True
+def test_prepare_guard_metric_impact_section_empty_is_unevaluated_failure():
+    payload, passed = report_metric_impact_mod.prepare_guard_metric_impact_section({})
+    assert payload["evaluated"] is False
+    assert payload["passed"] is False
+    assert passed is False
 
 
 def test_compute_validation_flags_respects_token_floors(monkeypatch):
@@ -245,19 +263,19 @@ def test_compute_validation_flags_respects_token_floors(monkeypatch):
         tier="balanced",
         _ppl_metrics={"preview_total_tokens": 1000, "final_total_tokens": 1000},
         target_ratio=1.05,
-        guard_overhead={"passed": False, "evaluated": True},
+        guard_metric_impact={"passed": False, "evaluated": True},
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.2},
         dataset_capacity={"tokens_available": 2000},
     )
     assert flags["primary_metric_acceptable"] is False
     assert flags["spectral_stable"] is False
-    assert flags["guard_overhead_acceptable"] is False
+    assert flags["guard_metric_impact_acceptable"] is False
     assert flags["rmt_stable"] is False
 
 
 def test_compute_validation_flags_accuracy_sets_hysteresis(monkeypatch):
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
-    pm = {"kind": "accuracy", "ratio_vs_baseline": -0.5, "n_final": 50}
+    pm = {"kind": "accuracy", "delta_vs_baseline_pp": -0.5, "n_final": 50}
     flags = report_validation_mod.compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.98},
         spectral={"caps_applied": 1},

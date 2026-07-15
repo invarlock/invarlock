@@ -151,6 +151,10 @@ class TestGuardChainComprehensive:
         ]
         assert not chain.all_passed(failing_outcomes)
 
+        assert chain.all_passed([{"passed": True, "decision": "allow"}])
+        assert not chain.all_passed([{"passed": False, "decision": "block"}])
+        assert not chain.all_passed([{"decision": "allow"}])
+
         # Test with outcomes without passed attribute
         mixed_outcomes = [
             Mock(passed=True),

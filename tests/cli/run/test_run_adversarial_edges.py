@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ import pytest
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
     assert_single_run_report_artifact,
+    canonical_ppl_metrics,
     common_ce_patches,
     synthetic_provider_min,
 )
@@ -28,7 +30,7 @@ def _common_ce():
     )
 
 
-def test_overhead_percent_display_release_profile(tmp_path: Path):
+def test_release_profile_rejects_display_value_without_finite_ratio(tmp_path: Path):
     cfg = _cfg(tmp_path)
 
     class Runner:
@@ -39,6 +41,14 @@ def test_overhead_percent_display_release_profile(tmp_path: Path):
                     "ppl_preview": 1.0,
                     "ppl_final": 1.0,
                     "ppl_ratio": 1.0,
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                        "ratio": 1.0,
+                        "n_preview": 1,
+                        "n_final": 1,
+                    },
                     "window_overlap_fraction": 0.0,
                     "window_match_fraction": 1.0,
                 },
@@ -55,23 +65,32 @@ def test_overhead_percent_display_release_profile(tmp_path: Path):
             self.warnings = []
             self.errors = []
             self.checks = {}
-            self.metrics = {"overhead_percent": 2.5, "overhead_ratio": None}
+            self.metrics = {"display_value": 2.5, "degradation": None}
 
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+                "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
                 lambda *a, **k: Overhead(),
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
-        run_command(
-            config=str(cfg), device="cpu", profile="release", out=str(tmp_path / "runs")
-        )
-    payload = assert_single_run_report_artifact(tmp_path, profile="release")
-    assert payload["context"]["primary_metric"]["overhead_threshold"] == pytest.approx(
+        with pytest.raises(click.exceptions.Exit) as exc_info:
+            run_command(
+                config=str(cfg),
+                device="cpu",
+                profile="release",
+                out=str(tmp_path / "runs"),
+            )
+    assert exc_info.value.exit_code == 1
+    report_paths = list((tmp_path / "runs").glob("*/report.json"))
+    assert len(report_paths) == 1
+    payload = json.loads(report_paths[0].read_text(encoding="utf-8"))
+    assert payload["guard_metric_impact"]["evaluated"] is False
+    assert payload["guard_metric_impact"]["passed"] is False
+    assert payload["context"]["primary_metric"]["degradation_limit"] == pytest.approx(
         0.01
     )
 
@@ -154,13 +173,13 @@ def test_save_report_missing_json_key_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", bad_save)
+            patch("invarlock.reporting.report_bundle.save_report", bad_save)
         )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 
 def test_release_planner_without_adjustment():
-    from invarlock.cli.run_overhead import plan_release_windows
+    from invarlock.cli.run_metric_impact import plan_release_windows
 
     cap = {
         "available_unique": 2000,
@@ -179,7 +198,7 @@ def test_release_planner_without_adjustment():
 
 
 def test_release_planner_candidate_limit_only_path():
-    from invarlock.cli.run_overhead import plan_release_windows
+    from invarlock.cli.run_metric_impact import plan_release_windows
 
     cap = {
         "available_unique": 2000,
@@ -278,11 +297,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         evaluation_windows={},
@@ -351,11 +366,7 @@ def test_bytes_only_adapter_path(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         evaluation_windows={},
@@ -424,11 +435,7 @@ def test_chunked_only_adapter_path(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         evaluation_windows={},
@@ -480,11 +487,7 @@ def test_tokenizer_digest_nonstring_keys_fallback(tmp_path: Path):
                 lambda: SimpleNamespace(
                     execute=lambda **k: SimpleNamespace(
                         edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
+                        metrics=canonical_ppl_metrics(),
                         guards={},
                         context={"dataset_meta": {}},
                         evaluation_windows={},

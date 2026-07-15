@@ -10,7 +10,6 @@ import invarlock.public_contracts as contracts
 from invarlock import evidence_pack_integrity, runtime_security_helpers
 from invarlock.cli import constants as cli_constants
 from invarlock.reporting import report_schema, verify_output
-from tests._repo_root import REPO_ROOT
 
 _JSON_CONTRACT_LOADER_CASES = (
     ("support_matrix.json", contracts.load_support_matrix),
@@ -30,27 +29,6 @@ _PUBLIC_CONTRACT_LOADER_CASES = (
     *_JSON_CONTRACT_LOADER_CASES,
     ("published_basis_index.json", contracts.load_public_evidence_index),
 )
-
-
-def _assert_public_evidence_path_available(rel_path: str, *, kind: str) -> None:
-    path = REPO_ROOT / rel_path
-    if kind == "file" and path.is_file():
-        return
-    if kind == "directory" and path.is_dir():
-        return
-    for entry in contracts.load_public_evidence_index()["entries"]:
-        artifacts = entry.get("artifacts", {})
-        if not isinstance(artifacts, dict):
-            continue
-        for summary in artifacts.values():
-            if not isinstance(summary, dict) or summary.get("path") != rel_path:
-                continue
-            assert summary["kind"] == kind
-            external = summary.get("external_asset")
-            assert isinstance(external, dict)
-            assert external["archive_path"] == rel_path
-            return
-    raise AssertionError(rel_path)
 
 
 def test_public_subcontract_versions_are_single_sourced() -> None:
@@ -166,7 +144,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-06-29"
+    assert family_catalog["as_of"] == "2026-07-13"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     published_lane_families = {
         lane["family"] for lane in contracts.published_basis_lanes()
@@ -181,7 +159,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only
-    assert "Qwen2.5 32B" in usage_only
+    assert "Qwen2.5 32B" not in usage_only
     candidate_section = family_catalog["published_basis_candidates_text_le_14b"]
     assert (
         candidate_section["format_version"]
@@ -190,52 +168,23 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     candidates = {
         item["display_name"]: item for item in candidate_section["candidates"]
     }
-    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "published_basis_complete"
-    assert (
-        candidates["Qwen2.5 7B causal LM"]["current_catalog_state"] == "published_basis"
-    )
-    assert (
-        candidates["Qwen2.5 7B causal LM"]["criteria_status"][
-            "approved_calibration_or_evaluation_evidence"
-        ]
-        == "pass"
-    )
-    assert candidates["Qwen2.5 14B causal LM"]["decision"] == "published_basis_complete"
-    assert (
-        candidates["Qwen2.5 14B causal LM"]["current_catalog_state"]
-        == "published_basis"
-    )
-    assert candidates["Qwen3 8B causal LM"]["decision"] == "published_basis_complete"
-    assert (
-        candidates["Qwen3 8B causal LM"]["current_catalog_state"] == "published_basis"
-    )
-    assert (
-        candidates["DeepSeek-R1-Distill-Qwen causal LM"]["decision"]
-        == "published_basis_complete"
-    )
-    assert (
-        candidates["DeepSeek-R1-Distill-Qwen causal LM"]["current_catalog_state"]
-        == "published_basis"
-    )
-    assert (
-        candidates["Phi-4 reasoning-plus causal LM"]["decision"]
-        == "published_basis_complete"
-    )
-    assert (
-        candidates["Phi-4 reasoning-plus causal LM"]["current_catalog_state"]
-        == "published_basis"
-    )
-    assert (
-        candidates["OpenLLaMA 7B causal LM"]["decision"] == "published_basis_complete"
-    )
-    assert (
-        candidates["OpenLLaMA 7B causal LM"]["current_catalog_state"]
-        == "published_basis"
-    )
-    assert candidates["Falcon 7B causal LM"]["decision"] == "published_basis_complete"
-    assert (
-        candidates["Falcon 7B causal LM"]["current_catalog_state"] == "published_basis"
-    )
+    cataloged_candidates = {
+        "Qwen2.5 7B causal LM",
+        "Qwen2.5 14B causal LM",
+        "Qwen3 8B causal LM",
+        "DeepSeek-R1-Distill-Qwen causal LM",
+        "Phi-4 reasoning-plus causal LM",
+        "OpenLLaMA 7B causal LM",
+        "Falcon 7B causal LM",
+    }
+    for display_name in cataloged_candidates:
+        candidate = candidates[display_name]
+        assert candidate["decision"] == "cataloged"
+        assert candidate["current_catalog_state"] == "published_basis"
+        assert (
+            candidate["criteria_status"]["approved_calibration_or_evaluation_evidence"]
+            == "not_created"
+        )
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
@@ -366,8 +315,9 @@ def test_public_contract_paths_are_repo_relative() -> None:
     ).as_posix() == ("contracts/support_matrix.json")
 
 
-def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() -> None:
+def test_support_matrix_records_current_evidence_status_and_paths() -> None:
     support_matrix = contracts.load_support_matrix()
+    public_index = contracts.load_public_evidence_index()
 
     published_basis = [
         lane
@@ -375,41 +325,26 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
         if lane.get("support_tier") == "published_basis"
     ]
     assert published_basis
-
+    indexed = {
+        lane_id
+        for entry in public_index["entries"]
+        for lane_id in entry.get("lanes", [])
+    }
+    available = {
+        lane["lane_id"]
+        for lane in published_basis
+        if lane["evidence_status"] == "available"
+    }
+    assert available == indexed
     for lane in published_basis:
-        evidence = lane.get("evidence", {})
-        assert evidence["evaluation_report_fixture"].startswith(
-            "public_evidence/published_basis/"
-        )
-        assert evidence["runtime_manifest_fixture"].startswith(
-            "public_evidence/published_basis/"
-        )
-        assert evidence["evidence_pack_recipe"].startswith(
-            "public_evidence/published_basis/"
-        )
-        if "evidence_pack_fixture" in evidence:
-            assert evidence["evidence_pack_fixture"].startswith(
-                "public_evidence/published_basis/"
-            )
-        if "artifact_package" in evidence:
-            assert evidence["artifact_package"].startswith(
-                "public_evidence/published_basis/"
-            )
-            _assert_public_evidence_path_available(
-                evidence["artifact_package"],
-                kind="directory",
-            )
-        if "guard_value_demo" in evidence:
-            assert evidence["guard_value_demo"].startswith(
-                "public_evidence/published_basis/"
-            )
-            _assert_public_evidence_path_available(
-                evidence["guard_value_demo"],
-                kind="directory",
-            )
-        assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
-        assert "tests/fixtures/" not in evidence["runtime_manifest_fixture"]
-        assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]
+        if lane["lane_id"] in available:
+            assert lane["evidence_status_label"] == "Available"
+            assert set(lane["evidence"]) == {"evidence_pack", "verification_receipt"}
+        else:
+            assert lane["evidence_status"] == "not_created"
+            assert lane["evidence_status_label"] == "Evidence not yet created"
+            assert "evidence" not in lane
+        assert "notes" not in lane
 
 
 def test_readme_surfaces_public_contract_catalog_entries() -> None:
@@ -420,22 +355,18 @@ def test_readme_surfaces_public_contract_catalog_entries() -> None:
     assert "`model_classification`, `validation_keys`, `console_labels`, and" in readme
 
 
-def test_packaged_public_evidence_index_covers_published_basis_lanes() -> None:
+def test_packaged_public_evidence_index_records_current_available_state() -> None:
     index = contracts.load_public_evidence_index()
     assert index["format_version"] == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
     assert index["published_basis_count"] == len(index["entries"])
-
-    indexed_lanes = {
-        lane_id for entry in index["entries"] for lane_id in entry.get("lanes", [])
-    }
-    expected_lanes = {lane["lane_id"] for lane in contracts.published_basis_lanes()}
-    assert expected_lanes <= indexed_lanes
-
-    for entry in index["entries"]:
-        assert entry["path"].startswith("public_evidence/published_basis/")
-        assert entry["artifacts"]["evaluation_report"]["sha256"].startswith("sha256:")
-        assert entry["artifacts"]["runtime_manifest"]["sha256"].startswith("sha256:")
+    if index["entries"]:
+        assert "status" not in index
+        assert "status_label" not in index
+    else:
+        assert index["status"] == "not_created"
+        assert index["status_label"] == "Evidence not yet created"
+    assert all(entry["lanes"] for entry in index["entries"])
 
 
 def test_packaged_public_evidence_index_rejects_non_object(
@@ -678,7 +609,12 @@ def test_public_contract_loader_raises_when_all_roots_are_missing(
 
 
 def test_packaged_contract_copies_match_repo_contracts() -> None:
-    repo_contracts = sorted(contracts.CONTRACTS_ROOT.glob("*.json"))
+    repository_only_contracts = {"broad_exception_review_buckets.json"}
+    repo_contracts = sorted(
+        path
+        for path in contracts.CONTRACTS_ROOT.glob("*.json")
+        if path.name not in repository_only_contracts
+    )
     assert repo_contracts
 
     for repo_path in repo_contracts:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import math
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +10,10 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    canonical_ppl_metrics,
+    configure_guard_metric_impact_skip,
+)
 from tests.cli.run._support_run_common import (
     synthetic_provider_min as _provider_min,
 )
@@ -47,7 +50,7 @@ def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 _capture_save_report(captured),
             )
         )
@@ -101,7 +104,7 @@ def test_provider_indices_not_iterable_fallback(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 _capture_save_report(captured),
             )
         )
@@ -167,7 +170,7 @@ def test_metrics_merges_masked_totals_from_context(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
@@ -213,7 +216,7 @@ def test_metrics_optional_logloss_keys_persisted(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.reporting.report_files.save_report", cap_save)
+            patch("invarlock.reporting.report_bundle.save_report", cap_save)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
@@ -226,7 +229,7 @@ def test_metrics_optional_logloss_keys_persisted(tmp_path: Path):
     assert "logloss_preview" in m and "logloss_final" in m and "logloss_delta" in m
 
 
-def test_guard_overhead_fail_exits(tmp_path: Path):
+def test_guard_metric_impact_fail_exits(tmp_path: Path):
     cfg = _write_cfg(tmp_path)
 
     class Runner:
@@ -244,9 +247,9 @@ def test_guard_overhead_fail_exits(tmp_path: Path):
             stack.enter_context(ctx)
         # Patch validator to fail
         for target in (
-            "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
-            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.reporting.validate.validate_guard_metric_impact",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
+            "invarlock.cli.run_runtime_exec.validate_guard_metric_impact",
         ):
             stack.enter_context(
                 patch(
@@ -257,7 +260,7 @@ def test_guard_overhead_fail_exits(tmp_path: Path):
                         warnings=[],
                         errors=[],
                         checks={},
-                        metrics={"overhead_ratio": 2.0, "overhead_percent": 100.0},
+                        metrics={"degradation": 2.0, "display_value": 100.0},
                     ),
                 )
             )
@@ -275,7 +278,7 @@ def test_guard_overhead_fail_exits(tmp_path: Path):
             )
 
 
-def test_drift_gate_fail_nonfatal(tmp_path: Path):
+def test_finite_primary_metric_persists_without_baseline(tmp_path: Path):
     cfg = _write_cfg(tmp_path)
     captured: dict[str, list[dict[str, object]]] = {}
 
@@ -283,7 +286,7 @@ def test_drift_gate_fail_nonfatal(tmp_path: Path):
         def execute(self, **kwargs):
             return SimpleNamespace(
                 edit={},
-                metrics={"ppl_preview": 1.0, "ppl_final": 3.0, "ppl_ratio": 3.0},
+                metrics=canonical_ppl_metrics(preview=1.0, final=3.0),
                 guards={},
                 context={"dataset_meta": {}},
                 status="success",
@@ -294,7 +297,7 @@ def test_drift_gate_fail_nonfatal(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 _capture_save_report(captured),
             )
         )
@@ -309,14 +312,14 @@ def test_drift_gate_fail_nonfatal(tmp_path: Path):
     report = captured["reports"][0]
     primary_metric = report["metrics"]["primary_metric"]
     assert primary_metric["kind"] == "ppl_causal"
-    assert math.isnan(primary_metric["preview"])
-    assert math.isnan(primary_metric["final"])
+    assert primary_metric["preview"] == pytest.approx(1.0)
+    assert primary_metric["final"] == pytest.approx(3.0)
     assert report["meta"]["adapter"] == "hf_causal"
     assert report["metrics"]["loss_type"] == "ce"
 
 
 def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
-    cfg = _write_cfg(tmp_path)
+    cfg = configure_guard_metric_impact_skip(_write_cfg(tmp_path))
     captured: dict[str, list[dict[str, object]]] = {}
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
@@ -396,7 +399,7 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_files.save_report",
+                "invarlock.reporting.report_bundle.save_report",
                 _capture_save_report(captured),
             )
         )

@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
-| **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, GPTQModel-backed AWQ/GPTQ adapters, torchao runtime quantization, HQQ runtime quantization, Quanto runtime quantization, and compressed-tensors checkpoint loading. |
+| **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, GPTQModel-backed AWQ/GPTQ adapters, torchao runtime quantization, HQQ runtime quantization, Quanto runtime quantization, and compressed-tensors checkpoint loading for diagnostic use. `hf_ct` is intentionally ineligible for strict assurance until a dedicated packed-storage artifact proof is implemented. |
 | **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF text adapters; `invarlock[multimodal]` for image-text adapters such as Gemma 4 unified checkpoints; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]`, `invarlock[torchao]`, `invarlock[hqq]`, `invarlock[quanto]`, or `invarlock[compressed-tensors]` for quantized adapters. All HF-backed extras require `transformers>=5.12.0`. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
@@ -44,14 +44,14 @@ model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
 
-> Adapter availability is broader than the published evidence basis. Current
-> `published_basis` lanes span GPT-2/BERT fixtures, dense decoder families
+> Maintained catalog lanes span GPT-2/BERT, dense decoder families
 > (Mistral, Ministral, TinyLlama, Granite, OLMo, OpenLLaMA, Falcon, Qwen,
 > DeepSeek, Phi, Gemma text-only, and SmolLM), FLAN-T5 through `hf_seq2seq`,
 > Gemma 4 image-text through `hf_multimodal` plus `vision_text`, and MoE causal
 > lanes such as OLMoE, Mixtral, and Qwen3 30B-A3B. Treat
-> `contracts/support_matrix.json` as authoritative for model-lane status and the
-> Model Family Catalog as the broader view of adapter/profile coverage.
+> `contracts/support_matrix.json` as authoritative for model-lane and evidence
+> status, and the Model Family Catalog as the broader view of adapter/profile
+> coverage.
 
 ## Support Tiers
 
@@ -63,13 +63,12 @@ public evidence support.
 
 | Tier | Applies to | Promise |
 | --- | --- | --- |
-| `published_basis` | Model/runtime/adapter lane | Public evidence fixture set with report, runtime-manifest, and evidence-pack provenance where available. |
-| `supported_experimental` | Model/runtime/adapter lane | Repo-included preset/config/test/smoke path exists, but no published-basis fixture set is claimed. |
-| `community_experimental` | Model/runtime/adapter lane | Path is usable for community experimentation without a maintained public evidence basis. |
+| `published_basis` | Model/runtime/adapter lane | Maintained catalog evidence lane; availability is reported separately by `evidence_status`. |
+| `supported_experimental` | Model/runtime/adapter lane | Maintained adapter, preset, configuration, and smoke path for experimental evaluation. |
+| `community_experimental` | Model/runtime/adapter lane | Adapter and runtime path available for community evaluation. |
 
-Do not infer `published_basis` from adapter availability alone. For example,
-`hf_causal` may be fully capable for a family while that family remains
-`supported_experimental` until public evidence artifacts are attached.
+Adapter capability and catalog status are recorded separately so users can see
+both the reusable implementation surface and the maintained evidence lanes.
 
 ## Concepts
 
@@ -85,15 +84,17 @@ Do not infer `published_basis` from adapter availability alone. For example,
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct`) handle
   their own device placement; avoid calling `.to(...)` on the loaded model.
 - **Containerized quant evidence** requires a runtime image with the optional
-  quant backends installed. For CUDA evidence-pack setup, set
-  `PACK_RUNTIME_IMAGE_FLAVOR=quant` to select/build
-  `invarlock-runtime:cuda-quant` instead of the default CUDA runtime image.
+  quant backends installed. Build `invarlock-runtime:cuda-quant` with
+  `make runtime-image-cuda-quant` instead of using the default CUDA image.
   This opt-in image uses the pinned CUDA devel base and retains the compiler
   toolchain because GPTQModel-backed GPTQ/AWQ kernels may JIT-compile CUDA
-  extensions at model-load time and require `nvcc`/`CUDA_HOME`.
-  Strict release-review evidence still needs normal runtime provenance: use a
-  local InvarLock runtime image tag or set `INVARLOCK_RUNTIME_IMAGE_DIGEST` for
-  custom image references.
+  extensions at model-load time. Explicit CUDA loads preflight a C++ compiler,
+  `ninja`, matching Python development headers, and `nvcc`; ordinary backend
+  discovery and CPU imports do not require that JIT preflight. The named
+  GPTQModel runtime boundary also bridges only the legacy hub symbols absent
+  from the selected Transformers release before importing the optional backend.
+  Strict evidence still needs normal runtime provenance and an independently
+  pinned `INVARLOCK_RUNTIME_IMAGE_DIGEST` for custom image references.
 - **Snapshot strategy**: HF adapters expose `snapshot`/`restore` and
   `snapshot_chunked`/`restore_chunked` (large-model friendly). The CLI selects the
   strategy automatically via `context.snapshot.*`.
@@ -120,7 +121,7 @@ Capability matrix (at a glance)
 | Quantized (`hf_torchao`) | Best-effort | Full when modules exposed | Platform-dependent |
 | Quantized (`hf_hqq`) | Best-effort | Full when modules exposed | Platform-dependent |
 | Quantized (`hf_quanto`) | Best-effort | Full when modules exposed | Platform-dependent |
-| Quantized (`hf_ct`) | Best-effort | Full when modules exposed | Platform-dependent |
+| Quantized (`hf_ct`) | Best-effort diagnostic load | Not strict-assurance eligible | Platform-dependent |
 
 Machine-readable adapter capability metadata is published at
 `contracts/adapter_capabilities.json` and surfaced through
@@ -143,14 +144,15 @@ Machine-readable adapter capability metadata is published at
 | `hf_torchao` | HF causal LMs quantized at runtime with torchao | `invarlock[torchao]` | Platform-dependent | Applies torchao int8 weight-only quantization after HF load; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results. |
 | `hf_hqq` | HF causal LMs quantized at runtime with HQQ | `invarlock[hqq]` | Platform-dependent | Applies native HQQ runtime quantization after HF load; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results. |
 | `hf_quanto` | HF causal LMs quantized at runtime with Quanto | `invarlock[quanto]` | Platform-dependent | Loads through Transformers with a Quanto quantization config; strict container evidence should be proven for the selected runtime before externally sharing strict-evidence results. |
-| `hf_ct` | HF causal LMs from compressed-tensors pre-quantized checkpoints | `invarlock[compressed-tensors]` | Platform-dependent | Loads pre-quantized compressed-tensors checkpoints; use llmcompressor or other tooling to create them outside the adapter. |
+| `hf_ct` | HF causal LMs from compressed-tensors pre-quantized checkpoints | `invarlock[compressed-tensors]` | Platform-dependent | Loads genuine pre-quantized compressed-tensors checkpoints for diagnostic compatibility work; strict assurance rejects this adapter until a dedicated packed-storage artifact proof is available. Use llmcompressor or other tooling to create checkpoints outside the adapter. |
 
 ### Adapter capabilities
 
 | Adapter class | Snapshot/restore | Guard compatibility | Notes |
 | --- | --- | --- | --- |
 | PyTorch HF adapters (`hf_causal`, `hf_mlm`, `hf_multimodal`, `hf_seq2seq`) | Yes | Full (module access) / multimodal full when decoder layers are exposed | Uses `HFAdapterMixin` snapshots. |
-| Quantized HF adapters (`hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct`) | Yes (best-effort) | Full when modules are exposed | Avoid explicit `.to()` calls. |
+| Quantized HF adapters (`hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`) | Yes (best-effort) | Full when modules are exposed | Avoid explicit `.to()` calls. |
+| Compressed-tensors (`hf_ct`) | Best-effort diagnostic load | Strict assurance unavailable | Avoid explicit `.to()` calls; a dedicated packed-storage artifact proof is required before strict use. |
 
 ### Adapter selection (`adapter: auto`)
 
@@ -299,7 +301,9 @@ finally:
   checkpoints.
 - **GPTQModel-backed adapters unavailable**: `hf_awq` and `hf_gptq` use
   GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
-  Python, PyTorch, and accelerator stack.
+  Python, PyTorch, and accelerator stack. The named runtime preparation reports
+  whether a narrow Transformers hub compatibility bridge was needed or applied;
+  it does not treat a Python import as a successful model load.
 - **torchao adapter unavailable**: `hf_torchao` requires the torchao optional
   stack. Install `invarlock[torchao]` in the environment that performs the
   model load.
@@ -309,15 +313,17 @@ finally:
   Install `invarlock[quanto]` in the environment that performs the model load.
 - **compressed-tensors adapter unavailable**: `hf_ct` requires the
   compressed-tensors optional stack. Install `invarlock[compressed-tensors]` in
-  the environment that performs the model load.
+  the environment that performs the model load. A successful diagnostic load
+  is not strict evidence: `hf_ct` remains fail-closed for strict assurance
+  until a dedicated packed-storage artifact proof is implemented.
 - **Container report fails with missing quant extra**: build or select the quant
-  CUDA runtime image (`make runtime-image-cuda-quant`, or
-  `PACK_RUNTIME_IMAGE_FLAVOR=quant` for the remote setup helper). The default
+  CUDA runtime image with `make runtime-image-cuda-quant`. The default
   CUDA runtime image is intentionally limited to the core evaluation stack.
 - **GPTQ/AWQ container load fails during JIT compile**: use the quant CUDA
   runtime image rather than the default CUDA runtime. The quant image is built
-  from the pinned CUDA devel base so `nvcc` and `CUDA_HOME` are available for
-  GPTQModel kernel compilation.
+  from the pinned CUDA devel base so the compiler, `ninja`, matching Python
+  headers, `nvcc`, and `CUDA_HOME` are available for GPTQModel kernel
+  compilation.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on
   non-CUDA hosts.
@@ -326,7 +332,10 @@ finally:
 
 ## Observability
 
-- `invarlock advanced plugins adapters --json` reports readiness and missing extras.
+- `invarlock advanced plugins adapters --json` reports dependency availability
+  and missing extras. A `ready` status does not prove a backend can load a
+  target checkpoint or establish strict evidence; use a real runtime proof for
+  the selected model and environment.
 - `report.context["plugins"]` and report `plugins.adapters` record adapter
   discovery for audit trails.
 

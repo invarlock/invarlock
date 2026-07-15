@@ -17,7 +17,11 @@ def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> dict:
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8
     r["data"]["stride"] = 8
-    r["metrics"]["primary_metric"] = {"kind": pm_kind, "final": pm_final}
+    r["metrics"]["primary_metric"] = {
+        "kind": pm_kind,
+        "preview": pm_final,
+        "final": pm_final,
+    }
     r["metrics"]["latency_ms_per_tok"] = 1.23
     r["metrics"]["memory_mb_peak"] = 12.3
     return r
@@ -41,6 +45,7 @@ def test_comparison_html_one_side_has_guards() -> None:
     r2["guards"] = [
         {
             "name": "variance",
+            "passed": False,
             "policy": {},
             "metrics": {},
             "actions": [],

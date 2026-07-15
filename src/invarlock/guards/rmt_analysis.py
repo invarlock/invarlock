@@ -6,8 +6,9 @@ from typing import Any, cast
 
 import numpy as np
 import torch
-import torch.linalg as tla
 import torch.nn as nn
+
+from .exact_svd import exact_svdvals
 
 __all__ = [
     "mp_bulk_edges",
@@ -178,7 +179,7 @@ def layer_svd_stats(
 
         m, n = W.shape
         try:
-            s_actual = tla.svdvals(W.float().cpu())
+            s_actual = exact_svdvals(W)
             s_min = s_actual[-1].item()
             s_max = s_actual[0].item()
         except (RuntimeError, torch.linalg.LinAlgError):
@@ -186,6 +187,11 @@ def layer_svd_stats(
 
         sigma_min_global = min(sigma_min_global, s_min)
         sigma_max_global = max(sigma_max_global, s_max)
+
+        s_sorted = s_actual.sort()[0] if len(s_actual) > 1 else s_actual
+        s_98 = (
+            s_sorted[int(0.98 * len(s_sorted))].item() if len(s_actual) > 1 else s_max
+        )
 
         if baseline_sigmas and module_name and module_name in baseline_sigmas:
             baseline_sigma = baseline_sigmas[module_name]
@@ -204,9 +210,6 @@ def layer_svd_stats(
                 ratio = 1.0
         else:
             if len(s_actual) > 1:
-                s_sorted = s_actual.sort()[0]
-                idx_98 = int(0.98 * len(s_sorted))
-                s_98 = s_sorted[idx_98].item()
                 ratio = s_max / s_98 if s_98 > 0 else 1.0
             else:
                 ratio = 1.0
@@ -219,9 +222,7 @@ def layer_svd_stats(
                 "s_max": s_max,
                 "s_min": s_min,
                 "s_median": s_actual.median().item() if len(s_actual) > 1 else s_max,
-                "s_98": s_actual.sort()[0][int(0.98 * len(s_actual))].item()
-                if len(s_actual) > 1
-                else s_max,
+                "s_98": s_98,
                 "ratio": ratio,
                 "mp_edge": mp_bulk_edge(m, n, whitened=False),
                 "normalization": "baseline_aware"
@@ -264,7 +265,7 @@ def capture_baseline_mp_stats(
                 if not torch.isfinite(W).all():
                     continue
                 try:
-                    s_actual = torch.linalg.svdvals(W.float().cpu())
+                    s_actual = exact_svdvals(W)
                     sigma_base = s_actual[0].item()
                     mp_edge_base = mp_bulk_edge(m, n, whitened=False)
                     r_mp_base = sigma_base / max(mp_edge_base, 1e-12)

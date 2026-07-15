@@ -2,15 +2,31 @@ from __future__ import annotations
 
 from hypothesis import given
 
+from invarlock.guards.variance_policy import predictive_gate_outcome
 from tests.guards.property.strategies import variance_decide, variance_inputs
 
 
 @given(variance_inputs())
-def test_variance_idempotent(data):
+def test_variance_production_decision_matches_reference(data):
     mu, ci, direction, me, one_sided = data
-    r1 = variance_decide(mu, ci, direction, me, one_sided)
-    r2 = variance_decide(mu, ci, direction, me, one_sided)
-    assert r1 == r2
+    reference = variance_decide(mu, ci, direction, me, one_sided)
+    production_mu = mu
+    production_ci = ci
+    if direction == "higher":
+        lo, hi = ci
+        production_mu = -mu
+        production_ci = (-hi, -lo)
+
+    production_pass, production_reason = predictive_gate_outcome(
+        production_mu,
+        production_ci,
+        me,
+        one_sided,
+    )
+
+    assert reference["evaluated"] is True
+    assert bool(reference["pass"]) is production_pass
+    assert reference["reason"] == production_reason
 
 
 @given(variance_inputs())

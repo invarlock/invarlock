@@ -28,7 +28,7 @@ def test_ppl_seq2seq_behaves_like_expected():
     assert math.isclose(pm["ratio_vs_baseline"], 6.0 / 5.0, rel_tol=1e-12)
 
 
-def test_accuracy_alias_behaves_like_accuracy():
+def test_accuracy_uses_percentage_point_baseline_delta():
     report = {
         "metrics": {
             "classification": {
@@ -43,16 +43,10 @@ def test_accuracy_alias_behaves_like_accuracy():
         }
     }
 
-    pm_alias = compute_primary_metric_from_report(
-        report, kind="accuracy", baseline=baseline
-    )
-    pm_acc = compute_primary_metric_from_report(
-        report, kind="accuracy", baseline=baseline
-    )
+    pm = compute_primary_metric_from_report(report, kind="accuracy", baseline=baseline)
 
-    assert math.isclose(pm_alias["preview"], 0.80, rel_tol=1e-12)
-    assert math.isclose(pm_alias["final"], 0.95, rel_tol=1e-12)
-    # For accuracy we report delta vs baseline in ratio field
-    assert math.isclose(pm_alias["ratio_vs_baseline"], 0.95 - 0.90, rel_tol=1e-12)
-    # Matches accuracy baseline
-    assert pm_alias["ratio_vs_baseline"] == pm_acc["ratio_vs_baseline"]
+    assert math.isclose(pm["preview"], 0.80, rel_tol=1e-12)
+    assert math.isclose(pm["final"], 0.95, rel_tol=1e-12)
+    expected_delta_pp = 100.0 * (0.95 - 0.90)
+    assert math.isclose(pm["delta_vs_baseline_pp"], expected_delta_pp, rel_tol=1e-12)
+    assert "ratio_vs_baseline" not in pm

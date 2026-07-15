@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Audit named model-evidence candidates before GPU execution.
+"""Audit the static public evidence catalog against model contracts.
 
-The check is intentionally offline. It verifies repo contracts, presets, adapter
-auto-routing, materialization metadata, and resource hints without downloading
-models or datasets.
+The check is intentionally offline. It verifies catalog entries, presets, adapter
+auto-routing, and dataset-provider contracts without scheduling or placement data.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -19,27 +19,19 @@ from typing import Any
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MODEL_EVIDENCE_DIR = REPO_ROOT / "scripts" / "model_evidence"
 SRC_DIR = REPO_ROOT / "src"
+EVIDENCE_CATALOG_PATH = REPO_ROOT / "contracts" / "evidence_catalog_v1.json"
+MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json"
+SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
 
-for path in (MODEL_EVIDENCE_DIR, SRC_DIR):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
-
-from model_evidence_lanes import (  # noqa: E402
-    MODEL_CATALOG_GPU_SUITE,
-    MODEL_FAMILY_CATALOG_PATH,
-    SUITES,
-    SUPPORT_MATRIX_BACKLOG_GPU_SUITE,
-    SUPPORT_MATRIX_PATH,
-    EvidenceLane,
-    lane_resource_estimate,
-)
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from invarlock.adapters.auto import resolve_auto_adapter  # noqa: E402
 from invarlock.model_family_registry import ModelFamilyRouteIndex  # noqa: E402
 
-ALLOWED_ADAPTERS = {"auto", "hf_causal", "hf_mlm", "hf_multimodal", "hf_seq2seq"}
+CATALOG_FORMAT = "invarlock/evidence-catalog-v1"
+ALLOWED_ADAPTERS = {"hf_causal", "hf_mlm", "hf_multimodal", "hf_seq2seq"}
 EXPECTED_PROVIDER_KINDS = {
     "hf_causal": {"hf_text", "local_jsonl", "text", "wikitext2"},
     "hf_mlm": {"hf_text", "local_jsonl", "text", "wikitext2"},
@@ -65,7 +57,10 @@ class Finding:
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise TypeError(f"{path} must contain a JSON object")
+    return payload
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -91,21 +86,16 @@ def _provider_kind(provider: Any) -> str | None:
     return None
 
 
-def _all_lanes() -> list[tuple[str, EvidenceLane]]:
-    seen: set[tuple[str, str]] = set()
-    lanes: list[tuple[str, EvidenceLane]] = []
-    for suite_name, suite_lanes in SUITES.items():
-        for lane in suite_lanes:
-            key = (lane.slug, lane.lane_id)
-            if key in seen:
-                continue
-            seen.add(key)
-            lanes.append((suite_name, lane))
-    return lanes
+def _catalog_entries(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    entries = payload.get("entries")
+    return (
+        [entry for entry in entries if isinstance(entry, Mapping)]
+        if isinstance(entries, list)
+        else []
+    )
 
 
-def _model_ids_from_catalog() -> set[str]:
-    payload = _load_json(MODEL_FAMILY_CATALOG_PATH)
+def _model_ids_from_catalog(payload: Mapping[str, Any]) -> set[str]:
     model_ids: set[str] = set()
 
     def collect(value: Any) -> None:
@@ -127,50 +117,31 @@ def _model_ids_from_catalog() -> set[str]:
     return model_ids
 
 
-def _support_matrix_rows() -> dict[str, dict[str, Any]]:
-    payload = _load_json(SUPPORT_MATRIX_PATH)
+def _support_matrix_rows(
+    payload: Mapping[str, Any],
+) -> dict[str, Mapping[str, Any]]:
+    lanes = payload.get("lanes")
+    if not isinstance(lanes, list):
+        return {}
     return {
         str(lane["lane_id"]): lane
-        for lane in payload.get("lanes", [])
-        if isinstance(lane, dict) and isinstance(lane.get("lane_id"), str)
+        for lane in lanes
+        if isinstance(lane, Mapping) and isinstance(lane.get("lane_id"), str)
     }
-
-
-def _requires_large_model_loading_defaults(
-    model_id: str,
-    estimate: Mapping[str, Any] | None,
-) -> bool:
-    lower = model_id.lower()
-    if not estimate:
-        return any(hint in lower for hint in ("34b", "72b"))
-    try:
-        recommended_gpus = float(estimate.get("recommended_min_gpus_80gb", 1))
-        estimated_weight_gb = float(estimate.get("estimated_weight_gb_bf16", 0))
-    except (TypeError, ValueError):
-        return False
-    return recommended_gpus > 1 or estimated_weight_gb >= 40
-
-
-def _is_public_materialized_lane(suite_name: str, lane: EvidenceLane) -> bool:
-    return bool(
-        suite_name == SUPPORT_MATRIX_BACKLOG_GPU_SUITE
-        and lane.adapter == "hf_multimodal"
-        and "public_vqav2" in lane.preset_relpath
-    )
 
 
 def _allows_explicit_task_adapter(
     *,
-    lane: EvidenceLane,
+    model_id: str,
     multi_adapter_model_ids: set[str],
     effective_adapter: str,
     preset_adapter: Any,
     provider_kind: str | None,
     loss_type: Any,
 ) -> bool:
-    """Allow task-specific adapters for checkpoints with multiple declared lanes."""
+    """Allow explicit task adapters only for cataloged multi-task checkpoints."""
 
-    if lane.model_id not in multi_adapter_model_ids:
+    if model_id not in multi_adapter_model_ids:
         return False
     if preset_adapter is None or str(preset_adapter) != effective_adapter:
         return False
@@ -178,76 +149,80 @@ def _allows_explicit_task_adapter(
     if expected_kinds and provider_kind not in expected_kinds:
         return False
     expected_loss_types = EXPECTED_LOSS_TYPES.get(effective_adapter)
-    if (
+    return not (
         expected_loss_types
         and loss_type is not None
         and str(loss_type) not in expected_loss_types
-    ):
-        return False
-    return True
+    )
 
 
-def _check_lane(
-    suite_name: str,
-    lane: EvidenceLane,
+def _check_entry(
+    entry: Mapping[str, Any],
     support_rows: Mapping[str, Mapping[str, Any]],
     multi_adapter_model_ids: set[str],
 ) -> list[Finding]:
     findings: list[Finding] = []
-    scope = f"{suite_name}:{lane.slug}"
-    if lane.adapter not in ALLOWED_ADAPTERS:
-        findings.append(Finding("error", scope, f"unknown adapter {lane.adapter!r}"))
+    lane_id = entry.get("lane_id")
+    scope = f"evidence_catalog:{lane_id if isinstance(lane_id, str) else '<unknown>'}"
+    model = entry.get("model")
+    preset_spec = entry.get("preset")
+    inputs = entry.get("inputs")
+    if not isinstance(model, Mapping):
+        return [Finding("error", scope, "model must be an object")]
+    if not isinstance(preset_spec, Mapping):
+        return [Finding("error", scope, "preset must be an object")]
+    if not isinstance(inputs, Mapping):
+        return [Finding("error", scope, "inputs must be an object")]
 
-    preset = REPO_ROOT / lane.preset_relpath
+    model_id = model.get("id")
+    adapter = model.get("adapter")
+    preset_relpath = preset_spec.get("path")
+    if not isinstance(model_id, str) or not model_id:
+        return [Finding("error", scope, "model.id is required")]
+    if adapter not in ALLOWED_ADAPTERS:
+        return [Finding("error", scope, f"unknown adapter {adapter!r}")]
+    if not isinstance(preset_relpath, str) or not preset_relpath:
+        return [Finding("error", scope, "preset.path is required")]
+
+    preset = REPO_ROOT / preset_relpath
     if not preset.is_file():
-        findings.append(
-            Finding("error", scope, f"missing preset {lane.preset_relpath}")
-        )
-        return findings
+        return [Finding("error", scope, f"missing preset {preset_relpath}")]
+    expected_digest = preset_spec.get("sha256")
+    observed_digest = "sha256:" + hashlib.sha256(preset.read_bytes()).hexdigest()
+    if expected_digest != observed_digest:
+        findings.append(Finding("error", scope, "preset digest does not match bytes"))
 
     data = _load_yaml(preset)
     preset_adapter = _nested(data, "model", "adapter")
-    effective_adapter = lane.adapter
-    if lane.adapter == "auto" and preset_adapter is not None:
-        effective_adapter = str(preset_adapter)
-
-    provider = _nested(data, "dataset", "provider")
-    provider_kind = _provider_kind(provider)
+    effective_adapter = str(adapter)
+    provider_kind = _provider_kind(_nested(data, "dataset", "provider"))
     loss_type = _nested(data, "eval", "loss", "type")
-    expected_auto = resolve_auto_adapter(lane.model_id)
+    expected_auto = resolve_auto_adapter(model_id)
     explicit_task_adapter = _allows_explicit_task_adapter(
-        lane=lane,
+        model_id=model_id,
         multi_adapter_model_ids=multi_adapter_model_ids,
         effective_adapter=effective_adapter,
         preset_adapter=preset_adapter,
         provider_kind=provider_kind,
         loss_type=loss_type,
     )
-    if (
-        effective_adapter != "auto"
-        and expected_auto != effective_adapter
-        and not explicit_task_adapter
-    ):
+    if expected_auto != effective_adapter and not explicit_task_adapter:
         findings.append(
             Finding(
                 "error",
                 scope,
-                f"adapter:auto resolves {lane.model_id!r} to {expected_auto!r}, "
-                f"but the lane uses {effective_adapter!r}",
+                f"adapter:auto resolves {model_id!r} to {expected_auto!r}, "
+                f"but the catalog uses {effective_adapter!r}",
             )
         )
 
-    if (
-        preset_adapter is not None
-        and lane.adapter != "auto"
-        and str(preset_adapter) != lane.adapter
-    ):
+    if preset_adapter is not None and str(preset_adapter) != effective_adapter:
         findings.append(
             Finding(
                 "error",
                 scope,
-                f"preset adapter {preset_adapter!r} does not match lane adapter "
-                f"{lane.adapter!r}",
+                f"preset adapter {preset_adapter!r} does not match catalog adapter "
+                f"{effective_adapter!r}",
             )
         )
 
@@ -260,6 +235,26 @@ def _check_lane(
                 f"dataset provider kind {provider_kind!r} is not valid for "
                 f"{effective_adapter}; expected one of {sorted(expected_kinds)}",
             )
+        )
+    source = inputs.get("source")
+    source_provider = source.get("provider") if isinstance(source, Mapping) else None
+    if source_provider != provider_kind:
+        findings.append(
+            Finding(
+                "error",
+                scope,
+                "catalog input provider disagrees with the preset provider",
+            )
+        )
+
+    input_kind = inputs.get("kind")
+    if effective_adapter == "hf_multimodal" and input_kind != "vision_text":
+        findings.append(
+            Finding("error", scope, "multimodal entries require vision_text inputs")
+        )
+    if effective_adapter != "hf_multimodal" and input_kind == "vision_text":
+        findings.append(
+            Finding("error", scope, "vision_text inputs require hf_multimodal")
         )
 
     expected_loss_types = EXPECTED_LOSS_TYPES.get(effective_adapter)
@@ -277,127 +272,100 @@ def _check_lane(
             )
         )
 
-    materialization = lane.vision_text_materialization
-    if _is_public_materialized_lane(suite_name, lane):
-        if not materialization:
+    support = support_rows.get(str(lane_id))
+    if support is None:
+        findings.append(Finding("error", scope, "missing support-matrix lane"))
+    else:
+        if support.get("adapter") != effective_adapter:
             findings.append(
-                Finding(
-                    "error",
-                    scope,
-                    "public vision-text lane lacks materialization metadata",
-                )
+                Finding("error", scope, "support-matrix adapter disagrees with catalog")
             )
-        elif (
-            materialization.get("dataset")
-            != "Multimodal-Fatima/VQAv2_sample_validation"
+        representatives = support.get("representative_models")
+        if (
+            isinstance(representatives, list)
+            and representatives
+            and model_id not in representatives
         ):
             findings.append(
                 Finding(
                     "error",
                     scope,
-                    "public vision-text lane must materialize the pinned VQAv2 sample",
+                    "catalog model is not a support-matrix representative",
                 )
             )
-
-    estimate = lane_resource_estimate(lane.model_id)
-    preset_model_id = _nested(data, "model", "id")
-    model_specific_preset = preset_model_id in {None, lane.model_id}
-    if (
-        suite_name != MODEL_CATALOG_GPU_SUITE
-        and model_specific_preset
-        and _requires_large_model_loading_defaults(lane.model_id, estimate)
-    ):
-        model_cfg = data.get("model", {}) if isinstance(data.get("model"), dict) else {}
-        if model_cfg.get("device_map") != "auto":
-            findings.append(
-                Finding(
-                    "error", scope, "large/MoE lane should set model.device_map=auto"
-                )
-            )
-        if model_cfg.get("low_cpu_mem_usage") is not True:
-            findings.append(
-                Finding(
-                    "error", scope, "large/MoE lane should set low_cpu_mem_usage=true"
-                )
-            )
-        if str(model_cfg.get("dtype", "")).lower() not in {
-            "auto",
-            "bfloat16",
-            "float16",
-        }:
-            findings.append(
-                Finding(
-                    "error",
-                    scope,
-                    "large/MoE lane should pin auto/bfloat16/float16 dtype",
-                )
-            )
-        if model_cfg.get("collect_loading_info") is not False:
-            findings.append(
-                Finding(
-                    "error",
-                    scope,
-                    "large/MoE lane should disable optional loading-info collection",
-                )
-            )
-
-    if lane.lane_id in support_rows:
-        matrix_adapter = support_rows[lane.lane_id].get("adapter")
-        if matrix_adapter != lane.adapter:
-            findings.append(
-                Finding(
-                    "error",
-                    scope,
-                    f"support matrix adapter {matrix_adapter!r} disagrees with lane",
-                )
-            )
-
     return findings
 
 
 def audit() -> list[Finding]:
     findings: list[Finding] = []
-    support_rows = _support_matrix_rows()
-    lane_model_ids: set[str] = set()
-    lanes = _all_lanes()
-    adapters_by_model_id: dict[str, set[str]] = {}
+    evidence_catalog = _load_json(EVIDENCE_CATALOG_PATH)
+    family_catalog = _load_json(MODEL_FAMILY_CATALOG_PATH)
+    support_matrix = _load_json(SUPPORT_MATRIX_PATH)
+    entries = _catalog_entries(evidence_catalog)
+    support_rows = _support_matrix_rows(support_matrix)
 
-    for _suite_name, lane in lanes:
-        adapters_by_model_id.setdefault(lane.model_id, set()).add(lane.adapter)
+    if evidence_catalog.get("format_version") != CATALOG_FORMAT:
+        findings.append(
+            Finding("error", "evidence_catalog", "unexpected format_version")
+        )
+    if evidence_catalog.get("entry_count") != len(entries):
+        findings.append(
+            Finding("error", "evidence_catalog", "entry_count does not match entries")
+        )
+
+    adapters_by_model_id: dict[str, set[str]] = {}
+    catalog_model_ids: set[str] = set()
+    catalog_lane_ids: set[str] = set()
+    for entry in entries:
+        model = entry.get("model")
+        lane_id = entry.get("lane_id")
+        if isinstance(lane_id, str):
+            if lane_id in catalog_lane_ids:
+                findings.append(
+                    Finding("error", f"evidence_catalog:{lane_id}", "duplicate lane")
+                )
+            catalog_lane_ids.add(lane_id)
+        if not isinstance(model, Mapping):
+            continue
+        model_id = model.get("id")
+        adapter = model.get("adapter")
+        if isinstance(model_id, str) and isinstance(adapter, str):
+            catalog_model_ids.add(model_id)
+            adapters_by_model_id.setdefault(model_id, set()).add(adapter)
 
     multi_adapter_model_ids = {
         model_id
         for model_id, adapters in adapters_by_model_id.items()
         if len(adapters) > 1
     }
+    for entry in entries:
+        findings.extend(_check_entry(entry, support_rows, multi_adapter_model_ids))
 
-    for suite_name, lane in lanes:
-        lane_model_ids.add(lane.model_id)
-        findings.extend(
-            _check_lane(
-                suite_name,
-                lane,
-                support_rows,
-                multi_adapter_model_ids,
+    expected_lane_ids = set(support_rows)
+    if catalog_lane_ids != expected_lane_ids:
+        findings.append(
+            Finding(
+                "error",
+                "evidence_catalog",
+                "lane IDs must exactly match the public support matrix: "
+                f"missing={sorted(expected_lane_ids - catalog_lane_ids)!r} "
+                f"extra={sorted(catalog_lane_ids - expected_lane_ids)!r}",
             )
         )
 
-    catalog_payload = _load_json(MODEL_FAMILY_CATALOG_PATH)
-    support_payload = _load_json(SUPPORT_MATRIX_PATH)
     routed_model_ids = ModelFamilyRouteIndex.from_contracts(
-        catalog=catalog_payload,
-        support_matrix=support_payload,
+        catalog=family_catalog,
+        support_matrix=support_matrix,
     ).routed_model_ids()
-    catalog_model_ids = _model_ids_from_catalog()
     missing_catalog_routes = sorted(
-        catalog_model_ids - lane_model_ids - routed_model_ids
+        _model_ids_from_catalog(family_catalog) - catalog_model_ids - routed_model_ids
     )
     for model_id in missing_catalog_routes:
         findings.append(
             Finding(
                 "error",
                 "model_family_catalog",
-                f"representative model {model_id!r} lacks a lane or preset override",
+                f"representative model {model_id!r} lacks a catalog entry or route",
             )
         )
 

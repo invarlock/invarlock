@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from invarlock.edits.quant_rtn import RTNQuantEdit
+from invarlock.edits.quant_rtn_kernels import exact_change_counts
 from tests.edits._support_quant_rtn import target as _target
 
 
@@ -153,3 +154,18 @@ def test_quant_rtn_aggregate_error_metric_edges() -> None:
     assert aggregate["mean_abs_error"] == 0.1
     assert aggregate["max_abs_error"] == 0.2
     assert aggregate["quant_code_edge_fraction"] == 0.6
+
+
+def test_quant_rtn_exact_change_counts_include_storage_only_changes() -> None:
+    original = torch.tensor([-0.0, 1.0], dtype=torch.float32)
+    edited = torch.tensor([0.0, 1.0], dtype=torch.float32)
+
+    counts = exact_change_counts(original, edited)
+
+    assert counts == {
+        "params_changed": 1,
+        "value_changed_elements": 0,
+        "byte_changed_elements": 1,
+        "bytes_changed": 1,
+        "tensor_changed": True,
+    }

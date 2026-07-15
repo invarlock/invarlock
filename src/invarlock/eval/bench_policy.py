@@ -14,7 +14,7 @@ from invarlock.reporting.report_types import RunReport
 # When benchmark golden outputs are intentionally updated, bump these values and
 # add the matching entry to CHANGELOG.md.
 BENCH_GOLDEN_ID = "bench-golden-2025-12-13"
-BENCH_GOLDEN_SHA256 = "2627b8872cd6bfc37bda31fbc11b78ed814751cbf2a9ad1396e173f1f4e5383a"
+BENCH_GOLDEN_SHA256 = "ae8094204c998fc51bf51052d7d1457d3cdc17bab9bc4785e88c4f07d0234ad3"
 
 
 @dataclass
@@ -66,9 +66,9 @@ class BenchmarkConfig:
     seed: int = 42
     output_dir: Path = Path("benchmarks")
     epsilon: float | None = None
-    ppl_overhead_threshold: float = 0.01
-    guard_overhead_time_threshold: float = 0.15
-    guard_overhead_mem_threshold: float = 0.10
+    ppl_degradation_limit: float = 0.01
+    guard_runtime_overhead_threshold: float = 0.15
+    guard_memory_overhead_threshold: float = 0.10
     catastrophic_spike_threshold: float = 2.0
 
     def __post_init__(self) -> None:
@@ -309,9 +309,9 @@ class MetricsAggregator:
         pm_bare = comparison["primary_metric_bare"]
         pm_guarded = comparison["primary_metric_guarded"]
         if not (math.isnan(pm_bare) or math.isnan(pm_guarded)) and pm_bare > 0:
-            comparison["primary_metric_overhead"] = (pm_guarded - pm_bare) / pm_bare
+            comparison["guard_primary_metric_impact"] = (pm_guarded - pm_bare) / pm_bare
         else:
-            comparison["primary_metric_overhead"] = float("nan")
+            comparison["guard_primary_metric_impact"] = float("nan")
 
         duration_bare = comparison.get("duration_bare_s", float("nan"))
         duration_guarded = comparison.get("duration_guarded_s", float("nan"))
@@ -321,7 +321,7 @@ class MetricsAggregator:
             and not (math.isnan(duration_bare) or math.isnan(duration_guarded))
             and float(duration_bare) > 0
         ):
-            comparison["guard_overhead_time"] = (
+            comparison["guard_runtime_overhead"] = (
                 float(duration_guarded) - float(duration_bare)
             ) / float(duration_bare)
         else:
@@ -331,18 +331,18 @@ class MetricsAggregator:
                 not (math.isnan(latency_bare) or math.isnan(latency_guarded))
                 and latency_bare > 0
             ):
-                comparison["guard_overhead_time"] = (
+                comparison["guard_runtime_overhead"] = (
                     latency_guarded - latency_bare
                 ) / latency_bare
             else:
-                comparison["guard_overhead_time"] = float("nan")
+                comparison["guard_runtime_overhead"] = float("nan")
 
         mem_bare = comparison["mem_bare"]
         mem_guarded = comparison["mem_guarded"]
         if not (math.isnan(mem_bare) or math.isnan(mem_guarded)) and mem_bare > 0:
-            comparison["guard_overhead_mem"] = (mem_guarded - mem_bare) / mem_bare
+            comparison["guard_memory_overhead"] = (mem_guarded - mem_bare) / mem_bare
         else:
-            comparison["guard_overhead_mem"] = float("nan")
+            comparison["guard_memory_overhead"] = float("nan")
 
         comparison.update(
             {
@@ -360,6 +360,22 @@ class ValidationGates:
     """Validate metrics against Step 14 gates."""
 
     @staticmethod
+    def _finite_gate_value(comparison: dict[str, Any], key: str) -> float | None:
+        """Return a measured finite gate value, never an unavailable sentinel."""
+        value = comparison.get(key)
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return None
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) else None
+
+    @staticmethod
+    def _finite_nonnegative_threshold(threshold: Any) -> float | None:
+        if isinstance(threshold, bool) or not isinstance(threshold, int | float):
+            return None
+        numeric = float(threshold)
+        return numeric if math.isfinite(numeric) and numeric >= 0.0 else None
+
+    @staticmethod
     def validate_catastrophic_spike_rate(comparison: dict[str, Any]) -> bool:
         return not comparison.get("catastrophic_spike", False)
 
@@ -375,31 +391,32 @@ class ValidationGates:
         return guarded_outliers <= allowed
 
     @staticmethod
-    def validate_primary_metric_overhead(
+    def validate_guard_primary_metric_impact(
         comparison: dict[str, Any], threshold: float = 0.01
     ) -> bool:
-        overhead = comparison.get("primary_metric_overhead", float("nan"))
-        if math.isnan(overhead):
-            return True
-        return overhead <= threshold
+        impact = ValidationGates._finite_gate_value(
+            comparison, "guard_primary_metric_impact"
+        )
+        limit = ValidationGates._finite_nonnegative_threshold(threshold)
+        return impact is not None and limit is not None and impact <= limit
 
     @staticmethod
-    def validate_time_overhead(
+    def validate_runtime_overhead(
         comparison: dict[str, Any], threshold: float = 0.15
     ) -> bool:
-        overhead = comparison.get("guard_overhead_time", float("nan"))
-        if math.isnan(overhead):
-            return True
-        return overhead <= threshold
+        impact = ValidationGates._finite_gate_value(
+            comparison, "guard_runtime_overhead"
+        )
+        limit = ValidationGates._finite_nonnegative_threshold(threshold)
+        return impact is not None and limit is not None and impact <= limit
 
     @staticmethod
     def validate_memory_overhead(
         comparison: dict[str, Any], threshold: float = 0.10
     ) -> bool:
-        overhead = comparison.get("guard_overhead_mem", float("nan"))
-        if math.isnan(overhead):
-            return True
-        return overhead <= threshold
+        impact = ValidationGates._finite_gate_value(comparison, "guard_memory_overhead")
+        limit = ValidationGates._finite_nonnegative_threshold(threshold)
+        return impact is not None and limit is not None and impact <= limit
 
     @classmethod
     def validate_all_gates(
@@ -409,14 +426,14 @@ class ValidationGates:
             "spike": cls.validate_catastrophic_spike_rate(comparison),
             "tying": cls.validate_tying_violations(comparison),
             "rmt": cls.validate_rmt_outliers(comparison, epsilon),
-            "quality": cls.validate_primary_metric_overhead(
-                comparison, config.ppl_overhead_threshold
+            "quality": cls.validate_guard_primary_metric_impact(
+                comparison, config.ppl_degradation_limit
             ),
-            "time": cls.validate_time_overhead(
-                comparison, config.guard_overhead_time_threshold
+            "time": cls.validate_runtime_overhead(
+                comparison, config.guard_runtime_overhead_threshold
             ),
             "mem": cls.validate_memory_overhead(
-                comparison, config.guard_overhead_mem_threshold
+                comparison, config.guard_memory_overhead_threshold
             ),
         }
 
@@ -471,15 +488,19 @@ def summary_to_step14_json(summary: BenchmarkSummary) -> dict[str, Any]:
                     "primary_metric_guarded": result.metrics.get(
                         "primary_metric_guarded"
                     ),
-                    "primary_metric_overhead": result.metrics.get(
-                        "primary_metric_overhead"
+                    "guard_primary_metric_impact": result.metrics.get(
+                        "guard_primary_metric_impact"
                     ),
                     "latency_bare": result.metrics.get("latency_bare"),
                     "latency_guarded": result.metrics.get("latency_guarded"),
-                    "guard_overhead_time": result.metrics.get("guard_overhead_time"),
+                    "guard_runtime_overhead": result.metrics.get(
+                        "guard_runtime_overhead"
+                    ),
                     "mem_bare": result.metrics.get("mem_bare"),
                     "mem_guarded": result.metrics.get("mem_guarded"),
-                    "guard_overhead_mem": result.metrics.get("guard_overhead_mem"),
+                    "guard_memory_overhead": result.metrics.get(
+                        "guard_memory_overhead"
+                    ),
                     "rmt_outliers_bare": result.metrics.get("rmt_outliers_bare"),
                     "rmt_outliers_guarded": result.metrics.get("rmt_outliers_guarded"),
                     "tying_violations_post": result.metrics.get(
@@ -494,13 +515,13 @@ def summary_to_step14_json(summary: BenchmarkSummary) -> dict[str, Any]:
                 {
                     "primary_metric_bare": None,
                     "primary_metric_guarded": None,
-                    "primary_metric_overhead": None,
+                    "guard_primary_metric_impact": None,
                     "latency_bare": None,
                     "latency_guarded": None,
-                    "guard_overhead_time": None,
+                    "guard_runtime_overhead": None,
                     "mem_bare": None,
                     "mem_guarded": None,
-                    "guard_overhead_mem": None,
+                    "guard_memory_overhead": None,
                     "rmt_outliers_bare": None,
                     "rmt_outliers_guarded": None,
                     "tying_violations_post": None,
@@ -553,27 +574,29 @@ def generate_step14_markdown(summary: BenchmarkSummary) -> str:
         else:
             all_pass = all(result.gates.values()) if result.gates else False
             status = "✅ PASS" if all_pass else "❌ FAIL"
-            pm_overhead = result.metrics.get("primary_metric_overhead")
-            if pm_overhead is not None and not math.isnan(pm_overhead):
-                ppl_delta = f"{pm_overhead:+.1%}"
+            quality_impact = result.metrics.get("guard_primary_metric_impact")
+            if quality_impact is not None and not math.isnan(quality_impact):
+                ppl_delta = f"{quality_impact:+.1%}"
                 ppl_delta = (
-                    f"🔴 {ppl_delta}" if pm_overhead > 0.01 else f"🟢 {ppl_delta}"
+                    f"🔴 {ppl_delta}" if quality_impact > 0.01 else f"🟢 {ppl_delta}"
                 )
             else:
                 ppl_delta = "-"
-            time_overhead = result.metrics.get("guard_overhead_time")
-            if time_overhead is not None and not math.isnan(time_overhead):
-                time_delta = f"{time_overhead:+.1%}"
+            runtime_overhead = result.metrics.get("guard_runtime_overhead")
+            if runtime_overhead is not None and not math.isnan(runtime_overhead):
+                time_delta = f"{runtime_overhead:+.1%}"
                 time_delta = (
-                    f"🔴 {time_delta}" if time_overhead > 0.15 else f"🟢 {time_delta}"
+                    f"🔴 {time_delta}"
+                    if runtime_overhead > 0.15
+                    else f"🟢 {time_delta}"
                 )
             else:
                 time_delta = "-"
-            mem_overhead = result.metrics.get("guard_overhead_mem")
-            if mem_overhead is not None and not math.isnan(mem_overhead):
-                mem_delta = f"{mem_overhead:+.1%}"
+            memory_overhead = result.metrics.get("guard_memory_overhead")
+            if memory_overhead is not None and not math.isnan(memory_overhead):
+                mem_delta = f"{memory_overhead:+.1%}"
                 mem_delta = (
-                    f"🔴 {mem_delta}" if mem_overhead > 0.10 else f"🟢 {mem_delta}"
+                    f"🔴 {mem_delta}" if memory_overhead > 0.10 else f"🟢 {mem_delta}"
                 )
             else:
                 mem_delta = "-"
@@ -637,9 +660,9 @@ def config_to_dict(config: BenchmarkConfig) -> dict[str, Any]:
         "stride": config.stride,
         "seed": config.seed,
         "epsilon": config.epsilon,
-        "ppl_overhead_threshold": config.ppl_overhead_threshold,
-        "guard_overhead_time_threshold": config.guard_overhead_time_threshold,
-        "guard_overhead_mem_threshold": config.guard_overhead_mem_threshold,
+        "ppl_degradation_limit": config.ppl_degradation_limit,
+        "guard_runtime_overhead_threshold": config.guard_runtime_overhead_threshold,
+        "guard_memory_overhead_threshold": config.guard_memory_overhead_threshold,
         "catastrophic_spike_threshold": config.catastrophic_spike_threshold,
     }
 

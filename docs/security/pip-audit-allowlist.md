@@ -9,7 +9,8 @@ Active exceptions are time-boxed and owned by `security-maintainers`.
 
 | Vulnerability ID      | Package | Expires      | Tracking Issue | Reason |
 | --------------------- | ------- | ------------ | -------------- | ------ |
-| `CVE-2025-3000` | `torch` | 2026-07-13 | [invarlock/invarlock#72](https://github.com/invarlock/invarlock/issues/72) | `pip-audit` reports the advisory against `torch==2.11.0` in optional HF and advanced install surfaces and currently lists no fixed Torch release; remove when upstream publishes a fixed version. |
+| `CVE-2025-3000` | `torch` | 2026-08-13 | [invarlock/invarlock#72](https://github.com/invarlock/invarlock/issues/72) | `pip-audit` reports the advisory against `torch==2.11.0` in optional HF and advanced install surfaces and currently lists no fixed Torch release; remove when upstream publishes a fixed version. |
+| `PYSEC-2026-3447` | `setuptools` | 2026-08-13 | [invarlock/invarlock#142](https://github.com/invarlock/invarlock/issues/142) | The pinned `torch==2.11.0+cu128` wheel requires `setuptools<82`; retain the runtime-only lock until a validated Torch/CUDA pairing permits Setuptools 83 or later. |
 
 All other findings must be remediated prior to release. Update this table and
 the JSON allowlist entry whenever the allowlist changes.

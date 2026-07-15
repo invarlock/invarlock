@@ -48,8 +48,8 @@ def test_container_launch_forwards_reviewed_runtime_env_contract(
     monkeypatch.setenv("TMPDIR", str(tmpdir))
     monkeypatch.setenv("INVARLOCK_STORE_EVAL_WINDOWS", "1")
     monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "auto")
-    monkeypatch.setenv("INVARLOCK_SKIP_OVERHEAD_CHECK", "1")
-    monkeypatch.setenv("INVARLOCK_DETERMINISM", "strict")
+    monkeypatch.setenv("INVARLOCK_SKIP_GUARD_METRIC_IMPACT_CHECK", "1")
+    monkeypatch.setenv("PACK_DETERMINISM", "strict")
     monkeypatch.setenv("HF_DATASETS_OFFLINE", "1")
 
     command = _build_container_command(["run", "--config", str(config_path)])
@@ -69,8 +69,8 @@ def test_container_launch_forwards_reviewed_runtime_env_contract(
     assert _env_value(command, "TMPDIR") == str(tmpdir)
     assert _env_value(command, "INVARLOCK_STORE_EVAL_WINDOWS") == "1"
     assert _env_value(command, "INVARLOCK_SNAPSHOT_MODE") == "auto"
-    assert _env_value(command, "INVARLOCK_SKIP_OVERHEAD_CHECK") == "1"
-    assert _env_value(command, "INVARLOCK_DETERMINISM") == "strict"
+    assert _env_value(command, "INVARLOCK_SKIP_GUARD_METRIC_IMPACT_CHECK") == "1"
+    assert _env_value(command, "PACK_DETERMINISM") == "strict"
     assert _env_value(command, "HF_DATASETS_OFFLINE") == "1"
 
 

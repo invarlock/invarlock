@@ -52,7 +52,31 @@ def test_model_candidate_compatibility_catches_multimodal_auto_route_drift(
     findings = mod.audit()
 
     assert any(
-        finding.scope == "support-matrix-backlog-gpu:qwen_qwen3_5_4b"
+        finding.scope == "evidence_catalog:qwen3-5-4b-image-text-hf"
         and "adapter:auto resolves 'Qwen/Qwen3.5-4B' to 'hf_causal'" in finding.message
+        for finding in findings
+    )
+
+
+def test_model_candidate_compatibility_catches_catalog_provider_drift(
+    monkeypatch, tmp_path: Path
+) -> None:
+    mod = _load_script_module()
+    payload = json.loads(
+        Path("contracts/evidence_catalog_v1.json").read_text(encoding="utf-8")
+    )
+    for entry in payload["entries"]:
+        if entry["lane_id"] == "qwen3-5-4b-image-text-hf":
+            entry["inputs"]["source"]["provider"] = "hf_text"
+            break
+    catalog_path = tmp_path / "evidence_catalog_v1.json"
+    catalog_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(mod, "EVIDENCE_CATALOG_PATH", catalog_path)
+
+    findings = mod.audit()
+
+    assert any(
+        finding.scope == "evidence_catalog:qwen3-5-4b-image-text-hf"
+        and "input provider disagrees" in finding.message
         for finding in findings
     )

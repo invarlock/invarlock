@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 from invarlock.reporting.report_bundle import save_evaluation_bundle
 from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import canonical_run_report
 
 
 def _report_and_base():
@@ -15,8 +17,13 @@ def _report_and_base():
             "seed": 1,
             "device": "cpu",
             "ts": "2024-01-01T00:00:00",
-            "auto": None,
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
+        "context": {"profile": "dev"},
         "data": {
             "dataset": "ds",
             "split": "val",
@@ -50,15 +57,9 @@ def _report_and_base():
             "final": {"window_ids": [1], "logloss": [4.0], "token_counts": [100]}
         },
     }
-    base = {
-        "schema_version": "baseline-v1",
-        "meta": {},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
-        "evaluation_windows": {
-            "final": {"window_ids": [1], "logloss": [4.0], "token_counts": [100]}
-        },
-    }
-    return rep, base
+    base = copy.deepcopy(rep)
+    base["edit"]["name"] = "noop"
+    return canonical_run_report(rep), canonical_run_report(base)
 
 
 def test_save_report_without_evidence(tmp_path: Path):

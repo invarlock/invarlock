@@ -158,6 +158,28 @@ def test_apply_policy_overrides_updates_optional_numeric_fields() -> None:
     assert guard.config["correction_enabled"] is False
 
 
+def test_apply_policy_overrides_rejects_nonpositive_correction_budget() -> None:
+    guard = SpectralGuard()
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID") as excinfo:
+        spectral_policy.apply_policy_overrides(guard, {"correction_cap_ratio": 0.0})
+
+    assert excinfo.value.details == {
+        "param": "correction_cap_ratio",
+        "reason": "must be > 0",
+        "value": 0.0,
+    }
+
+
+def test_apply_policy_overrides_retains_positive_correction_budget() -> None:
+    guard = SpectralGuard()
+
+    spectral_policy.apply_policy_overrides(guard, {"correction_cap_ratio": 1.25})
+
+    assert guard.correction_cap_ratio == pytest.approx(1.25)
+    assert guard.config["correction_cap_ratio"] == pytest.approx(1.25)
+
+
 def test_apply_policy_overrides_updates_module_patterns() -> None:
     guard = SpectralGuard()
     guard._scoped_modules_model_id = "cached"

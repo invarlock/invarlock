@@ -165,7 +165,7 @@ def suppress_noisy_warnings(
             }
             event_path.parent.mkdir(parents=True, exist_ok=True)
             with event_path.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(payload) + "\n")
+                fh.write(json.dumps(payload, allow_nan=False) + "\n")
         except (OSError, TypeError, ValueError):
             return
 

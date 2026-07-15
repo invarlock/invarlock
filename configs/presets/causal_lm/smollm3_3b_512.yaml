@@ -42,10 +42,6 @@ auto:
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
 
-context:
-  run:
-    skip_overhead_check: true
-
 output:
   dir: "runs"
   save_model: false

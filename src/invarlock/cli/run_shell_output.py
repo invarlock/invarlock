@@ -7,8 +7,8 @@ from typing import Any
 from rich.console import Console
 
 from invarlock.cli.output import OutputStyle, print_event, resolve_output_style
-from invarlock.reporting.report_overhead import (
-    build_guard_overhead_summary as _build_guard_overhead_summary_impl,
+from invarlock.reporting.report_metric_impact import (
+    build_guard_metric_impact_summary as _build_guard_metric_impact_summary_impl,
 )
 
 KV_LABEL_WIDTH = 10
@@ -71,36 +71,41 @@ def _print_pipeline_start(console: Console) -> None:
     _event(console, "INIT", "Starting InvarLock pipeline...", emoji="🚀")
 
 
-def _print_guard_overhead_summary(
+def _print_guard_metric_impact_summary(
     console: Console,
-    guard_overhead_info: dict[str, Any],
+    guard_metric_impact_info: dict[str, Any],
     *,
-    default_threshold: float = 0.01,
+    default_limit: float = 0.01,
 ) -> float:
-    """Print a concise guard-overhead console summary. Returns threshold fraction used."""
+    """Print a concise guard-metric-impact summary and return its degradation limit."""
 
-    summary = _build_guard_overhead_summary_impl(
-        guard_overhead_info,
-        default_threshold=default_threshold,
+    summary = _build_guard_metric_impact_summary_impl(
+        guard_metric_impact_info,
+        default_limit=default_limit,
     )
     if not summary.evaluated:
-        _event(console, "METRIC", "Guard Overhead: not evaluated", emoji="🛡️")
-        return summary.threshold_fraction
+        _event(console, "METRIC", "Guard Metric Impact: not evaluated", emoji="🛡️")
+        return summary.degradation_limit
     status = "PASS" if summary.passed else "FAIL"
-    if summary.overhead_percent is not None:
-        overhead_display = f"{summary.overhead_percent:+.2f}%"
-    elif summary.overhead_ratio is not None:
-        overhead_display = f"{summary.overhead_ratio:.3f}x"
+    if summary.display_value is not None and summary.display_unit == "percent":
+        impact_display = f"{summary.display_value:+.2f}%"
+        limit_display = f"≤ +{summary.degradation_limit * 100:.1f}%"
+    elif (
+        summary.display_value is not None
+        and summary.display_unit == "percentage_points"
+    ):
+        impact_display = f"{summary.display_value:+.2f} pp"
+        limit_display = f"≤ +{summary.degradation_limit * 100:.1f} pp"
     else:
-        overhead_display = "not evaluated"
-    threshold_display = f"≤ +{summary.threshold_fraction * 100:.1f}%"
+        impact_display = "display unavailable"
+        limit_display = "limit unavailable"
     _event(
         console,
         "METRIC",
-        f"Guard Overhead: {status} {overhead_display} ({threshold_display})",
+        f"Guard Metric Impact: {status} {impact_display} ({limit_display})",
         emoji="🛡️",
     )
-    return summary.threshold_fraction
+    return summary.degradation_limit
 
 
 def _print_retry_summary(console: Console, retry_controller: Any | None) -> None:

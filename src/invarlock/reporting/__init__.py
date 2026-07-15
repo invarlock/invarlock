@@ -16,7 +16,7 @@ def make_report(*args, **kwargs):
 
 
 def render_report_markdown(*args, **kwargs):
-    from .render_markdown import render_report_markdown as _render_report_markdown
+    from .rendering.markdown import render_report_markdown as _render_report_markdown
 
     return _render_report_markdown(*args, **kwargs)
 

@@ -65,6 +65,16 @@ def test_resolve_logspace_ci_prefers_ppl_analysis_pairing_and_falls_back():
         {"logloss_delta_ci": (0.3, 0.4)},
         {"stats": {"pairing": "independent"}, "logloss_delta_ci": (0.1, 0.2)},
     ) == (0.3, 0.4)
+    assert (
+        _resolve_logspace_ci(
+            {"logloss_delta_ci": (0.3, 0.4)},
+            {
+                "stats": {"pairing": "independent_preview_final"},
+                "logloss_delta_ci": (0.1, 0.2),
+            },
+        )
+        is None
+    )
 
 
 def test_attach_ppl_analysis_fields_populates_mean_logloss_and_ci():
@@ -136,7 +146,8 @@ def test_attach_primary_metric_classification_fallback(monkeypatch):
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.8)
     assert pm["display_ci"] == [pm["final"], pm["final"]]
-    assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
+    assert pm["delta_vs_baseline_pp"] == pytest.approx(10.0)
+    assert "ratio_vs_baseline" not in pm
     assert evaluation_report["report_build"]["fallback_fields"] == [
         {
             "field": "primary_metric",
@@ -471,7 +482,8 @@ def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
     pm = evaluation_report["primary_metric"]
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.65)
-    assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
+    assert pm["delta_vs_baseline_pp"] == pytest.approx(10.0)
+    assert "ratio_vs_baseline" not in pm
 
 
 def test_finalize_primary_metric_accuracy_uses_delta_pp_not_ratio() -> None:
@@ -484,7 +496,27 @@ def test_finalize_primary_metric_accuracy_uses_delta_pp_not_ratio() -> None:
         ppl_analysis=None,
     )
 
-    assert pm["ratio_vs_baseline"] == pytest.approx(2.0)
+    assert pm["delta_vs_baseline_pp"] == pytest.approx(2.0)
+    assert "ratio_vs_baseline" not in pm
+
+
+def test_finalize_primary_metric_accuracy_rejects_ratio_field() -> None:
+    report = classification_report(0.82)
+
+    with pytest.raises(ValueError, match="cannot contain ratio_vs_baseline"):
+        _finalize_primary_metric_snapshot(
+            {
+                "kind": "accuracy",
+                "preview": 0.81,
+                "final": 0.82,
+                "delta_vs_baseline_pp": 2.0,
+                "ratio_vs_baseline": 2.0,
+            },
+            report=report,
+            metrics_map=report["metrics"],
+            baseline_ref={"primary_metric": {"kind": "accuracy", "final": 0.80}},
+            ppl_analysis=None,
+        )
 
 
 def test_attach_primary_metric_ignores_bool_baseline_reference() -> None:

@@ -129,7 +129,10 @@ def test_tokenizer_factory_forwards_remote_code_opt_in(monkeypatch):
     profile = detect_model_profile(
         model_id="local-chatglm-compatible-checkpoint",
         adapter="hf_causal",
-        tokenizer_load_kwargs={"trust_remote_code": True},
+        tokenizer_load_kwargs={
+            "trust_remote_code": True,
+            "revision": "a" * 40,
+        },
     )
 
     with runtime_allowances_scope(allow_remote_code=True):
@@ -139,21 +142,32 @@ def test_tokenizer_factory_forwards_remote_code_opt_in(monkeypatch):
     assert isinstance(hash_value, str) and hash_value
     assert calls
     assert calls[0]["trust_remote_code"] is True
+    assert calls[0]["revision"] == "a" * 40
+    assert calls[0]["local_files_only"] is True
 
 
 def test_run_environment_attaches_config_remote_code_to_profile() -> None:
-    from invarlock.core.run_orchestrator_execute_environment import (
+    from invarlock.core.orchestration.environment import (
         _detect_model_profile_with_tokenizer_kwargs,
         _extract_tokenizer_load_kwargs_from_cfg,
     )
 
+    revision = "a" * 40
     cfg = SimpleNamespace(
         model=SimpleNamespace(trust_remote_code=False),
-        model_dump=lambda: {"model": {"trust_remote_code": True, "revision": "abc123"}},
+        model_dump=lambda: {
+            "model": {
+                "trust_remote_code": True,
+                "model_identity": {
+                    "kind": "remote_revision",
+                    "revision": revision,
+                },
+            }
+        },
     )
     assert _extract_tokenizer_load_kwargs_from_cfg(cfg) == {
         "trust_remote_code": True,
-        "revision": "abc123",
+        "revision": revision,
     }
 
     seen: dict[str, object] = {}
@@ -190,6 +204,55 @@ def test_run_environment_attaches_config_remote_code_to_profile() -> None:
     assert legacy_profile.tokenizer_load_kwargs == {
         "trust_remote_code": True,
         "revision": "abc123",
+    }
+
+
+@pytest.mark.parametrize(
+    "model_identity",
+    [
+        None,
+        {"kind": "remote_revision", "revision": "main"},
+        {"kind": "local_checkpoint_tree", "sha256": "sha256:" + "b" * 64},
+    ],
+)
+def test_tokenizer_kwargs_never_derive_revision_from_non_remote_identity(
+    model_identity: dict[str, str] | None,
+) -> None:
+    from invarlock.core.orchestration.environment import (
+        _extract_tokenizer_load_kwargs_from_cfg,
+    )
+
+    cfg = SimpleNamespace(
+        model=None,
+        model_dump=lambda: {
+            "model": {
+                "trust_remote_code": False,
+                "model_identity": model_identity,
+                "revision": "legacy-must-not-propagate",
+            }
+        },
+    )
+
+    assert _extract_tokenizer_load_kwargs_from_cfg(cfg) == {"trust_remote_code": False}
+
+
+def test_tokenizer_kwargs_read_typed_identity_from_object_config() -> None:
+    from invarlock.core.orchestration.environment import (
+        _extract_tokenizer_load_kwargs_from_cfg,
+    )
+
+    revision = "c" * 40
+    cfg = SimpleNamespace(
+        model=SimpleNamespace(
+            trust_remote_code=True,
+            model_identity={"kind": "remote_revision", "revision": revision},
+        ),
+        model_dump=lambda: {},
+    )
+
+    assert _extract_tokenizer_load_kwargs_from_cfg(cfg) == {
+        "trust_remote_code": True,
+        "revision": revision,
     }
 
 

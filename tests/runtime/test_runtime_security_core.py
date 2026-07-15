@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import invarlock.runtime_security as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
@@ -199,18 +201,23 @@ def test_resolve_runtime_image_prefers_local_cuda_when_gpu_visible(monkeypatch) 
 
 
 def test_inspect_container_image_parses_repo_digest_and_image_id(monkeypatch) -> None:
+    repo_digest = "sha256:" + "a" * 64
+    image_id = "sha256:" + "b" * 64
     monkeypatch.setattr(
         runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
-            stdout='["ghcr.io/invarlock/invarlock-runtime:test@sha256:abc"]\nsha256:def\n',
+            stdout=(
+                '["ghcr.io/invarlock/invarlock-runtime:test@'
+                f'{repo_digest}"]\n{image_id}\n'
+            ),
         ),
         raising=True,
     )
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
-        "sha256:abc",
+        repo_digest,
     )
 
     monkeypatch.setattr(
@@ -218,13 +225,13 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(monkeypatch) ->
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
-            stdout="not-json\nsha256:def\n",
+            stdout=f"not-json\n{image_id}\n",
         ),
         raising=True,
     )
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
-        "sha256:def",
+        image_id,
     )
 
 
@@ -249,7 +256,7 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
         raising=True,
     )
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
-        True,
+        False,
         None,
     )
 
@@ -260,7 +267,7 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
         raising=True,
     )
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
-        True,
+        False,
         None,
     )
 
@@ -274,9 +281,234 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
         raising=True,
     )
     assert runtime_security_helpers._inspect_container_image("docker", "img") == (
-        True,
+        False,
         None,
     )
+
+
+def test_observed_container_image_rejects_declared_digest_mismatch(
+    monkeypatch,
+) -> None:
+    image_id = "sha256:" + "b" * 64
+    repo_digest = "sha256:" + "c" * 64
+    monkeypatch.setenv(
+        runtime_security.RUNTIME_IMAGE_DIGEST_ENV,
+        "sha256:" + "a" * 64,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        lambda engine, image: runtime_security_helpers._ContainerImageInspection(
+            image_id=image_id,
+            repo_digests=(f"registry.example/runtime@{repo_digest}",),
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="does not match the observed"):
+        runtime_security_helpers._resolve_observed_container_image(
+            "docker", "registry.example/runtime:release"
+        )
+
+
+def test_declared_runtime_image_digest_rejects_malformed_or_conflicting_pins(
+    monkeypatch,
+) -> None:
+    digest_a = "sha256:" + "a" * 64
+    digest_b = "sha256:" + "b" * 64
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, "sha256:bad")
+    with pytest.raises(RuntimeError, match="must be lowercase"):
+        runtime_security_helpers._declared_runtime_image_digest("runtime:release")
+
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, digest_a.upper())
+    with pytest.raises(RuntimeError, match="must be lowercase"):
+        runtime_security_helpers._declared_runtime_image_digest("runtime:release")
+
+    monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, raising=False)
+    with pytest.raises(RuntimeError, match="must be lowercase"):
+        runtime_security_helpers._declared_runtime_image_digest("runtime@sha256:bad")
+
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, digest_a)
+    with pytest.raises(RuntimeError, match="does not match the image reference"):
+        runtime_security_helpers._declared_runtime_image_digest(f"runtime@{digest_b}")
+
+
+def test_observed_container_image_rejects_failed_identity_inspection(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        lambda engine, image: None,
+    )
+
+    with pytest.raises(RuntimeError, match="immutable local identity inspection"):
+        runtime_security_helpers._resolve_observed_container_image(
+            "docker", "runtime:release"
+        )
+
+
+def test_observed_container_image_selects_declared_immutable_repo_digest(
+    monkeypatch,
+) -> None:
+    image_id = "sha256:" + "b" * 64
+    repo_digest = "sha256:" + "c" * 64
+    immutable_ref = f"registry.example/runtime@{repo_digest}"
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, repo_digest)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        lambda engine, image: runtime_security_helpers._ContainerImageInspection(
+            image_id=image_id,
+            repo_digests=(immutable_ref,),
+        ),
+    )
+
+    observed = runtime_security_helpers._resolve_observed_container_image(
+        "docker", "registry.example/runtime:release"
+    )
+
+    assert observed.immutable_ref == immutable_ref
+    assert observed.image_digest == repo_digest
+
+
+def test_observed_container_image_accepts_declared_image_id(monkeypatch) -> None:
+    image_id = "sha256:" + "d" * 64
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, image_id)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        lambda engine, image: runtime_security_helpers._ContainerImageInspection(
+            image_id=image_id,
+            repo_digests=(),
+        ),
+    )
+
+    observed = runtime_security_helpers._resolve_observed_container_image(
+        "docker", "runtime:release"
+    )
+
+    assert observed.immutable_ref == image_id
+
+
+def test_observed_container_image_selects_repo_digest_without_declaration(
+    monkeypatch,
+) -> None:
+    image_id = "sha256:" + "d" * 64
+    repo_digest = "sha256:" + "e" * 64
+    immutable_ref = f"registry.example/runtime@{repo_digest}"
+    monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        lambda engine, image: runtime_security_helpers._ContainerImageInspection(
+            image_id=image_id,
+            repo_digests=(immutable_ref,),
+        ),
+    )
+
+    observed = runtime_security_helpers._resolve_observed_container_image(
+        "docker", "runtime:release"
+    )
+
+    assert observed.immutable_ref == immutable_ref
+    assert observed.image_digest == repo_digest
+
+
+def test_observed_container_image_uses_image_id_for_local_build(monkeypatch) -> None:
+    image_id = "sha256:" + "d" * 64
+    monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        lambda engine, image: runtime_security_helpers._ContainerImageInspection(
+            image_id=image_id,
+            repo_digests=(),
+        ),
+    )
+
+    observed = runtime_security_helpers._resolve_observed_container_image(
+        "docker", "invarlock-runtime:local"
+    )
+
+    assert observed.immutable_ref == image_id
+    assert observed.image_digest == image_id
+
+
+def test_container_launch_inspects_once_and_executes_observed_immutable_ref(
+    monkeypatch, tmp_path: Path
+) -> None:
+    image = "registry.example/runtime:release"
+    image_id = "sha256:" + "b" * 64
+    repo_digest = "sha256:" + "c" * 64
+    immutable_ref = f"registry.example/runtime@{repo_digest}"
+    inspections: list[tuple[str, str]] = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_ENV, image)
+    monkeypatch.setenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, repo_digest)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_container_engine",
+        lambda: "docker",
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "container_image_available_locally",
+        lambda selected, engine=None: True,
+    )
+    monkeypatch.setattr(runtime_security_helpers, "network_allowed", lambda: False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_container_pythonpath_entries",
+        lambda *, cwd: ([], []),
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_delegated_env_pairs",
+        lambda *, cwd: ({}, []),
+    )
+
+    def inspect(engine: str, selected: str):
+        inspections.append((engine, selected))
+        return runtime_security_helpers._ContainerImageInspection(
+            image_id=image_id,
+            repo_digests=(immutable_ref,),
+        )
+
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_inspect_container_image_identity",
+        inspect,
+    )
+    plan = runtime_security.ContainerLaunchPlan(
+        argv=("evaluate", "--help"),
+        argv_mounts=(),
+        needs_cwd_host_mirror=False,
+        gpu_passthrough=False,
+    )
+
+    command = runtime_security.build_container_command(plan)
+
+    assert inspections == [("docker", image)]
+    assert command[-3:] == [immutable_ref, "evaluate", "--help"]
+    assert image not in command
+    assert f"{runtime_security.RUNTIME_IMAGE_ENV}={immutable_ref}" in command
+    assert f"{runtime_security.RUNTIME_IMAGE_DIGEST_ENV}={repo_digest}" in command
+
+
+def test_normalized_launch_plan_can_require_read_only_source_workspace(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(runtime_security.SOURCE_BUNDLE_READ_ONLY_ENV, "1")
+    monkeypatch.setattr(
+        runtime_launch_plan,
+        "_host_nvidia_visible",
+        lambda: False,
+        raising=True,
+    )
+
+    plan = runtime_security.normalize_delegated_argv(["verify"], cwd=tmp_path)
+
+    assert plan.workspace_read_only is True
 
 
 def test_container_engine_and_device_helpers(monkeypatch) -> None:

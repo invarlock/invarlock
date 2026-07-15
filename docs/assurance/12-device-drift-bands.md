@@ -1,39 +1,39 @@
 # Cross‑Device Drift Bands (CPU ↔ MPS ↔ CUDA)
 
-> **Plain language:** With deterministic settings, evaluation ratios across
-> devices are reviewed against small, documented pilot bands. We publish the
-> budgets and a reproducible check.
+> **Plain language:** Evaluation ratios across devices can be compared with
+> configurable review tolerances. The shipped 0.5%/1.0% values are operational
+> defaults, not empirically established bounds for all models or hardware.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Define the pilot review bands for comparing CPU, MPS, and CUDA evaluation ratios. |
+| **Purpose** | Define default review tolerances for comparing CPU, MPS, and CUDA evaluation ratios. |
 | **Audience** | Maintainers, release approvers, and operators attaching cross-device evidence. |
 | **Contract scope** | Empirical drift review for matching reports; PyTorch cross-platform reproducibility remains a separate platform concern. |
 | **Source of truth** | `scripts/smoke/check_device_drift.py`, report `primary_metric.*`, and runtime metadata under `meta.*`. |
 
 ## Claim
 
-With deterministic settings and identical evaluation schedules/policies,
-cross-device evaluation ratios are expected to stay within small empirical
-review bands relative to CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA). These are pilot
-budgets for InvarLock report comparison.
+With matching evaluation schedules/policies, reviewers may use the default
+absolute PM-ratio tolerances (≤ 0.5% MPS, ≤ 1.0% CUDA) as investigation
+triggers. Deterministic settings reduce variation but do not make different
+backends numerically equivalent.
 
-## Budgets (expected)
+## Default Review Tolerances
 
 | Device | PM ratio vs CPU (Δ%) | Notes |
 |--------|------------------------|-------|
 | MPS    | within ±0.5%           | Apple Accelerate; deterministic seeds supported |
 | CUDA   | within ±1.0%           | Deterministic algorithms; set `CUBLAS_WORKSPACE_CONFIG`, disable TF32 |
 
-Bands were empirically derived on pilot models. The repo ships and tests
-`scripts/smoke/check_device_drift.py`; CI enforces the checker behavior on fixtures,
-while real CPU/MPS/CUDA drift enforcement requires CI or release evidence to
-provide comparable reports from those devices. The checker compares absolute
-drift in `primary_metric.ratio_vs_baseline`; report verification and provenance
-review establish matching devices, seeds, policy digests, and window schedules.
-Actual values may vary slightly by family/precision; verify on your setup.
+The public repository does not include a representative device-by-model pilot
+table deriving these values. It ships and tests
+`scripts/smoke/check_device_drift.py`; CI establishes checker behavior on
+fixtures only. Real CPU/MPS/CUDA comparison requires matched reports from those
+devices. The checker compares absolute differences in
+`primary_metric.ratio_vs_baseline`; reviewers must separately establish matching
+seeds, policies, window schedules, software, precision, and model inputs.
 
 ## Determinism & Setup
 
@@ -82,14 +82,17 @@ python scripts/smoke/check_device_drift.py \
 
 ## Observability
 
-- Archive a drift summary with release evidence; maintain pilot tables justifying chosen bands.
+- Archive a drift summary with release evidence. If a project claims an
+  empirically calibrated tolerance, publish the full device/model/precision
+  protocol, all selected runs, and the method used to choose the band.
 
 ## Assumptions & Scope
 
 - Deterministic flags must be enabled; TF32 must be disabled for CUDA.
 - Window plans and seeds must match; schedule changes invalidate comparisons.
-- Bands are empirical and may vary slightly by model family; verify locally and
-  adjust tolerance for CI accordingly.
+- Defaults are operational and may be inappropriate for a model family or
+  precision. Specify local tolerances from held-out evidence in advance rather than
+  adjusting them after observing a failure.
 
 ## Related Documentation
 

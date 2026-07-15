@@ -1,6 +1,6 @@
 from invarlock.core.config_runtime import InvarLockConfig
 from invarlock.core.run_policy import resolve_pm_acceptance_range
-from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.validation.report import compute_validation_flags
 
 
 def test_pm_acceptance_range_ignores_env_override(monkeypatch):
@@ -22,7 +22,7 @@ def test_evaluation_report_acceptance_range_applied():
         "rmt": {"stable": True},
         "invariants": {"status": "pass"},
         "_ppl_metrics": {"preview_total_tokens": 60000, "final_total_tokens": 60000},
-        "guard_overhead": {},
+        "guard_metric_impact": {},
         "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.12},
         "moe": {},
         "dataset_capacity": {"tokens_available": 120000},

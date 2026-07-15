@@ -239,7 +239,6 @@ def build_spectral_finalize_metrics(
         else 0.0,
         "spectral_stability_score": 1.0
         - min(len(candidate_violations) / max(len(final_metrics), 1), 1.0),
-        "correction_applied": len(selected_violations) > 0 and correction_enabled,
         "family_caps": family_caps,
         "family_z_summary": final_z_summary,
         "family_stats": final_family_stats,

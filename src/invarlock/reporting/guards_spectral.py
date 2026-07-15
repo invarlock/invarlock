@@ -129,7 +129,6 @@ def _resolve_guard_context(
             guard_metrics.get("violations_detected")
             or guard_metrics.get("violations_found")
             or guard_metrics.get("caps_applied")
-            or (1 if guard_metrics.get("correction_applied") else 0)
             or 0
         )
         caps_applied = _to_int_or_default(raw, 0)
@@ -437,9 +436,6 @@ def _build_policy_output(
                 policy_out["sigma_quantile"] = float(sigma_quantile)
             except _PARSE_EXCEPTIONS:
                 pass
-    if tier == "balanced":
-        policy_out["correction_enabled"] = False
-        policy_out["max_spectral_norm"] = None
     if multiple_testing and "multiple_testing" not in policy_out:
         policy_out["multiple_testing"] = multiple_testing
     return policy_out
@@ -519,6 +515,7 @@ def _build_spectral_result(
         summary["status"] = "stable" if int(caps_applied) == 0 else "capped"
     except _PARSE_EXCEPTIONS:
         summary["status"] = "stable" if not caps_applied else "capped"
+    summary["caps_applied"] = caps_applied
     if policy_out:
         result["policy"] = policy_out
     if default_sigma_quantile is not None:

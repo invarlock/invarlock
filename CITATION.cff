@@ -5,7 +5,7 @@ type: software
 abstract: >
   InvarLock is a baseline-relative evaluation and assurance toolkit for edited model checkpoints.
   It provides paired log-space evaluation against a baseline, layered guards (Spectral, RMT, Variance),
-  guard-overhead checks, and a machine-readable evaluation report artifact with determinism and provenance.
+  guard-metric-impact checks, and a machine-readable evaluation report artifact with determinism and provenance.
 repository-code: https://github.com/invarlock/invarlock
 repository-artifact: https://github.com/invarlock/invarlock/tags
 license: Apache-2.0

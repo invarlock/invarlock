@@ -46,7 +46,7 @@ auto:
 
 context:
   run:
-    skip_overhead_check: true
+    skip_guard_metric_impact_check: true
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]

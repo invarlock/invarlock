@@ -3,50 +3,57 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_make import make_report
+from invarlock.reporting.rendering.markdown import render_report_markdown
 from invarlock.reporting.report_outline import build_evaluation_report_outline
+from tests.reporting._support_canonical_reports import canonical_run_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report() -> dict:
-    return {
-        "meta": {
-            "model_id": "gpt2",
-            "adapter": "hf_causal",
-            "device": "cpu",
-            "seed": 42,
-            "ts": "2026-06-14T12:00:00Z",
-        },
-        "data": {
-            "dataset": "wikitext2",
-            "split": "validation",
-            "seq_len": 16,
-            "stride": 8,
-            "preview_n": 2,
-            "final_n": 2,
-        },
-        "edit": {
-            "name": "noop",
-            "plan_digest": "noop",
-            "deltas": {"params_changed": 0, "layers_modified": 0},
-        },
-        "guards": [],
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "unit": "ppl",
-                "preview": 10.0,
-                "final": 10.0,
-                "ratio_vs_baseline": 1.0,
-                "display_ci": [1.0, 1.0],
-            }
-        },
-        "evaluation_windows": {
-            "preview": {"window_ids": [1, 2], "logloss": [2.3, 2.3]},
-            "final": {"window_ids": [3, 4], "logloss": [2.3, 2.3]},
-        },
-        "artifacts": {"events_path": "", "logs_path": ""},
-    }
+    return canonical_run_report(
+        {
+            "meta": {
+                "model_id": "gpt2",
+                "adapter": "hf_causal",
+                "device": "cpu",
+                "seed": 42,
+                "ts": "2026-06-14T12:00:00Z",
+                "auto": {"tier": "balanced"},
+            },
+            "context": {"profile": "dev"},
+            "data": {
+                "dataset": "wikitext2",
+                "split": "validation",
+                "seq_len": 16,
+                "stride": 8,
+                "preview_n": 2,
+                "final_n": 2,
+            },
+            "edit": {
+                "name": "noop",
+                "plan_digest": "noop",
+                "deltas": {"params_changed": 0, "layers_modified": 0},
+            },
+            "guards": [],
+            "metrics": {
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "unit": "ppl",
+                    "preview": 10.0,
+                    "final": 10.0,
+                    "ratio_vs_baseline": 1.0,
+                    "display_ci": [1.0, 1.0],
+                }
+            },
+            "evaluation_windows": {
+                "preview": {"window_ids": [1, 2], "logloss": [2.3, 2.3]},
+                "final": {"window_ids": [3, 4], "logloss": [2.3, 2.3]},
+            },
+            "artifacts": {"events_path": "", "logs_path": ""},
+        }
+    )
 
 
 def _section(outline, key: str):
@@ -54,6 +61,23 @@ def _section(outline, key: str):
         if section.key == key:
             return section
     raise AssertionError(f"missing section {key!r}")
+
+
+def test_missing_gate_values_never_render_as_pass() -> None:
+    cert = make_report(_mk_report(), _mk_report())
+    cert["validation"]["invariants_pass"] = "yes"
+    cert.pop("guard_warnings", None)
+    cert["primary_metric_tail"] = {"evaluated": True}
+
+    outline = build_evaluation_report_outline(cert)
+
+    guard_signals = _section(outline, "guard_signals").facts_by_label
+    assert guard_signals["Invariants"].value == "N/A"
+    assert guard_signals["Invariants"].status == "info"
+    assert guard_signals["Guard Warnings"].value == "N/A"
+    assert (
+        _section(outline, "primary_metric").facts_by_label["Tail Gate"].value == "N/A"
+    )
 
 
 def test_report_outline_orders_modern_sections_before_appendix() -> None:
@@ -92,9 +116,9 @@ def test_report_outline_orders_modern_sections_before_appendix() -> None:
                 "edit": "quant_rtn",
                 "tier": "balanced",
                 "skip": False,
-                "primary_metric_overhead": 0.009,
-                "guard_overhead_time": 0.13,
-                "guard_overhead_mem": 0.09,
+                "guard_primary_metric_impact": 0.009,
+                "guard_runtime_overhead": 0.13,
+                "guard_memory_overhead": 0.09,
                 "rmt_outliers_bare": 2,
                 "rmt_outliers_guarded": 3,
                 "pass": {
@@ -217,7 +241,7 @@ def test_report_outline_summarizes_multimodal_accuracy_without_ppl_language() ->
         "unit": "accuracy",
         "preview": 0.86,
         "final": 0.855,
-        "ratio_vs_baseline": 0.0,
+        "delta_vs_baseline_pp": 0.0,
         "baseline_point": 0.855,
         "display_ci": [-0.01, 0.01],
     }
@@ -237,7 +261,7 @@ def test_markdown_accuracy_delta_pp_not_scaled_as_fraction() -> None:
         "unit": "accuracy",
         "preview": 0.86,
         "final": 0.855,
-        "ratio_vs_baseline": -0.50,
+        "delta_vs_baseline_pp": -0.50,
         "baseline_point": 0.860,
         "display_ci": [-1.0, 0.0],
     }
@@ -270,7 +294,7 @@ def test_report_outline_accuracy_drift_uses_delta_policy() -> None:
         "unit": "accuracy",
         "preview": 0.850,
         "final": 0.855,
-        "ratio_vs_baseline": +0.00,
+        "delta_vs_baseline_pp": +0.00,
         "display_ci": [-0.01, 0.01],
     }
     cert["resolved_policy"] = {
@@ -321,7 +345,7 @@ def test_report_outline_accepts_step14_benchmark_fixture() -> None:
 
     assert benchmark.facts_by_label["Profile"].value == "ci"
     assert benchmark.facts_by_label["Scenarios"].value == "2 total, 2 passed, 0 skipped"
-    assert benchmark.facts_by_label["Primary Metric Overhead"].value == "0.8% to 0.9%"
+    assert benchmark.facts_by_label["Primary Metric Impact"].value == "0.8% to 0.9%"
     assert benchmark.facts_by_label["RMT Outliers"].value == "2->3"
 
 

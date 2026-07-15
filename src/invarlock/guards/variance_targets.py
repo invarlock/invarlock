@@ -3,7 +3,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import torch
@@ -136,30 +136,92 @@ def is_focus_match(guard: Any, name: str) -> bool:
 
 
 def fingerprint_targets(guard: Any) -> str | None:
-    """Compute a lightweight fingerprint of targeted module weights."""
+    """Compute a deterministic, dtype-safe fingerprint of targeted weights."""
     if not guard._target_modules:
         return None
 
     hasher = hashlib.sha256()
+
+    def update_component(value: bytes) -> None:
+        hasher.update(len(value).to_bytes(8, byteorder="big", signed=False))
+        hasher.update(value)
+
+    def tensor_bytes(value: torch.Tensor) -> bytes:
+        return (
+            value.detach()
+            .contiguous()
+            .cpu()
+            .reshape(-1)
+            .view(torch.uint8)
+            .numpy()
+            .tobytes()
+        )
+
+    def update_quantization_contract(value: torch.Tensor) -> None:
+        qscheme = value.qscheme()
+        update_component(str(qscheme).encode("utf-8"))
+        if qscheme in {torch.per_tensor_affine, torch.per_tensor_symmetric}:
+            update_component(float(value.q_scale()).hex().encode("ascii"))
+            update_component(str(int(value.q_zero_point())).encode("ascii"))
+            return
+        if qscheme in {
+            torch.per_channel_affine,
+            torch.per_channel_symmetric,
+            torch.per_channel_affine_float_qparams,
+        }:
+            scales = value.q_per_channel_scales()
+            zero_points = value.q_per_channel_zero_points()
+            update_component(str(scales.dtype).encode("ascii"))
+            update_component(tensor_bytes(scales))
+            update_component(str(zero_points.dtype).encode("ascii"))
+            update_component(tensor_bytes(zero_points))
+            update_component(str(int(value.q_per_channel_axis())).encode("ascii"))
+            return
+        raise ValueError(f"unsupported quantization scheme: {qscheme}")
+
     try:
         for name in sorted(guard._target_modules.keys()):
             module = guard._target_modules[name]
             state = getattr(module, "state_dict", None)
             if not callable(state):
-                continue
+                raise TypeError(f"target module {name!r} has no callable state_dict")
             module_state = state()
+            if not isinstance(module_state, Mapping):
+                raise TypeError(
+                    f"target module {name!r} returned an invalid state_dict"
+                )
+            if not module_state:
+                module_state = {
+                    attribute: getattr(module, attribute)
+                    for attribute in ("weight", "qweight", "qzeros", "scales")
+                    if hasattr(module, attribute)
+                }
+            if not module_state:
+                raise ValueError(
+                    f"target module {name!r} has no fingerprintable weight state"
+                )
             for key in sorted(module_state.keys()):
                 tensor = module_state[key]
-                if hasattr(tensor, "detach"):
-                    data = tensor.detach().cpu().numpy().tobytes()
+                update_component(name.encode("utf-8"))
+                update_component(str(key).encode("utf-8"))
+                if isinstance(tensor, torch.Tensor):
+                    source = tensor.detach()
+                    if source.is_quantized:
+                        update_quantization_contract(source)
+                    storage = source.int_repr() if source.is_quantized else source
+                    metadata = (
+                        f"dtype={source.dtype};shape={tuple(source.shape)};"
+                        f"layout={source.layout}"
+                    ).encode()
+                    data = tensor_bytes(storage)
+                    update_component(metadata)
                 else:
                     data = bytes(str(tensor), "utf-8")
-                hasher.update(name.encode("utf-8"))
-                hasher.update(key.encode("utf-8"))
-                hasher.update(data)
-        return hasher.hexdigest()[:16]
-    except (AttributeError, RuntimeError, TypeError, ValueError):
-        return None
+                    update_component(type(tensor).__qualname__.encode("utf-8"))
+                update_component(data)
+        return hasher.hexdigest()
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("variance target fingerprinting failed") from exc
 
 
 def record_ab_provenance(
@@ -175,6 +237,13 @@ def record_ab_provenance(
     """Record provenance metadata for A/B evaluation conditions."""
     provenance = guard._stats.setdefault("ab_provenance", {})
     window_list = list(window_ids)
+    consumed_pairing_digest = (
+        hashlib.blake2s(
+            "||".join(window_list).encode("utf-8"), digest_size=16
+        ).hexdigest()
+        if window_list
+        else None
+    )
     provenance[condition] = {
         "tag": tag,
         "mode": mode,
@@ -183,6 +252,7 @@ def record_ab_provenance(
         "target_fingerprint": fingerprint,
         "status": status,
         "pairing_digest": guard._pairing_digest,
+        "consumed_pairing_digest": consumed_pairing_digest,
         "dataset_hash": (guard._dataset_meta or {}).get("dataset_hash"),
         "tokenizer_hash": (guard._dataset_meta or {}).get("tokenizer_hash"),
         "model_id": (guard._report_meta or {}).get("model_id"),
@@ -284,6 +354,10 @@ def resolve_target_modules(
         leaf = lower.rsplit(".", 1)[-1]
         attn_aliases = {"c_proj", "o_proj", "out_proj"}
         mlp_aliases = {"c_proj", "down_proj", "fc2", "w2"}
+        if lower.endswith("attention.output.dense"):
+            return f"transformer.h.{index}.attn.c_proj"
+        if lower == "output.dense" or (leaf == "lin2" and "ffn" in lower):
+            return f"transformer.h.{index}.mlp.c_proj"
         if leaf in attn_aliases and any(
             token in lower for token in ("attn", "attention", "self_attn")
         ):

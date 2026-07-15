@@ -104,7 +104,7 @@ def _run_with_common_patches(
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
         patch(
-            "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
+            "invarlock.core.orchestration.execute._should_measure_metric_impact_impl",
             lambda *_a: (False, False, None),
         ),
         patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
@@ -415,6 +415,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                         "window_ids": [0, 1],
                         "input_ids": [[1, 2], [3, 4]],
                         "attention_masks": [[1, 1], [1, 1]],
+                        "example_correct": [True, True],
                         "logloss": [1.0, 1.0],
                         "token_counts": [2, 2],
                     },
@@ -422,6 +423,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                         "window_ids": [2, 3],
                         "input_ids": [[5, 6], [7, 8]],
                         "attention_masks": [[1, 1], [1, 1]],
+                        "example_correct": [True, True],
                         "logloss": [1.0, 1.0],
                         "token_counts": [2, 2],
                     },
@@ -468,8 +470,14 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
         captured["model_in_exec"] = kwargs.get("model")
         return _core_report(
             evaluation_windows={
-                "preview": {"input_ids": [[1, 2], [3, 4]]},
-                "final": {"input_ids": [[5, 6], [7, 8]]},
+                "preview": {
+                    "input_ids": [[1, 2], [3, 4]],
+                    "example_correct": [True, True],
+                },
+                "final": {
+                    "input_ids": [[5, 6], [7, 8]],
+                    "example_correct": [True, True],
+                },
             }
         ), kwargs.get("model")
 
@@ -511,7 +519,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             ),
             patch(
-                "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
+                "invarlock.core.orchestration.execute._should_measure_metric_impact_impl",
                 lambda *_a: (False, False, None),
             ),
             patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),

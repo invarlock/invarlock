@@ -45,4 +45,5 @@ def test_collect_activations_shape_reconciliation():
     # Expect L dimension == number of blocks with consistent shapes (1 after reconcile)
     # The function stacks along layer dim after dropping mismatched shapes
     # Validate targets collected for MI-Gini path
-    assert out["targets"] and out["first_batch"] is not None
+    assert out["targets"]
+    assert set(out) == {"hidden_states", "fc1_activations", "targets"}

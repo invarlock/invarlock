@@ -428,9 +428,9 @@ class TestMetricsAggregator:
             bare_result, guarded_result
         )
 
-        assert comparison["primary_metric_overhead"] == pytest.approx(0.1)
-        assert comparison["guard_overhead_time"] == pytest.approx(0.5)
-        assert comparison["guard_overhead_mem"] == pytest.approx(0.2)
+        assert comparison["guard_primary_metric_impact"] == pytest.approx(0.1)
+        assert comparison["guard_runtime_overhead"] == pytest.approx(0.5)
+        assert comparison["guard_memory_overhead"] == pytest.approx(0.2)
 
     def test_compute_comparison_metrics_time_overhead_falls_back_to_latency(self):
         bare_report = create_empty_report()
@@ -455,7 +455,7 @@ class TestMetricsAggregator:
         comparison = MetricsAggregator.compute_comparison_metrics(
             bare_result, guarded_result
         )
-        assert comparison["guard_overhead_time"] == pytest.approx(0.5)
+        assert comparison["guard_runtime_overhead"] == pytest.approx(0.5)
 
 
 def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting.report_make import make_report
+from tests.reporting._support_canonical_reports import (
+    make_canonical_report as make_report,
+)
 
 
 def _mk_report_for_ci() -> dict:
@@ -15,6 +17,7 @@ def _mk_report_for_ci() -> dict:
             "ts": "now",
             "auto": {"tier": "balanced"},
         },
+        "context": {"profile": "dev", "assurance": {"mode": "off"}},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -37,12 +40,13 @@ def _mk_report_for_ci() -> dict:
         },
         "guards": [],
         "metrics": {
-            "ppl_preview": math.exp(1.2),
-            "ppl_final": math.exp(1.1),
-            "ppl_ratio": math.exp(1.1) / math.exp(1.2),
             "ppl_preview_ci": (math.exp(1.1), math.exp(1.3)),
             "ppl_final_ci": (math.exp(1.0), math.exp(1.2)),
-            "primary_metric": {"kind": "ppl_causal"},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": math.exp(1.2),
+                "final": math.exp(1.1),
+            },
         },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},

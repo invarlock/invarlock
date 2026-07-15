@@ -10,7 +10,7 @@ from invarlock.cli.run_shell_output import (
     _device_resolution_note,
     _event,
     _format_kv_line,
-    _print_guard_overhead_summary,
+    _print_guard_metric_impact_summary,
 )
 from invarlock.core.run_orchestrator import (
     RunAdapterSelectedEvent,
@@ -33,7 +33,7 @@ from invarlock.core.run_orchestrator import (
     RunExecutionEvent,
     RunFailureEvent,
     RunGuardChainResolvedEvent,
-    RunGuardOverheadSummaryEvent,
+    RunGuardMetricImpactSummaryEvent,
     RunLoadModelOnceEvent,
     RunMaskedTokensDebugEvent,
     RunOutputDirectoryReadyEvent,
@@ -262,11 +262,11 @@ def _render_diagnostic_event(console: Any, event: RunExecutionEvent) -> bool:
 
 
 def _render_metric_or_failure_event(console: Any, event: RunExecutionEvent) -> bool:
-    if isinstance(event, RunGuardOverheadSummaryEvent):
-        _print_guard_overhead_summary(
+    if isinstance(event, RunGuardMetricImpactSummaryEvent):
+        _print_guard_metric_impact_summary(
             console,
-            event.guard_overhead_info or {},
-            default_threshold=float(event.default_threshold or 0.01),
+            event.guard_metric_impact_info or {},
+            default_limit=float(event.default_limit or 0.01),
         )
         return True
     if isinstance(event, RunRetrySummaryEvent):
@@ -326,13 +326,28 @@ def _render_metric_or_failure_event(console: Any, event: RunExecutionEvent) -> b
     if code == "baseline_windows_missing":
         _emit_status_line(console, "FAIL", str(failure.summary or ""), emoji="❌")
         return True
-    if code == "guard_overhead_budget_exceeded":
-        threshold_fraction = float(context.get("threshold_fraction", 0.01) or 0.01)
+    if code == "guard_metric_impact_budget_exceeded":
+        degradation_limit = float(context.get("degradation_limit", 0.01) or 0.01)
+        degradation_basis = context.get("degradation_basis")
+        if degradation_basis == "absolute_drop":
+            budget = f">{degradation_limit * 100:.1f} pp drop"
+        elif degradation_basis == "relative_increase":
+            budget = f">{degradation_limit * 100:.1f}% increase"
+        else:
+            budget = f">{degradation_limit:.4g} degradation"
         _emit_status_line(
             console,
             "FAIL",
-            "Guard overhead gate exceeded the configured budget "
-            f"(>{threshold_fraction * 100:.1f}% increase)",
+            f"Guard metric impact gate exceeded the configured budget ({budget})",
+            emoji="❌",
+        )
+        return True
+    if code == "guard_metric_impact_unavailable":
+        reason = str(context.get("reason", "required evidence is unavailable"))
+        _emit_status_line(
+            console,
+            "FAIL",
+            f"Guard metric impact gate could not be evaluated: {reason}.",
             emoji="❌",
         )
         return True

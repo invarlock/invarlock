@@ -42,10 +42,32 @@ def _guard_section(value: dict[str, Any], guard_name: str) -> dict[str, Any]:
     metrics = _as_dict(value.get("metrics"))
     metric_section = _as_dict(metrics.get(guard_name))
 
+    matching_entries: list[dict[str, Any]] = []
     for entry_raw in _as_list(value.get("guards")):
         entry = _as_dict(entry_raw)
-        if str(entry.get("name") or "").strip().lower() != guard_name:
+        entry_name = str(entry.get("name") or "").strip().lower()
+        entry_stage = str(entry.get("stage") or "").strip().lower()
+        is_match = entry_name == guard_name
+        if guard_name == "invariants":
+            is_match = (
+                is_match or entry_name == "invariants_post" or entry_stage == "post"
+            )
+        if not is_match:
             continue
+        matching_entries.append(entry)
+
+    if matching_entries:
+        # A staged post-edit result supersedes its pre-edit result for warning
+        # attribution. Select one representation; never add both copies.
+        entry = next(
+            (
+                candidate
+                for candidate in matching_entries
+                if str(candidate.get("name") or "").strip().lower() == "invariants_post"
+                or str(candidate.get("stage") or "").strip().lower() == "post"
+            ),
+            matching_entries[0],
+        )
         merged = dict(section)
         merged.update(metric_section)
         merged.update(_as_dict(entry.get("metrics")))
@@ -57,6 +79,10 @@ def _guard_section(value: dict[str, Any], guard_name: str) -> dict[str, Any]:
             "epsilon_violations",
             "policy",
             "baseline_metrics",
+            "final_metrics",
+            "final_degeneracy",
+            "measurement_inventory",
+            "correction_ledger",
         ):
             if key not in entry:
                 continue
@@ -81,7 +107,12 @@ def _guard_section(value: dict[str, Any], guard_name: str) -> dict[str, Any]:
 
 
 def _policy_gate(validation: dict[str, Any], key: str) -> str:
-    return "pass" if bool(validation.get(key, True)) else "fail"
+    value = validation.get(key)
+    if value is True:
+        return "pass"
+    if value is False:
+        return "fail"
+    return "unknown"
 
 
 def _warning(
@@ -374,11 +405,20 @@ def _variance_warnings(
 def _invariant_warning_count(value: dict[str, Any]) -> int:
     invariants = _guard_section(value, "invariants")
     summary = _as_dict(invariants.get("summary"))
-    return (
-        _finite_int(summary.get("warning_violations"))
-        or _finite_int(summary.get("warnings"))
-        or 0
-    )
+    # Canonical evaluation reports place the count under ``summary`` while
+    # raw run reports expose it directly from ``guards[].metrics``. Prefer one
+    # representation instead of adding them because assembled reports may
+    # retain both views of the same observation.
+    for candidate in (
+        summary.get("warning_violations"),
+        summary.get("warnings"),
+        invariants.get("warning_violations"),
+        invariants.get("warnings"),
+    ):
+        count = _finite_int(candidate)
+        if count is not None:
+            return count
+    return 0
 
 
 def _invariant_warnings(
@@ -400,7 +440,7 @@ def _invariant_warnings(
             policy_gate=_policy_gate(validation, "invariants_pass"),
             message=(
                 "Policy passes, but subject has more non-fatal invariant warnings than baseline."
-                if bool(validation.get("invariants_pass", True))
+                if validation.get("invariants_pass") is True
                 else "Subject has more non-fatal invariant warnings than baseline."
             ),
         )

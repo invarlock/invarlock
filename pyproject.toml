@@ -1,5 +1,5 @@
 [build-system]
-requires      = ["setuptools>=82.0.1", "wheel"]
+requires      = ["setuptools>=83.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "typer>=0.15",
-    "click>=8.1",
+    "click>=8.3.3",
     "shellingham>=1.5.4",
     "cryptography>=48.0.1",
     "pydantic>=2.0",
@@ -39,6 +39,8 @@ dependencies = [
     "psutil>=5.9",
     "jsonschema>=4.0",
     "idna>=3.15",
+    # Strict verification independently replays paired bootstrap statistics.
+    "numpy>=1.24",
 ]
 [project.urls]
 Homepage = "https://invarlock.ai"
@@ -56,11 +58,12 @@ adapters = [
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
-  "pillow>=11.3.0",
+  "pillow>=12.3.0",
 ]
 
 # Hugging Face workflow (adapters + evaluation stack)
 hf = [
+  "setuptools>=83.0.0",
   "torch>=2.11.0,!=2.12.0",
   "accelerate>=0.26.0",
   "transformers>=5.12.0",
@@ -74,7 +77,8 @@ hf = [
   "huggingface_hub>=1.0.0",
   "aiohttp>=3.14.0",
   "h2>=4.3.0",
-  "pillow>=11.3.0",
+  "pillow>=12.3.0",
+  "peft>=0.19.1,<0.20",
 ]
 
 # Hugging Face image-text / multimodal workflow.
@@ -92,7 +96,7 @@ multimodal = [
   "huggingface_hub>=1.0.0",
   "aiohttp>=3.14.0",
   "h2>=4.3.0",
-  "pillow>=11.3.0",
+  "pillow>=12.3.0",
   "torchvision>=0.26.0",
 ]
 
@@ -105,6 +109,14 @@ guards = [
 # Edit functionality
 edits = [
   "torch>=2.11.0,!=2.12.0",
+]
+
+# Profile-driven full fine-tuning and trained PEFT LoRA merge evidence.
+training = [
+  "torch>=2.11.0,!=2.12.0",
+  "transformers>=5.12.0",
+  "safetensors>=0.4.0",
+  "peft>=0.19.1,<0.20",
 ]
 
 # Evaluation functionality
@@ -123,7 +135,7 @@ probes = [
 gptq = [
   "torch>=2.11.0,!=2.12.0",
   "torchvision>=0.23.0",
-  "gptqmodel>=7.0.0",
+  "gptqmodel>=7.1.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "transformers>=5.12.0",
   "safetensors>=0.4.0",
@@ -133,7 +145,7 @@ gptq = [
 awq = [
   "torch>=2.11.0,!=2.12.0",
   "torchvision>=0.23.0",
-  "gptqmodel>=7.0.0",
+  "gptqmodel>=7.1.0",
   "transformers>=5.12.0",
   "accelerate>=0.27",
   "safetensors>=0.4.0",
@@ -182,6 +194,7 @@ gpu = [
 
 # Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
 advanced = [
+  "setuptools>=83.0.0",
   "torch>=2.11.0,!=2.12.0",
   "transformers>=5.12.0",
   "protobuf>=4.25",
@@ -195,7 +208,7 @@ advanced = [
   "torchvision>=0.26.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "gptqmodel>=7.0.0",
+  "gptqmodel>=7.1.0",
   "torchao>=0.17.0",
   "hqq>=0.2.8",
   "optimum-quanto>=0.2.7",
@@ -203,7 +216,8 @@ advanced = [
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.14.0",
   "h2>=4.3.0",
-  "pillow>=11.3.0",
+  "pillow>=12.3.0",
+  "peft>=0.19.1,<0.20",
 ]
 
 
@@ -222,7 +236,7 @@ all = [
   "torchvision>=0.26.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "gptqmodel>=7.0.0",
+  "gptqmodel>=7.1.0",
   "torchao>=0.17.0",
   "hqq>=0.2.8",
   "optimum-quanto>=0.2.7",
@@ -230,7 +244,8 @@ all = [
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.14.0",
   "h2>=4.3.0",
-  "pillow>=11.3.0",
+  "pillow>=12.3.0",
+  "peft>=0.19.1,<0.20",
 ]
 
 # Development dependencies
@@ -238,7 +253,7 @@ dev = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
-  "ruff==0.15.20",
+  "ruff==0.15.21",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -256,11 +271,12 @@ dev = [
 ]
 
 ci = [
+  "setuptools>=83.0.0",
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "hypothesis>=6.98",
-  "ruff==0.15.20",
+  "ruff==0.15.21",
   "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
@@ -284,6 +300,8 @@ precommit-ci = [
 
 release-ci = [
   "build>=0.10.0",
+  "setuptools>=83.0.0",
+  "wheel==0.46.3",
   "requests>=2.33.0",
   "twine>=4.0.0",
   "cyclonedx-bom>=4.1",
@@ -302,17 +320,17 @@ security-ci = [
 quant_rtn = "invarlock.edits:RTNQuantEdit"
 
 [project.entry-points."invarlock.guards"]
-spectral = "invarlock.guards:SpectralGuard"
-variance = "invarlock.guards:VarianceGuard"
-rmt = "invarlock.guards:RMTGuard"
-invariants = "invarlock.guards:InvariantsGuard"
+spectral = "invarlock.guards.spectral:SpectralGuard"
+variance = "invarlock.guards.variance:VarianceGuard"
+rmt = "invarlock.guards.rmt:RMTGuard"
+invariants = "invarlock.guards.invariants:InvariantsGuard"
 demo_hello_guard = "invarlock.plugins:HelloGuard"
 
 [project.entry-points."invarlock.adapters"]
-hf_causal = "invarlock.adapters:HF_Causal_Adapter"
-hf_mlm = "invarlock.adapters:HF_MLM_Adapter"
-hf_seq2seq = "invarlock.adapters:HF_Seq2Seq_Adapter"
-hf_auto = "invarlock.adapters:HF_Auto_Adapter"
+hf_causal = "invarlock.adapters.hf_causal:HF_Causal_Adapter"
+hf_mlm = "invarlock.adapters.hf_mlm:HF_MLM_Adapter"
+hf_seq2seq = "invarlock.adapters.hf_seq2seq:HF_Seq2Seq_Adapter"
+hf_auto = "invarlock.adapters.auto:HF_Auto_Adapter"
 hf_multimodal = "invarlock.adapters.hf_multimodal:HF_Multimodal_Adapter"
 hf_gptq = "invarlock.plugins:HF_GPTQ_Adapter"
 hf_awq = "invarlock.plugins:HF_AWQ_Adapter"
@@ -465,7 +483,7 @@ module = [
     "invarlock.cli.run_config",
     "invarlock.cli.run_execution",
     "invarlock.cli.run_execution_output",
-    "invarlock.cli.run_overhead",
+    "invarlock.cli.run_metric_impact",
     "invarlock.cli.run_pairing",
     "invarlock.cli.run_pairing_baseline",
     "invarlock.cli.run_runtime_exec",
@@ -531,7 +549,6 @@ branch = true
 source = [
     "src",
     "scripts/release",
-    "scripts/evidence_workflows",
     "scripts/evidence_packs/python",
 ]
 omit = [
@@ -546,17 +563,25 @@ show_missing = true
 precision = 2
 include = [
     "scripts/release/*.py",
-    "scripts/evidence_workflows/*.py",
-    "scripts/evidence_packs/python/workflow_frontdoor.py",
     "scripts/evidence_packs/python/create_edit_model.py",
     "scripts/evidence_packs/python/create_edits_batch.py",
+    "scripts/evidence_packs/python/editing/edit_metadata_contract.py",
     "scripts/evidence_packs/python/editing/implementations.py",
+    "scripts/evidence_packs/python/editing/streaming_pruning.py",
+    "scripts/evidence_packs/python/editing/training_artifact_verifier.py",
+    "scripts/evidence_packs/python/editing/training_contract.py",
+    "scripts/evidence_packs/python/editing/training_receipt.py",
+    "scripts/evidence_packs/python/editing/training_runtime.py",
     "scripts/evidence_packs/python/editing/tensor_ops.py",
+    "scripts/evidence_packs/python/editing/validate_artifact.py",
     "scripts/evidence_packs/python/preset_generator.py",
     "scripts/evidence_packs/python/task_tools_reports.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration.py",
+    "src/invarlock/clean_pruning_selection_*.py",
+    "src/invarlock/clean_selection/*.py",
+    "src/invarlock/clean_selection_runtime.py",
     "src/invarlock/cli/*",
     "src/invarlock/reporting/*",
     "src/invarlock/core/*",
@@ -565,6 +590,10 @@ include = [
     "src/invarlock/adapters/hf_multimodal.py",
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
+    "src/invarlock/evidence_pack_json.py",
+    "src/invarlock/evidence_pack_contracts/deployable_coverage.py",
+    "src/invarlock/evidence_pack_scenario_contract.py",
+    "src/invarlock/training_evidence.py",
 ]
 exclude_lines = [
     "pragma: no cover",

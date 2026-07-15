@@ -26,9 +26,53 @@ class TestMakeEvaluationReport:
         assert evaluation_report["meta"]["seeds"]["python"] == 42
         # Plugin provenance is optional after report normalization; ensure structure present
         plugins = evaluation_report["plugins"]
-        assert isinstance(plugins, dict)
+        assert plugins["adapter"]["name"] == "hf_causal"
+        assert plugins["edit"]["name"] == "structured"
+        assert [guard["name"] for guard in plugins["guards"]] == ["spectral"]
 
-    def test_make_evaluation_report_invalid_preview_no_longer_raises(self):
+    def test_evaluation_report_binds_subject_and_baseline_model_identities(self):
+        report = create_mock_run_report()
+        baseline = create_mock_baseline()
+        report["meta"].update(
+            {
+                "model_identity": {
+                    "kind": "remote_revision",
+                    "revision": "a" * 40,
+                },
+            }
+        )
+        baseline["meta"].update(
+            {
+                "model_identity": {
+                    "kind": "remote_revision",
+                    "revision": "b" * 40,
+                },
+            }
+        )
+
+        with patch(
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
+        ):
+            evaluation_report = make_report(report, baseline)
+
+        assert evaluation_report["meta"]["model_identity"] == {
+            "kind": "remote_revision",
+            "revision": "a" * 40,
+        }
+        assert evaluation_report["subject_ref"]["model_identity"] == {
+            "kind": "remote_revision",
+            "revision": "a" * 40,
+        }
+        assert evaluation_report["baseline_ref"]["model_identity"] == {
+            "kind": "remote_revision",
+            "revision": "b" * 40,
+        }
+        assert "model_revision" not in evaluation_report["meta"]
+        assert "model_revision" not in evaluation_report["subject_ref"]
+        assert "model_revision" not in evaluation_report["baseline_ref"]
+
+    def test_ci_report_rejects_claimed_pairing_without_paired_windows(self):
         report = create_mock_run_report()
         report["metrics"]["ppl_preview"] = 0.5
         report["data"]["stride"] = report["data"]["seq_len"]
@@ -60,8 +104,8 @@ class TestMakeEvaluationReport:
                 "actual_preview": 180,
                 "actual_final": 180,
             }
-            evaluation_report = make_report(report, baseline)
-        assert isinstance(evaluation_report, dict)
+            with pytest.raises(ValueError, match="paired_windows"):
+                make_report(report, baseline)
 
     def test_make_evaluation_report_double_invalid_ppl_falls_back(self):
         report = create_mock_run_report(ppl_final=0.5)
@@ -76,12 +120,12 @@ class TestMakeEvaluationReport:
         # Normalized path keeps PM snapshot as provided; fallback applies internally for gating
         assert isinstance(evaluation_report.get("primary_metric"), dict)
 
-    def test_evaluation_report_includes_guard_overhead_metrics(self):
+    def test_evaluation_report_includes_guard_metric_impact_metrics(self):
         report = create_mock_run_report()
-        report["guard_overhead"] = {
-            "bare_ppl": 100.0,
-            "guarded_ppl": 101.0,
-            "overhead_threshold": 0.02,
+        report["guard_metric_impact"] = {
+            "bare_value": 100.0,
+            "guarded_value": 101.0,
+            "degradation_limit": 0.02,
         }
         baseline = create_mock_baseline()
         with patch(
@@ -89,9 +133,9 @@ class TestMakeEvaluationReport:
             return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
-        # Guard overhead is optional when not preserved by normalization
-        guard_overhead = evaluation_report.get("guard_overhead", {})
-        assert isinstance(guard_overhead, dict)
+        # Guard metric impact is optional when not preserved by normalization
+        guard_metric_impact = evaluation_report.get("guard_metric_impact", {})
+        assert isinstance(guard_metric_impact, dict)
 
     def test_evaluation_report_with_evaluation_windows_hashes(self):
         report = create_mock_run_report(include_evaluation_windows=True)
@@ -107,7 +151,7 @@ class TestMakeEvaluationReport:
 
     def test_make_evaluation_report_detects_delta_ratio_mismatch(self):
         report = create_mock_run_report()
-        baseline = create_mock_run_report()
+        baseline = create_mock_baseline()
         window_payload = {"window_ids": [1, 2, 3], "logloss": [0.2, 0.21, 0.19]}
         report["evaluation_windows"] = {"final": copy.deepcopy(window_payload)}
         baseline["evaluation_windows"] = {"final": copy.deepcopy(window_payload)}
@@ -117,7 +161,13 @@ class TestMakeEvaluationReport:
         report["metrics"]["ppl_ratio"] = 11.0 / 10.0
         report["metrics"]["logloss_delta"] = math.log(11.0) - math.log(10.0)
         report["metrics"]["logloss_delta_ci"] = (-0.01, 0.02)
-        report["metrics"]["paired_delta_summary"] = {"mean": math.log(1.2)}
+        report["metrics"]["preview_final_slice_delta_summary"] = (
+            independent_slice_summary(
+                math.log(1.2),
+                preview_windows=180,
+                final_windows=180,
+            )
+        )
 
         with patch(
             "invarlock.reporting.report_normalization.validate_report",
@@ -153,12 +203,12 @@ class TestMakeEvaluationReport:
                     "actual_preview": 180,
                     "actual_final": 180,
                 }
-                cert = make_report(report, baseline)
-                assert isinstance(cert, dict)
+                with pytest.raises(ValueError, match="drift ratio"):
+                    make_report(report, baseline)
 
     def test_make_evaluation_report_uses_paired_delta_ci_when_available(self):
         report = create_mock_run_report()
-        baseline = create_mock_run_report()
+        baseline = create_mock_baseline()
         report["evaluation_windows"] = {
             "final": {"window_ids": [10, 11], "logloss": [0.20, 0.18]}
         }
@@ -169,7 +219,13 @@ class TestMakeEvaluationReport:
         report["metrics"]["ppl_preview"] = 10.0
         report["metrics"]["ppl_final"] = 10.05
         report["metrics"]["ppl_ratio"] = 10.05 / 10.0
-        report["metrics"]["paired_delta_summary"] = {"mean": math.log(10.05 / 10.0)}
+        report["metrics"]["preview_final_slice_delta_summary"] = (
+            independent_slice_summary(
+                math.log(10.05 / 10.0),
+                preview_windows=10,
+                final_windows=50,
+            )
+        )
         report["metrics"]["logloss_delta_ci"] = (-0.005, 0.010)
 
         with patch(
@@ -228,6 +284,7 @@ class TestMakeEvaluationReport:
                     "max_adjusted_modules": 1,
                 }
                 break
+        report = refresh_runtime_policy_receipt(report)
         baseline = create_mock_baseline()
 
         with patch(
@@ -242,13 +299,14 @@ class TestMakeEvaluationReport:
             "configs/overrides/spectral.yaml",
             "configs/overrides/variance.yaml",
             "configs/overrides/rmt.yaml",
+            "local.yaml",
         ]
         variance_policy = evaluation_report["policies"]["variance"]
         assert variance_policy.get("policy_digest")
         assert evaluation_report["auto"]["policy_digest"] == provenance["policy_digest"]
 
-    def test_evaluation_report_without_auto_config(self):
-        """Test evaluation_report creation without auto-tuning."""
+    def test_evaluation_report_defaults_to_balanced_runtime_policy(self):
+        """Canonical fixtures retain the runtime's balanced policy receipt."""
         report = create_mock_run_report(include_auto=False)
         baseline = create_mock_baseline()
 
@@ -259,14 +317,14 @@ class TestMakeEvaluationReport:
             evaluation_report = make_report(report, baseline)
 
         auto = evaluation_report["auto"]
-        assert auto["tier"] == "none"
+        assert auto["tier"] == "balanced"
         assert auto["probes_used"] == 0
         assert auto["target_pm_ratio"] is None
 
-    def test_evaluation_report_with_baseline_v1(self):
-        """Test evaluation_report creation with baseline-v1 schema."""
+    def test_evaluation_report_with_canonical_baseline(self):
+        """Test evaluation-report creation with a canonical no-op RunReport."""
         report = create_mock_run_report()
-        baseline = create_mock_baseline(schema_type="baseline-v1")
+        baseline = create_mock_baseline()
 
         with patch(
             "invarlock.reporting.report_normalization.validate_report",
@@ -332,6 +390,7 @@ class TestMakeEvaluationReport:
             "ci_lower": 0.001,
             "ci_upper": 0.020,
         }
+        report = refresh_runtime_policy_receipt(report)
         baseline = create_mock_baseline()
 
         with patch(
@@ -370,14 +429,14 @@ class TestMakeEvaluationReport:
             final / preview, math.exp(delta), rel_tol=0.0, abs_tol=1e-12
         )
 
-    def test_guard_overhead_validation_flag(self):
-        """Guard overhead ratio should flip the validation flag when exceeding threshold."""
+    def test_guard_metric_impact_validation_flag(self):
+        """Excess degradation should flip the guard metric impact validation flag."""
         report = create_mock_run_report()
-        report["guard_overhead"] = {
-            "overhead_ratio": 1.02,
-            "overhead_threshold": 0.01,
-            "bare_ppl": 10.0,
-            "guarded_ppl": 10.2,
+        report["guard_metric_impact"] = {
+            "degradation": 1.02,
+            "degradation_limit": 0.01,
+            "bare_value": 10.0,
+            "guarded_value": 10.2,
         }
         baseline = create_mock_baseline()
 
@@ -386,8 +445,10 @@ class TestMakeEvaluationReport:
             return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
-        # Normalized evaluation_report may omit guard_overhead; validate the decision logic directly
-        sanitized, _ = _prepare_guard_overhead_section(report["guard_overhead"])
+        # Normalized evaluation_report may omit guard_metric_impact; validate the decision logic directly
+        sanitized, _ = _prepare_guard_metric_impact_section(
+            report["guard_metric_impact"]
+        )
         flags = _compute_validation_flags(
             ppl={
                 "ratio_vs_baseline": evaluation_report.get("primary_metric", {}).get(
@@ -397,14 +458,14 @@ class TestMakeEvaluationReport:
             spectral={},
             rmt={},
             invariants={},
-            guard_overhead=sanitized,
+            guard_metric_impact=sanitized,
         )
-        assert flags["guard_overhead_acceptable"] is False
+        assert flags["guard_metric_impact_acceptable"] is False
 
-    def test_guard_overhead_defaults_to_pass_without_metrics(self):
-        """If guard overhead data is missing the validation flag should default to True."""
+    def test_guard_metric_impact_missing_metrics_fails_closed(self):
+        """Missing guard-metric-impact evidence cannot produce a passing flag."""
         report = create_mock_run_report()
-        assert "guard_overhead" not in report
+        assert "guard_metric_impact" not in report
         baseline = create_mock_baseline()
 
         with patch(
@@ -413,7 +474,9 @@ class TestMakeEvaluationReport:
         ):
             evaluation_report = make_report(report, baseline)
 
-        assert evaluation_report["validation"]["guard_overhead_acceptable"] is True
+        assert (
+            evaluation_report["validation"]["guard_metric_impact_acceptable"] is False
+        )
 
     def test_evaluation_report_records_invariant_failures(self):
         """Evaluation Report should surface invariants guard failures with details."""
@@ -452,8 +515,8 @@ class TestMakeEvaluationReport:
                 },
             }
         ]
-        # Non-fatal invariant warnings should not fail the invariants gate
-        assert evaluation_report["validation"]["invariants_pass"] is True
+        # A recorded invariant failure cannot substantiate a passing gate.
+        assert evaluation_report["validation"]["invariants_pass"] is False
 
     def test_policy_digest_included_for_variance_guard(self):
         """Evaluation Report records both full-policy + variance-policy digests."""
@@ -474,6 +537,7 @@ class TestMakeEvaluationReport:
                 "metrics": {"ve_enabled": True},
             }
         ]
+        report = refresh_runtime_policy_receipt(report)
         baseline = create_mock_baseline()
 
         with patch(
@@ -498,7 +562,7 @@ class TestMakeEvaluationReport:
         report["guards"] = [
             {
                 "name": "spectral",
-                "policy": {},
+                "policy": {"sigma_quantile": 0.95},
                 "metrics": {
                     "max_spectral_norm": 60.0,
                     "stability_score": 1.0,
@@ -508,7 +572,15 @@ class TestMakeEvaluationReport:
             },
             {
                 "name": "rmt",
-                "policy": {},
+                "policy": {
+                    "epsilon_default": 0.1,
+                    "epsilon_by_family": {
+                        "ffn": 0.1,
+                        "attn": 0.1,
+                        "embed": 0.1,
+                        "other": 0.1,
+                    },
+                },
                 "metrics": {
                     "deadband_used": 0.1,
                     "margin_used": 1.5,
@@ -524,6 +596,7 @@ class TestMakeEvaluationReport:
                 },
             },
         ]
+        report = refresh_runtime_policy_receipt(report)
         baseline = create_mock_baseline()
 
         with patch(
@@ -546,7 +619,7 @@ class TestMakeEvaluationReport:
         report["guards"] = [
             {
                 "name": "variance",
-                "policy": {},
+                "policy": {"enabled": True},
                 "metrics": {
                     "ve_enabled": True,
                     "tap": "transformer.h.*.mlp.c_proj",
@@ -568,6 +641,7 @@ class TestMakeEvaluationReport:
                 },
             }
         ]
+        report = refresh_runtime_policy_receipt(report)
         baseline = create_mock_baseline()
 
         with patch(
@@ -609,7 +683,7 @@ class TestMakeEvaluationReport:
             "invarlock.reporting.report_normalization.validate_report",
             return_value=False,
         ):
-            with pytest.raises(ValueError, match="Invalid RunReport structure"):
+            with pytest.raises(ValueError, match="Invalid canonical RunReport"):
                 make_report(report, baseline)
 
     def test_pm_preview_final_ratio_identity(self):
@@ -622,9 +696,7 @@ class TestMakeEvaluationReport:
             return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
-        from tests.reporting._support_primary_metric import pm as _pm
-
-        M = _pm(evaluation_report)
+        M = dict(evaluation_report["primary_metric"])
         assert isinstance(M.get("preview"), int | float)
         assert isinstance(M.get("final"), int | float)
         expected = (

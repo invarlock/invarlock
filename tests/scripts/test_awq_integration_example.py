@@ -46,10 +46,12 @@ def test_awq_runner_has_expected_adapter_contract() -> None:
     assert "integration_log_step" in text
     assert "lane_artifact_label" in text
     assert "--require-backend-inventory" in text
+    assert "--require-runtime-quantization-proof" in text
     assert "AWQ lanes in this example are CUDA-only" in text
     assert '[[ "$effective_device" != cuda* ]]' in text
     assert '[[ "$quantize_device" != cuda* ]]' in text
-    assert "_patch_gptqmodel_transformers_hub_compat" in text
+    assert "require_gptqmodel_runtime" in text
+    assert "_patch_gptqmodel_transformers_hub_compat" not in text
 
 
 def test_awq_runner_rejects_cpu_lane_before_materialization(tmp_path: Path) -> None:
@@ -83,13 +85,14 @@ def test_awq_runner_rejects_cpu_lane_before_materialization(tmp_path: Path) -> N
 def test_awq_readme_scopes_strict_evidence_to_tiny_runtime() -> None:
     text = README.read_text(encoding="utf-8")
 
-    assert "strict container evidence is verified" in text
-    assert "for this tiny AWQ example" in text
+    assert "`cuda-container-strict` result requires" in text
+    assert "strict container evidence is verified" not in text
     assert "scoped to the configured tiny AWQ checkpoint" in text
     assert "shared integration evidence" in text
     assert "`cuda-host-off` | `--lane host --device cuda`" in text
     assert "The shell runner relies on InvarLock report persistence to emit" in text
     assert "`backend_inventory.json` when adapter provenance is available" in text
+    assert "`runtime_quantization_proof.json`" in text
 
 
 def test_awq_helper_defaults_are_awq_compatible() -> None:
@@ -115,7 +118,9 @@ def test_awq_helper_defaults_are_awq_compatible() -> None:
 def test_awq_helper_writes_local_jsonl_and_preset(tmp_path: Path) -> None:
     helper = _load_helper_module()
     helper_text = HELPER.read_text(encoding="utf-8")
-    assert "_patch_gptqmodel_transformers_hub_compat" in helper_text
+    assert "import_gptqmodel" in helper_text
+    assert "require_jit_toolchain=True" in helper_text
+    assert "_patch_gptqmodel_transformers_hub_compat" not in helper_text
 
     summary = helper.write_text_fixture(
         tmp_path,

@@ -1,23 +1,23 @@
-# Paired Evaluation Math (log-space, token-weighted)
+# Evaluation Math: Paired Baseline Ratios and Independent Slice Drift
 
-> **Plain language:** The reported perplexity ratio is just the exponential of
-> the token-weighted mean Δlog-loss, and the confidence interval comes from
-> exponentiating the same paired bootstrap; this note derives both facts in the
-> report's operating context.
+> **Plain language:** The baseline/subject perplexity ratio uses identical-ID
+> final windows and a paired bootstrap. Preview and final are deliberately
+> disjoint slices: their drift is a difference of two independently estimated
+> means, never an index-paired Δ distribution.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Derive the paired log-space primary-metric ratio and its displayed confidence interval. |
+| **Purpose** | Derive the paired baseline/subject ratio and distinguish it from independent preview/final drift. |
 | **Audience** | Report verifier maintainers, statistics auditors, and contributors changing paired metric code. |
-| **Contract scope** | PPL-like metrics on paired evaluation windows with known token counts and non-overlapping schedules. |
+| **Contract scope** | PPL-like metrics with identical-ID baseline/subject final windows plus disjoint preview/final slices. |
 | **Source of truth** | `src/invarlock/core/bootstrap.py`, report pairing logic, and paired-CI contract tests. |
 
 ## Claim
 
-For ppl-like metrics on paired evaluation windows `i = 1..n` with token counts `t_i`, the reported
-**ratio** between two arms A and B (e.g., preview/final or edited/baseline)
+For ppl-like metrics on identical-ID paired final windows `i = 1..n` with token
+counts `t_i`, the reported **ratio** between baseline A and subject B
 satisfies
 
 $$
@@ -34,6 +34,18 @@ $$
 The **ratio confidence interval** is obtained by exponentiating the paired
 ΔlogNLL CI computed on the **same** windows with BCa bootstrap (paired,
 token‑weighted).
+
+This identity does not make preview and final windows paired. Their ID sets are
+disjoint. For preview/final drift, InvarLock computes
+
+$$
+\Delta_{\mathrm{slice}} = \bar{\ell}_{\mathrm{final},w}
+- \bar{\ell}_{\mathrm{preview},w}
+$$
+
+and resamples the preview and final arms independently. It does not subtract
+array element `i` in preview from element `i` in final, and it does not apply a
+paired BCa interval to those disjoint arrays.
 
 ## Visual Overview
 
@@ -68,9 +80,9 @@ token‑weighted).
 │   ┌─────────────────┐                       ┌────────────────────────┐  │
 │   │     RATIO       │                       │   BCa BOOTSTRAP (CI)   │  │
 │   │ ────────────────│                       │ ────────────────────── │  │
-│   │ exp(Δℓ̄ₓ)        │                       │ Resample {Δℓᵢ} with    │  │
-│   │ = PPL⁽ᴮ⁾/PPL⁽ᴬ⁾ │                       │ weights ∝ tᵢ → [L,U]   │  │
-│   │                 │                       │ CI = [exp(L), exp(U)]  │  │
+│   │ exp(Δℓ̄ₓ)        │                       │ Resample windows      │  │
+│   │ = PPL⁽ᴮ⁾/PPL⁽ᴬ⁾ │                       │ uniformly; recompute  │  │
+│   │                 │                       │ weighted mean → [L,U]│  │
 │   └────────┬────────┘                       └───────────┬────────────┘  │
 │            │                                            │               │
 │            └────────────────────┬───────────────────────┘               │
@@ -102,25 +114,33 @@ $$
 = \exp\Big(\overline{\Delta \ell}_{\text{w}}\Big).
 $$
 
-BCa applied to the paired vector $\{\Delta \ell_i\}$ (resampled with weights
-proportional to $t_i$) yields CI $[L, U]$; exponentiate to obtain
-$[\exp(L), \exp(U)]$.
+BCa treats each paired window as a resampling cluster. Each replicate samples
+`n` window indices uniformly with replacement, carries each selected window's
+token count with it, and recomputes
+$\sum_j t_j\Delta\ell_j/\sum_j t_j$ on that replicate. This preserves the
+window-level target statistic; sampling windows with probability proportional to token
+count would define a different procedure. Exponentiating interval $[L,U]$
+gives $[\exp(L),\exp(U)]$.
 
-### Estimation note in log space
+### Finite-schedule identity in log space
 
-Let the token‑weighted mean be $\overline{\Delta \ell}_{\text{w}} = \sum_i t_i\,\Delta \ell_i / \sum_i t_i$. By linearity of expectation,
+Let $q_i^{(A)} = \exp(-\ell_i^{(A)})$ and $q_i^{(B)} =
+\exp(-\ell_i^{(B)})$ denote each window's geometric-mean assigned token
+probability. For the observed windows,
 
 $$
-\mathbb{E}\big[\overline{\Delta \ell}_{\text{w}}\big]
-= \frac{\sum_i t_i\, \mathbb{E}[\Delta \ell_i]}{\sum_i t_i}
-= \log\Bigg(\prod_i
-\Bigg(\frac{p_i^{(B)}}{p_i^{(A)}}\Bigg)^{t_i/\sum_j t_j}
-\Bigg)
+\overline{\Delta \ell}_{\text{w}}
+= \frac{\sum_i t_i\,(\ell_i^{(B)}-\ell_i^{(A)})}{\sum_i t_i}
+= \log\Bigg[\prod_i
+\Bigg(\frac{q_i^{(A)}}{q_i^{(B)}}\Bigg)^{t_i/\sum_j t_j}
+\Bigg].
 $$
 
-so, under the stated window-level assumptions, the estimator targets the log of
-the token‑weighted ratio. Under mild assumptions (ergodicity across windows),
-the point estimator converges to the population log‑ratio.
+Thus, for the selected finite schedule, the statistic is the log of a
+token-weighted geometric likelihood ratio. Generalization to a population
+requires an independently justified sampling design and dependence
+assumptions; deterministic selection, non-overlap, and a bootstrap seed do not
+by themselves establish that claim.
 
 ### Jensen inequality note
 
@@ -151,17 +171,17 @@ windows. A simple two‑window example shows the pitfall:
 from math import exp, log
 
 weights = [512, 256]
-preview = [40.0, 220.0]
-final = [38.0, 260.0]  # high-perplexity window regresses strongly
+baseline = [40.0, 220.0]
+subject = [38.0, 260.0]  # high-perplexity window regresses strongly
 
 ratio_log = exp(
-    sum(w * (log(b) - log(a)) for w, a, b in zip(weights, preview, final))
+    sum(w * (log(b) - log(a)) for w, a, b in zip(weights, baseline, subject))
     / sum(weights)
 )
 
 ratio_means = (
-    sum(w * b for w, b in zip(weights, final))
-    / sum(w * a for w, a in zip(weights, preview))
+    sum(w * b for w, b in zip(weights, subject))
+    / sum(w * a for w, a in zip(weights, baseline))
 )
 
 print(ratio_log, ratio_means)  # 1.0217..., 1.12
@@ -174,26 +194,40 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
 
 - reports must satisfy:
   - `primary_metric.display_ci == exp(primary_metric.ci)` (paired baseline path; ppl-like kinds).
-  - `dataset.windows.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
-  - `dataset.windows.stats.window_match_fraction == 1.0` and `dataset.windows.stats.window_overlap_fraction == 0.0`.
+  - `dataset.windows.stats.preview_final_slice_delta_summary` records the
+    independent-slice `{mean,ci,basis,paired,ci_method}` contract; `basis` is
+    `independent_disjoint_slices` and `paired` is `false`.
+  - baseline pairing evidence has `dataset.windows.stats.window_match_fraction
+    == 1.0`; configured sliding windows have
+    `dataset.windows.stats.window_overlap_fraction == 0.0`; and the raw
+    preview/final `evaluation_windows.*.window_ids` sets are disjoint.
 
 - Runs hard-fail in CI/Release profiles when a baseline pairing context exists
-  and preview/final counts differ, pairing is incomplete, or windows overlap.
-  Verification also rejects invalid pairing in generated reports.
+  and preview/final counts differ, baseline matching is incomplete, or the
+  configured stride creates overlapping token windows. Verification also
+  rejects invalid baseline pairing and intersecting preview/final ID sets in
+  generated reports.
 
 ## Observability
 
 - `primary_metric.{preview,final}` — supports preview→final drift checks for ppl-like kinds.
-- `primary_metric.display_ci` and `primary_metric.ci` — paired ΔlogNLL interval (check both log and exponentiated views).
+- `primary_metric.display_ci` and `primary_metric.ci` — paired baseline/subject
+  final-window ΔlogNLL interval (check both log and exponentiated views).
 - `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`.
-- `dataset.windows.stats.paired_delta_summary.{mean,std,degenerate}` and `dataset.windows.stats.bootstrap.{replicates,seed}`.
+- `dataset.windows.stats.preview_final_slice_delta_summary.{mean,ci,basis,paired,ci_method,preview_windows,final_windows}`.
+- `dataset.windows.stats.bootstrap.{replicates,seed,preview_final_delta_method,preview_final_delta_seed}`.
 - `dataset.windows.stats.coverage.{preview,final}` — confirms both arms honour window/coverage minima.
 
 ## Edge cases & safeguards
 
 - If all `t_i` equal, weighting reduces to simple mean: implementation can short‑circuit.
-- Degenerate Δ (all equal): mark `degenerate=true` and collapse the CI to `[μ, μ]` with `μ = mean(Δ)`; report records the fallback.
+- A collapsed independent-slice interval is recorded as `degenerate=true` but
+  does not by itself make the primary metric invalid.
+- A constant paired baseline/subject Δ may collapse the paired CI to `[μ, μ]`.
 - Label alignment & padding must not contribute to `t_i` (masked tokens excluded).
+- The repository tests arithmetic, resampling, fallbacks, and report identities.
+  It does not establish nominal BCa coverage for arbitrary serial dependence,
+  heterogeneous window weights, adaptive data selection, or cherry-picked runs.
 
 ## References
 
