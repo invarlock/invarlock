@@ -248,6 +248,7 @@ def test_release_preflight_runs_all_independent_gates(
     ]
     assert summary["ok"] is True
     assert summary["installed_wheel_import"] == "isolated_venv_from_candidate_wheel"
+    assert summary["installed_wheel_runtime_surface"] == "passed"
     assert summary["current_negative_evidence"] == "passed"
 
 
@@ -448,10 +449,39 @@ def test_checkout_must_match_exact_clean_release_sha(
 
 
 def test_candidate_wheel_is_installed_in_a_disposable_isolated_environment(
-    module: ModuleType, tmp_path: Path
+    module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     config = _config(module, tmp_path)
     artifacts = module.validate_distributions(config)
+    smoke_calls: list[tuple[Path, Path]] = []
+    monkeypatch.setattr(
+        module,
+        "_smoke_installed_wheel_cli",
+        lambda cli, *, cwd: smoke_calls.append((cli, cwd)),
+    )
+    monkeypatch.setattr(
+        module,
+        "_IMPORT_PROBE",
+        """
+import importlib.metadata as metadata
+import json
+from pathlib import Path
+import invarlock
+distribution = metadata.distribution("invarlock")
+root = Path(distribution.locate_file("")).resolve()
+module_file = Path(invarlock.__file__).resolve()
+print(json.dumps({
+    "module_file": str(module_file),
+    "module_version": str(invarlock.__version__),
+    "distribution_name": str(distribution.metadata["Name"]),
+    "distribution_version": str(distribution.version),
+    "distribution_root": str(root),
+    "package_paths": [str(item) for item in invarlock.__path__],
+    "invarlock_modules": {"invarlock": str(module_file)},
+}, sort_keys=True))
+""",
+    )
+    monkeypatch.setattr(module, "_PROBED_INVARLOCK_MODULES", frozenset({"invarlock"}))
 
     imported = module._probe_installed_wheel(config, artifacts.wheel)
 
@@ -459,6 +489,9 @@ def test_candidate_wheel_is_installed_in_a_disposable_isolated_environment(
     assert imported.distribution_version == _VERSION
     assert config.repo_root.resolve() not in imported.module_file.parents
     assert config.repo_root.resolve() not in imported.distribution_root.parents
+    assert len(smoke_calls) == 1
+    assert smoke_calls[0][0].name == "invarlock"
+    assert not module._is_within(smoke_calls[0][1], config.repo_root)
 
 
 def test_negative_evidence_audit_is_pinned_to_canonical_checkout_tree(
