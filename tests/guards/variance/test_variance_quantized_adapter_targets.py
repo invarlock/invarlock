@@ -343,8 +343,10 @@ def test_packed_quantized_variance_contract_is_fail_closed(
 
 
 def test_packed_metadata_projection_prepare_keeps_real_unsupported_reason() -> None:
-    model = _OpaqueQuantizedModel()
-    model.adapter_mlp = _PackedMetadataProjection()
+    with torch.random.fork_rng():
+        torch.manual_seed(0)
+        model = _OpaqueQuantizedModel()
+        model.adapter_mlp = _PackedMetadataProjection()
     guard = VarianceGuard(
         policy={
             "scope": "ffn",
@@ -365,6 +367,7 @@ def test_packed_metadata_projection_prepare_keeps_real_unsupported_reason() -> N
     assert result["ready"] is True
     assert guard._prepare_failure is None
     assert guard._stats["target_module_names"] == ["transformer.h.0.mlp.c_proj"]
+    assert guard._scales
     blockers = guard._stats["quantized_mutation_unsupported"]
     assert blockers[0]["reason"] == "packed_quantized_weight_mutation_unsupported"
 
