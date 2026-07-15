@@ -255,12 +255,20 @@ def _evaluate_lazy(
     baseline_runtime_provider: str = typer.Option(
         "hf_transformers",
         "--baseline-runtime-provider",
-        help="Runtime provider for the baseline side.",
+        help=(
+            "Runtime provider for the baseline side; currently only "
+            "'hf_transformers' is accepted. For GGUF or TensorRT-LLM, use "
+            "'invarlock advanced runtime-behavior'."
+        ),
     ),
     subject_runtime_provider: str = typer.Option(
         "hf_transformers",
         "--subject-runtime-provider",
-        help="Runtime provider for the subject side.",
+        help=(
+            "Runtime provider for the subject side; currently only "
+            "'hf_transformers' is accepted. For GGUF or TensorRT-LLM, use "
+            "'invarlock advanced runtime-behavior'."
+        ),
     ),
     device: str | None = typer.Option(
         None, "--device", help="Device override for runs (auto|cuda|mps|cpu)"
