@@ -56,10 +56,16 @@ def _bundle(
     return root
 
 
-def _read(path: Path, *, capability: str = "9.0"):
+def _read(
+    path: Path,
+    *,
+    capability: str = "9.0",
+    tokenizer_metadata_sha256: str = "a" * 64,
+):
     return tensorrt_llm_identity.read_tensorrt_llm_artifact_identity(
         path,
         target_compute_capability=capability,
+        tokenizer_metadata_sha256=tokenizer_metadata_sha256,
     )
 
 
@@ -77,6 +83,7 @@ def test_identity_accepts_closed_multi_rank_layout_and_hides_bundle_name(
 
     assert identity == renamed
     assert identity.target_compute_capability == "9.0"
+    assert identity.tokenizer_metadata_sha256 == "a" * 64
     assert identity.bundle_name == (
         f"tensorrt-llm-sha256-{identity.engine_bundle_tree_sha256}"
     )
@@ -85,13 +92,14 @@ def test_identity_accepts_closed_multi_rank_layout_and_hides_bundle_name(
         identity.engine_bundle_tree_sha256,
         identity.file_inventory_sha256,
         identity.builder_config_sha256,
+        identity.tokenizer_metadata_sha256,
         identity.engine_metadata_sha256,
     ):
         assert len(digest) == 64
         assert set(digest) <= set("0123456789abcdef")
 
 
-def test_identity_partitions_tree_builder_metadata_and_compute_capability(
+def test_identity_partitions_tree_builder_metadata_tokenizer_and_compute_capability(
     tmp_path: Path,
 ) -> None:
     base = _read(_bundle(tmp_path / "base", indent=None))
@@ -109,6 +117,9 @@ def test_identity_partitions_tree_builder_metadata_and_compute_capability(
         )
     )
     capability_changed = _read(_bundle(tmp_path / "capability"), capability="8.9")
+    tokenizer_changed = _read(
+        _bundle(tmp_path / "tokenizer"), tokenizer_metadata_sha256="b" * 64
+    )
 
     assert whitespace.engine_bundle_tree_sha256 != base.engine_bundle_tree_sha256
     assert whitespace.file_inventory_sha256 != base.file_inventory_sha256
@@ -126,6 +137,14 @@ def test_identity_partitions_tree_builder_metadata_and_compute_capability(
     assert capability_changed.file_inventory_sha256 == base.file_inventory_sha256
     assert capability_changed.builder_config_sha256 == base.builder_config_sha256
     assert capability_changed.engine_metadata_sha256 != base.engine_metadata_sha256
+
+    assert tokenizer_changed.engine_bundle_tree_sha256 == (
+        base.engine_bundle_tree_sha256
+    )
+    assert tokenizer_changed.file_inventory_sha256 == base.file_inventory_sha256
+    assert tokenizer_changed.builder_config_sha256 == base.builder_config_sha256
+    assert tokenizer_changed.tokenizer_metadata_sha256 == "b" * 64
+    assert tokenizer_changed.engine_metadata_sha256 != base.engine_metadata_sha256
 
 
 @pytest.mark.parametrize(
@@ -357,6 +376,21 @@ def test_identity_rejects_noncanonical_compute_capability(
         match="major.minor",
     ):
         _read(bundle, capability=capability)
+
+
+@pytest.mark.parametrize(
+    "digest",
+    ["", "a" * 63, "a" * 65, "A" * 64, "sha256:" + "a" * 64, "g" * 64],
+)
+def test_identity_rejects_noncanonical_tokenizer_digest(
+    tmp_path: Path, digest: str
+) -> None:
+    bundle = _bundle(tmp_path / "bundle")
+    with pytest.raises(
+        tensorrt_llm_identity.TensorRTLLMIdentityError,
+        match="lowercase sha256 digest",
+    ):
+        _read(bundle, tokenizer_metadata_sha256=digest)
 
 
 def test_identity_errors_never_disclose_absolute_bundle_path(tmp_path: Path) -> None:

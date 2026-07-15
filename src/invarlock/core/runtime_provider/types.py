@@ -33,7 +33,7 @@ _PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SETTING_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
-_COMPUTE_CAPABILITY = re.compile(r"^[0-9]{1,2}\.[0-9]{1,2}$")
+_COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
 _IMMUTABLE_REMOTE_REVISION = re.compile(r"^[0-9a-f]{40,64}$")
 
 _ARTIFACT_FORMATS = frozenset({"hf_snapshot", "gguf", "tensorrt_llm_engine"})
@@ -271,12 +271,13 @@ class GGUFArtifactIdentity:
 
 @dataclass(frozen=True)
 class TensorRTLLMArtifactIdentity:
-    """Content identity for a complete TensorRT-LLM engine bundle."""
+    """Content identity for an engine bundle and its external tokenizer."""
 
     bundle_name: str
     engine_bundle_tree_sha256: str
     file_inventory_sha256: str
     builder_config_sha256: str
+    tokenizer_metadata_sha256: str
     engine_metadata_sha256: str
     target_compute_capability: str
     format_version: str = field(default=MODEL_ARTIFACT_IDENTITY_FORMAT, init=False)
@@ -289,6 +290,10 @@ class TensorRTLLMArtifactIdentity:
         )
         _require_sha256(self.file_inventory_sha256, field_name="file_inventory_sha256")
         _require_sha256(self.builder_config_sha256, field_name="builder_config_sha256")
+        _require_sha256(
+            self.tokenizer_metadata_sha256,
+            field_name="tokenizer_metadata_sha256",
+        )
         _require_sha256(
             self.engine_metadata_sha256, field_name="engine_metadata_sha256"
         )

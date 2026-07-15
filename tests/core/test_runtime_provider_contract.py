@@ -153,6 +153,7 @@ def test_model_artifact_identity_variants_reject_paths_and_bad_digests() -> None
         engine_bundle_tree_sha256="a" * 64,
         file_inventory_sha256="b" * 64,
         builder_config_sha256="c" * 64,
+        tokenizer_metadata_sha256="e" * 64,
         engine_metadata_sha256="d" * 64,
         target_compute_capability="9.0",
     )
@@ -184,6 +185,10 @@ def test_model_artifact_identity_variants_reject_paths_and_bad_digests() -> None
         dataclasses.replace(engine, bundle_name="../engine")
     with pytest.raises(ValueError, match="sha256"):
         dataclasses.replace(hf, checkpoint_tree_sha256="bad")
+    with pytest.raises(ValueError, match="tokenizer_metadata_sha256"):
+        dataclasses.replace(engine, tokenizer_metadata_sha256="bad")
+    with pytest.raises(ValueError, match="major.minor"):
+        dataclasses.replace(engine, target_compute_capability="09.0")
     with pytest.raises(ValueError, match="at least one"):
         dataclasses.replace(hf, immutable_revision=None, checkpoint_tree_sha256=None)
 

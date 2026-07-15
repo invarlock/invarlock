@@ -38,6 +38,7 @@ _MAX_WORLD_SIZE = 256
 _HASH_CHUNK_BYTES = 1024 * 1024
 
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
+_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _RANK_ENGINE = re.compile(r"^rank(0|[1-9][0-9]*)\.engine$")
 
 
@@ -590,6 +591,7 @@ def read_tensorrt_llm_artifact_identity(
     bundle_path: str | os.PathLike[str],
     *,
     target_compute_capability: str,
+    tokenizer_metadata_sha256: str,
 ) -> TensorRTLLMArtifactIdentity:
     """Authenticate one closed-layout TensorRT-LLM engine bundle.
 
@@ -597,11 +599,19 @@ def read_tensorrt_llm_artifact_identity(
     Current TensorRT-LLM engine ``config.json`` files do not carry it, so the
     caller must obtain it from the pinned build contract.  It is included both
     in the typed identity and the derived engine-metadata digest.
+
+    TensorRT-LLM engines consume a tokenizer outside this closed bundle.
+    ``tokenizer_metadata_sha256`` authenticates the external tokenizer contract
+    used to encode prompts and decode generated token IDs.
     """
 
     if _COMPUTE_CAPABILITY.fullmatch(target_compute_capability) is None:
         raise TensorRTLLMIdentityError(
             "target_compute_capability must use major.minor notation"
+        )
+    if _SHA256.fullmatch(tokenizer_metadata_sha256) is None:
+        raise TensorRTLLMIdentityError(
+            "tokenizer_metadata_sha256 must be a lowercase sha256 digest"
         )
     root_descriptor = _open_root_without_symlinks(bundle_path)
     try:
@@ -669,6 +679,7 @@ def read_tensorrt_llm_artifact_identity(
             "pretrained_config": pretrained,
             "rank_engines": rank_inventory,
             "target_compute_capability": target_compute_capability,
+            "tokenizer_metadata_sha256": tokenizer_metadata_sha256,
         }
         engine_metadata_sha256 = hashlib.sha256(
             _canonical_json(engine_metadata)
@@ -678,6 +689,7 @@ def read_tensorrt_llm_artifact_identity(
             engine_bundle_tree_sha256=tree_sha256,
             file_inventory_sha256=inventory_sha256,
             builder_config_sha256=builder_sha256,
+            tokenizer_metadata_sha256=tokenizer_metadata_sha256,
             engine_metadata_sha256=engine_metadata_sha256,
             target_compute_capability=target_compute_capability,
         )

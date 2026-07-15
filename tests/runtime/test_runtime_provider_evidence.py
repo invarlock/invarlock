@@ -196,6 +196,7 @@ def test_typed_codecs_round_trip_canonical_contract_values() -> None:
             engine_bundle_tree_sha256="c" * 64,
             file_inventory_sha256="d" * 64,
             builder_config_sha256="e" * 64,
+            tokenizer_metadata_sha256="a" * 64,
             engine_metadata_sha256="f" * 64,
             target_compute_capability="9.0",
         ),

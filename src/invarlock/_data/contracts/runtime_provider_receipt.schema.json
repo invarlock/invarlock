@@ -157,7 +157,7 @@
     },
     "tensorrtLlmEngine": {
       "type": "object",
-      "required": ["format_version", "artifact_format", "bundle_name", "engine_bundle_tree_sha256", "file_inventory_sha256", "builder_config_sha256", "engine_metadata_sha256", "target_compute_capability"],
+      "required": ["format_version", "artifact_format", "bundle_name", "engine_bundle_tree_sha256", "file_inventory_sha256", "builder_config_sha256", "tokenizer_metadata_sha256", "engine_metadata_sha256", "target_compute_capability"],
       "properties": {
         "format_version": {"const": "invarlock/model-artifact-identity-v1"},
         "artifact_format": {"const": "tensorrt_llm_engine"},
@@ -165,8 +165,9 @@
         "engine_bundle_tree_sha256": {"$ref": "#/$defs/sha256"},
         "file_inventory_sha256": {"$ref": "#/$defs/sha256"},
         "builder_config_sha256": {"$ref": "#/$defs/sha256"},
+        "tokenizer_metadata_sha256": {"$ref": "#/$defs/sha256"},
         "engine_metadata_sha256": {"$ref": "#/$defs/sha256"},
-        "target_compute_capability": {"type": "string", "pattern": "^[0-9]{1,2}\\.[0-9]{1,2}$"}
+        "target_compute_capability": {"type": "string", "pattern": "^(0|[1-9][0-9]?)\\.(0|[1-9][0-9]?)$"}
       },
       "additionalProperties": false
     },

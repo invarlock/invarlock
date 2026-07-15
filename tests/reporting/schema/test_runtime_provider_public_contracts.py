@@ -54,6 +54,20 @@ def _artifact_payload() -> dict[str, object]:
     }
 
 
+def _tensorrt_artifact_payload() -> dict[str, object]:
+    return {
+        "format_version": "invarlock/model-artifact-identity-v1",
+        "artifact_format": "tensorrt_llm_engine",
+        "bundle_name": "tensorrt-llm-sha256-" + _digest("a"),
+        "engine_bundle_tree_sha256": _digest("a"),
+        "file_inventory_sha256": _digest("b"),
+        "builder_config_sha256": _digest("c"),
+        "tokenizer_metadata_sha256": _digest("d"),
+        "engine_metadata_sha256": _digest("e"),
+        "target_compute_capability": "9.0",
+    }
+
+
 def _settings_payload() -> dict[str, object]:
     return {
         "seed": 43,
@@ -171,6 +185,48 @@ def test_model_artifact_identity_schema_rejects_paths_and_malformed_facts(
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(
             payload, public_contracts.load_model_artifact_identity_schema()
+        )
+
+
+def test_tensorrt_artifact_schemas_require_canonical_tokenizer_binding() -> None:
+    artifact = _tensorrt_artifact_payload()
+    jsonschema.validate(
+        artifact,
+        public_contracts.load_model_artifact_identity_schema(),
+    )
+
+    receipt = _receipt_payload()
+    receipt["artifact_identity"] = artifact
+    jsonschema.validate(
+        receipt, public_contracts.load_runtime_provider_receipt_schema()
+    )
+
+    for malformed_digest in (None, "bad", "A" * 64):
+        malformed_artifact = copy.deepcopy(artifact)
+        if malformed_digest is None:
+            malformed_artifact.pop("tokenizer_metadata_sha256")
+        else:
+            malformed_artifact["tokenizer_metadata_sha256"] = malformed_digest
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(
+                malformed_artifact,
+                public_contracts.load_model_artifact_identity_schema(),
+            )
+
+        malformed_receipt = _receipt_payload()
+        malformed_receipt["artifact_identity"] = malformed_artifact
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(
+                malformed_receipt,
+                public_contracts.load_runtime_provider_receipt_schema(),
+            )
+
+    malformed_capability = copy.deepcopy(artifact)
+    malformed_capability["target_compute_capability"] = "09.0"
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            malformed_capability,
+            public_contracts.load_model_artifact_identity_schema(),
         )
 
 

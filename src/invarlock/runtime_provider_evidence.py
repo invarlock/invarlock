@@ -208,6 +208,7 @@ def _artifact_from_payload(payload: dict[str, object]) -> ModelArtifactIdentity:
             engine_bundle_tree_sha256=cast(str, payload["engine_bundle_tree_sha256"]),
             file_inventory_sha256=cast(str, payload["file_inventory_sha256"]),
             builder_config_sha256=cast(str, payload["builder_config_sha256"]),
+            tokenizer_metadata_sha256=cast(str, payload["tokenizer_metadata_sha256"]),
             engine_metadata_sha256=cast(str, payload["engine_metadata_sha256"]),
             target_compute_capability=cast(str, payload["target_compute_capability"]),
         )
