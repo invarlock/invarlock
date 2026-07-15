@@ -29,6 +29,8 @@ from invarlock.runtime_providers.llama_cpp_session import (
     LlamaCppRuntimeBindings,
     LlamaCppSession,
     LlamaCppSessionConfig,
+    inspect_llama_cpp_backend,
+    validate_llama_cpp_backend_version,
 )
 from invarlock.runtime_security_helpers import (
     RUNTIME_IMAGE_DIGEST_ENV,
@@ -294,6 +296,30 @@ def _require_strict_container_boundary(context: RuntimeExecutionContext) -> None
     _require_isolated_network_namespace()
 
 
+def _require_inspection_container_boundary() -> None:
+    """Authenticate the current immutable runtime before probing native code."""
+
+    if not strict_container_boundary_present():
+        raise ValueError(
+            "llama_cpp inspection requires the authenticated container boundary"
+        )
+    runtime_image_digest = os.environ.get(RUNTIME_IMAGE_DIGEST_ENV, "")
+    if _IMAGE_DIGEST.fullmatch(runtime_image_digest) is None:
+        raise ValueError(
+            f"llama_cpp inspection requires canonical {RUNTIME_IMAGE_DIGEST_ENV}"
+        )
+    runtime_image = os.environ.get(RUNTIME_IMAGE_ENV, "")
+    repository, separator, embedded_digest = runtime_image.rpartition("@")
+    if runtime_image != runtime_image_digest and not (
+        repository and separator and embedded_digest == runtime_image_digest
+    ):
+        raise ValueError(
+            f"llama_cpp inspection requires {RUNTIME_IMAGE_ENV} to embed the "
+            "exact runtime image digest"
+        )
+    _require_isolated_network_namespace()
+
+
 class LlamaCppProvider:
     """Authenticate one GGUF artifact through pinned raw llama-completion."""
 
@@ -320,9 +346,9 @@ class LlamaCppProvider:
         for name in _POSITIVE_INTEGER_SETTINGS:
             _required_integer(spec.settings, name, positive=True)
         _required_integer(spec.settings, "seed", positive=False)
-        backend_version = _required_text(spec.settings, "backend_version")
-        if " ".join(backend_version.split()) != backend_version:
-            raise ValueError("backend_version must use canonical single spacing")
+        validate_llama_cpp_backend_version(
+            _required_text(spec.settings, "backend_version")
+        )
         artifact_sha256 = _required_digest(spec.settings, "artifact_sha256")
         expected_model_id = f"gguf-sha256-{artifact_sha256}.gguf"
         if spec.model_id != expected_model_id:
@@ -349,6 +375,49 @@ class LlamaCppProvider:
                 "non_linux_execution",
             ),
         )
+
+    def inspect_runtime_spec(
+        self,
+        bindings: LlamaCppRuntimeBindings,
+        *,
+        seed: int,
+        context_length: int,
+        batch_size: int,
+        max_output_tokens: int,
+        timeout_seconds: int,
+    ) -> ModelRuntimeSpec:
+        """Derive one complete spec from authenticated local runtime inputs."""
+
+        if not isinstance(bindings, LlamaCppRuntimeBindings):
+            raise ValueError("llama_cpp inspection requires native runtime bindings")
+        _require_inspection_container_boundary()
+        identity = read_gguf_artifact_identity(bindings.gguf_path)
+        backend = inspect_llama_cpp_backend(bindings)
+        if read_gguf_artifact_identity(bindings.gguf_path) != identity:
+            raise ValueError("GGUF artifact changed during runtime inspection")
+        spec = ModelRuntimeSpec(
+            provider_name=self.name,
+            model_id=identity.artifact_name,
+            settings={
+                "artifact_byte_length": identity.byte_length,
+                "artifact_sha256": identity.sha256,
+                "backend_binary_sha256": backend.binary_sha256,
+                "backend_source_sha256": backend.source_sha256,
+                "backend_version": backend.version,
+                "batch_size": batch_size,
+                "context_length": context_length,
+                "gguf_metadata_sha256": identity.gguf_metadata_sha256,
+                "max_output_tokens": max_output_tokens,
+                "seed": seed,
+                "tensor_inventory_sha256": identity.tensor_inventory_sha256,
+                "timeout_seconds": timeout_seconds,
+                "tokenizer_metadata_sha256": identity.tokenizer_metadata_sha256,
+            },
+        )
+        self.validate_config(spec)
+        if self.identify_artifact(spec) != identity:
+            raise ValueError("derived GGUF settings do not reproduce artifact identity")
+        return spec
 
     def identify_artifact(self, spec: ModelRuntimeSpec) -> GGUFArtifactIdentity:
         self.validate_config(spec)

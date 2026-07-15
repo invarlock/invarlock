@@ -41,6 +41,11 @@ from invarlock.runtime_providers._tensorrt_llm_execution import (
     _run_bounded_process,
     _RunDirectory,
 )
+from invarlock.runtime_providers._tensorrt_llm_inspection import (
+    _MAX_TOKENIZER_CONTRACT_BYTES,
+    _open_validated_tensorrt_llm_static_inputs,
+    _strict_json_object,
+)
 from invarlock.runtime_providers.tensorrt_llm_identity import (
     read_tensorrt_llm_artifact_identity,
 )
@@ -54,7 +59,6 @@ _MAX_BATCH_RECORDS = 1024
 _MAX_STDOUT_BYTES = 2 * 1024 * 1024
 _MAX_STDERR_BYTES = 256 * 1024
 _MAX_INFO_BYTES = 16 * 1024
-_MAX_TOKENIZER_CONTRACT_BYTES = 128 * 1024 * 1024
 _INFO_TIMEOUT_SECONDS = 120
 _IO_CHUNK_BYTES = 64 * 1024
 _FICLONE = 0x40049409
@@ -87,38 +91,17 @@ class TensorRTLLMRuntimeBindings:
         )
 
 
-def _strict_json_object(payload: bytes, *, label: str) -> dict[str, object]:
-    try:
-        text = payload.decode("utf-8", errors="strict")
-    except UnicodeDecodeError as exc:
-        raise TensorRTLLMExecutionError(f"{label} is not UTF-8") from exc
+@dataclass(frozen=True)
+class TensorRTLLMInputInspection:
+    """Path-free identities observed from one pinned native runtime."""
 
-    def reject_duplicates(items: list[tuple[str, object]]) -> dict[str, object]:
-        result: dict[str, object] = {}
-        for key, value in items:
-            if key in result:
-                raise TensorRTLLMExecutionError(f"{label} contains a duplicate key")
-            result[key] = value
-        return result
-
-    def reject_constant(value: str) -> object:
-        raise TensorRTLLMExecutionError(
-            f"{label} contains non-finite JSON number {value!r}"
-        )
-
-    try:
-        value = json.loads(
-            text,
-            object_pairs_hook=reject_duplicates,
-            parse_constant=reject_constant,
-        )
-    except TensorRTLLMExecutionError:
-        raise
-    except (json.JSONDecodeError, RecursionError) as exc:
-        raise TensorRTLLMExecutionError(f"{label} is not strict JSON") from exc
-    if not isinstance(value, dict):
-        raise TensorRTLLMExecutionError(f"{label} must be a JSON object")
-    return value
+    artifact_identity: TensorRTLLMArtifactIdentity
+    backend_build_sha256: str
+    backend_version: str
+    engine_max_batch_size: int
+    engine_max_input_len: int
+    engine_max_seq_len: int
+    runner_binary_sha256: str
 
 
 def _probe_runner_info_object(
@@ -184,6 +167,108 @@ def _authenticated_official_runner_info(
             raise TensorRTLLMExecutionError(
                 "TensorRT-LLM runner probe cleanup did not complete"
             ) from cleanup_errors[0]
+
+
+def _validated_inspection_info(info: dict[str, object]) -> dict[str, str]:
+    expected_keys = {
+        "backend_build_sha256",
+        "backend_name",
+        "backend_version",
+        "cuda_compute_capability",
+        "cuda_device_name",
+        "cuda_driver_version",
+        "cuda_runtime_version",
+        "device_kind",
+        "format_version",
+        "protocol_version",
+    }
+    if set(info) != expected_keys:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM runner info has unexpected fields"
+        )
+    fixed = {
+        "backend_name": "TensorRT-LLM",
+        "backend_version": "1.2.1",
+        "device_kind": "cuda",
+        "format_version": _RUNNER_INFO_FORMAT,
+        "protocol_version": _RUNNER_PROTOCOL,
+    }
+    if any(info.get(name) != value for name, value in fixed.items()):
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM runner identity does not match the pinned contract"
+        )
+    normalized: dict[str, str] = {}
+    for name in expected_keys:
+        value = info.get(name)
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or any(ord(character) < 32 for character in value)
+        ):
+            raise TensorRTLLMExecutionError(
+                f"TensorRT-LLM runner info {name} is not canonical"
+            )
+        normalized[name] = value
+    if _SHA256.fullmatch(normalized["backend_build_sha256"]) is None:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM runner build identity is not canonical"
+        )
+    if _COMPUTE_CAPABILITY.fullmatch(normalized["cuda_compute_capability"]) is None:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM runner compute capability is not canonical"
+        )
+    if _CUDA_RUNTIME_VERSION.fullmatch(normalized["cuda_runtime_version"]) is None:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM runner CUDA runtime version is not canonical"
+        )
+    return normalized
+
+
+def inspect_tensorrt_llm_inputs(
+    bindings: TensorRTLLMRuntimeBindings,
+) -> TensorRTLLMInputInspection:
+    """Derive engine, tokenizer, runner, and backend identities in one probe."""
+
+    if not isinstance(bindings, TensorRTLLMRuntimeBindings):
+        raise ValueError("tensorrt_llm inspection requires native runtime bindings")
+    static_inputs = _open_validated_tensorrt_llm_static_inputs(
+        engine_bundle_path=bindings.engine_bundle_path,
+        tokenizer_contract_path=bindings.tokenizer_contract_path,
+    )
+    try:
+        info, runner_sha256 = _authenticated_official_runner_info(
+            bindings.runner_executable_path
+        )
+        normalized = _validated_inspection_info(info)
+        identity = read_tensorrt_llm_artifact_identity(
+            bindings.engine_bundle_path,
+            target_compute_capability=normalized["cuda_compute_capability"],
+            tokenizer_metadata_sha256=static_inputs.tokenizer_sha256,
+        )
+        static_inputs.recheck()
+        if (
+            read_tensorrt_llm_artifact_identity(
+                bindings.engine_bundle_path,
+                target_compute_capability=normalized["cuda_compute_capability"],
+                tokenizer_metadata_sha256=static_inputs.tokenizer_sha256,
+            )
+            != identity
+        ):
+            raise TensorRTLLMExecutionError(
+                "TensorRT-LLM engine changed during runtime inspection"
+            )
+        return TensorRTLLMInputInspection(
+            artifact_identity=identity,
+            backend_build_sha256=normalized["backend_build_sha256"],
+            backend_version=normalized["backend_version"],
+            engine_max_batch_size=static_inputs.engine_max_batch_size,
+            engine_max_input_len=static_inputs.engine_max_input_len,
+            engine_max_seq_len=static_inputs.engine_max_seq_len,
+            runner_binary_sha256=runner_sha256,
+        )
+    finally:
+        static_inputs.close()
 
 
 def _probe_runner(
@@ -694,7 +779,9 @@ class TensorRTLLMSession:
 
 
 __all__ = [
+    "inspect_tensorrt_llm_inputs",
     "TensorRTLLMExecutionError",
+    "TensorRTLLMInputInspection",
     "TensorRTLLMRuntimeBindings",
     "TensorRTLLMSession",
     "TensorRTLLMSessionConfig",

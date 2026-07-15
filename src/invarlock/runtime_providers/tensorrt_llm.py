@@ -29,6 +29,7 @@ from invarlock.runtime_providers.tensorrt_llm_session import (
     TensorRTLLMRuntimeBindings,
     TensorRTLLMSession,
     TensorRTLLMSessionConfig,
+    inspect_tensorrt_llm_inputs,
 )
 from invarlock.runtime_security_helpers import (
     RUNTIME_IMAGE_DIGEST_ENV,
@@ -190,6 +191,55 @@ class TensorRTLLMProvider:
                 "unpinned_outer_runtime",
             ),
         )
+
+    def inspect_runtime_spec(
+        self,
+        bindings: TensorRTLLMRuntimeBindings,
+        *,
+        seed: int,
+        context_length: int,
+        batch_size: int,
+        max_output_tokens: int,
+        timeout_seconds: int,
+    ) -> ModelRuntimeSpec:
+        """Derive one complete spec from authenticated local runtime inputs."""
+
+        inspection = inspect_tensorrt_llm_inputs(bindings)
+        if batch_size > inspection.engine_max_batch_size:
+            raise ValueError("batch_size exceeds the engine build limit")
+        if context_length > inspection.engine_max_input_len:
+            raise ValueError("context_length exceeds the engine build limit")
+        if context_length + max_output_tokens > inspection.engine_max_seq_len:
+            raise ValueError(
+                "context and output lengths exceed the engine sequence limit"
+            )
+        identity = inspection.artifact_identity
+        spec = ModelRuntimeSpec(
+            provider_name=self.name,
+            model_id=identity.bundle_name,
+            settings={
+                "backend_build_sha256": inspection.backend_build_sha256,
+                "backend_version": inspection.backend_version,
+                "batch_size": batch_size,
+                "builder_config_sha256": identity.builder_config_sha256,
+                "context_length": context_length,
+                "engine_bundle_tree_sha256": identity.engine_bundle_tree_sha256,
+                "engine_metadata_sha256": identity.engine_metadata_sha256,
+                "file_inventory_sha256": identity.file_inventory_sha256,
+                "max_output_tokens": max_output_tokens,
+                "runner_binary_sha256": inspection.runner_binary_sha256,
+                "seed": seed,
+                "target_compute_capability": identity.target_compute_capability,
+                "timeout_seconds": timeout_seconds,
+                "tokenizer_metadata_sha256": identity.tokenizer_metadata_sha256,
+            },
+        )
+        self.validate_config(spec)
+        if self.identify_artifact(spec) != identity:
+            raise ValueError(
+                "derived TensorRT-LLM settings do not reproduce artifact identity"
+            )
+        return spec
 
     def identify_artifact(self, spec: ModelRuntimeSpec) -> TensorRTLLMArtifactIdentity:
         self.validate_config(spec)

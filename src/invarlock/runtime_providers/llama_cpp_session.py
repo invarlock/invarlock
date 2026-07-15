@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import selectors
 import shutil
 import signal
@@ -42,6 +43,15 @@ _MAX_STDERR_BYTES = 256 * 1024
 _MAX_VERSION_BYTES = 16 * 1024
 _VERSION_TIMEOUT_SECONDS = 5
 _IO_CHUNK_BYTES = 64 * 1024
+_BACKEND_VERSION = re.compile(
+    r"^version: (?:0|[1-9][0-9]{0,9}) "
+    r"\([A-Za-z0-9][A-Za-z0-9._+-]{0,63}\) "
+    r"built with [A-Za-z0-9][A-Za-z0-9 ._()+,=@~+-]{0,383} "
+    r"for [A-Za-z0-9][A-Za-z0-9 ._()+,=@~+-]{0,127}$"
+)
+_SENSITIVE_VERSION_TEXT = re.compile(
+    r"(?i)(?:api[_.-]?key|bearer|credential|password|private[_.-]?key|secret|token)"
+)
 
 
 class LlamaCppExecutionError(RuntimeError):
@@ -60,6 +70,15 @@ class LlamaCppRuntimeBindings:
         object.__setattr__(self, "gguf_path", Path(self.gguf_path))
         object.__setattr__(self, "executable_path", Path(self.executable_path))
         object.__setattr__(self, "source_archive_path", Path(self.source_archive_path))
+
+
+@dataclass(frozen=True)
+class LlamaCppBackendInspection:
+    """Path-free identities observed from one pinned llama.cpp backend."""
+
+    binary_sha256: str
+    source_sha256: str
+    version: str
 
 
 def _stat_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
@@ -107,7 +126,7 @@ class _PinnedFile:
         cls,
         path: str | os.PathLike[str],
         *,
-        expected_sha256: str,
+        expected_sha256: str | None,
         require_executable: bool,
     ) -> _PinnedFile:
         if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
@@ -168,7 +187,7 @@ class _PinnedFile:
                         "pinned llama.cpp binary is not executable"
                     )
                 observed_sha256 = _hash_descriptor(descriptor, opened.st_size)
-                if observed_sha256 != expected_sha256:
+                if expected_sha256 is not None and observed_sha256 != expected_sha256:
                     raise LlamaCppExecutionError("pinned file digest does not match")
                 return cls(
                     path=absolute,
@@ -419,19 +438,43 @@ def _run_bounded_process(
                 final_stream.close()
 
 
+def validate_llama_cpp_backend_version(value: object) -> str:
+    """Return one privacy-safe canonical llama.cpp version or fail closed."""
+
+    if not isinstance(value, str) or not value:
+        raise ValueError("llama.cpp backend version must be non-empty text")
+    try:
+        value.encode("ascii", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise ValueError("llama.cpp backend version must be canonical ASCII") from exc
+    if " ".join(value.split()) != value or _BACKEND_VERSION.fullmatch(value) is None:
+        raise ValueError("llama.cpp backend version does not match the closed grammar")
+    if _SENSITIVE_VERSION_TEXT.search(value) is not None:
+        raise ValueError("llama.cpp backend version contains sensitive-looking text")
+    return value
+
+
 def _normalize_version_output(stdout: bytes, stderr: bytes) -> str:
     try:
-        decoded = (stdout + b"\n" + stderr).decode("utf-8", errors="strict")
+        decoded = (stdout + b"\n" + stderr).decode("ascii", errors="strict")
     except UnicodeDecodeError as exc:
-        raise LlamaCppExecutionError("llama.cpp version output is not UTF-8") from exc
-    lines = [" ".join(line.split()) for line in decoded.splitlines() if line.strip()]
-    version_lines = [line for line in lines if line.startswith("version: ")]
-    compiler_lines = [line for line in lines if line.startswith("built with ")]
-    if len(version_lines) != 1 or len(compiler_lines) != 1:
+        raise LlamaCppExecutionError(
+            "llama.cpp version output is not canonical ASCII"
+        ) from exc
+    lines = [line for line in decoded.splitlines() if line]
+    if (
+        len(lines) != 2
+        or not lines[0].startswith("version: ")
+        or not lines[1].startswith("built with ")
+    ):
         raise LlamaCppExecutionError(
             "llama.cpp version output lacks exact version/build lines"
         )
-    return f"{version_lines[0]} {compiler_lines[0]}"
+    version = f"{lines[0]} {lines[1]}"
+    try:
+        return validate_llama_cpp_backend_version(version)
+    except ValueError as exc:
+        raise LlamaCppExecutionError(str(exc)) from exc
 
 
 def probe_llama_cpp_version(
@@ -453,6 +496,50 @@ def probe_llama_cpp_version(
             f"llama.cpp version probe exited with status {status}"
         )
     return _normalize_version_output(stdout, stderr)
+
+
+def inspect_llama_cpp_backend(
+    bindings: LlamaCppRuntimeBindings,
+) -> LlamaCppBackendInspection:
+    """Derive immutable backend identities without trusting caller hashes."""
+
+    if not isinstance(bindings, LlamaCppRuntimeBindings):
+        raise ValueError("llama_cpp inspection requires native runtime bindings")
+    resources: list[_PinnedFile | _RunDirectory] = []
+    try:
+        executable = _PinnedFile.open(
+            bindings.executable_path,
+            expected_sha256=None,
+            require_executable=True,
+        )
+        resources.append(executable)
+        source = _PinnedFile.open(
+            bindings.source_archive_path,
+            expected_sha256=None,
+            require_executable=False,
+        )
+        resources.append(source)
+        run_directory = _RunDirectory.create()
+        resources.append(run_directory)
+        version = probe_llama_cpp_version(executable, run_directory)
+        executable.recheck()
+        source.recheck()
+        return LlamaCppBackendInspection(
+            binary_sha256=executable.sha256,
+            source_sha256=source.sha256,
+            version=version,
+        )
+    finally:
+        cleanup_errors: list[Exception] = []
+        for resource in reversed(resources):
+            try:
+                resource.close()
+            except Exception as exc:  # cleanup must continue across resources
+                cleanup_errors.append(exc)
+        if cleanup_errors:
+            raise LlamaCppExecutionError(
+                "llama.cpp inspection cleanup did not complete"
+            ) from cleanup_errors[0]
 
 
 def _records_sha256(records: tuple[RuntimeScoringRecord, ...]) -> str:
@@ -746,8 +833,11 @@ class LlamaCppSession:
 
 
 __all__ = [
+    "inspect_llama_cpp_backend",
+    "LlamaCppBackendInspection",
     "LlamaCppExecutionError",
     "LlamaCppRuntimeBindings",
     "LlamaCppSession",
     "LlamaCppSessionConfig",
+    "validate_llama_cpp_backend_version",
 ]

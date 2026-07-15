@@ -102,8 +102,116 @@ def test_native_binding_helpers_reject_unsupported_or_incomplete_providers(
             backend_source=None,
             tokenizer_contract=None,
         )
+    with pytest.raises(ValueError, match="--tokenizer-contract is not valid"):
+        command_module._native_bindings(
+            provider_name="llama_cpp",
+            artifact=str(tmp_path / "model.gguf"),
+            backend_executable=str(tmp_path / "llama-completion"),
+            backend_source=str(tmp_path / "llama.cpp.tar.gz"),
+            tokenizer_contract=str(tmp_path / "unused-tokenizer.json"),
+        )
+    with pytest.raises(ValueError, match="--backend-source is not valid"):
+        command_module._native_bindings(
+            provider_name="tensorrt_llm",
+            artifact=str(tmp_path / "engine"),
+            backend_executable=str(tmp_path / "tensorrt-runner"),
+            backend_source=str(tmp_path / "unused-source.tar.gz"),
+            tokenizer_contract=str(tmp_path / "tokenizer.json"),
+        )
     with pytest.raises(ValueError, match="cannot infer a device kind"):
         command_module._provider_device_kind("unknown_provider")
+
+
+def test_inspect_inputs_rejects_provider_without_native_inspector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        command_module,
+        "_provider",
+        lambda _name: SimpleNamespace(name="hf_transformers"),
+    )
+
+    result = CliRunner().invoke(
+        command_module.runtime_behavior_app,
+        [
+            "inspect-inputs",
+            "--provider",
+            "hf_transformers",
+            "--artifact",
+            str(tmp_path / "model"),
+            "--backend-executable",
+            str(tmp_path / "backend"),
+            "--context-length",
+            "32",
+            "--max-output-tokens",
+            "4",
+            "--timeout-seconds",
+            "5",
+            "--out",
+            str(tmp_path / "settings.json"),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert "does not support installed native input inspection" in payload["errors"][0]
+    assert not (tmp_path / "settings.json").exists()
+
+
+def test_inspect_inputs_rejects_mismatched_provider_spec_before_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mismatched_spec = ModelRuntimeSpec(
+        provider_name="tensorrt_llm",
+        model_id="model",
+        settings={
+            "seed": 0,
+            "context_length": 32,
+            "batch_size": 1,
+            "max_output_tokens": 4,
+            "timeout_seconds": 5,
+        },
+    )
+    monkeypatch.setattr(
+        command_module,
+        "_provider",
+        lambda _name: SimpleNamespace(
+            name="llama_cpp",
+            inspect_runtime_spec=lambda *_args, **_kwargs: mismatched_spec,
+        ),
+    )
+
+    result = CliRunner().invoke(
+        command_module.runtime_behavior_app,
+        [
+            "inspect-inputs",
+            "--provider",
+            "llama_cpp",
+            "--artifact",
+            str(tmp_path / "model.gguf"),
+            "--backend-executable",
+            str(tmp_path / "llama-completion"),
+            "--backend-source",
+            str(tmp_path / "llama.cpp.tar.gz"),
+            "--context-length",
+            "32",
+            "--max-output-tokens",
+            "4",
+            "--timeout-seconds",
+            "5",
+            "--out",
+            str(tmp_path / "settings.json"),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert "names a different provider" in payload["errors"][0]
+    assert not (tmp_path / "settings.json").exists()
 
 
 def test_emit_and_fail_plain_text_paths(capsys) -> None:

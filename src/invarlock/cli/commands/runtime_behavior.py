@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
@@ -21,6 +22,7 @@ RUNTIME_BEHAVIOR_VERIFY_PAIR_CLI_FORMAT = "runtime-behavior-verify-pair-cli-v1"
 RUNTIME_BEHAVIOR_BUILD_POLICY_CLI_FORMAT = "runtime-behavior-build-policy-cli-v1"
 RUNTIME_BEHAVIOR_BUILD_SCHEDULE_CLI_FORMAT = "runtime-behavior-build-schedule-cli-v1"
 RUNTIME_BEHAVIOR_PREPARE_BINDING_CLI_FORMAT = "runtime-behavior-prepare-binding-cli-v1"
+RUNTIME_BEHAVIOR_INSPECT_INPUTS_CLI_FORMAT = "runtime-behavior-inspect-inputs-cli-v1"
 MAX_RUNTIME_PROVIDER_SETTINGS_BYTES = 1024 * 1024
 MAX_RUNTIME_BEHAVIOR_INPUT_BYTES = 16 * 1024 * 1024
 _BEHAVIORAL_BINDING_FIELDS = frozenset(
@@ -41,8 +43,8 @@ class SideRole(StrEnum):
 
 runtime_behavior_app = typer.Typer(
     help=(
-        "Build a schedule and directed authorization, prepare native provider "
-        "bindings, produce native provider sides, then verify the directed pair."
+        "Inspect native inputs, build a schedule and directed authorization, "
+        "prepare native provider bindings, produce sides, then verify the pair."
     ),
     no_args_is_help=True,
 )
@@ -127,6 +129,48 @@ def _required_path(value: str | None, *, option: str) -> Path:
     return Path(value)
 
 
+def _preflight_new_output(path: Path) -> None:
+    """Fail before native inspection when the no-clobber target already exists."""
+
+    from invarlock.runtime_behavior.io import require_real_parent
+
+    output = Path(path)
+    target_name = output.name
+    if not target_name or target_name in {".", ".."} or "\0" in target_name:
+        raise ValueError("output must name one file entry")
+    parent = require_real_parent(output)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        descriptor = os.open(parent, flags)
+    except OSError as exc:
+        raise ValueError("output parent must be a real directory") from exc
+    try:
+        opened_parent = os.fstat(descriptor)
+        named_parent = parent.lstat()
+        if (
+            opened_parent.st_dev,
+            opened_parent.st_ino,
+            opened_parent.st_mode,
+        ) != (
+            named_parent.st_dev,
+            named_parent.st_ino,
+            named_parent.st_mode,
+        ):
+            raise ValueError("output parent identity changed")
+        try:
+            os.stat(target_name, dir_fd=descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        raise ValueError(f"output already exists: {target_name}")
+    finally:
+        os.close(descriptor)
+
+
 def _native_bindings(
     *,
     provider_name: str,
@@ -140,6 +184,8 @@ def _native_bindings(
             LlamaCppRuntimeBindings,
         )
 
+        if tokenizer_contract is not None:
+            raise ValueError("--tokenizer-contract is not valid for llama_cpp")
         return LlamaCppRuntimeBindings(
             gguf_path=Path(artifact),
             executable_path=Path(backend_executable),
@@ -152,6 +198,8 @@ def _native_bindings(
             TensorRTLLMRuntimeBindings,
         )
 
+        if backend_source is not None:
+            raise ValueError("--backend-source is not valid for tensorrt_llm")
         return TensorRTLLMRuntimeBindings(
             engine_bundle_path=Path(artifact),
             tokenizer_contract_path=_required_path(
@@ -328,6 +376,122 @@ def build_schedule_command(
         },
         json_out=json_out,
         success=f"Runtime behavioral schedule written: {output_path}",
+    )
+
+
+@runtime_behavior_app.command(
+    "inspect-inputs",
+    help=(
+        "Derive a provider-owned model ID and complete settings JSON from native "
+        "GGUF or TensorRT-LLM inputs without accepting caller-supplied hashes."
+    ),
+)
+def inspect_inputs_command(
+    provider_name: str = typer.Option(
+        ...,
+        "--provider",
+        help="Native provider: llama_cpp or tensorrt_llm.",
+    ),
+    artifact: str = typer.Option(
+        ...,
+        "--artifact",
+        help="GGUF file or TensorRT-LLM engine directory to authenticate.",
+    ),
+    backend_executable: str = typer.Option(
+        ...,
+        "--backend-executable",
+        help="llama-completion or official TensorRT-LLM runner to probe.",
+    ),
+    backend_source: str | None = typer.Option(
+        None,
+        "--backend-source",
+        help="Required for llama_cpp: authenticated source archive.",
+    ),
+    tokenizer_contract: str | None = typer.Option(
+        None,
+        "--tokenizer-contract",
+        help="Required for tensorrt_llm: external tokenizer contract.",
+    ),
+    seed: int = typer.Option(0, "--seed", min=0),
+    context_length: int = typer.Option(..., "--context-length", min=1),
+    batch_size: int = typer.Option(1, "--batch-size", min=1),
+    max_output_tokens: int = typer.Option(..., "--max-output-tokens", min=1),
+    timeout_seconds: int = typer.Option(..., "--timeout-seconds", min=1),
+    out: str = typer.Option(
+        ...,
+        "--out",
+        help="New path for directly reusable canonical provider settings JSON.",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Write path-free settings only after provider-owned inspection succeeds."""
+
+    try:
+        from invarlock.core.runtime_provider import (
+            artifact_identity_sha256,
+            runtime_execution_settings_from_mapping,
+        )
+        from invarlock.reporting.validation.runtime_behavioral_claim import (
+            runtime_execution_settings_sha256,
+        )
+        from invarlock.runtime_behavior.io import atomic_write_new, canonical_json_bytes
+
+        output_path = Path(out)
+        _preflight_new_output(output_path)
+        provider = _provider(provider_name)
+        inspector = getattr(provider, "inspect_runtime_spec", None)
+        if not callable(inspector):
+            raise ValueError(
+                f"runtime provider {provider_name!r} does not support installed "
+                "native input inspection"
+            )
+        bindings = _native_bindings(
+            provider_name=provider_name,
+            artifact=artifact,
+            backend_executable=backend_executable,
+            backend_source=backend_source,
+            tokenizer_contract=tokenizer_contract,
+        )
+        spec = inspector(
+            bindings,
+            seed=seed,
+            context_length=context_length,
+            batch_size=batch_size,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=timeout_seconds,
+        )
+        if spec.provider_name != provider_name:
+            raise ValueError("inspected runtime spec names a different provider")
+        provider.validate_config(spec)
+        identity = provider.identify_artifact(spec)
+        execution_settings = runtime_execution_settings_from_mapping(
+            spec.settings,
+            allow_network=False,
+        )
+        atomic_write_new(output_path, canonical_json_bytes(dict(spec.settings)))
+    except (ImportError, KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        _fail(
+            format_version=RUNTIME_BEHAVIOR_INSPECT_INPUTS_CLI_FORMAT,
+            json_out=json_out,
+            error=exc,
+        )
+        return
+
+    _emit(
+        {
+            "artifact_format": identity.artifact_format,
+            "artifact_identity_sha256": artifact_identity_sha256(identity),
+            "execution_settings_sha256": runtime_execution_settings_sha256(
+                execution_settings
+            ),
+            "format_version": RUNTIME_BEHAVIOR_INSPECT_INPUTS_CLI_FORMAT,
+            "model_id": spec.model_id,
+            "ok": True,
+            "provider_name": provider_name,
+            "settings": str(output_path),
+        },
+        json_out=json_out,
+        success=f"Runtime provider settings written: {output_path}",
     )
 
 
@@ -657,6 +821,7 @@ def verify_pair_command(
 __all__ = [
     "RUNTIME_BEHAVIOR_BUILD_SCHEDULE_CLI_FORMAT",
     "RUNTIME_BEHAVIOR_BUILD_POLICY_CLI_FORMAT",
+    "RUNTIME_BEHAVIOR_INSPECT_INPUTS_CLI_FORMAT",
     "RUNTIME_BEHAVIOR_PREPARE_BINDING_CLI_FORMAT",
     "RUNTIME_BEHAVIOR_RUN_SIDE_CLI_FORMAT",
     "RUNTIME_BEHAVIOR_VERIFY_PAIR_CLI_FORMAT",

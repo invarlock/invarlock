@@ -640,6 +640,7 @@ def test_tensorrt_llm_modules_remain_torch_free() -> None:
         for name in (
             "tensorrt_llm.py",
             "_tensorrt_llm_execution.py",
+            "_tensorrt_llm_inspection.py",
             "tensorrt_llm_runner.py",
             "tensorrt_llm_session.py",
         )

@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 from invarlock.cli.commands import runtime_behavior as command_module
 from invarlock.core.runtime_provider import (
     GGUFArtifactIdentity,
+    ModelRuntimeSpec,
     RuntimeExecutionSettings,
 )
 from invarlock.policy_pack import verify_policy_pack
@@ -32,6 +33,7 @@ class _LlamaProvider:
         self.validated = False
         self.opened_context: object | None = None
         self.closed = False
+        self.inspections = 0
 
     def validate_config(self, spec: object) -> None:
         self.validated = True
@@ -44,6 +46,30 @@ class _LlamaProvider:
             gguf_metadata_sha256="c" * 64,
             tensor_inventory_sha256="d" * 64,
             tokenizer_metadata_sha256="e" * 64,
+        )
+
+    def inspect_runtime_spec(
+        self, bindings: object, **settings: int
+    ) -> ModelRuntimeSpec:
+        self.inspections += 1
+        return ModelRuntimeSpec(
+            provider_name=self.name,
+            model_id="gguf-sha256-" + _SHA256 + ".gguf",
+            settings={
+                "artifact_byte_length": 1,
+                "artifact_sha256": _SHA256,
+                "backend_binary_sha256": "f" * 64,
+                "backend_source_sha256": "1" * 64,
+                "backend_version": "version: test built with test",
+                "batch_size": settings["batch_size"],
+                "context_length": settings["context_length"],
+                "gguf_metadata_sha256": "c" * 64,
+                "max_output_tokens": settings["max_output_tokens"],
+                "seed": settings["seed"],
+                "tensor_inventory_sha256": "d" * 64,
+                "timeout_seconds": settings["timeout_seconds"],
+                "tokenizer_metadata_sha256": "e" * 64,
+            },
         )
 
     def open(self, spec: object, context: object) -> object:
@@ -157,6 +183,7 @@ def test_runtime_behavior_help_exposes_three_stage_journey() -> None:
     assert "build-policy" in output
     assert "build-schedule" in output
     assert "prepare-binding" in output
+    assert "inspect-inputs" in output
 
     group = typer.main.get_command(command_module.runtime_behavior_app)
     assert isinstance(group, click.Group)
@@ -202,6 +229,58 @@ def test_prepare_binding_help_explains_provider_specific_and_boundary_inputs() -
     assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in output
     assert "INVARLOCK_RUNTIME_IMAGE" in output
     assert "INVARLOCK_CONTAINER_EXECUTION=1" in output
+
+
+def test_inspect_inputs_derives_reusable_settings_and_does_not_clobber(
+    tmp_path: Path, monkeypatch
+) -> None:
+    provider = _LlamaProvider()
+    monkeypatch.setattr(command_module, "_provider", lambda name: provider)
+    output = tmp_path / "derived-settings.json"
+    args = [
+        "inspect-inputs",
+        "--provider",
+        "llama_cpp",
+        "--artifact",
+        str(tmp_path / "private-model.gguf"),
+        "--backend-executable",
+        str(tmp_path / "private-llama-completion"),
+        "--backend-source",
+        str(tmp_path / "private-source.tar"),
+        "--seed",
+        "7",
+        "--context-length",
+        "512",
+        "--batch-size",
+        "1",
+        "--max-output-tokens",
+        "8",
+        "--timeout-seconds",
+        "60",
+        "--out",
+        str(output),
+        "--json",
+    ]
+
+    result = CliRunner().invoke(command_module.runtime_behavior_app, args)
+
+    assert result.exit_code == 0, result.output
+    response = json.loads(result.stdout)
+    settings = json.loads(output.read_bytes())
+    assert response["format_version"] == (
+        command_module.RUNTIME_BEHAVIOR_INSPECT_INPUTS_CLI_FORMAT
+    )
+    assert response["model_id"] == "gguf-sha256-" + _SHA256 + ".gguf"
+    assert response["artifact_format"] == "gguf"
+    assert settings["artifact_sha256"] == _SHA256
+    assert settings["backend_binary_sha256"] == "f" * 64
+    assert settings["context_length"] == 512
+    assert str(tmp_path) not in output.read_text(encoding="utf-8")
+
+    repeated = CliRunner().invoke(command_module.runtime_behavior_app, args)
+    assert repeated.exit_code == 2
+    assert "output already exists" in json.loads(repeated.stdout)["errors"][0]
+    assert provider.inspections == 1
 
 
 def test_build_schedule_derives_input_digests_and_does_not_clobber(

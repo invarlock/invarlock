@@ -39,8 +39,8 @@ def _bundle(root: Path) -> Path:
             {
                 "build_config": {
                     "max_batch_size": 8,
-                    "max_input_len": 128,
-                    "max_seq_len": 256,
+                    "max_input_len": 256,
+                    "max_seq_len": 512,
                 },
                 "pretrained_config": {
                     "architecture": "LlamaForCausalLM",

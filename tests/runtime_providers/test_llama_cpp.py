@@ -444,7 +444,12 @@ def test_llama_cpp_strict_open_authenticates_executable_and_version(
     bad_version = ModelRuntimeSpec(
         provider_name=spec.provider_name,
         model_id=spec.model_id,
-        settings={**spec.settings, "backend_version": "different build"},
+        settings={
+            **spec.settings,
+            "backend_version": (
+                "version: 4243 (test) built with TestCompiler for TestOS"
+            ),
+        },
     )
     with pytest.raises(LlamaCppExecutionError, match="version"):
         LlamaCppProvider().open(bad_version, context)
