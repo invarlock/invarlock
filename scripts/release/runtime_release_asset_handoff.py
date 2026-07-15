@@ -29,6 +29,7 @@ HANDOFF_FORMAT: Final = "invarlock/runtime-release-asset-handoff-v1"
 MAX_ASSET_BYTES: Final = 4 * 1024 * 1024
 MAX_DIGEST_FILE_BYTES: Final = 256
 SUPPORTED_PROVIDERS: Final = ("llama_cpp", "tensorrt_llm")
+_PRIVATE_FILE_MODE: Final = 0o400
 
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _GIT_COMMIT = re.compile(r"^[a-f0-9]{40}$")
@@ -140,7 +141,7 @@ def _write_exclusive(path: Path, payload: bytes, *, label: str) -> None:
         | getattr(os, "O_NOFOLLOW", 0)
     )
     try:
-        descriptor = os.open(path, flags, 0o444)
+        descriptor = os.open(path, flags, _PRIVATE_FILE_MODE)
     except OSError as exc:
         raise RuntimeReleaseAssetHandoffError(
             f"{label} already exists or cannot be created safely"
@@ -569,6 +570,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     providers = frozenset(args.expected_provider)
     qualifications = frozenset(args.expected_qualification)
+    result: dict[str, object] | None = None
     try:
         if args.command == "stage":
             result = stage_handoff(
@@ -613,6 +615,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         runtime_release_evidence.RuntimeReleaseEvidenceError,
     ) as exc:
         parser.error(str(exc))
+    if result is None:
+        parser.error("command completed without a handoff result")
     print(_canonical_json(result))
     return 0
 

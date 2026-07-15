@@ -9,7 +9,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from types import MappingProxyType
-from typing import Literal
+from typing import Literal, TypeAliasType
 
 RUNTIME_PROVIDER_ABI_VERSION = "1"
 RUNTIME_PROVIDER_CAPABILITIES_FORMAT = "runtime-provider-capabilities-v1"
@@ -17,17 +17,27 @@ MODEL_ARTIFACT_IDENTITY_FORMAT = "invarlock/model-artifact-identity-v1"
 RUNTIME_PROVIDER_RECEIPT_FORMAT = "invarlock/runtime-provider-receipt-v1"
 RUNTIME_SCORING_OBSERVATION_FORMAT = "invarlock/runtime-scoring-observation-v1"
 
-type ArtifactFormat = Literal["hf_snapshot", "gguf", "tensorrt_llm_engine"]
-type RuntimeTask = Literal["text_causal"]
-type RuntimeMetric = Literal[
-    "exact_match", "multiple_choice_accuracy", "normalized_nll_per_utf8_byte"
-]
-type RuntimeExecutionMode = Literal["in_process", "local_process", "container"]
-type EvidenceSurface = Literal[
-    "behavior", "tokenizer", "weights", "modules", "activations", "build"
-]
-type ScoringStatus = Literal["ok", "error"]
-type JSONScalar = str | int | float | bool | None
+ArtifactFormat = TypeAliasType(  # noqa: UP040
+    "ArtifactFormat", Literal["hf_snapshot", "gguf", "tensorrt_llm_engine"]
+)
+RuntimeTask = TypeAliasType("RuntimeTask", Literal["text_causal"])  # noqa: UP040
+RuntimeMetric = TypeAliasType(  # noqa: UP040
+    "RuntimeMetric",
+    Literal["exact_match", "multiple_choice_accuracy", "normalized_nll_per_utf8_byte"],
+)
+RuntimeExecutionMode = TypeAliasType(  # noqa: UP040
+    "RuntimeExecutionMode", Literal["in_process", "local_process", "container"]
+)
+EvidenceSurface = TypeAliasType(  # noqa: UP040
+    "EvidenceSurface",
+    Literal["behavior", "tokenizer", "weights", "modules", "activations", "build"],
+)
+ScoringStatus = TypeAliasType(  # noqa: UP040
+    "ScoringStatus", Literal["ok", "error"]
+)
+JSONScalar = TypeAliasType(  # noqa: UP040
+    "JSONScalar", str | int | float | bool | None
+)
 
 _PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SETTING_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -301,8 +311,9 @@ class TensorRTLLMArtifactIdentity:
             raise ValueError("target_compute_capability must use major.minor notation")
 
 
-type ModelArtifactIdentity = (
-    HFSnapshotArtifactIdentity | GGUFArtifactIdentity | TensorRTLLMArtifactIdentity
+ModelArtifactIdentity = TypeAliasType(  # noqa: UP040
+    "ModelArtifactIdentity",
+    HFSnapshotArtifactIdentity | GGUFArtifactIdentity | TensorRTLLMArtifactIdentity,
 )
 
 
@@ -541,9 +552,10 @@ def runtime_execution_settings_from_mapping(
     )
 
 
-type RuntimeScorer = Callable[
-    [EvaluationBatch, RuntimeExecutionSettings], ScoringObservation
-]
+RuntimeScorer = TypeAliasType(  # noqa: UP040
+    "RuntimeScorer",
+    Callable[[EvaluationBatch, RuntimeExecutionSettings], ScoringObservation],
+)
 
 
 @dataclass(frozen=True)

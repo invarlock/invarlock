@@ -8,7 +8,7 @@ import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, TypeAliasType
 
 from jsonschema import Draft202012Validator
 
@@ -22,8 +22,12 @@ RUNTIME_BEHAVIORAL_CLAIM_RECEIPT_FORMAT = (
     "invarlock/runtime-behavioral-claim-receipt-v1"
 )
 
-type RuntimeBehavioralClaimVerdict = Literal["pass"]
-type RuntimeBehavioralClaimMetric = Literal["exact_match"]
+RuntimeBehavioralClaimVerdict = TypeAliasType(  # noqa: UP040
+    "RuntimeBehavioralClaimVerdict", Literal["pass"]
+)
+RuntimeBehavioralClaimMetric = TypeAliasType(  # noqa: UP040
+    "RuntimeBehavioralClaimMetric", Literal["exact_match"]
+)
 
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _PREFIXED_SHA256 = re.compile(r"^sha256:[a-f0-9]{64}$")

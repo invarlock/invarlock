@@ -4,6 +4,7 @@ import gzip
 import io
 import json
 import os
+import stat
 import tarfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -89,6 +90,14 @@ def test_archive_writer_rejects_existing_or_racing_output(
         evidence._write_archive(output, {"index.json": b"{}"})
     assert not output.exists()
     assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_archive_writer_publishes_owner_readonly_output(tmp_path: Path) -> None:
+    output = tmp_path / "asset.tar.gz"
+    evidence._write_archive(output, {"index.json": b"{}"})
+
+    assert stat.S_IMODE(output.stat().st_mode) == evidence._PRIVATE_FILE_MODE == 0o400
+    assert evidence._read_archive(output.read_bytes()) == {"index.json": b"{}"}
 
 
 def test_archive_reader_rejects_member_count_and_total_payload_limits(

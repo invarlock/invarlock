@@ -468,10 +468,16 @@ class _RunDirectory:
         except OSError:
             shutil.rmtree(path, ignore_errors=True)
             raise
+        try:
+            initial_stat = os.fstat(descriptor)
+        except OSError:
+            os.close(descriptor)
+            shutil.rmtree(path, ignore_errors=True)
+            raise
         return cls(
             path=path,
             descriptor=descriptor,
-            initial_stat=os.fstat(descriptor),
+            initial_stat=initial_stat,
         )
 
     def recheck(self) -> None:

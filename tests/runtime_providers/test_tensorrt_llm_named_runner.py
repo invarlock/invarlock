@@ -453,3 +453,38 @@ def test_run_directory_removal_is_attempted_after_preparation_failure(
     with pytest.raises(TensorRTLLMExecutionError, match="cleanup failed"):
         run_directory.close()
     assert not run_root.exists()
+
+
+def test_run_directory_create_closes_descriptor_when_identity_read_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_root = tmp_path / "run"
+    target_descriptor: int | None = None
+    closed_descriptors: list[int] = []
+    real_fstat = tensorrt_llm_execution.os.fstat
+    real_close = tensorrt_llm_execution.os.close
+
+    def make_run_directory(**_kwargs: object) -> str:
+        run_root.mkdir()
+        return str(run_root)
+
+    def fail_first_fstat(descriptor: int):
+        nonlocal target_descriptor
+        if target_descriptor is None:
+            target_descriptor = descriptor
+            raise OSError("injected identity failure")
+        return real_fstat(descriptor)
+
+    def record_close(descriptor: int) -> None:
+        closed_descriptors.append(descriptor)
+        real_close(descriptor)
+
+    monkeypatch.setattr(tensorrt_llm_execution.tempfile, "mkdtemp", make_run_directory)
+    monkeypatch.setattr(tensorrt_llm_execution.os, "fstat", fail_first_fstat)
+    monkeypatch.setattr(tensorrt_llm_execution.os, "close", record_close)
+
+    with pytest.raises(OSError, match="injected identity failure"):
+        tensorrt_llm_execution._RunDirectory.create()  # noqa: SLF001
+
+    assert target_descriptor in closed_descriptors
+    assert not run_root.exists()

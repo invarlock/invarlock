@@ -253,3 +253,29 @@ def test_cli_converts_closed_validation_errors_into_usage_errors(
             ]
         )
     assert raised.value.code == 2
+
+
+def test_cli_rejects_a_missing_validation_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(evidence, "build_asset", lambda **_kwargs: None)
+
+    with pytest.raises(SystemExit) as raised:
+        evidence.main(
+            [
+                "build",
+                "--source-commit",
+                SOURCE_COMMIT,
+                "--source-archive-sha256",
+                SOURCE_ARCHIVE_SHA256,
+                "--behavior",
+                str(tmp_path / "receipt.json"),
+                "--output",
+                str(tmp_path / "asset.tar.gz"),
+            ]
+        )
+
+    assert raised.value.code == 2
+    assert "without a validation result" in capsys.readouterr().err

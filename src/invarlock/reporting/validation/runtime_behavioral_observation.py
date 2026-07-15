@@ -13,14 +13,16 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal, TypeAliasType, cast
 
 from jsonschema import Draft202012Validator
 
 from invarlock.core.runtime_provider import EvaluationBatch
 from invarlock.public_contracts import load_runtime_scoring_observation_schema
 
-type RuntimeBehavioralMetric = Literal["exact_match"]
+RuntimeBehavioralMetric = TypeAliasType(  # noqa: UP040
+    "RuntimeBehavioralMetric", Literal["exact_match"]
+)
 
 _SUPPORTED_METRICS = frozenset({"exact_match"})
 _PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")

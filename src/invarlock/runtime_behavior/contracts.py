@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, TypeAliasType, cast
 
 from invarlock.reporting.validation.runtime_behavioral_claim import (
     RuntimeBehavioralClaimVerificationResult,
@@ -19,7 +19,9 @@ from invarlock.runtime_behavioral_claim_receipt import (
 )
 from invarlock.runtime_provider_evidence import PersistedRuntimeProviderEvidence
 
-type RuntimeBehavioralRole = Literal["baseline", "subject"]
+RuntimeBehavioralRole = TypeAliasType(  # noqa: UP040
+    "RuntimeBehavioralRole", Literal["baseline", "subject"]
+)
 
 RUNTIME_BEHAVIORAL_SIDE_REPORT_FORMAT = "invarlock/runtime-behavioral-side-report-v1"
 RUNTIME_BEHAVIORAL_SIDE_CONFIG_FORMAT = "invarlock/runtime-behavioral-side-config-v1"

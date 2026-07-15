@@ -46,8 +46,8 @@ _IO_CHUNK_BYTES = 64 * 1024
 _BACKEND_VERSION = re.compile(
     r"^version: (?:0|[1-9][0-9]{0,9}) "
     r"\([A-Za-z0-9][A-Za-z0-9._+-]{0,63}\) "
-    r"built with [A-Za-z0-9][A-Za-z0-9 ._()+,=@~+-]{0,383} "
-    r"for [A-Za-z0-9][A-Za-z0-9 ._()+,=@~+-]{0,127}$"
+    r"built with [A-Za-z0-9][A-Za-z0-9 ._(),=@~+-]{0,383} "
+    r"for [A-Za-z0-9][A-Za-z0-9 ._(),=@~+-]{0,127}$"
 )
 _SENSITIVE_VERSION_TEXT = re.compile(
     r"(?i)(?:api[_.-]?key|bearer|credential|password|private[_.-]?key|secret|token)"
@@ -263,7 +263,13 @@ class _RunDirectory:
         except OSError:
             shutil.rmtree(path, ignore_errors=True)
             raise
-        return cls(path=path, descriptor=descriptor, initial_stat=os.fstat(descriptor))
+        try:
+            initial_stat = os.fstat(descriptor)
+        except OSError:
+            os.close(descriptor)
+            shutil.rmtree(path, ignore_errors=True)
+            raise
+        return cls(path=path, descriptor=descriptor, initial_stat=initial_stat)
 
     def recheck(self) -> None:
         if self._closed:

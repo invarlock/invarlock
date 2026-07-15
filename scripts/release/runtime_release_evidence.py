@@ -49,6 +49,7 @@ _MAX_ASSET_BYTES: Final = 4 * 1024 * 1024
 _MAX_ASSET_FILES: Final = 64
 _MAX_TOTAL_PAYLOAD_BYTES: Final = 2 * 1024 * 1024
 _ARCHIVE_MODE: Final = 0o444
+_PRIVATE_FILE_MODE: Final = 0o400
 _GGUF_KEYS: Final = frozenset(
     {
         "evidence_sha256",
@@ -424,7 +425,7 @@ def _write_archive(path: Path, files: Mapping[str, bytes]) -> None:
     temporary = Path(temporary_name)
     try:
         temporary.write_bytes(_archive_bytes(files))
-        os.chmod(temporary, 0o444)
+        os.chmod(temporary, _PRIVATE_FILE_MODE)
         try:
             os.link(temporary, path)
         except FileExistsError as exc:
@@ -873,6 +874,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+    result: dict[str, object] | None = None
     try:
         if args.command == "build":
             qualification_paths = _parse_qualification_paths(args.qualification)
@@ -908,6 +910,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
     except RuntimeReleaseEvidenceError as exc:
         parser.error(str(exc))
+    if result is None:
+        parser.error("command completed without a validation result")
     print(_canonical_json(result).decode("utf-8"))
     return 0
 

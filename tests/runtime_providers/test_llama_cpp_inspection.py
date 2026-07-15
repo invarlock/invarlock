@@ -182,10 +182,45 @@ def test_inspection_rejects_host_execution_before_version_probe(
 def test_backend_version_accepts_pinned_b10015_shape() -> None:
     value = (
         "version: 10015 (12127defda4f41b7679cb2477a4b0d65ee6a0c8f) "
-        "built with GNU 12.2.0 for Linux x86_64"
+        "built with GNU C++ 12.2.0 for Linux x86_64"
     )
 
     assert llama_cpp_session.validate_llama_cpp_backend_version(value) == value
+
+
+def test_run_directory_create_closes_descriptor_when_identity_read_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_root = tmp_path / "run"
+    target_descriptor: int | None = None
+    closed_descriptors: list[int] = []
+    real_fstat = llama_cpp_session.os.fstat
+    real_close = llama_cpp_session.os.close
+
+    def make_run_directory(**_kwargs: object) -> str:
+        run_root.mkdir()
+        return str(run_root)
+
+    def fail_first_fstat(descriptor: int):
+        nonlocal target_descriptor
+        if target_descriptor is None:
+            target_descriptor = descriptor
+            raise OSError("injected identity failure")
+        return real_fstat(descriptor)
+
+    def record_close(descriptor: int) -> None:
+        closed_descriptors.append(descriptor)
+        real_close(descriptor)
+
+    monkeypatch.setattr(llama_cpp_session.tempfile, "mkdtemp", make_run_directory)
+    monkeypatch.setattr(llama_cpp_session.os, "fstat", fail_first_fstat)
+    monkeypatch.setattr(llama_cpp_session.os, "close", record_close)
+
+    with pytest.raises(OSError, match="injected identity failure"):
+        llama_cpp_session._RunDirectory.create()  # noqa: SLF001
+
+    assert target_descriptor in closed_descriptors
+    assert not run_root.exists()
 
 
 @pytest.mark.parametrize(

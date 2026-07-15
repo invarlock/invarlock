@@ -229,8 +229,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed runtime release-evidence publication to normalize non-collision
   filesystem link failures into closed CLI errors after cleaning temporary
   files, avoiding raw exception and host-path disclosure.
-- Fixed static-analysis findings in evidence utility CLIs, pruning-contract key
-  validation, report-config cleanup, and verification export helpers.
+- Fixed runtime release-evidence staging to create archives and checksum
+  handoffs with owner-read-only permissions and to fail closed if command
+  dispatch completes without a validated result.
+- Fixed native GGUF and TensorRT-LLM run-directory setup to close descriptors
+  and remove temporary state if the initial filesystem identity snapshot fails.
+- Fixed static-analysis findings in runtime type-alias exports, evidence utility
+  CLIs, pruning-contract key validation, report-config cleanup, and verification
+  export helpers.
 
 ## [0.12.1] - 2026-07-05
 

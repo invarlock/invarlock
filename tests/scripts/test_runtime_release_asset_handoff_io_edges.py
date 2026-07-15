@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -131,6 +132,14 @@ def test_exclusive_writer_removes_partial_output(
     ):
         handoff._write_exclusive(output, b"payload", label="output")
     assert not output.exists()
+
+
+def test_exclusive_writer_creates_owner_readonly_output(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    handoff._write_exclusive(output, b"payload", label="output")
+
+    assert output.read_bytes() == b"payload"
+    assert stat.S_IMODE(output.stat().st_mode) == handoff._PRIVATE_FILE_MODE == 0o400
 
 
 def test_verify_rejects_digest_filename_asset_bytes_and_missing_counts(
@@ -299,3 +308,12 @@ def test_main_dispatches_stage_verify_upload_and_reports_errors(
             ["stage", "--asset", str(source), "--output-dir", str(output), *common]
         )
     assert raised.value.code == 2
+    assert "closed" in capsys.readouterr().err
+
+    monkeypatch.setattr(handoff, "stage_handoff", lambda **_kwargs: None)
+    with pytest.raises(SystemExit) as missing_result:
+        handoff.main(
+            ["stage", "--asset", str(source), "--output-dir", str(output), *common]
+        )
+    assert missing_result.value.code == 2
+    assert "without a handoff result" in capsys.readouterr().err
