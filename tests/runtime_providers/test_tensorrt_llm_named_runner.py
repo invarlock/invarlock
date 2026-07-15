@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-import shlex
-import sys
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,6 +21,7 @@ from tests.runtime_providers._tensorrt_llm_support import (
     _batch,
     _record,
     _runtime_inputs,
+    _write_fake_vendor_python,
 )
 
 _REQUIRE_READONLY_DESCRIPTOR = tensorrt_llm_execution._require_readonly_descriptor  # noqa: SLF001
@@ -58,6 +57,9 @@ def _closed_runtime_boundary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         tmp_path / "official-tensorrt-llm-runner",
         raising=False,
     )
+    vendor_python = tmp_path / "private-vendor-python"
+    _write_fake_vendor_python(vendor_python)
+    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", vendor_python)
     monkeypatch.setattr(
         tensorrt_llm_execution,
         "_require_readonly_descriptor",
@@ -76,14 +78,6 @@ def _closed_runtime_boundary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         lambda: None,
         raising=False,
     )
-
-
-def _vendor_python_wrapper(path: Path) -> None:
-    path.write_text(
-        "#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n',
-        encoding="utf-8",
-    )
-    path.chmod(0o700)
 
 
 def test_runner_binding_rejects_nonofficial_and_symlink_paths(
@@ -126,7 +120,7 @@ def test_runner_and_interpreter_reject_untrusted_ownership_or_mode(
         TensorRTLLMProvider().open(spec, context)
 
     vendor_python = tmp_path / "vendor-python"
-    _vendor_python_wrapper(vendor_python)
+    _write_fake_vendor_python(vendor_python)
     vendor_python.chmod(0o722)
     monkeypatch.setattr(
         tensorrt_llm_execution,
@@ -203,7 +197,6 @@ def test_sticky_parent_requires_trusted_directory_and_entry_owners() -> None:
 def test_provider_rejects_writable_root_mount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
 
     def require_readonly(_descriptor: int, *, label: str) -> None:
@@ -296,7 +289,7 @@ def test_mount_fact_parsers_reject_writable_and_mismatched_mounts(
     vendor_path = tmp_path / "vendor-python"
     runner_path.write_text("runner", encoding="utf-8")
     runner_path.chmod(0o700)
-    _vendor_python_wrapper(vendor_path)
+    _write_fake_vendor_python(vendor_path)
     runner = tensorrt_llm_execution._PinnedFile.open(  # noqa: SLF001
         runner_path,
         expected_sha256=None,
@@ -330,7 +323,6 @@ def test_mount_fact_parsers_reject_writable_and_mismatched_mounts(
 def test_launch_precheck_blocks_new_writable_boundary_before_spawn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
     boundary = session._execution_boundary  # noqa: SLF001
@@ -362,7 +354,6 @@ def test_launch_precheck_blocks_new_writable_boundary_before_spawn(
 def test_launch_precheck_blocks_privilege_drift_before_spawn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
     spawn_calls = 0
@@ -392,7 +383,6 @@ def test_launch_precheck_blocks_privilege_drift_before_spawn(
 def test_post_run_mount_drift_fails_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
     real_popen = tensorrt_llm_execution.subprocess.Popen
@@ -422,7 +412,6 @@ def test_run_directory_mode_mutation_fails_before_spawning(
     monkeypatch: pytest.MonkeyPatch,
     replacement_mode: int,
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
     spawn_calls = 0
@@ -444,7 +433,6 @@ def test_run_directory_mode_mutation_fails_before_spawning(
 def test_successful_close_and_constructor_rollback_remove_private_tree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
     successful_root = session._run_directory.path  # noqa: SLF001
@@ -480,7 +468,6 @@ def test_successful_close_and_constructor_rollback_remove_private_tree(
 def test_close_continues_cleanup_after_resource_close_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", Path(sys.executable))
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
     run_root = session._run_directory.path  # noqa: SLF001

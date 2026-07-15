@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
+import stat
 import sys
 from pathlib import Path
 
@@ -169,6 +171,22 @@ else:
     }}
 print(json.dumps(response, sort_keys=True, separators=(",", ":")))
 """,
+        encoding="utf-8",
+    )
+    path.chmod(0o700)
+
+
+def _write_fake_vendor_python(path: Path) -> None:
+    path.parent.chmod(0o700)
+    parent_stat = path.parent.stat()
+    if (
+        not stat.S_ISDIR(parent_stat.st_mode)
+        or stat.S_IMODE(parent_stat.st_mode) != 0o700
+        or parent_stat.st_uid != os.geteuid()
+    ):
+        raise AssertionError("test vendor Python requires a private owned parent")
+    path.write_text(
+        "#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n',
         encoding="utf-8",
     )
     path.chmod(0o700)

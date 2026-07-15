@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import signal
-import sys
 import threading
 import time
 from dataclasses import asdict, replace
@@ -41,6 +40,7 @@ from tests.runtime_providers._tensorrt_llm_support import (
     _record,
     _runtime_inputs,
     _write_fake_runner,
+    _write_fake_vendor_python,
 )
 
 
@@ -55,11 +55,9 @@ def _authenticated_container_boundary(
         "strict_container_boundary_present",
         lambda: True,
     )
-    monkeypatch.setattr(
-        tensorrt_llm_execution,
-        "_VENDOR_PYTHON",
-        Path(sys.executable),
-    )
+    vendor_python = tmp_path / "private-vendor-python"
+    _write_fake_vendor_python(vendor_python)
+    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", vendor_python)
     monkeypatch.setattr(
         tensorrt_llm_execution,
         "_REQUIRED_EXECUTABLE_OWNER",

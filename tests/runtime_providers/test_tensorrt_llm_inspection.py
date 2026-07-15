@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -24,6 +23,7 @@ from tests.runtime_providers._tensorrt_llm_support import (
     _IMAGE_DIGEST,
     _REQUIRES_POSIX_PINNING,
     _runtime_inputs,
+    _write_fake_vendor_python,
 )
 
 
@@ -38,11 +38,9 @@ def _authenticated_container_boundary(
         "strict_container_boundary_present",
         lambda: True,
     )
-    monkeypatch.setattr(
-        tensorrt_llm_execution,
-        "_VENDOR_PYTHON",
-        Path(sys.executable),
-    )
+    vendor_python = tmp_path / "private-vendor-python"
+    _write_fake_vendor_python(vendor_python)
+    monkeypatch.setattr(tensorrt_llm_execution, "_VENDOR_PYTHON", vendor_python)
     monkeypatch.setattr(
         tensorrt_llm_execution,
         "_REQUIRED_EXECUTABLE_OWNER",
