@@ -96,13 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added catalog profiles, adapters, and deterministic dataset materialization
   for current masked-language, sequence-to-sequence, causal-language, MoE, and
   vision-language model families.
-- Added a design-partner diagnostic runbook and checked case template for one
-  immutable baseline, one genuinely transformed Hugging Face subject,
-  immutable subject revision, reviewer-owned trust inputs, strict verification,
-  and decision-packet handoff. The handoff hash-binds the report and copied
-  transformation receipt, retains the declared change kind, and verifies both
-  artifacts against tampering, with explicit acceptance criteria and runtime
-  non-goals.
 
 ### Changed
 

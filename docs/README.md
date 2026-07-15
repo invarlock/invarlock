@@ -30,11 +30,6 @@ verification](reference/contracts.md#policy-packs) and the
 3. **[Reading a Report](user-guide/reading-report.md)** – interpret PASS/FAIL, evidence maturity, warnings, and provenance.
 4. **[Alternatives Comparison](reference/alternatives-comparison.md)** – decide when NeMo Evaluator, MLflow, lm-evaluation-harness, or another tool is the better fit.
 
-For a bounded first partner evaluation, use the
-**[Design-Partner Diagnostic](user-guide/design-partner-diagnostic.md)** to run
-one reviewed baseline against one genuinely transformed subject and collect a
-strict verification handoff.
-
 ### Choose Your Path
 
 - **Report reader**: start with [Reading a Report](user-guide/reading-report.md).
@@ -93,7 +88,6 @@ strict black-box run has passed.
 - [Live Examples](user-guide/live-examples.md)
 - [Integration Examples](user-guide/integrations.md)
 - [Native Runtime Providers](user-guide/native-runtime-providers.md) — authenticated GGUF and TensorRT-LLM side production
-- [Design-Partner Diagnostic](user-guide/design-partner-diagnostic.md)
 - [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
