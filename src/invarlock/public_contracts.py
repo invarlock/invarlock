@@ -21,6 +21,7 @@ EVIDENCE_CATALOG_FORMAT_VERSION = "invarlock/evidence-catalog-v1"
 EVIDENCE_CATALOG_VALIDATE_OUTPUT_FORMAT_VERSION = "evidence-catalog-validate-v1"
 PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION = "public-evidence-index-v2"
 RUNTIME_MANIFEST_CONTRACT_VERSION = "runtime-manifest-v1"
+RUNTIME_MANIFEST_V2_CONTRACT_VERSION = "runtime-manifest-v2"
 DOCTOR_OUTPUT_FORMAT_VERSION = "doctor-v1"
 PLUGINS_OUTPUT_FORMAT_VERSION = "plugins-v2"
 VERIFY_OUTPUT_FORMAT_VERSION = "verify-v1"
@@ -35,6 +36,7 @@ RUNTIME_PROVIDER_CAPABILITIES_FORMAT_VERSION = "runtime-provider-capabilities-v1
 MODEL_ARTIFACT_IDENTITY_FORMAT_VERSION = "invarlock/model-artifact-identity-v1"
 RUNTIME_PROVIDER_RECEIPT_FORMAT_VERSION = "invarlock/runtime-provider-receipt-v1"
 RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION = "invarlock/runtime-scoring-observation-v1"
+RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION = "invarlock/runtime-behavioral-schedule-v1"
 
 STABLE_CLI_JSON_SURFACES: dict[str, str] = {
     "invarlock doctor --json": DOCTOR_OUTPUT_FORMAT_VERSION,
@@ -255,6 +257,10 @@ def load_runtime_manifest_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("runtime_manifest.schema.json")
 
 
+def load_runtime_manifest_v2_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise("runtime_manifest_v2.schema.json")
+
+
 def load_runtime_provider_capabilities_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("runtime_provider_capabilities.json")
 
@@ -269,6 +275,10 @@ def load_runtime_provider_receipt_schema() -> dict[str, Any]:
 
 def load_runtime_scoring_observation_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("runtime_scoring_observation.schema.json")
+
+
+def load_runtime_behavioral_schedule_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise("runtime_behavioral_schedule.schema.json")
 
 
 def load_verify_output_schema() -> dict[str, Any]:
@@ -349,6 +359,11 @@ def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
             "source": "contracts/runtime_manifest.schema.json",
             "compatibility": "strict_contract_version_match",
         },
+        "runtime_manifest_v2": {
+            "version": RUNTIME_MANIFEST_V2_CONTRACT_VERSION,
+            "source": "contracts/runtime_manifest_v2.schema.json",
+            "compatibility": "strict_contract_version_match",
+        },
         "runtime_provider_capabilities": {
             "version": RUNTIME_PROVIDER_CAPABILITIES_FORMAT_VERSION,
             "source": "contracts/runtime_provider_capabilities.json",
@@ -368,6 +383,11 @@ def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
             "version": RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION,
             "source": "contracts/runtime_scoring_observation.schema.json",
             "compatibility": "closed_versioned_observation",
+        },
+        "runtime_behavioral_schedule": {
+            "version": RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION,
+            "source": "contracts/runtime_behavioral_schedule.schema.json",
+            "compatibility": "closed_versioned_schedule",
         },
         "cli_stability_policy": {
             "version": CLI_STABILITY_POLICY_VERSION,
@@ -433,6 +453,7 @@ def contract_catalog() -> dict[str, Any]:
         "console_labels": contract_reference("console_labels.json"),
         "metric_kinds": contract_reference("metric_kinds.json"),
         "runtime_manifest": contract_reference("runtime_manifest.schema.json"),
+        "runtime_manifest_v2": contract_reference("runtime_manifest_v2.schema.json"),
         "runtime_provider_capabilities": contract_reference(
             "runtime_provider_capabilities.json"
         ),
@@ -444,6 +465,9 @@ def contract_catalog() -> dict[str, Any]:
         ),
         "runtime_scoring_observation": contract_reference(
             "runtime_scoring_observation.schema.json"
+        ),
+        "runtime_behavioral_schedule": contract_reference(
+            "runtime_behavioral_schedule.schema.json"
         ),
         "verify_output": contract_reference("verify_output.schema.json"),
         "evidence_pack_manifest": contract_reference(
@@ -473,10 +497,12 @@ __all__ = [
     "PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION",
     "REPORT_SCHEMA_VERSION",
     "RUNTIME_MANIFEST_CONTRACT_VERSION",
+    "RUNTIME_MANIFEST_V2_CONTRACT_VERSION",
     "RUNTIME_PROVIDER_ABI_VERSION",
     "RUNTIME_PROVIDER_CAPABILITIES_FORMAT_VERSION",
     "RUNTIME_PROVIDER_RECEIPT_FORMAT_VERSION",
     "RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION",
+    "RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION",
     "RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION",
     "STABLE_CLI_JSON_SURFACES",
     "VERIFY_OUTPUT_FORMAT_VERSION",
@@ -496,10 +522,12 @@ __all__ = [
     "load_evidence_pack_manifest_schema",
     "load_evidence_catalog",
     "load_runtime_manifest_schema",
+    "load_runtime_manifest_v2_schema",
     "load_runtime_provider_capabilities_schema",
     "load_model_artifact_identity_schema",
     "load_runtime_provider_receipt_schema",
     "load_runtime_scoring_observation_schema",
+    "load_runtime_behavioral_schedule_schema",
     "load_verify_output_schema",
     "load_support_matrix",
     "maintained_catalog_lanes",

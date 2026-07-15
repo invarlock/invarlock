@@ -66,7 +66,12 @@ def _regular_file_stat(path: Path, *, label: str) -> os.stat_result:
     return file_stat
 
 
-def read_regular_file_bytes(path: Path, *, label: str) -> bytes:
+def read_regular_file_bytes(
+    path: Path,
+    *,
+    label: str,
+    max_bytes: int | None = None,
+) -> bytes:
     """Read one regular file and reject final-component substitutions.
 
     The package snapshot independently rejects symlinked directories and files.
@@ -74,7 +79,13 @@ def read_regular_file_bytes(path: Path, *, label: str) -> bytes:
     final input path is available.
     """
 
+    if max_bytes is not None and (
+        isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0
+    ):
+        raise StrictJsonError("max_bytes must be a positive integer")
     before = _regular_file_stat(path, label=label)
+    if max_bytes is not None and before.st_size > max_bytes:
+        raise StrictJsonError(f"{label} exceeds the {max_bytes}-byte size limit")
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         descriptor = os.open(path, flags)
@@ -87,7 +98,9 @@ def read_regular_file_bytes(path: Path, *, label: str) -> bytes:
         if _file_identity(before) != _file_identity(opened):
             raise StrictJsonError(f"{label} changed while being opened: {path}")
         with os.fdopen(descriptor, "rb", closefd=False) as handle:
-            payload = handle.read()
+            payload = handle.read() if max_bytes is None else handle.read(max_bytes + 1)
+        if max_bytes is not None and len(payload) > max_bytes:
+            raise StrictJsonError(f"{label} exceeds the {max_bytes}-byte size limit")
         after_read = os.fstat(descriptor)
         if _file_identity(opened) != _file_identity(after_read):
             raise StrictJsonError(f"{label} changed while being read: {path}")

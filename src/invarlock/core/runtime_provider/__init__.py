@@ -10,6 +10,21 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from ..api import ModelAdapter
+from .behavioral_schedule import (
+    RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
+    RuntimeBehavioralDatasetIdentity,
+    RuntimeBehavioralSchedule,
+    build_runtime_behavioral_schedule,
+    canonical_runtime_behavioral_schedule_json,
+    load_runtime_behavioral_schedule,
+    parse_runtime_behavioral_schedule_json,
+)
+from .claims import (
+    RUNTIME_BEHAVIORAL_CLAIM_SET,
+    RuntimeClaimCompatibility,
+    evaluate_runtime_claim_compatibility,
+    require_runtime_claim_compatibility,
+)
 from .types import (
     RUNTIME_PROVIDER_ABI_VERSION,
     EvaluationBatch,
@@ -76,8 +91,13 @@ __all__ = [
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
     "ModelArtifactIdentity",
     "ModelRuntimeSpec",
+    "RUNTIME_BEHAVIORAL_CLAIM_SET",
+    "RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT",
     "RUNTIME_PROVIDER_ABI_VERSION",
     "RuntimeBackendIdentity",
+    "RuntimeBehavioralDatasetIdentity",
+    "RuntimeBehavioralSchedule",
+    "RuntimeClaimCompatibility",
     "RuntimeDeviceFacts",
     "RuntimeExecutionContext",
     "RuntimeExecutionSettings",
@@ -90,5 +110,11 @@ __all__ = [
     "ScoringObservation",
     "TensorRTLLMArtifactIdentity",
     "artifact_identity_sha256",
+    "build_runtime_behavioral_schedule",
     "canonical_artifact_identity_json",
+    "canonical_runtime_behavioral_schedule_json",
+    "evaluate_runtime_claim_compatibility",
+    "load_runtime_behavioral_schedule",
+    "parse_runtime_behavioral_schedule_json",
+    "require_runtime_claim_compatibility",
 ]

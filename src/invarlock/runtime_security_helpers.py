@@ -22,7 +22,10 @@ from invarlock.evidence_pack_json import (
     parse_json_bytes,
     read_regular_file_bytes,
 )
-from invarlock.public_contracts import RUNTIME_MANIFEST_CONTRACT_VERSION
+from invarlock.public_contracts import (
+    RUNTIME_MANIFEST_CONTRACT_VERSION,
+    RUNTIME_MANIFEST_V2_CONTRACT_VERSION,
+)
 
 inspect_config_dependencies = _config_loader.inspect_config_dependencies
 
@@ -39,7 +42,9 @@ SOURCE_BUNDLE_DIGEST_ENV = "INVARLOCK_SOURCE_BUNDLE_SHA256"
 SOURCE_BUNDLE_READ_ONLY_ENV = "INVARLOCK_SOURCE_BUNDLE_READ_ONLY"
 RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
 RUNTIME_MANIFEST_VERSION = 1
+RUNTIME_MANIFEST_V2_VERSION = 2
 RUNTIME_VERIFIER_CONTRACT_VERSION = RUNTIME_MANIFEST_CONTRACT_VERSION
+RUNTIME_VERIFIER_V2_CONTRACT_VERSION = RUNTIME_MANIFEST_V2_CONTRACT_VERSION
 RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
 RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT = "invarlock-runtime:cuda-local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
@@ -67,7 +72,9 @@ __all__ = [
     "RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
+    "RUNTIME_MANIFEST_V2_VERSION",
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
+    "RUNTIME_VERIFIER_V2_CONTRACT_VERSION",
     "apply_runtime_allowances",
     "build_container_command",
     "build_container_python_command",
@@ -88,10 +95,12 @@ __all__ = [
     "runtime_allowances_scope",
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
+    "RuntimeProviderManifestFiles",
     "running_inside_container",
     "third_party_plugins_allowed",
     "unverified_provenance_allowed",
     "write_runtime_manifest",
+    "write_runtime_manifest_v2",
 ]
 
 
@@ -128,6 +137,15 @@ class RuntimeManifestExecution:
     allow_network: bool
     allow_remote_code: bool
     allow_third_party_plugins: bool
+
+
+@dataclass(frozen=True)
+class RuntimeProviderManifestFiles:
+    """Sibling provider evidence files bound by a runtime manifest v2."""
+
+    receipt: Path
+    scoring_observation: Path
+    artifact_identity: Path
 
 
 class RuntimeManifestLoadIssueCode(StrEnum):
@@ -814,6 +832,27 @@ def write_runtime_manifest(
         encoding="utf-8",
     )
     return manifest_path
+
+
+def write_runtime_manifest_v2(
+    report_path: str | os.PathLike[str],
+    *,
+    provider_files: RuntimeProviderManifestFiles,
+    config_path: str | os.PathLike[str] | None = None,
+    config_payload: Any | None = None,
+    execution: RuntimeManifestExecution | None = None,
+) -> Path:
+    """Write a closed v2 manifest via the isolated provider-binding owner."""
+
+    from invarlock.runtime_manifest_v2 import write_runtime_manifest_v2 as _write_v2
+
+    return _write_v2(
+        report_path,
+        provider_files=provider_files,
+        config_path=config_path,
+        config_payload=config_payload,
+        execution=execution,
+    )
 
 
 def load_runtime_manifest(
