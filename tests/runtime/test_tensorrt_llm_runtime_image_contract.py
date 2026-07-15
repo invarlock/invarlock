@@ -125,7 +125,8 @@ def test_makefile_qualifies_candidate_before_stable_tag() -> None:
     assert build < preflight_tokenizer_digest < image_build
     assert build < preflight_output_digest < image_build
     assert image_build < smoke < canary < stable_tag
-    assert "--gpus all" in text
+    assert "TENSORRT_LLM_DOCKER_GPUS ?= all" in text
+    assert '--gpus "$(TENSORRT_LLM_DOCKER_GPUS)"' in text
     assert "--network none" in text
     assert "--read-only" in text
     assert "--tmpfs /tmp:rw,nosuid,nodev,noexec" in text

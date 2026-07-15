@@ -338,6 +338,10 @@ schedule. That claim still requires a real `run-side` using the intended engine
 and tokenizer, followed by `verify-pair` against the intended schedule and
 policy.
 
+On a multi-GPU host, set `TENSORRT_LLM_DOCKER_GPUS=device=0` (or another
+reviewed Docker GPU selector) to reserve one device for qualification while
+independent CUDA validation uses the other device.
+
 ## Hugging Face Use
 
 Hugging Face remains the built-in model-loading path for `invarlock evaluate`

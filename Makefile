@@ -35,6 +35,7 @@ LLAMA_CPP_APT_SNAPSHOT ?= 20260712T232152Z
 LLAMA_CPP_BUILD_JOBS ?= 2
 RUNTIME_IMAGE_TENSORRT_LLM ?= invarlock-runtime:tensorrt-llm-local
 RUNTIME_IMAGE_TENSORRT_LLM_BUILD ?= $(RUNTIME_IMAGE_TENSORRT_LLM)-candidate
+TENSORRT_LLM_DOCKER_GPUS ?= all
 TENSORRT_LLM_BASE_IMAGE ?= nvcr.io/nvidia/tensorrt-llm/release:1.2.1@sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9
 TENSORRT_LLM_CANARY_ENGINE_BUNDLE ?=
 TENSORRT_LLM_CANARY_TOKENIZER_CONTRACT ?=
@@ -523,7 +524,7 @@ runtime-blackbox-gguf:  ## Run the optional pinned GGUF behavior black-box twice
 runtime-smoke-tensorrt-llm:  ## Smoke TensorRT-LLM imports and CUDA visibility on an NVIDIA host
 	@test "$(CONTAINER_ENGINE)" = "docker" || { echo "❌ The TensorRT-LLM smoke requires Docker with the NVIDIA Container Toolkit."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
-		--gpus all \
+		--gpus "$(TENSORRT_LLM_DOCKER_GPUS)" \
 		--network none \
 		--read-only \
 		--tmpfs /tmp:rw,nosuid,nodev,noexec \
@@ -549,7 +550,7 @@ runtime-canary-tensorrt-llm:  ## Score one prompt through the real-engine fixtur
 			case "$$image_digest" in sha256:[0-9a-f][0-9a-f]*) ;; *) echo "❌ TensorRT-LLM candidate image digest is not canonical."; exit 1 ;; esac; \
 			test "$${#image_digest}" -eq 71 || { echo "❌ TensorRT-LLM candidate image digest is not canonical."; exit 1; }; \
 			$(CONTAINER_ENGINE) run --rm \
-				--gpus all \
+				--gpus "$(TENSORRT_LLM_DOCKER_GPUS)" \
 				--network none \
 				--read-only \
 				--tmpfs /tmp:rw,nosuid,nodev,noexec \

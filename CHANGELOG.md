@@ -165,6 +165,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prompt, answer, and image identity bindings remain verified.
 - Fixed modern dense and MoE adapter routing, quantized-wrapper compatibility,
   snapshot restoration, and runtime dependency pins exercised by catalog lanes.
+- Fixed TensorRT-LLM qualification to accept an explicit Docker GPU selector,
+  allowing independent single-GPU workers on multi-GPU hosts without exposing
+  every device to each container.
 - Fixed documentation and CLI examples so strict commands include every
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog
