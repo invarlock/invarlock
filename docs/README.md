@@ -30,6 +30,11 @@ verification](reference/contracts.md#policy-packs) and the
 3. **[Reading a Report](user-guide/reading-report.md)** – interpret PASS/FAIL, evidence maturity, warnings, and provenance.
 4. **[Alternatives Comparison](reference/alternatives-comparison.md)** – decide when NeMo Evaluator, MLflow, lm-evaluation-harness, or another tool is the better fit.
 
+For a bounded first partner evaluation, use the
+**[Design-Partner Diagnostic](user-guide/design-partner-diagnostic.md)** to run
+one reviewed baseline against one genuinely transformed subject and collect a
+strict verification handoff.
+
 ### Choose Your Path
 
 - **Report reader**: start with [Reading a Report](user-guide/reading-report.md).
@@ -86,6 +91,7 @@ strict black-box run has passed.
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
 - [Integration Examples](user-guide/integrations.md)
+- [Design-Partner Diagnostic](user-guide/design-partner-diagnostic.md)
 - [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
@@ -140,7 +146,7 @@ separately reviewed run artifacts and independently supplied trust anchors.
 Calibration CSVs and evidence reports are produced by evaluation runs,
 typically under `runs/null_sweeps/**` and `reports/calibration/**`. Publish the
 supporting artifacts with any release that changes policy defaults. Current
-public artifacts are listed by `public_evidence/published_basis_index.json`.
+public artifacts are listed by `public_evidence/catalog_evidence_index.json`.
 
 ### Security
 
@@ -232,7 +238,14 @@ Notes
 
 InvarLock maintains 39 evaluation lanes across causal, masked-language, seq2seq, and image-text workflows. Each lane has a checked adapter, preset, input definition, execution policy, and required artifact set.
 
-The evidence column reports current artifacts only. A lane changes to **Available** after its current run and verification artifacts are published.
+The evidence column reports published artifacts only. Every catalog lane is a
+`noop` same-checkpoint compatibility run: it exercises model loading, paired
+evaluation, evidence generation, strict verification, and packaging, but it
+does not establish transformed-subject detection or guard effectiveness. A
+lane changes to **Available** after its run and verification artifacts are
+published. The 31 available packs use the frozen v1 claim set and are accepted
+through the current verifier's compatibility path; they do not exercise v2
+guard authority.
 
 | Surface | Lane ID | Adapter | Evidence |
 | --- | --- | --- | --- |

@@ -42,10 +42,11 @@
   **Bonferroni-named candidate selector** (`α=0.000625`), and `max_caps = 3`.
 
 The implementation combines that candidate selector with fixed per-family caps
-and a cap budget. In the current external-baseline strict path, any selected
-spectral violation blocks; `max_caps` governs exploratory local-baseline
-behavior. The selector has not been shown to satisfy formal FDR or family-wise
-error-rate control for the emitted decision. See
+and a cap budget. In the external-baseline strict path, a complete selected
+spectral finding blocks under `enforce` and remains observed under `observe`;
+missing or degraded evidence always blocks. `max_caps` governs exploratory
+local-baseline behavior. The selector has not been shown to satisfy formal FDR
+or family-wise error-rate control for the emitted decision. See
 [Spectral Threshold Semantics](05-spectral-fpr-derivation.md).
 
 **Runtime visibility.** reports record per-family WARNs and effective caps under
@@ -67,13 +68,13 @@ policy under `resolved_policy.spectral`.
 
 **Spectral evidence status.** The repository may be reviewed with an external
 empirical-evidence bundle, but no in-tree corpus establishes the shipped caps as
-calibrated population thresholds. Public-basis reports provide observed examples
-and contract fixtures; they do not re-derive `runtime/tiers.yaml`. Local tooling can parse
-evaluation report JSON files (glob pattern `**/evaluation.report.json`) and run
-reports to extract spectral evidence, summarize per-family maximum z-scores,
-and recommend updated family caps and multiple-testing α. Persist results in
-JSON/Markdown/CSV form with hashes for reproducibility and attach calibration
-reports to change proposals.
+calibrated population thresholds. Current catalog-evidence reports provide
+observed examples and contract fixtures; they do not re-derive
+`runtime/tiers.yaml`. Local tooling can parse evaluation report JSON files (glob
+pattern `**/evaluation.report.json`) and run reports to extract spectral
+evidence, summarize per-family maximum z-scores, and recommend updated family
+caps and multiple-testing α. Persist results in JSON/Markdown/CSV form with
+hashes for reproducibility and attach calibration reports to change proposals.
 
 ---
 

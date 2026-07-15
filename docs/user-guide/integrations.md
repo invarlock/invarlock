@@ -136,7 +136,7 @@ workflow.
 
 The maintained catalog provides stable lane identities for CI and downstream
 handoff. `contracts/support_matrix.json` records the current evidence status;
-completed artifacts are listed by `public_evidence/published_basis_index.json`.
+completed artifacts are listed by `public_evidence/catalog_evidence_index.json`.
 
 See the [Evidence Catalog](public-evidence-walkthrough.md) for the artifact
 shape and review workflow.

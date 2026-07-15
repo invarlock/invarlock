@@ -22,15 +22,22 @@ as kappa threshold, epsilon band, and guard metric impact.
 | --- | --- | --- | --- |
 | Paired primary metric | **Implemented, recomputed gate** | Must satisfy the configured paired regression policy. | Main baseline-versus-subject decision; field sensitivity depends on the selected data, metric, and thresholds. It is documented with reports because it is not a guard plugin. |
 | Invariants | **Stable blocking guard** | Structural and non-finite findings block. | Fail-closed integrity evidence. |
-| Spectral | **Operational diagnostic** | Selected external-baseline spectral violations block. | Baseline-relative weight diagnostic with a versioned measurement contract; interpret only within calibrated scope. |
-| RMT | **Experimental diagnostic** | Epsilon violations block. | Activation edge-risk diagnostic; interpret only within its evaluated sampling and family scope. |
-| Variance/VE | **Experimental intervention** | Predictive gate must be evaluated and pass. | A/B remediation/intervention evidence whose usefulness depends on workload-specific calibration and paired evidence. |
+| Spectral | **Operational diagnostic** | Complete findings block under `enforce` and remain visible under `observe`. | Baseline-relative weight diagnostic with a versioned measurement contract; interpret only within calibrated scope. |
+| RMT | **Experimental diagnostic** | Complete epsilon findings block under `enforce` and remain visible under `observe`. | Activation edge-risk diagnostic; interpret only within its evaluated sampling and family scope. |
+| Variance/VE | **Experimental intervention** | The predictive gate must be evaluated; a complete failing predictive-gate outcome blocks under `enforce` and remains visible under `observe`. | A/B remediation/intervention evidence whose usefulness depends on workload-specific calibration and paired evidence. |
 
-Maturity is not the same as enforcement. Current strict verification requires
-the canonical guard evidence and applies the blocking rules shown above even
-when the empirical interpretation remains diagnostic or experimental. The
-labels communicate how broadly to interpret each signal; they do not introduce
-separate core, diagnostic, calibrated, or research CLI modes.
+Maturity is not the same as enforcement. Current strict verification always
+requires the canonical guard execution and complete evidence that can be replayed.
+`resolved_policy.guard_authority` chooses whether a complete spectral, RMT, or
+variance finding has `enforce` or `observe` acceptance authority. Observation
+does not disable a guard and cannot waive missing, unsupported, degraded,
+monitor-only, or incomplete evidence. Primary metrics, drift, invariants, and
+guard-metric impact remain mandatory blockers. The maturity labels communicate
+how broadly to interpret each signal; they do not introduce separate CLI modes.
+
+All shipped tiers default spectral, RMT, and variance authority to `enforce`.
+Selecting `observe` is an explicit policy override that requires deliberate
+authorization for a complete, measured finding; it is not an evidence bypass.
 
 The paired primary metric is the implemented behavioral acceptance surface. Guards
 add structural checks and checkpoint-internal diagnostics; they do not replace
@@ -38,9 +45,17 @@ task evaluation, external benchmarks, or deployment monitoring.
 
 ## Quick Start
 
+This example deliberately overrides the shipped all-`enforce` authority for
+RMT and variance so their complete measured findings remain observable without
+changing the mandatory evidence requirements.
+
 ```yaml
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  authority:
+    spectral: enforce
+    rmt: observe
+    variance: observe
   spectral:
     sigma_quantile: 0.95
     deadband: 0.10

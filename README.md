@@ -167,9 +167,9 @@ is scoped to the named baseline, subject, dataset, pairing plan, and policy. See
 | --- | --- | --- | --- |
 | Paired primary metric | **Implemented, recomputed gate** | Must satisfy the configured paired regression policy. | Main baseline-versus-subject regression decision; field sensitivity depends on the selected data, metric, and thresholds. |
 | Invariants | **Stable blocking guard** | Structural and non-finite findings block. | Fail-closed integrity evidence. |
-| Spectral | **Operational diagnostic** | Selected external-baseline spectral violations block. | Interpret the baseline-relative weight signal only within its calibrated scope. |
-| RMT | **Experimental diagnostic** | Epsilon violations block. | Activation edge-risk evidence within the configured workload. |
-| Variance/VE | **Experimental intervention** | Predictive gate must be evaluated and pass. | Workload-specific A/B remediation evidence. |
+| Spectral | **Operational diagnostic** | Complete findings block under `enforce` and remain visible under `observe`. | Interpret the baseline-relative weight signal only within its calibrated scope. |
+| RMT | **Experimental diagnostic** | Complete epsilon findings block under `enforce` and remain visible under `observe`. | Activation edge-risk evidence within the configured workload. |
+| Variance/VE | **Experimental intervention** | The predictive gate must be evaluated; a complete failing predictive-gate outcome blocks under `enforce` and remains visible under `observe`. | Workload-specific A/B remediation evidence. |
 
 These labels communicate the maturity of each evidence surface. CI and release
 policies can require the corresponding report fields and gate outcomes. See the
@@ -241,7 +241,13 @@ pip install "invarlock[probes]"
 [Evidence Catalog](docs/user-guide/public-evidence-walkthrough.md) tracks which
 maintained lanes have current evidence artifacts. Source tags and wheels carry
 the compact hash-bound index; the full evidence tree is distributed as the
-GitHub Release asset named in that index.
+GitHub Release asset named in that index. All 39 catalog lanes are `noop`
+same-checkpoint baseline/subject runs that exercise compatibility and evidence
+mechanics; 31 have strictly verified evidence and 8 are **Evidence not yet
+created**. Transformation detection and guard effectiveness require an actual
+edited subject and are separate from these catalog results. The 31 available
+packs use the frozen v1 claim set and remain accepted by the current verifier's
+compatibility path; they do not exercise v2 guard authority.
 
 ## Project
 

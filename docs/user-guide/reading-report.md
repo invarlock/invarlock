@@ -74,12 +74,13 @@ image actually executed.
 | --- | --- | --- | --- |
 | Paired primary metric | **Implemented, recomputed gate** | Must satisfy the configured paired regression policy. | The main behavioral regression decision; field sensitivity depends on the selected data, metric, and thresholds. |
 | Invariants | **Stable blocking guard** | Structural and non-finite findings block. | Fail-closed integrity evidence. |
-| Spectral | **Operational diagnostic** | Selected external-baseline spectral violations block. | Investigate baseline-relative weight movement within calibrated policy scope. |
-| RMT | **Experimental diagnostic** | Epsilon violations block. | Treat activation edge-risk as scoped supporting evidence. |
-| Variance/VE | **Experimental intervention** | Predictive gate must be evaluated and pass. | Treat A/B-gated remediation evidence as workload-specific. |
+| Spectral | **Operational diagnostic** | Complete findings block under `enforce` and remain visible under `observe`. | Investigate baseline-relative weight movement within calibrated policy scope. |
+| RMT | **Experimental diagnostic** | Complete epsilon findings block under `enforce` and remain visible under `observe`. | Treat activation edge-risk as scoped supporting evidence. |
+| Variance/VE | **Experimental intervention** | The predictive gate must be evaluated; complete failing predictive-gate outcomes block under `enforce` and remain visible under `observe`. | Treat A/B-gated remediation evidence as workload-specific. |
 
 These labels describe interpretation maturity. They do not change current
-CI/release field requirements or create separate CLI modes.
+CI/release evidence requirements or create separate CLI modes. Observation
+authority never permits missing, unsupported, degraded, or monitor-only evidence.
 
 - Decision
   - First-screen summary of overall PASS/FAIL, evidence mode, subject model,

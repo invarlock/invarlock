@@ -174,7 +174,7 @@ Return exactly one JSON object like {{"answer":"short phrase"}}. Use a short phr
 
 The generated `manifest.jsonl`, `images/`, and
 `materialization_summary.json` are then consumed by `vision_text`. For evidence
-published-basis inclusion, pin the dataset revision and keep the materialization summary with
+publication, pin the dataset revision and keep the materialization summary with
 the run artifacts. Public VQA evidence prompts should prefer a structured
 answer field such as `{"answer":"..."}`; the evaluator extracts that field
 before exact-answer scoring and falls back to the raw generation when no JSON
@@ -199,7 +199,7 @@ dataset:
   final_n: 32
 ```
 
-The FLAN-T5 public seq2seq basis uses this provider shape with
+The maintained-catalog FLAN-T5 seq2seq lane uses this provider shape with
 `google/flan-t5-base` pinned to model revision
 `7bcac572ce56db69c1ea7c8af255c5d7c9672fc2`.
 

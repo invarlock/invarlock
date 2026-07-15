@@ -64,7 +64,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution
 
 Runtime configs (canonical, in‑package) live under `src/invarlock/_data/runtime/`:
 
-- `src/invarlock/_data/runtime/tiers.yaml` (published tier defaults)
+- `src/invarlock/_data/runtime/tiers.yaml` (maintained support-tier defaults)
 - `src/invarlock/_data/runtime/profiles/` (profile overlays; e.g. `--profile release`)
 
 The CLI loads runtime configs via `importlib.resources` (or `$INVARLOCK_CONFIG_ROOT/runtime/...`

@@ -223,7 +223,7 @@ Common options:
   report fragments are rejected. It is optional only when strict assurance is
   not being enforced.
 - `--policy-pack`: required whenever strict assurance is enforced. Supply the
-  independently maintained `policy-pack-v1` JSON/YAML artifact; strict verification
+  independently maintained `policy-pack-v2` JSON/YAML artifact; strict verification
   rejects thresholds authorized only by the submitted report.
 - `--tolerance`: finite recompute tolerance in `[0, 1e-9]`; larger, negative,
   NaN, and infinite values are rejected so callers cannot disable recomputation
@@ -448,8 +448,8 @@ Stable machine-readable output is available on these surfaces:
 | `invarlock doctor --json` | `doctor-v1` | Required envelope fields are stable. |
 | `invarlock verify --json` | `verify-v1` | Required envelope fields and exit-code meaning are stable. |
 | `invarlock advanced runtime-verify --json` | `runtime-verify-v1` | Runtime-manifest verification envelope is stable. |
-| `invarlock advanced plugins list --json` | `plugins-v1` | Plugin catalog envelope and contract catalog keys are stable. |
-| `invarlock advanced plugins adapters --json` | `plugins-v1` | Adapter rows and contract catalog keys are stable. |
+| `invarlock advanced plugins list --json` | `plugins-v2` | Plugin catalog envelope and contract catalog keys are stable. |
+| `invarlock advanced plugins adapters --json` | `plugins-v2` | Adapter rows and contract catalog keys are stable. |
 | `invarlock advanced evidence-pack verify --json` | `evidence-pack-verify-v1` | Evidence-pack verification envelope is stable. |
 | `invarlock advanced evidence-catalog validate --json` | `evidence-catalog-validate-v1` | Catalog validation envelope is stable. |
 | `invarlock advanced policy verify --json` | `policy-pack-verify-v1` | Policy-pack verification envelope is stable. |

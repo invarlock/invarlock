@@ -30,7 +30,11 @@ The public contract surface covers:
 | Verifier output | `invarlock verify --json.format_version` | `verify-v1` | `contracts/verify_output.schema.json` |
 | Runtime manifest | `runtime.manifest.json.verifier_contract_version` | `runtime-manifest-v1` | `contracts/runtime_manifest.schema.json` |
 | CLI stability policy | policy identifier | `cli-stability-v1` | `docs/reference/cli.md` |
-| Adapter/model support tiers | `support_matrix.support_tiers[]` | `published_basis`, `supported_experimental`, `community_experimental` | `contracts/support_matrix.json` |
+| Support matrix | `support_matrix.format_version` | `support-matrix-v2` | `contracts/support_matrix.json` |
+| Model-family catalog | `model_family_catalog.format_version` | `model-family-catalog-v2` | `contracts/model_family_catalog.json` |
+| Policy pack | `policy_pack.format` | `policy-pack-v2` | `contracts/policy_pack.schema.json` |
+| Public-evidence index | `catalog_evidence_index.format_version` | `public-evidence-index-v2` | `public_evidence/catalog_evidence_index.json` |
+| Adapter/model support tiers | `support_matrix.support_tiers[]` | `maintained_catalog`, `supported_experimental`, `community_experimental` | `contracts/support_matrix.json` |
 
 Compatibility rules:
 
@@ -49,7 +53,7 @@ Compatibility rules:
 | --- | --- | --- |
 | Support matrix | `contracts/support_matrix.json` | Normalized support tiers and public evidence references |
 | Model family catalog | `contracts/model_family_catalog.json` | Declared support, code-level coverage, usage-only checkpoints, and recommended additions |
-| Model classification | `contracts/model_classification.json` | Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model status |
+| Model classification | `contracts/model_classification.json` | Lifecycle classification for cataloged, backlog, blocked, smoke-only, usage-only, and out-of-scope model status |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
 | Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for `runtime.manifest.json` sidecars |
@@ -105,7 +109,7 @@ core ABI published in `contracts/plugin_compatibility.json`.
 
 For support-related automation, `plugins adapters --json` and `doctor --json`
 expose both the strict `support_matrix` contract and the broader
-`model_family_catalog` contract. Lifecycle decisions such as `published`,
+`model_family_catalog` contract. Lifecycle decisions such as `cataloged`,
 `backlog`, `blocked`, `usage_only`, and `out_of_scope` live in
 `model_classification`; update that manifest and rerun `make contracts-check`
 to refresh support surfaces. The same JSON surfaces also include the `validation_keys`,
@@ -126,7 +130,7 @@ The versioned JSON surfaces are intentionally explicit:
   `format_version: "runtime-verify-v1"`
 - `invarlock advanced plugins list --json` and
   `invarlock advanced plugins adapters --json` emit
-  `format_version: "plugins-v1"`
+  `format_version: "plugins-v2"`
 - `invarlock advanced policy verify --json` emits
   `format_version: "policy-pack-verify-v1"`
 - `invarlock advanced evidence-pack verify --json` emits
@@ -152,14 +156,17 @@ describes the public support tier for a model/runtime/adapter lane.
 
 | Tier | Meaning |
 | --- | --- |
-| `published_basis` | Maintained catalog evidence lane; availability is reported separately by `evidence_status`. |
+| `maintained_catalog` | Maintained catalog evidence lane; availability is reported separately by `evidence_status`. |
 | `supported_experimental` | Maintained adapter, preset, configuration, test, and smoke path. |
 | `community_experimental` | Adapter and runtime path available for community evaluation. |
 
-Policy packs that declare `compatibility.support_tiers` must use one of those
-three tier values.
+`policy-pack-v2` inputs that declare `compatibility.support_tiers` must use one
+of those three current tier values. Verification still accepts frozen
+`policy-pack-v1` artifacts that authorize the historical `published_basis`
+tier, but new builders and policy defaults emit only `policy-pack-v2` with
+`maintained_catalog`.
 
-`published_basis` is a stable compatibility identifier for lane eligibility;
+`maintained_catalog` is a stable compatibility identifier for lane eligibility;
 it does not mean that evidence already exists. For each lane,
 `evidence_status` and `evidence_status_label` state whether current evidence is
 available.
@@ -176,11 +183,20 @@ Full evidence packs are separate immutable GitHub Release assets referenced by
 the compact index; they are evidence carriers, not contract authorities.
 
 Source tags and installed wheels ship the same compact current-evidence index
-at `invarlock/_data/public_evidence/published_basis_index.json`. An empty index
+at `invarlock/_data/public_evidence/catalog_evidence_index.json`. An empty index
 uses `status=not_created` and the label **Evidence not yet created**. Completed
 lanes add hash-bound artifact entries as their current evidence becomes
 available. Each externalized entry records the release-asset URL, archive
 SHA-256, byte size, archive root, and logical path.
+
+Immutable assets published before this terminology change retain
+`public_evidence/published_basis/...` inside their archive bindings. That string
+identifies a historical carrier path only; it is not a current support tier.
+
+The 31 entries currently listed in the compact index are strictly verified
+frozen-v1 packs accepted through the current verifier's explicit compatibility
+path. Their availability does not imply that they contain or exercise v2
+`guard_authority` fields.
 
 ## Policy packs
 

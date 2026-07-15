@@ -394,7 +394,7 @@ def _seed_demo_inputs(workspace: Path, *, fixture_mode: bool = False) -> None:
     )
     _write_json(
         workspace / "compatibility.json",
-        {"support_tiers": ["published_basis"]},
+        {"support_tiers": ["maintained_catalog"]},
     )
 
 

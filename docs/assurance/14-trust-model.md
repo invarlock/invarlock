@@ -10,7 +10,7 @@
 | --- | --- |
 | **Purpose** | Define the public meaning of an InvarLock strict assurance pass. |
 | **Audience** | Release approvers, CI owners, operators accepting report evidence. |
-| **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v1`, report v1. |
+| **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v2`, report v1. |
 | **Source of truth** | `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`, `docs/assurance/00-assurance-case.md`, `docs/reference/reports.md`. |
 
 ## Quick Start
@@ -51,8 +51,7 @@ the runtime/evidence-pack checks described here.
 ## What A Strict Pass Means
 
 A strict pass means one submitted, configured edited-checkpoint comparison is
-internally consistent with and did not report a violation of the InvarLock
-weight-edit regression contract for the selected
+internally consistent with the InvarLock weight-edit regression contract for the selected
 baseline, subject, dataset windows, tier, profile, and runtime policy.
 The result is scoped to that configured comparison and its report/provenance
 evidence.
@@ -60,7 +59,9 @@ evidence.
 The current strict assurance contract requires:
 
 - `assurance.mode = strict`
-- `assurance.claim_set = invarlock-weight-edit-regression-v1`
+- `assurance.claim_set = invarlock-weight-edit-regression-v2`
+- an exact `resolved_policy.guard_authority` mapping, mirrored in
+  `assurance.guard_authority`, for spectral, RMT, and variance findings
 - CI or release profile
 - balanced or conservative tier
 - canonical guard chain: `invariants -> spectral -> rmt -> variance -> invariants`
@@ -78,9 +79,20 @@ The current strict assurance contract requires:
 - no unsupported guard status accepted as passing evidence
 - measured, passing guard-metric-impact evidence; an explicit skip does not satisfy
   current strict assurance
-- current guard outcome requirements: invariant findings block, selected
-  external-baseline spectral violations block, RMT epsilon violations block,
-  and the VE predictive gate must be evaluated and passing
+- invariant, primary-metric, drift, and guard-metric-impact findings always
+  block; spectral, RMT, and variance findings block when their policy authority
+  is `enforce`
+- `observe` authority changes only the acceptance effect of a complete guard
+  finding. It does not permit skipped, unsupported, degraded,
+  monitor-only, incomplete, or non-replayable evidence.
+
+Frozen v1 reports remain verifiable with implicit all-`enforce` authority. A
+v1 report or policy pack cannot declare `guard_authority`.
+
+All shipped v2 tiers also default spectral, RMT, and variance authority to
+`enforce`. An `observe` value is a deliberate, independently authorized policy
+override for a complete measured finding; it is not inferred from guard
+maturity or report contents.
 
 ## Strict Pass Scope
 
@@ -95,11 +107,11 @@ A strict pass covers the configured evidence surface:
 Evidence-pack signer authentication and support-matrix classification are
 separate review results. Report verification does not authenticate an
 evidence-pack signer, and it does not establish that a model or adapter lane is
-in the published support basis.
+listed in the maintained catalog.
 
 Adjacent review domains include content safety, alignment, prompt-security,
 deployment security, host isolation, dependency isolation, and model families
-outside the published support basis.
+outside the maintained catalog.
 
 The external image pin does **not** cryptographically attest actual container
 execution. A compromised evaluation environment can fabricate an internally consistent report
@@ -123,7 +135,8 @@ and an independently pinned image digest.
 | `verdict` | `pending_verifier` in generated reports; verifier success is required for acceptance |
 | `report_local_verdict` | `pass` |
 | `verified_assurance_verdict` | `pending` in generated reports |
-| `claim_set` | `invarlock-weight-edit-regression-v1` |
+| `claim_set` | `invarlock-weight-edit-regression-v2` |
+| `guard_authority` | exact mirror of `resolved_policy.guard_authority` |
 | `canonical_guard_chain_enforced` | `true` |
 | `fallback_fields_used` | `false` |
 | `runtime_provenance_verified` | `false` in generated reports; verifier confirms separately |
@@ -165,6 +178,10 @@ must establish both anchors separately.
 
 ### Example (report fragment)
 
+This fragment shows an explicit policy override from the shipped all-`enforce`
+default. The independently supplied policy pack must authorize the same exact
+mapping.
+
 ```json
 {
   "assurance": {
@@ -172,12 +189,24 @@ must establish both anchors separately.
     "verdict": "pending_verifier",
     "report_local_verdict": "pass",
     "verified_assurance_verdict": "pending",
-    "claim_set": "invarlock-weight-edit-regression-v1",
+    "claim_set": "invarlock-weight-edit-regression-v2",
+    "guard_authority": {
+      "spectral": "enforce",
+      "rmt": "observe",
+      "variance": "observe"
+    },
     "canonical_guard_chain_enforced": true,
     "fallback_fields_used": false,
     "runtime_provenance_verified": false,
     "runtime_provenance_verification_status": "pending",
     "blocking_reasons": []
+  },
+  "resolved_policy": {
+    "guard_authority": {
+      "spectral": "enforce",
+      "rmt": "observe",
+      "variance": "observe"
+    }
   }
 }
 ```

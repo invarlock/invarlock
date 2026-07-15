@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
+  variance findings in `policy-pack-v2`. Observation mode retains complete
+  guard execution, provenance, replay, and reporting while leaving primary
+  metrics, drift, invariants, and guard-metric impact as mandatory blockers.
+  Current strict reports use claim set `invarlock-weight-edit-regression-v2`
+  and require `assurance.guard_authority` to exactly mirror
+  `resolved_policy.guard_authority`; shipped tiers remain all-`enforce` by
+  default.
+- Added a hash-bound historical guard-scenario observation index and closed
+  semantic replay for the published Mistral asset, covering PM-pass spectral,
+  RMT, and variance signals plus a spectral negative control without upgrading
+  legacy reports into current strict-assurance results.
 - Added immutable real-training profiles and fail-closed receipts for tiny
   full-parameter fine-tuning and PEFT LoRA train/serialize/reload/merge flows.
 - Added complete raw-baseline, independently supplied policy-pack, and
@@ -25,9 +37,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added catalog profiles, adapters, and deterministic dataset materialization
   for current masked-language, sequence-to-sequence, causal-language, MoE, and
   vision-language model families.
+- Added a design-partner diagnostic runbook and checked case template for one
+  immutable baseline, one genuinely transformed Hugging Face subject,
+  immutable subject revision, reviewer-owned trust inputs, strict verification,
+  and decision-packet handoff. The handoff hash-binds the report and copied
+  transformation receipt, retains the declared change kind, and verifies both
+  artifacts against tampering, with explicit acceptance criteria and runtime
+  non-goals.
 
 ### Changed
 
+- Replaced the `published_basis` support-tier name with
+  `maintained_catalog`, separating maintained lane eligibility from the
+  independently reported `available` and `not_created` evidence states. This
+  migration introduces `support-matrix-v2`, `model-family-catalog-v2`,
+  `public-evidence-index-v2`, `plugins-v2`, and `policy-pack-v2`, renames the
+  compact index to `catalog_evidence_index.json`, and renames the corresponding
+  Python helpers and plugin metadata. The model lifecycle contract is now
+  `model-classification-v2`, where `cataloged` describes maintained catalog
+  scope without implying evidence publication. Frozen `policy-pack-v1` inputs
+  and historical release-asset paths remain verifiable but are not emitted by
+  new builders.
+- Made guard-value scenario verdicts require baseline-relative spectral and
+  variance signals, including an explicit no-new-cap negative control and a
+  positive measured variance signal rather than proposed scales alone.
 - Reclassified deterministic low-rank and dense perturbation generators as
   synthetic edit fixtures. Real `lora_merge` and `fine_tune` labels now require
   training provenance rather than generated look-alike edits.
@@ -40,10 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared identity consistency, not execution attestation.
 - Consolidated catalog evidence execution around the repository-owned lane
   command and retired overlapping sweep and campaign orchestration surfaces.
-- Published current strictly verified evidence packs for 31 model-catalog lanes
-  through a hash-bound GitHub Release asset and compact source/wheel index, and
+- Hardened public-evidence archive inspection to reject unsafe paths, duplicate
+  members, and non-regular entries, and to recompute the unique regular-file
+  count and byte total before accepting an external asset.
+- Published strictly verified frozen-v1 evidence packs for 31 model-catalog
+  lanes through a hash-bound GitHub Release asset and compact source/wheel
+  index, and
   aligned the remaining catalog rows with the **Evidence not yet created**
-  status used by the support matrix and documentation.
+  status used by the support matrix and documentation. These are `noop`
+  same-checkpoint compatibility runs covering the evidence mechanics;
+  transformed-subject detection and effectiveness remain separate experimental
+  claims. The current verifier accepts the frozen-v1 packs through its explicit
+  compatibility path; these packs do not exercise the new v2 guard-authority
+  fields.
 - Updated integration examples to distinguish real training, serialization,
   reload, merge, pruning, and quantization workflows from synthetic fixtures
   and to validate their emitted artifacts fail closed.
@@ -67,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed RMT and variance probe validation to recompute epsilon and measured-gain
+  arithmetic, bind ordinary and baseline-relative statuses, and reject
+  internally inconsistent sidecars.
 - Fixed strict evidence-pack verification to bind each subject report to signed,
   checksummed raw baseline material and independently supplied policy inputs.
 - Fixed verifier recomputation and fail-closed handling for paired windows,
@@ -91,6 +136,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and training-output ownership checks against immediate inode reuse.
 - Fixed training-artifact hashing to detect same-size concurrent rewrites even
   when the underlying filesystem does not advance modification timestamps.
+- Fixed error-injection `must_pass` verdicts so satisfied detector expectations
+  cannot hide a report-level primary-metric, drift, invariant, or guard failure.
+- Fixed installed-package plugin discovery so InvarLock's identical shipped
+  entry points are not rejected as duplicate built-ins, while packaging drift
+  and third-party name collisions continue to fail closed.
 - Fixed static-analysis findings in evidence utility CLIs, pruning-contract key
   validation, report-config cleanup, and verification export helpers.
 

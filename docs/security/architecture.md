@@ -42,7 +42,7 @@ Overview of the core security-related components and defaults.
   as runtime provenance.
 - Product runtime-provenance verification does not depend on an external verifier binary or
   `PATH` lookup, so verifier behavior stays stable across installs.
-- Use it before published-basis inclusion or later automation to prevent policy regressions.
+- Use it before evidence publication or later automation to prevent policy regressions.
 
 ## Supply chain (reference)
 

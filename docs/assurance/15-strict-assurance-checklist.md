@@ -10,7 +10,7 @@
 | --- | --- |
 | **Purpose** | Acceptance checklist for strict assurance evidence. |
 | **Audience** | Maintainers, release approvers, CI gate owners. |
-| **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v1`, report v1. |
+| **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v2`, report v1. |
 | **Source of truth** | `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`, `docs/assurance/14-trust-model.md`. |
 
 Use this checklist before accepting a strict report as assurance evidence.
@@ -56,6 +56,8 @@ strict assurance contract.
   the submitted report bundle, exactly matching the intended resolved policy,
   and binding the expected dataset identity under
   `compatibility.dataset_identity`.
+- [ ] `resolved_policy.guard_authority` exactly matches the v2 policy pack and
+  is mirrored by `assurance.guard_authority`.
 - [ ] Unverified provenance was not allowed.
 
 ## Confirmed Policy Context
@@ -73,10 +75,11 @@ strict assurance contract.
 - [ ] No guard was skipped, duplicated outside the canonical chain, or marked
   monitor-only for a pass.
 - [ ] Unsupported guard/model statuses are explicit and block assurance.
-- [ ] Current strict outcome rules are satisfied: no selected
-  external-baseline spectral violation, no RMT epsilon violation, and
-  `variance.predictive_gate.evaluated` and
-  `variance.predictive_gate.passed` are both `true`.
+- [ ] Spectral, RMT, and variance evidence is complete and can be independently
+  replayed. Findings block when the corresponding authority is `enforce` and
+  remain visible when it is `observe`.
+- [ ] Primary metrics, drift, invariants, and guard-metric impact pass; these
+  mandatory blockers have no observation mode.
 - [ ] `guard_metric_impact` is measured, evaluated, and passing; it is not skipped.
 - [ ] Its `metric_kind`, `direction`, and `degradation_basis` agree with the
   metric registry. PPL uses `relative_increase`; accuracy uses `absolute_drop`.
@@ -94,8 +97,8 @@ strict assurance contract.
   diagnostics.
 - [ ] RMT correction failures are emitted as `rmt_correct_failed` error events
   and do not silently erase the original outlier.
-- [ ] Variance guard preparation/finalization failures fail closed unless an
-  explicit monitor-only policy is recorded in the report.
+- [ ] Variance guard preparation/finalization failures and monitor-only results
+  fail closed.
 - [ ] Evidence reports expose fallback diagnostics under the relevant
   guard result, and strict assurance blocks unsupported or degraded guard states.
 

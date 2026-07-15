@@ -63,7 +63,7 @@ public evidence support.
 
 | Tier | Applies to | Promise |
 | --- | --- | --- |
-| `published_basis` | Model/runtime/adapter lane | Maintained catalog evidence lane; availability is reported separately by `evidence_status`. |
+| `maintained_catalog` | Model/runtime/adapter lane | Maintained catalog evidence lane; availability is reported separately by `evidence_status`. |
 | `supported_experimental` | Model/runtime/adapter lane | Maintained adapter, preset, configuration, and smoke path for experimental evaluation. |
 | `community_experimental` | Model/runtime/adapter lane | Adapter and runtime path available for community evaluation. |
 
@@ -227,7 +227,7 @@ model:
 
 The `vision_text` path above is a local smoke fixture. Public evidence
 uses materialized, pinned public datasets with dataset materialization summaries
-stored alongside the run artifacts, and image-text published-basis inclusion
+stored alongside the run artifacts, and image-text evidence publication
 requires a measured primary-metric floor rather than preservation pass/fail
 alone.
 

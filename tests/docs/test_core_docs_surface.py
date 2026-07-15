@@ -226,7 +226,7 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     assert 'format_version: "runtime-verify-v1"' in text
     assert 'format_version: "evidence-pack-verify-v1"' in text
     assert 'verify.format_version: "verify-v1"' in text
-    assert "invarlock/_data/public_evidence/published_basis_index.json" in text
+    assert "invarlock/_data/public_evidence/catalog_evidence_index.json" in text
     assert "Evidence not yet created" in text
     assert "empty index" in text
     assert "maintained public contract carriers" in normalized
