@@ -12,18 +12,10 @@ import importlib
 import json
 import os
 import re
-import selectors
-import shutil
-import signal
 import stat
-import subprocess
-import tempfile
 import threading
-import time
-from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import BinaryIO, cast
 
 from invarlock.core.api import ModelAdapter
 from invarlock.core.runtime_provider import (
@@ -39,6 +31,15 @@ from invarlock.core.runtime_provider import (
     ScoringObservation,
     TensorRTLLMArtifactIdentity,
     artifact_identity_sha256,
+)
+from invarlock.runtime_providers._tensorrt_llm_execution import (
+    TensorRTLLMExecutionError,
+    _ImmutableExecutionBoundary,
+    _pin_official_runner,
+    _PinnedFile,
+    _resolve_vendor_python,
+    _run_bounded_process,
+    _RunDirectory,
 )
 from invarlock.runtime_providers.tensorrt_llm_identity import (
     read_tensorrt_llm_artifact_identity,
@@ -61,15 +62,7 @@ _ENGINE_NAME = re.compile(r"^rank(0|[1-9][0-9]*)\.engine$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
 _CUDA_RUNTIME_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
-# Minimal read-only vendor paths pinned by the TensorRT-LLM 1.2.1 runtime image.
-_TENSORRT_LLM_LD_LIBRARY_PATH = "/usr/local/tensorrt/lib"
-_TENSORRT_LLM_OPAL_PREFIX = "/opt/hpcx/ompi"
-_TENSORRT_LLM_PATH = "/opt/hpcx/ompi/bin:/usr/bin:/bin"
 _fcntl = importlib.import_module("fcntl") if os.name == "posix" else None
-
-
-class TensorRTLLMExecutionError(RuntimeError):
-    """Raised when authenticated TensorRT-LLM execution cannot continue."""
 
 
 @dataclass(frozen=True)
@@ -92,378 +85,6 @@ class TensorRTLLMRuntimeBindings:
         object.__setattr__(
             self, "runner_executable_path", Path(self.runner_executable_path)
         )
-
-
-def _stat_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
-    return (
-        value.st_dev,
-        value.st_ino,
-        value.st_mode,
-        value.st_size,
-        value.st_mtime_ns,
-        value.st_ctime_ns,
-    )
-
-
-def _directory_identity(value: os.stat_result) -> tuple[int, int, int]:
-    return (value.st_dev, value.st_ino, value.st_mode)
-
-
-def _hash_descriptor(descriptor: int, expected_size: int) -> str:
-    os.lseek(descriptor, 0, os.SEEK_SET)
-    remaining = expected_size
-    digest = hashlib.sha256()
-    while remaining:
-        chunk = os.read(descriptor, min(remaining, _IO_CHUNK_BYTES))
-        if not chunk:
-            raise TensorRTLLMExecutionError("pinned file changed while being hashed")
-        digest.update(chunk)
-        remaining -= len(chunk)
-    if os.read(descriptor, 1):
-        raise TensorRTLLMExecutionError("pinned file grew while being hashed")
-    return digest.hexdigest()
-
-
-@dataclass
-class _PinnedFile:
-    path: Path = field(repr=False)
-    descriptor: int = field(repr=False)
-    parent_descriptor: int = field(repr=False)
-    basename: str
-    initial_stat: os.stat_result = field(repr=False)
-    sha256: str
-    _closed: bool = field(default=False, init=False, repr=False)
-
-    @classmethod
-    def open(
-        cls,
-        path: str | os.PathLike[str],
-        *,
-        expected_sha256: str,
-        require_executable: bool,
-        max_bytes: int | None = None,
-    ) -> _PinnedFile:
-        if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
-            raise TensorRTLLMExecutionError(
-                "secure pinned-file execution requires POSIX nofollow support"
-            )
-        try:
-            absolute = Path(os.path.abspath(os.fspath(path)))
-        except (TypeError, ValueError, OSError) as exc:
-            raise TensorRTLLMExecutionError("pinned file path is invalid") from exc
-        flags = (
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_DIRECTORY | os.O_NOFOLLOW
-        )
-        try:
-            parent_descriptor = os.open(absolute.anchor, flags)
-        except OSError as exc:
-            raise TensorRTLLMExecutionError(
-                "pinned file root cannot be opened"
-            ) from exc
-        try:
-            for component in absolute.parts[1:-1]:
-                try:
-                    next_descriptor = os.open(
-                        component, flags, dir_fd=parent_descriptor
-                    )
-                except OSError as exc:
-                    raise TensorRTLLMExecutionError(
-                        "pinned file path contains a symlink or inaccessible directory"
-                    ) from exc
-                os.close(parent_descriptor)
-                parent_descriptor = next_descriptor
-            try:
-                named = os.stat(
-                    absolute.name,
-                    dir_fd=parent_descriptor,
-                    follow_symlinks=False,
-                )
-                descriptor = os.open(
-                    absolute.name,
-                    os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,
-                    dir_fd=parent_descriptor,
-                )
-            except OSError as exc:
-                raise TensorRTLLMExecutionError(
-                    "pinned file cannot be opened without following symlinks"
-                ) from exc
-            try:
-                opened = os.fstat(descriptor)
-                if not stat.S_ISREG(opened.st_mode) or _stat_identity(
-                    named
-                ) != _stat_identity(opened):
-                    raise TensorRTLLMExecutionError(
-                        "pinned file changed while being opened"
-                    )
-                if max_bytes is not None and opened.st_size > max_bytes:
-                    raise TensorRTLLMExecutionError(
-                        "pinned file exceeds the configured size bound"
-                    )
-                if require_executable and opened.st_mode & 0o111 == 0:
-                    raise TensorRTLLMExecutionError(
-                        "pinned TensorRT-LLM runner is not executable"
-                    )
-                observed_sha256 = _hash_descriptor(descriptor, opened.st_size)
-                if observed_sha256 != expected_sha256:
-                    raise TensorRTLLMExecutionError("pinned file digest does not match")
-                return cls(
-                    path=absolute,
-                    descriptor=descriptor,
-                    parent_descriptor=parent_descriptor,
-                    basename=absolute.name,
-                    initial_stat=opened,
-                    sha256=observed_sha256,
-                )
-            except Exception:
-                os.close(descriptor)
-                raise
-        except Exception:
-            os.close(parent_descriptor)
-            raise
-
-    @property
-    def fd_path(self) -> str:
-        self._require_open()
-        if os.path.isdir("/proc/self/fd"):
-            return f"/proc/self/fd/{self.descriptor}"
-        raise TensorRTLLMExecutionError(
-            "Linux descriptor-backed runner execution is unavailable"
-        )
-
-    def _require_open(self) -> None:
-        if self._closed:
-            raise TensorRTLLMExecutionError("pinned file is closed")
-
-    def recheck(self) -> None:
-        self._require_open()
-        expected = _stat_identity(self.initial_stat)
-        try:
-            opened = os.fstat(self.descriptor)
-            named = os.stat(
-                self.basename,
-                dir_fd=self.parent_descriptor,
-                follow_symlinks=False,
-            )
-        except OSError as exc:
-            raise TensorRTLLMExecutionError("pinned file became unavailable") from exc
-        if _stat_identity(opened) != expected or _stat_identity(named) != expected:
-            raise TensorRTLLMExecutionError("pinned file identity changed")
-        if _hash_descriptor(self.descriptor, opened.st_size) != self.sha256:
-            raise TensorRTLLMExecutionError("pinned file digest changed")
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        os.close(self.descriptor)
-        os.close(self.parent_descriptor)
-
-
-@dataclass
-class _RunDirectory:
-    path: Path = field(repr=False)
-    descriptor: int = field(repr=False)
-    initial_stat: os.stat_result = field(repr=False)
-    _closed: bool = field(default=False, init=False, repr=False)
-
-    @classmethod
-    def create(cls) -> _RunDirectory:
-        path = Path(tempfile.mkdtemp(prefix="invarlock-tensorrt-llm-"))
-        path.chmod(0o700)
-        try:
-            descriptor = os.open(
-                path,
-                os.O_RDONLY
-                | getattr(os, "O_CLOEXEC", 0)
-                | os.O_DIRECTORY
-                | os.O_NOFOLLOW,
-            )
-        except OSError:
-            shutil.rmtree(path, ignore_errors=True)
-            raise
-        return cls(path=path, descriptor=descriptor, initial_stat=os.fstat(descriptor))
-
-    def recheck(self) -> None:
-        if self._closed:
-            raise TensorRTLLMExecutionError("isolated runtime directory is closed")
-        try:
-            opened = os.fstat(self.descriptor)
-            named = self.path.lstat()
-        except OSError as exc:
-            raise TensorRTLLMExecutionError(
-                "isolated runtime directory became unavailable"
-            ) from exc
-        if (
-            not stat.S_ISDIR(opened.st_mode)
-            or _directory_identity(opened) != _directory_identity(self.initial_stat)
-            or _directory_identity(named) != _directory_identity(self.initial_stat)
-        ):
-            raise TensorRTLLMExecutionError("isolated runtime directory changed")
-
-    def environment(self) -> dict[str, str]:
-        self.recheck()
-        rendered = str(self.path)
-        return {
-            "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
-            "DO_NOT_TRACK": "1",
-            "FORCE_DETERMINISTIC": "1",
-            "HF_DATASETS_OFFLINE": "1",
-            "HF_HUB_DISABLE_TELEMETRY": "1",
-            "HF_HUB_OFFLINE": "1",
-            "HOME": rendered,
-            "INVARLOCK_CONTAINER_EXECUTION": "1",
-            "LANG": "C.UTF-8",
-            "LC_ALL": "C.UTF-8",
-            "LD_LIBRARY_PATH": _TENSORRT_LLM_LD_LIBRARY_PATH,
-            "NO_COLOR": "1",
-            "NO_PROXY": "*",
-            "OPAL_PREFIX": _TENSORRT_LLM_OPAL_PREFIX,
-            "PATH": _TENSORRT_LLM_PATH,
-            "TELEMETRY_DISABLED": "1",
-            "TOKENIZERS_PARALLELISM": "false",
-            "TRANSFORMERS_OFFLINE": "1",
-            "TRTLLM_NO_USAGE_STATS": "1",
-            "TMPDIR": rendered,
-            "XDG_CACHE_HOME": rendered,
-        }
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        os.close(self.descriptor)
-        shutil.rmtree(self.path, ignore_errors=True)
-
-
-def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=2)
-
-
-def _close_selector_stream(selector: selectors.BaseSelector, stream: BinaryIO) -> None:
-    try:
-        selector.unregister(stream)
-    except (KeyError, ValueError):
-        pass
-    stream.close()
-
-
-def _run_bounded_process(
-    *,
-    executable: _PinnedFile,
-    arguments: Sequence[str],
-    input_bytes: bytes,
-    run_directory: _RunDirectory,
-    timeout_seconds: int,
-    stdout_limit: int,
-    stderr_limit: int,
-) -> tuple[int, bytes, bytes]:
-    run_directory.recheck()
-    executable.recheck()
-    executable_path = executable.fd_path
-    try:
-        process = subprocess.Popen(
-            [executable_path, *arguments],
-            executable=executable_path,
-            stdin=subprocess.PIPE if input_bytes else subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=run_directory.path,
-            env=run_directory.environment(),
-            shell=False,
-            close_fds=True,
-            pass_fds=(executable.descriptor,),
-            start_new_session=True,
-            bufsize=0,
-        )
-    except OSError as exc:
-        raise TensorRTLLMExecutionError(
-            "descriptor-backed TensorRT-LLM runner execution is unavailable"
-        ) from exc
-    if (
-        (input_bytes and process.stdin is None)
-        or process.stdout is None
-        or process.stderr is None
-    ):
-        _kill_process_group(process)
-        raise TensorRTLLMExecutionError("TensorRT-LLM runner pipes are unavailable")
-
-    selector = selectors.DefaultSelector()
-    stdout = bytearray()
-    stderr = bytearray()
-    input_offset = 0
-    try:
-        streams = tuple(
-            stream
-            for stream in (process.stdin, process.stdout, process.stderr)
-            if stream is not None
-        )
-        for stream in streams:
-            os.set_blocking(stream.fileno(), False)
-        if input_bytes:
-            assert process.stdin is not None
-            selector.register(process.stdin, selectors.EVENT_WRITE, "stdin")
-        selector.register(process.stdout, selectors.EVENT_READ, "stdout")
-        selector.register(process.stderr, selectors.EVENT_READ, "stderr")
-        deadline = time.monotonic() + timeout_seconds
-        while selector.get_map():
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TensorRTLLMExecutionError("TensorRT-LLM record timed out")
-            events = selector.select(remaining)
-            if not events:
-                raise TensorRTLLMExecutionError("TensorRT-LLM record timed out")
-            for key, _mask in events:
-                stream = cast(BinaryIO, key.fileobj)
-                if key.data == "stdin":
-                    try:
-                        written = os.write(
-                            stream.fileno(),
-                            input_bytes[input_offset : input_offset + _IO_CHUNK_BYTES],
-                        )
-                    except BrokenPipeError:
-                        _close_selector_stream(selector, stream)
-                        continue
-                    input_offset += written
-                    if input_offset == len(input_bytes):
-                        _close_selector_stream(selector, stream)
-                    continue
-                try:
-                    chunk = os.read(stream.fileno(), _IO_CHUNK_BYTES)
-                except BlockingIOError:
-                    continue
-                if not chunk:
-                    _close_selector_stream(selector, stream)
-                    continue
-                target = stdout if key.data == "stdout" else stderr
-                target.extend(chunk)
-                limit = stdout_limit if key.data == "stdout" else stderr_limit
-                if len(target) > limit:
-                    raise TensorRTLLMExecutionError(
-                        f"TensorRT-LLM runner {key.data} limit exceeded"
-                    )
-        try:
-            status = process.wait(timeout=max(0.1, deadline - time.monotonic()))
-        except subprocess.TimeoutExpired as exc:
-            raise TensorRTLLMExecutionError("TensorRT-LLM record timed out") from exc
-        return status, bytes(stdout), bytes(stderr)
-    except BaseException:
-        _kill_process_group(process)
-        raise
-    finally:
-        selector.close()
-        for final_stream in (process.stdin, process.stdout, process.stderr):
-            if final_stream is not None and not final_stream.closed:
-                final_stream.close()
 
 
 def _strict_json_object(payload: bytes, *, label: str) -> dict[str, object]:
@@ -500,16 +121,16 @@ def _strict_json_object(payload: bytes, *, label: str) -> dict[str, object]:
     return value
 
 
-def _probe_runner(
-    executable: _PinnedFile,
+def _probe_runner_info_object(
+    runner: _PinnedFile,
+    vendor_python: _PinnedFile,
+    execution_boundary: _ImmutableExecutionBoundary,
     run_directory: _RunDirectory,
-    *,
-    expected_version: str,
-    expected_build_sha256: str,
-    expected_compute_capability: str,
-) -> RuntimeDeviceFacts:
+) -> dict[str, object]:
     status, stdout, stderr = _run_bounded_process(
-        executable=executable,
+        runner=runner,
+        vendor_python=vendor_python,
+        execution_boundary=execution_boundary,
         arguments=("--invarlock-runtime-info-v1",),
         input_bytes=b"",
         run_directory=run_directory,
@@ -523,7 +144,64 @@ def _probe_runner(
         )
     if stderr:
         raise TensorRTLLMExecutionError("TensorRT-LLM runner info probe emitted stderr")
-    info = _strict_json_object(stdout, label="TensorRT-LLM runner info")
+    return _strict_json_object(stdout, label="TensorRT-LLM runner info")
+
+
+def _authenticated_official_runner_info(
+    runner_path: Path,
+) -> tuple[dict[str, object], str]:
+    resources: list[_PinnedFile | _ImmutableExecutionBoundary | _RunDirectory] = []
+    try:
+        runner = _pin_official_runner(runner_path, expected_sha256=None)
+        resources.append(runner)
+        vendor_python = _resolve_vendor_python()
+        resources.append(vendor_python)
+        execution_boundary = _ImmutableExecutionBoundary.create(
+            runner,
+            vendor_python,
+        )
+        resources.append(execution_boundary)
+        run_directory = _RunDirectory.create()
+        resources.append(run_directory)
+        _require_isolated_network_namespace()
+        return (
+            _probe_runner_info_object(
+                runner,
+                vendor_python,
+                execution_boundary,
+                run_directory,
+            ),
+            runner.sha256,
+        )
+    finally:
+        cleanup_errors: list[Exception] = []
+        for resource in reversed(resources):
+            try:
+                resource.close()
+            except Exception as exc:  # cleanup must continue across resources
+                cleanup_errors.append(exc)
+        if cleanup_errors:
+            raise TensorRTLLMExecutionError(
+                "TensorRT-LLM runner probe cleanup did not complete"
+            ) from cleanup_errors[0]
+
+
+def _probe_runner(
+    runner: _PinnedFile,
+    vendor_python: _PinnedFile,
+    execution_boundary: _ImmutableExecutionBoundary,
+    run_directory: _RunDirectory,
+    *,
+    expected_version: str,
+    expected_build_sha256: str,
+    expected_compute_capability: str,
+) -> RuntimeDeviceFacts:
+    info = _probe_runner_info_object(
+        runner,
+        vendor_python,
+        execution_boundary,
+        run_directory,
+    )
     expected_keys = {
         "backend_build_sha256",
         "backend_name",
@@ -627,6 +305,7 @@ def _copy_from_descriptor(source: int, destination: Path, byte_length: int) -> N
                 raise TensorRTLLMExecutionError(
                     "engine bundle changed while being snapshotted"
                 ) from None
+        os.fchmod(destination_fd, 0o400)
         os.fsync(destination_fd)
     finally:
         os.close(destination_fd)
@@ -741,15 +420,21 @@ class TensorRTLLMSession:
         self._latest_observation_sha256: str | None = None
         self._run_directory = _RunDirectory.create()
         self._runner: _PinnedFile | None = None
+        self._vendor_python: _PinnedFile | None = None
+        self._execution_boundary: _ImmutableExecutionBoundary | None = None
         self._tokenizer_source: _PinnedFile | None = None
         self._device: RuntimeDeviceFacts | None = None
         self._engine_snapshot = self._run_directory.path / "engine"
         self._tokenizer_snapshot = self._run_directory.path / "tokenizer.json"
         try:
-            self._runner = _PinnedFile.open(
+            self._runner = _pin_official_runner(
                 config.bindings.runner_executable_path,
                 expected_sha256=config.runner_binary_sha256,
-                require_executable=True,
+            )
+            self._vendor_python = _resolve_vendor_python()
+            self._execution_boundary = _ImmutableExecutionBoundary.create(
+                self._runner,
+                self._vendor_python,
             )
             self._tokenizer_source = _PinnedFile.open(
                 config.bindings.tokenizer_contract_path,
@@ -785,6 +470,8 @@ class TensorRTLLMSession:
             _require_isolated_network_namespace()
             self._device = _probe_runner(
                 self._runner,
+                self._vendor_python,
+                self._execution_boundary,
                 self._run_directory,
                 expected_version=config.backend_version,
                 expected_build_sha256=config.backend_build_sha256,
@@ -799,15 +486,25 @@ class TensorRTLLMSession:
             config.artifact_identity
         )
 
-    def _require_open(self) -> _PinnedFile:
-        if self._closed or self._runner is None:
+    def _require_open(
+        self,
+    ) -> tuple[_PinnedFile, _PinnedFile, _ImmutableExecutionBoundary]:
+        if (
+            self._closed
+            or self._runner is None
+            or self._vendor_python is None
+            or self._execution_boundary is None
+        ):
             raise RuntimeError("runtime provider session is closed")
-        return self._runner
+        return self._runner, self._vendor_python, self._execution_boundary
 
     def _recheck_runtime(self) -> None:
-        runner = self._require_open()
-        runner.recheck()
+        runner, vendor_python, execution_boundary = self._require_open()
         self._run_directory.recheck()
+        execution_boundary.recheck(runner, vendor_python)
+        self._recheck_artifact_snapshots()
+
+    def _recheck_artifact_snapshots(self) -> None:
         observed = read_tensorrt_llm_artifact_identity(
             self._engine_snapshot,
             target_compute_capability=(
@@ -846,9 +543,11 @@ class TensorRTLLMSession:
         return encoded
 
     def _execute_record(self, record: EvaluationRecord) -> str:
-        runner = self._require_open()
+        runner, vendor_python, execution_boundary = self._require_open()
         status, stdout, stderr = _run_bounded_process(
-            executable=runner,
+            runner=runner,
+            vendor_python=vendor_python,
+            execution_boundary=execution_boundary,
             arguments=("--invarlock-score-v1",),
             input_bytes=self._request(record),
             run_directory=self._run_directory,
@@ -910,7 +609,7 @@ class TensorRTLLMSession:
                         )
                     )
             finally:
-                self._recheck_runtime()
+                self._recheck_artifact_snapshots()
             records = tuple(scoring_records)
             expected_pairing = tuple(
                 (record.record_id, record.input_sha256) for record in batch.records
@@ -933,45 +632,65 @@ class TensorRTLLMSession:
             return observation
 
     def runtime_receipt(self) -> RuntimeProviderReceipt:
-        self._require_open()
-        if self._latest_observation_sha256 is None:
-            raise RuntimeError("runtime provider receipt is unavailable before scoring")
-        if self._device is None:
-            raise RuntimeError("runtime provider device facts are unavailable")
-        return RuntimeProviderReceipt(
-            plugin=self._config.plugin,
-            backend=RuntimeBackendIdentity(
-                name="TensorRT-LLM",
-                version=self._config.backend_version,
-                source_sha256=None,
-                binary_sha256=self._config.runner_binary_sha256,
-                build_sha256=self._config.backend_build_sha256,
-            ),
-            capabilities=self._config.capabilities,
-            artifact_identity=self._config.artifact_identity,
-            execution_settings=self._config.execution_settings,
-            device=self._device,
-            outer_image_digest=self._config.outer_image_digest,
-            scoring_observation_sha256=self._latest_observation_sha256,
-        )
+        with self._score_lock:
+            self._require_open()
+            if self._latest_observation_sha256 is None:
+                raise RuntimeError(
+                    "runtime provider receipt is unavailable before scoring"
+                )
+            if self._device is None:
+                raise RuntimeError("runtime provider device facts are unavailable")
+            return RuntimeProviderReceipt(
+                plugin=self._config.plugin,
+                backend=RuntimeBackendIdentity(
+                    name="TensorRT-LLM",
+                    version=self._config.backend_version,
+                    source_sha256=None,
+                    binary_sha256=self._config.runner_binary_sha256,
+                    build_sha256=self._config.backend_build_sha256,
+                ),
+                capabilities=self._config.capabilities,
+                artifact_identity=self._config.artifact_identity,
+                execution_settings=self._config.execution_settings,
+                device=self._device,
+                outer_image_digest=self._config.outer_image_digest,
+                scoring_observation_sha256=self._latest_observation_sha256,
+            )
 
     def model_adapter(self) -> ModelAdapter | None:
-        self._require_open()
-        return None
+        with self._score_lock:
+            self._require_open()
+            return None
 
     def native_model(self) -> object | None:
-        self._require_open()
-        return None
+        with self._score_lock:
+            self._require_open()
+            return None
 
     def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        if self._tokenizer_source is not None:
-            self._tokenizer_source.close()
-        if self._runner is not None:
-            self._runner.close()
-        self._run_directory.close()
+        with self._score_lock:
+            if self._closed:
+                return
+            self._closed = True
+            cleanup_errors: list[Exception] = []
+            resources = (
+                self._tokenizer_source,
+                self._execution_boundary,
+                self._runner,
+                self._vendor_python,
+                self._run_directory,
+            )
+            for resource in resources:
+                if resource is None:
+                    continue
+                try:
+                    resource.close()
+                except Exception as exc:  # cleanup must continue across resources
+                    cleanup_errors.append(exc)
+            if cleanup_errors:
+                raise TensorRTLLMExecutionError(
+                    "TensorRT-LLM session cleanup did not complete"
+                ) from cleanup_errors[0]
 
 
 __all__ = [

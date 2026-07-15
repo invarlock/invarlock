@@ -35,7 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same canonical provider-receipt digest across GPUs. That digest is bound into
   the closed qualification summary. The isolated runner requires InvarLock's
   deterministic execution marker and fixed decoding settings, and records CUDA
-  runtime version separately from driver version. Failed qualification leaves
+  runtime version separately from driver version. Each TensorRT-LLM session
+  authenticates and executes the fixed installed launcher from the reviewed
+  runtime image's read-only root filesystem, verifies a no-new-privileges and
+  zero-capability boundary, and rechecks launcher and interpreter identities
+  around each invocation. Failed qualification leaves
   the existing stable local tag unchanged, and TensorRT-LLM still requires
   separate NVIDIA platform and real-engine qualification. CUDA and TensorRT-LLM
   qualification targets accept explicit Docker GPU selectors; CUDA smokes now

@@ -7,10 +7,7 @@ import hashlib
 import json
 import os
 import re
-import stat
-import subprocess
 import sys
-import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -26,7 +23,6 @@ from invarlock.core.runtime_provider import (
 )
 from invarlock.evidence_pack_json import (
     StrictJsonError,
-    parse_json_bytes,
     read_regular_file_bytes,
 )
 from invarlock.runtime_provider_evidence import (
@@ -39,7 +35,9 @@ from invarlock.runtime_providers.tensorrt_llm_identity import (
     read_tensorrt_llm_artifact_identity,
 )
 from invarlock.runtime_providers.tensorrt_llm_session import (
+    TensorRTLLMExecutionError,
     TensorRTLLMRuntimeBindings,
+    _authenticated_official_runner_info,
 )
 from invarlock.runtime_security_helpers import (
     RUNTIME_IMAGE_DIGEST_ENV,
@@ -50,10 +48,7 @@ _FORMAT = "invarlock/tensorrt-llm-candidate-qualification-v1"
 _RUNNER_INFO_FORMAT = "invarlock/tensorrt-llm-runner-info-v1"
 _RUNNER_PROTOCOL = "invarlock/tensorrt-llm-runner-v1"
 _BACKEND_VERSION = "1.2.1"
-_MAX_RUNNER_BYTES = 16 * 1024 * 1024
 _MAX_TOKENIZER_BYTES = 128 * 1024 * 1024
-_MAX_INFO_BYTES = 64 * 1024
-_INFO_TIMEOUT_SECONDS = 30
 _IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
@@ -118,59 +113,16 @@ def _validate_runner_info(payload: object) -> dict[str, str]:
     return normalized
 
 
-def _raw_runner_info(runner: Path) -> dict[str, str]:
-    """Probe candidate facts before the provider pins them as expected values."""
+def _raw_runner_info(runner: Path) -> tuple[dict[str, str], str]:
+    """Authenticate the official runner before probing candidate facts."""
 
-    path = Path(runner)
     try:
-        metadata = path.lstat()
-    except OSError as exc:
-        raise TensorRTLLMCanaryError("candidate runner is unavailable") from exc
-    if (
-        stat.S_ISLNK(metadata.st_mode)
-        or not stat.S_ISREG(metadata.st_mode)
-        or metadata.st_size <= 0
-        or metadata.st_size > _MAX_RUNNER_BYTES
-        or metadata.st_mode & 0o111 == 0
-    ):
+        payload, runner_sha256 = _authenticated_official_runner_info(Path(runner))
+    except TensorRTLLMExecutionError as exc:
         raise TensorRTLLMCanaryError(
-            "candidate runner must be a bounded executable regular file"
-        )
-
-    with (
-        tempfile.TemporaryFile() as stdout,
-        tempfile.TemporaryFile() as stderr,
-    ):
-        try:
-            completed = subprocess.run(  # noqa: S603 - exact candidate path, no shell
-                [str(path), "--invarlock-runtime-info-v1"],
-                stdin=subprocess.DEVNULL,
-                stdout=stdout,
-                stderr=stderr,
-                check=False,
-                timeout=_INFO_TIMEOUT_SECONDS,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise TensorRTLLMCanaryError("candidate runner info probe failed") from exc
-        stdout_size = os.fstat(stdout.fileno()).st_size
-        stderr_size = os.fstat(stderr.fileno()).st_size
-        if completed.returncode != 0:
-            raise TensorRTLLMCanaryError(
-                f"candidate runner info probe exited with status {completed.returncode}"
-            )
-        if stderr_size:
-            raise TensorRTLLMCanaryError("candidate runner info probe emitted stderr")
-        if stdout_size <= 0 or stdout_size > _MAX_INFO_BYTES:
-            raise TensorRTLLMCanaryError("candidate runner info output is invalid")
-        stdout.seek(0)
-        output = stdout.read(_MAX_INFO_BYTES + 1)
-    try:
-        decoded = parse_json_bytes(output, label="candidate runner info")
-    except StrictJsonError as exc:
-        raise TensorRTLLMCanaryError(
-            "candidate runner info is not strict JSON"
+            "candidate runner authentication or info probe failed"
         ) from exc
-    return _validate_runner_info(decoded)
+    return _validate_runner_info(payload), runner_sha256
 
 
 def _read_digest(path: Path, *, label: str, max_bytes: int) -> str:
@@ -247,10 +199,7 @@ def qualify_candidate(
         expected_output_sha256, label="expected output digest"
     )
     image_digest = _require_image_binding()
-    runner_info = _raw_runner_info(runner)
-    runner_sha256 = _read_digest(
-        runner, label="candidate runner", max_bytes=_MAX_RUNNER_BYTES
-    )
+    runner_info, runner_sha256 = _raw_runner_info(runner)
     tokenizer_sha256 = _read_digest(
         tokenizer_contract,
         label="candidate tokenizer contract",

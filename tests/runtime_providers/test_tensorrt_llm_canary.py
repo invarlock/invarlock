@@ -72,6 +72,20 @@ def test_runner_info_contract_rejects_unknown_or_unpinned_values() -> None:
         canary._validate_runner_info(wrong_version)  # noqa: SLF001
 
 
+def test_nonofficial_runner_is_rejected_without_execution(tmp_path: Path) -> None:
+    marker = tmp_path / "executed"
+    runner = tmp_path / "untrusted-runner"
+    runner.write_text(
+        f"#!/bin/sh\ntouch {marker}\n",
+        encoding="utf-8",
+    )
+    runner.chmod(0o755)
+
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="authentication"):
+        canary._raw_runner_info(runner)  # noqa: SLF001
+    assert not marker.exists()
+
+
 def test_image_binding_requires_exact_digest_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -114,7 +128,11 @@ def test_candidate_qualification_uses_real_provider_session_contract(
     receipt_versions: list[str] = []
     emitted_receipts: list[RuntimeProviderReceipt] = []
 
-    monkeypatch.setattr(canary, "_raw_runner_info", lambda _runner: info)
+    monkeypatch.setattr(
+        canary,
+        "_raw_runner_info",
+        lambda _runner: (info, runner_sha256),
+    )
 
     def identify(
         path: Path, *, target_compute_capability: str, tokenizer_metadata_sha256: str
@@ -283,7 +301,11 @@ def test_candidate_qualification_rejects_unreviewed_fixture_digests(
     runner.chmod(0o755)
     tokenizer_sha256 = hashlib.sha256(tokenizer.read_bytes()).hexdigest()
     identity = _identity(tokenizer_sha256)
-    monkeypatch.setattr(canary, "_raw_runner_info", lambda _runner: _runner_info())
+    monkeypatch.setattr(
+        canary,
+        "_raw_runner_info",
+        lambda _runner: (_runner_info(), hashlib.sha256(b"runner").hexdigest()),
+    )
     monkeypatch.setattr(
         canary,
         "read_tensorrt_llm_artifact_identity",
@@ -325,7 +347,11 @@ def test_candidate_qualification_fails_closed_on_session_device_drift(
     runner.chmod(0o755)
     tokenizer_sha256 = hashlib.sha256(b"{}").hexdigest()
     identity = _identity(tokenizer_sha256)
-    monkeypatch.setattr(canary, "_raw_runner_info", lambda _runner: _runner_info())
+    monkeypatch.setattr(
+        canary,
+        "_raw_runner_info",
+        lambda _runner: (_runner_info(), hashlib.sha256(b"runner").hexdigest()),
+    )
     monkeypatch.setattr(
         canary,
         "read_tensorrt_llm_artifact_identity",

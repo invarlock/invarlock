@@ -2,75 +2,52 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import signal
 import sys
+import threading
+import time
 from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
 
 from invarlock.core.runtime_provider import (
-    EvaluationBatch,
     EvaluationRecord,
     ModelRuntimeSpec,
-    RuntimeExecutionContext,
     RuntimeProvider,
     RuntimeSession,
-    artifact_identity_sha256,
 )
 from invarlock.reporting.validation.runtime_behavioral_observation import (
     runtime_scoring_records_sha256,
 )
+from invarlock.runtime_providers import (
+    _tensorrt_llm_execution as tensorrt_llm_execution,
+)
 from invarlock.runtime_providers import tensorrt_llm as tensorrt_llm_provider
 from invarlock.runtime_providers import tensorrt_llm_session
-from invarlock.runtime_providers.tensorrt_llm import (
-    TensorRTLLMProvider,
-    TensorRTLLMRuntimeBindings,
-)
-from invarlock.runtime_providers.tensorrt_llm_identity import (
-    read_tensorrt_llm_artifact_identity,
-)
+from invarlock.runtime_providers.tensorrt_llm import TensorRTLLMProvider
 from invarlock.runtime_providers.tensorrt_llm_session import (
     TensorRTLLMExecutionError,
 )
-
-_IMAGE_DIGEST = "sha256:" + "a" * 64
-_BACKEND_BUILD_SHA256 = "b" * 64
-_BACKEND_VERSION = "1.2.1"
-_REQUIRES_LINUX_FD_EXECUTION = pytest.mark.skipif(
-    not sys.platform.startswith("linux"),
-    reason="the pinned TensorRT-LLM image uses Linux descriptor execution",
+from tests.runtime_providers._tensorrt_llm_support import (
+    _BACKEND_BUILD_SHA256,
+    _BACKEND_VERSION,
+    _IMAGE_DIGEST,
+    _REQUIRES_POSIX_PINNING,
+    _batch,
+    _bundle,
+    _process_is_running,
+    _record,
+    _runtime_inputs,
+    _write_fake_runner,
 )
 
 
-def _bundle(root: Path) -> Path:
-    root.mkdir()
-    root.joinpath("config.json").write_text(
-        json.dumps(
-            {
-                "build_config": {
-                    "max_batch_size": 8,
-                    "max_input_len": 128,
-                    "max_seq_len": 256,
-                },
-                "pretrained_config": {
-                    "architecture": "LlamaForCausalLM",
-                    "dtype": "float16",
-                    "mapping": {"pp_size": 1, "tp_size": 1, "world_size": 1},
-                    "num_hidden_layers": 2,
-                },
-                "version": "1.0.0",
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ),
-        encoding="utf-8",
-    )
-    root.joinpath("rank0.engine").write_bytes(b"serialized-test-engine")
-    return root
-
-
 @pytest.fixture(autouse=True)
-def _authenticated_container_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+def _authenticated_container_boundary(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _IMAGE_DIGEST)
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", f"invarlock-runtime@{_IMAGE_DIGEST}")
     monkeypatch.setattr(
@@ -78,159 +55,44 @@ def _authenticated_container_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
         "strict_container_boundary_present",
         lambda: True,
     )
-
-
-def _write_fake_runner(path: Path, *, compute_capability: str = "9.0") -> None:
-    path.write_text(
-        f"""#!{sys.executable}
-import json
-import os
-import sys
-import time
-
-INFO = {{
-    "backend_build_sha256": "{_BACKEND_BUILD_SHA256}",
-    "backend_name": "TensorRT-LLM",
-    "backend_version": "{_BACKEND_VERSION}",
-    "cuda_compute_capability": "{compute_capability}",
-    "cuda_device_name": "Observed NVIDIA H200",
-    "cuda_driver_version": "570.00",
-    "cuda_runtime_version": "12.8",
-    "device_kind": "cuda",
-    "format_version": "invarlock/tensorrt-llm-runner-info-v1",
-    "protocol_version": "invarlock/tensorrt-llm-runner-v1",
-}}
-
-if sys.argv[1:] == ["--invarlock-runtime-info-v1"]:
-    print(json.dumps(INFO, sort_keys=True, separators=(",", ":")))
-    raise SystemExit(0)
-if sys.argv[1:] != ["--invarlock-score-v1"]:
-    raise SystemExit(64)
-
-request = json.load(sys.stdin)
-prompt = request["input_text"]
-if prompt == "__sleep__":
-    time.sleep(30)
-elif prompt == "__flood__":
-    os.write(1, b"x" * (3 * 1024 * 1024))
-    raise SystemExit(0)
-elif prompt == "__stderr__":
-    os.write(2, b"unexpected diagnostic")
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "x",
-    }}
-elif prompt == "__fail__":
-    raise SystemExit(7)
-elif prompt == "__bad_json__":
-    os.write(1, b"not-json")
-    raise SystemExit(0)
-elif prompt == "__duplicate__":
-    os.write(1, b'{{"format_version":"a","format_version":"b","output_text":"x"}}')
-    raise SystemExit(0)
-elif prompt == "__extra__":
-    response = {{
-        "extra": True,
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "x",
-    }}
-elif prompt == "__env__":
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": json.dumps(dict(os.environ), sort_keys=True, separators=(",", ":")),
-    }}
-elif prompt == "__request__":
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": json.dumps(request, sort_keys=True, separators=(",", ":")),
-    }}
-else:
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "OUT:" + prompt,
-    }}
-print(json.dumps(response, sort_keys=True, separators=(",", ":")))
-""",
-        encoding="utf-8",
+    monkeypatch.setattr(
+        tensorrt_llm_execution,
+        "_VENDOR_PYTHON",
+        Path(sys.executable),
     )
-    path.chmod(0o700)
-
-
-def _runtime_inputs(
-    tmp_path: Path,
-) -> tuple[ModelRuntimeSpec, TensorRTLLMRuntimeBindings, RuntimeExecutionContext]:
-    tokenizer = tmp_path / "private-tokenizer.json"
-    tokenizer.write_text(
-        json.dumps(
-            {
-                "add_special_tokens": False,
-                "clean_up_tokenization_spaces": False,
-                "eos_token_id": 1,
-                "format_version": "invarlock/tensorrt-llm-tokenizer-contract-v1",
-                "pad_token_id": 0,
-                "skip_special_tokens": True,
-                "tokenizer_json": {
-                    "model": {"type": "test"},
-                    "version": "1.0",
-                },
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ),
-        encoding="utf-8",
+    monkeypatch.setattr(
+        tensorrt_llm_execution,
+        "_REQUIRED_EXECUTABLE_OWNER",
+        (os.getuid(), os.getgid()),
     )
-    tokenizer_sha256 = hashlib.sha256(tokenizer.read_bytes()).hexdigest()
-    bundle = _bundle(tmp_path / "private-engine-name")
-    identity = read_tensorrt_llm_artifact_identity(
-        bundle,
-        target_compute_capability="9.0",
-        tokenizer_metadata_sha256=tokenizer_sha256,
+    monkeypatch.setattr(
+        tensorrt_llm_execution,
+        "_OFFICIAL_RUNNER_PATH",
+        tmp_path / "private-tensorrt-runner",
+        raising=False,
     )
-    runner = tmp_path / "private-tensorrt-runner"
-    _write_fake_runner(runner)
-    runner_sha256 = hashlib.sha256(runner.read_bytes()).hexdigest()
-    spec = ModelRuntimeSpec(
-        provider_name="tensorrt_llm",
-        model_id=identity.bundle_name,
-        settings={
-            "backend_build_sha256": _BACKEND_BUILD_SHA256,
-            "backend_version": _BACKEND_VERSION,
-            "batch_size": 4,
-            "builder_config_sha256": identity.builder_config_sha256,
-            "context_length": 256,
-            "engine_bundle_tree_sha256": identity.engine_bundle_tree_sha256,
-            "engine_metadata_sha256": identity.engine_metadata_sha256,
-            "file_inventory_sha256": identity.file_inventory_sha256,
-            "max_output_tokens": 16,
-            "runner_binary_sha256": runner_sha256,
-            "seed": 7,
-            "target_compute_capability": "9.0",
-            "timeout_seconds": 1,
-            "tokenizer_metadata_sha256": tokenizer_sha256,
-        },
+    monkeypatch.setattr(
+        tensorrt_llm_execution,
+        "_require_readonly_descriptor",
+        lambda *_args, **_kwargs: None,
+        raising=False,
     )
-    bindings = TensorRTLLMRuntimeBindings(
-        engine_bundle_path=bundle,
-        tokenizer_contract_path=tokenizer,
-        runner_executable_path=runner,
+    monkeypatch.setattr(
+        tensorrt_llm_execution,
+        "_descriptor_mount_id",
+        lambda _descriptor: 533,
+        raising=False,
     )
-    context = RuntimeExecutionContext(
-        strict=True,
-        allow_network=False,
-        container_image_digest=_IMAGE_DIGEST,
-        device_kind="cuda",
-        artifact_identity_sha256=artifact_identity_sha256(identity),
-        native_model=bindings,
+    monkeypatch.setattr(
+        tensorrt_llm_execution,
+        "_require_restricted_process_status",
+        lambda: None,
+        raising=False,
     )
-    return spec, bindings, context
-
-
-def _record(record_id: str, text: str) -> EvaluationRecord:
-    return EvaluationRecord(
-        record_id=record_id,
-        input_text=text,
-        input_sha256=hashlib.sha256(text.encode()).hexdigest(),
-        expected_output=f"OUT:{text}",
+    monkeypatch.setattr(
+        tensorrt_llm_session,
+        "_require_isolated_network_namespace",
+        lambda: None,
     )
 
 
@@ -241,7 +103,7 @@ def test_tensorrt_llm_closed_environment_pins_vendor_runtime(
     monkeypatch.setenv("OPAL_PREFIX", "/tmp/ambient-opal")
     monkeypatch.setenv("PATH", "/tmp/ambient-bin")
     monkeypatch.setenv("INVARLOCK_TEST_SECRET", "must-not-cross-boundary")
-    run_directory = tensorrt_llm_session._RunDirectory(  # noqa: SLF001
+    run_directory = tensorrt_llm_execution._RunDirectory(  # noqa: SLF001
         path=tmp_path,
         descriptor=-1,
         initial_stat=tmp_path.stat(),
@@ -284,10 +146,6 @@ def test_tensorrt_llm_closed_environment_pins_vendor_runtime(
         Path(entry).is_absolute() and entry not in {rendered, "/tmp", "/var/tmp"}
         for entry in fixed_paths
     )
-
-
-def _batch(*records: EvaluationRecord) -> EvaluationBatch:
-    return EvaluationBatch(schedule_sha256="c" * 64, records=tuple(records))
 
 
 def test_tensorrt_llm_config_identity_capabilities_and_private_bindings(
@@ -411,7 +269,7 @@ def test_tensorrt_llm_snapshot_rejects_multi_rank_engine(tmp_path: Path) -> None
         )
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_scores_in_order_and_emits_bound_receipt(
     tmp_path: Path,
 ) -> None:
@@ -462,7 +320,7 @@ def test_tensorrt_llm_scores_in_order_and_emits_bound_receipt(
         session.score(_batch(_record("c", "gamma")))
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_rejects_runner_identity_mismatch(tmp_path: Path) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
     wrong_version = ModelRuntimeSpec(
@@ -474,7 +332,7 @@ def test_tensorrt_llm_rejects_runner_identity_mismatch(tmp_path: Path) -> None:
         TensorRTLLMProvider().open(wrong_version, context)
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_rejects_observed_compute_capability_mismatch(
     tmp_path: Path,
 ) -> None:
@@ -493,7 +351,7 @@ def test_tensorrt_llm_rejects_observed_compute_capability_mismatch(
         TensorRTLLMProvider().open(mismatched_runner, context)
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_rejects_input_digest_and_runner_path_swap(
     tmp_path: Path,
 ) -> None:
@@ -513,19 +371,19 @@ def test_tensorrt_llm_rejects_input_digest_and_runner_path_swap(
         session.score(_batch(_record("a", "alpha")))
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
-    calls: list[dict[str, object]] = []
-    real_popen = tensorrt_llm_session.subprocess.Popen
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    real_popen = tensorrt_llm_execution.subprocess.Popen
 
     def recording_popen(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
-        calls.append(dict(kwargs))
+        calls.append((args, dict(kwargs)))
         return real_popen(*args, **kwargs)
 
-    monkeypatch.setattr(tensorrt_llm_session.subprocess, "Popen", recording_popen)
+    monkeypatch.setattr(tensorrt_llm_execution.subprocess, "Popen", recording_popen)
     monkeypatch.setenv("HF_TOKEN", "private-token")
     monkeypatch.setenv("HTTP_PROXY", "http://private-proxy")
     monkeypatch.setenv("INVARLOCK_TEST_SECRET", "private-value")
@@ -562,8 +420,28 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
     assert "HTTP_PROXY" not in environment
     assert "INVARLOCK_TEST_SECRET" not in environment
     assert calls
-    assert all(call["shell"] is False for call in calls)
-    assert all(call["start_new_session"] is True for call in calls)
+    vendor_python_path = str(session._vendor_python.path)  # noqa: SLF001
+    runner_path = str(session._runner.path)  # noqa: SLF001
+    run_path = session._run_directory.path  # noqa: SLF001
+    assert [tuple(positional[0][2:]) for positional, _keywords in calls] == [
+        ("--invarlock-runtime-info-v1",),
+        ("--invarlock-score-v1",),
+        ("--invarlock-score-v1",),
+    ]
+    for positional, keywords in calls:
+        argv = positional[0]
+        assert keywords["executable"] == argv[0] == vendor_python_path
+        assert argv[1] == runner_path
+        assert "/proc/self/fd/" not in " ".join(argv)
+        assert keywords["cwd"] == run_path
+        process_environment = keywords["env"]
+        assert process_environment["HOME"] == str(run_path)
+        assert process_environment["TMPDIR"] == str(run_path)
+        assert process_environment["XDG_CACHE_HOME"] == str(run_path)
+        assert keywords["shell"] is False
+        assert keywords["close_fds"] is True
+        assert keywords["pass_fds"] == ()
+        assert keywords["start_new_session"] is True
 
 
 @pytest.mark.parametrize(
@@ -578,7 +456,7 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
         ("__extra__", "unexpected fields"),
     ],
 )
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_fails_closed_on_runner_errors(
     tmp_path: Path, prompt: str, message: str
 ) -> None:
@@ -588,37 +466,168 @@ def test_tensorrt_llm_fails_closed_on_runner_errors(
         session.score(_batch(_record("bad", prompt)))
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_timeout_kills_the_child_process_group(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
     killed: list[int] = []
-    real_kill = tensorrt_llm_session._kill_process_group
+    real_kill = tensorrt_llm_execution._kill_process_group
 
     def recording_kill(process):  # noqa: ANN001, ANN202
         killed.append(process.pid)
         real_kill(process)
 
-    monkeypatch.setattr(tensorrt_llm_session, "_kill_process_group", recording_kill)
+    monkeypatch.setattr(tensorrt_llm_execution, "_kill_process_group", recording_kill)
     session = TensorRTLLMProvider().open(spec, context)
     with pytest.raises(TensorRTLLMExecutionError, match="timed out"):
         session.score(_batch(_record("sleep", "__sleep__")))
     assert killed
 
 
-@_REQUIRES_LINUX_FD_EXECUTION
-def test_tensorrt_llm_uses_private_snapshot_and_detects_mutation(
+@_REQUIRES_POSIX_PINNING
+def test_tensorrt_llm_timeout_kills_descendant_after_leader_exits(
+    tmp_path: Path,
+) -> None:
+    spec, _bindings, context = _runtime_inputs(tmp_path)
+    session = TensorRTLLMProvider().open(spec, context)
+    pid_path = session._run_directory.path / "grandchild.pid"  # noqa: SLF001
+
+    with pytest.raises(TensorRTLLMExecutionError, match="timed out"):
+        session.score(_batch(_record("orphan", "__orphan_pipe__")))
+
+    grandchild_pid = int(pid_path.read_text(encoding="ascii"))
+    try:
+        deadline = time.monotonic() + 2
+        while _process_is_running(grandchild_pid) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not _process_is_running(grandchild_pid)
+    finally:
+        if _process_is_running(grandchild_pid):
+            os.kill(grandchild_pid, signal.SIGKILL)
+
+
+@_REQUIRES_POSIX_PINNING
+@pytest.mark.parametrize("_attempt", range(5))
+def test_tensorrt_llm_success_kills_descendant_that_closed_inherited_fds(
+    tmp_path: Path,
+    _attempt: int,
+) -> None:
+    spec, _bindings, context = _runtime_inputs(tmp_path)
+    session = TensorRTLLMProvider().open(spec, context)
+    pid_path = session._run_directory.path / "detached.pid"  # noqa: SLF001
+
+    observation = session.score(_batch(_record("detached", "__detached_success__")))
+
+    assert observation.records[0].output_text == "OUT:__detached_success__"
+    grandchild_pid = int(pid_path.read_text(encoding="ascii"))
+    try:
+        deadline = time.monotonic() + 2
+        while _process_is_running(grandchild_pid) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not _process_is_running(grandchild_pid)
+    finally:
+        if _process_is_running(grandchild_pid):
+            os.kill(grandchild_pid, signal.SIGKILL)
+        session.close()
+
+
+@_REQUIRES_POSIX_PINNING
+def test_tensorrt_llm_close_waits_for_active_score_and_then_removes_tree(
+    tmp_path: Path,
+) -> None:
+    spec, _bindings, context = _runtime_inputs(tmp_path)
+    session = TensorRTLLMProvider().open(spec, context)
+    run_root = session._run_directory.path  # noqa: SLF001
+    started_path = run_root / "score.started"
+    release_path = run_root / "score.release"
+    score_results: list[str] = []
+    thread_errors: list[BaseException] = []
+    close_started = threading.Event()
+    close_lock_attempted = threading.Event()
+    close_finished = threading.Event()
+
+    class ObservedLock:
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+
+        def __enter__(self) -> ObservedLock:
+            if threading.current_thread().name == "tensorrt-close":
+                close_lock_attempted.set()
+            self._lock.acquire()
+            return self
+
+        def __exit__(
+            self,
+            _exc_type: object,
+            _exc: object,
+            _traceback: object,
+        ) -> None:
+            self._lock.release()
+
+    session._score_lock = ObservedLock()  # type: ignore[assignment]  # noqa: SLF001
+
+    def score() -> None:
+        try:
+            observation = session.score(_batch(_record("wait", "__wait_for_release__")))
+            score_results.append(observation.records[0].output_text or "")
+        except BaseException as exc:
+            thread_errors.append(exc)
+
+    def close() -> None:
+        close_started.set()
+        try:
+            session.close()
+        except BaseException as exc:
+            thread_errors.append(exc)
+        finally:
+            close_finished.set()
+
+    score_thread = threading.Thread(target=score, name="tensorrt-score")
+    score_thread.start()
+    close_thread = threading.Thread(target=close, name="tensorrt-close")
+    close_thread_started = False
+    try:
+        deadline = time.monotonic() + 1
+        while not started_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert started_path.exists()
+
+        close_thread.start()
+        close_thread_started = True
+        assert close_started.wait(timeout=1)
+        assert close_lock_attempted.wait(timeout=1)
+        assert not close_finished.wait(timeout=0.1)
+        assert run_root.exists()
+    finally:
+        if run_root.exists():
+            release_path.write_text("release", encoding="ascii")
+        score_thread.join(timeout=2)
+        if close_thread_started:
+            close_thread.join(timeout=2)
+        elif run_root.exists():
+            session.close()
+
+    assert not score_thread.is_alive()
+    assert not close_thread.is_alive()
+    assert thread_errors == []
+    assert score_results == ["released"]
+    assert not run_root.exists()
+
+
+@_REQUIRES_POSIX_PINNING
+def test_tensorrt_llm_uses_private_engine_and_tokenizer_snapshots(
     tmp_path: Path,
 ) -> None:
     spec, bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
 
-    # The authenticated private snapshot, not this caller-controlled source, is run.
+    # Engine execution uses the authenticated private bundle snapshot.
     bindings.engine_bundle_path.joinpath("rank0.engine").write_bytes(b"source changed")
     observation = session.score(_batch(_record("a", "alpha")))
     assert observation.records[0].output_text == "OUT:alpha"
 
+    session._tokenizer_snapshot.chmod(0o600)  # noqa: SLF001
     session._tokenizer_snapshot.write_bytes(b"snapshot changed")  # noqa: SLF001
     with pytest.raises(TensorRTLLMExecutionError, match="tokenizer contract changed"):
         session.score(_batch(_record("b", "beta")))
@@ -630,6 +639,7 @@ def test_tensorrt_llm_modules_remain_torch_free() -> None:
         root.joinpath(name).read_text(encoding="utf-8")
         for name in (
             "tensorrt_llm.py",
+            "_tensorrt_llm_execution.py",
             "tensorrt_llm_runner.py",
             "tensorrt_llm_session.py",
         )

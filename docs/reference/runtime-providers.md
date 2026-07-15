@@ -268,9 +268,14 @@ compute capability, driver version, and CUDA runtime version that it observes,
 and it requires the observed compute capability to match
 `target_compute_capability`. Its backend-build digest is derived from pinned
 backend content and checked against the expected `backend_build_sha256` in the
-settings. `runner_binary_sha256` names the installed launcher wrapper; the
-connector module and its dependency closure remain bound by the reviewed outer
-image digest. The outer image digest remains an independently supplied binding;
+settings. `runner_binary_sha256` authenticates the installed launcher wrapper.
+Each session executes that fixed launcher through the vendor Python interpreter
+supplied by the reviewed runtime image only after verifying that both reside on
+the same read-only root mount, no-new-privileges is active, and every process
+capability set is empty. Launcher and interpreter identities are rechecked
+around each invocation. The connector module, interpreter, and dependency
+closure remain bound by the reviewed outer image digest. The outer image digest
+remains an independently supplied binding;
 the receipt is not remote attestation of the execution host or image.
 
 After both sides exist, verify them in a separate process or trust domain. This
