@@ -268,6 +268,19 @@ def _collect_files(root_descriptor: int) -> tuple[_FileRecord, ...]:
     return tuple(sorted(records, key=lambda record: record.logical_name))
 
 
+def _same_authenticated_records(
+    initial: tuple[_FileRecord, ...], current: tuple[_FileRecord, ...]
+) -> bool:
+    """Compare mutation-relevant metadata while ignoring read-driven atime."""
+
+    return len(initial) == len(current) and all(
+        before.logical_name == after.logical_name
+        and before.byte_length == after.byte_length
+        and _stat_identity(before.initial_stat) == _stat_identity(after.initial_stat)
+        for before, after in zip(initial, current, strict=True)
+    )
+
+
 def _open_file_by_components(
     root_descriptor: int, logical_name: str
 ) -> tuple[int, int]:
@@ -655,7 +668,7 @@ def read_tensorrt_llm_artifact_identity(
                 )
 
         hashed = tuple(_hash_file(root_descriptor, record) for record in records)
-        if _collect_files(root_descriptor) != records:
+        if not _same_authenticated_records(records, _collect_files(root_descriptor)):
             raise TensorRTLLMIdentityError(
                 "TensorRT-LLM engine bundle changed while being authenticated"
             )

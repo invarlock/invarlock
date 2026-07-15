@@ -2,11 +2,36 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from invarlock.runtime_providers import tensorrt_llm_identity
+
+
+def _record_stat(*, atime_ns: int = 1, mtime_ns: int = 2):
+    class RecordStat:
+        st_dev = 1
+        st_ino = 2
+        st_mode = 0o100600
+        st_size = 3
+        st_ctime_ns = 4
+
+        def __init__(self) -> None:
+            self.st_atime_ns = atime_ns
+            self.st_mtime_ns = mtime_ns
+
+    return RecordStat()
+
+
+def test_authenticated_record_comparison_ignores_read_driven_atime_only() -> None:
+    initial = (tensorrt_llm_identity._FileRecord("rank0.engine", 3, _record_stat()),)
+    atime_changed = (replace(initial[0], initial_stat=_record_stat(atime_ns=9)),)
+    mtime_changed = (replace(initial[0], initial_stat=_record_stat(mtime_ns=9)),)
+
+    assert tensorrt_llm_identity._same_authenticated_records(initial, atime_changed)
+    assert not tensorrt_llm_identity._same_authenticated_records(initial, mtime_changed)
 
 
 def _config(
