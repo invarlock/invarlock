@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API, while normal `evaluate` behavior is unchanged. Cross-runtime claims are
   limited to policy-bound exact-match behavior and do not imply weight,
   activation, numerical, performance, export, or backend equivalence.
+- Added provider-owned `inspect-inputs` derivation for GGUF/llama.cpp and
+  TensorRT-LLM. The installed command authenticates the native artifact,
+  backend, runner, source or tokenizer inputs and writes complete path-free,
+  no-clobber settings without accepting caller-supplied hashes. A runnable
+  mixed-provider example and operator guide now cover the full schedule,
+  directed-policy, side-production, and paired-verification transaction.
 - Added pinned native runtime-image qualification targets. GGUF requires its
   two-container behavior black-box before assigning the stable local tag.
   TensorRT-LLM requires a reviewed pinned-model inventory, an exact-base
@@ -51,6 +57,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-matching compute capabilities, sizes the isolated canary workspace for
   authenticated engine snapshots, and promotes only the digest bound by the
   qualification summary.
+- Added deterministic compact runtime release-evidence assets with public
+  qualification-receipt and asset-index contracts. Each asset embeds canonical
+  sanitized provider summaries, source and image bindings, independently
+  validated schedule-level receipts, and a closed hash inventory while
+  excluding model files, engine bundles, raw logs, and host paths. Path-free
+  qualification names allow one provider to carry multiple receipt-bound
+  results with exact set validation; names inventory reviewed runs but do not
+  claim independent execution. A no-clobber release handoff stages the archive
+  and checksum under source-, tag-, and digest-bound names, revalidates both
+  evidence and release bindings, and verifies the uploaded GitHub Release
+  assets without treating the evidence source commit as the release commit.
 - Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
   variance findings in `policy-pack-v2`. Observation mode retains complete
   guard execution, provenance, replay, and reporting while leaving primary

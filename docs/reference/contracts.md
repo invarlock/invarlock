@@ -38,6 +38,8 @@ The public contract surface covers:
 | Runtime scoring observation | `format_version` | `invarlock/runtime-scoring-observation-v1` | `contracts/runtime_scoring_observation.schema.json` |
 | Runtime behavioral schedule | `format_version` | `invarlock/runtime-behavioral-schedule-v1` | `contracts/runtime_behavioral_schedule.schema.json` |
 | Runtime behavioral claim receipt | `format_version` | `invarlock/runtime-behavioral-claim-receipt-v1` | `contracts/runtime_behavioral_claim_receipt.schema.json` |
+| Runtime qualification release receipt | `format_version` | `invarlock/runtime-qualification-release-receipt-v1` | `contracts/runtime_qualification_release_receipt.schema.json` |
+| Runtime release-evidence index | `format_version` | `invarlock/runtime-release-evidence-index-v1` | `contracts/runtime_release_evidence_index.schema.json` |
 | CLI stability policy | policy identifier | `cli-stability-v1` | `docs/reference/cli.md` |
 | Support matrix | `support_matrix.format_version` | `support-matrix-v2` | `contracts/support_matrix.json` |
 | Model-family catalog | `model_family_catalog.format_version` | `model-family-catalog-v2` | `contracts/model_family_catalog.json` |
@@ -57,6 +59,12 @@ Compatibility rules:
 - Optional report blocks can graduate into the required core only with a report
   schema version bump.
 
+Runtime release-evidence v1 keeps its original single-qualification entries
+valid and adds an optional path-free `qualification_name`. Named entries let an
+index carry multiple independently reviewed summaries for one provider. Their
+names are bound into the generated qualification receipt and deterministic
+member paths; repeated entries for a provider must all be named.
+
 ## Machine-readable contract files
 
 | Contract | Path | Purpose |
@@ -68,12 +76,14 @@ Compatibility rules:
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
 | Runtime manifest v1 | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for ordinary evaluation report sidecars |
 | Runtime manifest v2 | `contracts/runtime_manifest_v2.schema.json` | Strict runtime-provider side manifest binding report, config, receipt, observation, artifact identity, schedule, and policy |
-| Runtime-provider capabilities | `contracts/runtime_provider_capabilities.json` | Closed provider ABI and supported artifact formats, precision modes, and device kinds |
+| Runtime-provider capabilities | `contracts/runtime_provider_capabilities.json` | Closed provider ABI plus artifact formats, tasks, metrics, execution modes, required extras and images, platform constraints, evidence surfaces, claim sets, and degraded or unavailable modes |
 | Model artifact identity | `contracts/model_artifact_identity.schema.json` | Path-free identities for Hugging Face snapshots, GGUF files, and TensorRT-LLM engine bundles |
 | Runtime-provider receipt | `contracts/runtime_provider_receipt.schema.json` | Provider execution receipt binding capabilities, artifact identity, image, device observation, and scoring observation |
 | Runtime scoring observation | `contracts/runtime_scoring_observation.schema.json` | Canonical policy-scored behavioral records and aggregate metric |
 | Runtime behavioral schedule | `contracts/runtime_behavioral_schedule.schema.json` | Canonical ordered inputs shared by separately produced provider sides |
 | Runtime behavioral claim receipt | `contracts/runtime_behavioral_claim_receipt.schema.json` | Positive digest-only receipt from directed baseline/subject replay |
+| Runtime qualification release receipt | `contracts/runtime_qualification_release_receipt.schema.json` | Digest-only release receipt for a provider image and platform qualification; it does not assert schedule-level behavior |
+| Runtime release-evidence index | `contracts/runtime_release_evidence_index.schema.json` | Hash-bound inventory that keeps provider qualification separate from schedule-level behavioral claims |
 | Verify output | `contracts/verify_output.schema.json` | JSON output schema for `invarlock verify --json` |
 | Evidence-pack manifest | `contracts/evidence_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material signed provenance fields |
 | Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |

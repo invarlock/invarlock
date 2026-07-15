@@ -40,6 +40,12 @@ RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION = "invarlock/runtime-behavioral-sched
 RUNTIME_BEHAVIORAL_CLAIM_RECEIPT_FORMAT_VERSION = (
     "invarlock/runtime-behavioral-claim-receipt-v1"
 )
+RUNTIME_QUALIFICATION_RELEASE_RECEIPT_FORMAT_VERSION = (
+    "invarlock/runtime-qualification-release-receipt-v1"
+)
+RUNTIME_RELEASE_EVIDENCE_INDEX_FORMAT_VERSION = (
+    "invarlock/runtime-release-evidence-index-v1"
+)
 
 STABLE_CLI_JSON_SURFACES: dict[str, str] = {
     "invarlock doctor --json": DOCTOR_OUTPUT_FORMAT_VERSION,
@@ -290,6 +296,16 @@ def load_runtime_behavioral_claim_receipt_schema() -> dict[str, Any]:
     )
 
 
+def load_runtime_qualification_release_receipt_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise(
+        "runtime_qualification_release_receipt.schema.json"
+    )
+
+
+def load_runtime_release_evidence_index_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise("runtime_release_evidence_index.schema.json")
+
+
 def load_verify_output_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("verify_output.schema.json")
 
@@ -403,6 +419,16 @@ def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
             "source": "contracts/runtime_behavioral_claim_receipt.schema.json",
             "compatibility": "closed_versioned_receipt",
         },
+        "runtime_qualification_release_receipt": {
+            "version": RUNTIME_QUALIFICATION_RELEASE_RECEIPT_FORMAT_VERSION,
+            "source": "contracts/runtime_qualification_release_receipt.schema.json",
+            "compatibility": "closed_versioned_receipt",
+        },
+        "runtime_release_evidence_index": {
+            "version": RUNTIME_RELEASE_EVIDENCE_INDEX_FORMAT_VERSION,
+            "source": "contracts/runtime_release_evidence_index.schema.json",
+            "compatibility": "closed_versioned_index",
+        },
         "cli_stability_policy": {
             "version": CLI_STABILITY_POLICY_VERSION,
             "source": "docs/reference/cli.md",
@@ -486,6 +512,12 @@ def contract_catalog() -> dict[str, Any]:
         "runtime_behavioral_claim_receipt": contract_reference(
             "runtime_behavioral_claim_receipt.schema.json"
         ),
+        "runtime_qualification_release_receipt": contract_reference(
+            "runtime_qualification_release_receipt.schema.json"
+        ),
+        "runtime_release_evidence_index": contract_reference(
+            "runtime_release_evidence_index.schema.json"
+        ),
         "verify_output": contract_reference("verify_output.schema.json"),
         "evidence_pack_manifest": contract_reference(
             "evidence_pack_manifest.schema.json"
@@ -521,6 +553,8 @@ __all__ = [
     "RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION",
     "RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION",
     "RUNTIME_BEHAVIORAL_CLAIM_RECEIPT_FORMAT_VERSION",
+    "RUNTIME_QUALIFICATION_RELEASE_RECEIPT_FORMAT_VERSION",
+    "RUNTIME_RELEASE_EVIDENCE_INDEX_FORMAT_VERSION",
     "RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION",
     "STABLE_CLI_JSON_SURFACES",
     "VERIFY_OUTPUT_FORMAT_VERSION",
@@ -547,6 +581,8 @@ __all__ = [
     "load_runtime_scoring_observation_schema",
     "load_runtime_behavioral_schedule_schema",
     "load_runtime_behavioral_claim_receipt_schema",
+    "load_runtime_qualification_release_receipt_schema",
+    "load_runtime_release_evidence_index_schema",
     "load_verify_output_schema",
     "load_support_matrix",
     "maintained_catalog_lanes",

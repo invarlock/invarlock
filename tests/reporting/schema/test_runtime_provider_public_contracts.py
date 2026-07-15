@@ -260,6 +260,8 @@ def test_runtime_provider_contracts_are_cataloged_and_packaged_byte_identically(
         "model_artifact_identity",
         "runtime_provider_receipt",
         "runtime_scoring_observation",
+        "runtime_qualification_release_receipt",
+        "runtime_release_evidence_index",
     }
     catalog = public_contracts.contract_catalog()
     assert expected <= set(catalog)
@@ -314,6 +316,14 @@ def test_runtime_provider_contract_versions_are_single_sourced() -> None:
         (
             "runtime_scoring_observation.schema.json",
             public_contracts.load_runtime_scoring_observation_schema,
+        ),
+        (
+            "runtime_qualification_release_receipt.schema.json",
+            public_contracts.load_runtime_qualification_release_receipt_schema,
+        ),
+        (
+            "runtime_release_evidence_index.schema.json",
+            public_contracts.load_runtime_release_evidence_index_schema,
         ),
     ],
 )

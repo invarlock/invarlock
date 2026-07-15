@@ -469,6 +469,13 @@ def test_native_runtime_docs_keep_fixture_and_release_asset_claims_narrow() -> N
     assert "scripts/release/runtime_release_evidence.py validate" in guide
     assert "release-asset carrier" in guide
     assert "not source-tree evidence" in guide
+    assert "--qualification llama_cpp:cpu-reference=" in guide
+    assert "--qualification tensorrt_llm:pair-a=" in guide
+    assert "--qualification tensorrt_llm:pair-b=" in guide
+    assert "--expected-qualification llama_cpp:cpu-reference" in guide
+    assert "--expected-qualification tensorrt_llm:pair-a" in guide
+    assert "--expected-qualification tensorrt_llm:pair-b" in guide
+    assert "does not by itself prove independent execution" in guide
     assert "provider-owned `inspect-inputs` command" in reference
     assert "do not hand-assemble" in reference
 

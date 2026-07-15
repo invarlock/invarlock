@@ -110,8 +110,9 @@ authenticated checkout of the matching source:
 python scripts/release/runtime_release_evidence.py build \
   --source-commit <full-40-hex-source-commit> \
   --source-archive-sha256 <source-archive-64-hex-sha256> \
-  --qualification llama_cpp=artifacts/qualification/gguf-runtime-blackbox-summary.json \
-  --qualification tensorrt_llm=artifacts/qualification/tensorrt-llm-qualification-summary.json \
+  --qualification llama_cpp:cpu-reference=artifacts/qualification/gguf-runtime-blackbox-summary.json \
+  --qualification tensorrt_llm:pair-a=artifacts/qualification/tensorrt-llm-pair-a-summary.json \
+  --qualification tensorrt_llm:pair-b=artifacts/qualification/tensorrt-llm-pair-b-summary.json \
   --behavior artifacts/native-runtime-pair/paired-receipt.json \
   --output artifacts/release/invarlock-runtime-evidence.tar.gz
 
@@ -121,8 +122,24 @@ python scripts/release/runtime_release_evidence.py validate \
   --expected-source-archive-sha256 <source-archive-64-hex-sha256> \
   --expected-provider llama_cpp \
   --expected-provider tensorrt_llm \
+  --expected-qualification llama_cpp:cpu-reference \
+  --expected-qualification tensorrt_llm:pair-a \
+  --expected-qualification tensorrt_llm:pair-b \
   --require-behavioral-claim
 ```
+
+Use a lowercase path-free qualification name to distinguish independently
+reviewed runs of the same provider. A repeated provider must use a name on
+every entry, and the validator can pin the complete provider-and-name set.
+Naming does not by itself prove independent execution. Deterministic independent
+runs may legitimately produce byte-identical summaries, so the carrier accepts
+that result without adding meaningless entropy. Review the private run
+provenance before accepting an independence claim. Do not put host names,
+addresses, operator identities, or filesystem paths in a name.
+
+The original `PROVIDER=SUMMARY` form remains valid for one qualification per
+provider, preserving existing single-run automation and assets. Do not mix the
+original and named forms for the same provider in one asset.
 
 Use the resulting `tar.gz` as the release-asset carrier after independent
 validation. It is not source-tree evidence and does not contain model files,
