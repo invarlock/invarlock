@@ -46,4 +46,4 @@ def test_makefile_exposes_podman_runtime_targets() -> None:
     assert "shutil.which('jq')" in text
     assert "RUNTIME_SOURCE_DATE_EPOCH ?=" in text
     assert text.count("SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)") >= 6
-    assert text.count("--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)") == 3
+    assert text.count("--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)") == 5
