@@ -25,7 +25,7 @@ fixture = load_script("tensorrt_llm_runtime_fixture")
 
 def identity(*, tree: str = "1" * 64) -> TensorRTLLMArtifactIdentity:
     return TensorRTLLMArtifactIdentity(
-        bundle_name="engine",
+        bundle_name=f"tensorrt-llm-sha256-{tree}",
         engine_bundle_tree_sha256=tree,
         file_inventory_sha256="2" * 64,
         builder_config_sha256="3" * 64,

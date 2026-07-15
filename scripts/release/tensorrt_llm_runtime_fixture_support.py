@@ -324,7 +324,10 @@ def _validated_identity_mapping(
         )
     except (TypeError, ValueError) as exc:
         raise FixtureContractError(f"the {label} identity is invalid") from exc
-    if normalized != value or normalized["bundle_name"] != "engine":
+    expected_bundle_name = (
+        "tensorrt-llm-sha256-" + normalized["engine_bundle_tree_sha256"]
+    )
+    if normalized != value or normalized["bundle_name"] != expected_bundle_name:
         raise FixtureContractError(f"the {label} identity binding is not canonical")
     return normalized
 

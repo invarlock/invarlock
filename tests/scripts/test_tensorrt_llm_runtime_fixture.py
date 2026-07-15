@@ -220,7 +220,14 @@ def test_build_fixture_runs_two_builds_and_two_cross_gpu_probes(
 
     monkeypatch.setattr(fixture, "_build_one", fake_build_one)
     identities = iter(
-        (_identity(), replace(_identity(), engine_bundle_tree_sha256="6" * 64))
+        (
+            _identity(),
+            replace(
+                _identity(),
+                bundle_name=f"tensorrt-llm-sha256-{'6' * 64}",
+                engine_bundle_tree_sha256="6" * 64,
+            ),
+        )
     )
     monkeypatch.setattr(
         fixture,

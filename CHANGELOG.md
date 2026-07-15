@@ -183,8 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed TensorRT-LLM qualification to initialize the pinned vendor library
   environment without contaminating strict machine output, keep required
   runtime and engine-build timing caches inside the bounded temporary
-  filesystem, and recognize both canonical proprietary and open-kernel NVIDIA
-  driver-version records.
+  filesystem, validate content-derived engine bundle names, and recognize both
+  canonical proprietary and open-kernel NVIDIA driver-version records.
 - Fixed documentation and CLI examples so strict commands include every
   independently supplied verifier input.
 - Fixed public-evidence, packaged-data, support-matrix, and model-catalog

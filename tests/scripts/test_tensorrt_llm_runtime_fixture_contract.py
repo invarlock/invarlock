@@ -290,7 +290,11 @@ def test_qualification_rejects_changed_bindings_and_cross_gpu_results(
     monkeypatch.setattr(
         fixture,
         "read_tensorrt_llm_artifact_identity",
-        lambda *_a, **_k: replace(identity, engine_bundle_tree_sha256="9" * 64),
+        lambda *_a, **_k: replace(
+            identity,
+            bundle_name=f"tensorrt-llm-sha256-{'9' * 64}",
+            engine_bundle_tree_sha256="9" * 64,
+        ),
     )
     with pytest.raises(fixture.TensorRTLLMFixtureError, match="engine identity"):
         fixture.qualify_two_gpu(
@@ -348,13 +352,20 @@ def test_qualification_rejects_changed_bindings_and_cross_gpu_results(
         ),
         (
             lambda value: value["engine_builds"]["primary"].update(
+                bundle_name=f"tensorrt-llm-sha256-{'e' * 64}"
+            ),
+            "not canonical",
+        ),
+        (
+            lambda value: value["engine_builds"]["primary"].update(
                 tokenizer_metadata_sha256="f" * 64
             ),
             "tokenizer binding",
         ),
         (
             lambda value: value["selected_engine_identity"].update(
-                engine_bundle_tree_sha256="e" * 64
+                bundle_name=f"tensorrt-llm-sha256-{'e' * 64}",
+                engine_bundle_tree_sha256="e" * 64,
             ),
             "not the primary",
         ),
@@ -373,6 +384,22 @@ def test_nested_manifest_contract_is_closed(
     path.write_bytes(fixture._canonical_json(manifest))
     with pytest.raises(fixture.TensorRTLLMFixtureError, match=message):
         fixture._load_manifest(path)
+
+
+def test_manifest_accepts_distinct_canonical_engine_builds(tmp_path: Path) -> None:
+    primary = _identity()
+    secondary = _identity(tree="6" * 64)
+    manifest = _valid_manifest(primary)
+    manifest["engine_builds"]["secondary"] = fixture.asdict(secondary)
+    manifest["engine_byte_reproduction"] = "different"
+    path = tmp_path / "fixture-manifest.json"
+    path.write_bytes(fixture._canonical_json(manifest))
+
+    loaded = fixture._load_manifest(path)
+
+    assert loaded["engine_builds"]["primary"] == fixture.asdict(primary)
+    assert loaded["engine_builds"]["secondary"] == fixture.asdict(secondary)
+    assert loaded["engine_byte_reproduction"] == "different"
 
 
 def test_canary_requires_exact_schema_and_bindings(
