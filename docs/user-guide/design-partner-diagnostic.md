@@ -4,8 +4,9 @@ Use this runbook for one bounded question: does one real transformed checkpoint
 remain acceptable against one reviewer-selected baseline under independently
 controlled acceptance inputs?
 
-This is the smallest useful partner diagnostic. It uses the existing shared
-compare wrapper; it does not introduce a second evaluation workflow.
+This is the smallest useful checkpoint diagnostic for a partner engagement. It
+uses the existing shared compare wrapper and produces the standard strict
+verification handoff.
 
 ## Applicability
 
@@ -13,6 +14,11 @@ Use this runbook only when both checkpoints are loadable through InvarLock's
 current Hugging Face/PyTorch adapter path. The subject must be the output of a
 real quantization, pruning, adapter, fine-tuning, or other transformation. A
 copy, alias, or renamed baseline is not a valid subject.
+
+When the reviewed artifact is a deployed GGUF file or TensorRT-LLM engine, use
+the [Native Runtime Providers](native-runtime-providers.md) runbook instead. It
+authenticates the native artifact and compares policy-scoped `exact_match`
+behavior on a reviewer-selected record schedule.
 
 Before the run, the reviewer records:
 
@@ -296,23 +302,15 @@ label this partner handoff as a signed evidence pack. End this workflow at the
 strict verifier output and release-review bundle unless a supported producer
 for this case type is added later.
 
-## Non-goals
+## Claim boundary
 
-This diagnostic does not:
-
-- validate TensorRT, ONNX, GGUF, CoreML, or a black-box serving endpoint;
-- prove production serving parity, throughput, latency, or cost;
-- certify general model safety, security, governance approval, or deployment
-  readiness;
-- create, train, transform, publish, sign, or deploy the subject;
-- replace partner-specific acceptance criteria or independent review.
-
-If the partner's actual artifact is outside the Hugging Face/PyTorch checkpoint
-path, record it as unsupported by this diagnostic instead of converting it
-silently and claiming the original runtime was evaluated. For experimental
-GGUF/llama.cpp and TensorRT-LLM exact-match behavior workflows, use the
-[runtime-provider guide](../reference/runtime-providers.md). ONNX, CoreML, and
-black-box serving endpoints remain outside the current provider surface.
+This checkpoint diagnostic records regression and guard evidence for the named
+baseline, transformed subject, evaluation data, runtime, and acceptance policy.
+The native-provider runbook provides the corresponding bounded path for
+GGUF/llama.cpp and TensorRT-LLM artifacts. Production serving parity,
+performance, general model safety, governance approval, and deployment
+readiness require their own acceptance evidence. ONNX, CoreML, and black-box
+serving endpoints remain outside the current provider surface.
 
 ## Related documentation
 

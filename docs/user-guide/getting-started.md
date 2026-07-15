@@ -20,6 +20,13 @@ multimodal preset and provider configuration. The minimal install is enough for
 as the first path to get green before you reach for deeper report-analysis
 commands.
 
+Choose the path that matches the reviewed artifact. The checkpoint workflow
+below covers Hugging Face/PyTorch inputs. For a deployed GGUF file or
+TensorRT-LLM engine, start with [Native Runtime
+Providers](native-runtime-providers.md), which authenticates the native
+artifact and compares policy-scoped `exact_match` behavior on a reviewed record
+schedule.
+
 ## Install InvarLock
 
 ```bash
@@ -157,6 +164,7 @@ Artifact model:
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
 | **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Public Contracts](../reference/contracts.md) |
 | **Integration author** | Getting Started → [Integration Examples](integrations.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
+| **Native runtime operator** | Getting Started → [Native Runtime Providers](native-runtime-providers.md) → [Runtime Providers reference](../reference/runtime-providers.md) |
 | **Knowledge/self-edit workflow owner** | Getting Started → [Knowledge & self-edit workflows](knowledge-and-self-edit-workflows.md) → [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
 
@@ -168,6 +176,7 @@ surfaces live under `invarlock advanced`:
 - `invarlock advanced evidence-pack ...`
 - `invarlock advanced policy ...`
 - `invarlock advanced plugins ...`
+- `invarlock advanced runtime-behavior ...`
 - `invarlock advanced calibrate ...`
 
 Installed packages also include the evidence-pack verifier, so bundles can be
@@ -204,6 +213,7 @@ for local smoke and portability runs.
 | evaluate my own edited checkpoint workflow | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | evaluate a subject from a knowledge-edit or self-edit workflow | [Knowledge & self-edit workflows](knowledge-and-self-edit-workflows.md) |
 | attach evidence to an external edit toolchain | [Integration Examples](integrations.md) |
+| compare deployed GGUF or TensorRT-LLM artifacts | [Native Runtime Providers](native-runtime-providers.md) |
 | understand the CLI commands | [Quickstart](quickstart.md) |
 | bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
 | see example outputs | [Example Reports](example-reports.md) |

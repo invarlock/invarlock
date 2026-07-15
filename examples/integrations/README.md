@@ -31,6 +31,9 @@ prerequisites, commands, and generated artifact list.
 - `design_partner_diagnostic/` provides the reviewer-owned case template for a
   single strict baseline-versus-transformed-subject diagnostic. The checked
   runbook lives in `docs/user-guide/design-partner-diagnostic.md`.
+- `runtime_providers/` runs the full authenticated schedule, directed policy,
+  native GGUF or TensorRT-LLM sides, and pair-receipt workflow for qualified
+  user-supplied artifacts.
 - `ci_registry/` shows how to attach current report verification, HTML, MLflow
   tags, Hugging Face model-card evidence, and release-review packets to
   existing CI and registry workflows.

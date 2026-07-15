@@ -6,6 +6,11 @@ boundary owns artifact identity, deterministic scoring, backend identity,
 observed device facts, and a portable receipt. InvarLock owns policy replay and
 the paired decision.
 
+Operators can start with the shorter [Native Runtime Providers](../user-guide/native-runtime-providers.md)
+guide and the [runnable pair example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/runtime_providers).
+This page defines the complete provider settings, qualification, and claim
+boundary.
+
 ## Included Providers
 
 | Provider | Artifact | Execution integration | Installation |
@@ -110,6 +115,47 @@ The builder derives every input digest, validates the closed material through
 the canonical schedule builder, and writes canonical JSON without replacing an
 existing output.
 
+Derive each native provider's settings inside the exact reviewed image with the
+provider-owned `inspect-inputs` command. This is the authoritative derivation
+path: do not hand-assemble artifact, backend, tokenizer, build, or device hashes.
+The image must be launched network-disabled with the authenticated container
+marker and exact image bindings. The runnable example shows the complete Docker
+launches. Inside those launches, use:
+
+```bash
+invarlock advanced runtime-behavior inspect-inputs \
+  --provider llama_cpp \
+  --artifact /models/baseline.gguf \
+  --backend-executable /opt/llama.cpp/llama-completion \
+  --backend-source /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
+  --seed 0 \
+  --context-length 8 \
+  --batch-size 1 \
+  --max-output-tokens 1 \
+  --timeout-seconds 300 \
+  --out baseline-gguf-settings.json \
+  --json
+
+invarlock advanced runtime-behavior inspect-inputs \
+  --provider tensorrt_llm \
+  --artifact /engines/subject \
+  --backend-executable /opt/invarlock/bin/tensorrt-llm-runner \
+  --tokenizer-contract /models/subject-tokenizer.json \
+  --seed 0 \
+  --context-length 8 \
+  --batch-size 1 \
+  --max-output-tokens 1 \
+  --timeout-seconds 300 \
+  --out subject-tensorrt-settings.json \
+  --json
+```
+
+The command securely inspects the mounted inputs, validates that the resulting
+settings reproduce their path-free identity, refuses to replace an existing
+output, and returns the provider-required `model_id`. Pass that returned model
+ID and the unchanged generated settings to both `prepare-binding` and
+`run-side`.
+
 Next prepare one binding for each role inside its selected pinned runtime
 image. `prepare-binding` opens the provider, so it must run inside the same
 strict, network-disabled container boundary required by the corresponding side
@@ -133,7 +179,7 @@ material, and reviewed image digest that the corresponding side run will use:
 ```bash
 invarlock advanced runtime-behavior prepare-binding \
   --provider llama_cpp \
-  --model-id "gguf-sha256-${BASELINE_GGUF_SHA256}.gguf" \
+  --model-id "$BASELINE_MODEL_ID" \
   --settings baseline-gguf-settings.json \
   --artifact /models/baseline.gguf \
   --backend-executable /opt/llama.cpp/llama-completion \
@@ -144,7 +190,7 @@ invarlock advanced runtime-behavior prepare-binding \
 
 invarlock advanced runtime-behavior prepare-binding \
   --provider tensorrt_llm \
-  --model-id "tensorrt-llm-sha256-${SUBJECT_ENGINE_TREE_SHA256}" \
+  --model-id "$SUBJECT_MODEL_ID" \
   --settings subject-tensorrt-settings.json \
   --artifact /engines/subject \
   --backend-executable /opt/invarlock/bin/tensorrt-llm-runner \
@@ -210,7 +256,7 @@ preparation.
 invarlock advanced runtime-behavior run-side \
   --role baseline \
   --provider llama_cpp \
-  --model-id "gguf-sha256-${GGUF_SHA256}.gguf" \
+  --model-id "$BASELINE_MODEL_ID" \
   --settings baseline-gguf-settings.json \
   --artifact /models/baseline.gguf \
   --backend-executable /opt/llama.cpp/llama-completion \
@@ -223,7 +269,7 @@ invarlock advanced runtime-behavior run-side \
 invarlock advanced runtime-behavior run-side \
   --role subject \
   --provider tensorrt_llm \
-  --model-id "tensorrt-llm-sha256-${ENGINE_TREE_SHA256}" \
+  --model-id "$SUBJECT_MODEL_ID" \
   --settings subject-tensorrt-settings.json \
   --artifact /engines/subject \
   --backend-executable /opt/invarlock/bin/tensorrt-llm-runner \
@@ -234,9 +280,10 @@ invarlock advanced runtime-behavior run-side \
   --out runtime-sides/subject
 ```
 
-The settings files contain public scalar settings and expected identities, not
-host paths or secrets. Digest and byte-length values must come from the exact
-artifacts and binaries mounted for the run. `llama_cpp` requires:
+The generated settings files contain public scalar settings and expected
+identities, not host paths or secrets. The following field lists describe the
+validated output contract; they are not a recipe for constructing it manually.
+`llama_cpp` includes:
 
 - `artifact_byte_length`, `artifact_sha256`, `gguf_metadata_sha256`,
   `tensor_inventory_sha256`, and `tokenizer_metadata_sha256`;
@@ -244,7 +291,7 @@ artifacts and binaries mounted for the run. `llama_cpp` requires:
 - `seed`, `context_length`, `batch_size`, `max_output_tokens`, and
   `timeout_seconds`.
 
-`tensorrt_llm` requires:
+`tensorrt_llm` includes:
 
 - `engine_bundle_tree_sha256`, `file_inventory_sha256`,
   `builder_config_sha256`, `tokenizer_metadata_sha256`, and

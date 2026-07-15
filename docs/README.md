@@ -39,6 +39,7 @@ strict verification handoff.
 
 - **Report reader**: start with [Reading a Report](user-guide/reading-report.md).
 - **Checkpoint evaluator**: start with [Getting Started](user-guide/getting-started.md).
+- **Native runtime operator**: use [Native Runtime Providers](user-guide/native-runtime-providers.md) for GGUF or TensorRT-LLM artifacts.
 - **CI owner**: continue from [Quickstart](user-guide/quickstart.md) to the [CLI Reference](reference/cli.md).
 - **Toolchain designer**: use [Alternatives Comparison](reference/alternatives-comparison.md) before choosing workflow components.
 
@@ -91,6 +92,7 @@ strict black-box run has passed.
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Live Examples](user-guide/live-examples.md)
 - [Integration Examples](user-guide/integrations.md)
+- [Native Runtime Providers](user-guide/native-runtime-providers.md) — authenticated GGUF and TensorRT-LLM side production
 - [Design-Partner Diagnostic](user-guide/design-partner-diagnostic.md)
 - [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
 - [Configuration Gallery](user-guide/config-gallery.md)

@@ -45,14 +45,11 @@ evidence, and render the outcome for people and CI.
 recomputes the acceptance decision with independently supplied inputs. `report
 html` turns the canonical JSON into a review-friendly document.
 
-For deployment-format checks, the experimental runtime-provider workflow can
-produce separate Hugging Face, GGUF/llama.cpp, or TensorRT-LLM sides and replay
-a policy-scoped `exact_match` comparison. The installed native commands cover
-GGUF and TensorRT-LLM; strict Hugging Face runtime-behavior evidence uses the
-provider-owned scorer through the Python API, while `evaluate` remains its
-normal CLI path. See
-[Runtime Providers](docs/reference/runtime-providers.md) for its runtime-image
-requirements and narrower claim boundary.
+For a deployed GGUF or TensorRT-LLM artifact, the first-party experimental
+runtime-provider workflow authenticates the native artifact, produces one side
+per role, and replays a policy-scoped `exact_match` comparison. See [Native
+Runtime Providers](docs/user-guide/native-runtime-providers.md) for the
+runnable operator path and its bounded claim.
 
 ## One Checkpoint Comparison
 
