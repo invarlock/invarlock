@@ -73,10 +73,20 @@ POLICY_PACK_APPROVAL_FIELDS = frozenset(
 POLICY_PACK_BEHAVIORAL_CLAIM_FIELDS = frozenset(
     {
         "claim_set",
-        "allowed_provider_names",
-        "allowed_artifact_formats",
+        "schedule_sha256",
+        "baseline",
+        "subject",
         "required_capabilities",
         "metric_policy",
+    }
+)
+POLICY_PACK_BEHAVIORAL_BINDING_FIELDS = frozenset(
+    {
+        "provider_name",
+        "artifact_format",
+        "artifact_identity_sha256",
+        "outer_image_digest",
+        "execution_settings_sha256",
     }
 )
 POLICY_PACK_BEHAVIORAL_CAPABILITY_FIELDS = frozenset(
@@ -89,6 +99,7 @@ RUNTIME_BEHAVIORAL_METRICS = frozenset({"exact_match"})
 RUNTIME_ARTIFACT_FORMATS = frozenset({"hf_snapshot", "gguf", "tensorrt_llm_engine"})
 
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _PROVIDER_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _OVERRIDE_PATH_RE = re.compile(r"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$")
 _JSON_INTEGER_RE = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
@@ -204,11 +215,19 @@ def _load_structured_text(text: str, *, suffix: str) -> Any:
         ) from exc
 
 
-def _load_structured_file_snapshot(path: Path) -> tuple[bytes, Any]:
+def _load_structured_file_snapshot(
+    path: Path, *, max_bytes: int | None = None
+) -> tuple[bytes, Any]:
     try:
-        payload = read_regular_file_bytes(path, label="policy pack")
+        payload = read_regular_file_bytes(
+            path,
+            label="policy pack",
+            max_bytes=max_bytes,
+        )
         text = payload.decode("utf-8")
-    except (StrictJsonError, UnicodeDecodeError) as exc:
+    except StrictJsonError as exc:
+        raise ValueError(str(exc)) from exc
+    except UnicodeDecodeError as exc:
         raise ValueError("policy pack could not be decoded as JSON/YAML") from exc
     return payload, _load_structured_text(text, suffix=path.suffix)
 
@@ -323,28 +342,46 @@ def _behavioral_claim_errors(value: object) -> list[str]:
     if value.get("claim_set") != RUNTIME_BEHAVIORAL_CLAIM_SET:
         errors.append(f"{path}.claim_set must be {RUNTIME_BEHAVIORAL_CLAIM_SET}")
 
-    providers = value.get("allowed_provider_names")
-    errors.extend(
-        _ordered_string_list_errors(
-            providers,
-            path=f"{path}.allowed_provider_names",
-        )
-    )
-    if isinstance(providers, list) and any(
-        not isinstance(provider, str) or _PROVIDER_NAME_RE.fullmatch(provider) is None
-        for provider in providers
+    schedule_sha256 = value.get("schedule_sha256")
+    if (
+        not isinstance(schedule_sha256, str)
+        or _SHA256_RE.fullmatch(schedule_sha256) is None
     ):
-        errors.append(
-            f"{path}.allowed_provider_names contains a non-canonical provider name"
-        )
+        errors.append(f"{path}.schedule_sha256 must be a lowercase sha256 digest")
 
-    errors.extend(
-        _ordered_string_list_errors(
-            value.get("allowed_artifact_formats"),
-            path=f"{path}.allowed_artifact_formats",
-            allowed=RUNTIME_ARTIFACT_FORMATS,
-        )
-    )
+    for role in ("baseline", "subject"):
+        binding = value.get(role)
+        binding_path = f"{path}.{role}"
+        if not isinstance(binding, dict) or set(binding) != (
+            POLICY_PACK_BEHAVIORAL_BINDING_FIELDS
+        ):
+            errors.append(
+                f"{binding_path} must contain exactly "
+                + ", ".join(sorted(POLICY_PACK_BEHAVIORAL_BINDING_FIELDS))
+            )
+            continue
+        provider_name = binding.get("provider_name")
+        if (
+            not isinstance(provider_name, str)
+            or _PROVIDER_NAME_RE.fullmatch(provider_name) is None
+        ):
+            errors.append(f"{binding_path}.provider_name must be canonical")
+        if binding.get("artifact_format") not in RUNTIME_ARTIFACT_FORMATS:
+            errors.append(f"{binding_path}.artifact_format is unsupported")
+        for field in ("artifact_identity_sha256", "execution_settings_sha256"):
+            digest = binding.get(field)
+            if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+                errors.append(
+                    f"{binding_path}.{field} must be a lowercase sha256 digest"
+                )
+        outer_image_digest = binding.get("outer_image_digest")
+        if (
+            not isinstance(outer_image_digest, str)
+            or _DIGEST_RE.fullmatch(outer_image_digest) is None
+        ):
+            errors.append(
+                f"{binding_path}.outer_image_digest must be a sha256 image digest"
+            )
 
     capabilities = value.get("required_capabilities")
     required_metrics: object = None
@@ -657,8 +694,9 @@ def build_policy_pack(
 def build_behavioral_policy_pack(
     *,
     tier: str,
-    allowed_provider_names: list[str],
-    allowed_artifact_formats: list[str],
+    schedule_sha256: str,
+    baseline: dict[str, Any],
+    subject: dict[str, Any],
     metric_kind: str,
     minimum_subject_score: float,
     maximum_regression: float,
@@ -685,8 +723,9 @@ def build_behavioral_policy_pack(
         },
         "behavioral_claim": {
             "claim_set": RUNTIME_BEHAVIORAL_CLAIM_SET,
-            "allowed_provider_names": list(allowed_provider_names),
-            "allowed_artifact_formats": list(allowed_artifact_formats),
+            "schedule_sha256": schedule_sha256,
+            "baseline": copy.deepcopy(baseline),
+            "subject": copy.deepcopy(subject),
             "required_capabilities": {
                 "tasks": ["text_causal"],
                 "metrics": [metric_kind],
@@ -716,10 +755,12 @@ def load_policy_pack(path: Path) -> dict[str, Any]:
     return read_policy_pack_snapshot(path)[1]
 
 
-def read_policy_pack_snapshot(path: Path) -> tuple[bytes, dict[str, Any]]:
+def read_policy_pack_snapshot(
+    path: Path, *, max_bytes: int | None = None
+) -> tuple[bytes, dict[str, Any]]:
     """Read one finite policy-pack object from one regular-file snapshot."""
 
-    raw, payload = _load_structured_file_snapshot(path)
+    raw, payload = _load_structured_file_snapshot(path, max_bytes=max_bytes)
     errors = _json_value_errors(payload, path="policy input")
     if errors:
         raise ValueError("; ".join(errors))

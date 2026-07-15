@@ -79,6 +79,7 @@ class AdvancedGroup(TyperGroup):
             "policy",
             "plugins",
             "calibrate",
+            "runtime-behavior",
             "runtime-verify",
             "inputs",
         ]
@@ -507,6 +508,10 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
         from invarlock.cli.commands.verify import runtime_verify_app
 
         return _register_command(name, runtime_verify_app)
+    if name == "runtime-behavior":
+        from .commands.runtime_behavior import runtime_behavior_app
+
+        return _register(name, runtime_behavior_app)
     if name == "inputs":
         from .commands.inputs import inputs_app
 

@@ -15,6 +15,7 @@ from .behavioral_schedule import (
     RuntimeBehavioralDatasetIdentity,
     RuntimeBehavioralSchedule,
     build_runtime_behavioral_schedule,
+    build_runtime_behavioral_schedule_from_material,
     canonical_runtime_behavioral_schedule_json,
     load_runtime_behavioral_schedule,
     parse_runtime_behavioral_schedule_json,
@@ -45,6 +46,7 @@ from .types import (
     TensorRTLLMArtifactIdentity,
     artifact_identity_sha256,
     canonical_artifact_identity_json,
+    runtime_execution_settings_from_mapping,
 )
 
 INVARLOCK_RUNTIME_PROVIDER_ABI = RUNTIME_PROVIDER_ABI_VERSION
@@ -111,7 +113,9 @@ __all__ = [
     "TensorRTLLMArtifactIdentity",
     "artifact_identity_sha256",
     "build_runtime_behavioral_schedule",
+    "build_runtime_behavioral_schedule_from_material",
     "canonical_artifact_identity_json",
+    "runtime_execution_settings_from_mapping",
     "canonical_runtime_behavioral_schedule_json",
     "evaluate_runtime_claim_compatibility",
     "load_runtime_behavioral_schedule",

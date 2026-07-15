@@ -15,6 +15,7 @@ from invarlock.core.runtime_provider.behavioral_schedule import (
     MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS,
     RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
     build_runtime_behavioral_schedule,
+    build_runtime_behavioral_schedule_from_material,
     canonical_runtime_behavioral_schedule_json,
     load_runtime_behavioral_schedule,
     parse_runtime_behavioral_schedule_json,
@@ -65,6 +66,40 @@ def test_build_runtime_behavioral_schedule_recomputes_canonical_digest() -> None
     assert schedule.schedule_sha256 == hashlib.sha256(expected_json).hexdigest()
     assert schedule.evaluation_batch().schedule_sha256 == schedule.schedule_sha256
     assert [record.record_id for record in schedule.records] == ["arc/1", "arc/2"]
+
+
+def test_build_schedule_from_material_derives_digest_in_canonical_builder() -> None:
+    payload = _payload()
+    records = [
+        {
+            "record_id": record["record_id"],
+            "input_text": record["input_text"],
+            "expected_output": record["expected_output"],
+        }
+        for record in payload["records"]
+    ]
+
+    schedule = build_runtime_behavioral_schedule_from_material(
+        dataset_identity=payload["dataset_identity"],
+        records=records,
+    )
+
+    assert schedule.to_payload() == payload
+    assert (
+        schedule.schedule_sha256
+        == build_runtime_behavioral_schedule(payload).schedule_sha256
+    )
+
+
+def test_build_schedule_from_material_rejects_caller_supplied_digest() -> None:
+    payload = _payload()
+    record = dict(payload["records"][0])
+
+    with pytest.raises(ValueError, match="unknown input_sha256"):
+        build_runtime_behavioral_schedule_from_material(
+            dataset_identity=payload["dataset_identity"],
+            records=[record],
+        )
 
 
 def test_schedule_digest_binds_order_and_exact_record_material() -> None:

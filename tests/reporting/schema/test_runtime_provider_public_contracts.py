@@ -126,6 +126,7 @@ def _receipt_payload() -> dict[str, object]:
             "device_name": "x86_64",
             "compute_capability": None,
             "driver_version": None,
+            "cuda_runtime_version": None,
         },
         "outer_image_digest": "sha256:" + _digest("d"),
         "scoring_observation_sha256": _digest("e"),
@@ -147,7 +148,9 @@ def _receipt_payload() -> dict[str, object]:
 def test_runtime_provider_public_schemas_accept_canonical_payloads(
     loader, payload
 ) -> None:
-    jsonschema.validate(payload, loader())
+    schema = loader()
+    assert isinstance(schema, dict)
+    jsonschema.validate(payload, schema)
 
 
 @pytest.mark.parametrize(

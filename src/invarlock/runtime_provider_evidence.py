@@ -306,6 +306,7 @@ def _receipt_from_payload(payload: dict[str, object]) -> RuntimeProviderReceipt:
             device_name=cast(str, device["device_name"]),
             compute_capability=_optional_text(device["compute_capability"]),
             driver_version=_optional_text(device["driver_version"]),
+            cuda_runtime_version=_optional_text(device["cuda_runtime_version"]),
         ),
         outer_image_digest=_optional_text(payload["outer_image_digest"]),
         scoring_observation_sha256=cast(str, payload["scoring_observation_sha256"]),

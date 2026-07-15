@@ -32,6 +32,7 @@ _DATASET_IDENTITY_FIELDS = frozenset(
 _RECORD_FIELDS = frozenset(
     {"record_id", "input_text", "input_sha256", "expected_output"}
 )
+_RECORD_MATERIAL_FIELDS = frozenset({"record_id", "input_text", "expected_output"})
 _PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
@@ -336,6 +337,43 @@ def build_runtime_behavioral_schedule(
     )
 
 
+def build_runtime_behavioral_schedule_from_material(
+    *,
+    dataset_identity: Mapping[str, object],
+    records: Sequence[object],
+) -> RuntimeBehavioralSchedule:
+    """Build canonical schedule material while deriving every input digest."""
+
+    materialized_records: list[dict[str, object]] = []
+    for index, value in enumerate(records):
+        field_name = f"records[{index}]"
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{field_name} must be an object")
+        _require_exact_fields(
+            value,
+            expected=_RECORD_MATERIAL_FIELDS,
+            field_name=field_name,
+        )
+        input_text = value["input_text"]
+        if not isinstance(input_text, str):
+            raise ValueError(f"{field_name}.input_text must be text")
+        materialized_records.append(
+            {
+                "record_id": value["record_id"],
+                "input_text": input_text,
+                "input_sha256": hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                "expected_output": value["expected_output"],
+            }
+        )
+    return build_runtime_behavioral_schedule(
+        {
+            "format_version": RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
+            "dataset_identity": dict(dataset_identity),
+            "records": materialized_records,
+        }
+    )
+
+
 def parse_runtime_behavioral_schedule_json(text: str) -> RuntimeBehavioralSchedule:
     """Parse strict JSON and build a closed runtime behavioral schedule."""
 
@@ -380,6 +418,7 @@ __all__ = [
     "RuntimeBehavioralDatasetIdentity",
     "RuntimeBehavioralSchedule",
     "build_runtime_behavioral_schedule",
+    "build_runtime_behavioral_schedule_from_material",
     "canonical_runtime_behavioral_schedule_json",
     "load_runtime_behavioral_schedule",
     "parse_runtime_behavioral_schedule_json",

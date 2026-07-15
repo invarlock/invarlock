@@ -23,11 +23,27 @@ def _dataset_identity() -> dict[str, object]:
     }
 
 
+def _binding(
+    provider_name: str,
+    artifact_format: str,
+    *,
+    marker: str,
+) -> dict[str, object]:
+    return {
+        "provider_name": provider_name,
+        "artifact_format": artifact_format,
+        "artifact_identity_sha256": marker * 64,
+        "outer_image_digest": "sha256:" + marker * 64,
+        "execution_settings_sha256": "e" * 64,
+    }
+
+
 def _pack() -> dict[str, object]:
     return build_behavioral_policy_pack(
         tier="balanced",
-        allowed_provider_names=["hf_transformers", "llama_cpp"],
-        allowed_artifact_formats=["gguf", "hf_snapshot"],
+        schedule_sha256="f" * 64,
+        baseline=_binding("hf_transformers", "hf_snapshot", marker="a"),
+        subject=_binding("llama_cpp", "gguf", marker="b"),
         metric_kind="exact_match",
         minimum_subject_score=0.7,
         maximum_regression=0.05,
@@ -56,9 +72,21 @@ def test_behavioral_policy_pack_round_trip_and_schema() -> None:
         ),
         (
             lambda pack: pack["behavioral_claim"].update(  # type: ignore[union-attr]
-                {"allowed_provider_names": ["llama-cpp"]}
+                {"baseline": _binding("llama-cpp", "hf_snapshot", marker="a")}
             ),
-            "non-canonical provider",
+            "provider_name must be canonical",
+        ),
+        (
+            lambda pack: pack["behavioral_claim"].update(  # type: ignore[union-attr]
+                {"schedule_sha256": "A" * 64}
+            ),
+            "schedule_sha256 must be a lowercase sha256 digest",
+        ),
+        (
+            lambda pack: pack["behavioral_claim"]["subject"].update(  # type: ignore[index,union-attr]
+                {"outer_image_digest": "B" * 64}
+            ),
+            "outer_image_digest must be a sha256 image digest",
         ),
         (
             lambda pack: pack["behavioral_claim"]["required_capabilities"].update(  # type: ignore[index,union-attr]
@@ -119,12 +147,13 @@ def test_v1_v2_cannot_smuggle_behavioral_authority() -> None:
     assert any("only for policy-pack-v3" in error for error in errors)
 
 
-def test_behavioral_builder_rejects_noncanonical_order_and_metric() -> None:
-    with pytest.raises(ValueError, match="canonical sorted order"):
+def test_behavioral_builder_rejects_malformed_directed_binding_and_metric() -> None:
+    with pytest.raises(ValueError, match="provider_name must be canonical"):
         build_behavioral_policy_pack(
             tier="balanced",
-            allowed_provider_names=["llama_cpp", "hf_transformers"],
-            allowed_artifact_formats=["gguf", "hf_snapshot"],
+            schedule_sha256="f" * 64,
+            baseline=_binding("llama-cpp", "hf_snapshot", marker="a"),
+            subject=_binding("llama_cpp", "gguf", marker="b"),
             metric_kind="exact_match",
             minimum_subject_score=0.7,
             maximum_regression=0.05,
@@ -134,8 +163,9 @@ def test_behavioral_builder_rejects_noncanonical_order_and_metric() -> None:
     with pytest.raises(ValueError, match="must be exact_match"):
         build_behavioral_policy_pack(
             tier="balanced",
-            allowed_provider_names=["hf_transformers"],
-            allowed_artifact_formats=["hf_snapshot"],
+            schedule_sha256="f" * 64,
+            baseline=_binding("hf_transformers", "hf_snapshot", marker="a"),
+            subject=_binding("llama_cpp", "gguf", marker="b"),
             metric_kind="multiple_choice_accuracy",
             minimum_subject_score=0.7,
             maximum_regression=0.05,

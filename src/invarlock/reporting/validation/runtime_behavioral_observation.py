@@ -193,10 +193,6 @@ def _require_authentic_record_facts(
     return tuple(outputs)
 
 
-def _normalize_answer(text: str) -> str:
-    return " ".join(text.strip().lower().split())
-
-
 def verify_runtime_behavioral_observation(
     payload: Mapping[str, object],
     *,
@@ -245,7 +241,7 @@ def verify_runtime_behavioral_observation(
         cast(str, record.expected_output) for record in expected_batch.records
     )
     correct_records = sum(
-        _normalize_answer(output) == _normalize_answer(expected)
+        output == expected
         for output, expected in zip(outputs, expected_outputs, strict=True)
     )
     total_records = len(expected_outputs)

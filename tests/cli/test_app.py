@@ -130,6 +130,8 @@ def test_advanced_group_handles_registered_runtime_and_unknown_commands():
 
     assert _load_advanced_subapp(advanced, "runtime-verify") is True
     assert advanced.get_command(advanced_ctx, "runtime-verify") is not None
+    assert _load_advanced_subapp(advanced, "runtime-behavior") is True
+    assert advanced.get_command(advanced_ctx, "runtime-behavior") is not None
     assert _load_advanced_subapp(advanced, "definitely-missing") is False
     assert advanced.get_command(advanced_ctx, "definitely-missing") is None
 

@@ -121,6 +121,7 @@ def _receipt_payload(
             "device_name": "x86_64",
             "compute_capability": None,
             "driver_version": None,
+            "cuda_runtime_version": None,
         },
         "outer_image_digest": _IMAGE_DIGEST,
         "scoring_observation_sha256": _sha256(observation_bytes),
@@ -220,6 +221,24 @@ def test_runtime_manifest_v2_writer_binds_portable_sibling_inputs(
             "sha256": _sha256(path.read_bytes()),
         }
     assert str(tmp_path) not in manifest.read_text(encoding="utf-8")
+
+
+def test_runtime_manifest_v2_strict_verification_rejects_network_access(
+    tmp_path: Path,
+) -> None:
+    report, manifest, _sidecars = _write_v2_inputs(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["outer_container"]["allow_network"] = True
+    manifest.write_bytes(_canonical_json(payload))
+
+    result = runtime_verify.verify_runtime_manifest(
+        report,
+        manifest,
+        require_strict_runtime=True,
+    )
+
+    assert result.ok is False
+    assert "strict runtime forbids allow_network=true" in result.errors
 
 
 def test_runtime_manifest_v2_public_contract_is_valid_and_packaged() -> None:

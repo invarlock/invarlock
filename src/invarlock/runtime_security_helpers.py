@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -97,6 +98,7 @@ __all__ = [
     "RuntimeManifestLoadResult",
     "RuntimeProviderManifestFiles",
     "running_inside_container",
+    "strict_container_boundary_present",
     "third_party_plugins_allowed",
     "unverified_provenance_allowed",
     "write_runtime_manifest",
@@ -283,6 +285,52 @@ def third_party_plugins_allowed() -> bool:
 
 def running_inside_container() -> bool:
     return _coerce_bool(os.environ.get(CONTAINER_EXECUTION_ENV)) is True
+
+
+def _regular_file_marker_present(path: str) -> bool:
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
+def _read_bounded_kernel_file(path: str, *, max_bytes: int = 16 * 1024) -> bytes | None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            return None
+        payload = os.read(descriptor, max_bytes + 1)
+        if len(payload) > max_bytes:
+            return None
+        return payload
+    except OSError:
+        return None
+    finally:
+        os.close(descriptor)
+
+
+def strict_container_boundary_present() -> bool:
+    """Require both InvarLock intent and kernel-visible container evidence."""
+
+    if not running_inside_container():
+        return False
+    if any(
+        _regular_file_marker_present(path)
+        for path in ("/.dockerenv", "/run/.containerenv")
+    ):
+        return True
+    cgroup = _read_bounded_kernel_file("/proc/1/cgroup")
+    if cgroup is None:
+        return False
+    lowered = cgroup.lower()
+    return any(
+        marker in lowered
+        for marker in (b"docker", b"containerd", b"kubepods", b"libpod")
+    )
 
 
 def current_execution_mode() -> str:

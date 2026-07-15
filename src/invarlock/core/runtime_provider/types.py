@@ -488,7 +488,62 @@ class ScoringObservation:
             raise ValueError("record IDs must be unique within an observation")
 
 
-type RuntimeScorer = Callable[[EvaluationBatch], ScoringObservation]
+@dataclass(frozen=True)
+class RuntimeExecutionSettings:
+    """Shared deterministic settings captured in provider receipts."""
+
+    seed: int
+    context_length: int
+    batch_size: int
+    max_output_tokens: int
+    timeout_seconds: int
+    allow_network: bool = False
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.seed, bool)
+            or not isinstance(self.seed, int)
+            or self.seed < 0
+        ):
+            raise ValueError("seed must be a non-negative integer")
+        _require_positive_int(self.context_length, field_name="context_length")
+        _require_positive_int(self.batch_size, field_name="batch_size")
+        _require_positive_int(self.max_output_tokens, field_name="max_output_tokens")
+        _require_positive_int(self.timeout_seconds, field_name="timeout_seconds")
+        if not isinstance(self.allow_network, bool):
+            raise ValueError("allow_network must be boolean")
+
+
+def runtime_execution_settings_from_mapping(
+    settings: Mapping[str, JSONScalar],
+    *,
+    allow_network: bool,
+) -> RuntimeExecutionSettings:
+    """Build the canonical portable execution settings from provider settings."""
+
+    if not isinstance(settings, Mapping):
+        raise TypeError("settings must be a mapping")
+    return RuntimeExecutionSettings(
+        seed=_require_nonnegative_int(settings.get("seed"), field_name="seed"),
+        context_length=_require_positive_int(
+            settings.get("context_length"), field_name="context_length"
+        ),
+        batch_size=_require_positive_int(
+            settings.get("batch_size"), field_name="batch_size"
+        ),
+        max_output_tokens=_require_positive_int(
+            settings.get("max_output_tokens"), field_name="max_output_tokens"
+        ),
+        timeout_seconds=_require_positive_int(
+            settings.get("timeout_seconds"), field_name="timeout_seconds"
+        ),
+        allow_network=allow_network,
+    )
+
+
+type RuntimeScorer = Callable[
+    [EvaluationBatch, RuntimeExecutionSettings], ScoringObservation
+]
 
 
 @dataclass(frozen=True)
@@ -523,32 +578,6 @@ class RuntimeExecutionContext:
             raise ValueError("scorer must be callable")
         if self.close_callback is not None and not callable(self.close_callback):
             raise ValueError("close_callback must be callable")
-
-
-@dataclass(frozen=True)
-class RuntimeExecutionSettings:
-    """Shared deterministic settings captured in provider receipts."""
-
-    seed: int
-    context_length: int
-    batch_size: int
-    max_output_tokens: int
-    timeout_seconds: int
-    allow_network: bool = False
-
-    def __post_init__(self) -> None:
-        if (
-            isinstance(self.seed, bool)
-            or not isinstance(self.seed, int)
-            or self.seed < 0
-        ):
-            raise ValueError("seed must be a non-negative integer")
-        _require_positive_int(self.context_length, field_name="context_length")
-        _require_positive_int(self.batch_size, field_name="batch_size")
-        _require_positive_int(self.max_output_tokens, field_name="max_output_tokens")
-        _require_positive_int(self.timeout_seconds, field_name="timeout_seconds")
-        if not isinstance(self.allow_network, bool):
-            raise ValueError("allow_network must be boolean")
 
 
 @dataclass(frozen=True)
@@ -592,6 +621,7 @@ class RuntimeDeviceFacts:
     device_name: str
     compute_capability: str | None = None
     driver_version: str | None = None
+    cuda_runtime_version: str | None = None
 
     def __post_init__(self) -> None:
         _require_provider_name(self.device_kind, field_name="device_kind")
@@ -603,6 +633,10 @@ class RuntimeDeviceFacts:
             raise ValueError("compute_capability must use major.minor notation")
         if self.driver_version is not None:
             _require_nonempty_string(self.driver_version, field_name="driver_version")
+        if self.cuda_runtime_version is not None:
+            _require_nonempty_string(
+                self.cuda_runtime_version, field_name="cuda_runtime_version"
+            )
 
 
 @dataclass(frozen=True)
@@ -651,6 +685,7 @@ __all__ = [
     "RuntimeExecutionContext",
     "RuntimeExecutionMode",
     "RuntimeExecutionSettings",
+    "runtime_execution_settings_from_mapping",
     "RuntimeMetric",
     "RuntimeProviderCapabilities",
     "RuntimeProviderPluginIdentity",

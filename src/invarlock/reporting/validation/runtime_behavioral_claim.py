@@ -9,6 +9,7 @@ thresholds.  Provider-supplied aggregate values are never consumed.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
@@ -17,7 +18,9 @@ from invarlock.core.runtime_provider import (
     RUNTIME_BEHAVIORAL_CLAIM_SET,
     EvaluationBatch,
     ModelArtifactIdentity,
+    RuntimeExecutionSettings,
     RuntimeProviderCapabilities,
+    RuntimeProviderReceipt,
     ScoringObservation,
     artifact_identity_sha256,
     evaluate_runtime_claim_compatibility,
@@ -98,8 +101,6 @@ def _artifact_binding(
     identity: ModelArtifactIdentity,
     *,
     capabilities: RuntimeProviderCapabilities,
-    allowed_provider_names: frozenset[str],
-    allowed_artifact_formats: frozenset[str],
     required_tasks: frozenset[str],
     required_metrics: frozenset[str],
     required_surfaces: frozenset[str],
@@ -107,15 +108,6 @@ def _artifact_binding(
     errors: list[str] = []
     provider_name = capabilities.provider_name
     artifact_format = identity.artifact_format
-    if provider_name not in allowed_provider_names:
-        errors.append(
-            f"{role} provider {provider_name!r} is not authorized by policy-pack-v3"
-        )
-    if artifact_format not in allowed_artifact_formats:
-        errors.append(
-            f"{role} artifact format {artifact_format!r} is not authorized by "
-            "policy-pack-v3"
-        )
     if artifact_format not in capabilities.artifact_formats:
         errors.append(
             f"{role} provider {provider_name!r} does not declare artifact format "
@@ -189,6 +181,81 @@ def _string_set(value: object) -> frozenset[str]:
     return frozenset(item for item in value if isinstance(item, str))
 
 
+def runtime_execution_settings_sha256(settings: RuntimeExecutionSettings) -> str:
+    """Return the canonical digest used by directed behavioral policy bindings."""
+
+    if not isinstance(settings, RuntimeExecutionSettings):
+        raise TypeError("settings must be RuntimeExecutionSettings")
+    encoded = json.dumps(
+        asdict(settings),
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _receipt_binding_errors(
+    role: str,
+    *,
+    receipt: RuntimeProviderReceipt,
+    capabilities: RuntimeProviderCapabilities,
+    artifact_identity: ModelArtifactIdentity,
+    observation: Mapping[str, object] | ScoringObservation,
+    expected_binding: object,
+) -> list[str]:
+    errors: list[str] = []
+    if receipt.capabilities != capabilities:
+        errors.append(f"{role} receipt capabilities do not match passed capabilities")
+    if receipt.artifact_identity != artifact_identity:
+        errors.append(
+            f"{role} receipt artifact identity does not match passed artifact"
+        )
+
+    payload = _observation_payload(observation)
+    if payload is None:
+        errors.append(f"{role} receipt cannot bind a non-JSON scoring observation")
+    else:
+        try:
+            observation_bytes = json.dumps(
+                dict(payload),
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        except (TypeError, ValueError):
+            errors.append(f"{role} receipt cannot bind a non-canonical observation")
+        else:
+            observed_digest = hashlib.sha256(observation_bytes).hexdigest()
+            if receipt.scoring_observation_sha256 != observed_digest:
+                errors.append(
+                    f"{role} receipt scoring observation digest does not match "
+                    "passed observation"
+                )
+
+    if not isinstance(expected_binding, Mapping):
+        errors.append(f"policy-pack-v3 is missing behavioral_claim.{role}")
+        return errors
+
+    artifact_sha256 = artifact_identity_sha256(artifact_identity)
+    observed_binding: dict[str, object] = {
+        "provider_name": capabilities.provider_name,
+        "artifact_format": artifact_identity.artifact_format,
+        "artifact_identity_sha256": artifact_sha256,
+        "outer_image_digest": receipt.outer_image_digest,
+        "execution_settings_sha256": runtime_execution_settings_sha256(
+            receipt.execution_settings
+        ),
+    }
+    for field, observed in observed_binding.items():
+        expected = expected_binding.get(field)
+        if observed != expected:
+            errors.append(f"{role} {field} does not match the directed policy binding")
+    return errors
+
+
 def _number(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
@@ -201,6 +268,8 @@ def verify_runtime_behavioral_claim(
     subject_capabilities: RuntimeProviderCapabilities,
     baseline_artifact_identity: ModelArtifactIdentity,
     subject_artifact_identity: ModelArtifactIdentity,
+    baseline_receipt: RuntimeProviderReceipt,
+    subject_receipt: RuntimeProviderReceipt,
     baseline_observation: Mapping[str, object] | ScoringObservation,
     subject_observation: Mapping[str, object] | ScoringObservation,
     schedule: RuntimeBehavioralSchedule,
@@ -249,6 +318,12 @@ def verify_runtime_behavioral_claim(
             f"paired runtime verification requires {RUNTIME_BEHAVIORAL_CLAIM_SET}"
         )
 
+    if claim.get("schedule_sha256") != authenticated_schedule.schedule_sha256:
+        errors.append(
+            "authenticated runtime behavioral schedule does not match the directed "
+            "policy binding"
+        )
+
     compatibility_block = policy.get("compatibility")
     compatibility_payload = (
         compatibility_block if isinstance(compatibility_block, Mapping) else {}
@@ -260,8 +335,6 @@ def verify_runtime_behavioral_claim(
         )
     )
 
-    allowed_provider_names = _string_set(claim.get("allowed_provider_names"))
-    allowed_artifact_formats = _string_set(claim.get("allowed_artifact_formats"))
     required_capabilities = claim.get("required_capabilities")
     required_payload = (
         required_capabilities if isinstance(required_capabilities, Mapping) else {}
@@ -283,8 +356,6 @@ def verify_runtime_behavioral_claim(
         "baseline",
         baseline_artifact_identity,
         capabilities=baseline_capabilities,
-        allowed_provider_names=allowed_provider_names,
-        allowed_artifact_formats=allowed_artifact_formats,
         required_tasks=required_tasks,
         required_metrics=required_metrics,
         required_surfaces=required_surfaces,
@@ -293,14 +364,42 @@ def verify_runtime_behavioral_claim(
         "subject",
         subject_artifact_identity,
         capabilities=subject_capabilities,
-        allowed_provider_names=allowed_provider_names,
-        allowed_artifact_formats=allowed_artifact_formats,
         required_tasks=required_tasks,
         required_metrics=required_metrics,
         required_surfaces=required_surfaces,
     )
     errors.extend(baseline_artifact_errors)
     errors.extend(subject_artifact_errors)
+
+    if not isinstance(baseline_receipt, RuntimeProviderReceipt):
+        raise TypeError("baseline_receipt must be a RuntimeProviderReceipt")
+    if not isinstance(subject_receipt, RuntimeProviderReceipt):
+        raise TypeError("subject_receipt must be a RuntimeProviderReceipt")
+    errors.extend(
+        _receipt_binding_errors(
+            "baseline",
+            receipt=baseline_receipt,
+            capabilities=baseline_capabilities,
+            artifact_identity=baseline_artifact_identity,
+            observation=baseline_observation,
+            expected_binding=claim.get("baseline"),
+        )
+    )
+    errors.extend(
+        _receipt_binding_errors(
+            "subject",
+            receipt=subject_receipt,
+            capabilities=subject_capabilities,
+            artifact_identity=subject_artifact_identity,
+            observation=subject_observation,
+            expected_binding=claim.get("subject"),
+        )
+    )
+    if baseline_receipt.execution_settings != subject_receipt.execution_settings:
+        errors.append(
+            "baseline and subject execution settings must be equal for comparable "
+            "decoding"
+        )
 
     baseline_result, baseline_errors = _verify_one_observation(
         "baseline",
@@ -369,5 +468,6 @@ def verify_runtime_behavioral_claim(
 __all__ = [
     "PAIRED_BEHAVIORAL_METRICS",
     "RuntimeBehavioralClaimVerificationResult",
+    "runtime_execution_settings_sha256",
     "verify_runtime_behavioral_claim",
 ]

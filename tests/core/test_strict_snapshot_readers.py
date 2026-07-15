@@ -176,6 +176,22 @@ def test_regular_snapshot_enforces_explicit_byte_limit(tmp_path: Path) -> None:
             )
 
 
+def test_regular_snapshot_rechecks_limit_after_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "input.json"
+    path.write_bytes(b"12")
+    original_fdopen = strict_json.os.fdopen
+
+    def grow_before_read(descriptor: int, mode: str, *, closefd: bool) -> object:
+        path.write_bytes(b"12345")
+        return original_fdopen(descriptor, mode, closefd=closefd)
+
+    monkeypatch.setattr(strict_json.os, "fdopen", grow_before_read)
+    with pytest.raises(StrictJsonError, match="3-byte size limit"):
+        read_regular_file_bytes(path, label="input", max_bytes=3)
+
+
 def test_regular_snapshot_rejects_missing_directory_and_unsafe_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

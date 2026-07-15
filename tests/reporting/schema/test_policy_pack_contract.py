@@ -675,7 +675,7 @@ def test_policy_pack_snapshot_helpers_reject_unsafe_or_non_json_values(
     monkeypatch.setattr(
         policy_pack_mod,
         "_load_structured_file_snapshot",
-        lambda _path: (b"{}", {"bad": {1, 2}}),
+        lambda _path, *, max_bytes=None: (b"{}", {"bad": {1, 2}}),
     )
     with pytest.raises(ValueError, match="unsupported value type"):
         policy_pack_mod.read_policy_pack_snapshot(tmp_path / "unused.json")
@@ -687,3 +687,18 @@ def test_policy_pack_snapshot_helpers_reject_unsafe_or_non_json_values(
     )
     with pytest.raises(ValueError, match="unsupported value type"):
         policy_pack_mod.load_policy_input(tmp_path / "unused.json")
+
+
+def test_policy_pack_snapshot_honors_public_byte_bound(tmp_path: Path) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text('{"format":"policy-pack-v2"}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="size limit"):
+        policy_pack_mod.read_policy_pack_snapshot(policy_path, max_bytes=8)
+
+    raw, payload = policy_pack_mod.read_policy_pack_snapshot(
+        policy_path,
+        max_bytes=policy_path.stat().st_size,
+    )
+    assert raw == policy_path.read_bytes()
+    assert payload == {"format": "policy-pack-v2"}

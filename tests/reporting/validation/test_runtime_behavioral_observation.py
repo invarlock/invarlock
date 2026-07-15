@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 import pytest
 
@@ -71,7 +72,7 @@ def _record(
 def _payload() -> dict[str, object]:
     batch = _batch()
     records = [
-        _record(batch.records[0], output="  PARIS\n"),
+        _record(batch.records[0], output="Paris"),
         _record(batch.records[1], output="B"),
     ]
     return {
@@ -98,6 +99,29 @@ def test_verifier_recomputes_exact_match_from_record_facts() -> None:
     assert result.correct_records == 1
     assert result.total_records == 2
     assert result.aggregate_source_sha256 == _payload()["aggregate_source_sha256"]
+
+
+@pytest.mark.parametrize("output", ["paris", " Paris", "Paris\n"])
+def test_exact_match_does_not_normalize_output(output: str) -> None:
+    payload = _payload()
+    records = copy.deepcopy(payload["records"])
+    assert isinstance(records, list)
+    assert isinstance(records[0], dict)
+    records[0]["output_text"] = output
+    records[0]["output_sha256"] = _sha256(output)
+    payload["records"] = records
+    payload["aggregate_source_sha256"] = _records_sha256(records)
+
+    result = verify_runtime_behavioral_observation(
+        payload,
+        expected_provider_name="llama_cpp",
+        expected_artifact_identity_sha256=_sha256("artifact"),
+        expected_batch=_batch(),
+        metric="exact_match",
+    )
+
+    assert result.correct_records == 0
+    assert result.value == 0.0
 
 
 @pytest.mark.parametrize(
@@ -310,4 +334,42 @@ def test_verifier_rejects_unsupported_metrics(metric: str) -> None:
             expected_artifact_identity_sha256=_sha256("artifact"),
             expected_batch=_batch(),
             metric=metric,
+        )
+
+
+def test_verifier_rejects_noncanonical_expected_bindings() -> None:
+    with pytest.raises(RuntimeBehavioralObservationError, match="provider name"):
+        verify_runtime_behavioral_observation(
+            _payload(),
+            expected_provider_name="Llama-Cpp",
+            expected_artifact_identity_sha256=_sha256("artifact"),
+            expected_batch=_batch(),
+            metric="exact_match",
+        )
+    with pytest.raises(RuntimeBehavioralObservationError, match="lowercase sha256"):
+        verify_runtime_behavioral_observation(
+            _payload(),
+            expected_provider_name="llama_cpp",
+            expected_artifact_identity_sha256="SHA256:" + _sha256("artifact"),
+            expected_batch=_batch(),
+            metric="exact_match",
+        )
+    with pytest.raises(RuntimeBehavioralObservationError, match="EvaluationBatch"):
+        verify_runtime_behavioral_observation(
+            _payload(),
+            expected_provider_name="llama_cpp",
+            expected_artifact_identity_sha256=_sha256("artifact"),
+            expected_batch=cast(EvaluationBatch, object()),
+            metric="exact_match",
+        )
+
+
+def test_verifier_rejects_non_object_payload_before_schema_validation() -> None:
+    with pytest.raises(RuntimeBehavioralObservationError, match="must be an object"):
+        verify_runtime_behavioral_observation(
+            cast(Mapping[str, object], []),
+            expected_provider_name="llama_cpp",
+            expected_artifact_identity_sha256=_sha256("artifact"),
+            expected_batch=_batch(),
+            metric="exact_match",
         )

@@ -4,7 +4,7 @@ import copy
 import hashlib
 import json
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -13,7 +13,12 @@ from invarlock.core.runtime_provider import (
     EvaluationBatch,
     GGUFArtifactIdentity,
     HFSnapshotArtifactIdentity,
+    RuntimeBackendIdentity,
+    RuntimeDeviceFacts,
+    RuntimeExecutionSettings,
     RuntimeProviderCapabilities,
+    RuntimeProviderPluginIdentity,
+    RuntimeProviderReceipt,
     artifact_identity_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_schedule import (
@@ -23,6 +28,11 @@ from invarlock.core.runtime_provider.behavioral_schedule import (
 )
 from invarlock.policy_pack import build_behavioral_policy_pack
 from invarlock.reporting.validation.runtime_behavioral_claim import (
+    _artifact_binding,
+    _dataset_identity_errors,
+    _observation_payload,
+    _receipt_binding_errors,
+    runtime_execution_settings_sha256,
     verify_runtime_behavioral_claim,
 )
 from invarlock.reporting.validation.runtime_behavioral_observation import (
@@ -168,18 +178,112 @@ def _observation(
     }
 
 
+def _settings(*, seed: int = 7) -> RuntimeExecutionSettings:
+    return RuntimeExecutionSettings(
+        seed=seed,
+        context_length=512,
+        batch_size=1,
+        max_output_tokens=32,
+        timeout_seconds=120,
+        allow_network=False,
+    )
+
+
+def _observation_sha256(observation: dict[str, object]) -> str:
+    encoded = json.dumps(
+        observation,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _receipt(
+    *,
+    capabilities: RuntimeProviderCapabilities,
+    artifact: HFSnapshotArtifactIdentity | GGUFArtifactIdentity,
+    observation: dict[str, object],
+    image_marker: str,
+    settings: RuntimeExecutionSettings | None = None,
+) -> RuntimeProviderReceipt:
+    return RuntimeProviderReceipt(
+        plugin=RuntimeProviderPluginIdentity(
+            name=capabilities.provider_name,
+            distribution="invarlock",
+            distribution_version="0.13.0",
+        ),
+        backend=RuntimeBackendIdentity(
+            name="runtime-backend",
+            version="1",
+            source_sha256="9" * 64,
+            binary_sha256=None,
+            build_sha256=None,
+        ),
+        capabilities=capabilities,
+        artifact_identity=artifact,
+        execution_settings=settings or _settings(),
+        device=RuntimeDeviceFacts(device_kind="cpu", device_name="test-cpu"),
+        outer_image_digest="sha256:" + image_marker * 64,
+        scoring_observation_sha256=_observation_sha256(observation),
+    )
+
+
+def _binding(receipt: RuntimeProviderReceipt) -> dict[str, object]:
+    return {
+        "provider_name": receipt.capabilities.provider_name,
+        "artifact_format": receipt.artifact_identity.artifact_format,
+        "artifact_identity_sha256": artifact_identity_sha256(receipt.artifact_identity),
+        "outer_image_digest": receipt.outer_image_digest,
+        "execution_settings_sha256": runtime_execution_settings_sha256(
+            receipt.execution_settings
+        ),
+    }
+
+
 def _policy(
     *,
     minimum_subject_score: float = 0.75,
     maximum_regression: float = 0.25,
     metric_kind: str = "exact_match",
-    providers: list[str] | None = None,
-    formats: list[str] | None = None,
+    baseline_binding: dict[str, object] | None = None,
+    subject_binding: dict[str, object] | None = None,
+    schedule_sha256: str | None = None,
 ) -> dict[str, Any]:
+    schedule = _schedule()
+    batch = schedule.evaluation_batch()
+    baseline_artifact = _baseline_artifact()
+    subject_artifact = _subject_artifact()
+    baseline_observation = _observation(
+        provider_name="hf_transformers",
+        artifact_sha256=artifact_identity_sha256(baseline_artifact),
+        outputs=("alpha", "beta", "gamma", "delta"),
+        batch=batch,
+    )
+    subject_observation = _observation(
+        provider_name="llama_cpp",
+        artifact_sha256=artifact_identity_sha256(subject_artifact),
+        outputs=("alpha", "beta", "wrong", "delta"),
+        batch=batch,
+    )
+    baseline_receipt = _receipt(
+        capabilities=_baseline_capabilities(),
+        artifact=baseline_artifact,
+        observation=baseline_observation,
+        image_marker="1",
+    )
+    subject_receipt = _receipt(
+        capabilities=_subject_capabilities(),
+        artifact=subject_artifact,
+        observation=subject_observation,
+        image_marker="2",
+    )
     return build_behavioral_policy_pack(
         tier="balanced",
-        allowed_provider_names=providers or ["hf_transformers", "llama_cpp"],
-        allowed_artifact_formats=formats or ["gguf", "hf_snapshot"],
+        schedule_sha256=schedule_sha256 or schedule.schedule_sha256,
+        baseline=baseline_binding or _binding(baseline_receipt),
+        subject=subject_binding or _binding(subject_receipt),
         metric_kind=metric_kind,
         minimum_subject_score=minimum_subject_score,
         maximum_regression=maximum_regression,
@@ -209,30 +313,49 @@ def _verify(
     subject_artifact: GGUFArtifactIdentity | None = None,
     baseline_outputs: tuple[str, ...] = ("alpha", "beta", "gamma", "delta"),
     subject_outputs: tuple[str, ...] = ("alpha", "beta", "wrong", "delta"),
+    baseline_receipt: RuntimeProviderReceipt | None = None,
+    subject_receipt: RuntimeProviderReceipt | None = None,
     subject_observation: dict[str, object] | None = None,
 ):
     effective_schedule = schedule or _schedule()
     effective_batch = effective_schedule.evaluation_batch()
     effective_baseline_artifact = baseline_artifact or _baseline_artifact()
     effective_subject_artifact = subject_artifact or _subject_artifact()
+    effective_baseline_capabilities = baseline_capabilities or _baseline_capabilities()
+    effective_subject_capabilities = subject_capabilities or _subject_capabilities()
+    baseline_observation = _observation(
+        provider_name="hf_transformers",
+        artifact_sha256=artifact_identity_sha256(effective_baseline_artifact),
+        outputs=baseline_outputs,
+        batch=effective_batch,
+    )
+    effective_subject_observation = subject_observation or _observation(
+        provider_name="llama_cpp",
+        artifact_sha256=artifact_identity_sha256(effective_subject_artifact),
+        outputs=subject_outputs,
+        batch=effective_batch,
+    )
+    effective_baseline_receipt = baseline_receipt or _receipt(
+        capabilities=effective_baseline_capabilities,
+        artifact=effective_baseline_artifact,
+        observation=baseline_observation,
+        image_marker="1",
+    )
+    effective_subject_receipt = subject_receipt or _receipt(
+        capabilities=effective_subject_capabilities,
+        artifact=effective_subject_artifact,
+        observation=effective_subject_observation,
+        image_marker="2",
+    )
     return verify_runtime_behavioral_claim(
-        baseline_capabilities=baseline_capabilities or _baseline_capabilities(),
-        subject_capabilities=subject_capabilities or _subject_capabilities(),
+        baseline_capabilities=effective_baseline_capabilities,
+        subject_capabilities=effective_subject_capabilities,
         baseline_artifact_identity=effective_baseline_artifact,
         subject_artifact_identity=effective_subject_artifact,
-        baseline_observation=_observation(
-            provider_name="hf_transformers",
-            artifact_sha256=artifact_identity_sha256(effective_baseline_artifact),
-            outputs=baseline_outputs,
-            batch=effective_batch,
-        ),
-        subject_observation=subject_observation
-        or _observation(
-            provider_name="llama_cpp",
-            artifact_sha256=artifact_identity_sha256(effective_subject_artifact),
-            outputs=subject_outputs,
-            batch=effective_batch,
-        ),
+        baseline_receipt=effective_baseline_receipt,
+        subject_receipt=effective_subject_receipt,
+        baseline_observation=baseline_observation,
+        subject_observation=effective_subject_observation,
         schedule=effective_schedule,
         policy_pack=policy or _policy(),
     )
@@ -299,16 +422,135 @@ def test_paired_behavioral_claim_rejects_policy_digest_tampering() -> None:
     assert any("policy digest mismatch" in error for error in result.errors)
 
 
-def test_paired_behavioral_claim_rejects_unauthorized_provider_and_format() -> None:
-    provider_result = _verify(policy=_policy(providers=["hf_transformers"]))
-    format_result = _verify(policy=_policy(formats=["hf_snapshot"]))
+def test_paired_behavioral_claim_rejects_direction_swap() -> None:
+    policy = _policy()
+    claim = policy["behavioral_claim"]
+    claim["baseline"], claim["subject"] = claim["subject"], claim["baseline"]
+    _redigest(policy)
 
+    result = _verify(policy=policy)
+
+    assert result.ok is False
     assert any(
-        "subject provider 'llama_cpp'" in error for error in provider_result.errors
+        "baseline provider_name does not match the directed policy binding" in error
+        for error in result.errors
     )
     assert any(
-        "subject artifact format 'gguf'" in error for error in format_result.errors
+        "subject provider_name does not match the directed policy binding" in error
+        for error in result.errors
     )
+
+
+@pytest.mark.parametrize("field", ["artifact_identity_sha256", "outer_image_digest"])
+def test_paired_behavioral_claim_rejects_unrelated_artifact_or_image(
+    field: str,
+) -> None:
+    policy = _policy()
+    replacement = "sha256:" + "f" * 64 if field == "outer_image_digest" else "f" * 64
+    policy["behavioral_claim"]["subject"][field] = replacement
+    _redigest(policy)
+
+    result = _verify(policy=policy)
+
+    assert result.ok is False
+    assert any(
+        f"subject {field} does not match the directed policy binding" in error
+        for error in result.errors
+    )
+
+
+def test_paired_behavioral_claim_rejects_policy_schedule_drift() -> None:
+    result = _verify(policy=_policy(schedule_sha256="f" * 64))
+
+    assert result.ok is False
+    assert any(
+        "schedule does not match the directed policy binding" in error
+        for error in result.errors
+    )
+
+
+def test_paired_behavioral_claim_rejects_settings_mismatch() -> None:
+    schedule = _schedule()
+    artifact = _subject_artifact()
+    observation = _observation(
+        provider_name="llama_cpp",
+        artifact_sha256=artifact_identity_sha256(artifact),
+        outputs=("alpha", "beta", "wrong", "delta"),
+        batch=schedule.evaluation_batch(),
+    )
+    receipt = _receipt(
+        capabilities=_subject_capabilities(),
+        artifact=artifact,
+        observation=observation,
+        image_marker="2",
+        settings=_settings(seed=8),
+    )
+    policy = _policy(subject_binding=_binding(receipt))
+
+    result = _verify(policy=policy, subject_receipt=receipt)
+
+    assert result.ok is False
+    assert any("settings must be equal" in error for error in result.errors)
+
+
+def test_paired_behavioral_claim_rejects_receipt_observation_mismatch() -> None:
+    schedule = _schedule()
+    artifact = _subject_artifact()
+    observation = _observation(
+        provider_name="llama_cpp",
+        artifact_sha256=artifact_identity_sha256(artifact),
+        outputs=("alpha", "beta", "wrong", "delta"),
+        batch=schedule.evaluation_batch(),
+    )
+    receipt = replace(
+        _receipt(
+            capabilities=_subject_capabilities(),
+            artifact=artifact,
+            observation=observation,
+            image_marker="2",
+        ),
+        scoring_observation_sha256="f" * 64,
+    )
+
+    result = _verify(subject_receipt=receipt)
+
+    assert result.ok is False
+    assert any("receipt scoring observation digest" in error for error in result.errors)
+
+
+@pytest.mark.parametrize("field", ["capabilities", "artifact_identity"])
+def test_paired_behavioral_claim_rejects_receipt_input_mismatch(field: str) -> None:
+    schedule = _schedule()
+    artifact = _subject_artifact()
+    observation = _observation(
+        provider_name="llama_cpp",
+        artifact_sha256=artifact_identity_sha256(artifact),
+        outputs=("alpha", "beta", "wrong", "delta"),
+        batch=schedule.evaluation_batch(),
+    )
+    receipt = _receipt(
+        capabilities=_subject_capabilities(),
+        artifact=artifact,
+        observation=observation,
+        image_marker="2",
+    )
+    if field == "capabilities":
+        receipt = replace(
+            receipt,
+            capabilities=replace(
+                _subject_capabilities(), execution_modes=("container",)
+            ),
+        )
+    else:
+        receipt = replace(
+            receipt,
+            artifact_identity=replace(artifact, byte_length=artifact.byte_length + 1),
+        )
+
+    result = _verify(subject_receipt=receipt)
+
+    assert result.ok is False
+    assert any(f"receipt {field.replace('_', ' ')}" in error for error in result.errors)
 
 
 def test_paired_behavioral_claim_rejects_missing_required_capability() -> None:
@@ -402,3 +644,133 @@ def test_same_entrypoint_rejects_opaque_weight_edit_claim() -> None:
     assert any(
         "paired runtime verification requires" in error for error in result.errors
     )
+
+
+def test_dataset_identity_validation_rejects_missing_and_extra_fields() -> None:
+    identity = _dataset_identity()
+
+    assert _dataset_identity_errors(identity, expected=None) == [
+        "policy-pack-v3 is missing compatibility.dataset_identity"
+    ]
+    assert _dataset_identity_errors(
+        {key: value for key, value in identity.items() if key != "split"},
+        expected=identity,
+    ) == [
+        "authenticated dataset identity must contain exactly "
+        "config_name, dataset_name, provider, revision, split"
+    ]
+    assert _dataset_identity_errors(
+        identity,
+        expected={**identity, "unexpected": True},
+    ) == [
+        "policy dataset identity must contain exactly "
+        "config_name, dataset_name, provider, revision, split"
+    ]
+
+
+def test_claim_verifier_rejects_malformed_policy_contract_fields() -> None:
+    policy = copy.deepcopy(_policy())
+    policy["format"] = "invarlock/policy-pack-v2"
+    claim = policy["behavioral_claim"]
+    assert isinstance(claim, dict)
+    claim["claim_set"] = "unknown-runtime-claim"
+    claim["required_capabilities"] = {
+        "tasks": None,
+        "metrics": None,
+        "evidence_surfaces": None,
+    }
+    claim["metric_policy"] = {
+        "kind": "provider_accuracy",
+        "minimum_subject_score": True,
+        "maximum_regression": "0.25",
+    }
+    claim.pop("baseline")
+    compatibility = policy["compatibility"]
+    assert isinstance(compatibility, dict)
+    compatibility["dataset_identity"] = None
+    _redigest(policy)
+
+    result = _verify(policy=policy)
+
+    assert result.ok is False
+    assert any(
+        "runtime behavioral claims require policy-pack-v3" in error
+        for error in result.errors
+    )
+    assert any(
+        "unsupported runtime claim set" in error.lower() for error in result.errors
+    )
+    assert any("compatibility.dataset_identity" in error for error in result.errors)
+    assert any(
+        "currently supports only exact_match" in error for error in result.errors
+    )
+    assert any("missing behavioral_claim.baseline" in error for error in result.errors)
+
+
+def test_artifact_binding_rejects_undeclared_format_and_capabilities() -> None:
+    _, errors = _artifact_binding(
+        "subject",
+        _subject_artifact(),
+        capabilities=replace(
+            _subject_capabilities(),
+            artifact_formats=("hf_snapshot",),
+        ),
+        required_tasks=frozenset({"image_text"}),
+        required_metrics=frozenset({"normalized_nll_per_utf8_byte"}),
+        required_surfaces=frozenset({"activations"}),
+    )
+
+    assert any("does not declare artifact format" in error for error in errors)
+    assert any("lacks required tasks" in error for error in errors)
+    assert any("lacks required metrics" in error for error in errors)
+    assert any("lacks required evidence surfaces" in error for error in errors)
+
+
+def test_observation_and_receipt_binding_fail_closed_on_non_json_values() -> None:
+    artifact = _subject_artifact()
+    observation = _observation(
+        provider_name="llama_cpp",
+        artifact_sha256=artifact_identity_sha256(artifact),
+        outputs=("alpha", "beta", "wrong", "delta"),
+    )
+    receipt = _receipt(
+        capabilities=_subject_capabilities(),
+        artifact=artifact,
+        observation=observation,
+        image_marker="2",
+    )
+
+    assert _observation_payload(cast(Any, object())) is None
+    non_json_errors = _receipt_binding_errors(
+        "subject",
+        receipt=receipt,
+        capabilities=_subject_capabilities(),
+        artifact_identity=artifact,
+        observation=cast(Any, object()),
+        expected_binding=None,
+    )
+    noncanonical_errors = _receipt_binding_errors(
+        "subject",
+        receipt=receipt,
+        capabilities=_subject_capabilities(),
+        artifact_identity=artifact,
+        observation={**observation, "unexpected": object()},
+        expected_binding=_binding(receipt),
+    )
+
+    assert (
+        "subject receipt cannot bind a non-JSON scoring observation" in non_json_errors
+    )
+    assert "policy-pack-v3 is missing behavioral_claim.subject" in non_json_errors
+    assert (
+        "subject receipt cannot bind a non-canonical observation" in noncanonical_errors
+    )
+
+
+def test_claim_verifier_rejects_wrong_settings_and_receipt_types() -> None:
+    with pytest.raises(TypeError, match="RuntimeExecutionSettings"):
+        runtime_execution_settings_sha256(cast(RuntimeExecutionSettings, object()))
+    with pytest.raises(TypeError, match="baseline_receipt"):
+        _verify(baseline_receipt=cast(RuntimeProviderReceipt, object()))
+    with pytest.raises(TypeError, match="subject_receipt"):
+        _verify(subject_receipt=cast(RuntimeProviderReceipt, object()))

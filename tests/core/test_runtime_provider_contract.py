@@ -64,7 +64,7 @@ def test_runtime_execution_context_binds_existing_hf_objects_and_callbacks() -> 
 
     adapter = object()
     native_model = object()
-    scorer = lambda batch: batch  # noqa: E731
+    scorer = lambda batch, settings: (batch, settings)  # noqa: E731
     close_callback = lambda: None  # noqa: E731
 
     context = RuntimeExecutionContext(
@@ -86,6 +86,44 @@ def test_runtime_execution_context_binds_existing_hf_objects_and_callbacks() -> 
     assert context.artifact_identity_sha256 == "b" * 64
     assert dataclasses.is_dataclass(context)
     assert context.__dataclass_params__.frozen is True
+
+
+def test_runtime_execution_settings_mapping_uses_shared_validation() -> None:
+    from invarlock.core.runtime_provider.types import (
+        RuntimeExecutionSettings,
+        runtime_execution_settings_from_mapping,
+    )
+
+    settings = runtime_execution_settings_from_mapping(
+        {
+            "seed": 7,
+            "context_length": 2048,
+            "batch_size": 1,
+            "max_output_tokens": 64,
+            "timeout_seconds": 30,
+        },
+        allow_network=False,
+    )
+
+    assert settings == RuntimeExecutionSettings(
+        seed=7,
+        context_length=2048,
+        batch_size=1,
+        max_output_tokens=64,
+        timeout_seconds=30,
+        allow_network=False,
+    )
+    with pytest.raises(ValueError, match="seed must be a non-negative integer"):
+        runtime_execution_settings_from_mapping(
+            {
+                "seed": True,
+                "context_length": 2048,
+                "batch_size": 1,
+                "max_output_tokens": 64,
+                "timeout_seconds": 30,
+            },
+            allow_network=False,
+        )
 
 
 def test_runtime_provider_capabilities_are_closed_and_canonical() -> None:
@@ -191,6 +229,23 @@ def test_model_artifact_identity_variants_reject_paths_and_bad_digests() -> None
         dataclasses.replace(engine, target_compute_capability="09.0")
     with pytest.raises(ValueError, match="at least one"):
         dataclasses.replace(hf, immutable_revision=None, checkpoint_tree_sha256=None)
+
+
+def test_runtime_device_facts_keep_driver_and_cuda_runtime_distinct() -> None:
+    from invarlock.core.runtime_provider.types import RuntimeDeviceFacts
+
+    facts = RuntimeDeviceFacts(
+        device_kind="cuda",
+        device_name="NVIDIA H200",
+        compute_capability="9.0",
+        driver_version="570.00",
+        cuda_runtime_version="12.8",
+    )
+
+    assert facts.driver_version == "570.00"
+    assert facts.cuda_runtime_version == "12.8"
+    with pytest.raises(ValueError, match="cuda_runtime_version"):
+        dataclasses.replace(facts, cuda_runtime_version=" 12.8 ")
 
 
 def test_evaluation_batch_and_scoring_observation_validate_pairing() -> None:
