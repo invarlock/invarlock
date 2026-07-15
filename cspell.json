@@ -125,6 +125,7 @@
     "Narasimhan",
     "TFLOPS",
     "ONNX",
+    "GGUF",
     "standardised",
     "recalibrated",
     "matvec",

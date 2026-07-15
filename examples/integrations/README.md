@@ -28,6 +28,9 @@ prerequisites, commands, and generated artifact list.
 - `public_e2e/` demonstrates a handoff from caller-supplied current evidence to
   verifier, HTML, MLflow tag, model-card, release-review, and CI summary
   artifacts.
+- `design_partner_diagnostic/` provides the reviewer-owned case template for a
+  single strict baseline-versus-transformed-subject diagnostic. The checked
+  runbook lives in `docs/user-guide/design-partner-diagnostic.md`.
 - `ci_registry/` shows how to attach current report verification, HTML, MLflow
   tags, Hugging Face model-card evidence, and release-review packets to
   existing CI and registry workflows.
