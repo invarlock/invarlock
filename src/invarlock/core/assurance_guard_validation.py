@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from invarlock.guards.authority import guard_is_enforced, resolved_guard_authority
+
 from .assurance_guard_validation_common import (
     _GUARD_NAMES,
     _dedupe,
@@ -43,7 +45,10 @@ _STRICT_VALIDATION_KEYS = (
 
 
 def _validation_errors(
-    report: Mapping[str, Any], *, require_complete: bool
+    report: Mapping[str, Any],
+    *,
+    require_complete: bool,
+    guard_authority: Mapping[str, str] | None = None,
 ) -> list[str]:
     validation = report.get("validation")
     if not isinstance(validation, dict):
@@ -53,6 +58,11 @@ def _validation_errors(
             else []
         )
     errors: list[str] = []
+    authority = (
+        dict(guard_authority)
+        if guard_authority is not None
+        else resolved_guard_authority(report)[0]
+    )
     keys = _STRICT_VALIDATION_KEYS if require_complete else _VALIDATION_GUARD_KEYS
     for key in keys:
         if key not in validation:
@@ -62,7 +72,13 @@ def _validation_errors(
         value = validation.get(key)
         if not isinstance(value, bool):
             errors.append(f"validation.{key} must be a boolean.")
-        elif value is not True:
+        elif value is not True and (
+            key not in {"spectral_stable", "rmt_stable"}
+            or guard_is_enforced(
+                authority,
+                "spectral" if key == "spectral_stable" else "rmt",
+            )
+        ):
             errors.append(f"validation.{key} is false.")
     for key in ("guard_warning_policy_acceptable", "primary_metric_tail_acceptable"):
         if key in validation:
@@ -85,6 +101,8 @@ def guard_evidence_policy_errors(
     """
 
     errors: list[str] = []
+    authority, authority_errors, _ = resolved_guard_authority(report)
+    errors.extend(authority_errors)
     inventory = _guard_inventory(report)
     for guard_name in _GUARD_NAMES:
         errors.extend(
@@ -93,6 +111,7 @@ def guard_evidence_policy_errors(
                 report.get(guard_name),
                 source=guard_name,
                 require_complete=require_complete,
+                enforce_outcome=guard_is_enforced(authority, guard_name),
             )
         )
     for guard_name, entry, source in inventory:
@@ -102,15 +121,34 @@ def guard_evidence_policy_errors(
                 entry,
                 source=source,
                 require_complete=require_complete,
+                enforce_outcome=guard_is_enforced(authority, guard_name),
             )
         )
 
     errors.extend(
-        _spectral_errors(report, inventory, require_complete=require_complete)
+        _spectral_errors(
+            report,
+            inventory,
+            require_complete=require_complete,
+            enforce_outcome=guard_is_enforced(authority, "spectral"),
+        )
     )
-    errors.extend(_rmt_errors(report, inventory, require_complete=require_complete))
+    errors.extend(
+        _rmt_errors(
+            report,
+            inventory,
+            require_complete=require_complete,
+            enforce_outcome=guard_is_enforced(authority, "rmt"),
+        )
+    )
     errors.extend(_invariants_errors(report, require_complete=require_complete))
-    errors.extend(_variance_errors(report, require_complete=require_complete))
+    errors.extend(
+        _variance_errors(
+            report,
+            require_complete=require_complete,
+            enforce_outcome=guard_is_enforced(authority, "variance"),
+        )
+    )
     variance = _mapping(report.get("variance"))
     if variance is not None:
         errors.extend(
@@ -119,6 +157,7 @@ def guard_evidence_policy_errors(
                 variance,
                 inventory,
                 require_complete=require_complete,
+                enforce_outcome=guard_is_enforced(authority, "variance"),
             )
         )
     errors.extend(
@@ -129,9 +168,16 @@ def guard_evidence_policy_errors(
             report,
             inventory,
             require_complete=require_complete,
+            enforce_spectral_outcome=guard_is_enforced(authority, "spectral"),
         )
     )
-    errors.extend(_validation_errors(report, require_complete=require_complete))
+    errors.extend(
+        _validation_errors(
+            report,
+            require_complete=require_complete,
+            guard_authority=authority,
+        )
+    )
     return _dedupe(errors)
 
 

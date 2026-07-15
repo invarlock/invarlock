@@ -79,6 +79,7 @@ class AdvancedGroup(TyperGroup):
             "policy",
             "plugins",
             "calibrate",
+            "runtime-behavior",
             "runtime-verify",
             "inputs",
         ]
@@ -251,6 +252,24 @@ def _evaluate_lazy(
         "--subject-adapter",
         help="Adapter for the subject side, or 'auto' to resolve from subject.",
     ),
+    baseline_runtime_provider: str = typer.Option(
+        "hf_transformers",
+        "--baseline-runtime-provider",
+        help=(
+            "Runtime provider for the baseline side; currently only "
+            "'hf_transformers' is accepted. For GGUF or TensorRT-LLM, use "
+            "'invarlock advanced runtime-behavior'."
+        ),
+    ),
+    subject_runtime_provider: str = typer.Option(
+        "hf_transformers",
+        "--subject-runtime-provider",
+        help=(
+            "Runtime provider for the subject side; currently only "
+            "'hf_transformers' is accepted. For GGUF or TensorRT-LLM, use "
+            "'invarlock advanced runtime-behavior'."
+        ),
+    ),
     device: str | None = typer.Option(
         None, "--device", help="Device override for runs (auto|cuda|mps|cpu)"
     ),
@@ -396,6 +415,8 @@ def _evaluate_lazy(
         subject_revision=subject_revision,
         baseline_adapter=baseline_adapter,
         subject_adapter=subject_adapter,
+        baseline_runtime_provider=baseline_runtime_provider,
+        subject_runtime_provider=subject_runtime_provider,
         device=device,
         profile=profile,
         tier=tier,
@@ -495,6 +516,10 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
         from invarlock.cli.commands.verify import runtime_verify_app
 
         return _register_command(name, runtime_verify_app)
+    if name == "runtime-behavior":
+        from .commands.runtime_behavior import runtime_behavior_app
+
+        return _register(name, runtime_behavior_app)
     if name == "inputs":
         from .commands.inputs import inputs_app
 
@@ -588,8 +613,9 @@ def _verify_typed(
         None,
         "--policy-pack",
         help=(
-            "Independently supplied policy-pack-v1 JSON/YAML authorization. Required "
-            "for strict verification so the report cannot choose its own thresholds."
+            "Independently supplied policy-pack-v2 JSON/YAML authorization; frozen "
+            "policy-pack-v1 inputs remain accepted. Required for strict verification "
+            "so the report cannot choose its own thresholds."
         ),
     ),
     baseline: str | None = typer.Option(

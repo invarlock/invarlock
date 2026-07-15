@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _VALID_TEST_IMAGE_DIGEST,
     _bind_strict_baseline,
     _final_window_schedule_digest,

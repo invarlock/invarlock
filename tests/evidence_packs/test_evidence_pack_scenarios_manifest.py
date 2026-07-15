@@ -349,6 +349,11 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
     ve_detectors = ve_requirements["detectors_all_of"]
     assert {
         "kind": "ve_probe",
+        "field": "signal",
+        "expected": True,
+    } in ve_detectors
+    assert {
+        "kind": "ve_probe",
         "field": "proposed_scales",
         "min": 1,
     } in ve_detectors
@@ -356,3 +361,12 @@ def test_mistral_guard_value_scenarios_cover_rmt_and_variance_sidecars() -> None
         "kind": "guard_signal_baseline_relative",
         "guard": "variance",
     } in ve_detectors
+
+    negative = by_id["spectral_moderate_scale_attn_l31_o_s105"]
+    assert negative["strictness"] == "must_pass"
+    assert negative["intent"] == "negative_control"
+    assert {
+        "kind": "guard_signal_baseline_relative",
+        "guard": "spectral",
+        "expected": False,
+    } in negative["requirements"]["detectors_all_of"]

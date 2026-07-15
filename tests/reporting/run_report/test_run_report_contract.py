@@ -147,8 +147,16 @@ def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
     assert result.report["edit"]["name"] == "noop"
     assert result.report["artifacts"]["mask_artifact_path"].endswith("ref_masks.json")
     assert result.report["flags"]["all_passed"] is True
-    assert result.report["resolved_policy"] == core_report.meta["tier_policies"]
+    assert result.report["resolved_policy"] == {
+        **core_report.meta["tier_policies"],
+        "guard_authority": {
+            "spectral": "enforce",
+            "rmt": "enforce",
+            "variance": "enforce",
+        },
+    }
     assert result.report["resolved_policy"] is not core_report.meta["tier_policies"]
+    assert "guard_authority" not in core_report.meta["tier_policies"]
     assert result.report["policy_resolution"]["source"] == "runtime"
     assert result.timings["latency_s"] == 1.5
 

@@ -34,6 +34,7 @@ fresh install or wheel-only environment:
 | `invarlock advanced --help` | Lists the advanced maintenance namespace before drilling into subcommands |
 | `invarlock advanced calibrate --help` | Establishes that calibration lives under `advanced` rather than the core loop |
 | `invarlock advanced runtime-verify --help` | Wheel-native runtime-manifest verification for existing report bundles |
+| `invarlock advanced runtime-behavior --help` | Separate provider-side production from directed paired replay |
 
 ## Quick Start
 
@@ -98,6 +99,7 @@ invarlock report export -i reports/eval/evaluation.report.json --format mlflow-t
 | Export evidence to CI and registry handoff formats | `invarlock report export` | MLflow tag JSON, model-card Markdown, or release-review Markdown |
 | Inspect environment health | `invarlock doctor` | Human or JSON diagnostics |
 | Evidence-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
+| Produce and compare cross-runtime behavioral evidence | `invarlock advanced runtime-behavior ...` | Strict side bundles and a positive digest-only pair receipt |
 
 ## Artifact Outputs Matrix
 
@@ -113,6 +115,11 @@ invarlock report export -i reports/eval/evaluation.report.json --format mlflow-t
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |
 | `invarlock advanced plugins` | No | No | Read-only plugin discovery and explanation |
 | `invarlock advanced calibrate` | Yes | Yes | Advanced tier-policy calibration workflows |
+| `invarlock advanced runtime-behavior build-schedule` | No | Writes the selected `--out` file without replacing an existing file | Builds one authenticated canonical schedule |
+| `invarlock advanced runtime-behavior prepare-binding` | No | Writes the selected `--out` file without replacing an existing file | Validates native inputs and derives one directed role binding |
+| `invarlock advanced runtime-behavior build-policy` | No | Writes the selected `--out` file without replacing an existing file | Builds one directed `policy-pack-v3` |
+| `invarlock advanced runtime-behavior run-side` | No | Writes the selected `--out` directory | Produces one strictly verified baseline or subject side bundle |
+| `invarlock advanced runtime-behavior verify-pair` | No | Writes the selected `--receipt` file | Independently replays two immutable side bundles |
 
 ## Top-Level Command Index
 
@@ -125,6 +132,7 @@ invarlock report export -i reports/eval/evaluation.report.json --format mlflow-t
 | `invarlock advanced` | Advanced evidence-pack, policy, plugin, and calibration workflows |
 | `invarlock version` | Show the installed version |
 | `invarlock advanced runtime-verify` | Verify an evaluation report against its sibling `runtime.manifest.json` |
+| `invarlock advanced runtime-behavior` | Produce one provider side and independently verify a baseline/subject pair |
 
 Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
 `3=hard abort` for profile-aware fail-closed paths. Advanced evidence-pack
@@ -137,9 +145,9 @@ success.
 | Stability class | Commands | Contract |
 | --- | --- | --- |
 | Stable core workflow | `invarlock evaluate`, `invarlock verify`, `invarlock report html`, `invarlock report explain`, `invarlock report export`, `invarlock report validate`, `invarlock doctor`, `invarlock version` | Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy. |
-| Stable JSON automation | `invarlock doctor --json`, `invarlock verify --json`, `invarlock advanced runtime-verify --json`, `invarlock advanced plugins list --json`, `invarlock advanced plugins adapters --json`, `invarlock advanced evidence-pack verify --json`, `invarlock advanced evidence-catalog validate --json`, `invarlock advanced policy verify --json` | Required envelope fields and `format_version` values are stable; optional fields are additive. |
-| Stable advanced verifiers | `invarlock advanced runtime-verify`, `invarlock advanced evidence-pack inspect`, `invarlock advanced evidence-pack verify`, `invarlock advanced evidence-catalog validate`, `invarlock advanced policy build`, `invarlock advanced policy verify`, `invarlock advanced plugins list`, `invarlock advanced plugins adapters` | Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster. |
-| Experimental or maintainer-only | `invarlock advanced calibrate`, repo scripts under `scripts/`, package-internal config runners, undocumented flags, and local harness entrypoints | Useful for development, calibration, and release work; not covered by the public CLI stability contract until documented as stable here. |
+| Stable JSON automation | `invarlock doctor --json`, `invarlock verify --json`, `invarlock advanced runtime-verify --json`, `invarlock advanced plugins list --json`, `invarlock advanced plugins adapters --json`, `invarlock advanced plugins runtime-providers --json`, `invarlock advanced evidence-pack verify --json`, `invarlock advanced evidence-catalog validate --json`, `invarlock advanced policy verify --json` | Required envelope fields and `format_version` values are stable; optional fields are additive. |
+| Stable advanced verifiers | `invarlock advanced runtime-verify`, `invarlock advanced evidence-pack inspect`, `invarlock advanced evidence-pack verify`, `invarlock advanced evidence-catalog validate`, `invarlock advanced policy build`, `invarlock advanced policy verify`, `invarlock advanced plugins list`, `invarlock advanced plugins adapters`, `invarlock advanced plugins runtime-providers` | Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster. |
+| Experimental or maintainer-only | `invarlock advanced runtime-behavior`, `invarlock advanced calibrate`, repo scripts under `scripts/`, package-internal config runners, undocumented flags, and local harness entrypoints | Useful for cross-runtime behavioral evidence, development, calibration, and release work; not covered by the public CLI stability contract until promoted here. |
 
 ## `invarlock evaluate`
 
@@ -223,7 +231,7 @@ Common options:
   report fragments are rejected. It is optional only when strict assurance is
   not being enforced.
 - `--policy-pack`: required whenever strict assurance is enforced. Supply the
-  independently maintained `policy-pack-v1` JSON/YAML artifact; strict verification
+  independently maintained `policy-pack-v2` JSON/YAML artifact; strict verification
   rejects thresholds authorized only by the submitted report.
 - `--tolerance`: finite recompute tolerance in `[0, 1e-9]`; larger, negative,
   NaN, and infinite values are rejected so callers cannot disable recomputation
@@ -360,6 +368,8 @@ Subcommands:
   - Tier-policy calibration and sweep tooling
 - `invarlock advanced runtime-verify`
   - Low-level runtime-manifest verification for an existing report
+- `invarlock advanced runtime-behavior`
+  - Build a directed policy, produce each strict runtime-provider side, then independently replay the baseline/subject pair
 
 Examples:
 
@@ -378,6 +388,7 @@ invarlock advanced policy verify policy-pack.json --json
 invarlock advanced plugins list --json
 invarlock advanced calibrate --help
 invarlock advanced runtime-verify --report reports/eval/evaluation.report.json --manifest reports/eval/runtime.manifest.json
+invarlock advanced runtime-behavior --help
 ```
 
 `advanced evidence-pack verify --skip-verify` is a diagnostic-only integrity
@@ -398,6 +409,14 @@ Available read-only flows include:
 - `invarlock advanced plugins adapters`
 - `invarlock advanced plugins guards`
 - `invarlock advanced plugins edits`
+- `invarlock advanced plugins runtime-providers`
+
+The `support_tier` field in `plugins-v2` rows describes plugin maturity, not a
+model lane's support tier or evidence status. For runtime providers, connector
+readiness and strict-contract eligibility also do not establish backend or
+platform qualification; the metadata-only inventory always reports
+`runtime_qualification: not_probed`. See
+[Contracts](contracts.md#lane-support-tiers-and-plugin-maturity).
 
 Optional backends are installed through normal Python packaging, for example:
 
@@ -407,6 +426,40 @@ pip install "invarlock[awq,gptq]"
 ```
 
 Plugin install and uninstall commands are not part of the CLI surface.
+
+## `invarlock advanced runtime-behavior`
+
+Purpose: build a directed authorization, run baseline and subject sides
+separately through the first-party runtime-provider boundary, then independently
+replay both side bundles and publish a positive receipt. The installed side
+producer supports the process-isolated `llama_cpp` and `tensorrt_llm`
+providers. Hugging Face remains
+the built-in `evaluate` path through the optional `[hf]` extra; callers with
+pre-bound HF objects can use the Python `run_side` API.
+
+```bash
+invarlock advanced runtime-behavior build-schedule --help
+invarlock advanced runtime-behavior prepare-binding --help
+invarlock advanced runtime-behavior build-policy --help
+invarlock advanced runtime-behavior run-side --help
+invarlock advanced runtime-behavior verify-pair --help
+```
+
+`build-schedule` derives record hashes from closed record material.
+`prepare-binding` validates the actual native artifact and backend inputs and
+derives the same artifact and execution-settings identities used by side
+production. `build-policy` derives the schedule digest and dataset identity from
+the authenticated schedule and binds exact baseline/subject provider, artifact,
+image, and execution-settings identities into `policy-pack-v3`. Both side runs
+must use that same schedule and policy pack. The installed producer and binding
+commands support native GGUF/llama.cpp and TensorRT-LLM inputs. Strict Hugging
+Face runtime-behavior evidence uses the Python API with provider-owned, exact
+model/artifact-bound objects; normal `evaluate` remains the standard Hugging
+Face CLI path. The claim covers policy-bound
+`exact_match` behavior only; it does not claim weight, activation,
+log-probability, performance, or backend equivalence. See
+[Runtime Providers](runtime-providers.md) for provider settings, runtime-image
+requirements, the complete end-to-end journey, and non-claims.
 
 ## `invarlock advanced runtime-verify`
 
@@ -448,8 +501,8 @@ Stable machine-readable output is available on these surfaces:
 | `invarlock doctor --json` | `doctor-v1` | Required envelope fields are stable. |
 | `invarlock verify --json` | `verify-v1` | Required envelope fields and exit-code meaning are stable. |
 | `invarlock advanced runtime-verify --json` | `runtime-verify-v1` | Runtime-manifest verification envelope is stable. |
-| `invarlock advanced plugins list --json` | `plugins-v1` | Plugin catalog envelope and contract catalog keys are stable. |
-| `invarlock advanced plugins adapters --json` | `plugins-v1` | Adapter rows and contract catalog keys are stable. |
+| `invarlock advanced plugins list --json` | `plugins-v2` | Plugin catalog envelope and contract catalog keys are stable. |
+| `invarlock advanced plugins adapters --json` | `plugins-v2` | Adapter rows and contract catalog keys are stable. |
 | `invarlock advanced evidence-pack verify --json` | `evidence-pack-verify-v1` | Evidence-pack verification envelope is stable. |
 | `invarlock advanced evidence-catalog validate --json` | `evidence-catalog-validate-v1` | Catalog validation envelope is stable. |
 | `invarlock advanced policy verify --json` | `policy-pack-verify-v1` | Policy-pack verification envelope is stable. |

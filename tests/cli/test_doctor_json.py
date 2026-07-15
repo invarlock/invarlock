@@ -21,10 +21,10 @@ def test_doctor_json_mode_outputs_findings_and_exitcode(monkeypatch):
     assert payload.get("format_version") == "doctor-v1"
     assert isinstance(payload.get("findings"), list)
     assert payload["contracts"]["model_family_catalog"]["format_version"] == (
-        "model-family-catalog-v1"
+        "model-family-catalog-v2"
     )
     assert payload["model_family_catalog"]["format_version"] == (
-        "model-family-catalog-v1"
+        "model-family-catalog-v2"
     )
     # Should include at least one note when INVARLOCK_TINY_RELAX is set
     # (ok if filtered out on some builds; ensure structure viable)

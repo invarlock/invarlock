@@ -18,10 +18,16 @@ dependencies out of the runtime package and core install.
 | Shared compare wrapper | Present under `examples/integrations/_shared/run_invarlock_compare.sh`. |
 | Public end-to-end handoff | Present under `examples/integrations/public_e2e/`. |
 | CI and registry evidence | Present under `examples/integrations/ci_registry/`. |
+| Native GGUF/TensorRT-LLM pair | Runnable with qualified user-supplied artifacts under `examples/integrations/runtime_providers/`. |
 | Target-specific examples | Added one target at a time after backend compatibility is validated. |
 
 Browse the integration scaffold in the repository:
 <https://github.com/invarlock/invarlock/tree/main/examples/integrations>
+
+Native deployment artifacts use a separate provider-side transaction rather
+than `invarlock evaluate`. Follow the [Native Runtime Providers](native-runtime-providers.md)
+guide and its runnable pair wrapper when the reviewed subject is a GGUF file or
+TensorRT-LLM engine bundle.
 
 ## Target Example Readiness
 
@@ -136,7 +142,7 @@ workflow.
 
 The maintained catalog provides stable lane identities for CI and downstream
 handoff. `contracts/support_matrix.json` records the current evidence status;
-completed artifacts are listed by `public_evidence/published_basis_index.json`.
+completed artifacts are listed by `public_evidence/catalog_evidence_index.json`.
 
 See the [Evidence Catalog](public-evidence-walkthrough.md) for the artifact
 shape and review workflow.

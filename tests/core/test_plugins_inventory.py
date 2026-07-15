@@ -265,10 +265,16 @@ def test_gather_adapter_inventory_rows_handles_multimodal_missing_extra_without_
 def test_filter_inventory_rows_support_tier_modes() -> None:
     rows = [
         {"name": "spectral", "support_tier": "core_supported", "status": "ready"},
+        {
+            "name": "llama_cpp",
+            "support_tier": "first_party_experimental",
+            "status": "ready",
+        },
         {"name": "hello", "support_tier": "demo_only", "status": "ready"},
     ]
 
-    assert filter_inventory_rows(rows, "demo_only") == [rows[1]]
+    assert filter_inventory_rows(rows, "first_party_experimental") == [rows[1]]
+    assert filter_inventory_rows(rows, "demo_only") == [rows[2]]
 
 
 def test_gather_generic_and_combined_inventory_payloads() -> None:

@@ -11,11 +11,11 @@ from typing import Any
 
 from scripts.checks.public_evidence_checks.common import _load_json, _relative
 
-PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY = 0.10
-PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES = 200
-PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE = 0.95
-PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_WORDS = 12
-PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_CHARS = 80
+CATALOG_EVIDENCE_MULTIMODAL_MIN_FINAL_ACCURACY = 0.10
+CATALOG_EVIDENCE_MULTIMODAL_MIN_FINAL_EXAMPLES = 200
+CATALOG_EVIDENCE_MULTIMODAL_MIN_ANSWER_SHAPE_RATE = 0.95
+CATALOG_EVIDENCE_MULTIMODAL_MAX_ANSWER_WORDS = 12
+CATALOG_EVIDENCE_MULTIMODAL_MAX_ANSWER_CHARS = 80
 
 
 def _require_path(
@@ -86,12 +86,12 @@ def _classification_final_counts(
     return None, None
 
 
-def _is_direct_published_basis_artifact(artifact_dir: Path, root: Path) -> bool:
+def _is_direct_catalog_evidence_artifact(artifact_dir: Path, root: Path) -> bool:
     try:
         parts = artifact_dir.relative_to(root).parts
     except ValueError:
         return False
-    return len(parts) == 2 and parts[0] == "published_basis"
+    return len(parts) == 2 and parts[0] == "catalog_evidence"
 
 
 def _is_vision_text_accuracy_report(report: dict[str, Any]) -> bool:
@@ -135,8 +135,8 @@ def _answer_shape_ok(prediction: Any) -> bool:
     if not answer:
         return False
     return (
-        len(answer) <= PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_CHARS
-        and len(answer.split()) <= PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_WORDS
+        len(answer) <= CATALOG_EVIDENCE_MULTIMODAL_MAX_ANSWER_CHARS
+        and len(answer.split()) <= CATALOG_EVIDENCE_MULTIMODAL_MAX_ANSWER_WORDS
     )
 
 
@@ -160,7 +160,7 @@ def _embedded_answer_shape_rate(report: dict[str, Any]) -> tuple[int, int] | Non
     return ok, total
 
 
-def _check_published_basis_multimodal_quality(
+def _check_catalog_evidence_multimodal_quality(
     errors: list[str],
     base: Path,
     report_path: Path,
@@ -184,33 +184,33 @@ def _check_published_basis_multimodal_quality(
 
     if primary.get("counts_source") != "measured" or primary.get("estimated") is True:
         errors.append(
-            f"{_relative(base)}: published image-text basis requires measured accuracy counts"
+            f"{_relative(base)}: catalog image-text evidence requires measured accuracy counts"
         )
-    if n_final is None or n_final < PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES:
+    if n_final is None or n_final < CATALOG_EVIDENCE_MULTIMODAL_MIN_FINAL_EXAMPLES:
         errors.append(
-            f"{_relative(base)}: published image-text basis requires at least "
-            f"{PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES} final examples"
+            f"{_relative(base)}: catalog image-text evidence requires at least "
+            f"{CATALOG_EVIDENCE_MULTIMODAL_MIN_FINAL_EXAMPLES} final examples"
         )
     if (
         final_accuracy is None
-        or final_accuracy < PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY
+        or final_accuracy < CATALOG_EVIDENCE_MULTIMODAL_MIN_FINAL_ACCURACY
     ):
         observed = "missing" if final_accuracy is None else f"{final_accuracy:.4f}"
         errors.append(
-            f"{_relative(base)}: published image-text basis final accuracy "
+            f"{_relative(base)}: catalog image-text evidence final accuracy "
             f"{observed} is below "
-            f"{PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY:.2f}"
+            f"{CATALOG_EVIDENCE_MULTIMODAL_MIN_FINAL_ACCURACY:.2f}"
         )
 
     shape_counts = _embedded_answer_shape_rate(report)
     if shape_counts is not None:
         ok, total_shape = shape_counts
         rate = ok / total_shape
-        if rate < PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE:
+        if rate < CATALOG_EVIDENCE_MULTIMODAL_MIN_ANSWER_SHAPE_RATE:
             errors.append(
-                f"{_relative(base)}: published image-text basis answer-shape rate "
+                f"{_relative(base)}: catalog image-text evidence answer-shape rate "
                 f"{rate:.4f} is below "
-                f"{PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE:.2f}"
+                f"{CATALOG_EVIDENCE_MULTIMODAL_MIN_ANSWER_SHAPE_RATE:.2f}"
             )
 
 

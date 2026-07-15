@@ -8,6 +8,7 @@ from pathlib import Path
 
 from invarlock.core.assurance_contract import ASSURANCE_CLAIM_SET, CANONICAL_GUARD_CHAIN
 from invarlock.core.dataset_identity import dataset_identity_from_report
+from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
 from invarlock.policy_pack import build_policy_pack
 from invarlock.reporting import verify_contract as verify_mod
 from invarlock.reporting.report_provenance import compute_report_digest
@@ -87,7 +88,7 @@ def _matching_strict_policy_pack(payload: dict | None = None) -> dict:
         tier=tier,
         resolved_policy=copy.deepcopy(resolved_policy),
         compatibility={
-            "support_tiers": ["published_basis"],
+            "support_tiers": ["maintained_catalog"],
             "dataset_identity": dataset_identity_from_report(subject),
         },
     )
@@ -399,6 +400,7 @@ def _strict_provenance_gate_cert() -> dict:
         "measurement_contract_match": True,
     }
     payload["resolved_policy"] = {
+        "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
         "spectral": {"measurement_contract": spectral_contract},
         "rmt": {"measurement_contract": rmt_contract},
         "metrics": {
@@ -454,6 +456,7 @@ def _strict_provenance_gate_cert() -> dict:
         "profile": "ci",
         "tier": "balanced",
         "claim_set": ASSURANCE_CLAIM_SET,
+        "guard_authority": copy.deepcopy(DEFAULT_GUARD_AUTHORITY),
         "canonical_guard_chain": list(CANONICAL_GUARD_CHAIN),
         "guard_chain_observed": list(CANONICAL_GUARD_CHAIN),
         "canonical_guard_chain_enforced": True,

@@ -12,7 +12,7 @@
   ],
   "properties": {
     "format": {
-      "const": "policy-pack-v1"
+      "enum": ["policy-pack-v1", "policy-pack-v2", "policy-pack-v3"]
     },
     "tier": {
       "enum": ["aggressive", "balanced", "conservative"]
@@ -48,11 +48,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": [
-              "published_basis",
-              "supported_experimental",
-              "community_experimental"
-            ]
+            "type": "string"
           }
         },
         "adapter_families": {
@@ -102,7 +98,201 @@
     },
     "metadata": {
       "type": "object"
+    },
+    "behavioral_claim": {
+      "type": "object",
+      "required": [
+        "claim_set",
+        "schedule_sha256",
+        "baseline",
+        "subject",
+        "required_capabilities",
+        "metric_policy"
+      ],
+      "properties": {
+        "claim_set": {
+          "const": "invarlock-runtime-behavioral-regression-v1"
+        },
+        "schedule_sha256": {"$ref": "#/$defs/sha256"},
+        "baseline": {"$ref": "#/$defs/runtimeBehavioralBinding"},
+        "subject": {"$ref": "#/$defs/runtimeBehavioralBinding"},
+        "required_capabilities": {
+          "type": "object",
+          "required": ["tasks", "metrics", "evidence_surfaces"],
+          "properties": {
+            "tasks": {
+              "const": ["text_causal"]
+            },
+            "metrics": {
+              "const": ["exact_match"]
+            },
+            "evidence_surfaces": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["behavior", "tokenizer", "build"]
+              },
+              "allOf": [
+                {"contains": {"const": "behavior"}},
+                {"contains": {"const": "tokenizer"}}
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "metric_policy": {
+          "type": "object",
+          "required": ["kind", "minimum_subject_score", "maximum_regression"],
+          "properties": {
+            "kind": {
+              "const": "exact_match"
+            },
+            "minimum_subject_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "maximum_regression": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "runtimeBehavioralBinding": {
+      "type": "object",
+      "required": [
+        "provider_name",
+        "artifact_format",
+        "artifact_identity_sha256",
+        "outer_image_digest",
+        "execution_settings_sha256"
+      ],
+      "properties": {
+        "provider_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "artifact_format": {
+          "enum": ["hf_snapshot", "gguf", "tensorrt_llm_engine"]
+        },
+        "artifact_identity_sha256": {"$ref": "#/$defs/sha256"},
+        "outer_image_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "execution_settings_sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"format": {"const": "policy-pack-v1"}},
+        "required": ["format"]
+      },
+      "then": {
+        "properties": {
+          "resolved_policy": {
+            "not": {"required": ["guard_authority"]}
+          },
+          "compatibility": {
+            "properties": {
+              "support_tiers": {
+                "items": {
+                  "enum": [
+                    "published_basis",
+                    "supported_experimental",
+                    "community_experimental"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"format": {"const": "policy-pack-v2"}},
+        "required": ["format"]
+      },
+      "then": {
+        "properties": {
+          "resolved_policy": {
+            "required": ["guard_authority"],
+            "properties": {
+              "guard_authority": {
+                "type": "object",
+                "required": ["spectral", "rmt", "variance"],
+                "properties": {
+                  "spectral": {"enum": ["observe", "enforce"]},
+                  "rmt": {"enum": ["observe", "enforce"]},
+                  "variance": {"enum": ["observe", "enforce"]}
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "compatibility": {
+            "properties": {
+              "support_tiers": {
+                "items": {
+                  "enum": [
+                    "maintained_catalog",
+                    "supported_experimental",
+                    "community_experimental"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"format": {"const": "policy-pack-v3"}},
+        "required": ["format"]
+      },
+      "then": {
+        "required": ["behavioral_claim"],
+        "properties": {
+          "resolved_policy": {
+            "not": {"required": ["guard_authority"]}
+          },
+          "compatibility": {
+            "required": ["dataset_identity"],
+            "properties": {
+              "support_tiers": {
+                "items": {
+                  "enum": [
+                    "maintained_catalog",
+                    "supported_experimental",
+                    "community_experimental"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "not": {"required": ["behavioral_claim"]}
+      }
+    }
+  ]
 }

@@ -440,6 +440,7 @@ def extract_model_load_kwargs(
         not in {
             "id",
             "adapter",
+            "runtime_provider",
             "device",
             "baseline_id",
             "subject_id",

@@ -676,7 +676,7 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     assert tokenizer_allowlist["condition"] == "AND"
     assert tokenizer_allowlist["regexTarget"] == "match"
     assert tokenizer_allowlist["paths"] == [
-        r"public_evidence/published_basis/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$"
+        r"public_evidence/(?:catalog_evidence|published_basis)/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$"
     ]
     assert tokenizer_allowlist["regexes"] == [
         r'tokenizer_(?:hash|sha256)"\s*:\s*"[0-9A-Fa-f]{32,128}"'

@@ -317,7 +317,7 @@ security-ci = [
 
 # Entry points for built-in and optional plugins
 [project.entry-points."invarlock.edits"]
-quant_rtn = "invarlock.edits:RTNQuantEdit"
+quant_rtn = "invarlock.edits.quant_rtn:RTNQuantEdit"
 
 [project.entry-points."invarlock.guards"]
 spectral = "invarlock.guards.spectral:SpectralGuard"
@@ -340,9 +340,15 @@ hf_hqq = "invarlock.plugins:HF_HQQ_Adapter"
 hf_quanto = "invarlock.plugins:HF_Quanto_Adapter"
 hf_ct = "invarlock.plugins:HF_CompressedTensors_Adapter"
 
+[project.entry-points."invarlock.runtime_providers"]
+hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"
+llama_cpp = "invarlock.runtime_providers.llama_cpp:LlamaCppProvider"
+tensorrt_llm = "invarlock.runtime_providers.tensorrt_llm:TensorRTLLMProvider"
+
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
+invarlock-tensorrt-llm-runner = "invarlock.runtime_providers.tensorrt_llm_runner:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

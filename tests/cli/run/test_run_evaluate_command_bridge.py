@@ -14,11 +14,11 @@ from invarlock.core.auto_tuning import resolve_tier_policies
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 from tests.cli._support_effective_config import preserve_effective_config
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.run._support_run_evaluate_command_bridge import _stub_run
+from tests.cli.verify._support_runtime_provenance import (
     _write_matching_strict_policy_pack,
     bind_runtime_policy_receipt,
 )
-from tests.cli.run._support_run_evaluate_command_bridge import _stub_run
 from tests.core._support_assurance_contract import (
     _plugin_metadata,
     bind_noop_variance_evidence,

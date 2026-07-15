@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_scoring_observation.schema.json",
+  "title": "InvarLock Runtime Scoring Observation",
+  "type": "object",
+  "required": [
+    "format_version",
+    "provider_name",
+    "artifact_identity_sha256",
+    "schedule_sha256",
+    "records",
+    "aggregate_source_sha256"
+  ],
+  "properties": {
+    "format_version": {"const": "invarlock/runtime-scoring-observation-v1"},
+    "provider_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "artifact_identity_sha256": {"$ref": "#/$defs/sha256"},
+    "schedule_sha256": {"$ref": "#/$defs/sha256"},
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/record"}
+    },
+    "aggregate_source_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "record": {
+      "type": "object",
+      "required": [
+        "record_id",
+        "input_sha256",
+        "status",
+        "output_text",
+        "output_sha256",
+        "logprob_sum",
+        "token_count",
+        "utf8_byte_count",
+        "error_code"
+      ],
+      "properties": {
+        "record_id": {"type": "string", "minLength": 1},
+        "input_sha256": {"$ref": "#/$defs/sha256"},
+        "status": {"enum": ["ok", "error"]},
+        "output_text": {"type": ["string", "null"]},
+        "output_sha256": {
+          "anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+        },
+        "logprob_sum": {"type": ["number", "null"]},
+        "token_count": {"type": ["integer", "null"], "minimum": 0},
+        "utf8_byte_count": {"type": ["integer", "null"], "minimum": 0},
+        "error_code": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "error"}}},
+          "then": {
+            "properties": {
+              "output_text": {"const": null},
+              "output_sha256": {"const": null},
+              "logprob_sum": {"const": null},
+              "token_count": {"const": null},
+              "utf8_byte_count": {"const": null},
+              "error_code": {"type": "string"}
+            }
+          },
+          "else": {
+            "properties": {"error_code": {"const": null}},
+            "anyOf": [
+              {
+                "properties": {
+                  "output_text": {"type": "string"},
+                  "output_sha256": {"$ref": "#/$defs/sha256"}
+                }
+              },
+              {
+                "properties": {
+                  "logprob_sum": {"type": "number"},
+                  "token_count": {"type": "integer", "minimum": 1},
+                  "utf8_byte_count": {"type": "integer", "minimum": 1}
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {"properties": {"output_text": {"type": "string"}}},
+          "then": {"properties": {"output_sha256": {"$ref": "#/$defs/sha256"}}},
+          "else": {"properties": {"output_sha256": {"const": null}}}
+        }
+      ],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

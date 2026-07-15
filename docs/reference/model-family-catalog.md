@@ -19,8 +19,14 @@ The repository currently defines 39 maintained lanes covering causal language
 models, masked language models, seq2seq models, dense and MoE architectures,
 and image-text evaluation. Their adapters and presets are available today.
 
-Current-contract evidence is **Available** for 23 lanes. The other 16 lanes
-retain **Evidence not yet created** until their artifacts are published.
+Strictly verified frozen-v1 evidence is **Available** for 31 lanes through the
+current verifier's explicit compatibility path. Those packs do not exercise v2
+guard authority. The other 8 lanes retain **Evidence not yet created** until
+their artifacts are published.
+
+All 39 lanes are `noop` same-checkpoint compatibility runs. They exercise the
+declared model-loading, pairing, report, verification, and packaging mechanics;
+they do not establish transformed-subject detection or guard effectiveness.
 
 Use the [Support Matrix](../README.md#support-matrix) for the complete table.
 
@@ -30,6 +36,10 @@ Use the [Support Matrix](../README.md#support-matrix) for the complete table.
 families that share maintained loader, profile, or adapter paths. This makes it
 easy to discover compatible checkpoints and identify where a dedicated
 catalog lane would add value.
+
+`support_groups` are discovery facets, not support tiers or publication
+claims. For example, `modern_open_weight` groups newer open-weight families;
+evidence availability is reported only by `evidence_status`.
 
 Coverage states include:
 

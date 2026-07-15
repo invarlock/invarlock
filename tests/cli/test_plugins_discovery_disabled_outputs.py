@@ -26,5 +26,5 @@ def test_plugins_discovery_disabled_for_all_categories_json():
 def test_plugins_datasets_json_shape():
     p = _invoke_json(["advanced", "plugins", "list", "datasets", "--json"])
     assert p.get("category") == "datasets"
-    assert p.get("format_version") == "plugins-v1"
+    assert p.get("format_version") == "plugins-v2"
     assert isinstance(p.get("items"), list)

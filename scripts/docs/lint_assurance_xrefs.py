@@ -350,6 +350,11 @@ def _sample_reports() -> list[dict[str, Any]]:
             "provider_digest": {"ids_sha256": "provider-sha"},
         },
         "resolved_policy": {
+            "guard_authority": {
+                "spectral": "enforce",
+                "rmt": "enforce",
+                "variance": "enforce",
+            },
             "metrics": {
                 "pm_ratio": {
                     "ratio_limit_base": 1.10,

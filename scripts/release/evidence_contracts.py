@@ -57,7 +57,7 @@ except ImportError:  # pragma: no cover - direct script execution path
 
 # This checker only validates the presence and shape of local supporting files.
 # It deliberately cannot authorize a release: use release_preflight.py for the
-# fail-closed checkout, distribution, strict-closure, and negative-evidence gate.
+# fail-closed checkout, distribution, strict-closure, and public-evidence gate.
 RELEASE_CHECK_SCHEMA = "invarlock/release-artifact-shape-check-v1"
 OFFLINE_BUNDLE_SCHEMA = "invarlock/release-offline-bundle-v1"
 GUARD_VALIDATION_SMOKE_SCHEMA = "invarlock/guard-validation-smoke-v1"

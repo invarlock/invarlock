@@ -4,7 +4,25 @@ import json
 import math
 from typing import Any
 
+from invarlock.guards.authority import (
+    guard_is_enforced,
+    resolved_guard_authority,
+)
+
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
+
+
+def _guard_display_status(
+    evaluation_report: dict[str, Any], validation_key: str, guard: str
+) -> str:
+    validation = evaluation_report.get("validation")
+    observed = validation.get(validation_key) if isinstance(validation, dict) else None
+    authority = resolved_guard_authority(evaluation_report)[0]
+    if observed is True:
+        return "✅ PASS"
+    if observed is False and not guard_is_enforced(authority, guard):
+        return "⚠️ OBSERVED"
+    return "❌ FAIL"
 
 
 def _append_pairing_details(
@@ -203,7 +221,9 @@ def append_guard_check_details_section(
             non_fatal_message = "Non-fatal invariant warnings present."
         lines.append(f"- Non-fatal: {non_fatal_message}")
 
-    spec_status = "✅ PASS" if validation.get("spectral_stable", False) else "❌ FAIL"
+    spec_status = _guard_display_status(
+        evaluation_report, "spectral_stable", "spectral"
+    )
     spectral_summary = evaluation_report.get("spectral", {}) or {}
     caps_applied = (
         spectral_summary.get("caps_applied")
@@ -242,7 +262,7 @@ def append_guard_check_details_section(
                 f"| Catastrophic Spike Gate (hard stop) | {pm_status} | {pm_ratio:.3f}x | ≤ 2.0x | Hard stop @ 2.0× |"
             )
 
-    rmt_status = "✅ PASS" if validation.get("rmt_stable", False) else "❌ FAIL"
+    rmt_status = _guard_display_status(evaluation_report, "rmt_stable", "rmt")
     rmt_state = evaluation_report.get("rmt", {}).get("status", "unknown").title()
     lines.append(
         f"| RMT Health | {rmt_status} | {rmt_state} | ε-rule | Random Matrix Theory guard status |"
@@ -269,6 +289,12 @@ def _append_spectral_observability(
     lines.append("|--------|-------|--------|")
 
     spectral_ok = validation.get("spectral_stable") is True
+    spectral_observed = bool(
+        validation.get("spectral_stable") is False
+        and not guard_is_enforced(
+            resolved_guard_authority(evaluation_report)[0], "spectral"
+        )
+    )
     caps_applied = spectral_info.get("caps_applied")
     max_caps = spectral_info.get("max_caps")
     caps_val = (
@@ -277,7 +303,8 @@ def _append_spectral_observability(
         else "-"
     )
     lines.append(
-        f"| Caps Applied | {caps_val} | {'✅ OK' if spectral_ok else '❌ FAIL'} |"
+        f"| Caps Applied | {caps_val} | "
+        f"{'✅ OK' if spectral_ok else '⚠️ OBSERVED' if spectral_observed else '❌ FAIL'} |"
     )
 
     summary = spectral_info.get("summary", {}) or {}
@@ -372,9 +399,15 @@ def _append_rmt_observability(
         raw_rmt_families if isinstance(raw_rmt_families, dict) else {}
     )
     stable = rmt_info.get("stable")
+    rmt_observed = bool(
+        stable is False
+        and not guard_is_enforced(resolved_guard_authority(evaluation_report)[0], "rmt")
+    )
     status = (
         "✅ OK"
         if stable is True
+        else "⚠️ OBSERVED"
+        if rmt_observed
         else "❌ FAIL"
         if stable is False
         else "ℹ️ NOT EVALUATED"

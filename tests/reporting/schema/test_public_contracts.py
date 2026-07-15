@@ -27,7 +27,7 @@ _JSON_CONTRACT_LOADER_CASES = (
 
 _PUBLIC_CONTRACT_LOADER_CASES = (
     *_JSON_CONTRACT_LOADER_CASES,
-    ("published_basis_index.json", contracts.load_public_evidence_index),
+    ("catalog_evidence_index.json", contracts.load_public_evidence_index),
 )
 
 
@@ -98,9 +98,9 @@ def test_public_subcontract_versions_are_single_sourced() -> None:
 
 def test_public_contract_loaders_and_catalog_round_trip() -> None:
     support_matrix = contracts.load_support_matrix()
-    assert support_matrix["format_version"] == "support-matrix-v1"
+    assert support_matrix["format_version"] == "support-matrix-v2"
     assert contracts.support_tiers() == tuple(support_matrix["support_tiers"])
-    assert {lane["lane_id"] for lane in contracts.published_basis_lanes()} == {
+    assert {lane["lane_id"] for lane in contracts.maintained_catalog_lanes()} == {
         "gpt2-causal-hf",
         "bert-mlm-hf",
         "mistral-7b-causal-hf",
@@ -143,27 +143,27 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     }
 
     family_catalog = contracts.load_model_family_catalog()
-    assert family_catalog["format_version"] == "model-family-catalog-v1"
+    assert family_catalog["format_version"] == "model-family-catalog-v2"
     assert family_catalog["as_of"] == "2026-07-13"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     published_lane_families = {
-        lane["family"] for lane in contracts.published_basis_lanes()
+        lane["family"] for lane in contracts.maintained_catalog_lanes()
     }
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == published_lane_families
     assert all(item["support_groups"] for item in family_catalog["declared_support"])
     assert all(
-        item["state"] != "published_basis"
+        item["state"] != "maintained_catalog"
         for item in family_catalog["implemented_coverage"]
     )
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
     assert "Qwen2.5 7B" not in usage_only
     assert "Qwen2.5 32B" not in usage_only
-    candidate_section = family_catalog["published_basis_candidates_text_le_14b"]
+    candidate_section = family_catalog["maintained_catalog_candidates_text_le_14b"]
     assert (
         candidate_section["format_version"]
-        == "published-basis-candidates-text-le-14b-v1"
+        == "maintained-catalog-candidates-text-le-14b-v1"
     )
     candidates = {
         item["display_name"]: item for item in candidate_section["candidates"]
@@ -180,7 +180,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     for display_name in cataloged_candidates:
         candidate = candidates[display_name]
         assert candidate["decision"] == "cataloged"
-        assert candidate["current_catalog_state"] == "published_basis"
+        assert candidate["current_catalog_state"] == "maintained_catalog"
         assert (
             candidate["criteria_status"]["approved_calibration_or_evaluation_evidence"]
             == "not_created"
@@ -215,21 +215,21 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert recommended == {"Audio-text evaluation pipeline"}
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None
-    assert gpt2_lane["support_tier"] == "published_basis"
+    assert gpt2_lane["support_tier"] == "maintained_catalog"
 
     catalog = contracts.contract_catalog()
-    assert catalog["support_matrix"]["format_version"] == "support-matrix-v1"
+    assert catalog["support_matrix"]["format_version"] == "support-matrix-v2"
     assert (
-        catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v1"
+        catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v2"
     )
     model_classification = contracts.load_model_classification()
-    assert model_classification["format_version"] == "model-classification-v1"
+    assert model_classification["format_version"] == "model-classification-v2"
     assert model_classification["policy"]["allowed_named_checkpoint_license_ids"] == [
         "apache-2.0",
         "mit",
     ]
     assert (
-        catalog["model_classification"]["format_version"] == "model-classification-v1"
+        catalog["model_classification"]["format_version"] == "model-classification-v2"
     )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
@@ -281,10 +281,18 @@ def test_support_tier_descriptions_and_policy_pack_schema_are_in_sync() -> None:
     assert all(descriptions[tier] for tier in tiers)
 
     policy_schema = contracts.load_policy_pack_schema()
-    enum = policy_schema["properties"]["compatibility"]["properties"]["support_tiers"][
-        "items"
-    ]["enum"]
-    assert enum == tiers
+    format_rules = {
+        rule["if"]["properties"]["format"]["const"]: rule["then"]["properties"][
+            "compatibility"
+        ]["properties"]["support_tiers"]["items"]["enum"]
+        for rule in policy_schema["allOf"]
+    }
+    assert format_rules["policy-pack-v2"] == tiers
+    assert format_rules["policy-pack-v1"] == [
+        "published_basis",
+        "supported_experimental",
+        "community_experimental",
+    ]
 
     for lane in support_matrix["lanes"]:
         assert lane["support_tier"] in tiers
@@ -319,12 +327,12 @@ def test_support_matrix_records_current_evidence_status_and_paths() -> None:
     support_matrix = contracts.load_support_matrix()
     public_index = contracts.load_public_evidence_index()
 
-    published_basis = [
+    maintained_catalog = [
         lane
         for lane in support_matrix["lanes"]
-        if lane.get("support_tier") == "published_basis"
+        if lane.get("support_tier") == "maintained_catalog"
     ]
-    assert published_basis
+    assert maintained_catalog
     indexed = {
         lane_id
         for entry in public_index["entries"]
@@ -332,11 +340,11 @@ def test_support_matrix_records_current_evidence_status_and_paths() -> None:
     }
     available = {
         lane["lane_id"]
-        for lane in published_basis
+        for lane in maintained_catalog
         if lane["evidence_status"] == "available"
     }
     assert available == indexed
-    for lane in published_basis:
+    for lane in maintained_catalog:
         if lane["lane_id"] in available:
             assert lane["evidence_status_label"] == "Available"
             assert set(lane["evidence"]) == {"evidence_pack", "verification_receipt"}
@@ -359,7 +367,7 @@ def test_packaged_public_evidence_index_records_current_available_state() -> Non
     index = contracts.load_public_evidence_index()
     assert index["format_version"] == contracts.PUBLIC_EVIDENCE_INDEX_FORMAT_VERSION
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
-    assert index["published_basis_count"] == len(index["entries"])
+    assert index["catalog_evidence_count"] == len(index["entries"])
     if index["entries"]:
         assert "status" not in index
         assert "status_label" not in index
@@ -374,7 +382,7 @@ def test_packaged_public_evidence_index_rejects_non_object(
 ) -> None:
     index_root = tmp_path / "public_evidence"
     index_root.mkdir()
-    (index_root / "published_basis_index.json").write_text("[]\n", encoding="utf-8")
+    (index_root / "catalog_evidence_index.json").write_text("[]\n", encoding="utf-8")
     monkeypatch.setattr(contracts, "PACKAGE_PUBLIC_EVIDENCE_ROOT", index_root)
 
     with pytest.raises(contracts.ContractLoadError, match="expected JSON object"):
@@ -386,7 +394,7 @@ def test_packaged_public_evidence_index_rejects_wrong_format_version(
 ) -> None:
     index_root = tmp_path / "public_evidence"
     index_root.mkdir()
-    (index_root / "published_basis_index.json").write_text(
+    (index_root / "catalog_evidence_index.json").write_text(
         json.dumps({"format_version": "older-index"}) + "\n",
         encoding="utf-8",
     )
@@ -418,7 +426,7 @@ def test_public_contract_loader_falls_back_to_packaged_contracts(
     monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
 
     payload = contracts.load_support_matrix()
-    assert payload["format_version"] == "support-matrix-v1"
+    assert payload["format_version"] == "support-matrix-v2"
     assert payload["lanes"]
 
 

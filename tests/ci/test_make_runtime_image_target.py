@@ -105,5 +105,5 @@ def test_runtime_image_targets_fail_closed_without_a_source_epoch() -> None:
 
     assert "RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct" in data
     assert "$(or $(shell git log -1 --pretty=%ct" not in data
-    assert data.count('test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"') == 3
+    assert data.count('test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"') == 4
     assert "set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds" in data

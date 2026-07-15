@@ -18,6 +18,7 @@ nav:
       - Knowledge & Self-Edit Workflows: user-guide/knowledge-and-self-edit-workflows.md
       - Live Examples: user-guide/live-examples.md
       - Integration Examples: user-guide/integrations.md
+      - Native Runtime Providers: user-guide/native-runtime-providers.md
       - Public Evidence Walkthrough: user-guide/public-evidence-walkthrough.md
       - Bring Your Own Data: user-guide/bring-your-own-data.md
       - Plugin Workflow: user-guide/plugins.md
@@ -36,6 +37,7 @@ nav:
       - Report Outline: reference/report-outline.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
+      - Runtime Providers: reference/runtime-providers.md
       - Model Family Catalog: reference/model-family-catalog.md
       - Public Contracts: reference/contracts.md
       - Configuration Schema: reference/config-schema.md

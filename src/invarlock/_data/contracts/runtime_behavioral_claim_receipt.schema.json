@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_behavioral_claim_receipt.schema.json",
+  "title": "InvarLock Runtime Behavioral Claim Receipt",
+  "type": "object",
+  "required": [
+    "format_version",
+    "claim_set",
+    "baseline",
+    "subject",
+    "schedule_sha256",
+    "policy_digest",
+    "metric",
+    "baseline_score",
+    "subject_score",
+    "regression",
+    "verdict"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "invarlock/runtime-behavioral-claim-receipt-v1"
+    },
+    "claim_set": {
+      "const": "invarlock-runtime-behavioral-regression-v1"
+    },
+    "baseline": {
+      "$ref": "#/$defs/evidenceBindings"
+    },
+    "subject": {
+      "$ref": "#/$defs/evidenceBindings"
+    },
+    "schedule_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/prefixedSha256"
+    },
+    "metric": {
+      "const": "exact_match"
+    },
+    "baseline_score": {
+      "$ref": "#/$defs/score"
+    },
+    "subject_score": {
+      "$ref": "#/$defs/score"
+    },
+    "regression": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "verdict": {
+      "const": "pass"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "evidenceBindings": {
+      "type": "object",
+      "required": [
+        "runtime_manifest_sha256",
+        "evaluation_report_sha256",
+        "provider_receipt_sidecar_sha256",
+        "scoring_observation_sidecar_sha256",
+        "artifact_identity_sidecar_sha256"
+      ],
+      "properties": {
+        "runtime_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "provider_receipt_sidecar_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scoring_observation_sidecar_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_identity_sidecar_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

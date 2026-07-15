@@ -52,6 +52,62 @@ See also: [`SECURITY.md`](../SECURITY.md) for vulnerability reporting policy.
 
 - **`release.yml`** - Tag-gated build and publish workflow for PyPI/TestPyPI
 
+#### Runtime evidence release asset handoff
+
+The compact native-runtime evidence archive is a GitHub Release asset, not a
+Python distribution. Before upload, stage it under a tag-and-digest-bound name
+and generate its canonical SHA-256 sidecar:
+
+```bash
+mkdir -p artifacts/release-runtime
+python scripts/release/runtime_release_asset_handoff.py stage \
+  --asset runtime-release-evidence.tar.gz \
+  --output-dir artifacts/release-runtime \
+  --release-tag "$RELEASE_TAG" \
+  --expected-source-commit "$SOURCE_COMMIT" \
+  --expected-source-archive-sha256 "$SOURCE_ARCHIVE_SHA256" \
+  --expected-asset-sha256 "$ASSET_SHA256" \
+  --expected-provider llama_cpp \
+  --expected-provider tensorrt_llm \
+  --expected-qualification llama_cpp:cpu-reference \
+  --expected-qualification tensorrt_llm:pair-a \
+  --expected-qualification tensorrt_llm:pair-b \
+  --require-behavioral-claim
+```
+
+The release manager creates the GitHub Release only after the tag publication
+has passed. Attach the already-staged pair with the same independent bindings:
+
+```bash
+ASSET="artifacts/release-runtime/invarlock-${RELEASE_TAG}-runtime-evidence-source-${SOURCE_COMMIT:0:12}-${ASSET_SHA256}.tar.gz"
+python scripts/release/runtime_release_asset_handoff.py upload \
+  --asset "$ASSET" \
+  --digest-file "${ASSET}.sha256" \
+  --repository "$GITHUB_REPOSITORY" \
+  --release-tag "$RELEASE_TAG" \
+  --expected-release-commit "$RELEASE_COMMIT" \
+  --expected-source-commit "$SOURCE_COMMIT" \
+  --expected-source-archive-sha256 "$SOURCE_ARCHIVE_SHA256" \
+  --expected-asset-sha256 "$ASSET_SHA256" \
+  --expected-provider llama_cpp \
+  --expected-provider tensorrt_llm \
+  --expected-qualification llama_cpp:cpu-reference \
+  --expected-qualification tensorrt_llm:pair-a \
+  --expected-qualification tensorrt_llm:pair-b \
+  --require-behavioral-claim
+```
+
+The helper revalidates the archive, provider set, behavior-claim requirement,
+evidence source bindings, source-labeled immutable filenames, and sidecar.
+The repeated qualification arguments are an exact set, so a missing or
+substituted named qualification fails closed.
+Upload separately requires an existing non-draft release whose remote tag
+resolves to `RELEASE_COMMIT`; it does not claim that this release-management
+commit is the commit that produced the evidence. Existing assets are never
+replaced, and the uploaded names and sizes are checked before success is
+reported. Omit `--require-behavioral-claim` only when the release publishes
+runtime qualification receipts without a schedule-level behavior claim.
+
 ### Benchmark Workflows
 
 - **`guard-effect-benchmark.yml`** - Paired guard overhead and stability benchmark (manual `workflow_dispatch`, not part of default CI or a detection-efficacy study)
@@ -85,8 +141,9 @@ job or step, emit container-backed outputs, and verify them without bypasses.
   `advanced` shipped dependency surfaces.
 - The release workflow peels annotated tags to immutable commit SHAs before
   checkout/publish, scans the release delta since the previous release tag,
-  uses an installed-wheel environment for its release SBOM, and publishes
-  distributions without a separate public release-asset upload step.
+  uses an installed-wheel environment for its release SBOM, and publishes the
+  Python distributions. Compact runtime evidence uses the separately verified
+  GitHub Release asset handoff documented above.
 - The scheduled secret-history workflow keeps the slower full-history
   `gitleaks` scan out of the tag publish critical path.
 - The tag-gated CI supply-chain job remains the slower release backstop and keeps the tool-environment SBOM.

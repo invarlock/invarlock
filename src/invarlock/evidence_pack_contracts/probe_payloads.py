@@ -56,6 +56,11 @@ def _finite(value: object) -> bool:
     )
 
 
+def _number(value: object) -> float:
+    assert not isinstance(value, bool) and isinstance(value, int | float)
+    return float(value)
+
+
 def _finite_mapping(value: object) -> bool:
     return isinstance(value, dict) and all(
         isinstance(key, str) and key and _finite(item) for key, item in value.items()
@@ -141,6 +146,137 @@ def _valid_rmt_metrics(value: object) -> bool:
     )
 
 
+def _close(left: object, right: object) -> bool:
+    return (
+        _finite(left)
+        and _finite(right)
+        and math.isclose(_number(left), _number(right), rel_tol=1e-9, abs_tol=1e-12)
+    )
+
+
+def _expected_rmt_violation_families(payload: dict[str, Any]) -> set[str]:
+    metrics = payload["metrics"]
+    base_by_family = metrics["edge_base_by_family"]
+    current_by_family = metrics["edge_cur_by_family"]
+    if set(base_by_family) != set(current_by_family):
+        raise ProbePayloadError("RMT family aggregates do not cover the same families")
+    if not _close(payload["epsilon_default"], metrics["epsilon_default"]):
+        raise ProbePayloadError("RMT epsilon policy disagrees with metrics")
+    if payload["epsilon_by_family"] != metrics["epsilon_by_family"]:
+        raise ProbePayloadError("RMT family epsilon policy disagrees with metrics")
+
+    expected: set[str] = set()
+    for family, base in base_by_family.items():
+        current = current_by_family[family]
+        epsilon = payload["epsilon_by_family"].get(family, payload["epsilon_default"])
+        if base < 0 or current < 0 or epsilon < 0:
+            raise ProbePayloadError(
+                "RMT family aggregates and epsilon must be non-negative"
+            )
+        if base > 0 and current > base * (1.0 + epsilon):
+            expected.add(family)
+    return expected
+
+
+def _validate_rmt_violations(
+    payload: dict[str, Any], expected_families: set[str]
+) -> None:
+    metrics = payload["metrics"]
+    observed_families: set[str] = set()
+    for violation in payload["epsilon_violations"]:
+        base = violation["edge_base"]
+        current = violation["edge_cur"]
+        epsilon = violation["epsilon"]
+        family = violation["family"]
+        if family in observed_families or family not in metrics["edge_base_by_family"]:
+            raise ProbePayloadError(
+                "RMT epsilon violations contain an unknown or duplicate family"
+            )
+        observed_families.add(family)
+        if (
+            base <= 0
+            or epsilon < 0
+            or not _close(base, metrics["edge_base_by_family"][family])
+            or not _close(current, metrics["edge_cur_by_family"][family])
+            or not _close(violation["allowed"], base * (1.0 + epsilon))
+            or not _close(violation["delta"], current / base - 1.0)
+            or current <= violation["allowed"]
+        ):
+            raise ProbePayloadError("RMT epsilon violation arithmetic is invalid")
+        family_epsilon = payload["epsilon_by_family"].get(
+            family, payload["epsilon_default"]
+        )
+        if not _close(epsilon, family_epsilon):
+            raise ProbePayloadError("RMT epsilon violation is not policy-bound")
+    if observed_families != expected_families:
+        raise ProbePayloadError("RMT epsilon violations do not match family aggregates")
+
+
+def _validate_rmt_semantics(payload: dict[str, Any]) -> None:
+    stable = payload["stable"]
+    violations = payload["epsilon_violations"]
+    metrics = payload["metrics"]
+    if (
+        payload["passed"] is not payload["stable_guard"]
+        or metrics["stable"] is not payload["stable_guard"]
+        or bool(violations) is stable
+    ):
+        raise ProbePayloadError("RMT probe status is inconsistent with its violations")
+    expected_families = _expected_rmt_violation_families(payload)
+    _validate_rmt_violations(payload, expected_families)
+    if stable is bool(expected_families):
+        raise ProbePayloadError("RMT stable status disagrees with family aggregates")
+
+
+def _validate_ve_semantics(payload: dict[str, Any]) -> None:
+    signal = payload["signal"]
+    reasons = payload["signal_reasons"]
+    if signal:
+        if (
+            reasons
+            or payload["proposed_scales"] <= 0
+            or payload["ab_gain"] is None
+            or payload["ab_gain"] <= 0
+            or payload["abs_improvement"] is None
+            or payload["abs_improvement"] <= 0
+        ):
+            raise ProbePayloadError("VE positive signal lacks positive measured gain")
+    elif not reasons:
+        raise ProbePayloadError("VE absent signal must record a reason")
+    gate = payload["predictive_gate"]
+    if payload["would_enable"] is not gate["would_enable"]:
+        raise ProbePayloadError("VE enable decision disagrees with its predictive gate")
+    if gate["reason"] != payload["gate_reason"]:
+        raise ProbePayloadError("VE gate reason disagrees with its predictive gate")
+    no_ve, with_ve = payload["ppl_no_ve"], payload["ppl_with_ve"]
+    if (no_ve is None) is not (with_ve is None):
+        raise ProbePayloadError("VE perplexity measurements must be paired")
+    if signal and (no_ve is None or with_ve is None):
+        raise ProbePayloadError("VE positive signal lacks paired measurements")
+    if no_ve is not None and with_ve is not None:
+        if no_ve <= 0 or with_ve <= 0:
+            raise ProbePayloadError("VE perplexities must be positive")
+        if payload["abs_improvement"] is None or not _close(
+            payload["abs_improvement"], no_ve - with_ve
+        ):
+            raise ProbePayloadError("VE absolute improvement arithmetic is invalid")
+        if payload["ab_gain"] is not None and not _close(
+            payload["ab_gain"], (no_ve - with_ve) / no_ve
+        ):
+            raise ProbePayloadError("VE relative gain arithmetic is invalid")
+    elif payload["abs_improvement"] is not None:
+        raise ProbePayloadError("VE absolute improvement lacks paired measurements")
+    ratio = payload["ratio_ci"]
+    if ratio is not None:
+        if ratio[0] <= 0 or ratio[1] <= 0:
+            raise ProbePayloadError("VE ratio interval must be positive")
+        if ratio[0] > ratio[1]:
+            raise ProbePayloadError("VE ratio interval is reversed")
+    calibration = payload["calibration"]
+    if calibration["min_coverage"] > calibration["windows"]:
+        raise ProbePayloadError("VE minimum coverage exceeds calibration windows")
+
+
 def validate_rmt_payload(payload: dict[str, Any], *, schema: str) -> None:
     violations = payload.get("violations")
     if (
@@ -171,6 +307,7 @@ def validate_rmt_payload(payload: dict[str, Any], *, schema: str) -> None:
         or not valid_binding_shape(payload.get("binding"))
     ):
         raise ProbePayloadError("RMT probe field types are invalid")
+    _validate_rmt_semantics(payload)
 
 
 def validate_ve_payload(payload: dict[str, Any], *, schema: str) -> None:
@@ -224,3 +361,4 @@ def validate_ve_payload(payload: dict[str, Any], *, schema: str) -> None:
         or not valid_binding_shape(payload.get("binding"))
     ):
         raise ProbePayloadError("VE probe field types are invalid")
+    _validate_ve_semantics(payload)

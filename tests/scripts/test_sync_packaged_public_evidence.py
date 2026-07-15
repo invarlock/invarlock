@@ -18,14 +18,18 @@ def _write_json(path: Path, payload: object) -> None:
 def _write_fixture(root: Path) -> tuple[Path, Path]:
     source_root = root / "public_evidence"
     support_matrix = root / "contracts" / "support_matrix.json"
-    evidence_dir = source_root / "published_basis" / "demo"
+    evidence_dir = source_root / "catalog_evidence" / "demo"
     evidence_dir.mkdir(parents=True)
     (source_root / "README.md").write_text("# Public evidence\n", encoding="utf-8")
-    (evidence_dir / "evaluation.report.json").write_text("report\n", encoding="utf-8")
-    (evidence_dir / "runtime.manifest.json").write_text("manifest\n", encoding="utf-8")
     (evidence_dir / "evidence_pack").mkdir()
     (evidence_dir / "evidence_pack" / "manifest.json").write_text(
         "{}\n", encoding="utf-8"
+    )
+    (evidence_dir / "evidence_pack" / "evaluation.report.json").write_text(
+        "report\n", encoding="utf-8"
+    )
+    (evidence_dir / "evidence_pack" / "runtime.manifest.json").write_text(
+        "manifest\n", encoding="utf-8"
     )
     _write_json(
         evidence_dir / "evidence.meta.json",
@@ -33,8 +37,8 @@ def _write_fixture(root: Path) -> tuple[Path, Path]:
             "evidence_class": "strict_pass_fixture",
             "summary": "fixture report",
             "artifact_paths": {
-                "evaluation_report": "evaluation.report.json",
-                "runtime_manifest": "runtime.manifest.json",
+                "evaluation_report": "evidence_pack/evaluation.report.json",
+                "runtime_manifest": "evidence_pack/runtime.manifest.json",
                 "evidence_pack": "evidence_pack",
             },
         },
@@ -45,11 +49,11 @@ def _write_fixture(root: Path) -> tuple[Path, Path]:
             "lanes": [
                 {
                     "lane_id": "demo-lane",
-                    "support_tier": "published_basis",
+                    "support_tier": "maintained_catalog",
                     "evidence": {
                         "evaluation_report_fixture": (
-                            "public_evidence/published_basis/demo/"
-                            "evaluation.report.json"
+                            "public_evidence/catalog_evidence/demo/"
+                            "evidence_pack/evaluation.report.json"
                         )
                     },
                 }
@@ -97,13 +101,20 @@ def test_sync_packaged_public_evidence_write_and_check(tmp_path: Path) -> None:
 
     assert written.returncode == 0, written.stderr
     index = json.loads(
-        (packaged_root / "published_basis_index.json").read_text(encoding="utf-8")
+        (packaged_root / "catalog_evidence_index.json").read_text(encoding="utf-8")
     )
-    assert index["format_version"] == "public-evidence-index-v1"
+    assert index["format_version"] == "public-evidence-index-v2"
     assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
     assert index["entries"][0]["lanes"] == ["demo-lane"]
     assert index["entries"][0]["artifacts"]["evaluation_report"]["sha256"].startswith(
         "sha256:"
+    )
+    unique_files = sorted(
+        path for path in (source_root / "catalog_evidence").rglob("*") if path.is_file()
+    )
+    assert index["catalog_evidence_file_count"] == 4 == len(unique_files)
+    assert index["catalog_evidence_size_bytes"] == sum(
+        path.stat().st_size for path in unique_files
     )
 
     checked = _run(
@@ -123,8 +134,8 @@ def test_sync_packaged_public_evidence_rejects_drift_and_legacy_tree(
     source_root, support_matrix = _write_fixture(tmp_path)
     packaged_root = tmp_path / "packaged"
     packaged_root.mkdir()
-    _write_json(packaged_root / "published_basis_index.json", {"stale": True})
-    (packaged_root / "published_basis" / "demo").mkdir(parents=True)
+    _write_json(packaged_root / "catalog_evidence_index.json", {"stale": True})
+    (packaged_root / "catalog_evidence" / "demo").mkdir(parents=True)
 
     checked = _run(
         source_root=source_root,
@@ -135,7 +146,7 @@ def test_sync_packaged_public_evidence_rejects_drift_and_legacy_tree(
 
     assert checked.returncode == 1
     combined = checked.stdout + checked.stderr
-    assert "legacy packaged public evidence tree must be removed" in combined
+    assert "full packaged public evidence tree must be removed" in combined
     assert "out-of-sync packaged public evidence index" in combined
 
 
@@ -144,7 +155,7 @@ def test_sync_packaged_public_evidence_write_removes_legacy_tree(
 ) -> None:
     source_root, support_matrix = _write_fixture(tmp_path)
     packaged_root = tmp_path / "packaged"
-    (packaged_root / "published_basis" / "demo").mkdir(parents=True)
+    (packaged_root / "catalog_evidence" / "demo").mkdir(parents=True)
 
     written = _run(
         source_root=source_root,
@@ -154,8 +165,8 @@ def test_sync_packaged_public_evidence_write_removes_legacy_tree(
     )
 
     assert written.returncode == 0, written.stderr
-    assert "removed_legacy_tree=True" in written.stdout
-    assert not (packaged_root / "published_basis").exists()
+    assert "removed_full_tree=True" in written.stdout
+    assert not (packaged_root / "catalog_evidence").exists()
 
 
 def test_sync_packaged_public_evidence_uses_source_index_after_externalization(
@@ -173,7 +184,7 @@ def test_sync_packaged_public_evidence_uses_source_index_after_externalization(
             "--write-source-index",
             "--external-asset-url",
             "https://github.com/example/repo/releases/download/public-evidence/"
-            "published-basis.tar.gz",
+            "catalog-evidence.tar.gz",
             "--external-asset-sha256",
             "sha256:" + "a" * 64,
             "--external-asset-size-bytes",
@@ -182,15 +193,15 @@ def test_sync_packaged_public_evidence_uses_source_index_after_externalization(
     )
 
     assert written.returncode == 0, written.stderr
-    source_index_path = source_root / "published_basis_index.json"
+    source_index_path = source_root / "catalog_evidence_index.json"
     index = json.loads(source_index_path.read_text(encoding="utf-8"))
     artifact = index["entries"][0]["artifacts"]["evaluation_report"]
     assert artifact["external_asset"]["archive_path"] == (
-        "public_evidence/published_basis/demo/evaluation.report.json"
+        "public_evidence/catalog_evidence/demo/evidence_pack/evaluation.report.json"
     )
     assert artifact["external_asset"]["sha256"] == "sha256:" + "a" * 64
 
-    shutil.rmtree(source_root / "published_basis")
+    shutil.rmtree(source_root / "catalog_evidence")
     checked = _run(
         source_root=source_root,
         support_matrix=support_matrix,

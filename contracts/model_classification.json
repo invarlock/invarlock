@@ -1,6 +1,6 @@
 {
-  "format_version": "model-classification-v1",
-  "as_of": "2026-06-29",
+  "format_version": "model-classification-v2",
+  "as_of": "2026-07-14",
   "policy": {
     "named_checkpoint_license_policy": "strict_apache_2_or_mit",
     "allowed_named_checkpoint_license_ids": [
@@ -10,7 +10,7 @@
     "notes": "Support and candidate classifications are explicit. User-supplied local checkpoints remain BYOE inputs."
   },
   "classification_values": [
-    "published",
+    "cataloged",
     "backlog",
     "blocked",
     "smoke_canary",
@@ -26,7 +26,7 @@
   "entries": [
     {
       "id": "gpt2-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gpt2-causal-hf",
       "catalog_family_ids": [
@@ -35,7 +35,7 @@
     },
     {
       "id": "bert-mlm-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "bert-mlm-hf",
       "catalog_family_ids": [
@@ -44,7 +44,7 @@
     },
     {
       "id": "mistral-7b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "mistral-7b-causal-hf",
       "catalog_family_ids": [
@@ -53,7 +53,7 @@
     },
     {
       "id": "ministral-3-8b-text-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "ministral-3-8b-text-causal-hf",
       "catalog_family_ids": [
@@ -62,7 +62,7 @@
     },
     {
       "id": "ministral-3-14b-text-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "ministral-3-14b-text-causal-hf",
       "catalog_family_ids": [
@@ -71,7 +71,7 @@
     },
     {
       "id": "qwen2-7b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen2-7b-causal-hf",
       "catalog_family_ids": [
@@ -80,7 +80,7 @@
     },
     {
       "id": "qwen2-5-7b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen2-5-7b-causal-hf",
       "catalog_family_ids": [
@@ -89,7 +89,7 @@
     },
     {
       "id": "qwen2-5-14b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen2-5-14b-causal-hf",
       "catalog_family_ids": [
@@ -98,7 +98,7 @@
     },
     {
       "id": "qwen3-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-causal-hf",
       "catalog_family_ids": [
@@ -107,7 +107,7 @@
     },
     {
       "id": "deepseek-r1-distill-qwen-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "deepseek-r1-distill-qwen-causal-hf",
       "catalog_family_ids": [
@@ -116,7 +116,7 @@
     },
     {
       "id": "phi-4-text-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "phi-4-text-causal-hf",
       "catalog_family_ids": [
@@ -125,7 +125,7 @@
     },
     {
       "id": "gemma4-e2b-text-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-e2b-text-causal-hf",
       "catalog_family_ids": [
@@ -134,7 +134,7 @@
     },
     {
       "id": "tinyllama-1-1b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "tinyllama-1-1b-causal-hf",
       "catalog_family_ids": [
@@ -143,7 +143,7 @@
     },
     {
       "id": "olmo-2-7b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "olmo-2-7b-causal-hf",
       "catalog_family_ids": [
@@ -152,7 +152,7 @@
     },
     {
       "id": "olmo-2-13b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "olmo-2-13b-causal-hf",
       "catalog_family_ids": [
@@ -161,7 +161,7 @@
     },
     {
       "id": "open-llama-7b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "open-llama-7b-causal-hf",
       "catalog_family_ids": [
@@ -170,7 +170,7 @@
     },
     {
       "id": "falcon-7b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "falcon-7b-causal-hf",
       "catalog_family_ids": [
@@ -179,7 +179,7 @@
     },
     {
       "id": "qwen3-5-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-5-causal-hf",
       "catalog_family_ids": [
@@ -188,7 +188,7 @@
     },
     {
       "id": "granite-4-1-3b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "granite-4-1-3b-causal-hf",
       "catalog_family_ids": [
@@ -197,7 +197,7 @@
     },
     {
       "id": "flan-t5-base-seq2seq-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "flan-t5-base-seq2seq-hf",
       "catalog_family_ids": [
@@ -206,7 +206,7 @@
     },
     {
       "id": "gemma4-12b-any-to-any-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-12b-any-to-any-hf",
       "catalog_family_ids": [
@@ -215,7 +215,7 @@
     },
     {
       "id": "gemma4-e4b-image-text-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-e4b-image-text-hf",
       "catalog_family_ids": [
@@ -224,7 +224,7 @@
     },
     {
       "id": "gemma4-e2b-image-text-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-e2b-image-text-hf",
       "catalog_family_ids": [
@@ -233,7 +233,7 @@
     },
     {
       "id": "qwen3-5-4b-image-text-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-5-4b-image-text-hf",
       "catalog_family_ids": [
@@ -242,7 +242,7 @@
     },
     {
       "id": "qwen3-5-2b-image-text-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-5-2b-image-text-hf",
       "catalog_family_ids": [
@@ -251,7 +251,7 @@
     },
     {
       "id": "qwen3-6-27b-image-text-scoped-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-6-27b-image-text-scoped-hf",
       "catalog_family_ids": [
@@ -260,7 +260,7 @@
     },
     {
       "id": "qwen3-5-27b-image-text-scoped-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-5-27b-image-text-scoped-hf",
       "catalog_family_ids": [
@@ -269,7 +269,7 @@
     },
     {
       "id": "gemma4-26b-a4b-moe-image-text-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-26b-a4b-moe-image-text-hf",
       "catalog_family_ids": [
@@ -278,7 +278,7 @@
     },
     {
       "id": "gemma4-31b-image-text-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gemma4-31b-image-text-hf",
       "catalog_family_ids": [
@@ -287,7 +287,7 @@
     },
     {
       "id": "mixtral-8x7b-moe-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "mixtral-8x7b-moe-causal-hf",
       "catalog_family_ids": [
@@ -296,7 +296,7 @@
     },
     {
       "id": "qwen3-30b-a3b-moe-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "qwen3-30b-a3b-moe-causal-hf",
       "catalog_family_ids": [
@@ -305,7 +305,7 @@
     },
     {
       "id": "olmoe-1b-7b-0924-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "olmoe-1b-7b-0924-causal-hf",
       "catalog_family_ids": [
@@ -314,7 +314,7 @@
     },
     {
       "id": "ministral-3-3b-text-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "ministral-3-3b-text-causal-hf",
       "catalog_family_ids": [
@@ -323,7 +323,7 @@
     },
     {
       "id": "granite-4-1-8b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "granite-4-1-8b-causal-hf",
       "catalog_family_ids": [
@@ -332,7 +332,7 @@
     },
     {
       "id": "smollm3-3b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "smollm3-3b-causal-hf",
       "catalog_family_ids": [
@@ -341,7 +341,7 @@
     },
     {
       "id": "phi-4-mini-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "phi-4-mini-causal-hf",
       "catalog_family_ids": [
@@ -350,7 +350,7 @@
     },
     {
       "id": "deepseek-r1-distill-qwen-14b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "deepseek-r1-distill-qwen-14b-causal-hf",
       "catalog_family_ids": [
@@ -359,7 +359,7 @@
     },
     {
       "id": "deepseek-r1-0528-qwen3-8b-causal-hf",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "deepseek-r1-0528-qwen3-8b-causal-hf",
       "catalog_family_ids": [
@@ -426,7 +426,7 @@
     },
     {
       "id": "gpt-oss-family",
-      "classification": "published",
+      "classification": "cataloged",
       "eligibility": "eligible",
       "support_matrix_lane_id": "gpt-oss-20b-causal-hf",
       "catalog_family_ids": [

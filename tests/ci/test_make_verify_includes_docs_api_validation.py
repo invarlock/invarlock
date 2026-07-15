@@ -83,9 +83,13 @@ def test_makefile_exposes_scripts_audit_target() -> None:
     assert "scripts/check_scripts_inventory.py --json" in block
 
 
-def test_empirical_inventory_is_not_a_release_gate() -> None:
-    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+def test_empirical_and_negative_evidence_are_not_release_authority() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    makefile = repo_root / "Makefile"
     data = makefile.read_text(encoding="utf-8")
+    preflight_source = (repo_root / "scripts/release/release_preflight.py").read_text(
+        encoding="utf-8"
+    )
 
     inventory = _get_make_target_block(data, "empirical-guard-inventory-check")
     release_shape = _get_make_target_block(data, "release-evidence-check")
@@ -98,6 +102,8 @@ def test_empirical_inventory_is_not_a_release_gate() -> None:
     assert "empirical" not in release_shape
     assert release_preflight is not None
     assert "empirical" not in release_preflight
+    assert "--require-current-negative-evidence" not in preflight_source
+    assert "_run_current_negative_evidence_audit" not in preflight_source
 
 
 def test_contracts_check_runs_model_candidate_compatibility_audit() -> None:

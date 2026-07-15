@@ -13,8 +13,11 @@
 !requirements/workflows/runtime-image-py312-cu128.txt
 !requirements/workflows/runtime-image-quant-py312-cu128.txt
 !requirements/workflows/runtime-wheel-build-py312.txt
+!requirements/workflows/core-py312.txt
 !runtime/
 !runtime/Dockerfile
+!runtime/Dockerfile.llama-cpp
+!runtime/Dockerfile.tensorrt-llm
 !src/
 !src/**
 src/**/__pycache__/

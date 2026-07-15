@@ -1049,7 +1049,7 @@
       ],
       "category": "error_injection",
       "failure_class": "spectral.targeted_attn_scale",
-      "strictness": "informational",
+      "strictness": "must_pass",
       "intent": "negative_control",
       "primary_guard": "spectral",
       "generation": {
@@ -1071,6 +1071,26 @@
             "kind": "validation_flag",
             "flag": "primary_metric_acceptable",
             "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "invariants_pass",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "spectral_stable",
+            "expected": true
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "guard_signal_baseline_relative",
+            "guard": "spectral",
+            "expected": false
           }
         ],
         "notes": "Stock-cap-clean negative control for the Mistral guard-value sweep: a smaller attention layer31 o_proj scale that passes PM, adds no baseline-relative spectral cap, and keeps the edited target below the documented stock attention cap."
@@ -1192,6 +1212,11 @@
           {
             "kind": "validation_flag",
             "flag": "rmt_stable",
+            "expected": true
+          },
+          {
+            "kind": "ve_probe",
+            "field": "signal",
             "expected": true
           },
           {

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -22,7 +23,10 @@ from invarlock.evidence_pack_json import (
     parse_json_bytes,
     read_regular_file_bytes,
 )
-from invarlock.public_contracts import RUNTIME_MANIFEST_CONTRACT_VERSION
+from invarlock.public_contracts import (
+    RUNTIME_MANIFEST_CONTRACT_VERSION,
+    RUNTIME_MANIFEST_V2_CONTRACT_VERSION,
+)
 
 inspect_config_dependencies = _config_loader.inspect_config_dependencies
 
@@ -39,7 +43,9 @@ SOURCE_BUNDLE_DIGEST_ENV = "INVARLOCK_SOURCE_BUNDLE_SHA256"
 SOURCE_BUNDLE_READ_ONLY_ENV = "INVARLOCK_SOURCE_BUNDLE_READ_ONLY"
 RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
 RUNTIME_MANIFEST_VERSION = 1
+RUNTIME_MANIFEST_V2_VERSION = 2
 RUNTIME_VERIFIER_CONTRACT_VERSION = RUNTIME_MANIFEST_CONTRACT_VERSION
+RUNTIME_VERIFIER_V2_CONTRACT_VERSION = RUNTIME_MANIFEST_V2_CONTRACT_VERSION
 RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
 RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT = "invarlock-runtime:cuda-local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
@@ -67,7 +73,9 @@ __all__ = [
     "RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
+    "RUNTIME_MANIFEST_V2_VERSION",
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
+    "RUNTIME_VERIFIER_V2_CONTRACT_VERSION",
     "apply_runtime_allowances",
     "build_container_command",
     "build_container_python_command",
@@ -88,10 +96,13 @@ __all__ = [
     "runtime_allowances_scope",
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
+    "RuntimeProviderManifestFiles",
     "running_inside_container",
+    "strict_container_boundary_present",
     "third_party_plugins_allowed",
     "unverified_provenance_allowed",
     "write_runtime_manifest",
+    "write_runtime_manifest_v2",
 ]
 
 
@@ -128,6 +139,15 @@ class RuntimeManifestExecution:
     allow_network: bool
     allow_remote_code: bool
     allow_third_party_plugins: bool
+
+
+@dataclass(frozen=True)
+class RuntimeProviderManifestFiles:
+    """Sibling provider evidence files bound by a runtime manifest v2."""
+
+    receipt: Path
+    scoring_observation: Path
+    artifact_identity: Path
 
 
 class RuntimeManifestLoadIssueCode(StrEnum):
@@ -265,6 +285,52 @@ def third_party_plugins_allowed() -> bool:
 
 def running_inside_container() -> bool:
     return _coerce_bool(os.environ.get(CONTAINER_EXECUTION_ENV)) is True
+
+
+def _regular_file_marker_present(path: str) -> bool:
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
+def _read_bounded_kernel_file(path: str, *, max_bytes: int = 16 * 1024) -> bytes | None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            return None
+        payload = os.read(descriptor, max_bytes + 1)
+        if len(payload) > max_bytes:
+            return None
+        return payload
+    except OSError:
+        return None
+    finally:
+        os.close(descriptor)
+
+
+def strict_container_boundary_present() -> bool:
+    """Require both InvarLock intent and kernel-visible container evidence."""
+
+    if not running_inside_container():
+        return False
+    if any(
+        _regular_file_marker_present(path)
+        for path in ("/.dockerenv", "/run/.containerenv")
+    ):
+        return True
+    cgroup = _read_bounded_kernel_file("/proc/1/cgroup")
+    if cgroup is None:
+        return False
+    lowered = cgroup.lower()
+    return any(
+        marker in lowered
+        for marker in (b"docker", b"containerd", b"kubepods", b"libpod")
+    )
 
 
 def current_execution_mode() -> str:
@@ -814,6 +880,27 @@ def write_runtime_manifest(
         encoding="utf-8",
     )
     return manifest_path
+
+
+def write_runtime_manifest_v2(
+    report_path: str | os.PathLike[str],
+    *,
+    provider_files: RuntimeProviderManifestFiles,
+    config_path: str | os.PathLike[str] | None = None,
+    config_payload: Any | None = None,
+    execution: RuntimeManifestExecution | None = None,
+) -> Path:
+    """Write a closed v2 manifest via the isolated provider-binding owner."""
+
+    from invarlock.runtime_manifest_v2 import write_runtime_manifest_v2 as _write_v2
+
+    return _write_v2(
+        report_path,
+        provider_files=provider_files,
+        config_path=config_path,
+        config_payload=config_payload,
+        execution=execution,
+    )
 
 
 def load_runtime_manifest(

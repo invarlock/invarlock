@@ -12,6 +12,10 @@ from invarlock.core.metric_kind_contract import (
     is_ppl_metric_kind,
     normalize_metric_kind,
 )
+from invarlock.guards.authority import (
+    guard_is_enforced,
+    resolved_guard_authority,
+)
 from invarlock.primary_metric_tail import (
     PrimaryMetricTailContractError,
     require_primary_metric_tail,
@@ -540,13 +544,17 @@ def _validate_release_gate_outcomes(report: dict[str, Any]) -> list[str]:
     if not isinstance(validation, dict):
         return ["Release verification requires a validation block."]
 
-    required_true = (
+    authority, authority_errors, _ = resolved_guard_authority(report)
+    errors.extend(authority_errors)
+    required_true = [
         "primary_metric_acceptable",
         "preview_final_drift_acceptable",
         "invariants_pass",
-        "spectral_stable",
-        "rmt_stable",
-    )
+    ]
+    if guard_is_enforced(authority, "spectral"):
+        required_true.append("spectral_stable")
+    if guard_is_enforced(authority, "rmt"):
+        required_true.append("rmt_stable")
     for key in required_true:
         if validation.get(key) is not True:
             errors.append(

@@ -23,6 +23,7 @@ EXPECTED_EXECUTABLE_DIRS = {
     "evidence_packs",
     "reporting",
     "runtime",
+    "runtime_providers",
     "scripts",
 }
 

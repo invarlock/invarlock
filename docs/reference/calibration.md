@@ -86,13 +86,13 @@ invarlock advanced calibrate ve-sweep \
 
 ## Catalog Lanes and Included Configs
 
-The maintained evaluation lanes are the `published_basis` rows in
+The maintained evaluation lanes are the `maintained_catalog` rows in
 `contracts/support_matrix.json`, with the readable table in
 `docs/README.md#support-matrix`. Each lane has an included preset and calibration
 configuration. Multimodal configurations using `vision_text` materialize their
 pinned manifest before evaluation.
 
-`public_evidence/published_basis_index.json` lists current empirical artifacts.
+`public_evidence/catalog_evidence_index.json` lists current empirical artifacts.
 The initial status is **Evidence not yet created**; completed lanes move to
 **Available** as their current run and verification artifacts are published.
 Family-specific calibration evidence can then be reviewed alongside the tier

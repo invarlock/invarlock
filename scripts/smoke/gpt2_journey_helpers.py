@@ -12,7 +12,10 @@ COLUMNS = ["journey", "expectation", "status", "verify", "metric", "artifact", "
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"expected a JSON object in {path}")
+    return payload
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -106,6 +109,7 @@ def write_strict_bundle_fixture(args: argparse.Namespace) -> int:
         ASSURANCE_CLAIM_SET,
         CANONICAL_GUARD_CHAIN,
     )
+    from invarlock.guards.authority import DEFAULT_GUARD_AUTHORITY
     from invarlock.reporting import verify_contract as verify_mod
     from invarlock.runtime_security import RUNTIME_VERIFIER_CONTRACT_VERSION
 
@@ -122,6 +126,7 @@ def write_strict_bundle_fixture(args: argparse.Namespace) -> int:
         },
     }
     guard_chain = list(CANONICAL_GUARD_CHAIN)
+    guard_authority = dict(DEFAULT_GUARD_AUTHORITY)
     report = {
         "schema_version": "v1",
         "run_id": "evidence-pack-wheel-smoke",
@@ -198,6 +203,7 @@ def write_strict_bundle_fixture(args: argparse.Namespace) -> int:
         "variance": {"supported": True, "status": "pass"},
         "invariants": {"supported": True, "status": "pass"},
         "resolved_policy": {
+            "guard_authority": guard_authority,
             "spectral": {"measurement_contract": spectral_contract},
             "rmt": {"measurement_contract": rmt_contract},
         },
@@ -212,6 +218,7 @@ def write_strict_bundle_fixture(args: argparse.Namespace) -> int:
             "profile": "ci",
             "tier": "balanced",
             "claim_set": ASSURANCE_CLAIM_SET,
+            "guard_authority": guard_authority,
             "canonical_guard_chain": guard_chain,
             "guard_chain_observed": guard_chain,
             "canonical_guard_chain_enforced": True,

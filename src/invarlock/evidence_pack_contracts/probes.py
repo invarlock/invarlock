@@ -119,7 +119,9 @@ def validate_probe_payload(filename: str, payload: object) -> dict[str, Any]:
     return payload
 
 
-def load_probe_snapshot(path: Path) -> tuple[bytes, dict[str, Any]]:
+def load_probe_snapshot(
+    path: Path, *, report_path: Path | None = None
+) -> tuple[bytes, dict[str, Any]]:
     try:
         raw, payload = read_json_object_snapshot(
             path,
@@ -128,7 +130,7 @@ def load_probe_snapshot(path: Path) -> tuple[bytes, dict[str, Any]]:
     except StrictJsonError as exc:
         raise ProbeValidationError(str(exc)) from exc
     probe = validate_probe_payload(path.name, payload)
-    report_path = path.parent / "evaluation.report.json"
+    report_path = report_path or path.parent / "evaluation.report.json"
     try:
         report_raw, report = read_json_object_snapshot(
             report_path,
@@ -144,8 +146,8 @@ def load_probe_snapshot(path: Path) -> tuple[bytes, dict[str, Any]]:
     return raw, probe
 
 
-def load_probe_file(path: Path) -> dict[str, Any]:
-    return load_probe_snapshot(path)[1]
+def load_probe_file(path: Path, *, report_path: Path | None = None) -> dict[str, Any]:
+    return load_probe_snapshot(path, report_path=report_path)[1]
 
 
 __all__ = [

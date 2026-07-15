@@ -52,8 +52,8 @@ paths = [
   "scripts/checks/public_evidence_checks/__init__.py",
   "scripts/checks/public_evidence_checks/artifacts.py",
   "scripts/checks/public_evidence_checks/common.py",
+  "scripts/checks/public_evidence_checks/guard_scenarios.py",
   "scripts/checks/public_evidence_checks/index.py",
-  "scripts/checks/public_evidence_checks/negative_fixtures.py",
   "scripts/checks/public_evidence_checks/summaries.py",
   "scripts/check_scripts_inventory.py",
   "scripts/scripts_inventory.toml",
@@ -196,11 +196,10 @@ audience = "maintainer"
 expected_runtime = "data-dependent"
 network = "optional"
 gpu = "never"
-invoked_by = ["catalog validation", "fixture generation"]
-description = "Bounded public-input materialization and negative-fixture helpers."
+invoked_by = ["catalog validation"]
+description = "Bounded public-input materialization for maintained catalog lanes."
 paths = [
   "scripts/model_evidence/materialize_vision_text_dataset.py",
-  "scripts/model_evidence/negative_fixture_generation.py",
 ]
 
 [[families]]
@@ -224,9 +223,9 @@ stability = "release-critical"
 audience = "release-only"
 expected_runtime = "medium"
 network = "optional"
-gpu = "never"
-invoked_by = ["make release-preflight", "make release-evidence-check", "make empirical-guard-inventory-check (standalone diagnostic)"]
-description = "Release checks, offline-bundle helpers, and a separate non-authoritative empirical-artifact inventory."
+gpu = "optional"
+invoked_by = ["make release-preflight", "make release-evidence-check", "make runtime-image-tensorrt-llm-dual", "make empirical-guard-inventory-check (standalone diagnostic)"]
+description = "Release checks, offline-bundle helpers, native-runtime qualification, and a separate non-authoritative empirical-artifact inventory."
 paths = [
   "scripts/release/**",
 ]

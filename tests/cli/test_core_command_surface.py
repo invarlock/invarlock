@@ -27,7 +27,14 @@ def test_advanced_help_lists_advanced_commands():
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
 
-    for name in ("evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"):
+    for name in (
+        "evidence-pack",
+        "policy",
+        "plugins",
+        "calibrate",
+        "runtime-behavior",
+        "runtime-verify",
+    ):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
 
 

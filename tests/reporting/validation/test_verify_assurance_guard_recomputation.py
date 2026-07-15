@@ -11,7 +11,7 @@ from invarlock.core.assurance_contract import (
     CANONICAL_GUARD_CHAIN,
 )
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
-from tests.cli._support_verify_runtime_provenance import bind_runtime_policy_receipt
+from tests.cli.verify._support_runtime_provenance import bind_runtime_policy_receipt
 from tests.reporting.validation._support_verify_assurance_guard_chain import (
     _report,
     _run_strict,
@@ -368,7 +368,9 @@ def test_verify_assurance_strict_accepts_replayed_bounded_spectral_cap(
 
     result = _run_strict(report_path)
 
-    assert result.outcome == VerifyOutcome.OK
+    assert result.outcome == VerifyOutcome.OK, "\n".join(
+        item.message for item in result.diagnostics
+    )
 
 
 def test_verify_assurance_strict_rebuilds_rmt_family_risk_from_modules(

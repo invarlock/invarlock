@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-import tests.cli._support_verify_runtime_provenance as provenance_support
+import tests.cli.verify._support_runtime_provenance as provenance_support
 from invarlock.catalog_inputs import build_evaluation_input_binding
 from invarlock.cli.run_config import prepare_config_for_run
 from invarlock.core.evaluate_plan import (

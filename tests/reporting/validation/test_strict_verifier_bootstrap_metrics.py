@@ -5,7 +5,7 @@ import math
 import pytest
 
 from invarlock.reporting import verify_bootstrap as bootstrap_mod
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _strict_provenance_gate_cert,
 )
 from tests.reporting.validation._support_strict_verifier_branch_contracts import (

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -110,12 +111,64 @@ class SectionMixin:
         return _section_dataclass_payload(self).items()
 
 
+_RUNTIME_PROVIDER_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+@dataclass
+class RuntimeProviderConfig(SectionMixin):
+    """Normalized runtime-provider selection embedded in a model config."""
+
+    name: str = "hf_transformers"
+    settings: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.name = str(self.name).strip()
+        if not self.name or _RUNTIME_PROVIDER_NAME_PATTERN.fullmatch(self.name) is None:
+            raise ValueError(
+                "model.runtime_provider.name must be a canonical lowercase plugin name"
+            )
+        if not isinstance(self.settings, dict):
+            raise ValueError("model.runtime_provider.settings must be a mapping")
+        self.settings = copy.deepcopy(self.settings)
+
+
 @dataclass
 class ModelConfig(SectionMixin):
     id: str | None = None
     adapter: str | None = None
     device: str | None = None
+    runtime_provider: RuntimeProviderConfig | dict[str, Any] = field(
+        default_factory=RuntimeProviderConfig
+    )
     _extra: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        provider_config = self.runtime_provider
+        if isinstance(provider_config, dict):
+            unknown = set(provider_config) - {"name", "settings"}
+            if unknown:
+                rendered = ", ".join(sorted(str(item) for item in unknown))
+                raise ValueError(f"Unsupported model.runtime_provider keys: {rendered}")
+            normalized_provider = RuntimeProviderConfig(**provider_config)
+            self.runtime_provider = normalized_provider
+        elif isinstance(provider_config, RuntimeProviderConfig):
+            normalized_provider = provider_config
+        else:
+            raise ValueError("model.runtime_provider must be a mapping")
+
+        provider_name = normalized_provider.name
+        adapter_name = str(self.adapter or "").strip().lower()
+        if provider_name != "hf_transformers":
+            if adapter_name in {"auto", ""}:
+                # The evaluate front door historically supplies ``auto`` as a
+                # default. It is not an explicit HF adapter selection for an
+                # explicitly selected opaque runtime.
+                self.adapter = None
+            elif adapter_name == "auto_hf" or adapter_name.startswith("hf_"):
+                raise ValueError(
+                    f"runtime provider '{provider_name}' cannot use HF adapter "
+                    f"'{self.adapter}'"
+                )
 
 
 @dataclass

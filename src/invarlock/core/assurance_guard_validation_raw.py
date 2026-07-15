@@ -46,12 +46,19 @@ def _required_mapping(
 def _spectral_raw_errors(
     report: Mapping[str, Any],
     inventory: Sequence[tuple[str, dict[str, Any], str]],
+    *,
+    enforce_outcome: bool,
 ) -> list[str]:
     entries = _entries(inventory, "spectral")
     if len(entries) != 1:
         return ["strict assurance requires exactly one raw spectral guard record."]
     entry, source = entries[0]
-    return replay_spectral_guard(report, entry, source)
+    return replay_spectral_guard(
+        report,
+        entry,
+        source,
+        enforce_outcome=enforce_outcome,
+    )
 
 
 def _rmt_raw_errors(
@@ -311,13 +318,18 @@ def raw_guard_evidence_errors(
     inventory: Sequence[tuple[str, dict[str, Any], str]],
     *,
     require_complete: bool,
+    enforce_spectral_outcome: bool = True,
 ) -> list[str]:
     """Validate raw evidence needed to replay strict guard outcomes."""
 
     if not require_complete:
         return []
     return [
-        *_spectral_raw_errors(report, inventory),
+        *_spectral_raw_errors(
+            report,
+            inventory,
+            enforce_outcome=enforce_spectral_outcome,
+        ),
         *_rmt_raw_errors(report, inventory),
         *_invariants_raw_errors(inventory),
         *_guard_metric_impact_raw_errors(report),

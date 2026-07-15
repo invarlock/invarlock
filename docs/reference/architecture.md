@@ -4,11 +4,11 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Auditable strict-verification framework for ML model weight modifications. |
+| **Purpose** | Auditable strict-verification framework for ML model changes and policy-scoped cross-runtime behavior. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security auditors. |
-| **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
+| **Core components** | CLI shells, Core/runtime policy layer, Runtime-provider boundary, Guard chain, Reporting/artifact subsystem. |
 | **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, and reviewable report-recorded provenance. |
-| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
+| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/core/runtime_provider/*.py`, `src/invarlock/runtime_behavior/*.py`, `src/invarlock/runtime_providers/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
 the canonical guard chain, policy digest, and measurement contract.
@@ -114,6 +114,10 @@ console/event rendering; policy ownership stays in the core and reporting
 owners.
 
 Public model-loading commands use the runtime container by default.
+The experimental runtime-provider path is separate: it produces a baseline or
+subject side from an authenticated behavioral schedule, then replays both
+immutable sides through a separate paired verifier. See
+[Runtime Providers](runtime-providers.md) for its narrower exact-match claim.
 `invarlock evaluate --execution-mode host` is the explicit host-side path.
 
 | Command | Purpose | Primary Output |
@@ -122,7 +126,7 @@ Public model-loading commands use the runtime container by default.
 | `verify` | Validate report against schema and pairing | Exit code + messages |
 | `report` | Render, explain, validate, or export reports | MD/HTML/JSON artifacts |
 | `doctor` | Environment diagnostics | Health check output |
-| `advanced` | Maintenance workflows such as evidence packs, policy packs, plugins, and calibration | Exit code + workflow-specific artifacts |
+| `advanced` | Maintenance workflows such as evidence packs, policy packs, plugins, runtime behavior, and calibration | Exit code + workflow-specific artifacts |
 | `version` | Emit package and schema version information | Version string |
 
 ### Core Policy / Contracts (`src/invarlock/core/`, `src/invarlock/reporting/`)
@@ -142,6 +146,23 @@ by the CLI and non-CLI entrypoints.
 | `retry.py` | Retry controller, edit-parameter adjustment, attempt summaries, and retry state transitions |
 | `run_snapshot_contract.py` | Snapshot planning, restore behavior, and retry transitions |
 | `run_report_contract.py` | Run provenance finalization, payload shaping, and run-report assembly contracts |
+| `runtime_provider/` | Provider ABI, artifact identities, behavioral schedules, and claim types |
+
+### Runtime-provider Boundary
+
+`src/invarlock/runtime_providers/` contains the first-party Hugging Face,
+GGUF/llama.cpp, and TensorRT-LLM connectors. A connector identifies immutable
+model material, reports closed capabilities, and opens an execution session;
+it does not decide whether a behavioral difference is acceptable.
+
+`src/invarlock/runtime_behavior/` owns side production and directed paired
+replay. Each side binds its provider receipt, artifact identity, scoring
+observation, authenticated schedule, policy pack, and runtime manifest. The
+paired verifier accepts only policy-authorized `exact_match` behavior and emits
+a positive digest-only receipt. Runtime-image bindings and observed backend or
+device facts expose mismatches to replay within the execution trust boundary;
+they do not establish producer independence, remote attestation, or backend
+equivalence.
 
 ### Runtime Evidence Verification Ownership
 
@@ -372,6 +393,7 @@ InvarLock supports extension via entry points without modifying core code.
 | Adapters | `invarlock.adapters` | `hf_causal`, `hf_mlm`, `hf_seq2seq`, `hf_multimodal`, `hf_auto`, `hf_bnb`, `hf_awq`, `hf_gptq`, `hf_torchao`, `hf_hqq`, `hf_quanto`, `hf_ct` |
 | Guards | `invarlock.guards` | `invariants`, `spectral`, `rmt`, `variance` |
 | Edits | `invarlock.edits` | `quant_rtn` (`noop` is built in for internal/catalog use, not a pyproject entry-point example) |
+| Runtime providers | `invarlock.runtime_providers` | `hf_transformers`, `llama_cpp`, `tensorrt_llm` |
 
 ### Custom Adapter Example
 
@@ -417,5 +439,6 @@ my_custom_adapter = "my_adapter:MyAdapter"
 - [CLI Reference](cli.md) — Command usage and options
 - [Guards Reference](guards.md) — Guard configuration and evidence
 - [Configuration Schema](config-schema.md) — YAML config structure
+- [Runtime Providers](runtime-providers.md) — Provider contracts, runtime images, and paired behavioral verification
 - [reports](reports.md) — report schema and verification
 - [Assurance Case Overview](../assurance/00-assurance-case.md) — Assurance claims and evidence

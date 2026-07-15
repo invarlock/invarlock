@@ -65,7 +65,7 @@ def _build_scenario_catalog(manifest: dict[str, Any]) -> ScenarioCatalog:
             or (category == "stress" and strictness == "must_fail")
             or (
                 category == "error_injection"
-                and strictness in {"must_fail", "must_detect"}
+                and strictness in {"must_fail", "must_detect", "must_pass"}
             )
         ):
             gating_by_category[category].add(scenario_id)
@@ -178,6 +178,14 @@ def _collect_baseline_reports(output_dir: Path) -> dict[str, dict[str, Any]]:
         for path in sorted(paths, reverse=True):
             cert = _load_json_object(path)
             if cert is not None:
+                ve_probe_path = path.parent / "ve_probe.json"
+                if ve_probe_path.is_file():
+                    try:
+                        cert["ve_probe"] = load_probe_file(
+                            ve_probe_path, report_path=path
+                        )
+                    except ProbeValidationError as exc:
+                        cert["_probe_validation_errors"] = [f"ve_probe.json: {exc}"]
                 cert["_baseline_report_path"] = _run_relative_path(path, output_dir)
                 baselines[model_name] = cert
                 break
@@ -190,12 +198,14 @@ def _scenario_detectors(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
     reqs = spec.get("requirements") if isinstance(spec, dict) else None
     detectors_any: list[dict[str, Any]] = []
-    if isinstance(reqs, dict) and isinstance(reqs.get("detectors_any_of"), list):
-        detectors_any = [d for d in reqs.get("detectors_any_of") if isinstance(d, dict)]
+    raw_detectors_any = reqs.get("detectors_any_of") if isinstance(reqs, dict) else None
+    if isinstance(raw_detectors_any, list):
+        detectors_any = [d for d in raw_detectors_any if isinstance(d, dict)]
 
     detectors_all: list[dict[str, Any]] = []
-    if isinstance(reqs, dict) and isinstance(reqs.get("detectors_all_of"), list):
-        detectors_all = [d for d in reqs.get("detectors_all_of") if isinstance(d, dict)]
+    raw_detectors_all = reqs.get("detectors_all_of") if isinstance(reqs, dict) else None
+    if isinstance(raw_detectors_all, list):
+        detectors_all = [d for d in raw_detectors_all if isinstance(d, dict)]
 
     primary_guard_required = bool(
         isinstance(reqs, dict) and reqs.get("primary_guard_required") is True
@@ -284,8 +294,6 @@ def _build_record(
     outcome = _evaluate_report(cert)
     probe_errors = cert.get("_probe_validation_errors")
     spec = scenario_index.get(scenario_id, {})
-    if not isinstance(spec, dict):
-        spec = {}
     detectors_any, detectors_all, primary_guard_required = _scenario_detectors(spec)
 
     detector_kinds = {

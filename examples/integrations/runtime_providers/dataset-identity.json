@@ -1,0 +1,7 @@
+{
+  "provider": "invarlock_native_fixture",
+  "dataset_name": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+  "config_name": "gguf-f16-vs-tensorrt-llm-fp16-one-token",
+  "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+  "split": "release-canary"
+}

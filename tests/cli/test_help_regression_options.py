@@ -62,7 +62,14 @@ def test_groups_help_list_subcommands(monkeypatch):
         ("report", ["generate", "explain", "html", "export", "validate"]),
         (
             "advanced",
-            ["evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"],
+            [
+                "evidence-pack",
+                "policy",
+                "plugins",
+                "calibrate",
+                "runtime-behavior",
+                "runtime-verify",
+            ],
         ),
         ("advanced plugins", ["list", "guards", "edits", "adapters"]),
     ):

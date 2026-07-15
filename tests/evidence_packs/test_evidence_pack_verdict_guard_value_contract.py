@@ -8,6 +8,7 @@ from tests.evidence_packs._verdict_contract_support import (
     write_cert,
     write_guard_value_manifest,
     write_rmt_probe,
+    write_ve_probe,
 )
 
 
@@ -168,6 +169,270 @@ def test_verdict_contract_accepts_new_spectral_cap_as_guard_value(
     spectral = record["guard_baseline_relative"]["spectral"]
     assert spectral["new_caps_applied"] == 1
     assert spectral["delta_caps_applied"] == 1
+
+
+def test_verdict_contract_gates_negative_control_on_absent_new_cap(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    write_guard_value_manifest(
+        manifest_path,
+        scenario_id="spectral_negative_control",
+        category="error_injection",
+        primary_guard="spectral",
+        strictness="must_pass",
+        primary_guard_required=False,
+        detectors_all_of=[
+            {
+                "kind": "validation_flag",
+                "flag": "primary_metric_acceptable",
+                "expected": True,
+            },
+            {
+                "kind": "guard_signal_baseline_relative",
+                "guard": "spectral",
+                "expected": False,
+            },
+        ],
+    )
+    model_dir = output_dir / "mistral-7b"
+    baseline = model_dir / "baseline_reports" / "run" / "baseline_report.json"
+    subject = (
+        model_dir
+        / "reports"
+        / "errors"
+        / "spectral_negative_control"
+        / "evaluation.report.json"
+    )
+    validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+        "preview_final_drift_acceptable": True,
+        "guard_metric_impact_acceptable": True,
+    }
+    shared = [("model.layers.0.self_attn.q_proj", "attn", 7.7)]
+    write_cert(
+        baseline,
+        validation=validation,
+        spectral_caps_applied=1,
+        spectral_violations=shared,
+    )
+    write_cert(
+        subject,
+        validation=validation,
+        spectral_caps_applied=1,
+        spectral_violations=shared,
+    )
+    assert (
+        run_verdict_with_manifest(repo_root, output_dir, manifest_path)["verdict"]
+        == "PASS"
+    )
+
+    write_cert(
+        subject,
+        validation=validation,
+        spectral_caps_applied=2,
+        spectral_violations=[
+            *shared,
+            ("model.layers.31.self_attn.o_proj", "attn", 3.5),
+        ],
+    )
+    verdict = run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+    assert verdict["verdict"] == "FAIL"
+    assert any(
+        failure.get("requirement") == "error_injection_detected"
+        for failure in verdict["failed_requirements"]
+    )
+
+
+def test_required_pass_error_injection_cannot_hide_failed_report(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    write_guard_value_manifest(
+        manifest_path,
+        scenario_id="spectral_negative_control",
+        category="error_injection",
+        primary_guard="spectral",
+        strictness="must_pass",
+        primary_guard_required=False,
+        detectors_all_of=[
+            {
+                "kind": "validation_flag",
+                "flag": "primary_metric_acceptable",
+                "expected": True,
+            }
+        ],
+    )
+    subject = (
+        output_dir
+        / "mistral-7b"
+        / "reports"
+        / "errors"
+        / "spectral_negative_control"
+        / "evaluation.report.json"
+    )
+    write_cert(
+        subject,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": False,
+            "guard_metric_impact_acceptable": True,
+        },
+    )
+
+    verdict = run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+
+    assert verdict["verdict"] == "FAIL"
+    [record] = verdict["records"]
+    assert record["detectors_hit"] is True
+    assert record["passed"] is False
+    assert "drift_fail" in record["reasons"]
+    assert any(
+        failure.get("requirement") == "error_injection_required_pass"
+        and failure.get("scenario") == "spectral_negative_control"
+        for failure in verdict["failed_requirements"]
+    )
+
+
+def test_verdict_contract_requires_positive_ve_subject_vs_baseline_signal(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    write_guard_value_manifest(
+        manifest_path,
+        scenario_id="ve_targeted",
+        category="error_injection",
+        primary_guard="variance",
+        detectors_all_of=[
+            {
+                "kind": "validation_flag",
+                "flag": "primary_metric_acceptable",
+                "expected": True,
+            },
+            {"kind": "ve_probe", "field": "signal", "expected": True},
+            {"kind": "guard_signal_baseline_relative", "guard": "variance"},
+        ],
+    )
+    model_dir = output_dir / "mistral-7b"
+    baseline = model_dir / "baseline_reports" / "run" / "baseline_report.json"
+    subject = (
+        model_dir / "reports" / "errors" / "ve_targeted" / "evaluation.report.json"
+    )
+    validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+        "preview_final_drift_acceptable": True,
+        "guard_metric_impact_acceptable": True,
+    }
+    write_cert(baseline, validation=validation)
+    write_ve_probe(
+        baseline.parent / "ve_probe.json",
+        signal=False,
+        proposed_scales=32,
+        ab_gain=-0.1,
+        report_path=baseline,
+    )
+    write_cert(subject, validation=validation)
+    write_ve_probe(
+        subject.parent / "ve_probe.json",
+        signal=False,
+        proposed_scales=32,
+        ab_gain=-0.1,
+    )
+    assert (
+        run_verdict_with_manifest(repo_root, output_dir, manifest_path)["verdict"]
+        == "FAIL"
+    )
+
+    write_ve_probe(
+        subject.parent / "ve_probe.json",
+        signal=True,
+        proposed_scales=32,
+        ab_gain=0.01,
+    )
+    verdict = run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+    assert verdict["verdict"] == "PASS"
+    [record] = verdict["records"]
+    assert record["guard_baseline_relative"]["variance"] == {
+        "baseline_available": True,
+        "baseline_signal": False,
+        "relative_signal": True,
+        "subject_signal": True,
+    }
+
+
+def test_verdict_contract_accepts_pm_pass_rmt_subject_relative_signal(
+    tmp_path: Path,
+) -> None:
+    """Characterize current verdict logic with synthetic, non-empirical reports."""
+
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+    write_guard_value_manifest(
+        manifest_path,
+        scenario_id="rmt_norm_noise",
+        category="error_injection",
+        primary_guard="rmt",
+        detectors_all_of=[
+            {
+                "kind": "validation_flag",
+                "flag": "primary_metric_acceptable",
+                "expected": True,
+            },
+            {"kind": "rmt_probe", "field": "stable", "expected": False},
+            {"kind": "guard_signal_baseline_relative", "guard": "rmt"},
+        ],
+    )
+
+    model_dir = output_dir / "mistral-7b"
+    baseline_path = model_dir / "baseline_reports" / "run" / "baseline_report.json"
+    subject_path = (
+        model_dir / "reports" / "errors" / "rmt_norm_noise" / "evaluation.report.json"
+    )
+    validation = {
+        "invariants_pass": True,
+        "primary_metric_acceptable": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+        "preview_final_drift_acceptable": True,
+        "guard_metric_impact_acceptable": True,
+    }
+    write_cert(baseline_path, validation=validation, invariants_status="pass")
+    write_rmt_probe(
+        baseline_path.parent / "rmt_probe.json",
+        stable=True,
+        report_path=baseline_path,
+    )
+    write_cert(subject_path, validation=validation, invariants_status="pass")
+    write_rmt_probe(subject_path.parent / "rmt_probe.json", stable=False)
+
+    verdict = run_verdict_with_manifest(repo_root, output_dir, manifest_path)
+
+    assert verdict["verdict"] == "PASS"
+    [record] = verdict["records"]
+    assert record["detectors_hit"] is True
+    assert record["primary_guard_hit"] is True
+    assert record["guard_baseline_relative"]["rmt"] == {
+        "baseline_available": True,
+        "baseline_signal": False,
+        "relative_signal": True,
+        "subject_signal": True,
+    }
 
 
 def test_verdict_contract_rejects_guard_value_when_rmt_signal_is_baseline(

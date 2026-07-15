@@ -1,6 +1,8 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 .PHONY: release-preflight
+.PHONY: runtime-image-gguf runtime-smoke-gguf runtime-blackbox-gguf
+.PHONY: runtime-image-tensorrt-llm-candidate runtime-fixture-tensorrt-llm runtime-canary-tensorrt-llm-dual runtime-image-tensorrt-llm-dual runtime-image-tensorrt-llm runtime-smoke-tensorrt-llm runtime-canary-tensorrt-llm
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-fast verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce coverage-enforce-parallel mutation-smoke statistical-calibration-fast statistical-calibration-slow docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-dry contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-quant runtime-smoke-cuda-podman runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door local-hf-env-check local-hf-env-refresh local-hf-pipeline-smoke local-hf-pipeline-smoke-locked ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-inventory-check
 
@@ -18,15 +20,44 @@ EMPIRICAL_GUARD_INVENTORY_ROOT ?= artifacts/guard-validation/empirical
 RELEASE_PREFLIGHT_ARGS ?=
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
+RUNTIME_IMAGE_APT_SNAPSHOT ?= 20260712T232152Z
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_QUANT ?= invarlock-runtime:cuda-quant
+RUNTIME_CUDA_DOCKER_GPUS ?= all
 RUNTIME_IMAGE_CUDA_QUANT_BASE ?= nvidia/cuda:12.8.1-devel-ubuntu24.04@sha256:520292dbb4f755fd360766059e62956e9379485d9e073bbd2f6e3c20c270ed66
 RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS ?= requirements/workflows/runtime-image-quant-py312-cu128.txt
+RUNTIME_IMAGE_GGUF ?= invarlock-runtime:gguf-local
+RUNTIME_IMAGE_GGUF_BUILD ?= $(RUNTIME_IMAGE_GGUF)-candidate
+GGUF_BLACKBOX_MODEL ?=
+LLAMA_CPP_SOURCE_COMMIT ?= 12127defda4f41b7679cb2477a4b0d65ee6a0c8f
+LLAMA_CPP_SOURCE_SHA256 ?= 5ab75e394f4c71425ecce64a213dab3b8e3e9cfe0f19d0dcda4d5a4f7733da83
+LLAMA_CPP_APT_SNAPSHOT ?= 20260712T232152Z
+LLAMA_CPP_BUILD_JOBS ?= 2
+RUNTIME_IMAGE_TENSORRT_LLM ?= invarlock-runtime:tensorrt-llm-local
+RUNTIME_IMAGE_TENSORRT_LLM_BUILD ?= invarlock-runtime:tensorrt-llm-local-candidate
+TENSORRT_LLM_DOCKER_GPUS ?= all
+TENSORRT_LLM_FIXTURE_MODEL_DIR ?=
+TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256 ?=
+TENSORRT_LLM_FIXTURE_DIR ?= artifacts/runtime-qualification/tensorrt-llm
+TENSORRT_LLM_PRIMARY_DOCKER_GPUS ?= device=0
+TENSORRT_LLM_SECONDARY_DOCKER_GPUS ?= device=1
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_CUDA_APT_SNAPSHOT ?= 20260712T232152Z
 RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct 2>/dev/null)
 RUNTIME_IMAGE_BUILD_COMMAND = $(if $(filter docker,$(CONTAINER_ENGINE)),$(CONTAINER_ENGINE) buildx build --load --provenance=false,$(CONTAINER_ENGINE) build)
+
+_safe_make_export = $(if $(filter file,$(origin $(1))),$($(1)),$(value $(1)))
+export INVARLOCK_TENSORRT_LLM_CONTAINER_ENGINE := $(call _safe_make_export,CONTAINER_ENGINE)
+export INVARLOCK_TENSORRT_LLM_IMAGE := $(call _safe_make_export,RUNTIME_IMAGE_TENSORRT_LLM_BUILD)
+export INVARLOCK_TENSORRT_LLM_STABLE_TAG := $(call _safe_make_export,RUNTIME_IMAGE_TENSORRT_LLM)
+export INVARLOCK_TENSORRT_LLM_GPU_0 := $(call _safe_make_export,TENSORRT_LLM_PRIMARY_DOCKER_GPUS)
+export INVARLOCK_TENSORRT_LLM_GPU_1 := $(call _safe_make_export,TENSORRT_LLM_SECONDARY_DOCKER_GPUS)
+export INVARLOCK_TENSORRT_LLM_SMOKE_GPU := $(call _safe_make_export,TENSORRT_LLM_DOCKER_GPUS)
+export INVARLOCK_TENSORRT_LLM_MODEL := $(call _safe_make_export,TENSORRT_LLM_FIXTURE_MODEL_DIR)
+export INVARLOCK_TENSORRT_LLM_FIXTURE_ROOT := $(call _safe_make_export,TENSORRT_LLM_FIXTURE_DIR)
+export INVARLOCK_TENSORRT_LLM_MODEL_INVENTORY_SHA256 := $(call _safe_make_export,TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256)
+export INVARLOCK_TENSORRT_LLM_SOURCE_DATE_EPOCH := $(call _safe_make_export,RUNTIME_SOURCE_DATE_EPOCH)
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
@@ -396,6 +427,7 @@ runtime-image:  ## Build the local container runtime image used for default exec
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
 	SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND) \
 		--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) \
+		--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_APT_SNAPSHOT) \
 		-f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
 
 runtime-image-podman: CONTAINER_ENGINE=podman
@@ -437,6 +469,43 @@ runtime-image-cuda-quant:  ## Build the local CUDA runtime image with optional q
 runtime-image-cuda-quant-podman: CONTAINER_ENGINE=podman
 runtime-image-cuda-quant-podman: runtime-image-cuda-quant  ## Build the quant CUDA runtime image with Podman
 
+runtime-image-gguf:  ## Build the pinned llama.cpp runtime-provider image
+	@test "$(CONTAINER_ENGINE)" = "docker" || { echo "❌ The GGUF image currently requires Docker BuildKit."; exit 1; }
+	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "❌ Unable to derive the source epoch; set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds."; exit 1; }
+	@test -n "$(GGUF_BLACKBOX_MODEL)" || { echo "❌ Set GGUF_BLACKBOX_MODEL before building; stable qualification requires the pinned behavior fixture."; exit 1; }
+	@test -f "$(GGUF_BLACKBOX_MODEL)" || { echo "❌ GGUF behavior fixture is not a file."; exit 1; }
+	SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND) \
+		--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) \
+		--build-arg LLAMA_CPP_APT_SNAPSHOT=$(LLAMA_CPP_APT_SNAPSHOT) \
+		--build-arg LLAMA_CPP_BUILD_JOBS=$(LLAMA_CPP_BUILD_JOBS) \
+		--build-arg LLAMA_CPP_SOURCE_COMMIT=$(LLAMA_CPP_SOURCE_COMMIT) \
+		--build-arg LLAMA_CPP_SOURCE_SHA256=$(LLAMA_CPP_SOURCE_SHA256) \
+		-f runtime/Dockerfile.llama-cpp \
+		-t $(RUNTIME_IMAGE_GGUF_BUILD) .
+	$(MAKE) runtime-smoke-gguf RUNTIME_IMAGE_GGUF=$(RUNTIME_IMAGE_GGUF_BUILD)
+	$(MAKE) runtime-blackbox-gguf RUNTIME_IMAGE_GGUF=$(RUNTIME_IMAGE_GGUF_BUILD) GGUF_BLACKBOX_MODEL=$(GGUF_BLACKBOX_MODEL)
+	$(CONTAINER_ENGINE) image tag $(RUNTIME_IMAGE_GGUF_BUILD) $(RUNTIME_IMAGE_GGUF)
+	$(CONTAINER_ENGINE) image rm $(RUNTIME_IMAGE_GGUF_BUILD) >/dev/null
+
+runtime-image-tensorrt-llm-candidate:  ## Build the TensorRT-LLM candidate before real-fixture qualification
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py build-image
+
+runtime-fixture-tensorrt-llm:  ## Build and freeze the real TensorRT-LLM fixture independently on two GPUs
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py build-fixture
+
+runtime-canary-tensorrt-llm-dual:  ## Qualify one frozen real engine independently on two GPUs
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py qualify-two-gpu
+
+runtime-image-tensorrt-llm-dual:  ## Build, create a real fixture on two GPUs, qualify, then promote the stable tag
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py preflight
+	$(MAKE) runtime-image-tensorrt-llm-candidate
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py smoke-image
+	$(MAKE) runtime-fixture-tensorrt-llm
+	$(MAKE) runtime-canary-tensorrt-llm-dual
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py promote
+
+runtime-image-tensorrt-llm: runtime-image-tensorrt-llm-dual  ## Build and qualify the pinned TensorRT-LLM runtime-provider image
+
 runtime-smoke:  ## Smoke the local container runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
@@ -446,6 +515,29 @@ runtime-smoke:  ## Smoke the local container runtime image
 
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman
+
+runtime-smoke-gguf:  ## Smoke the pinned llama.cpp runtime-provider image
+	@test "$(CONTAINER_ENGINE)" = "docker" || { echo "❌ The GGUF image currently requires Docker."; exit 1; }
+	$(CONTAINER_ENGINE) run --rm \
+		--network none \
+		--entrypoint /bin/sh \
+		$(RUNTIME_IMAGE_GGUF) \
+		-ec 'echo "$(LLAMA_CPP_SOURCE_SHA256)  /opt/llama.cpp/source/llama.cpp-b10015.tar.gz" | sha256sum -c -; python -c "import invarlock; print(invarlock.__version__)"; /opt/llama.cpp/llama-completion --version'
+
+runtime-blackbox-gguf:  ## Run the optional pinned GGUF behavior black-box twice
+	@test "$(CONTAINER_ENGINE)" = "docker" || { echo "❌ The GGUF black-box currently requires Docker."; exit 1; }
+	@test -n "$(GGUF_BLACKBOX_MODEL)" || { echo "❌ Set GGUF_BLACKBOX_MODEL to the pinned local stories15M q4_0 fixture; this target never downloads it."; exit 1; }
+	@$(PYTHON) scripts/release/gguf_runtime_blackbox.py \
+		--engine "$(CONTAINER_ENGINE)" \
+		--image "$(RUNTIME_IMAGE_GGUF)" \
+		--model "$(GGUF_BLACKBOX_MODEL)"
+
+runtime-smoke-tensorrt-llm: export INVARLOCK_TENSORRT_LLM_IMAGE := $(call _safe_make_export,RUNTIME_IMAGE_TENSORRT_LLM)
+runtime-smoke-tensorrt-llm:  ## Smoke TensorRT-LLM imports and CUDA visibility on an NVIDIA host
+	$(PYTHON) scripts/release/tensorrt_llm_runtime_fixture.py smoke-image
+
+runtime-canary-tensorrt-llm: runtime-canary-tensorrt-llm-dual  ## Qualify the maintained real-engine fixture on two GPUs
+
 
 .PHONY: container-default-smoke container-default-smoke-podman container-front-door-smoke container-front-door-smoke-podman
 container-default-smoke: runtime-image  ## Smoke the default container-backed evaluate path end-to-end
@@ -484,6 +576,14 @@ container-front-door-smoke-podman: runtime-image-podman  ## Smoke the default co
 
 runtime-smoke-cuda: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime image
+	$(CONTAINER_ENGINE) run --rm \
+		--gpus "$(RUNTIME_CUDA_DOCKER_GPUS)" \
+		--network none \
+		--read-only \
+		--tmpfs /tmp:rw,nosuid,nodev,noexec \
+		--entrypoint python \
+		$(RUNTIME_IMAGE) \
+		-c "import torch; assert torch.cuda.is_available(), 'CUDA device unavailable'; probe = torch.arange(16, dtype=torch.float32, device='cuda').reshape(4, 4); result = probe @ probe; torch.cuda.synchronize(); assert result.is_cuda and torch.isfinite(result).all().item(); print('CUDA tensor execution ok')"
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
@@ -493,10 +593,12 @@ runtime-smoke-cuda-quant: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)
 runtime-smoke-cuda-quant:  ## Smoke the local CUDA quant runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
+		--gpus "$(RUNTIME_CUDA_DOCKER_GPUS)" \
+		--network none \
 		-v "$(CURDIR)/examples/integrations/_runtime_images/quant_runtime_image_smoke.py:/tmp/quant_runtime_image_smoke.py:ro" \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		/tmp/quant_runtime_image_smoke.py --require-cuda-toolchain
+		/tmp/quant_runtime_image_smoke.py --require-cuda-toolchain --require-gpu
 
 runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-quant-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)

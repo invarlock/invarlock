@@ -12,7 +12,7 @@ from invarlock.reporting.verify_strict_accuracy import (
     _append_accuracy_recompute_errors,
 )
 from invarlock.reporting.verify_strict_ppl import _append_strict_ppl_schedule_errors
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _VALID_TEST_IMAGE_DIGEST,
     _final_window_schedule_digest,
     _matching_strict_accuracy_baseline,

@@ -18,10 +18,10 @@ MODEL_CLASSIFICATION_PATH = REPO_ROOT / "contracts" / "model_classification.json
 MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json"
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
 
-CLASSIFICATION_FORMAT = "model-classification-v1"
+CLASSIFICATION_FORMAT = "model-classification-v2"
 AUDIT_FORMAT = "invarlock/model-classification-audit-v1"
 CLASSIFICATIONS = {
-    "published",
+    "cataloged",
     "backlog",
     "blocked",
     "smoke_canary",
@@ -30,7 +30,7 @@ CLASSIFICATIONS = {
     "out_of_scope",
 }
 ELIGIBILITY = {"eligible", "blocked", "not_applicable"}
-SUPPORT_MATRIX_CLASSIFICATIONS = {"published", "backlog", "blocked"}
+SUPPORT_MATRIX_CLASSIFICATIONS = {"cataloged", "backlog", "blocked"}
 EVIDENCE_CATALOG_FORMAT = "invarlock/evidence-catalog-v1"
 ENTRY_FIELDS = {
     "id",
@@ -145,8 +145,8 @@ def _catalog_families(
     return indexed
 
 
-def _published_basis_candidates(catalog: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    section = catalog.get("published_basis_candidates_text_le_14b")
+def _catalog_evidence_candidates(catalog: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    section = catalog.get("maintained_catalog_candidates_text_le_14b")
     if not isinstance(section, Mapping):
         return []
     candidates = section.get("candidates")
@@ -187,11 +187,11 @@ def _collect_named_model_sources(
         for model_id in _string_list(family.get("representative_models")):
             sources[model_id].add(f"model_family_catalog:{section}:{family_id}")
 
-    for candidate in _published_basis_candidates(catalog):
+    for candidate in _catalog_evidence_candidates(catalog):
         model_id = candidate.get("representative_model")
         candidate_id = candidate.get("candidate_id", "<unknown>")
         if isinstance(model_id, str) and model_id:
-            sources[model_id].add(f"published_basis_candidate:{candidate_id}")
+            sources[model_id].add(f"maintained_catalog_candidate:{candidate_id}")
 
     entries = evidence_catalog.get("entries")
     if isinstance(entries, list):
@@ -280,9 +280,9 @@ def _check_manifest_shape(
             findings.append(
                 Finding("error", scope, f"unknown eligibility {eligibility!r}")
             )
-        if classification == "published" and eligibility != "eligible":
+        if classification == "cataloged" and eligibility != "eligible":
             findings.append(
-                Finding("error", scope, "published entries must be eligible")
+                Finding("error", scope, "cataloged entries must be eligible")
             )
         if classification == "blocked" and not _string_list(entry.get("blockers")):
             findings.append(
@@ -337,13 +337,13 @@ def _check_support_matrix(
 
         support_tier = row.get("support_tier")
         docs_label = row.get("docs_label")
-        if classification == "published":
-            if support_tier != "published_basis":
+        if classification == "cataloged":
+            if support_tier != "maintained_catalog":
                 findings.append(
                     Finding(
                         "error",
                         scope,
-                        "published classification requires support_tier='published_basis'",
+                        "cataloged classification requires support_tier='maintained_catalog'",
                     )
                 )
             if docs_label != "Yes":
@@ -351,16 +351,16 @@ def _check_support_matrix(
                     Finding(
                         "error",
                         scope,
-                        "published classification requires docs_label='Yes'",
+                        "cataloged classification requires docs_label='Yes'",
                     )
                 )
         else:
-            if support_tier == "published_basis":
+            if support_tier == "maintained_catalog":
                 findings.append(
                     Finding(
                         "error",
                         scope,
-                        f"{classification} classification cannot use published_basis",
+                        f"{classification} classification cannot use maintained_catalog",
                     )
                 )
             if docs_label != "No":
@@ -385,37 +385,37 @@ def _check_catalog(
     for family_id, (section, family) in catalog_families.items():
         state = family.get("state")
         entry = by_catalog_family.get(family_id)
-        if section == "declared_support" or state == "published_basis":
+        if section == "declared_support" or state == "maintained_catalog":
             if entry is None:
                 findings.append(
                     Finding(
                         "error",
                         f"model_family_catalog:{family_id}",
-                        "published/declared family missing model_classification entry",
+                        "cataloged/declared family missing model_classification entry",
                     )
                 )
                 continue
         if entry is None:
             continue
         classification = entry.get("classification")
-        if classification == "published" and state != "published_basis":
+        if classification == "cataloged" and state != "maintained_catalog":
             findings.append(
                 Finding(
                     "error",
                     f"model_family_catalog:{family_id}",
-                    "published classification requires catalog state published_basis",
+                    "cataloged classification requires catalog state maintained_catalog",
                 )
             )
-        if classification == "blocked" and state == "published_basis":
+        if classification == "blocked" and state == "maintained_catalog":
             findings.append(
                 Finding(
                     "error",
                     f"model_family_catalog:{family_id}",
-                    "blocked classification cannot use catalog state published_basis",
+                    "blocked classification cannot use catalog state maintained_catalog",
                 )
             )
 
-    for candidate in _published_basis_candidates(catalog):
+    for candidate in _catalog_evidence_candidates(catalog):
         candidate_id = candidate.get("candidate_id")
         if not isinstance(candidate_id, str) or not candidate_id:
             continue
@@ -423,7 +423,7 @@ def _check_catalog(
         if decision not in {"blocked_missing_artifacts", "explicitly_out_of_scope"}:
             continue
         entry = by_candidate.get(candidate_id)
-        scope = f"published_basis_candidate:{candidate_id}"
+        scope = f"maintained_catalog_candidate:{candidate_id}"
         if entry is None:
             findings.append(
                 Finding("error", scope, "missing model_classification entry")

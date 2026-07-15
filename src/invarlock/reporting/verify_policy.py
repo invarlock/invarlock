@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
+from invarlock.core.assurance_contract import (
+    ASSURANCE_CLAIM_SET_V2,
+    LEGACY_ASSURANCE_CLAIM_SET,
+)
 from invarlock.core.dataset_identity import (
     DATASET_IDENTITY_FIELDS,
     canonical_dataset_revision,
     dataset_identity_from_report,
     is_hosted_dataset_provider,
 )
-from invarlock.policy_pack import POLICY_PACK_FORMAT, verify_policy_pack
+from invarlock.policy_pack import (
+    LEGACY_POLICY_PACK_FORMAT,
+    verify_policy_pack,
+)
 
 STRICT_AUTHORIZED_TIERS = frozenset({"balanced", "conservative"})
 
@@ -34,7 +41,13 @@ def append_strict_policy_authorization_errors(
 
     pack_errors = verify_policy_pack(policy_pack)
     if pack_errors:
-        errors.extend(f"Invalid {POLICY_PACK_FORMAT}: {error}" for error in pack_errors)
+        submitted_format = policy_pack.get("format")
+        format_label = (
+            submitted_format
+            if isinstance(submitted_format, str) and submitted_format.strip()
+            else "policy pack"
+        )
+        errors.extend(f"Invalid {format_label}: {error}" for error in pack_errors)
         return
 
     pack_tier = str(policy_pack.get("tier") or "").strip().lower()
@@ -57,6 +70,17 @@ def append_strict_policy_authorization_errors(
     assurance_tier = (
         str(_mapping(report.get("assurance")).get("tier") or "").strip().lower()
     )
+    assurance_claim = _mapping(report.get("assurance")).get("claim_set")
+    expected_claim = (
+        LEGACY_ASSURANCE_CLAIM_SET
+        if policy_pack.get("format") == LEGACY_POLICY_PACK_FORMAT
+        else ASSURANCE_CLAIM_SET_V2
+    )
+    if assurance_claim != expected_claim:
+        errors.append(
+            "Strict assurance claim_set does not match the policy-pack format "
+            f"(report={assurance_claim!r}, expected={expected_claim!r})."
+        )
     if assurance_tier != pack_tier:
         errors.append(
             "Strict assurance tier mismatch between report.assurance and policy pack "
@@ -72,10 +96,18 @@ def append_strict_policy_authorization_errors(
 
     compatibility = _mapping(policy_pack.get("compatibility"))
     support_tiers = compatibility.get("support_tiers")
-    if not isinstance(support_tiers, list) or "published_basis" not in support_tiers:
+    required_support_tier = (
+        "published_basis"
+        if policy_pack.get("format") == LEGACY_POLICY_PACK_FORMAT
+        else "maintained_catalog"
+    )
+    if (
+        not isinstance(support_tiers, list)
+        or required_support_tier not in support_tiers
+    ):
         errors.append(
             "Strict assurance policy-pack compatibility.support_tiers must "
-            "authorize published_basis."
+            f"authorize {required_support_tier}."
         )
     expected_identity = compatibility.get("dataset_identity")
     if not isinstance(expected_identity, dict):

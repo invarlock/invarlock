@@ -8,6 +8,11 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from invarlock.guards.authority import (
+    DEFAULT_GUARD_AUTHORITY,
+    guard_authority_errors,
+)
+
 RUNTIME_POLICY_RECEIPT_FORMAT = "invarlock.runtime-policy-receipt.v1"
 _RUNTIME_GUARDS = frozenset({"spectral", "rmt", "variance"})
 _RECEIPT_FIELDS = frozenset(
@@ -87,6 +92,13 @@ def build_runtime_policy_receipt(
     if not normalized_edit:
         raise ValueError("runtime policy receipt edit_name is required")
     resolved = copy.deepcopy(dict(runtime_policies))
+    resolved.setdefault("guard_authority", copy.deepcopy(DEFAULT_GUARD_AUTHORITY))
+    authority_errors = guard_authority_errors(
+        resolved.get("guard_authority"),
+        path="runtime resolved_policy.guard_authority",
+    )
+    if authority_errors:
+        raise ValueError("; ".join(authority_errors))
     applied = _guard_policies(guard_entries)
     for name, policy in applied.items():
         base_policy = resolved.get(name)

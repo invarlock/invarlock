@@ -6,12 +6,12 @@
 | --- | --- |
 | **Purpose** | Programmatic interface for running the InvarLock pipeline and generating reports. |
 | **Audience** | Python callers building scripted workflows or integrations. |
-| **Supported surface** | Stable contract surfaces remain CLI/report/contract-read paths; `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, and direct reporting helpers are advanced/non-stable. |
+| **Supported surface** | Stable contract surfaces remain CLI/report/contract-read paths; `CoreRunner.execute`, `RunConfig`, runtime-provider execution helpers, `ModelAdapter`, `ModelEdit`, `Guard`, and direct reporting helpers are advanced/non-stable. |
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while Python callers set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
 | **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `invarlock.reporting.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_summary.py`, `src/invarlock/reporting/report_schema.py`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/core/runtime_provider/`, `src/invarlock/runtime_behavior/`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_summary.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 
@@ -67,6 +67,30 @@ print("primary metric:", report.metrics.get("primary_metric"))
 | report | `make_report(report, baseline)` + `save_evaluation_bundle(...)` for evaluation-bundle generation. |
 
 Note: CoreRunner coordinates each lane.
+
+### Runtime-provider evidence
+
+The advanced runtime-provider API separates side production from paired replay:
+
+```python
+from invarlock.runtime_behavior import run_side, verify_pair
+```
+
+Use `run_side(...)` in the controlled execution environment for one baseline or
+subject, then transfer both immutable side directories to an independent
+environment and call `verify_pair(...)`. Hugging Face callers must supply
+pre-bound model and adapter objects plus the provider-owned
+`HFTransformersCausalScorer`; strict evidence rejects an arbitrary scorer and
+requires the scorer to be bound to the exact authenticated local safetensors
+checkpoint and live tokenizer contract. The installed CLI constructs the
+GGUF/llama.cpp and TensorRT-LLM process-isolated bindings. The provider API and
+its CLI remain experimental even though their emitted artifact schemas are
+versioned public contracts. These requirements apply to strict runtime-behavior
+evidence, not the normal Hugging Face `evaluate` path.
+
+See [Runtime Providers](runtime-providers.md) for required bindings, runtime
+images, the installed command journey, and the deliberately narrow
+`exact_match` claim.
 
 ## Reference
 

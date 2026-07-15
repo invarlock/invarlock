@@ -44,6 +44,56 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
         assert runtime_security.third_party_plugins_allowed() is True
 
 
+def test_strict_container_boundary_requires_marker_and_kernel_evidence(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(runtime_security.CONTAINER_EXECUTION_ENV, raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_regular_file_marker_present",
+        lambda path: True,
+    )
+    assert runtime_security_helpers.strict_container_boundary_present() is False
+
+    monkeypatch.setenv(runtime_security.CONTAINER_EXECUTION_ENV, "1")
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_regular_file_marker_present",
+        lambda path: False,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_read_bounded_kernel_file",
+        lambda path: b"0::/user.slice",
+    )
+    assert runtime_security_helpers.strict_container_boundary_present() is False
+
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_read_bounded_kernel_file",
+        lambda path: b"0::/kubepods.slice/pod/containerd",
+    )
+    assert runtime_security_helpers.strict_container_boundary_present() is True
+
+
+def test_strict_container_boundary_accepts_regular_container_marker(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(runtime_security.CONTAINER_EXECUTION_ENV, "1")
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_regular_file_marker_present",
+        lambda path: path == "/.dockerenv",
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_read_bounded_kernel_file",
+        lambda path: None,
+    )
+
+    assert runtime_security_helpers.strict_container_boundary_present() is True
+
+
 def test_serialize_canonical_json_normalizes_supported_types() -> None:
     payload = {
         "path": Path("artifact.txt"),

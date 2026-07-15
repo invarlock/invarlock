@@ -31,7 +31,7 @@ def _record(
         representative_index=0,
         modalities=modalities,
         task_role=task_role,
-        state="published_basis",
+        state="maintained_catalog",
         repo_evidence=repo_evidence,
         support_groups=support_groups,
     )
@@ -49,7 +49,7 @@ def test_records_by_model_id_preserves_ambiguous_catalog_records() -> None:
                 "display_name": "Demo text",
                 "modalities": ["text"],
                 "task_role": "causal_lm",
-                "state": "published_basis",
+                "state": "maintained_catalog",
                 "representative_models": ["demo/model"],
             },
             {
@@ -57,7 +57,7 @@ def test_records_by_model_id_preserves_ambiguous_catalog_records() -> None:
                 "display_name": "Demo image",
                 "modalities": ["text", "image"],
                 "task_role": "image_text",
-                "state": "published_basis",
+                "state": "maintained_catalog",
                 "representative_models": ["demo/model"],
             },
         ]
@@ -124,7 +124,7 @@ def test_model_family_route_index_preserves_ambiguous_context() -> None:
                 "display_name": "Demo text",
                 "modalities": ["text"],
                 "task_role": "causal_lm",
-                "state": "published_basis",
+                "state": "maintained_catalog",
                 "representative_models": ["demo/model"],
                 "repo_evidence": ["configs/presets/causal_lm/demo_512.yaml"],
                 "support_groups": ["text"],
@@ -134,7 +134,7 @@ def test_model_family_route_index_preserves_ambiguous_context() -> None:
                 "display_name": "Demo image",
                 "modalities": ["text", "image"],
                 "task_role": "image_text",
-                "state": "published_basis",
+                "state": "maintained_catalog",
                 "representative_models": ["demo/model"],
                 "repo_evidence": ["configs/presets/multimodal/demo_vqa_256.yaml"],
                 "support_groups": ["vision"],
@@ -201,7 +201,7 @@ def test_catalog_routed_model_ids_skips_records_without_runnable_route() -> None
                 "display_name": "Demo causal",
                 "modalities": ["text"],
                 "task_role": "causal_lm",
-                "state": "published_basis",
+                "state": "maintained_catalog",
                 "representative_models": ["demo/causal"],
             },
             {

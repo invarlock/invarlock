@@ -33,13 +33,16 @@ def test_runtime_security_facade_exposes_only_public_surface() -> None:
         "RUNTIME_IMAGE_ENV",
         "RUNTIME_IMAGE_LOCAL_DEFAULT",
         "RUNTIME_MANIFEST_FILENAME",
+        "RUNTIME_MANIFEST_V2_VERSION",
         "RUNTIME_MANIFEST_VERSION",
+        "RUNTIME_VERIFIER_V2_CONTRACT_VERSION",
         "RUNTIME_VERIFIER_CONTRACT_VERSION",
         "SOURCE_BUNDLE_DIGEST_ENV",
         "SOURCE_BUNDLE_READ_ONLY_ENV",
         "RuntimeManifestExecution",
         "RuntimeManifestLoadIssueCode",
         "RuntimeManifestLoadResult",
+        "RuntimeProviderManifestFiles",
         "RuntimeSecurityPolicy",
         "apply_runtime_allowances",
         "build_container_command",
@@ -65,6 +68,7 @@ def test_runtime_security_facade_exposes_only_public_surface() -> None:
         "third_party_plugins_allowed",
         "unverified_provenance_allowed",
         "write_runtime_manifest",
+        "write_runtime_manifest_v2",
     }
 
     assert set(runtime_security.__all__) == expected_public

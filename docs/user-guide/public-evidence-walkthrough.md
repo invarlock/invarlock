@@ -17,13 +17,23 @@ support table and current evidence state live in
 
 ## Current status
 
-The current index contains strictly verified evidence for 31 of the 39
-maintained lanes. Those rows are labeled **Available** and link to their
-evidence packs and verification receipts. The other 8 rows retain the label
-**Evidence not yet created** until current-contract evidence is published.
+All 39 maintained lanes declare `edit_name: noop` and evaluate the same model
+checkpoint as baseline and subject. These compatibility runs exercise the
+evidence mechanics across the catalog: model loading, input materialization,
+paired evaluation, guard/report generation, strict verification, and
+packaging. They establish that workflow for the declared lane; transformation
+detection and guard effectiveness require separate runs with an actual edited
+subject.
+
+The current index contains strictly verified frozen-v1 evidence for 31 lanes.
+Those rows are labeled **Available** and link to their evidence packs and
+verification receipts. The current verifier accepts these packs through its
+explicit v1 compatibility path; they do not exercise v2 guard authority. The
+other 8 rows retain the label **Evidence not yet created** until strictly
+verified artifacts are published.
 
 Each available row has a corresponding entry in
-`public_evidence/published_basis_index.json`. The compact index is carried by
+`public_evidence/catalog_evidence_index.json`. The compact index is carried by
 source tags and installed wheels; the complete 31-lane evidence tree is the
 hash-bound GitHub Release asset recorded by every artifact entry.
 
@@ -44,7 +54,7 @@ The complete invocation and execution boundary are documented in
 `scripts/evidence_packs/README.md`.
 
 To publish completed results, stage the verified packs under
-`public_evidence/published_basis/`, update each lane from `not_created` to
+`public_evidence/catalog_evidence/`, update each lane from `not_created` to
 `available`, build the archive, and run
 `scripts/checks/sync_packaged_public_evidence.py` with the external asset URL,
 SHA-256, size, and archive root. Commit the compact source and packaged indexes;

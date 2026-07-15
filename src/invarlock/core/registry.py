@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import (
@@ -58,7 +59,7 @@ class PluginInfo:
     entry_point: Any | None = None
     support_tier: str = "third_party"
     strict_assurance_allowed: bool = False
-    published_basis: bool = False
+    maintained_catalog: bool = False
     deployment_claim: bool = False
 
 
@@ -73,6 +74,35 @@ def _select_entry_points(eps: Any, group: str) -> list[EntryPoint]:
     return list(selected)
 
 
+def _normalized_distribution_name(value: str) -> str:
+    """Normalize a distribution name using the packaging-name equivalence rule."""
+
+    return re.sub(r"[-_.]+", "-", value).lower()
+
+
+def _is_identical_shipped_entry_point(
+    entry_point: EntryPoint,
+    plugin_type: str,
+) -> bool:
+    """Return whether discovery rediscovered this installed InvarLock built-in."""
+
+    dist = getattr(entry_point, "dist", None)
+    dist_name = getattr(dist, "name", None)
+    dist_version = getattr(dist, "version", None)
+    if (
+        not isinstance(dist_name, str)
+        or _normalized_distribution_name(dist_name) != "invarlock"
+        or dist_version != INVARLOCK_VERSION
+    ):
+        return False
+
+    value = getattr(entry_point, "value", None)
+    for spec in builtin_plugin_specs(plugin_type):
+        if entry_point.name == spec.name:
+            return value == f"{spec.module}:{spec.class_name}"
+    return False
+
+
 class CoreRegistry:
     """
     Central registry for InvarLock plugins using entry point discovery.
@@ -85,6 +115,7 @@ class CoreRegistry:
         self._adapters: dict[str, PluginInfo] = {}
         self._edits: dict[str, PluginInfo] = {}
         self._guards: dict[str, PluginInfo] = {}
+        self._runtime_providers: dict[str, PluginInfo] = {}
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
@@ -117,6 +148,11 @@ class CoreRegistry:
                 self._guards,
                 _select_entry_points(eps, "invarlock.guards"),
                 "guards",
+            )
+            self._register_entry_points(
+                self._runtime_providers,
+                _select_entry_points(eps, "invarlock.runtime_providers"),
+                "runtime_providers",
             )
         except _DISCOVERY_ERRORS as error:
             raise RuntimeError(f"Plugin discovery failed: {error}") from error
@@ -155,6 +191,7 @@ class CoreRegistry:
             "adapters": self._adapters,
             "edits": self._edits,
             "guards": self._guards,
+            "runtime_providers": self._runtime_providers,
         }
         for plugin_type, registry in registries.items():
             for spec in builtin_plugin_specs(plugin_type):
@@ -169,7 +206,7 @@ class CoreRegistry:
                 registry[
                     spec.name
                 ].strict_assurance_allowed = spec.strict_assurance_allowed
-                registry[spec.name].published_basis = spec.published_basis
+                registry[spec.name].maintained_catalog = spec.maintained_catalog
                 registry[spec.name].deployment_claim = spec.deployment_claim
 
     def _register_entry_points(
@@ -179,7 +216,16 @@ class CoreRegistry:
         plugin_type: str,
     ) -> None:
         for entry_point in entry_points_for_group:
+            if (
+                plugin_type == "runtime_providers"
+                and re.fullmatch(r"[a-z][a-z0-9_]{0,63}", entry_point.name) is None
+            ):
+                raise RuntimeError(
+                    f"Invalid runtime provider plugin name: {entry_point.name!r}"
+                )
             if entry_point.name in registry:
+                if _is_identical_shipped_entry_point(entry_point, plugin_type):
+                    continue
                 raise RuntimeError(
                     f"Duplicate {plugin_type.rstrip('s')} plugin name: {entry_point.name}"
                 )
@@ -280,6 +326,23 @@ class CoreRegistry:
                 f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
             )
 
+    def _validate_runtime_provider_abi(self, cls: Any) -> None:
+        from .runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI
+
+        provider_mod = importlib.import_module(cls.__module__)
+        plugin_abi = getattr(provider_mod, "INVARLOCK_RUNTIME_PROVIDER_ABI", None)
+        if not isinstance(plugin_abi, str) or not plugin_abi.strip():
+            raise ImportError(
+                "ABI missing: runtime provider must declare "
+                "INVARLOCK_RUNTIME_PROVIDER_ABI="
+                f"{INVARLOCK_RUNTIME_PROVIDER_ABI}"
+            )
+        if plugin_abi != INVARLOCK_RUNTIME_PROVIDER_ABI:
+            raise ImportError(
+                "ABI mismatch: runtime provider="
+                f"{plugin_abi} != core={INVARLOCK_RUNTIME_PROVIDER_ABI}"
+            )
+
     def _instantiate_plugin(
         self,
         info: PluginInfo,
@@ -302,6 +365,35 @@ class CoreRegistry:
             )
         return instance
 
+    def _instantiate_runtime_provider(self, info: PluginInfo) -> Any:
+        from .runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI, RuntimeProvider
+
+        try:
+            cls = self._resolve_plugin_class(info)
+            self._validate_runtime_provider_abi(cls)
+            instance = cls()
+        except _PLUGIN_LOAD_ERRORS as error:
+            raise ImportError(
+                f"Failed to load runtime provider '{info.name}': {error}"
+            ) from error
+        if not isinstance(instance, RuntimeProvider):
+            raise ImportError(
+                f"Failed to load runtime provider '{info.name}': "
+                f"Expected RuntimeProvider, got {type(instance)}"
+            )
+        if instance.name != info.name:
+            raise ImportError(
+                f"Failed to load runtime provider '{info.name}': "
+                f"provider identity mismatch ({instance.name!r})"
+            )
+        if instance.abi_version != INVARLOCK_RUNTIME_PROVIDER_ABI:
+            raise ImportError(
+                f"Failed to load runtime provider '{info.name}': ABI mismatch: "
+                f"instance={instance.abi_version} != "
+                f"core={INVARLOCK_RUNTIME_PROVIDER_ABI}"
+            )
+        return instance
+
     def list_adapters(self) -> list[str]:
         """List all registered adapter names."""
         self._ensure_initialized()
@@ -316,6 +408,11 @@ class CoreRegistry:
         """List all registered guard names."""
         self._ensure_initialized()
         return list(self._guards.keys())
+
+    def list_runtime_providers(self) -> list[str]:
+        """List registered runtime providers without importing their backends."""
+        self._ensure_initialized()
+        return list(self._runtime_providers.keys())
 
     def get_adapter(self, name: str) -> ModelAdapter:
         """Get an adapter instance by name."""
@@ -380,6 +477,19 @@ class CoreRegistry:
             ),
         )
 
+    def get_runtime_provider(self, name: str) -> Any:
+        """Instantiate a runtime provider after exact ABI validation."""
+        self._ensure_initialized()
+
+        if name not in self._runtime_providers:
+            available = list(self._runtime_providers.keys())
+            raise KeyError(f"Unknown runtime provider '{name}'. Available: {available}")
+
+        info = self._runtime_providers[name]
+        if not info.available:
+            raise ImportError(f"Runtime provider '{name}' unavailable: {info.status}")
+        return self._instantiate_runtime_provider(info)
+
     def get_plugin_info(self, name: str, plugin_type: str) -> dict[str, Any]:
         """Get plugin information without instantiation."""
         self._ensure_initialized()
@@ -393,6 +503,9 @@ class CoreRegistry:
         elif plugin_type == "guards":
             registry = self._guards
             entry_group = "invarlock.guards"
+        elif plugin_type == "runtime_providers":
+            registry = self._runtime_providers
+            entry_group = "invarlock.runtime_providers"
         else:
             raise ValueError(f"Unknown plugin type: {plugin_type}")
 
@@ -410,7 +523,7 @@ class CoreRegistry:
             "entry_point_group": entry_group if info.entry_point else None,
             "support_tier": info.support_tier,
             "strict_assurance_allowed": info.strict_assurance_allowed,
-            "published_basis": info.published_basis,
+            "maintained_catalog": info.maintained_catalog,
             "deployment_claim": info.deployment_claim,
         }
 

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_behavioral_schedule.schema.json",
+  "title": "InvarLock Runtime Behavioral Schedule",
+  "$comment": "Loaders reject source or canonical schedule material over 16777216 UTF-8 bytes.",
+  "type": "object",
+  "required": ["format_version", "dataset_identity", "records"],
+  "properties": {
+    "format_version": {
+      "const": "invarlock/runtime-behavioral-schedule-v1"
+    },
+    "dataset_identity": {"$ref": "#/$defs/datasetIdentity"},
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "providerName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "logicalName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*:/)(?!.*//)(?!.*\\/$)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]*\\S$"
+    },
+    "recordId": {
+      "allOf": [
+        {"$ref": "#/$defs/logicalName"},
+        {"maxLength": 256}
+      ]
+    },
+    "splitName": {
+      "allOf": [
+        {"$ref": "#/$defs/logicalName"},
+        {"maxLength": 128}
+      ]
+    },
+    "immutableRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "datasetIdentity": {
+      "type": "object",
+      "required": [
+        "provider",
+        "dataset_name",
+        "config_name",
+        "revision",
+        "split"
+      ],
+      "properties": {
+        "provider": {"$ref": "#/$defs/providerName"},
+        "dataset_name": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/logicalName"}
+          ]
+        },
+        "config_name": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/logicalName"}
+          ]
+        },
+        "revision": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/immutableRevision"}
+          ]
+        },
+        "split": {"$ref": "#/$defs/splitName"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "provider": {
+                "enum": ["hf_text", "hf_seq2seq", "wikitext2"]
+              }
+            },
+            "required": ["provider"]
+          },
+          "then": {
+            "properties": {
+              "dataset_name": {"$ref": "#/$defs/logicalName"},
+              "config_name": {"$ref": "#/$defs/logicalName"},
+              "revision": {"$ref": "#/$defs/immutableRevision"}
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "record": {
+      "type": "object",
+      "required": [
+        "record_id",
+        "input_text",
+        "input_sha256",
+        "expected_output"
+      ],
+      "properties": {
+        "record_id": {"$ref": "#/$defs/recordId"},
+        "input_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "pattern": "\\S"
+        },
+        "input_sha256": {"$ref": "#/$defs/sha256"},
+        "expected_output": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

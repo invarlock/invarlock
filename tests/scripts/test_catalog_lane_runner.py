@@ -270,7 +270,9 @@ def test_catalog_lane_can_retain_a_failed_workspace(
 
 def test_staging_output_cannot_publish_or_overwrite(tmp_path: Path) -> None:
     with pytest.raises(CatalogLaneError, match="outside public_evidence"):
-        validate_staging_output(REPO_ROOT / "public_evidence" / "published_basis" / "x")
+        validate_staging_output(
+            REPO_ROOT / "public_evidence" / "catalog_evidence" / "x"
+        )
 
     existing = tmp_path / "existing"
     existing.mkdir()

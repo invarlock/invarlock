@@ -33,9 +33,9 @@ evidence limits that accompany the InvarLock assurance notes.
 | Guard | Inputs | Check & Threshold | Failure behavior | Code reference |
 |-------|--------|-------------------|-------------------|----------------|
 | **Invariants** | Baseline and subject model weights, adapter metadata | Separate pre-edit and post-edit checks cover non-finite parameters/buffers, tokenizer/vocabulary alignment, and configured structural invariants | Strict assurance forces `strict_mode=true` and `on_fail=block`; outside strict mode, non-finite/tokenizer failures are fatal and remaining findings follow configured policy | `invarlock.guards.invariants` |
-| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute the spectral score under the fixed measurement contract; apply candidate selection, `abs(z) > κ_f`, and cap-budget rules. The thresholds are operational; the combined decision has no established FDR/FWER guarantee. | Exploratory local-baseline runs may monitor selected violations within `max_caps`; the current external-baseline strict path blocks any selected violation. Fatal degeneracy or absolute-limit violations also block. | `invarlock.guards.spectral` |
-| **RMT** | Sampled activations | Globally center and scale the sampled activation matrix, run the configured finite-iteration estimator, and compute per-module/family edge-risk scores; accept when baseline-relative growth stays within the configured ε band. This is not covariance whitening. | The current runtime blocks ε-band violations; catastrophic primary-metric spikes are gated separately (`spike_threshold` defaults to 2.0× for ppl-like metrics). | `invarlock.guards.rmt` |
-| **Variance (VE)** | Paired ΔlogNLL on predictive windows | Enable VE only if the predictive CI upper bound and mean are both negative and also meet −`min_effect_lognll` (Balanced uses a one-sided CI; Conservative uses a two-sided CI). | VE stays disabled when the gate fails, but the current strict verifier separately requires `predictive_gate.passed=true`. | `invarlock.guards.variance` |
+| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute the spectral score under the fixed measurement contract; apply candidate selection, `abs(z) > κ_f`, and cap-budget rules. The thresholds are operational; the combined decision has no established FDR/FWER guarantee. | Complete selected findings block under `enforce` and remain visible under `observe`. Fatal, unsupported, degraded, or incomplete evidence blocks in either mode. | `invarlock.guards.spectral` |
+| **RMT** | Sampled activations | Globally center and scale the sampled activation matrix, run the configured finite-iteration estimator, and compute per-module/family edge-risk scores; evaluate baseline-relative growth against the configured ε band. This is not covariance whitening. | Complete ε-band findings block under `enforce` and remain visible under `observe`; catastrophic primary-metric spikes are mandatory and gated separately (`spike_threshold` defaults to 2.0× for ppl-like metrics). | `invarlock.guards.rmt` |
+| **Variance (VE)** | Paired ΔlogNLL on predictive windows | Enable VE only if the predictive CI upper bound and mean are both negative and also meet −`min_effect_lognll` (Balanced uses a one-sided CI; Conservative uses a two-sided CI). | VE stays disabled when the gate fails. A complete failing predictive-gate outcome blocks under `enforce` and remains visible under `observe`; incomplete or degraded evidence always blocks. | `invarlock.guards.variance` |
 | **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ selected tier floor | Abort or fail verification and surface reason | `invarlock.reporting.report_make` |
 
 Reports record a report-level policy digest plus guard metrics. Spectral and RMT
@@ -107,10 +107,11 @@ larger changes are scaled by δ. The chosen δ is published as
 **Caps and `max_caps`**: each selected module breach contributes to
 `caps_applied`. Exploratory runs using a run-local baseline may continue while
 `caps_applied ≤ max_caps`; exceeding the limit blocks. The current
-external-baseline strict path is stronger and blocks whenever any selected
-violation remains, even within the cap budget. In either blocking case, the
-guard emits a blocking decision. Reports store the count and limit under
-`spectral.{caps_applied,max_caps}`.
+external-baseline strict path records every selected finding. A complete
+finding blocks under `enforce` and remains visible under `observe`, even within
+the cap budget; missing or degraded evidence blocks in either mode. Reports
+store the count and limit under `spectral.{caps_applied,max_caps}`. When
+authority is `enforce`, the guard emits a blocking decision.
 
 ### Quality Gates (Acceptance)
 
@@ -316,8 +317,8 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
   `-min_effect_lognll`).
 - **Spectral caps:** in exploratory local-baseline mode, Balanced permits at
   most five selected caps (`max_caps = 5`); a sixth sets
-  `spectral.summary.caps_exceeded = true` and blocks. The external-baseline
-  strict path blocks on the first selected violation.
+  `spectral.summary.caps_exceeded = true`. In strict reports, a complete cap
+  finding blocks under `enforce` and remains visible under `observe`.
 
 ## 7. Scope Boundaries
 

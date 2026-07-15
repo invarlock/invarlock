@@ -50,6 +50,11 @@ def test_assurance_cross_reference_samples_do_not_require_runtime_builder(
         module._path_exists_in_obj(cert, "primary_metric.ratio_vs_baseline")
         for cert in certs
     )
+    for guard in ("spectral", "rmt", "variance"):
+        assert any(
+            module._path_exists_in_obj(cert, f"resolved_policy.guard_authority.{guard}")
+            for cert in certs
+        )
 
 
 def test_assurance_cross_reference_regex_accepts_bare_file_and_pytest_node() -> None:

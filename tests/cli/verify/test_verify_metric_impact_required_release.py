@@ -12,7 +12,7 @@ from invarlock.eval.guard_metric_impact import (
     compute_guard_metric_impact,
 )
 from invarlock.reporting import verify_contract as verify_mod
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _VALID_TEST_IMAGE_DIGEST,
     _write_runtime_manifest,
 )

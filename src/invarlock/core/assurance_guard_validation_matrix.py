@@ -22,6 +22,7 @@ def _spectral_errors(
     inventory: Sequence[tuple[str, dict[str, Any], str]],
     *,
     require_complete: bool,
+    enforce_outcome: bool = True,
 ) -> list[str]:
     spectral = _mapping(report.get("spectral"))
     if spectral is None:
@@ -70,7 +71,7 @@ def _spectral_errors(
         _field_values(sources, "caps_exceeded"),
         required_path="spectral.caps_exceeded" if require_complete else None,
     )
-    if caps_exceeded is True:
+    if caps_exceeded is True and enforce_outcome:
         errors.append("spectral.caps_exceeded is true.")
     submitted_caps = _nonnegative_int(spectral.get("caps_applied"))
     submitted_max_caps = _nonnegative_int(spectral.get("max_caps"))
@@ -78,12 +79,18 @@ def _spectral_errors(
         submitted_caps is not None
         and submitted_max_caps is not None
         and submitted_caps > submitted_max_caps
+        and enforce_outcome
     ):
         errors.append(
             "spectral.caps_applied exceeds spectral.max_caps "
             f"({submitted_caps} > {submitted_max_caps})."
         )
-    if caps_applied is not None and max_caps is not None and caps_applied > max_caps:
+    if (
+        caps_applied is not None
+        and max_caps is not None
+        and caps_applied > max_caps
+        and enforce_outcome
+    ):
         errors.append(
             "spectral.caps_applied exceeds spectral.max_caps "
             f"({caps_applied} > {max_caps})."
@@ -114,7 +121,10 @@ def _spectral_errors(
                 errors.append("spectral.summary.status must be a string.")
             else:
                 normalized = _normalized_token(summary_status)
-                if normalized not in {"stable", "capped"}:
+                if normalized not in {"stable", "capped"} and not (
+                    not enforce_outcome
+                    and normalized in {"block", "fail", "failed", "unstable"}
+                ):
                     errors.append("spectral.summary.status is not a passing state.")
                 elif normalized == "stable" and caps_applied not in {None, 0}:
                     errors.append(
@@ -167,6 +177,7 @@ def _rmt_evaluation_errors(
     sources: Sequence[tuple[str, Mapping[str, Any]]],
     *,
     require_complete: bool,
+    enforce_outcome: bool,
 ) -> list[str]:
     errors: list[str] = []
     evaluated = rmt.get("evaluated")
@@ -183,7 +194,7 @@ def _rmt_evaluation_errors(
         _field_values(sources, "stable"),
         required_path="rmt.stable" if require_complete else None,
     )
-    if stable is False:
+    if stable is False and enforce_outcome:
         errors.append("rmt.stable is false.")
 
     violation_values = _field_values(sources, "epsilon_violations")
@@ -192,7 +203,7 @@ def _rmt_evaluation_errors(
     for path, violations in violation_values:
         if not isinstance(violations, list):
             errors.append(f"{path} must be an array.")
-        elif violations:
+        elif violations and enforce_outcome:
             errors.append(f"{path} must be empty; epsilon violations were recorded.")
     return errors
 
@@ -204,6 +215,7 @@ def _rmt_acceptance_errors(
     epsilon_default: float | None,
     *,
     require_complete: bool,
+    enforce_outcome: bool,
 ) -> list[str]:
     errors: list[str] = []
     if set(edge_base) != set(edge_cur):
@@ -224,7 +236,7 @@ def _rmt_acceptance_errors(
             errors.append(f"rmt epsilon for family {family!r} is unavailable.")
             continue
         allowed = (1.0 + epsilon) * base
-        if current > allowed:
+        if current > allowed and enforce_outcome:
             errors.append(
                 f"rmt acceptance inequality failed for {family}: {current} > {allowed}."
             )
@@ -285,12 +297,16 @@ def _rmt_errors(
     inventory: Sequence[tuple[str, dict[str, Any], str]],
     *,
     require_complete: bool,
+    enforce_outcome: bool = True,
 ) -> list[str]:
     rmt = _mapping(report.get("rmt"))
     if rmt is None:
         return []
     errors = _rmt_evaluation_errors(
-        rmt, _rmt_sources(rmt, inventory), require_complete=require_complete
+        rmt,
+        _rmt_sources(rmt, inventory),
+        require_complete=require_complete,
+        enforce_outcome=enforce_outcome,
     )
 
     edge_base = _numeric_map(
@@ -327,6 +343,7 @@ def _rmt_errors(
                 epsilon_map,
                 epsilon_default,
                 require_complete=require_complete,
+                enforce_outcome=enforce_outcome,
             )
         )
 

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from invarlock.core.assurance_contract import (
-    ASSURANCE_CLAIM_SET,
     CANONICAL_GUARD_CHAIN,
+    LEGACY_ASSURANCE_CLAIM_SET,
     build_assurance_section,
     normalize_assurance_mode,
     normalize_verify_assurance_mode,
@@ -23,7 +23,7 @@ def test_build_assurance_section_passes_for_canonical_strict_report() -> None:
     section = build_assurance_section(report)
 
     assert section["mode"] == "strict"
-    assert section["claim_set"] == ASSURANCE_CLAIM_SET
+    assert section["claim_set"] == LEGACY_ASSURANCE_CLAIM_SET
     assert section["guard_chain_observed"] == list(CANONICAL_GUARD_CHAIN)
     assert section["canonical_guard_chain_enforced"] is True
     assert section["runtime_provenance_verified"] is False

@@ -112,7 +112,12 @@ def _guard_inventory(
     return entries
 
 
-def _validate_diagnostics(source: str, value: Any) -> list[str]:
+def _validate_diagnostics(
+    source: str,
+    value: Any,
+    *,
+    allowed_error_kinds: frozenset[str] = frozenset(),
+) -> list[str]:
     if value is None:
         return []
     if not isinstance(value, list):
@@ -134,92 +139,135 @@ def _validate_diagnostics(source: str, value: Any) -> list[str]:
             errors.append(
                 f"{source}.diagnostics[{index}].severity is unsupported: {severity}."
             )
-        elif normalized_severity in _ERROR_SEVERITIES:
+        diagnostic_kind = _normalized_token(str(diagnostic.get("kind") or ""))
+        if (
+            normalized_severity in _ERROR_SEVERITIES
+            and diagnostic_kind not in allowed_error_kinds
+        ):
             errors.append(
                 f"{source}.diagnostics[{index}] records a blocking {severity} event."
             )
     return errors
 
 
-def _validate_guard_outcome(
-    guard_name: str,
-    block: Any,
-    *,
-    source: str,
-    require_complete: bool,
+def _guard_support_errors(
+    block: Mapping[str, Any], *, source: str, require_complete: bool
 ) -> list[str]:
-    if not isinstance(block, dict) or not block:
+    if "supported" not in block:
         return (
-            [f"strict assurance missing {source} guard evidence."]
+            [f"{source}.supported is required for strict assurance."]
             if require_complete
             else []
         )
-
-    errors: list[str] = []
-    spectral_intervention = guard_name == "spectral"
     supported = block.get("supported")
-    if "supported" not in block:
-        if require_complete:
-            errors.append(f"{source}.supported is required for strict assurance.")
-    elif not isinstance(supported, bool):
-        errors.append(f"{source}.supported must be a boolean.")
-    elif supported is not True:
-        reason = block.get("reason")
-        suffix = f": {reason}" if isinstance(reason, str) and reason else ""
-        errors.append(f"{source} is unsupported for strict assurance{suffix}.")
+    if not isinstance(supported, bool):
+        return [f"{source}.supported must be a boolean."]
+    if supported:
+        return []
+    reason = block.get("reason")
+    suffix = f": {reason}" if isinstance(reason, str) and reason else ""
+    return [f"{source} is unsupported for strict assurance{suffix}."]
 
-    passed = block.get("passed")
+
+def _guard_passed_errors(
+    guard_name: str,
+    block: Mapping[str, Any],
+    *,
+    source: str,
+    require_complete: bool,
+    enforce_outcome: bool,
+) -> list[str]:
     if "passed" not in block:
-        if require_complete:
-            errors.append(f"{source}.passed is required for strict assurance.")
-    elif not isinstance(passed, bool):
-        errors.append(f"{source}.passed must be a boolean.")
-    elif passed is not True:
-        errors.append(f"{source}.passed is false; {guard_name} did not pass.")
+        return (
+            [f"{source}.passed is required for strict assurance."]
+            if require_complete
+            else []
+        )
+    passed = block.get("passed")
+    if not isinstance(passed, bool):
+        return [f"{source}.passed must be a boolean."]
+    if not passed and enforce_outcome:
+        return [f"{source}.passed is false; {guard_name} did not pass."]
+    return []
 
-    decision = block.get("decision")
+
+def _guard_decision_errors(
+    block: Mapping[str, Any],
+    *,
+    source: str,
+    require_complete: bool,
+    enforce_outcome: bool,
+    spectral_intervention: bool,
+) -> list[str]:
     if "decision" not in block:
-        if require_complete:
-            errors.append(f"{source}.decision is required for strict assurance.")
-    elif not isinstance(decision, str) or not decision.strip():
-        errors.append(f"{source}.decision must be a non-empty string.")
-    else:
-        normalized_decision = _normalized_token(decision)
-        if normalized_decision in _FAIL_DECISIONS:
-            errors.append(f"{source}.decision={decision!r} is blocking.")
-        elif (
-            require_complete
-            and normalized_decision not in _PASS_DECISIONS
-            and not (spectral_intervention and normalized_decision == "monitor")
-        ):
-            errors.append(
-                f"{source}.decision must be an allow/pass decision for strict assurance."
-            )
+        return (
+            [f"{source}.decision is required for strict assurance."]
+            if require_complete
+            else []
+        )
+    decision = block.get("decision")
+    if not isinstance(decision, str) or not decision.strip():
+        return [f"{source}.decision must be a non-empty string."]
+    normalized = _normalized_token(decision)
+    if normalized in _FAIL_DECISIONS and enforce_outcome:
+        return [f"{source}.decision={decision!r} is blocking."]
+    known = normalized in _PASS_DECISIONS or normalized in _FAIL_DECISIONS
+    if (
+        require_complete
+        and not known
+        and not (spectral_intervention and normalized == "monitor")
+    ):
+        return [
+            f"{source}.decision must be an allow/pass decision for strict assurance."
+        ]
+    return []
 
+
+def _guard_status_errors(
+    block: Mapping[str, Any],
+    *,
+    source: str,
+    require_complete: bool,
+    enforce_outcome: bool,
+    spectral_intervention: bool,
+) -> list[str]:
+    if "status" not in block:
+        return []
     status = block.get("status")
-    if "status" in block:
-        if not isinstance(status, str) or not status.strip():
-            errors.append(f"{source}.status must be a non-empty string.")
-        else:
-            normalized_status = _normalized_token(status)
-            if normalized_status in _FAIL_STATUSES:
-                errors.append(f"{source}.status={status!r} is not passing.")
-            elif (
-                require_complete
-                and normalized_status not in _PASS_STATUSES
-                and not (spectral_intervention and normalized_status == "capped")
-            ):
-                errors.append(
-                    f"{source}.status must be a canonical passing status when present."
-                )
+    if not isinstance(status, str) or not status.strip():
+        return [f"{source}.status must be a non-empty string."]
+    normalized = _normalized_token(status)
+    evidence_failures = {"degraded", "error", "monitor-only", "unsupported"}
+    if normalized in evidence_failures:
+        return [f"{source}.status={status!r} is not passing."]
+    if normalized in _FAIL_STATUSES and enforce_outcome:
+        return [f"{source}.status={status!r} is not passing."]
+    known = normalized in _PASS_STATUSES or normalized in _FAIL_STATUSES
+    if (
+        require_complete
+        and not known
+        and not (spectral_intervention and normalized == "capped")
+    ):
+        return [f"{source}.status must be a canonical passing status when present."]
+    return []
 
+
+def _guard_collection_errors(
+    block: Mapping[str, Any],
+    *,
+    source: str,
+    require_complete: bool,
+    enforce_outcome: bool,
+    spectral_intervention: bool,
+) -> tuple[list[str], Any]:
+    errors: list[str] = []
     violations = block.get("violations")
     if "violations" not in block:
         if require_complete:
             errors.append(f"{source}.violations is required for strict assurance.")
     elif not isinstance(violations, list):
         errors.append(f"{source}.violations must be an array.")
-    elif violations and not spectral_intervention:
+    elif violations and not spectral_intervention and enforce_outcome:
         errors.append(f"{source}.violations must be empty for strict assurance.")
 
     failures = block.get("failures")
@@ -237,6 +285,63 @@ def _validate_guard_outcome(
             errors.append(f"{source}.{field} must be an array.")
         elif values and not (spectral_intervention and field == "warnings"):
             errors.append(f"{source}.{field} must be empty for strict assurance.")
+    return errors, violations
+
+
+def _validate_guard_outcome(
+    guard_name: str,
+    block: Any,
+    *,
+    source: str,
+    require_complete: bool,
+    enforce_outcome: bool = True,
+) -> list[str]:
+    if not isinstance(block, dict) or not block:
+        return (
+            [f"strict assurance missing {source} guard evidence."]
+            if require_complete
+            else []
+        )
+
+    spectral_intervention = guard_name == "spectral"
+    errors = _guard_support_errors(
+        block, source=source, require_complete=require_complete
+    )
+    errors.extend(
+        _guard_passed_errors(
+            guard_name,
+            block,
+            source=source,
+            require_complete=require_complete,
+            enforce_outcome=enforce_outcome,
+        )
+    )
+    errors.extend(
+        _guard_decision_errors(
+            block,
+            source=source,
+            require_complete=require_complete,
+            enforce_outcome=enforce_outcome,
+            spectral_intervention=spectral_intervention,
+        )
+    )
+    errors.extend(
+        _guard_status_errors(
+            block,
+            source=source,
+            require_complete=require_complete,
+            enforce_outcome=enforce_outcome,
+            spectral_intervention=spectral_intervention,
+        )
+    )
+    collection_errors, violations = _guard_collection_errors(
+        block,
+        source=source,
+        require_complete=require_complete,
+        enforce_outcome=enforce_outcome,
+        spectral_intervention=spectral_intervention,
+    )
+    errors.extend(collection_errors)
 
     assurance_blocking = block.get("assurance_blocking")
     if "assurance_blocking" in block and not isinstance(assurance_blocking, bool):
@@ -244,7 +349,20 @@ def _validate_guard_outcome(
     elif assurance_blocking is True:
         errors.append(f"{source}.assurance_blocking is true.")
 
-    errors.extend(_validate_diagnostics(source, block.get("diagnostics")))
+    allowed_error_kinds: frozenset[str] = frozenset()
+    if not enforce_outcome and isinstance(violations, list):
+        allowed_error_kinds = frozenset(
+            _normalized_token(str(item.get("type") or ""))
+            for item in violations
+            if isinstance(item, dict) and item.get("type")
+        )
+    errors.extend(
+        _validate_diagnostics(
+            source,
+            block.get("diagnostics"),
+            allowed_error_kinds=allowed_error_kinds,
+        )
+    )
     return errors
 
 

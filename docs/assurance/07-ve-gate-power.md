@@ -78,10 +78,10 @@ false-enable rate or detection power under the chosen window budgets.
 The runtime can leave VE disabled after a complete no-benefit experiment and
 continue the edit. The current strict verifier is narrower: it requires
 `variance.predictive_gate.evaluated=true` and `passed=true` for strict
-acceptance, regardless of `variance.enabled`. Therefore a complete negative
-VE result is not currently acceptable as strict evidence. Treat this as a
-product-contract constraint, not as evidence that VE must improve every valid
-edit.
+acceptance, regardless of `variance.enabled`. Therefore a complete no-benefit
+predictive-gate outcome is not currently acceptable as strict evidence. Treat
+this as a product-contract constraint, not as evidence that VE must improve
+every valid edit.
 
 ## Evidence status and local recalibration
 
@@ -112,13 +112,14 @@ adopting or describing the value as calibrated.
 - Report verification rejects `variance.enabled = true` when the predictive
   gate did not pass, the predictive CI includes zero or misses the
   `min_effect_lognll` threshold, the mean Δ misses the same threshold, or A/B
-  seed/window provenance is missing. Strict assurance additionally requires
-  the predictive gate itself to be evaluated and passing even when VE is
-  disabled.
+  seed/window provenance is missing. Strict assurance always requires a
+  complete predictive-gate result that can be independently replayed. A complete
+  failing predictive-gate outcome blocks under `enforce` and remains observed under `observe`;
+  missing, degraded, or monitor-only evidence blocks in either mode.
 
 These checks validate report consistency. The offline verifier does not replay
-the predictive A/B computation from model tensors and cannot establish that a
-the evaluation environment honestly generated or selected the recorded windows.
+the predictive A/B computation from model tensors and cannot establish that the
+evaluation environment honestly generated or selected the recorded windows.
 
 ## Observability
 

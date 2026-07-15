@@ -226,14 +226,14 @@ def test_release_preflight_runs_all_independent_gates(
         calls.append("installed-wheel")
         return _passing_import(module)
 
-    def fake_negative_audit(received: object) -> None:
+    def fake_public_evidence_audit(received: object) -> None:
         assert received == config
-        calls.append("negative-audit")
+        calls.append("public-evidence-audit")
 
     monkeypatch.setattr(module, "_git_output", fake_git)
     monkeypatch.setattr(module, "_probe_installed_wheel", fake_probe)
     monkeypatch.setattr(
-        module, "_run_current_negative_evidence_audit", fake_negative_audit
+        module, "_run_current_public_evidence_audit", fake_public_evidence_audit
     )
 
     summary = module.run_release_preflight(config)
@@ -242,13 +242,14 @@ def test_release_preflight_runs_all_independent_gates(
         "git:rev-parse",
         "git:status",
         "installed-wheel",
-        "negative-audit",
+        "public-evidence-audit",
         "git:rev-parse",
         "git:status",
     ]
     assert summary["ok"] is True
     assert summary["installed_wheel_import"] == "isolated_venv_from_candidate_wheel"
-    assert summary["current_negative_evidence"] == "passed"
+    assert summary["installed_wheel_runtime_surface"] == "passed"
+    assert summary["current_public_evidence"] == "passed"
 
 
 def test_release_preflight_rejects_plain_text_shape_artifacts(
@@ -448,10 +449,39 @@ def test_checkout_must_match_exact_clean_release_sha(
 
 
 def test_candidate_wheel_is_installed_in_a_disposable_isolated_environment(
-    module: ModuleType, tmp_path: Path
+    module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     config = _config(module, tmp_path)
     artifacts = module.validate_distributions(config)
+    smoke_calls: list[tuple[Path, Path]] = []
+    monkeypatch.setattr(
+        module,
+        "_smoke_installed_wheel_cli",
+        lambda cli, *, cwd: smoke_calls.append((cli, cwd)),
+    )
+    monkeypatch.setattr(
+        module,
+        "_IMPORT_PROBE",
+        """
+import importlib.metadata as metadata
+import json
+from pathlib import Path
+import invarlock
+distribution = metadata.distribution("invarlock")
+root = Path(distribution.locate_file("")).resolve()
+module_file = Path(invarlock.__file__).resolve()
+print(json.dumps({
+    "module_file": str(module_file),
+    "module_version": str(invarlock.__version__),
+    "distribution_name": str(distribution.metadata["Name"]),
+    "distribution_version": str(distribution.version),
+    "distribution_root": str(root),
+    "package_paths": [str(item) for item in invarlock.__path__],
+    "invarlock_modules": {"invarlock": str(module_file)},
+}, sort_keys=True))
+""",
+    )
+    monkeypatch.setattr(module, "_PROBED_INVARLOCK_MODULES", frozenset({"invarlock"}))
 
     imported = module._probe_installed_wheel(config, artifacts.wheel)
 
@@ -459,9 +489,12 @@ def test_candidate_wheel_is_installed_in_a_disposable_isolated_environment(
     assert imported.distribution_version == _VERSION
     assert config.repo_root.resolve() not in imported.module_file.parents
     assert config.repo_root.resolve() not in imported.distribution_root.parents
+    assert len(smoke_calls) == 1
+    assert smoke_calls[0][0].name == "invarlock"
+    assert not module._is_within(smoke_calls[0][1], config.repo_root)
 
 
-def test_negative_evidence_audit_is_pinned_to_canonical_checkout_tree(
+def test_public_evidence_audit_is_pinned_to_canonical_checkout_tree(
     module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     config = _config(module, tmp_path)
@@ -477,12 +510,13 @@ def test_negative_evidence_audit_is_pinned_to_canonical_checkout_tree(
     monkeypatch.setenv("INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE", "1")
     monkeypatch.setenv("PYTHONPATH", "/untrusted")
 
-    module._run_current_negative_evidence_audit(config)
+    module._run_current_public_evidence_audit(config)
 
     command, kwargs = commands[0]
     assert command[command.index("--root") + 1] == str(
         (config.repo_root / "public_evidence").resolve()
     )
+    assert "--require-current-negative-evidence" not in command
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE" not in environment
@@ -519,7 +553,7 @@ def test_post_gate_checkout_recheck_rejects_source_toctou(
     monkeypatch.setattr(
         module, "_probe_installed_wheel", lambda *_: _passing_import(module)
     )
-    monkeypatch.setattr(module, "_run_current_negative_evidence_audit", lambda _: None)
+    monkeypatch.setattr(module, "_run_current_public_evidence_audit", lambda _: None)
 
     with pytest.raises(module.ReleasePreflightError, match="not clean"):
         module.run_release_preflight(config)
@@ -555,7 +589,7 @@ def test_preflight_summary_has_no_checkout_paths(
     monkeypatch.setattr(
         module, "_probe_installed_wheel", lambda *_: _passing_import(module)
     )
-    monkeypatch.setattr(module, "_run_current_negative_evidence_audit", lambda _: None)
+    monkeypatch.setattr(module, "_run_current_public_evidence_audit", lambda _: None)
 
     payload = json.dumps(module.run_release_preflight(config), sort_keys=True)
 

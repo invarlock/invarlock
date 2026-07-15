@@ -11,7 +11,7 @@ from invarlock.reporting import verify_contract as contract_mod
 from invarlock.reporting import verify_strict_accuracy as accuracy_mod
 from invarlock.reporting import verify_strict_ppl as ppl_mod
 from invarlock.runtime_provenance import RuntimeProvenanceResult
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _matching_strict_ppl_baseline,
     _strict_accuracy_cert,
     _strict_provenance_gate_cert,

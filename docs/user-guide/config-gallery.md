@@ -64,7 +64,7 @@ invarlock evaluate --allow-network --baseline bert-base-uncased --subject /path/
 | --- | --- | --- | --- |
 | `configs/presets/seq2seq/synth_64.yaml` | Quick seq2seq tests | T5/BART-style encoder-decoder | Synthetic |
 | `configs/presets/seq2seq/synth_128.yaml` | Longer seq2seq smoke runs | T5/BART-style encoder-decoder | Synthetic |
-| `configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml` | Public-basis FLAN-T5 preservation evidence | FLAN-T5 encoder-decoder | CNN/DailyMail validation |
+| `configs/presets/seq2seq/flan_t5_base_cnn_dailymail_256.yaml` | Maintained-catalog FLAN-T5 preservation evidence | FLAN-T5 encoder-decoder | CNN/DailyMail validation |
 
 **When to use:** Encoder-decoder models. Synthetic data keeps runs offline and
 fast for smoke testing. The FLAN-T5 preset uses a pinned public Hugging Face

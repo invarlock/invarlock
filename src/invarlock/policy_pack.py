@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -10,10 +11,15 @@ from typing import Any
 import yaml
 
 from invarlock.core.dataset_identity import DATASET_IDENTITY_FIELDS
+from invarlock.core.runtime_provider.claims import RUNTIME_BEHAVIORAL_CLAIM_SET
 from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
     read_regular_file_bytes,
+)
+from invarlock.guards.authority import (
+    DEFAULT_GUARD_AUTHORITY,
+    guard_authority_errors,
 )
 from invarlock.public_contracts import load_policy_pack_schema
 
@@ -33,28 +39,68 @@ else:  # pragma: no cover - exercised when jsonschema is installed
         jsonschema.ValidationError,
     )
 
-POLICY_PACK_FORMAT = "policy-pack-v1"
+POLICY_PACK_FORMAT = "policy-pack-v2"
+LEGACY_POLICY_PACK_FORMAT = "policy-pack-v1"
+BEHAVIORAL_POLICY_PACK_FORMAT = "policy-pack-v3"
+POLICY_PACK_FORMATS = frozenset(
+    {LEGACY_POLICY_PACK_FORMAT, POLICY_PACK_FORMAT, BEHAVIORAL_POLICY_PACK_FORMAT}
+)
 POLICY_PACK_DIGEST_PREFIX = "sha256:"
 
 POLICY_PACK_TIERS = frozenset({"aggressive", "balanced", "conservative"})
 POLICY_PACK_SUPPORT_TIER_ORDER = (
-    "published_basis",
+    "maintained_catalog",
     "supported_experimental",
     "community_experimental",
 )
 POLICY_PACK_SUPPORT_TIERS = frozenset(POLICY_PACK_SUPPORT_TIER_ORDER)
+LEGACY_POLICY_PACK_SUPPORT_TIER_ORDER = (
+    "published_basis",
+    "supported_experimental",
+    "community_experimental",
+)
+LEGACY_POLICY_PACK_SUPPORT_TIERS = frozenset(LEGACY_POLICY_PACK_SUPPORT_TIER_ORDER)
 POLICY_PACK_REQUIRED_FIELDS = frozenset(
     {"format", "tier", "resolved_policy", "overrides", "policy_digest", "compatibility"}
 )
-POLICY_PACK_OPTIONAL_FIELDS = frozenset({"approval", "metadata"})
+POLICY_PACK_OPTIONAL_FIELDS = frozenset({"approval", "metadata", "behavioral_claim"})
 POLICY_PACK_COMPATIBILITY_FIELDS = frozenset(
     {"support_tiers", "adapter_families", "runtime_lanes", "dataset_identity"}
 )
 POLICY_PACK_APPROVAL_FIELDS = frozenset(
     {"owner", "change_ticket", "rationale", "effective_date", "signature"}
 )
+POLICY_PACK_BEHAVIORAL_CLAIM_FIELDS = frozenset(
+    {
+        "claim_set",
+        "schedule_sha256",
+        "baseline",
+        "subject",
+        "required_capabilities",
+        "metric_policy",
+    }
+)
+POLICY_PACK_BEHAVIORAL_BINDING_FIELDS = frozenset(
+    {
+        "provider_name",
+        "artifact_format",
+        "artifact_identity_sha256",
+        "outer_image_digest",
+        "execution_settings_sha256",
+    }
+)
+POLICY_PACK_BEHAVIORAL_CAPABILITY_FIELDS = frozenset(
+    {"tasks", "metrics", "evidence_surfaces"}
+)
+POLICY_PACK_BEHAVIORAL_METRIC_FIELDS = frozenset(
+    {"kind", "minimum_subject_score", "maximum_regression"}
+)
+RUNTIME_BEHAVIORAL_METRICS = frozenset({"exact_match"})
+RUNTIME_ARTIFACT_FORMATS = frozenset({"hf_snapshot", "gguf", "tensorrt_llm_engine"})
 
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_PROVIDER_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _OVERRIDE_PATH_RE = re.compile(r"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$")
 _JSON_INTEGER_RE = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _JSON_FLOAT_RE = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
@@ -169,11 +215,19 @@ def _load_structured_text(text: str, *, suffix: str) -> Any:
         ) from exc
 
 
-def _load_structured_file_snapshot(path: Path) -> tuple[bytes, Any]:
+def _load_structured_file_snapshot(
+    path: Path, *, max_bytes: int | None = None
+) -> tuple[bytes, Any]:
     try:
-        payload = read_regular_file_bytes(path, label="policy pack")
+        payload = read_regular_file_bytes(
+            path,
+            label="policy pack",
+            max_bytes=max_bytes,
+        )
         text = payload.decode("utf-8")
-    except (StrictJsonError, UnicodeDecodeError) as exc:
+    except StrictJsonError as exc:
+        raise ValueError(str(exc)) from exc
+    except UnicodeDecodeError as exc:
         raise ValueError("policy pack could not be decoded as JSON/YAML") from exc
     return payload, _load_structured_text(text, suffix=path.suffix)
 
@@ -262,6 +316,137 @@ def _ordered_string_list_errors(
     return errors
 
 
+def _unit_interval_errors(value: object, *, path: str) -> list[str]:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int | float)
+        or not math.isfinite(float(value))
+        or not 0.0 <= float(value) <= 1.0
+    ):
+        return [f"{path} must be a finite number in [0, 1]"]
+    return []
+
+
+def _behavioral_claim_errors(value: object) -> list[str]:
+    path = "behavioral_claim"
+    if not isinstance(value, dict):
+        return [f"{path} must be an object"]
+    fields = set(value)
+    if fields != POLICY_PACK_BEHAVIORAL_CLAIM_FIELDS:
+        return [
+            f"{path} must contain exactly "
+            + ", ".join(sorted(POLICY_PACK_BEHAVIORAL_CLAIM_FIELDS))
+        ]
+
+    errors: list[str] = []
+    if value.get("claim_set") != RUNTIME_BEHAVIORAL_CLAIM_SET:
+        errors.append(f"{path}.claim_set must be {RUNTIME_BEHAVIORAL_CLAIM_SET}")
+
+    schedule_sha256 = value.get("schedule_sha256")
+    if (
+        not isinstance(schedule_sha256, str)
+        or _SHA256_RE.fullmatch(schedule_sha256) is None
+    ):
+        errors.append(f"{path}.schedule_sha256 must be a lowercase sha256 digest")
+
+    for role in ("baseline", "subject"):
+        binding = value.get(role)
+        binding_path = f"{path}.{role}"
+        if not isinstance(binding, dict) or set(binding) != (
+            POLICY_PACK_BEHAVIORAL_BINDING_FIELDS
+        ):
+            errors.append(
+                f"{binding_path} must contain exactly "
+                + ", ".join(sorted(POLICY_PACK_BEHAVIORAL_BINDING_FIELDS))
+            )
+            continue
+        provider_name = binding.get("provider_name")
+        if (
+            not isinstance(provider_name, str)
+            or _PROVIDER_NAME_RE.fullmatch(provider_name) is None
+        ):
+            errors.append(f"{binding_path}.provider_name must be canonical")
+        if binding.get("artifact_format") not in RUNTIME_ARTIFACT_FORMATS:
+            errors.append(f"{binding_path}.artifact_format is unsupported")
+        for field in ("artifact_identity_sha256", "execution_settings_sha256"):
+            digest = binding.get(field)
+            if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+                errors.append(
+                    f"{binding_path}.{field} must be a lowercase sha256 digest"
+                )
+        outer_image_digest = binding.get("outer_image_digest")
+        if (
+            not isinstance(outer_image_digest, str)
+            or _DIGEST_RE.fullmatch(outer_image_digest) is None
+        ):
+            errors.append(
+                f"{binding_path}.outer_image_digest must be a sha256 image digest"
+            )
+
+    capabilities = value.get("required_capabilities")
+    required_metrics: object = None
+    if not isinstance(capabilities, dict) or set(capabilities) != (
+        POLICY_PACK_BEHAVIORAL_CAPABILITY_FIELDS
+    ):
+        errors.append(
+            f"{path}.required_capabilities must contain exactly "
+            + ", ".join(sorted(POLICY_PACK_BEHAVIORAL_CAPABILITY_FIELDS))
+        )
+    else:
+        if capabilities.get("tasks") != ["text_causal"]:
+            errors.append(
+                f"{path}.required_capabilities.tasks must equal ['text_causal']"
+            )
+        required_metrics = capabilities.get("metrics")
+        errors.extend(
+            _ordered_string_list_errors(
+                required_metrics,
+                path=f"{path}.required_capabilities.metrics",
+                allowed=RUNTIME_BEHAVIORAL_METRICS,
+            )
+        )
+        surfaces = capabilities.get("evidence_surfaces")
+        errors.extend(
+            _ordered_string_list_errors(
+                surfaces,
+                path=f"{path}.required_capabilities.evidence_surfaces",
+                allowed=frozenset({"behavior", "tokenizer", "build"}),
+            )
+        )
+        if isinstance(surfaces, list) and not {
+            "behavior",
+            "tokenizer",
+        }.issubset(surfaces):
+            errors.append(
+                f"{path}.required_capabilities.evidence_surfaces must require "
+                "behavior and tokenizer"
+            )
+
+    metric_policy = value.get("metric_policy")
+    if not isinstance(metric_policy, dict) or set(metric_policy) != (
+        POLICY_PACK_BEHAVIORAL_METRIC_FIELDS
+    ):
+        errors.append(
+            f"{path}.metric_policy must contain exactly "
+            + ", ".join(sorted(POLICY_PACK_BEHAVIORAL_METRIC_FIELDS))
+        )
+    else:
+        metric_kind = metric_policy.get("kind")
+        if metric_kind not in RUNTIME_BEHAVIORAL_METRICS:
+            errors.append(f"{path}.metric_policy.kind must be exact_match")
+        elif isinstance(required_metrics, list) and metric_kind not in required_metrics:
+            errors.append(
+                f"{path}.metric_policy.kind must be listed in required metrics"
+            )
+        for field in ("minimum_subject_score", "maximum_regression"):
+            errors.extend(
+                _unit_interval_errors(
+                    metric_policy.get(field), path=f"{path}.metric_policy.{field}"
+                )
+            )
+    return errors
+
+
 def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     fields = set(pack)
@@ -275,10 +460,23 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
         errors.append(
             "policy pack contains unknown fields: " + ", ".join(sorted(unknown))
         )
-    if pack.get("format") != POLICY_PACK_FORMAT:
+    pack_format = pack.get("format")
+    if pack_format not in POLICY_PACK_FORMATS:
         errors.append(
-            f"policy pack format must be {POLICY_PACK_FORMAT} (found {pack.get('format')!r})"
+            f"policy pack format must be {POLICY_PACK_FORMAT}, "
+            f"{LEGACY_POLICY_PACK_FORMAT}, or {BEHAVIORAL_POLICY_PACK_FORMAT} "
+            f"(found {pack_format!r})"
         )
+    support_tiers = (
+        LEGACY_POLICY_PACK_SUPPORT_TIERS
+        if pack_format == LEGACY_POLICY_PACK_FORMAT
+        else POLICY_PACK_SUPPORT_TIERS
+    )
+    support_tier_order = (
+        LEGACY_POLICY_PACK_SUPPORT_TIER_ORDER
+        if pack_format == LEGACY_POLICY_PACK_FORMAT
+        else POLICY_PACK_SUPPORT_TIER_ORDER
+    )
     tier = pack.get("tier")
     if tier not in POLICY_PACK_TIERS:
         errors.append("tier must be aggressive, balanced, or conservative")
@@ -288,6 +486,25 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
         errors.append("resolved_policy must be an object")
     else:
         errors.extend(_json_value_errors(resolved_policy, path="resolved_policy"))
+        raw_authority = resolved_policy.get("guard_authority")
+        if pack_format == POLICY_PACK_FORMAT:
+            errors.extend(
+                guard_authority_errors(
+                    raw_authority,
+                    path="resolved_policy.guard_authority",
+                )
+            )
+        elif "guard_authority" in resolved_policy:
+            errors.append(
+                f"{pack_format or 'policy pack'} cannot declare "
+                "resolved_policy.guard_authority"
+            )
+
+    behavioral_claim = pack.get("behavioral_claim")
+    if pack_format == BEHAVIORAL_POLICY_PACK_FORMAT:
+        errors.extend(_behavioral_claim_errors(behavioral_claim))
+    elif behavioral_claim is not None:
+        errors.append("behavioral_claim is allowed only for policy-pack-v3")
 
     overrides = pack.get("overrides")
     if not isinstance(overrides, list):
@@ -330,8 +547,8 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
                 _ordered_string_list_errors(
                     compatibility["support_tiers"],
                     path="compatibility.support_tiers",
-                    allowed=POLICY_PACK_SUPPORT_TIERS,
-                    canonical_order=POLICY_PACK_SUPPORT_TIER_ORDER,
+                    allowed=support_tiers,
+                    canonical_order=support_tier_order,
                 )
             )
         for field in ("adapter_families", "runtime_lanes"):
@@ -362,6 +579,10 @@ def _policy_pack_shape_errors(pack: dict[str, Any]) -> list[str]:
                         errors.append(
                             f"compatibility.dataset_identity.{field} must be null or non-empty"
                         )
+        elif pack_format == BEHAVIORAL_POLICY_PACK_FORMAT:
+            errors.append(
+                "compatibility.dataset_identity is required for policy-pack-v3"
+            )
 
     approval = pack.get("approval")
     if approval is not None:
@@ -409,13 +630,15 @@ def compute_policy_pack_digest(
     compatibility_obj = (
         dict(compatibility)
         if isinstance(compatibility, dict)
-        else {"support_tiers": ["published_basis"]}
+        else {"support_tiers": ["maintained_catalog"]}
     )
     normalized_overrides = _normalize_overrides(overrides)
+    resolved = copy.deepcopy(resolved_policy)
+    resolved.setdefault("guard_authority", dict(DEFAULT_GUARD_AUTHORITY))
     digest_payload = {
         "format": POLICY_PACK_FORMAT,
         "tier": tier,
-        "resolved_policy": resolved_policy,
+        "resolved_policy": resolved,
         "overrides": normalized_overrides,
         "compatibility": compatibility_obj,
     }
@@ -447,11 +670,13 @@ def build_policy_pack(
         raise ValueError("metadata must be an object")
     normalized_overrides = _normalize_overrides(overrides)
     compatibility_obj = dict(compatibility) if isinstance(compatibility, dict) else {}
-    compatibility_obj.setdefault("support_tiers", ["published_basis"])
+    compatibility_obj.setdefault("support_tiers", ["maintained_catalog"])
+    resolved = copy.deepcopy(resolved_policy)
+    resolved.setdefault("guard_authority", dict(DEFAULT_GUARD_AUTHORITY))
     pack: dict[str, Any] = {
         "format": POLICY_PACK_FORMAT,
         "tier": tier,
-        "resolved_policy": resolved_policy,
+        "resolved_policy": resolved,
         "overrides": normalized_overrides,
         "compatibility": compatibility_obj,
     }
@@ -466,14 +691,76 @@ def build_policy_pack(
     return pack
 
 
+def build_behavioral_policy_pack(
+    *,
+    tier: str,
+    schedule_sha256: str,
+    baseline: dict[str, Any],
+    subject: dict[str, Any],
+    metric_kind: str,
+    minimum_subject_score: float,
+    maximum_regression: float,
+    dataset_identity: dict[str, Any],
+    required_evidence_surfaces: list[str] | None = None,
+    approval: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a v3 authorization for the narrow runtime-behavioral claim."""
+
+    if approval is not None and not isinstance(approval, dict):
+        raise ValueError("approval must be an object")
+    if metadata is not None and not isinstance(metadata, dict):
+        raise ValueError("metadata must be an object")
+
+    pack: dict[str, Any] = {
+        "format": BEHAVIORAL_POLICY_PACK_FORMAT,
+        "tier": tier,
+        "resolved_policy": {},
+        "overrides": [],
+        "compatibility": {
+            "support_tiers": ["maintained_catalog"],
+            "dataset_identity": copy.deepcopy(dataset_identity),
+        },
+        "behavioral_claim": {
+            "claim_set": RUNTIME_BEHAVIORAL_CLAIM_SET,
+            "schedule_sha256": schedule_sha256,
+            "baseline": copy.deepcopy(baseline),
+            "subject": copy.deepcopy(subject),
+            "required_capabilities": {
+                "tasks": ["text_causal"],
+                "metrics": [metric_kind],
+                "evidence_surfaces": list(
+                    required_evidence_surfaces or ["behavior", "tokenizer"]
+                ),
+            },
+            "metric_policy": {
+                "kind": metric_kind,
+                "minimum_subject_score": minimum_subject_score,
+                "maximum_regression": maximum_regression,
+            },
+        },
+    }
+    if isinstance(approval, dict) and approval:
+        pack["approval"] = copy.deepcopy(approval)
+    if isinstance(metadata, dict) and metadata:
+        pack["metadata"] = copy.deepcopy(metadata)
+    pack["policy_digest"] = _compute_policy_pack_digest(pack)
+    errors = _policy_pack_shape_errors(pack)
+    if errors:
+        raise ValueError("invalid behavioral policy pack: " + "; ".join(errors))
+    return pack
+
+
 def load_policy_pack(path: Path) -> dict[str, Any]:
     return read_policy_pack_snapshot(path)[1]
 
 
-def read_policy_pack_snapshot(path: Path) -> tuple[bytes, dict[str, Any]]:
+def read_policy_pack_snapshot(
+    path: Path, *, max_bytes: int | None = None
+) -> tuple[bytes, dict[str, Any]]:
     """Read one finite policy-pack object from one regular-file snapshot."""
 
-    raw, payload = _load_structured_file_snapshot(path)
+    raw, payload = _load_structured_file_snapshot(path, max_bytes=max_bytes)
     errors = _json_value_errors(payload, path="policy input")
     if errors:
         raise ValueError("; ".join(errors))
@@ -547,8 +834,11 @@ def exercise_policy_pack_bytes(data: bytes) -> None:
 
 
 __all__ = [
+    "BEHAVIORAL_POLICY_PACK_FORMAT",
+    "LEGACY_POLICY_PACK_FORMAT",
     "POLICY_PACK_FORMAT",
     "POLICY_PACK_DIGEST_PREFIX",
+    "build_behavioral_policy_pack",
     "build_policy_pack",
     "compute_policy_pack_digest",
     "exercise_policy_pack_bytes",

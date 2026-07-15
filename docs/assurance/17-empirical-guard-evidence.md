@@ -48,12 +48,12 @@ gain authority from inclusion in this diagnostic inventory.
 
 The synthetic guard-validation smoke remains a deterministic
 production-primitive wiring check, not field-effectiveness evidence. New or
-expanded guard calibration, model-family calibration, or published-basis claims
+expanded guard calibration, model-family calibration, or guard-effectiveness claims
 require a separate authoritative study contract and independent review. This
 inventory does not satisfy that requirement.
 
-The inventory may also list claimed published-basis no-op catalog-evaluation
-reports under `families/*.json`. Inventory membership does not establish that
+The inventory may also list no-op catalog-evaluation reports under
+`families/*.json`. Inventory membership does not establish that
 those summaries are authentic or adequate null-behavior evidence. A
 family-specific false-positive claim requires a representative held-out null
 study whose protocol was fixed in advance. Merely generating a null-sweep

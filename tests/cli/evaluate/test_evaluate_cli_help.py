@@ -13,10 +13,15 @@ def test_cli_evaluate_help():
     result = runner.invoke(app, ["evaluate", "--help"], env={"COLUMNS": "240"})
     assert result.exit_code == 0
     stdout = strip_ansi(result.stdout)
+    normalized = " ".join(stdout.replace("│", " ").split())
     assert "--baseline" in stdout and "--subject" in stdout
     assert "--baseline-report" in stdout
     assert "--baseline-revision" in stdout
     assert "--subject-revision" in stdout
+    assert "--baseline-runtime-provider" in stdout
+    assert "--subject-runtime-provider" in stdout
+    assert normalized.count("currently only 'hf_transformers' is accepted") == 2
+    assert normalized.count("invarlock advanced runtime-behavior") == 2
     assert "remote baseline" in stdout
     assert "remote subject" in stdout
     assert stdout.count("40-64 character lowercase hexadecimal revision") == 2

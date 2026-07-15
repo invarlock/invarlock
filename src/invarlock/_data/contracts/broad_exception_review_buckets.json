@@ -15,13 +15,13 @@
     {
       "path": "src/invarlock/cli/evaluate_phases.py",
       "lines": [
-        150,
-        199,
-        211,
-        246,
-        314,
-        376,
-        386
+        151,
+        200,
+        212,
+        247,
+        316,
+        379,
+        389
       ],
       "bucket": "acceptable",
       "rationale": "Phase-shell wrappers preserve buffered child output, normalize CLI exit codes, and isolate heterogeneous failures while orchestration and report-contract helpers still raise mixed exception types."
@@ -29,8 +29,8 @@
     {
       "path": "src/invarlock/cli/evaluate_report_phase.py",
       "lines": [
-        169,
-        194
+        170,
+        195
       ],
       "bucket": "acceptable",
       "rationale": "Receipt-bound selection finalizers are extension boundaries with heterogeneous failures; both catches terminate report publication through the explicit fail callback."

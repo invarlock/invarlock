@@ -292,7 +292,7 @@ def _finite(value: object, *, label: str) -> float:
 
 
 def _scope(value: object, *, label: str) -> str:
-    if value not in {"ffn", "attn", "all"}:
+    if not isinstance(value, str) or value not in {"ffn", "attn", "all"}:
         raise CleanPruningSelectionEvidenceError(
             f"{label} must be one of ffn, attn, or all"
         )

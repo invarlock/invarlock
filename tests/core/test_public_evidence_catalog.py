@@ -30,7 +30,7 @@ def test_public_evidence_catalog_is_exact_and_contains_no_operational_placement(
     expected_ids = {
         lane["lane_id"]
         for lane in support["lanes"]
-        if lane.get("support_tier") == "published_basis"
+        if lane.get("support_tier") == "maintained_catalog"
     }
     assert len(catalog.entries) == 39
     assert set(catalog.entries) == expected_ids

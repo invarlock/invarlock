@@ -28,6 +28,9 @@ prerequisites, commands, and generated artifact list.
 - `public_e2e/` demonstrates a handoff from caller-supplied current evidence to
   verifier, HTML, MLflow tag, model-card, release-review, and CI summary
   artifacts.
+- `runtime_providers/` runs the full authenticated schedule, directed policy,
+  native GGUF or TensorRT-LLM sides, and pair-receipt workflow for qualified
+  user-supplied artifacts.
 - `ci_registry/` shows how to attach current report verification, HTML, MLflow
   tags, Hugging Face model-card evidence, and release-review packets to
   existing CI and registry workflows.

@@ -26,7 +26,7 @@ GuardType = Literal["spectral_guard", "rmt_guard", "variance_guard"]
 
 _REQUIRED_TIERS = frozenset({"balanced", "conservative", "aggressive"})
 _REQUIRED_GUARDS = frozenset({"spectral_guard", "rmt_guard", "variance_guard"})
-_REQUIRED_TIER_KEYS = _REQUIRED_GUARDS | {"metrics"}
+_REQUIRED_TIER_KEYS = _REQUIRED_GUARDS | {"metrics", "guard_authority"}
 _REQUIRED_GUARD_KEYS = {
     "spectral_guard": frozenset(
         {
@@ -250,6 +250,15 @@ def _validate_tier_config(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             raise TierConfigError(f"Tier {tier!r} has invalid section inventory")
         if not isinstance(tier_data["metrics"], dict) or not tier_data["metrics"]:
             raise TierConfigError(f"Tier {tier!r} metrics must be a non-empty mapping")
+        authority = tier_data["guard_authority"]
+        if not isinstance(authority, dict) or set(authority) != {
+            "spectral",
+            "rmt",
+            "variance",
+        }:
+            raise TierConfigError(f"Tier {tier!r} guard_authority is invalid")
+        if any(value not in {"observe", "enforce"} for value in authority.values()):
+            raise TierConfigError(f"Tier {tier!r} guard_authority is invalid")
         result[tier] = {}
         for guard in sorted(_REQUIRED_GUARDS):
             guard_data = tier_data[guard]

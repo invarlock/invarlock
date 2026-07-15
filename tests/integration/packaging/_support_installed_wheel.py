@@ -19,7 +19,7 @@ from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _matching_strict_policy_pack,
     _matching_strict_ppl_baseline,
     _strict_provenance_gate_cert,

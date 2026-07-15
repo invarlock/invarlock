@@ -12,6 +12,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Configuration Schema](config-schema.md) | YAML config structure and precedence | CLI users |
 | [Guards](guards.md) | Guard configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
+| [Runtime Providers](runtime-providers.md) | Hugging Face, GGUF, and TensorRT-LLM execution contracts | Operators, integrators |
 | [Model Family Catalog](model-family-catalog.md) | Support tiers and backlog | Auditors, tool authors |
 | [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, auditors |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
@@ -31,9 +32,10 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
-5. [Knowledge & self-edit workflows](../user-guide/knowledge-and-self-edit-workflows.md) — External edit systems as BYOE subject generators
-6. [Model Family Catalog](model-family-catalog.md) — Support tiers and backlog
-7. [Public Contracts](contracts.md) — Machine-readable trust contracts
+5. [Runtime Providers](runtime-providers.md) — HF, GGUF, and TensorRT-LLM behavioral execution
+6. [Knowledge & self-edit workflows](../user-guide/knowledge-and-self-edit-workflows.md) — External edit systems as BYOE subject generators
+7. [Model Family Catalog](model-family-catalog.md) — Support tiers and backlog
+8. [Public Contracts](contracts.md) — Machine-readable trust contracts
 
 ### Understanding reports
 

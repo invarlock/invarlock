@@ -45,6 +45,28 @@ def test_resolve_tier_policies_applies_explicit_overrides() -> None:
     assert resolved["new_guard"] == overrides["new_guard"]
 
 
+def test_resolve_tier_policies_defaults_and_overrides_guard_authority() -> None:
+    resolved = resolve_tier_policies("balanced")
+    assert resolved["guard_authority"] == {
+        "spectral": "enforce",
+        "rmt": "enforce",
+        "variance": "enforce",
+    }
+
+    observed = resolve_tier_policies(
+        "balanced",
+        explicit_overrides={"authority": {"spectral": "observe"}},
+    )
+    assert observed["guard_authority"]["spectral"] == "observe"
+    assert observed["guard_authority"]["rmt"] == "enforce"
+
+    with pytest.raises(ValueError, match="guard_authority"):
+        resolve_tier_policies(
+            "balanced",
+            explicit_overrides={"authority": {"invariants": "observe"}},
+        )
+
+
 def test_resolve_tier_policies_unknown_tier_raises() -> None:
     with pytest.raises(ValueError):
         resolve_tier_policies("not-a-tier")

@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tests.cli._support_verify_runtime_provenance import (
+from tests.cli.verify._support_runtime_provenance import (
     _VALID_TEST_IMAGE_DIGEST,
     _matching_strict_policy_pack,
     _matching_strict_ppl_baseline,

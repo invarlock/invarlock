@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,6 +10,29 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.release import release_preflight as preflight
+
+
+def _runtime_provider_inventory() -> dict[str, object]:
+    return {
+        "category": "runtime-providers",
+        "format_version": "plugins-v2",
+        "items": [
+            {
+                "name": name,
+                "module": expected["module"],
+                "entry_point": name,
+                "entry_point_group": "invarlock.runtime_providers",
+                "kind": "runtime_provider",
+                "origin": "builtin",
+                "status": "ready",
+                "connector_status": expected["connector_status"],
+                "backend_delivery": expected["backend_delivery"],
+                "runtime_qualification": expected["runtime_qualification"],
+                "support_tier": expected["support_tier"],
+            }
+            for name, expected in preflight._FIRST_PARTY_RUNTIME_PROVIDERS.items()
+        ],
+    }
 
 
 def _config(tmp_path: Path, **changes: object) -> preflight.ReleasePreflightConfig:
@@ -117,13 +142,181 @@ def test_import_probe_requires_complete_json_identity(
 
 
 def test_import_probe_parses_complete_identity() -> None:
+    modules = {
+        name: "/tmp/site/invarlock/"
+        + ("__init__.py" if name == "invarlock" else name.split(".")[-1] + ".py")
+        for name in preflight._PROBED_INVARLOCK_MODULES
+    }
     imported = preflight._parse_import_probe(
-        '{"module_file":"/tmp/site/invarlock/__init__.py",'
-        '"module_version":"1.2.3","distribution_name":"invarlock",'
-        '"distribution_version":"1.2.3","distribution_root":"/tmp/site"}'
+        json.dumps(
+            {
+                "module_file": "/tmp/site/invarlock/__init__.py",
+                "module_version": "1.2.3",
+                "distribution_name": "invarlock",
+                "distribution_version": "1.2.3",
+                "distribution_root": "/tmp/site",
+                "package_paths": ["/tmp/site/invarlock"],
+                "invarlock_modules": modules,
+            }
+        )
     )
     assert imported.module_file.name == "__init__.py"
     assert imported.distribution_root == Path("/tmp/site").resolve()
+
+
+@pytest.mark.parametrize(
+    ("package_paths", "modules", "expected"),
+    [
+        (
+            ["/tmp/site/invarlock", "/checkout/src/invarlock"],
+            {"invarlock": "/tmp/site/invarlock/__init__.py"},
+            "package path is extended",
+        ),
+        (
+            ["/tmp/site/invarlock"],
+            {"invarlock.cli.app": "/checkout/src/invarlock/cli/app.py"},
+            "modules escaped",
+        ),
+    ],
+)
+def test_import_probe_rejects_candidate_package_source_fallback(
+    package_paths: list[str], modules: dict[str, str], expected: str
+) -> None:
+    payload = {
+        "module_file": "/tmp/site/invarlock/__init__.py",
+        "module_version": "1.2.3",
+        "distribution_name": "invarlock",
+        "distribution_version": "1.2.3",
+        "distribution_root": "/tmp/site",
+        "package_paths": package_paths,
+        "invarlock_modules": modules,
+    }
+    with pytest.raises(preflight.ReleasePreflightError, match=expected):
+        preflight._parse_import_probe(json.dumps(payload))
+
+
+def test_installed_wheel_runtime_surface_validators_require_complete_contract() -> None:
+    preflight._validate_runtime_behavior_help(
+        "build-schedule prepare-binding build-policy run-side verify-pair"
+    )
+    preflight._validate_runtime_provider_inventory(
+        json.dumps(_runtime_provider_inventory())
+    )
+
+    with pytest.raises(preflight.ReleasePreflightError, match="omitted commands"):
+        preflight._validate_runtime_behavior_help("build-schedule build-policy")
+
+    inventory = _runtime_provider_inventory()
+    items = inventory["items"]
+    assert isinstance(items, list)
+    items[1]["backend_delivery"] = "python_extra"
+    with pytest.raises(preflight.ReleasePreflightError, match="metadata is invalid"):
+        preflight._validate_runtime_provider_inventory(json.dumps(inventory))
+
+
+def test_installed_wheel_runtime_surface_runs_canonical_cli_journey(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+
+    def command(
+        invoked: list[str], *, cwd: Path, label: str, timeout: int = 60
+    ) -> subprocess.CompletedProcess[str]:
+        del label, timeout
+        assert cwd == tmp_path
+        commands.append(invoked)
+        if invoked[-1] == "--help":
+            return subprocess.CompletedProcess(
+                invoked,
+                0,
+                "build-schedule prepare-binding build-policy run-side verify-pair",
+                "",
+            )
+        if "runtime-providers" in invoked:
+            return subprocess.CompletedProcess(
+                invoked, 0, json.dumps(_runtime_provider_inventory()), ""
+            )
+        output = Path(invoked[invoked.index("--out") + 1])
+        if "build-schedule" in invoked:
+            payload = {
+                "dataset_identity": {
+                    "config_name": None,
+                    "dataset_name": None,
+                    "provider": "local_manifest",
+                    "revision": None,
+                    "split": "validation",
+                },
+                "format_version": "invarlock/runtime-behavioral-schedule-v1",
+                "records": [{"record_id": "release-smoke-1"}],
+            }
+        else:
+            schedule = tmp_path / "runtime-schedule.json"
+            payload = {
+                "behavioral_claim": {
+                    "schedule_sha256": hashlib.sha256(schedule.read_bytes()).hexdigest()
+                },
+                "format": "policy-pack-v3",
+            }
+        output.write_text(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(invoked, 0, "{}", "")
+
+    monkeypatch.setattr(
+        preflight, "_require_successful_installed_wheel_command", command
+    )
+
+    preflight._smoke_installed_wheel_cli(tmp_path / "bin" / "invarlock", cwd=tmp_path)
+
+    assert [
+        next(
+            (
+                token
+                for token in (
+                    "runtime-providers",
+                    "build-schedule",
+                    "build-policy",
+                )
+                if token in invoked
+            ),
+            "runtime-behavior-help",
+        )
+        for invoked in commands
+    ] == [
+        "runtime-behavior-help",
+        "runtime-providers",
+        "build-schedule",
+        "build-policy",
+    ]
+    assert (tmp_path / "runtime-schedule.json").is_file()
+    assert (tmp_path / "runtime-policy.json").is_file()
+
+
+def test_dependency_bridge_is_a_plain_locked_site_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dependency_root = tmp_path / "locked-environment" / "site-packages"
+    dependency_root.mkdir(parents=True)
+    environment = tmp_path / "child"
+    if preflight.os.name == "nt":
+        child_site = environment / "Lib" / "site-packages"
+    else:
+        child_site = (
+            environment
+            / "lib"
+            / f"python{preflight.sys.version_info.major}.{preflight.sys.version_info.minor}"
+            / "site-packages"
+        )
+    child_site.mkdir(parents=True)
+    monkeypatch.setattr(
+        preflight.site, "getsitepackages", lambda: [str(dependency_root)]
+    )
+
+    preflight._install_isolated_dependency_bridge(environment)
+
+    bridge = child_site / "invarlock-release-dependencies.pth"
+    assert bridge.read_text(encoding="utf-8") == f"{dependency_root.resolve()}\n"
 
 
 @pytest.mark.parametrize(
@@ -197,11 +390,14 @@ def test_installed_wheel_probe_rejects_each_failed_isolation_step(
 
     monkeypatch.setattr(preflight, "_run_isolated_wheel_command", command)
     monkeypatch.setattr(preflight, "_require_executable_file", lambda *_args: None)
+    monkeypatch.setattr(
+        preflight, "_install_isolated_dependency_bridge", lambda *_args: None
+    )
     with pytest.raises(preflight.ReleasePreflightError, match=expected):
         preflight._probe_installed_wheel(_config(tmp_path), tmp_path / "candidate.whl")
 
 
-def test_negative_evidence_subprocess_gate_fails_closed(
+def test_public_evidence_subprocess_gate_fails_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = _config(tmp_path)
@@ -210,8 +406,8 @@ def test_negative_evidence_subprocess_gate_fails_closed(
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess([], 2, "", "failure"),
     )
-    with pytest.raises(preflight.ReleasePreflightError, match="negative-evidence"):
-        preflight._run_current_negative_evidence_audit(config)
+    with pytest.raises(preflight.ReleasePreflightError, match="public-evidence"):
+        preflight._run_current_public_evidence_audit(config)
 
 
 def test_config_from_args_resolves_checkout_relative_paths(tmp_path: Path) -> None:
