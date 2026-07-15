@@ -34,7 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deterministic execution marker and fixed decoding settings, and records CUDA
   runtime version separately from driver version. Failed qualification leaves
   the existing stable local tag unchanged, and TensorRT-LLM still requires
-  separate NVIDIA platform and real-engine qualification.
+  separate NVIDIA platform and real-engine qualification. CUDA and TensorRT-LLM
+  qualification targets accept explicit Docker GPU selectors; CUDA smokes now
+  require a visible selected device and execute a real tensor kernel.
 - Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
   variance findings in `policy-pack-v2`. Observation mode retains complete
   guard execution, provenance, replay, and reporting while leaving primary

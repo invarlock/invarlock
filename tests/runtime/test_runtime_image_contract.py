@@ -266,6 +266,25 @@ def test_cuda_quant_runtime_smoke_covers_supported_quant_adapters() -> None:
     assert "_patch_gptqmodel_transformers_hub_compat" not in smoke_text
 
 
+def test_cuda_runtime_smokes_require_a_selected_gpu_and_execute_cuda_work() -> None:
+    root = Path.cwd()
+    makefile_text = (root / "Makefile").read_text(encoding="utf-8")
+    smoke_text = (
+        root
+        / "examples"
+        / "integrations"
+        / "_runtime_images"
+        / "quant_runtime_image_smoke.py"
+    ).read_text(encoding="utf-8")
+
+    assert "RUNTIME_CUDA_DOCKER_GPUS ?= all" in makefile_text
+    assert '--gpus "$(RUNTIME_CUDA_DOCKER_GPUS)"' in makefile_text
+    assert "CUDA tensor execution ok" in makefile_text
+    assert "--require-cuda-toolchain --require-gpu" in makefile_text
+    assert 'device="cuda"' in smoke_text
+    assert "torch.cuda.synchronize()" in smoke_text
+
+
 def test_quant_runtime_input_pins_compatible_gptqmodel_dependencies() -> None:
     root = Path.cwd()
     text = (root / "requirements" / "workflows" / "runtime-image-quant.in").read_text(

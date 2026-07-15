@@ -182,6 +182,11 @@ def _check_cuda_runtime(
         _fail("CUDA device unavailable through the container runtime")
     if require_gpu:
         torch.cuda.get_device_name(0)
+        probe = torch.arange(16, dtype=torch.float32, device="cuda").reshape(4, 4)
+        result = probe @ probe
+        torch.cuda.synchronize()
+        if not result.is_cuda or not bool(torch.isfinite(result).all().item()):
+            _fail("CUDA tensor execution failed")
     if not require_cuda_toolchain:
         return
 

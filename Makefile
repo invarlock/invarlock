@@ -24,6 +24,7 @@ RUNTIME_IMAGE_APT_SNAPSHOT ?= 20260712T232152Z
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_QUANT ?= invarlock-runtime:cuda-quant
+RUNTIME_CUDA_DOCKER_GPUS ?= all
 RUNTIME_IMAGE_CUDA_QUANT_BASE ?= nvidia/cuda:12.8.1-devel-ubuntu24.04@sha256:520292dbb4f755fd360766059e62956e9379485d9e073bbd2f6e3c20c270ed66
 RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS ?= requirements/workflows/runtime-image-quant-py312-cu128.txt
 RUNTIME_IMAGE_GGUF ?= invarlock-runtime:gguf-local
@@ -607,6 +608,14 @@ container-front-door-smoke-podman: runtime-image-podman  ## Smoke the default co
 
 runtime-smoke-cuda: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime image
+	$(CONTAINER_ENGINE) run --rm \
+		--gpus "$(RUNTIME_CUDA_DOCKER_GPUS)" \
+		--network none \
+		--read-only \
+		--tmpfs /tmp:rw,nosuid,nodev,noexec \
+		--entrypoint python \
+		$(RUNTIME_IMAGE) \
+		-c "import torch; assert torch.cuda.is_available(), 'CUDA device unavailable'; probe = torch.arange(16, dtype=torch.float32, device='cuda').reshape(4, 4); result = probe @ probe; torch.cuda.synchronize(); assert result.is_cuda and torch.isfinite(result).all().item(); print('CUDA tensor execution ok')"
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
@@ -616,10 +625,12 @@ runtime-smoke-cuda-quant: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)
 runtime-smoke-cuda-quant:  ## Smoke the local CUDA quant runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
+		--gpus "$(RUNTIME_CUDA_DOCKER_GPUS)" \
+		--network none \
 		-v "$(CURDIR)/examples/integrations/_runtime_images/quant_runtime_image_smoke.py:/tmp/quant_runtime_image_smoke.py:ro" \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		/tmp/quant_runtime_image_smoke.py --require-cuda-toolchain
+		/tmp/quant_runtime_image_smoke.py --require-cuda-toolchain --require-gpu
 
 runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-quant-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)
