@@ -33,6 +33,18 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
             class_name="HFTransformersProvider",
             required_deps=("torch", "transformers"),
         ),
+        BuiltinPluginSpec(
+            name="llama_cpp",
+            module="invarlock.runtime_providers.llama_cpp",
+            class_name="LlamaCppProvider",
+            support_tier="first_party_experimental",
+        ),
+        BuiltinPluginSpec(
+            name="tensorrt_llm",
+            module="invarlock.runtime_providers.tensorrt_llm",
+            class_name="TensorRTLLMProvider",
+            support_tier="first_party_experimental",
+        ),
     ),
     "adapters": (
         BuiltinPluginSpec(

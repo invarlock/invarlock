@@ -363,7 +363,10 @@ def _plugins_runtime_providers(
     only: str | None = typer.Option(
         None,
         "--only",
-        help="Filter: missing|ready|core|optional|core_supported|third_party",
+        help=(
+            "Filter: missing|ready|core|optional|core_supported|"
+            "first_party_experimental|third_party"
+        ),
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),

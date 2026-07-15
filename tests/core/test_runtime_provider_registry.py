@@ -14,7 +14,7 @@ from invarlock.core.plugins_inventory import (
 )
 
 
-def test_builtin_runtime_provider_catalog_declares_only_hf_foundation() -> None:
+def test_builtin_runtime_provider_catalog_declares_shipped_foundations() -> None:
     specs = builtin_plugin_specs("runtime_providers")
 
     assert [(spec.name, spec.module, spec.class_name) for spec in specs] == [
@@ -22,7 +22,22 @@ def test_builtin_runtime_provider_catalog_declares_only_hf_foundation() -> None:
             "hf_transformers",
             "invarlock.runtime_providers.hf_transformers",
             "HFTransformersProvider",
-        )
+        ),
+        (
+            "llama_cpp",
+            "invarlock.runtime_providers.llama_cpp",
+            "LlamaCppProvider",
+        ),
+        (
+            "tensorrt_llm",
+            "invarlock.runtime_providers.tensorrt_llm",
+            "TensorRTLLMProvider",
+        ),
+    ]
+    assert [spec.support_tier for spec in specs] == [
+        "core_supported",
+        "first_party_experimental",
+        "first_party_experimental",
     ]
 
 
@@ -41,7 +56,11 @@ def test_registry_lists_builtin_runtime_provider_without_importing_backend(
     monkeypatch.setattr(registry_mod.importlib, "import_module", guarded_import)
     registry = registry_mod.CoreRegistry()
 
-    assert registry.list_runtime_providers() == ["hf_transformers"]
+    assert registry.list_runtime_providers() == [
+        "hf_transformers",
+        "llama_cpp",
+        "tensorrt_llm",
+    ]
     assert registry.get_plugin_info("hf_transformers", "runtime_providers") == {
         "available": True,
         "status": "Built-in",
@@ -64,6 +83,24 @@ def test_registry_loads_hf_reference_provider_only_on_request() -> None:
     provider = registry.get_runtime_provider("hf_transformers")
 
     assert provider.name == "hf_transformers"
+    assert provider.abi_version == "1"
+
+
+def test_registry_loads_llama_cpp_provider_only_on_request() -> None:
+    registry = registry_mod.CoreRegistry()
+
+    provider = registry.get_runtime_provider("llama_cpp")
+
+    assert provider.name == "llama_cpp"
+    assert provider.abi_version == "1"
+
+
+def test_registry_loads_tensorrt_llm_provider_only_on_request() -> None:
+    registry = registry_mod.CoreRegistry()
+
+    provider = registry.get_runtime_provider("tensorrt_llm")
+
+    assert provider.name == "tensorrt_llm"
     assert provider.abi_version == "1"
 
 
@@ -92,6 +129,8 @@ def test_runtime_provider_entry_point_discovery_is_lazy(
 
     assert registry.list_runtime_providers() == [
         "hf_transformers",
+        "llama_cpp",
+        "tensorrt_llm",
         "third_party_runtime",
     ]
     assert (
@@ -143,11 +182,49 @@ def test_runtime_provider_inventory_is_static_and_machine_readable() -> None:
         "name": "hf_transformers",
         "kind": "runtime_provider",
         "module": "invarlock.runtime_providers.hf_transformers",
-        "entry_point": None,
+        "entry_point": "hf_transformers",
+        "entry_point_group": "invarlock.runtime_providers",
         "origin": "builtin",
         "status": "ready",
+        "connector_status": "ready",
+        "backend_delivery": "python_extra",
+        "runtime_qualification": "not_probed",
         "required_extra": "invarlock[hf]",
         "support_tier": "core_supported",
+        "strict_assurance_allowed": True,
+        "maintained_catalog": False,
+        "deployment_claim": False,
+    }
+    assert runtime_provider_inventory_json_items(rows)[1] == {
+        "name": "llama_cpp",
+        "kind": "runtime_provider",
+        "module": "invarlock.runtime_providers.llama_cpp",
+        "entry_point": "llama_cpp",
+        "entry_point_group": "invarlock.runtime_providers",
+        "origin": "builtin",
+        "status": "ready",
+        "connector_status": "ready",
+        "backend_delivery": "oci_image",
+        "runtime_qualification": "not_probed",
+        "required_extra": None,
+        "support_tier": "first_party_experimental",
+        "strict_assurance_allowed": True,
+        "maintained_catalog": False,
+        "deployment_claim": False,
+    }
+    assert runtime_provider_inventory_json_items(rows)[2] == {
+        "name": "tensorrt_llm",
+        "kind": "runtime_provider",
+        "module": "invarlock.runtime_providers.tensorrt_llm",
+        "entry_point": "tensorrt_llm",
+        "entry_point_group": "invarlock.runtime_providers",
+        "origin": "builtin",
+        "status": "ready",
+        "connector_status": "ready",
+        "backend_delivery": "oci_image",
+        "runtime_qualification": "not_probed",
+        "required_extra": None,
+        "support_tier": "first_party_experimental",
         "strict_assurance_allowed": True,
         "maintained_catalog": False,
         "deployment_claim": False,

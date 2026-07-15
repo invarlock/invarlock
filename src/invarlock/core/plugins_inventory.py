@@ -341,15 +341,28 @@ def gather_runtime_provider_inventory_rows(*, registry: Any) -> list[InventoryRo
         info = registry.get_plugin_info(name, "runtime_providers")
         module = str(info.get("module") or "")
         builtin = module.startswith("invarlock.runtime_providers")
+        connector_status = "ready" if info.get("available") else "needs_extra"
+        backend_delivery = {
+            "hf_transformers": "python_extra",
+            "llama_cpp": "oci_image",
+            "tensorrt_llm": "oci_image",
+        }.get(name, "plugin_defined")
         rows.append(
             {
                 "name": name,
-                "backend": "transformers" if name == "hf_transformers" else None,
+                "backend": {
+                    "hf_transformers": "transformers",
+                    "llama_cpp": "llama.cpp",
+                    "tensorrt_llm": "TensorRT-LLM",
+                }.get(name),
                 "backend_version": None,
                 "support": "core" if builtin else "optional",
                 "origin": "core" if builtin else "plugin",
                 "mode": "runtime-provider",
-                "status": "ready" if info.get("available") else "needs_extra",
+                "status": connector_status,
+                "connector_status": connector_status,
+                "backend_delivery": backend_delivery,
+                "runtime_qualification": "not_probed",
                 "enable": (
                     "pip install 'invarlock[hf]'" if name == "hf_transformers" else ""
                 ),
@@ -357,7 +370,9 @@ def gather_runtime_provider_inventory_rows(*, registry: Any) -> list[InventoryRo
                     "invarlock[hf]" if name == "hf_transformers" else None
                 ),
                 "module": module,
-                "entry_point": info.get("entry_point"),
+                "entry_point": info.get("entry_point") or (name if builtin else None),
+                "entry_point_group": info.get("entry_point_group")
+                or ("invarlock.runtime_providers" if builtin else None),
                 **_support_metadata(
                     plugin_type="runtime_providers", name=name, info=info
                 ),
@@ -384,6 +399,8 @@ def filter_inventory_rows(
         return [row for row in rows if row["support"] == "optional"]
     support_tiers = {
         "core_supported",
+        "first_party_experimental",
+        "supported_experimental",
         "optional_backend_loader",
         "validation_simulation",
         "demo_only",
@@ -446,8 +463,12 @@ def runtime_provider_inventory_json_items(
             "kind": "runtime_provider",
             "module": row.get("module"),
             "entry_point": row.get("entry_point"),
+            "entry_point_group": row.get("entry_point_group"),
             "origin": _module_origin(str(row.get("module") or "")),
             "status": row.get("status"),
+            "connector_status": row.get("connector_status"),
+            "backend_delivery": row.get("backend_delivery"),
+            "runtime_qualification": row.get("runtime_qualification"),
             "required_extra": row.get("required_extra"),
             "support_tier": row.get("support_tier"),
             "strict_assurance_allowed": row.get("strict_assurance_allowed"),

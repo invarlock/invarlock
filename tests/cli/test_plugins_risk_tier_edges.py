@@ -159,6 +159,7 @@ def test_all_categories_dispatches_nonempty_dataset_provider():
         console=_console()[0],
         adapter_rows_loader=lambda _registry: [],
         generic_rows_loader=lambda _registry, _kind: [],
+        runtime_provider_rows_loader=lambda _registry: [],
         provider_registry_loader=load_provider_registry,
     )
     assert calls == ["list", "registry"]

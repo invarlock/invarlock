@@ -331,7 +331,11 @@ def _print_generic_compact(
             "runtime-provider": "Runtime provider",
         }.get(str(row.get("mode")), "Plugin")
         if row["status"] == "ready":
-            status_disp = "Ready"
+            status_disp = (
+                "Connector ready (metadata only); runtime not probed"
+                if row.get("mode") == "runtime-provider"
+                else "Ready"
+            )
         elif row["status"] == "needs_extra":
             status_disp = f"Needs extra: {row['enable'] or ''}".rstrip(": ")
         else:
@@ -380,7 +384,11 @@ def _print_generic_verbose(
             }.get(str(row.get("mode")), "Plugin"),
             backend_disp,
             version_disp,
-            row["status"].replace("needs_extra", "Needs extra").capitalize(),
+            (
+                "Connector ready (metadata only); runtime not probed"
+                if row.get("mode") == "runtime-provider" and row["status"] == "ready"
+                else row["status"].replace("needs_extra", "Needs extra").capitalize()
+            ),
             str(row.get("support_tier") or ""),
             row["module"],
             entry,
@@ -484,6 +492,29 @@ def _explain_generic(
     console.print(f"[bold]{row['name']}[/bold]")
     console.print(f"  Support     : {row['support'].capitalize()}")
     console.print(f"  Tier        : {row.get('support_tier') or '-'}")
+    if plugin_type == "runtime_providers":
+        console.print(
+            "  Strict contract       : "
+            + ("eligible" if row.get("strict_assurance_allowed") else "not eligible")
+        )
+        qualification = str(row.get("runtime_qualification") or "not_probed")
+        console.print(
+            "  Runtime qualification : " + qualification.replace("_", " ").capitalize()
+        )
+        connector = str(row.get("connector_status") or row.get("status") or "unknown")
+        console.print(
+            "  Connector             : "
+            + connector.replace("_", " ").capitalize()
+            + " (metadata only)"
+        )
+        console.print(f"  Backend delivery      : {row.get('backend_delivery') or '-'}")
+        if row.get("enable"):
+            console.print(f"  Enable                : {_escape(row['enable'])}")
+        console.print(f"  Module                : {row['module']}")
+        entry = row["entry_point"] or ""
+        if entry:
+            console.print(f"  Entry point           : {entry}")
+        return
     console.print(
         "  Strict OK   : " + ("yes" if row.get("strict_assurance_allowed") else "no")
     )
