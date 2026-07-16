@@ -137,6 +137,7 @@ def test_load_allowlist_uses_strict_pip_audit_policy(tmp_path: Path) -> None:
                 "entries": [
                     {
                         "advisory": "GHSA-test-test-test",
+                        "compensating_control": "isolated test surface",
                         "owner": "security-maintainers",
                         "expires": (date.today() + timedelta(days=7)).isoformat(),
                         "tracking_issue": "https://github.com/example/repo/pull/1",

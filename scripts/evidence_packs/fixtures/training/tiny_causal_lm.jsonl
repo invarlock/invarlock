@@ -1,8 +1,0 @@
-{"text":"InvarLock training fixture alpha records a deterministic causal language-model row."}
-{"text":"InvarLock training fixture beta binds optimizer evidence to immutable input bytes."}
-{"text":"A real fine-tune performs forward, backward, and optimizer steps before saving."}
-{"text":"A real LoRA lane trains adapter parameters before merging them into the base model."}
-{"text":"Training receipts bind data, profiles, seeds, losses, model hashes, and tool versions."}
-{"text":"Reloaded subject checkpoints must match the in-memory post-training model state."}
-{"text":"Synthetic perturbations remain separate and never use fine-tune or LoRA-merge labels."}
-{"text":"Tampered receipts and unchanged copied checkpoints must fail contract validation."}

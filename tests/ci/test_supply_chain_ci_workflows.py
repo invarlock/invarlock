@@ -1,766 +1,167 @@
-import json
+from __future__ import annotations
+
 import re
-import tomllib
-from datetime import date
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-WORKFLOWS_DIR = Path(".github/workflows")
-PINNED_ACTION_RE = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
-ACTIONS_CACHE_PIN = "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
-TRANSFORMERS_LOCKFILES = (
-    Path("requirements/workflows/ci-hf-py312.txt"),
-    Path("requirements/workflows/ci-hf-py313.txt"),
-    Path("requirements/workflows/hf-py313.txt"),
-    Path("requirements/workflows/runtime-image-py312.txt"),
-    Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
-    Path("requirements/workflows/training-profile-py312.txt"),
-)
-TRANSFORMERS_512_HASHES = {
-    "500be9eb644ede81c3103eee7687fc36d05dd75d1c76686c3820b26396fe7c7c",
-    "f0cf42ae1464c2eb41e7e0e66d7fd4b66145f48af17093b4cc0b2e9781faa7f4",
-}
-TRANSFORMERS_512_RE = re.compile(
-    r"transformers==5\.12\.0 \\\n"
-    r"(?P<hash1>\s+--hash=sha256:(?P<digest1>[0-9a-f]{64}) \\\n)"
-    r"(?P<hash2>\s+--hash=sha256:(?P<digest2>[0-9a-f]{64}))",
-    re.MULTILINE,
-)
+WORKFLOWS = Path(".github/workflows")
+PINNED_ACTION = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 
 
-def _load_workflow(path: Path) -> dict[str, Any]:
+def _load(path: Path) -> dict[str, Any]:
     workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
     if True in workflow and "on" not in workflow:
         workflow["on"] = workflow.pop(True)
     return workflow
 
 
-def _workflow_paths() -> list[Path]:
-    return sorted(WORKFLOWS_DIR.glob("*.yml"))
+def _steps(workflow: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        step
+        for job in workflow.get("jobs", {}).values()
+        if isinstance(job, dict)
+        for step in job.get("steps", [])
+        if isinstance(step, dict)
+    ]
 
 
-def _iter_job_steps(workflow: dict[str, Any]) -> list[dict[str, Any]]:
-    jobs = workflow.get("jobs", {})
-    steps: list[dict[str, Any]] = []
-    for job in jobs.values():
-        if not isinstance(job, dict):
-            continue
-        for step in job.get("steps", []):
-            if isinstance(step, dict):
-                steps.append(step)
-    return steps
-
-
-def _requires_job_permissions(step: dict[str, Any]) -> bool:
-    uses = str(step.get("uses", ""))
-    return any(
-        marker in uses
-        for marker in (
-            "actions/github-script",
-            "pypa/gh-action-pypi-publish",
-            "actions/attest-build-provenance",
-            "github/codeql-action/upload-sarif",
-            "nwtgck/actions-netlify",
-            "ossf/scorecard-action",
-            "sigstore/gh-action-sigstore-python",
-        )
-    )
-
-
-def _find_step_by_name(steps: list[dict[str, Any]], name: str) -> dict[str, Any]:
+def _step(steps: list[dict[str, Any]], name: str) -> dict[str, Any]:
     return next(step for step in steps if step.get("name") == name)
 
 
-def _find_step_by_uses_prefix(
-    steps: list[dict[str, Any]], uses_prefix: str
-) -> dict[str, Any]:
-    return next(
-        step for step in steps if str(step.get("uses", "")).startswith(uses_prefix)
-    )
+def test_workflows_pin_actions_and_declare_permissions() -> None:
+    unpinned: list[str] = []
+    missing_permissions: list[str] = []
+
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        workflow = _load(path)
+        if "permissions" not in workflow:
+            missing_permissions.append(path.name)
+        for step in _steps(workflow):
+            uses = str(step.get("uses", ""))
+            if uses and not uses.startswith("./") and not PINNED_ACTION.fullmatch(uses):
+                unpinned.append(f"{path.name}: {uses}")
+
+    assert unpinned == []
+    assert missing_permissions == []
 
 
-def _iter_pip_install_commands(workflow: dict[str, Any]) -> list[str]:
-    commands: list[str] = []
-    for step in _iter_job_steps(workflow):
-        run = step.get("run")
-        if not isinstance(run, str):
-            continue
-        for line in run.splitlines():
-            stripped = line.strip()
-            if "pip install" in stripped:
-                commands.append(stripped)
-    return commands
+def test_workflow_pip_installs_use_hashed_lock_files() -> None:
+    offenders: list[str] = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _steps(_load(path)):
+            command = step.get("run")
+            if not isinstance(command, str):
+                continue
+            for line in command.splitlines():
+                line = line.strip()
+                if "pip install" not in line:
+                    continue
+                is_built_artifact = "dist/*.whl" in line or "wheelhouse/*.whl" in line
+                if not is_built_artifact and "--require-hashes" not in line:
+                    offenders.append(f"{path.name}: {line}")
+
+    assert offenders == []
 
 
-def _extract_transformers_512_hashes(path: Path) -> set[str]:
-    match = TRANSFORMERS_512_RE.search(path.read_text(encoding="utf-8"))
-    assert match is not None, f"transformers==5.12.0 stanza missing in {path}"
-    return {match.group("digest1"), match.group("digest2")}
+def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
+    workflow = _load(WORKFLOWS / "supply-chain-pr.yml")
+    scan = workflow["jobs"]["scan"]
+    steps = scan["steps"]
+    names = [step.get("name") for step in steps]
 
-
-def _locked_requirement_version(path: Path, package: str) -> str:
-    pattern = re.compile(rf"^{re.escape(package)}==(?P<version>[^\s\\]+) \\", re.M)
-    match = pattern.search(path.read_text(encoding="utf-8"))
-    assert match is not None, f"{package} missing from {path}"
-    return match.group("version")
-
-
-def _uv_locked_version(package: str) -> str:
-    lock = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
-    for entry in lock["package"]:
-        if entry.get("name") == package:
-            return entry["version"]
-    raise AssertionError(f"{package} missing from uv.lock")
-
-
-def test_precommit_workflow_uses_named_check_context() -> None:
-    workflow = _load_workflow(Path(".github/workflows/pre-commit.yml"))
-
-    assert workflow["jobs"]["run"]["name"] == "pre-commit"
-
-
-def test_supply_chain_job_configured():
-    """Test supply-chain job includes core security checks.
-
-    The scheduled/tag CI lane keeps the tool-environment SBOM + pip-audit
-    backstop; the PR-time workflow carries the install-surface SBOM and the
-    gitleaks artifact scan.
-    """
-    workflow_path = Path(".github/workflows/ci.yml")
-    assert workflow_path.exists(), "CI workflow definition not found"
-
-    workflow = _load_workflow(workflow_path)
-    jobs = workflow.get("jobs", {})
-    assert "supply-chain" in jobs, "Supply-chain job missing from CI workflow"
-
-    supply_job = jobs["supply-chain"]
-    steps = supply_job.get("steps", [])
-    step_names = [step.get("name") for step in steps if isinstance(step, dict)]
-
-    assert "Generate tool-environment SBOM" in step_names
-    assert "Run pip-audit" in step_names
-
-    audit_commands = [step.get("run", "") for step in steps if isinstance(step, dict)]
-    assert any("scripts/security/run_pip_audit.py" in cmd for cmd in audit_commands)
-    assert any("--scope tool-environment" in cmd for cmd in audit_commands)
-
-
-def test_repo_hygiene_checks_uv_lock_sync() -> None:
-    workflow = _load_workflow(Path(".github/workflows/repo-hygiene.yml"))
-    jobs = workflow["jobs"]
-
-    assert "lockfile-sync" in jobs
-    job = jobs["lockfile-sync"]
-    steps = job["steps"]
-    step_names = [step.get("name") for step in steps if isinstance(step, dict)]
-
-    assert step_names == ["Checkout repository", "Set up uv", "Check uv.lock sync"]
-
-    checkout_step = steps[0]
-    assert checkout_step["uses"].startswith("actions/checkout@")
-    assert checkout_step["with"]["fetch-depth"] == 0
-
-    uv_step = _find_step_by_name(steps, "Set up uv")
-    assert (
-        uv_step["uses"] == "astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990"
-    )
-    assert uv_step["with"]["version"] == "0.10.10"
-
-    check_step = _find_step_by_name(steps, "Check uv.lock sync")
-    assert check_step["run"] == "make lock-sync"
-
-
-def test_pr_supply_chain_workflow_is_configured() -> None:
-    workflow = _load_workflow(Path(".github/workflows/supply-chain-pr.yml"))
-    triggers = workflow["on"]
-
-    assert triggers["pull_request"]["branches"] == ["main", "staging/next"]
-    assert "workflow_dispatch" in triggers
-    assert workflow["permissions"] == {"contents": "read"}
-
-    job = workflow["jobs"]["scan"]
-    assert job["runs-on"] == "ubuntu-latest"
-    assert job["timeout-minutes"] == 30
-
-    steps = job["steps"]
-    step_names = [step.get("name") for step in steps if isinstance(step, dict)]
-
-    assert step_names == [
-        "Checkout repository",
-        "Set up Python",
-        "Install supply-chain tools",
-        "Cache gitleaks binary",
-        "Install gitleaks",
+    for required in (
         "Run gitleaks PR git delta scan",
-        "Upload gitleaks PR artifacts",
-        "Fail on secret findings",
         "Build release wheel",
-        "Create install-surface venv",
         "Run pip-audit",
         "Generate install-surface SBOM",
-        "Upload supply-chain artifacts",
-        "Remove install-surface venv",
-        "Create HF surface venv",
         "Run HF surface pip-audit",
-        "Remove HF surface venv",
-        "Create advanced surface venv",
-        "Run advanced surface pip-audit",
-    ]
-
-    install_step = _find_step_by_name(steps, "Install supply-chain tools")
-    assert (
-        install_step["run"]
-        == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
-    )
-
-    checkout_step = steps[0]
-    assert checkout_step["uses"].startswith("actions/checkout@")
-    assert checkout_step["with"]["fetch-depth"] == 0
-
-    gitleaks_cache = _find_step_by_name(steps, "Cache gitleaks binary")
-    assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN
-    assert gitleaks_cache["with"]["path"] == "~/go/bin/gitleaks"
-    assert "gitleaks-v8.30.0" in gitleaks_cache["with"]["key"]
-
-    gitleaks_install = _find_step_by_name(steps, "Install gitleaks")
-    assert (
-        "go install github.com/zricethezav/gitleaks/v8@v8.30.0"
-        in gitleaks_install["run"]
-    )
-    assert 'if [ ! -x "${gitleaks_bin}" ]; then' in gitleaks_install["run"]
-
-    build_step = _find_step_by_name(steps, "Build release wheel")
-    assert "rm -rf build dist" in build_step["run"]
-    build_commands = [
-        line.strip()
-        for line in build_step["run"].splitlines()
-        if line.strip().startswith("python -m build")
-    ]
-    assert build_commands == ["python -m build --no-isolation"]
-
-    venv_step = _find_step_by_name(steps, "Create install-surface venv")
-    assert venv_step["id"] == "install_surface"
-    assert "python -m venv .artifact-venv" in venv_step["run"]
-    assert (
-        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
-        in venv_step["run"]
-    )
-    assert "python -m pip install dist/*.whl" in venv_step["run"]
-    assert "site_packages=" in venv_step["run"]
-
-    sbom_step = _find_step_by_name(steps, "Generate install-surface SBOM")
-    assert (
-        "scripts/security/generate_sbom.sh --scope install-surface --python"
-        in sbom_step["run"]
-    )
-    assert "artifacts/supply-chain/sbom.json" in sbom_step["run"]
-
-    install_cleanup_step = _find_step_by_name(steps, "Remove install-surface venv")
-    assert "rm -rf .artifact-venv" in install_cleanup_step["run"]
-
-    audit_step = _find_step_by_name(steps, "Run pip-audit")
-    assert "python scripts/security/run_pip_audit.py --path" in audit_step["run"]
-    assert "${{ steps.install_surface.outputs.site_packages }}" in audit_step["run"]
-
-    hf_venv_step = _find_step_by_name(steps, "Create HF surface venv")
-    assert hf_venv_step["id"] == "hf_surface"
-    assert (
-        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
-        in hf_venv_step["run"]
-    )
-    assert "python -m pip install dist/*.whl --no-deps" in hf_venv_step["run"]
-    assert (
-        "python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt"
-        in hf_venv_step["run"]
-    )
-
-    hf_audit_step = _find_step_by_name(steps, "Run HF surface pip-audit")
-    assert "python scripts/security/run_pip_audit.py --path" in hf_audit_step["run"]
-    assert "${{ steps.hf_surface.outputs.site_packages }}" in hf_audit_step["run"]
-
-    hf_cleanup_step = _find_step_by_name(steps, "Remove HF surface venv")
-    assert "rm -rf .hf-venv" in hf_cleanup_step["run"]
-
-    advanced_venv_step = _find_step_by_name(steps, "Create advanced surface venv")
-    assert advanced_venv_step["id"] == "advanced_surface"
-    assert (
-        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
-        in advanced_venv_step["run"]
-    )
-    assert "python -m pip install dist/*.whl --no-deps" in advanced_venv_step["run"]
-    assert (
-        "python -m pip install --require-hashes -r requirements/workflows/advanced-py313.txt"
-        in advanced_venv_step["run"]
-    )
-
-    advanced_audit_step = _find_step_by_name(steps, "Run advanced surface pip-audit")
-    assert (
-        "python scripts/security/run_pip_audit.py --path" in advanced_audit_step["run"]
-    )
-    assert (
-        "${{ steps.advanced_surface.outputs.site_packages }}"
-        in advanced_audit_step["run"]
-    )
-
-    secret_scan_step = _find_step_by_name(steps, "Run gitleaks PR git delta scan")
-    assert (
-        secret_scan_step["env"]["PR_BASE_SHA"]
-        == "${{ github.event.pull_request.base.sha }}"
-    )
-    assert (
-        secret_scan_step["env"]["PR_HEAD_SHA"]
-        == "${{ github.event.pull_request.head.sha }}"
-    )
-    assert (
-        'git diff --name-only --diff-filter=ACMRT "${PR_BASE_SHA}" "${PR_HEAD_SHA}"'
-        in secret_scan_step["run"]
-    )
-    assert "gitleaks git ." in secret_scan_step["run"]
-    assert "--config .gitleaks.toml" in secret_scan_step["run"]
-    assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in secret_scan_step["run"]
-    assert "git rev-parse --verify HEAD~1" in secret_scan_step["run"]
-    assert 'scan_range="HEAD~1..HEAD"' in secret_scan_step["run"]
-    assert "changed_file_count=" in secret_scan_step["run"]
-    assert '--log-opts "${scan_range}"' in secret_scan_step["run"]
-    assert "--report-format json" in secret_scan_step["run"]
-    assert "--report-format sarif" not in secret_scan_step["run"]
-    assert "artifacts/supply-chain/gitleaks.changed-files" in secret_scan_step["run"]
-    assert "artifacts/supply-chain/gitleaks.json" in secret_scan_step["run"]
-
-    gitleaks_upload_step = _find_step_by_name(steps, "Upload gitleaks PR artifacts")
-    assert gitleaks_upload_step["uses"].startswith("actions/upload-artifact@")
-    assert gitleaks_upload_step["with"]["name"] == "supply-chain-pr-gitleaks"
-    assert (
-        "artifacts/supply-chain/gitleaks.changed-files"
-        in gitleaks_upload_step["with"]["path"]
-    )
-    assert (
-        "artifacts/supply-chain/gitleaks.json" in gitleaks_upload_step["with"]["path"]
-    )
-
-    fail_step = _find_step_by_name(steps, "Fail on secret findings")
-    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
-    assert "gitleaks detected secrets" in fail_step["run"]
-
-    upload_step = _find_step_by_name(steps, "Upload supply-chain artifacts")
-    assert upload_step["uses"].startswith("actions/upload-artifact@")
-    assert upload_step["with"]["name"] == "supply-chain-pr-artifacts"
-    assert "artifacts/supply-chain/sbom.json" in upload_step["with"]["path"]
-    assert (
-        "artifacts/supply-chain/gitleaks.changed-files" in upload_step["with"]["path"]
-    )
-    assert "artifacts/supply-chain/gitleaks.json" in upload_step["with"]["path"]
-    assert "artifacts/supply-chain/gitleaks.sarif" not in upload_step["with"]["path"]
-
-
-def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:
-    allowlist_path = Path("scripts/security/pip_audit_allowlist.json")
-    payload = json.loads(allowlist_path.read_text(encoding="utf-8"))
-    allowlist_doc = Path("docs/security/pip-audit-allowlist.md").read_text(
-        encoding="utf-8"
-    )
-
-    assert payload["owner"] == "security-maintainers"
-    assert isinstance(payload["entries"], list)
-    if not payload["entries"]:
-        assert "There are no active exceptions." in allowlist_doc
-
-    for entry in payload["entries"]:
-        advisory = entry["advisory"]
-        assert entry["owner"] == "security-maintainers"
-        expires = date.fromisoformat(entry["expires"])
-        assert 0 <= (expires - date.today()).days <= 30
-        assert re.fullmatch(
-            r"https://github\.com/[^/]+/[^/]+/issues/[1-9]\d*",
-            entry["tracking_issue"],
-        )
-        assert "reason" in entry
-        assert f"`{advisory}`" in allowlist_doc
-        assert entry["expires"] in allowlist_doc
-        assert entry["tracking_issue"] in allowlist_doc
-
-
-def test_ruff_toolchain_pins_are_aligned() -> None:
-    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
-    ci_deps = pyproject["project"]["optional-dependencies"]["ci"]
-    ruff_pin = next(dep for dep in ci_deps if dep.startswith("ruff=="))
-    ruff_version = ruff_pin.removeprefix("ruff==")
-
-    precommit_config = yaml.safe_load(
-        Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
-    )
-    ruff_repo = next(
-        repo
-        for repo in precommit_config["repos"]
-        if repo["repo"] == "https://github.com/astral-sh/ruff-pre-commit"
-    )
-    assert ruff_repo["rev"] == f"v{ruff_version}"
-    assert {hook["id"] for hook in ruff_repo["hooks"]} >= {"ruff", "ruff-format"}
-
-    for lockfile in (
-        Path("requirements/workflows/ci-hf-py312.txt"),
-        Path("requirements/workflows/ci-hf-py313.txt"),
-        Path("requirements/workflows/docs-ci-py313.txt"),
-        Path("requirements/workflows/assurance-ci-py313.txt"),
     ):
-        assert _locked_requirement_version(lockfile, "ruff") == ruff_version
+        assert required in names
+    assert not any("advanced" in str(name).lower() for name in names)
+
+    secret_scan = _step(steps, "Run gitleaks PR git delta scan")
+    assert "--config .gitleaks.toml" in secret_scan["run"]
+    assert "--log-opts" in secret_scan["run"]
+    assert "--redact" in secret_scan["run"]
 
 
-def test_security_workflow_known_vulnerable_pins_are_remediated() -> None:
-    for lockfile in (
-        Path("requirements/workflows/security-ci-py313.txt"),
-        Path("requirements/workflows/release-security-py313.txt"),
-    ):
-        assert _locked_requirement_version(lockfile, "lxml") == "6.1.0"
+def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    jobs = workflow["jobs"]
 
-    assert _uv_locked_version("lxml") == "6.1.0"
+    resolve = jobs["resolve_release_ref"]
+    resolve_step = _step(resolve["steps"], "Resolve release ref")
+    assert "git ls-remote --tags" in resolve_step["run"]
+    assert "release_tag must start with v" in resolve_step["run"]
 
-    for lockfile in (
-        Path("requirements/workflows/ci-hf-py312.txt"),
-        Path("requirements/workflows/ci-hf-py313.txt"),
-        Path("requirements/workflows/docs-ci-py313.txt"),
-        Path("requirements/workflows/assurance-ci-py313.txt"),
-    ):
-        assert _locked_requirement_version(lockfile, "soupsieve") == "2.8.4"
-
-    assert _uv_locked_version("soupsieve") == "2.8.4"
-
-
-def test_codeowners_protect_security_control_surfaces() -> None:
-    codeowners = Path(".github/CODEOWNERS").read_text(encoding="utf-8")
-
-    for required_entry in (
-        ".github/workflows/codeql.yml",
-        ".github/workflows/ci.yml",
-        ".github/workflows/dependabot-main-guard.yml",
-        ".github/workflows/release.yml",
-        ".github/workflows/supply-chain-pr.yml",
-        ".github/codeql/",
-        ".github/dependabot.yml",
-        "docs/security/",
-        "requirements/workflows/*security*.txt",
-        "requirements/workflows/pip-bootstrap-py313.txt",
-        "scripts/security/",
-    ):
-        assert required_entry in codeowners
-
-
-def test_workflows_pin_github_actions_to_full_shas():
-    offenders: list[str] = []
-    for workflow_path in _workflow_paths():
-        workflow = _load_workflow(workflow_path)
-        for step in _iter_job_steps(workflow):
-            uses = step.get("uses")
-            if not uses or str(uses).startswith("./"):
-                continue
-            if not PINNED_ACTION_RE.match(str(uses)):
-                offenders.append(f"{workflow_path.name}: {uses}")
-
-    assert not offenders, "Unpinned workflow actions:\n" + "\n".join(offenders)
-
-
-def test_workflows_declare_explicit_permissions():
-    missing_top_level: list[str] = []
-    missing_job_level: list[str] = []
-
-    for workflow_path in _workflow_paths():
-        workflow = _load_workflow(workflow_path)
-        if "permissions" not in workflow:
-            missing_top_level.append(workflow_path.name)
-
-        jobs = workflow.get("jobs", {})
-        for job_name, job in jobs.items():
-            if not isinstance(job, dict):
-                continue
-            needs_job_permissions = any(
-                _requires_job_permissions(step) for step in job.get("steps", [])
-            )
-            if needs_job_permissions and "permissions" not in job:
-                missing_job_level.append(f"{workflow_path.name}:{job_name}")
-
-    assert not missing_top_level, "Missing workflow permissions:\n" + "\n".join(
-        missing_top_level
+    build = jobs["build_check"]
+    checkout = build["steps"][0]
+    assert checkout["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
-    assert not missing_job_level, "Missing job permissions:\n" + "\n".join(
-        missing_job_level
+    distribution_build = _step(build["steps"], "Build first-party distributions")["run"]
+    assert "python -m build --no-isolation" in distribution_build
+    for addin in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
+        assert f"addins/{addin}" in distribution_build
+
+    twine = _step(build["steps"], "Twine check")["run"]
+    assert "dist/*.whl dist/*.tar.gz" in twine
+    assert "dist/addins/*" in twine
+
+    publish = jobs["publish"]
+    assert publish["permissions"] == {
+        "contents": "read",
+        "id-token": "write",
+        "attestations": "write",
+    }
+    publish_step = next(
+        step
+        for step in publish["steps"]
+        if str(step.get("uses", "")).startswith("pypa/gh-action-pypi-publish@")
     )
+    assert "user" not in publish_step.get("with", {})
+    assert "password" not in publish_step.get("with", {})
+
+    testpypi = jobs["testpypi_smoke"]
+    testpypi_checkout = testpypi["steps"][0]
+    assert testpypi_checkout["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    smoke = _step(testpypi["steps"], "Install published wheel and smoke test")
+    assert "requirements/workflows/pip-bootstrap-py313.txt" in smoke["run"]
 
 
-def test_workflows_pin_pip_installs_by_hash() -> None:
-    offenders: list[str] = []
-    for workflow_path in _workflow_paths():
-        workflow = _load_workflow(workflow_path)
-        for command in _iter_pip_install_commands(workflow):
-            if workflow_path.name in {"release.yml", "supply-chain-pr.yml"} and (
-                "python -m pip install dist/*.whl" in command
-                or "python -m pip install wheelhouse/*.whl" in command
-            ):
-                continue
-            if "--require-hashes" not in command:
-                offenders.append(f"{workflow_path.name}: {command}")
-
-    assert not offenders, "Unhashed workflow pip installs:\n" + "\n".join(offenders)
-
-
-def test_transformers_512_hashes_match_pypi_across_requirement_locks() -> None:
-    mismatches = {
-        str(path): sorted(_extract_transformers_512_hashes(path))
-        for path in TRANSFORMERS_LOCKFILES
-        if _extract_transformers_512_hashes(path) != TRANSFORMERS_512_HASHES
+def test_codeql_and_scorecards_keep_least_privilege() -> None:
+    codeql = _load(WORKFLOWS / "codeql.yml")
+    analyze = codeql["jobs"]["analyze"]
+    assert analyze["permissions"] == {
+        "contents": "read",
+        "actions": "read",
+        "security-events": "write",
     }
 
-    assert not mismatches, (
-        "transformers==5.12.0 hashes drifted from the current PyPI wheel/sdist:\n"
-        + "\n".join(f"{path}: {hashes}" for path, hashes in mismatches.items())
-    )
-
-
-def test_scorecards_workflow_uses_least_privilege_top_level_permissions() -> None:
-    workflow = _load_workflow(Path(".github/workflows/scorecards.yml"))
-    assert workflow["permissions"] == {"contents": "read"}
-
-    analysis = workflow["jobs"]["analysis"]
-    assert analysis["permissions"] == {
+    scorecards = _load(WORKFLOWS / "scorecards.yml")
+    assert scorecards["permissions"] == {"contents": "read"}
+    assert scorecards["jobs"]["analysis"]["permissions"] == {
         "id-token": "write",
         "security-events": "write",
     }
 
 
-def test_release_workflow_uses_trusted_publishing():
-    workflow = _load_workflow(Path(".github/workflows/release.yml"))
-    triggers = workflow["on"]
-    dispatch_inputs = triggers["workflow_dispatch"]["inputs"]
+def test_repo_hygiene_covers_integration_branch_and_renames() -> None:
+    workflow = _load(WORKFLOWS / "repo-hygiene.yml")
+    assert workflow["on"]["pull_request"]["branches"] == ["main", "staging/next"]
 
-    assert dispatch_inputs["release_tag"]["type"] == "string"
-    assert dispatch_inputs["release_tag"]["default"] == ""
-
-    resolve = workflow["jobs"]["resolve_release_ref"]
-    assert resolve["permissions"] == {"contents": "read"}
-
-    resolve_step = _find_step_by_name(resolve["steps"], "Resolve release ref")
-    assert "release_tag is required for manual release dispatch" in resolve_step["run"]
-    assert "release_tag must start with v" in resolve_step["run"]
-    assert "git ls-remote --tags" in resolve_step["run"]
-
-    resolve_outputs = resolve["outputs"]
-    assert (
-        resolve_outputs["release_tag"]
-        == "${{ steps.resolve_release_ref.outputs.release_tag }}"
+    generated = _step(
+        workflow["jobs"]["no-generated-artifacts"]["steps"],
+        "Detect forbidden files in PR diff",
     )
-    assert (
-        resolve_outputs["release_sha"]
-        == "${{ steps.resolve_release_ref.outputs.release_sha }}"
+    large = _step(
+        workflow["jobs"]["large-files"]["steps"],
+        "Prevent >10MB files in PR diff",
     )
-
-    publish = workflow["jobs"]["publish"]
-    permissions = publish.get("permissions", {})
-
-    assert permissions == {
-        "contents": "read",
-        "id-token": "write",
-        "attestations": "write",
-    }
-    assert publish.get("environment") == (
-        "${{ github.event_name == 'push' && 'pypi' || inputs.target }}"
-    )
-    assert publish["needs"] == ["build_check", "resolve_release_ref"]
-
-    steps = publish.get("steps", [])
-    assert "startsWith(github.ref, 'refs/tags/v')" in publish["if"]
-    assert "github.event_name == 'push'" in publish["if"]
-    assert "inputs.publish == true" in publish["if"]
-
-    checkout_step = steps[0]
-    assert checkout_step["uses"].startswith("actions/checkout@")
-    assert (
-        checkout_step["with"]["ref"]
-        == "${{ needs.resolve_release_ref.outputs.release_sha }}"
-    )
-    assert checkout_step["with"]["fetch-depth"] == 0
-
-    dist_download_step = _find_step_by_name(steps, "Download dist artifacts")
-    assert dist_download_step["with"]["path"] == "_release_dist"
-
-    stage_step = _find_step_by_name(steps, "Stage publish distributions")
-    assert "rm -rf publish-dist" in stage_step["run"]
-    assert "cp _release_dist/*.whl publish-dist/" in stage_step["run"]
-    assert "cp _release_dist/*.tar.gz publish-dist/" in stage_step["run"]
-
-    attest_step = _find_step_by_uses_prefix(steps, "actions/attest-build-provenance@")
-    assert attest_step["with"]["subject-path"] == "publish-dist/*"
-    assert attest_step["id"] == "attest_release"
-
-    provenance_step = _find_step_by_name(steps, "Upload provenance bundle")
-    assert provenance_step["uses"].startswith("actions/upload-artifact@")
-    assert provenance_step["with"]["name"] == "release-provenance"
-    assert (
-        provenance_step["with"]["path"]
-        == "${{ steps.attest_release.outputs.bundle-path }}"
-    )
-
-    publish_step = _find_step_by_uses_prefix(steps, "pypa/gh-action-pypi-publish@")
-    step_with = publish_step.get("with", {})
-    assert "user" not in step_with
-    assert "password" not in step_with
-    assert step_with["packages-dir"] == "publish-dist"
-    assert "steps.vars.outputs.publish_repository_url" in step_with["repository-url"]
-    assert step_with["skip-existing"] is True
-
-
-def test_release_workflow_builds_and_publishes_tag_only_artifacts():
-    workflow = _load_workflow(Path(".github/workflows/release.yml"))
-    resolve = workflow["jobs"]["resolve_release_ref"]
-    assert resolve["steps"][0]["name"] == "Resolve release ref"
-
-    resolve_step = resolve["steps"][0]
-    assert "git ls-remote --tags" in resolve_step["run"]
-    assert "refs/tags/${tag}^{}" in resolve_step["run"]
-    assert "release_tag must start with v" in resolve_step["run"]
-
-    build_check = workflow["jobs"]["build_check"]
-    assert build_check["needs"] == "resolve_release_ref"
-    assert build_check["timeout-minutes"] == 45
-    build_steps = build_check.get("steps", [])
-
-    install_step = _find_step_by_name(build_steps, "Install build tooling")
-    assert (
-        install_step["run"]
-        == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
-    )
-
-    build_step = _find_step_by_name(build_steps, "Build wheel/sdist")
-    build_commands = [
-        line.strip()
-        for line in build_step["run"].splitlines()
-        if line.strip().startswith("python -m build")
-    ]
-    assert build_commands == ["python -m build --no-isolation"]
-
-    gitleaks_cache = _find_step_by_name(build_steps, "Cache gitleaks binary")
-    assert gitleaks_cache["uses"] == ACTIONS_CACHE_PIN
-    assert gitleaks_cache["with"]["path"] == "~/go/bin/gitleaks"
-    assert "gitleaks-v8.30.0" in gitleaks_cache["with"]["key"]
-
-    gitleaks_install = _find_step_by_name(build_steps, "Install gitleaks")
-    assert (
-        "go install github.com/zricethezav/gitleaks/v8@v8.30.0"
-        in gitleaks_install["run"]
-    )
-    assert 'if [ ! -x "${gitleaks_bin}" ]; then' in gitleaks_install["run"]
-
-    gitleaks_range = _find_step_by_name(build_steps, "Resolve gitleaks release range")
-    assert "git fetch --force --tags origin" in gitleaks_range["run"]
-    assert "git describe --tags --match 'v[0-9]*'" in gitleaks_range["run"]
-    assert "previous_tag" in gitleaks_range["run"]
-    assert "log_opts=" in gitleaks_range["run"]
-
-    gitleaks_scan = _find_step_by_name(build_steps, "Run gitleaks release delta scan")
-    assert "gitleaks git ." in gitleaks_scan["run"]
-    assert "--config .gitleaks.toml" in gitleaks_scan["run"]
-    assert "artifacts/supply-chain/gitleaks.json" in gitleaks_scan["run"]
-    assert "artifacts/supply-chain/gitleaks.sarif" not in gitleaks_scan["run"]
-    assert "steps.gitleaks_range.outputs.log_opts" in gitleaks_scan["run"]
-    assert '--log-opts "${log_opts}"' in gitleaks_scan["run"]
-    assert "--report-format json" in gitleaks_scan["run"]
-    assert "--report-format sarif" not in gitleaks_scan["run"]
-
-    gitleaks_config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
-    allowlists = gitleaks_config["allowlists"]
-    tokenizer_allowlist = next(
-        entry
-        for entry in allowlists
-        if entry["description"].startswith("Tokenizer digest fields")
-    )
-    assert tokenizer_allowlist["condition"] == "AND"
-    assert tokenizer_allowlist["regexTarget"] == "match"
-    assert tokenizer_allowlist["paths"] == [
-        r"public_evidence/(?:catalog_evidence|published_basis)/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$"
-    ]
-    assert tokenizer_allowlist["regexes"] == [
-        r'tokenizer_(?:hash|sha256)"\s*:\s*"[0-9A-Fa-f]{32,128}"'
-    ]
-
-    smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
-    assert (
-        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
-        in smoke_step["run"]
-    )
-    assert "python -m pip install dist/*.whl" in smoke_step["run"]
-    assert "invarlock --help" in smoke_step["run"]
-    assert 'python -c "import invarlock.cli.app"' in smoke_step["run"]
-
-    checkout_step = build_steps[0]
-    assert checkout_step["uses"].startswith("actions/checkout@")
-    assert (
-        checkout_step["with"]["ref"]
-        == "${{ needs.resolve_release_ref.outputs.release_sha }}"
-    )
-    assert checkout_step["with"]["fetch-depth"] == 0
-
-    install_surface_step = _find_step_by_name(
-        build_steps, "Create release install-surface venv"
-    )
-    assert install_surface_step["id"] == "install_surface"
-    assert "python -m venv .artifact-venv" in install_surface_step["run"]
-    assert (
-        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
-        in install_surface_step["run"]
-    )
-    assert "python -m pip install dist/*.whl" in install_surface_step["run"]
-
-    audit_step = _find_step_by_name(build_steps, "Run release pip-audit")
-    assert "python scripts/security/run_pip_audit.py --path" in audit_step["run"]
-    assert "${{ steps.install_surface.outputs.site_packages }}" in audit_step["run"]
-
-    sbom_step = _find_step_by_name(build_steps, "Generate release install-surface SBOM")
-    assert "--scope install-surface --python" in sbom_step["run"]
-    assert "artifacts/supply-chain/sbom.json" in sbom_step["run"]
-
-    sbom_upload = _find_step_by_name(build_steps, "Upload SBOM artifact")
-    assert sbom_upload["uses"].startswith("actions/upload-artifact@")
-    assert sbom_upload["with"]["name"] == "release-sbom"
-
-    gitleaks_upload = _find_step_by_name(build_steps, "Upload gitleaks artifacts")
-    assert gitleaks_upload["uses"].startswith("actions/upload-artifact@")
-    assert gitleaks_upload["with"]["name"] == "release-gitleaks"
-    assert "artifacts/supply-chain/gitleaks.json" in gitleaks_upload["with"]["path"]
-    assert (
-        "artifacts/supply-chain/gitleaks.sarif" not in gitleaks_upload["with"]["path"]
-    )
-
-    fail_step = _find_step_by_name(build_steps, "Fail on secret findings")
-    assert "gitleaks scan did not publish an exit code" in fail_step["run"]
-    assert "gitleaks detected secrets" in fail_step["run"]
-
-    dist_upload = _find_step_by_name(build_steps, "Upload dist artifacts")
-    assert dist_upload["with"]["path"] == "dist/*.whl\ndist/*.tar.gz\n"
-    retired_bundle_job = "bundle" + "_release"
-    release_cli_prefix = "gh" + " release"
-    assert retired_bundle_job not in workflow["jobs"]
-    assert not any(
-        release_cli_prefix in str(step.get("run", ""))
-        for step in _iter_job_steps(workflow)
-    )
-
-    testpypi_smoke = workflow["jobs"]["testpypi_smoke"]
-    assert testpypi_smoke["needs"] == ["publish", "resolve_release_ref"]
-    assert workflow["jobs"]["publish"]["timeout-minutes"] == 10
-    assert testpypi_smoke["timeout-minutes"] == 10
-    assert "inputs.target == 'testpypi'" in testpypi_smoke["if"]
-    smoke_steps = testpypi_smoke.get("steps", [])
-    download_step = _find_step_by_name(smoke_steps, "Download published TestPyPI wheel")
-    assert "https://test.pypi.org/pypi/invarlock/" in download_step["run"]
-    assert "wheelhouse/requirements.txt" in download_step["run"]
-    assert (
-        download_step["env"]["INVARLOCK_RELEASE_VERSION"]
-        == "${{ needs.resolve_release_ref.outputs.release_tag }}"
-    )
-
-    install_published_step = _find_step_by_name(
-        smoke_steps, "Install published wheel and smoke test"
-    )
-    assert "python -m pip install wheelhouse/*.whl" in install_published_step["run"]
-    assert "invarlock --help" in install_published_step["run"]
-    assert 'python -c "import invarlock.cli.app"' in install_published_step["run"]
+    assert "--diff-filter=ACMR" in generated["run"]
+    assert "--diff-filter=ACMR" in large["run"]

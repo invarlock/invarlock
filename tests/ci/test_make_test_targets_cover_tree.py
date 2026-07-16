@@ -1,92 +1,79 @@
 from __future__ import annotations
 
-import ast
-import re
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-MAKEFILE = REPO_ROOT / "Makefile"
-
-EXPECTED_TEST_DIR_TARGETS = {
-    "adapters",
-    "calibration",
-    "ci",
-    "cli",
-    "core",
-    "docs",
-    "edits",
-    "eval",
-    "guards",
-    "integration",
-    "lint",
-    "observability",
-    "plugins",
-    "evidence_packs",
-    "reporting",
-    "runtime",
-    "scripts",
-}
+MAKEFILE = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
+    encoding="utf-8"
+)
 
 
-def _make_pytest_selectors() -> set[str]:
-    text = MAKEFILE.read_text(encoding="utf-8")
-    return set(
-        re.findall(
-            r"tests/[A-Za-z0-9_./-]+\.py(?:::[A-Za-z_][A-Za-z0-9_]*)?",
-            text,
-        )
+def test_test_directories_use_one_pattern_target() -> None:
+    assert "test-%:" in MAKEFILE
+    assert "tests/$*" in MAKEFILE
+    assert "TEST_DIR_TARGETS" not in MAKEFILE
+
+
+def test_root_tooling_has_no_legacy_product_workflows() -> None:
+    forbidden = (
+        "evidence-pack-v1",
+        "scripts/evidence_packs",
+        "scripts/model_evidence",
+        "guard-validation-smoke",
+        "architecture-fragmentation-check",
+        "empirical-guard-inventory-check",
+        "eval-loop",
+        "--edit-config",
+        "runtime-image-gguf",
+        "runtime-image-tensorrt-llm",
+        "runtime-image-cuda-quant",
     )
+    assert [value for value in forbidden if value in MAKEFILE] == []
 
 
-def test_make_test_dir_targets_cover_executable_tree() -> None:
-    text = MAKEFILE.read_text(encoding="utf-8")
-    match = re.search(r"^TEST_DIR_TARGETS := (.+)$", text, flags=re.MULTILINE)
-    assert match is not None
-    actual = set(match.group(1).split())
-    assert actual == EXPECTED_TEST_DIR_TARGETS
-
-    grouped_targets = actual - {"integration"}
-    missing_assignments = sorted(
-        target
-        for target in grouped_targets
-        if f"test-{target}: TEST_DIR = {target}" not in text
-    )
-    missing_help = sorted(
-        target
-        for target in grouped_targets
-        if f"test-{target}: ## Run tests/{target}" not in text
-    )
-    assert missing_assignments == []
-    assert missing_help == []
+def test_optional_provider_runtime_images_stay_outside_root_tooling() -> None:
+    assert "gguf_runtime_blackbox.py" not in MAKEFILE
+    assert "tensorrt_llm_runtime_fixture.py" not in MAKEFILE
+    assert "runtime-image-gguf" not in MAKEFILE
+    assert "runtime-image-tensorrt-llm" not in MAKEFILE
+    for addin in ("gguf", "tensorrt_llm"):
+        assert (
+            Path(__file__).resolve().parents[2] / "addins" / addin / "Makefile"
+        ).is_file()
 
 
-def test_makefile_declares_runtime_and_reporting_targets() -> None:
-    text = MAKEFILE.read_text(encoding="utf-8")
-    for target in ("test-runtime", "test-reporting"):
-        assert re.search(rf"^{target}:", text, flags=re.MULTILINE), target
+def test_first_party_addins_share_test_and_distribution_gates() -> None:
+    assert "addins-test:" in MAKEFILE
+    assert "addins-install-smoke:" in MAKEFILE
+    for path in (
+        "addins/diagnostics",
+        "addins/gguf",
+        "addins/multimodal",
+        "addins/tensorrt_llm",
+    ):
+        assert path in MAKEFILE
 
 
-def test_makefile_pytest_file_and_node_selectors_resolve() -> None:
-    missing_files: list[str] = []
-    missing_nodes: list[str] = []
+def test_container_smoke_explicitly_enables_the_gated_integration_test() -> None:
+    block = MAKEFILE.split("container-front-door-smoke:", 1)[1].split(
+        "##@ Verification", 1
+    )[0]
 
-    for selector in sorted(_make_pytest_selectors()):
-        relative_path, _, node_name = selector.partition("::")
-        path = REPO_ROOT / relative_path
-        if not path.is_file():
-            missing_files.append(relative_path)
-            continue
-        if not node_name:
-            continue
+    assert "INVARLOCK_RUN_CONTAINER_SMOKE=1" in block
+    assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in block
+    assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in block
+    assert "tests/integration/test_container_front_door_journey.py" in block
 
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        function_names = {
-            node.name
-            for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-        }
-        if node_name not in function_names:
-            missing_nodes.append(selector)
 
-    assert missing_files == []
-    assert missing_nodes == []
+def test_standard_tools_own_general_repository_gates() -> None:
+    for tool in (
+        "ruff",
+        "mypy",
+        "pytest",
+        "mkdocs",
+        "markdownlint-cli2",
+        "cspell",
+        "actionlint",
+        "python -m build",
+        "python -m twine",
+    ):
+        assert tool in MAKEFILE.lower()

@@ -527,7 +527,7 @@ def test_make_release_preflight_is_distinct_from_artifact_shape_check() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
     preflight = text.split("release-preflight:", 1)[1].split(
-        "\nguard-validation-smoke:", 1
+        "\n\n##@ Runtime image", 1
     )[0]
 
     assert "scripts/release/release_preflight.py" in preflight

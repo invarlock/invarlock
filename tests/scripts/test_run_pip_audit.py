@@ -36,6 +36,7 @@ def _write_allowlist(
                 "entries": [
                     {
                         "advisory": "GHSA-test-test-test",
+                        "compensating_control": "isolated test surface",
                         "owner": "security-maintainers",
                         "expires": (date.today() + timedelta(days=7)).isoformat(),
                         "tracking_issue": tracking_issue,
@@ -84,3 +85,39 @@ def test_load_allowlist_accepts_empty_entries(tmp_path: Path) -> None:
 
     assert owner == "security-maintainers"
     assert entries == []
+
+
+@pytest.mark.parametrize("location", ["top", "entry"])
+def test_load_allowlist_rejects_undocumented_fields(
+    tmp_path: Path, location: str
+) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    _write_allowlist(
+        allowlist,
+        tracking_issue="https://github.com/pypa/pip/issues/13607",
+    )
+    payload = json.loads(allowlist.read_text(encoding="utf-8"))
+    if location == "top":
+        payload["unexpected"] = True
+    else:
+        payload["entries"][0]["unexpected"] = True
+    allowlist.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="unsupported fields"):
+        module._load_allowlist(allowlist)
+
+
+def test_load_allowlist_requires_a_compensating_control(tmp_path: Path) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    _write_allowlist(
+        allowlist,
+        tracking_issue="https://github.com/pypa/pip/issues/13607",
+    )
+    payload = json.loads(allowlist.read_text(encoding="utf-8"))
+    payload["entries"][0]["compensating_control"] = ""
+    allowlist.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="is incomplete"):
+        module._load_allowlist(allowlist)

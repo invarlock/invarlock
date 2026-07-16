@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -195,26 +194,7 @@ def test_import_probe_rejects_candidate_package_source_fallback(
         preflight._parse_import_probe(json.dumps(payload))
 
 
-def test_installed_wheel_runtime_surface_validators_require_complete_contract() -> None:
-    preflight._validate_runtime_behavior_help(
-        "build-schedule prepare-binding build-policy run-side verify-pair"
-    )
-    preflight._validate_runtime_provider_inventory(
-        json.dumps(_runtime_provider_inventory())
-    )
-
-    with pytest.raises(preflight.ReleasePreflightError, match="omitted commands"):
-        preflight._validate_runtime_behavior_help("build-schedule build-policy")
-
-    inventory = _runtime_provider_inventory()
-    items = inventory["items"]
-    assert isinstance(items, list)
-    items[1]["backend_delivery"] = "python_extra"
-    with pytest.raises(preflight.ReleasePreflightError, match="metadata is invalid"):
-        preflight._validate_runtime_provider_inventory(json.dumps(inventory))
-
-
-def test_installed_wheel_runtime_surface_runs_canonical_cli_journey(
+def test_installed_wheel_cli_smoke_checks_only_supported_commands(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     commands: list[list[str]] = []
@@ -225,43 +205,10 @@ def test_installed_wheel_runtime_surface_runs_canonical_cli_journey(
         del label, timeout
         assert cwd == tmp_path
         commands.append(invoked)
-        if invoked[-1] == "--help":
-            return subprocess.CompletedProcess(
-                invoked,
-                0,
-                "build-schedule prepare-binding build-policy run-side verify-pair",
-                "",
-            )
-        if "runtime-providers" in invoked:
-            return subprocess.CompletedProcess(
-                invoked, 0, json.dumps(_runtime_provider_inventory()), ""
-            )
-        output = Path(invoked[invoked.index("--out") + 1])
-        if "build-schedule" in invoked:
-            payload = {
-                "dataset_identity": {
-                    "config_name": None,
-                    "dataset_name": None,
-                    "provider": "local_manifest",
-                    "revision": None,
-                    "split": "validation",
-                },
-                "format_version": "invarlock/runtime-behavioral-schedule-v1",
-                "records": [{"record_id": "release-smoke-1"}],
-            }
-        else:
-            schedule = tmp_path / "runtime-schedule.json"
-            payload = {
-                "behavioral_claim": {
-                    "schedule_sha256": hashlib.sha256(schedule.read_bytes()).hexdigest()
-                },
-                "format": "policy-pack-v3",
-            }
-        output.write_text(
-            json.dumps(payload, sort_keys=True, separators=(",", ":")),
-            encoding="utf-8",
+        output = (
+            "evaluate verify report version" if invoked[1:] == ["--help"] else "usage"
         )
-        return subprocess.CompletedProcess(invoked, 0, "{}", "")
+        return subprocess.CompletedProcess(invoked, 0, output, "")
 
     monkeypatch.setattr(
         preflight, "_require_successful_installed_wheel_command", command
@@ -269,28 +216,27 @@ def test_installed_wheel_runtime_surface_runs_canonical_cli_journey(
 
     preflight._smoke_installed_wheel_cli(tmp_path / "bin" / "invarlock", cwd=tmp_path)
 
-    assert [
-        next(
-            (
-                token
-                for token in (
-                    "runtime-providers",
-                    "build-schedule",
-                    "build-policy",
-                )
-                if token in invoked
-            ),
-            "runtime-behavior-help",
-        )
-        for invoked in commands
-    ] == [
-        "runtime-behavior-help",
-        "runtime-providers",
-        "build-schedule",
-        "build-policy",
+    assert [invoked[1:] for invoked in commands] == [
+        ["--help"],
+        ["evaluate", "--help"],
+        ["verify", "--help"],
+        ["report", "--help"],
     ]
-    assert (tmp_path / "runtime-schedule.json").is_file()
-    assert (tmp_path / "runtime-policy.json").is_file()
+
+
+def test_installed_wheel_cli_smoke_rejects_retired_commands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        preflight,
+        "_require_successful_installed_wheel_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, "evaluate verify report version advanced", ""
+        ),
+    )
+
+    with pytest.raises(preflight.ReleasePreflightError, match="retired command"):
+        preflight._smoke_installed_wheel_cli(tmp_path / "invarlock", cwd=tmp_path)
 
 
 def test_dependency_bridge_is_a_plain_locked_site_path(

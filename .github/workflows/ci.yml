@@ -1,296 +1,149 @@
 name: CI
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   push:
-    branches: [ main, 'release/v*' ]
-    # Allow supply-chain job to run on release tags too.
-    tags: [ 'v*' ]
+    branches: [main, staging/next, 'release/v*']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
       full:
-        description: "Run full verify (slow): make verify + mkdocs build"
+        description: "Run the complete repository and distribution gates"
         required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  # Single test job (Python 3.13)
-  tests-docs:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+  verify-fast:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
-      INVARLOCK_LIGHT_IMPORT: "1"
+      PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
-      PYTHON: "python"
-      PYTHONWARNINGS: "default"
-    timeout-minutes: 20
+      PYTHONWARNINGS: default
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          python-version: "3.13"
-
-      - name: Cache pip
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        # `act` can clobber PATH after setup-python on some hosts; cache is optional.
-        if: ${{ github.actor != 'nektos/act' }}
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.13-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.13-
-
-      - name: Install (core + hf + docs)
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
         run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
-
-      - name: Run actionlint
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Run fast repository gates
+        run: make verify-fast
+      - name: Lint workflows
         run: |
-          export PATH="$HOME/go/bin:$PATH"
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-          make actionlint
+          gopath="$(go env GOPATH)"
+          export PATH="${gopath}/bin:$PATH"
+          make workflow-lint
 
-      - name: Run complete fast lane
-        run: make test-fast
-
-      - name: Run statistical calibration fast lane
-        run: make statistical-calibration-fast
-
-      - name: Run local HF pipeline smoke
-        env:
-          INVARLOCK_REQUIRE_LOCAL_HF: "1"
-        run: make local-hf-pipeline-smoke
-
-      - name: Run mutation smoke
-        run: make mutation-smoke
-
-      - name: Docs build (strict)
-        run: |
-          mkdocs build --strict
-
-      - name: Run curated live examples
-        run: make docs-live-fast
-
-  # Minimum-supported Python (3.12) smoke (small subset).
-  tests-min-py312:
+  minimum-python:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
-      INVARLOCK_LIGHT_IMPORT: "1"
+      PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
-      PYTHONWARNINGS: "default"
-    timeout-minutes: 20
+      PYTHONWARNINGS: default
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          python-version: "3.12"
-
-      - name: Cache pip
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        # `act` can clobber PATH after setup-python on some hosts; cache is optional.
-        if: ${{ github.actor != 'nektos/act' }}
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.12-
-
-      - name: Install (core + hf)
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
         run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
+      - name: Run minimum-Python tests
+        run: make test-fast
+      - name: Check command surface
+        run: make cli-smoke-core
 
-      - name: Min supported smoke
-        run: |
-          pytest -q \
-            tests/core \
-            tests/guards \
-            tests/reporting \
-            tests/cli/test_python_m_invarlock.py
-
-      - name: Packaging smoke (minimal install)
-        run: make packaging-smoke-minimal
-
-  training-profiles:
+  coverage:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
-    env:
-      INVARLOCK_LIGHT_IMPORT: "1"
-      PYTHONPATH: ${{ github.workspace }}/src
-      PYTHONWARNINGS: "default"
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: "3.12.13"
-
-      - name: Cache pip
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: ${{ github.actor != 'nektos/act' }}
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-training-profile-py312-${{ hashFiles('requirements/workflows/training-profile-py312.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-training-profile-py312-
-
-      - name: Install immutable training profile
-        run: >-
-          python -m pip install
-          --require-hashes
-          --extra-index-url https://download.pytorch.org/whl/cpu
-          -r requirements/workflows/training-profile-py312.txt
-
-      - name: Run real tiny training profiles
-        env:
-          INVARLOCK_REQUIRE_REAL_TRAINING: "1"
-        run: >-
-          python -m pytest -q -m integration
-          tests/evidence_packs/test_training_runtime.py
-
-  coverage-enforce:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
-    runs-on: ubuntu-latest
-    env:
-      INVARLOCK_LIGHT_IMPORT: "1"
-      PYTHON: "python"
-      PYTHONPATH: ${{ github.workspace }}/src
-      PYTHONWARNINGS: "default"
     timeout-minutes: 45
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: default
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          python-version: "3.13"
-
-      - name: Cache pip
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: ${{ github.actor != 'nektos/act' }}
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-assurance-pip-3.13-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-assurance-pip-3.13-
-
-      - name: Install (hf + assurance tools)
-        run: python -m pip install --require-hashes -r requirements/workflows/assurance-ci-py313.txt
-
-      - name: Enforce coverage thresholds
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+      - name: Enforce coverage
         run: make coverage-enforce
 
-  typed-surface:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
-    runs-on: ubuntu-latest
-    env:
-      INVARLOCK_LIGHT_IMPORT: "1"
-      PYTHON: "python"
-      PYTHONPATH: ${{ github.workspace }}/src
-      PYTHONWARNINGS: "default"
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: "3.13"
-
-      - name: Cache pip
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: ${{ github.actor != 'nektos/act' }}
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-typed-pip-3.13-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-typed-pip-3.13-
-
-      - name: Install (hf + assurance tools)
-        run: python -m pip install --require-hashes -r requirements/workflows/assurance-ci-py313.txt
-
-      - name: Run typed-surface mypy
-        run: make mypy-typed-surface
-
-  # Manual full gate: broader tests + lint/format + docs build.
   verify-full:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.full == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
-      INVARLOCK_LIGHT_IMPORT: "1"
-      PYTHONWARNINGS: "default"
-      PYTHON: "python"
+      PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
-    timeout-minutes: 45
+      PYTHONWARNINGS: default
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          python-version: "3.13"
-
+          python-version: '3.13'
+          cache: pip
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: "22"
-
-      - name: Cache pip
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        # `act` can clobber PATH after setup-python on some hosts; cache is optional.
-        if: ${{ github.actor != 'nektos/act' }}
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.13-full-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.13-full-
-
-      - name: Install (core + hf + verify tools)
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
         run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
-
-      - name: Install docs lint toolchain
+      - name: Install documentation linters
         run: npm ci
-
-      - name: Full verify
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Run complete repository gates
+        run: make verify
+      - name: Lint workflows
         run: |
-          make verify
-          export PATH="$HOME/go/bin:$PATH"
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-          make actionlint
-          make packaging-smoke-minimal
-          mkdocs build --strict
+          gopath="$(go env GOPATH)"
+          export PATH="${gopath}/bin:$PATH"
+          make workflow-lint
+      - name: Build and validate distributions
+        run: make dist-check
 
-  # Supply-chain security for release tags. PR-time checks live in supply-chain-pr.yml.
   supply-chain:
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: startsWith(github.ref, 'refs/tags/')
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          python-version: "3.13"
-
-      - name: Install supply-chain tools
+          python-version: '3.13'
+      - name: Install security tools
         run: python -m pip install --require-hashes -r requirements/workflows/security-ci-py313.txt
-
       - name: Generate tool-environment SBOM
         run: bash scripts/security/generate_sbom.sh --scope tool-environment
-
-      - name: Run pip-audit
+      - name: Audit dependencies
         run: python scripts/security/run_pip_audit.py

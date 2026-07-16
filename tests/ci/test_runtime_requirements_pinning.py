@@ -3,10 +3,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW_REQUIREMENTS = ROOT / "requirements" / "workflows"
+REFRESH_SCRIPT = ROOT / "scripts" / "security" / "refresh_pinned_requirements.sh"
 
-def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
-    script = Path.cwd() / "scripts" / "security" / "refresh_pinned_requirements.sh"
-    text = script.read_text(encoding="utf-8")
+
+def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
 
     assert (
         '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
@@ -14,89 +17,65 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
     ) in text
     assert (
         '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
-        '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
-    ) in text
-    assert (
-        '"${WORKFLOW_DIR}/runtime-image-quant.in" \\\n'
-        '    "${WORKFLOW_DIR}/runtime-image-quant-py312-cu128.txt"'
-    ) in text
-    assert (
-        '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert (
-        '"${WORKFLOW_DIR}/training-profile.in" \\\n'
-        '    "${WORKFLOW_DIR}/training-profile-py312.txt"'
+        '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
+        '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
     ) in text
-    assert (
-        '"${EVIDENCE_PACK_DIR}/accelerate.in" \\\n'
-        '    "${EVIDENCE_PACK_DIR}/accelerate.txt" \\\n'
-        "    --no-deps"
-    ) in text
-    assert (
-        '"${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \\\n'
-        '    "${EVIDENCE_PACK_DIR}/cuda-nvcc.txt" \\\n'
-        "    --no-deps"
-    ) in text
-    assert (
-        '"${EVIDENCE_PACK_DIR}/flash-attn.in" \\\n'
-        '    "${EVIDENCE_PACK_DIR}/flash-attn.txt" \\\n'
-        "    --no-deps"
-    ) in text
-    assert text.count("--torch-backend cpu") == 3
-    assert text.count("--torch-backend cu128") == 2
+    assert text.count("--torch-backend cpu") == 2
+    assert text.count("--torch-backend cu128") == 1
 
 
-def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
-    req_dir = Path.cwd() / "requirements" / "evidence-packs"
-    forbidden = (
-        "torch==",
-        "torchvision==",
-        "torchao==",
-        "triton==",
-        "bitsandbytes==",
-        "optimum-quanto==",
-        "cuda-toolkit",
-        "cuda-bindings",
-        "nvidia-",
-        "cu13",
+def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
+    retired = (
+        "advanced-py313",
+        "assurance-ci",
+        "evidence-packs",
+        "runtime-image-quant",
+        "training-profile",
     )
-    allowed_backend_specific = {"cuda-nvcc.txt"}
 
-    for path in sorted(req_dir.glob("*.txt")):
-        text = path.read_text(encoding="utf-8")
-        assert str(Path.cwd()) not in text, f"{path.name} must use repo-relative paths"
-        if path.name in allowed_backend_specific:
-            continue
-        for token in forbidden:
-            assert token not in text, f"{path.name} must not pin {token!r}"
+    for marker in retired:
+        assert marker not in text
 
 
-def test_runtime_image_locks_are_the_explicit_torch_backend_surface() -> None:
-    workflow_dir = Path.cwd() / "requirements" / "workflows"
-    runtime_locks = {
-        "runtime-image-py312.txt": ("2.13.0+cpu", "0.28.0+cpu"),
-        "runtime-image-py312-aarch64.txt": ("2.11.0+cpu", "0.26.0+cpu"),
-        "runtime-image-py312-cu128.txt": ("2.11.0+cu128", "0.26.0+cu128"),
-        "runtime-image-quant-py312-cu128.txt": (
-            "2.11.0+cu128",
-            "0.26.0+cu128",
-        ),
-        "training-profile-py312.txt": ("2.11.0+cpu", "0.26.0+cpu"),
-    }
+def test_runtime_image_locks_are_cpu_only() -> None:
+    runtime_locks = (
+        "runtime-image-py312.txt",
+        "runtime-image-py312-aarch64.txt",
+    )
 
-    for filename, (torch_version, torchvision_version) in runtime_locks.items():
-        text = (workflow_dir / filename).read_text(encoding="utf-8")
-        assert f"torch=={torch_version}" in text
-        assert f"torchvision=={torchvision_version}" in text
+    for filename in runtime_locks:
+        text = (WORKFLOW_REQUIREMENTS / filename).read_text(encoding="utf-8")
+        assert "torch==2.11.0+cpu" in text
+        assert "+cu" not in text
         assert "cu13" not in text
 
 
-def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
-    script = Path.cwd() / "scripts" / "security" / "refresh_pinned_requirements.sh"
+def test_cuda_runtime_image_lock_is_separate_and_backend_pinned() -> None:
+    text = (WORKFLOW_REQUIREMENTS / "runtime-image-py312-cu128.txt").read_text(
+        encoding="utf-8"
+    )
 
+    assert "torch==2.11.0+cu128" in text
+    assert "nvidia-cuda-runtime-cu12==" in text
+    assert "--hash=sha256:" in text
+    assert "bitsandbytes==" not in text
+    assert "gptqmodel==" not in text
+
+
+def test_runtime_wheel_build_lock_is_retained() -> None:
+    lock = WORKFLOW_REQUIREMENTS / "runtime-wheel-build-py312.txt"
+
+    assert lock.is_file()
+    assert "--hash=sha256:" in lock.read_text(encoding="utf-8")
+
+
+def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
     result = subprocess.run(
-        ["bash", str(script), "--help"],
+        ["bash", str(REFRESH_SCRIPT), "--help"],
         capture_output=True,
         text=True,
         check=False,
@@ -104,4 +83,5 @@ def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
 
     assert result.returncode == 0
     assert "--check" in result.stdout
+    assert "all or workflows" in result.stdout
     assert "uv pip compile" not in result.stderr

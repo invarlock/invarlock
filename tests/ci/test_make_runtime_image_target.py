@@ -4,12 +4,10 @@ import re
 from pathlib import Path
 
 
-def _get_make_target_block(text: str, target: str) -> str | None:
-    pattern = re.compile(rf"^\s*{re.escape(target)}\s*:\s*(?:##.*)?$", re.MULTILINE)
+def _target_block(text: str, target: str) -> str:
+    pattern = re.compile(rf"^\s*{re.escape(target)}\s*:[^\n]*$", re.MULTILINE)
     match = pattern.search(text)
-    if not match:
-        return None
-
+    assert match is not None, f"{target} target not found"
     lines: list[str] = []
     for line in text[match.end() :].splitlines():
         if line and re.match(r"^[A-Za-z0-9_.-]+\s*:\s*", line):
@@ -18,92 +16,66 @@ def _get_make_target_block(text: str, target: str) -> str | None:
     return "\n".join(lines)
 
 
-def test_runtime_image_target_replaces_existing_local_tag_before_build() -> None:
-    makefile = Path(__file__).resolve().parents[2] / "Makefile"
-    data = makefile.read_text(encoding="utf-8")
-    block = _get_make_target_block(data, "runtime-image")
+def test_make_exposes_the_canonical_cpu_runtime_image_build() -> None:
+    data = Path("Makefile").read_text(encoding="utf-8")
+    block = _target_block(data, "runtime-image")
 
-    assert block is not None, "runtime-image target not found in Makefile"
-    assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE)" in block
-    assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE)" in block
-    assert (
-        "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND)"
-        in block
-    )
+    assert 'test -n "$(CONTAINER_ENGINE)"' in block
+    assert 'test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
+    assert "$(CONTAINER_ENGINE) build" in block
     assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
     assert "-f runtime/Dockerfile -t $(RUNTIME_IMAGE) ." in block
+    assert "runtime-image-quant" not in data
 
 
-def test_runtime_image_cuda_target_builds_cuda_tag_with_cuda_requirements() -> None:
-    makefile = Path(__file__).resolve().parents[2] / "Makefile"
-    data = makefile.read_text(encoding="utf-8")
-    block = _get_make_target_block(data, "runtime-image-cuda")
+def test_make_exposes_a_separate_minimal_cuda_runtime_image_build() -> None:
+    data = Path("Makefile").read_text(encoding="utf-8")
+    block = _target_block(data, "runtime-image-cuda")
 
-    assert block is not None, "runtime-image-cuda target not found in Makefile"
-    assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA)" in block
-    assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA)" in block
+    assert 'test -n "$(CONTAINER_ENGINE)"' in block
+    assert 'test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
+    assert "$(CONTAINER_ENGINE) build" in block
+    assert "--platform linux/amd64" in block
+    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
+    assert "-f runtime/Dockerfile.cuda -t $(RUNTIME_IMAGE_CUDA) ." in block
+    assert "runtime-image-cuda-quant" not in data
+
+
+def test_make_runtime_smoke_uses_the_built_image_offline() -> None:
+    data = Path("Makefile").read_text(encoding="utf-8")
+    block = _target_block(data, "runtime-smoke")
+
+    assert "$(CONTAINER_ENGINE) run --rm --network none" in block
+    assert "--entrypoint python $(RUNTIME_IMAGE)" in block
+    assert "import torch, transformers, safetensors" in block
+
+
+def test_make_cuda_runtime_smoke_requires_a_visible_gpu() -> None:
+    data = Path("Makefile").read_text(encoding="utf-8")
+    block = _target_block(data, "runtime-smoke-cuda")
+
     assert (
-        "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND)"
+        "$(CONTAINER_ENGINE) run --rm --network none $(RUNTIME_CUDA_DEVICE_ARGS)"
         in block
     )
-    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
+    assert "--entrypoint python $(RUNTIME_IMAGE_CUDA)" in block
+    assert "assert torch.version.cuda == '12.8'" in block
+    assert "assert torch.cuda.is_available()" in block
     assert (
-        "--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_CUDA_APT_SNAPSHOT)" in block
+        "RUNTIME_CUDA_DEVICE_ARGS = $(if $(filter podman,$(CONTAINER_ENGINE)),"
+        "--device nvidia.com/gpu=all,--gpus all)"
+    ) in data
+
+
+def test_container_front_door_target_runs_the_opt_in_journey() -> None:
+    data = Path("Makefile").read_text(encoding="utf-8")
+    block = _target_block(data, "container-front-door-smoke")
+
+    assert (
+        "runtime-image"
+        in data.split("container-front-door-smoke:", 1)[1].splitlines()[0]
     )
-    assert (
-        "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS)"
-    ) in block
-    assert (
-        "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
-    ) in block
-    assert "-t $(RUNTIME_IMAGE_CUDA) ." in block
-
-
-def test_runtime_image_cuda_quant_target_builds_quant_tag_with_quant_requirements() -> (
-    None
-):
-    makefile = Path(__file__).resolve().parents[2] / "Makefile"
-    data = makefile.read_text(encoding="utf-8")
-    block = _get_make_target_block(data, "runtime-image-cuda-quant")
-
-    assert block is not None, "runtime-image-cuda-quant target not found in Makefile"
-    assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT)" in block
-    assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT)" in block
-    assert (
-        "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH) $(RUNTIME_IMAGE_BUILD_COMMAND)"
-        in block
-    )
-    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
-    assert (
-        "--build-arg RUNTIME_APT_SNAPSHOT=$(RUNTIME_IMAGE_CUDA_APT_SNAPSHOT)" in block
-    )
-    assert "--build-arg RUNTIME_BASE_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT_BASE)" in block
-    assert (
-        "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS)"
-    ) in block
-    assert "--build-arg RUNTIME_CUDA_HOME=/usr/local/cuda" in block
-    assert "--build-arg RUNTIME_KEEP_BUILD_TOOLCHAIN=1" in block
-    assert "--build-arg RUNTIME_PATH_PREFIX=/usr/local/cuda/bin:" in block
-    assert (
-        "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
-    ) in block
-    assert "-t $(RUNTIME_IMAGE_CUDA_QUANT) ." in block
-
-
-def test_runtime_image_build_command_uses_reproducible_docker_buildx_path() -> None:
-    makefile = Path(__file__).resolve().parents[2] / "Makefile"
-    data = makefile.read_text(encoding="utf-8")
-
-    assert "RUNTIME_IMAGE_BUILD_COMMAND" in data
-    assert "buildx build --load --provenance=false" in data
-    assert "$(CONTAINER_ENGINE) build)" in data
-
-
-def test_runtime_image_targets_fail_closed_without_a_source_epoch() -> None:
-    makefile = Path(__file__).resolve().parents[2] / "Makefile"
-    data = makefile.read_text(encoding="utf-8")
-
-    assert "RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct" in data
-    assert "$(or $(shell git log -1 --pretty=%ct" not in data
-    assert data.count('test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"') == 4
-    assert "set RUNTIME_SOURCE_DATE_EPOCH explicitly for archive builds" in data
+    assert "INVARLOCK_RUN_CONTAINER_SMOKE=1" in block
+    assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in block
+    assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in block
+    assert "tests/integration/test_container_front_door_journey.py" in block

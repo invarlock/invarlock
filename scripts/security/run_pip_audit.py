@@ -23,12 +23,15 @@ class AllowlistEntry:
     expires: date
     tracking_issue: str
     reason: str
+    compensating_control: str
 
 
 def load_pip_audit_allowlist(path: Path) -> tuple[str, list[AllowlistEntry]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise SystemExit(f"Allowlist file must contain an object: {path}")
+    if set(payload) != {"owner", "entries"}:
+        raise SystemExit(f"Allowlist file has unsupported fields: {path}")
 
     owner = str(payload.get("owner", "")).strip()
     if not owner:
@@ -43,17 +46,30 @@ def load_pip_audit_allowlist(path: Path) -> tuple[str, list[AllowlistEntry]]:
     for index, raw_entry in enumerate(raw_entries, start=1):
         if not isinstance(raw_entry, dict):
             raise SystemExit(f"Allowlist entry {index} in {path} must be an object")
+        if set(raw_entry) != {
+            "advisory",
+            "compensating_control",
+            "expires",
+            "owner",
+            "reason",
+            "tracking_issue",
+        }:
+            raise SystemExit(
+                f"Allowlist entry {index} in {path} has unsupported fields"
+            )
         advisory = str(raw_entry.get("advisory", "")).strip()
         entry_owner = str(raw_entry.get("owner", "")).strip()
         expires_raw = str(raw_entry.get("expires", "")).strip()
         tracking_issue = str(raw_entry.get("tracking_issue", "")).strip()
         reason = str(raw_entry.get("reason", "")).strip()
+        compensating_control = str(raw_entry.get("compensating_control", "")).strip()
         if (
             not advisory
             or not entry_owner
             or not expires_raw
             or not tracking_issue
             or not reason
+            or not compensating_control
         ):
             raise SystemExit(f"Allowlist entry {index} in {path} is incomplete")
         expires = date.fromisoformat(expires_raw)
@@ -76,6 +92,7 @@ def load_pip_audit_allowlist(path: Path) -> tuple[str, list[AllowlistEntry]]:
                 expires=expires,
                 tracking_issue=tracking_issue,
                 reason=reason,
+                compensating_control=compensating_control,
             )
         )
 
@@ -115,6 +132,10 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"Allowing {entry.advisory} until {entry.expires.isoformat()} "
             f"({entry.owner}; {entry.tracking_issue}): {entry.reason}",
+            file=sys.stderr,
+        )
+        print(
+            f"Compensating control for {entry.advisory}: {entry.compensating_control}",
             file=sys.stderr,
         )
 

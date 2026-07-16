@@ -1,8 +1,0 @@
--r runtime-image.in
-
-# Immutable real-training toolchain exercised by the dedicated CI lane.
-peft==0.19.1
-pytest==9.0.3
-setuptools<82
-torch==2.11.0
-transformers==5.12.0

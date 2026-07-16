@@ -182,26 +182,3 @@ jobs:
 
       - name: Remove HF surface venv
         run: rm -rf .hf-venv
-
-      - name: Create advanced surface venv
-        id: advanced_surface
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PIP_NO_CACHE_DIR=1
-          rm -rf .advanced-venv
-          python -m venv .advanced-venv
-          . .advanced-venv/bin/activate
-          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
-          python -m pip install dist/*.whl --no-deps
-          python -m pip install --require-hashes -r requirements/workflows/advanced-py313.txt
-          site_packages="$(python - <<'PY'
-          import site
-          paths = site.getsitepackages()
-          print(paths[0] if paths else site.getusersitepackages())
-          PY
-          )"
-          echo "site_packages=${site_packages}" >> "$GITHUB_OUTPUT"
-
-      - name: Run advanced surface pip-audit
-        run: python scripts/security/run_pip_audit.py --path "${{ steps.advanced_surface.outputs.site_packages }}"

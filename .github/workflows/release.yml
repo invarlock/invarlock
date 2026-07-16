@@ -167,12 +167,18 @@ jobs:
             printf '[]\n' > artifacts/supply-chain/gitleaks.json
           fi
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-      - name: Build wheel/sdist
+      - name: Build first-party distributions
         run: |
           rm -rf build dist
           python -m build --no-isolation
+          python -m build --no-isolation --outdir dist/addins addins/diagnostics
+          python -m build --no-isolation --outdir dist/addins addins/gguf
+          python -m build --no-isolation --outdir dist/addins addins/multimodal
+          python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
       - name: Twine check
-        run: python -m twine check dist/*
+        run: |
+          python -m twine check dist/*.whl dist/*.tar.gz
+          python -m twine check dist/addins/*
       - name: Install smoke from wheel
         env:
           INVARLOCK_LIGHT_IMPORT: "1"
@@ -188,9 +194,14 @@ jobs:
           print(f"Wheel digest verified: {digest}")
           PY
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
-          python -m pip install dist/*.whl
+          python -m pip install dist/*.whl dist/addins/*.whl
           invarlock --help
           python -c "import invarlock.cli.app"
+          invarlock-gguf-conformance
+          invarlock-hf-vision-text-conformance
+          invarlock-tensorrt-llm-conformance
+          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
+          python -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"
       - name: Create release install-surface venv
         id: install_surface
         shell: bash
@@ -200,7 +211,7 @@ jobs:
           python -m venv .artifact-venv
           . .artifact-venv/bin/activate
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
-          python -m pip install dist/*.whl
+          python -m pip install dist/*.whl dist/addins/*.whl
           site_packages="$(python - <<'PY'
           import site
           paths = site.getsitepackages()
@@ -221,6 +232,8 @@ jobs:
           path: |
             dist/*.whl
             dist/*.tar.gz
+            dist/addins/*.whl
+            dist/addins/*.tar.gz
           if-no-files-found: error
           retention-days: 3
       - name: Upload SBOM artifact
@@ -287,6 +300,8 @@ jobs:
           mkdir -p publish-dist
           cp _release_dist/*.whl publish-dist/
           cp _release_dist/*.tar.gz publish-dist/
+          cp _release_dist/addins/*.whl publish-dist/
+          cp _release_dist/addins/*.tar.gz publish-dist/
       - name: Resolve publish target
         id: vars
         run: |
@@ -328,10 +343,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
-      - name: Download published TestPyPI wheel
+      - name: Download published TestPyPI wheels
         env:
           INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
@@ -345,25 +364,42 @@ jobs:
           from pathlib import Path
 
           version = os.environ["INVARLOCK_RELEASE_VERSION"].removeprefix("v")
-          metadata_url = f"https://test.pypi.org/pypi/invarlock/{version}/json"
-          with urllib.request.urlopen(metadata_url) as response:
-              payload = json.load(response)
+          projects = (
+              "invarlock",
+              "invarlock-diagnostics",
+              "invarlock-runtime-gguf",
+              "invarlock-runtime-hf-vision-text",
+              "invarlock-runtime-tensorrt-llm",
+          )
+          requirements = []
+          for project in projects:
+              metadata_url = (
+                  f"https://test.pypi.org/pypi/{project}/{version}/json"
+              )
+              with urllib.request.urlopen(metadata_url) as response:
+                  payload = json.load(response)
 
-          wheel = next(item for item in payload["urls"] if item["filename"].endswith(".whl"))
-          destination = Path("wheelhouse") / wheel["filename"]
-          with urllib.request.urlopen(wheel["url"]) as response:
-              destination.write_bytes(response.read())
+              wheel = next(
+                  item
+                  for item in payload["urls"]
+                  if item["filename"].endswith(".whl")
+              )
+              destination = Path("wheelhouse") / wheel["filename"]
+              with urllib.request.urlopen(wheel["url"]) as response:
+                  destination.write_bytes(response.read())
 
-          digest = hashlib.sha256(destination.read_bytes()).hexdigest()
-          if digest != wheel["digests"]["sha256"]:
-              raise SystemExit("TestPyPI wheel digest mismatch")
+              digest = hashlib.sha256(destination.read_bytes()).hexdigest()
+              if digest != wheel["digests"]["sha256"]:
+                  raise SystemExit(f"TestPyPI digest mismatch for {project}")
+              requirements.append(
+                  f"{destination.resolve()} --hash=sha256:{digest}\n"
+              )
+              print(f"Downloaded {destination.name}")
 
-          requirements = Path("wheelhouse/requirements.txt")
-          requirements.write_text(
-              f"{destination.resolve()} --hash=sha256:{digest}\n",
+          Path("wheelhouse/requirements.txt").write_text(
+              "".join(requirements),
               encoding="utf-8",
           )
-          print(f"Downloaded {destination.name}")
           PY
       - name: Install published wheel and smoke test
         env:
@@ -375,3 +411,8 @@ jobs:
           python -m pip install wheelhouse/*.whl
           invarlock --help
           python -c "import invarlock.cli.app"
+          invarlock-gguf-conformance
+          invarlock-hf-vision-text-conformance
+          invarlock-tensorrt-llm-conformance
+          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
+          python -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"
