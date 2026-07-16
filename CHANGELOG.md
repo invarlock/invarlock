@@ -1,218 +1,174 @@
 # InvarLock – Changelog
 
-All notable changes to the InvarLock framework will be documented in this file.
+All notable changes to the InvarLock engine will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+This release centers InvarLock on paired model release-regression evaluation:
+authenticate the inputs, execute or import both sides over the same schedule,
+derive a policy decision from replayable record facts, and publish evidence that
+can be verified independently.
+
 ### Added
 
-- Added a first-party runtime-provider ABI and registry with built-in Hugging
-  Face support through the optional `[hf]` extra and process-isolated
-  GGUF/llama.cpp and TensorRT-LLM connectors. The machine-readable
-  `invarlock advanced plugins runtime-providers` inventory distinguishes
-  connector availability, backend delivery, and the metadata-only
-  `runtime_qualification: not_probed` state. GGUF and TensorRT-LLM use the
-  `first_party_experimental` plugin-maturity tier; connector readiness and
-  strict-contract eligibility do not qualify a backend, image, platform, or
-  model artifact.
-- Added installed `build-schedule`, `prepare-binding`, `build-policy`,
-  `run-side`, and `verify-pair` commands for the native providers. They derive
-  canonical schedules and role bindings, authorize exact per-role inputs,
-  produce each strict side separately, and replay the baseline/subject pair into
-  a positive digest-only receipt. `evaluate` now records provider selection
-  through `--baseline-runtime-provider` and `--subject-runtime-provider`; its
-  execution path remains Hugging Face-only and directs native-provider
-  comparisons to the advanced runtime-behavior workflow. Strict Hugging Face
-  runtime-behavior evidence uses the provider-owned exact
-  model/artifact-bound scorer through the Python API. Cross-runtime claims are
-  limited to policy-bound exact-match behavior and do not imply weight,
-  activation, numerical, performance, export, or backend equivalence.
-- Added provider-owned `inspect-inputs` derivation for GGUF/llama.cpp and
-  TensorRT-LLM. The installed command authenticates the native artifact,
-  backend, runner, source or tokenizer inputs and writes complete path-free,
-  no-clobber settings without accepting caller-supplied hashes. A runnable
-  mixed-provider example and operator guide now cover the full schedule,
-  directed-policy, side-production, and paired-verification transaction.
-- Added pinned native runtime-image qualification targets. GGUF requires a
-  two-container behavior black-box before assigning the stable local tag.
-  TensorRT-LLM uses explicit GPU selectors, real CUDA execution, reviewed model
-  and image inputs, matched-device preflight, independently built engines, and
-  cross-device execution of the frozen primary engine. Qualification binds the
-  engine, tokenizer, settings, immutable candidate image, and canonical
-  provider receipt; it promotes only the qualified digest and leaves an
-  existing stable tag unchanged on failure. GGUF and TensorRT-LLM remain
-  experimental, and TensorRT-LLM requires separate NVIDIA platform and
-  real-engine qualification.
-- Added deterministic compact runtime release-evidence assets with public
-  qualification-receipt and asset-index contracts. Each asset embeds canonical
-  sanitized provider summaries, source and image bindings, independently
-  validated schedule-level receipts, and a closed hash inventory while
-  excluding model files, engine bundles, raw logs, and host paths. Path-free
-  qualification names allow one provider to carry multiple receipt-bound
-  results with exact set validation; names inventory reviewed runs but do not
-  claim independent execution. A no-clobber release handoff stages the archive
-  and checksum under source-, tag-, and digest-bound names, revalidates both
-  evidence and release bindings, and verifies the uploaded GitHub Release
-  assets without treating the evidence source commit as the release commit.
-- Added policy-bound `observe` and `enforce` authority for spectral, RMT, and
-  variance findings in `policy-pack-v2`. Observation mode retains complete
-  guard execution, provenance, replay, and reporting while leaving primary
-  metrics, drift, invariants, and guard-metric impact as mandatory blockers.
-  Current strict reports use claim set `invarlock-weight-edit-regression-v2`
-  and require `assurance.guard_authority` to exactly mirror
-  `resolved_policy.guard_authority`; shipped tiers remain all-`enforce` by
-  default.
-- Added a hash-bound historical guard-scenario observation index and closed
-  semantic replay for the published Mistral asset, covering PM-pass spectral,
-  RMT, and variance signals plus a spectral negative control without upgrading
-  legacy reports into current strict-assurance results.
-- Added immutable real-training profiles and fail-closed receipts for tiny
-  full-parameter fine-tuning and PEFT LoRA train/serialize/reload/merge flows.
-- Added complete raw-baseline, independently supplied policy-pack, and
-  runtime-image inputs to strict report and evidence-pack verification.
-- Added catalog-bound evidence verification with immutable catalog, source,
-  runtime-image, and signer anchors plus a repository-owned command for running
-  one evidence lane.
-- Added canonical report-contract, policy-provenance, dataset-identity,
-  checkpoint-identity, and guard-recomputation checks for release-grade
-  verification.
-- Added architecture, coverage-ratchet, mutation-smoke, documentation,
-  distribution, and release-preflight checks to the maintained validation
-  entrypoints.
-- Added catalog profiles, adapters, and deterministic dataset materialization
-  for current masked-language, sequence-to-sequence, causal-language, MoE, and
-  vision-language model families.
+- Added a closed evaluation-request contract that binds the baseline, subject,
+  dataset, runtime provider, policy, exactly one built-in metric or scorer
+  binding, execution mode, and evidence destination in one request-root
+  transaction.
+- Added digest-pinned local JSONL preparation for run mode, preserving source
+  order and deterministically deriving the canonical schedule, record IDs, and
+  input hashes used by both sides.
+- Added canonical evidence bundles with typed provider identities, paired
+  records, verifier-derived scores, complete inventories and checksums,
+  per-side runtime bindings, and an Ed25519 evidence-signer signature.
+- Added independently signed verification receipts that bind caller-supplied
+  baseline and subject artifact identities, the canonical schedule, policy,
+  runtime digests, evidence-signer identity, verifier identity, and the
+  verification result.
+- Added a compact runtime-provider ABI with Hugging Face Transformers as the
+  canonical built-in provider and GGUF/llama.cpp plus TensorRT-LLM as
+  first-party optional packages.
+- Added task-bound provider and schedule contracts with canonical structured
+  input parts, allowing future task integrations to share the same evidence
+  transaction without expanding the built-in execution surface.
+- Added the first structured-content integration as an optional Hugging Face
+  vision-text provider package, with authenticated prompt-and-image inputs,
+  deterministic local inference, and the ordinary evaluate, verify, and report
+  journey.
+- Added the `invarlock.engine` embedding facade for request loading,
+  evaluation, verification, reporting, provider ABI types, and independent
+  validation of signed verification receipts.
+- Added the standalone `invarlock-diagnostics` package for observation-only
+  spectral, random-matrix, and variance summaries.
+- Added optional authenticated observation attachments to evaluation requests,
+  signed evidence bundles, verification results, and human reports. Their
+  content and comparison bindings are verified while acceptance remains solely
+  a function of the selected paired comparison and policy.
+- Added paired accepted/rejected offline examples and an isolated
+  evidence-signer-versus-verifier demonstration that proves policy rejection and
+  tamper detection without sharing signing keys or workspaces.
+- Added a typed external-record authoring kit that accepts schedule-bound
+  per-record facts, writes complete runtime side evidence atomically, reloads
+  it through the independent verifier, and derives paired records without
+  accepting provider-supplied aggregates.
+- Added a bounded verifier-replayable scorer extension contract for
+  deterministic text-output scoring. Requests and policies bind the scorer ID,
+  version, descriptor, configuration, and configuration digest; core retains
+  unit-interval score semantics, arithmetic means, paired percentage-point
+  delta, deterministic interval, and verdict authority.
+- Added normalized negative log-likelihood per expected UTF-8 byte to the
+  Hugging Face provider, with teacher-forced scoring and fail-closed tokenizer
+  continuation checks.
+- Added verifier-derived paired exact-match statistics: baseline-pass to
+  subject-fail regressions, baseline-fail to subject-pass improvements, an
+  exact two-sided McNemar probability, and a paired Newcombe 95% effect-size
+  interval whose lower bound controls the exact-match policy.
+- Added a deterministic 95% paired schedule-resampling interval with 2,048
+  SHA-256-derived replicates for normalized NLL; its upper bound controls the
+  likelihood-regression policy.
+- Added a token-weighted perplexity ratio as a verifier-derived likelihood
+  interpretation when authenticated tokenizer contracts and per-pair target
+  token counts are comparable. It is not a selectable metric or policy input.
+- Added automatic host-to-OCI run execution with independently digest-pinned
+  baseline and subject workers, closed CPU/CUDA selection, disabled networking,
+  read-only worker inputs and roots, isolated writable outputs, reduced
+  container privileges, and host-only evidence signing.
+- Added separately locked CPU and x86_64 CUDA Hugging Face runtime images plus
+  matching smoke targets, with device-aware sequential or parallel side
+  execution.
+- Added add-in-owned image build, isolated smoke, real canary, and
+  evaluate-to-verify qualification targets for the optional GGUF and
+  TensorRT-LLM runtimes.
 
 ### Changed
 
-- Strengthened cross-runtime behavioral authorization in `policy-pack-v3` with
-  directed baseline and subject bindings for the schedule, provider, artifact
-  format and identity, outer runtime image, and execution-settings digest.
-  Strict side verification reloads and cross-checks the provider receipt and
-  scoring observation before paired replay, and exact-match scoring compares
-  literal typed values without coercion. Side publication is
-  descriptor-relative, atomic, and no-clobber; it checks staging and parent
-  identities immediately around publication and rolls back if a directory is
-  replaced during the operation. Portable cross-runtime comparisons use one
-  sequence per scheduled record (`batch_size=1`); same-artifact no-change
-  comparisons remain valid when the directed policy authorizes them, without
-  claiming producer independence.
-- Replaced the `published_basis` support-tier name with
-  `maintained_catalog`, separating maintained lane eligibility from the
-  independently reported `available` and `not_created` evidence states. This
-  migration introduces `support-matrix-v2`, `model-family-catalog-v2`,
-  `public-evidence-index-v2`, `plugins-v2`, and `policy-pack-v2`, renames the
-  compact index to `catalog_evidence_index.json`, and renames the corresponding
-  Python helpers and plugin metadata. The model lifecycle contract is now
-  `model-classification-v2`, where `cataloged` describes maintained catalog
-  scope without implying evidence publication. Frozen `policy-pack-v1` inputs
-  and historical release-asset paths remain verifiable but are not emitted by
-  new builders.
-- Made guard-value scenario verdicts require baseline-relative spectral and
-  variance signals, including an explicit no-new-cap negative control and a
-  positive measured variance signal rather than proposed scales alone.
-- Reclassified deterministic low-rank and dense perturbation generators as
-  synthetic edit fixtures. Real `lora_merge` and `fine_tune` labels now require
-  training provenance rather than generated look-alike edits.
-- Reworked guard reporting around measured primary-metric impact while keeping
-  runtime and memory overhead as separate system measurements.
-- Strengthened the report schema and renderer-independent outline so JSON,
-  console, Markdown, and HTML surfaces share the same decision, metric, policy,
-  guard, provenance, and appendix structure.
-- Clarified that runtime-manifest binding and image-digest matching establish
-  declared identity consistency, not execution attestation.
-- Standardized catalog evidence execution on the repository-owned lane command.
-- Hardened public-evidence archive inspection to reject unsafe paths, duplicate
-  members, and non-regular entries, and to recompute the unique regular-file
-  count and byte total before accepting an external asset.
-- Published strictly verified frozen-v1 evidence packs for 31 model-catalog
-  lanes through a hash-bound GitHub Release asset and compact source/wheel
-  index. The remaining catalog rows use the **Evidence not yet created** status
-  from the support matrix and documentation. These are `noop`
-  same-checkpoint compatibility runs covering the evidence mechanics;
-  transformed-subject detection and effectiveness remain separate experimental
-  claims. The current verifier accepts the frozen-v1 packs through its explicit
-  compatibility path; these packs do not exercise the new v2 guard-authority
-  fields.
-- Updated integration examples to distinguish real training, serialization,
-  reload, merge, pruning, and quantization workflows from synthetic fixtures
-  and to validate their emitted artifacts fail closed.
-- Refocused the root and documentation landing pages on the evaluate, verify,
-  and report workflow, current contracts, supported model families, and public
-  evidence status.
-- Updated the pinned CodeQL, uv setup, Ruff, and Setuptools validation
-  toolchain.
-- Extended isolated installed-wheel release preflight to reject checkout or
-  namespace-package leakage, import the shipped runtime modules, validate the
-  exact first-party provider inventory and command surface, and smoke schedule
-  and directed-policy construction.
+- Consolidated the public workflow into `invarlock evaluate request.yaml`,
+  `invarlock verify evidence/`, and `invarlock report evidence/`.
+- Unified executed and imported provider records behind the same canonical
+  evidence publication and independent verification transaction.
+- Centered acceptance on paired behavioral metrics under verifier-owned policy;
+  model transformation and training systems now supply artifacts and receipts
+  rather than being implemented inside the InvarLock engine.
+- Kept network, external-model, human, executable SQL/code, model-based
+  similarity, and LLM-judge scorers outside acceptance. Their results remain
+  eligible only as authenticated observations until separate replay and
+  calibration contracts exist.
+- Defined normalized NLL as teacher-forced likelihood regression over the
+  authenticated expected continuation for each prompt, with prompt tokens
+  excluded from the loss. It is not a measure of general model quality.
+- Renamed exact-match policy and report fields around their actual semantics:
+  `metrics.exact_match.delta_min_pp` and `exact_match_delta_pp` replace the
+  earlier generic accuracy vocabulary.
+- Replaced the generic normalized-NLL policy name with
+  `metrics.normalized_nll_per_utf8_byte.ratio_max`.
+- Consolidated reporting around canonical JSON, one console renderer, and one
+  self-contained HTML renderer.
+- Rebuilt the documentation around the three-command journey with a complete
+  offline example, current decision and replay semantics, assurance and threat
+  models, key and lifecycle guidance, versioned contracts, provider packages,
+  and the narrow embeddable engine.
+- Expanded operational guidance and maintained automation around independent
+  CI verification, negative-path exercises, public evidence carriers, runtime
+  and key-custody limits, dependency-audit exceptions, coordinated release
+  recovery, and offline release review.
+- Made packaged contract data the sole schema authority, removing working-tree
+  and environment-based contract substitution from verification paths.
+- Extended distribution and release validation to build, check, install, and
+  publish the core, diagnostics, GGUF, Hugging Face vision-text, and
+  TensorRT-LLM packages together while enforcing one matching release version
+  and core dependency line.
 
 ### Removed
 
-- Removed full public evidence packs from source and wheel distributions; the
-  compact catalog index now binds the corresponding GitHub Release asset.
-- Removed the standalone negative-fixture publisher, source-tree bundle
-  contract, and superseded evidence-generation entry points in favor of the
-  compact current public-evidence index and catalog-bound lane command. Release
-  preflight audits the compact index; deterministic guard-scenario and
-  fail-closed verifier suites remain repository gates, while historical
-  observations remain non-authoritative.
-- Removed duplicate tiny fine-tuning and PEFT materializers in favor of the
-  immutable training profiles.
+- Removed the multi-command and catalog orchestration surfaces, built-in
+  edit/training/quantization workflows, the custom observability stack, and
+  duplicate report surfaces.
+- Removed the former broad masked-LM, sequence-to-sequence, and multimodal
+  adapter set from built-in execution; the canonical provider focuses on paired
+  text-causal decisions while bounded task integrations use optional add-ins.
+- Moved spectral, random-matrix, and variance measurements out of the core
+  acceptance path into the optional observation-only diagnostics package.
 
 ### Fixed
 
-- Fixed RMT and variance probe validation to recompute epsilon and measured-gain
-  arithmetic, bind ordinary and baseline-relative statuses, and reject
-  internally inconsistent sidecars.
-- Fixed strict evidence-pack verification to bind each subject report to signed,
-  checksummed raw baseline material and independently supplied policy inputs.
-- Fixed verifier recomputation and fail-closed handling for paired windows,
-  bootstrap statistics, primary-metric drift, guard evidence, policy digests,
-  runtime manifests, and signer authorization.
-- Fixed masked-language-model variance targeting and deterministic WikiText
-  calibration inputs used by the catalog profile.
-- Fixed vision-language materialization and paired bare-control replay so local
-  image paths are rehydrated only from authenticated current inputs while
-  prompt, answer, and image identity bindings remain verified.
-- Fixed modern dense and MoE adapter routing, quantized-wrapper compatibility,
-  snapshot restoration, and runtime dependency pins exercised by catalog lanes.
-- Fixed TensorRT-LLM qualification and engine authentication for read-driven
-  access-time changes, clean vendor-runtime initialization, bounded timing
-  caches, content-derived engine names, and proprietary or open-kernel NVIDIA
-  driver records while preserving strict rejection of substantive artifact
-  changes.
-- Fixed documentation and CLI examples so strict commands include every
-  independently supplied verifier input.
-- Fixed public-evidence, packaged-data, support-matrix, and model-catalog
-  consistency checks so superseded results cannot be presented as current.
-- Fixed public-evidence privacy screening to inspect decoded JSON values,
-  avoiding false host-path matches in escaped model output while retaining
-  rejection of actual host paths.
-- Fixed source-checkout CLI and immutable training-profile CI isolation, Torch
-  wheel-version normalization, strict source-matrix import-path preservation,
-  and training-output ownership checks against immediate inode reuse.
-- Fixed training-artifact hashing to detect same-size concurrent rewrites even
-  when the underlying filesystem does not advance modification timestamps.
-- Fixed error-injection `must_pass` verdicts so satisfied detector expectations
-  cannot hide a report-level primary-metric, drift, invariant, or guard failure.
-- Fixed installed-package plugin discovery so InvarLock's identical shipped
-  entry points are not rejected as duplicate built-ins, while packaging drift
-  and third-party name collisions continue to fail closed.
-- Fixed runtime release-evidence publication and staging to normalize
-  filesystem link failures into closed CLI errors, clean temporary state,
-  create owner-read-only archive and checksum handoffs, and require a validated
-  command result.
-- Fixed native GGUF and TensorRT-LLM run-directory setup to close descriptors
-  and remove temporary state if the initial filesystem identity snapshot fails.
-- Fixed cross-platform runtime-provider checks so Hugging Face local build
-  suffixes reconcile with installed distribution versions, TensorRT-LLM accepts
-  trusted entries beneath sticky temporary directories while rejecting unsafe
-  writable parents or ownership, and engine-name casefold collisions fail
-  consistently on case-sensitive filesystems.
+- Fixed corrupt safetensors handling so the Hugging Face provider fails closed
+  through its documented identity error instead of leaking a backend-specific
+  exception.
+- Fixed strict provider execution so network, remote-code, and third-party
+  opt-ins are observed, recorded truthfully in runtime manifests, and rejected
+  before provider discovery or preparation begins.
+- Hardened the reusable verification action against shell and artifact-pattern
+  injection, symlink-bearing evidence, unsafe policy/key placement, output
+  clobbering, and malformed failure-policy values while preserving
+  failed-review artifacts only after a safe layout is established.
+- Fixed public-evidence synchronization so local and hash-bound external
+  carriers can coexist, source and packaged indexes remain byte-identical, and
+  local artifact summaries, accepted signed receipts, signer-authenticated pack
+  integrity, anchor binding, and credential-free external locators are
+  validated.
+- Closed the TensorRT-LLM runner request boundary around canonical JSON and
+  made dependency-audit exceptions use a closed, time-bounded schema with an
+  explicit compensating control.
+- Fixed release verification examples and TestPyPI smoke setup so clean-checkout
+  preflight and tag-bound dependency installation use the files they claim.
+- Fixed imported and replayed comparisons so the built-in metric, or the exact
+  collection metric required by a scorer binding, must be declared by both
+  authenticated provider receipts and installed provider capabilities.
+- Closed selected-comparison policy and rendered-report semantics so ignored
+  controls and comparison contradictions fail before publication or
+  presentation.
+- Fixed strict runtime replay to validate each side configuration's role,
+  provider, artifact, schedule, and policy bindings; require OCI image
+  references to agree with their authenticated digest; and publish imported
+  paired records only after a complete fsynced staging file exists.
+- Fixed Hugging Face normalized-NLL scoring so only tokenizer-stable prompt
+  continuations are accepted and byte denominators are replayed from the frozen
+  expected output rather than trusted from provider output.
+- Fixed the real-provider integration fixture so its expected answer is frozen
+  before execution instead of being copied from the observed prediction.
 
 ## [0.12.1] - 2026-07-05
 

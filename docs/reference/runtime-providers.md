@@ -1,459 +1,394 @@
-# Runtime Providers
+# Runtime providers
 
-Runtime providers let InvarLock authenticate and compare model behavior without
-requiring every model to be a Hugging Face/PyTorch checkpoint. The provider
-boundary owns artifact identity, deterministic scoring, backend identity,
-observed device facts, and a portable receipt. InvarLock owns policy replay and
-the paired decision.
+Runtime-provider ABI `1` isolates backend-specific artifact identity and
+execution from the evidence transaction. Hugging Face Transformers is built
+into the core distribution. GGUF through `llama.cpp`, TensorRT-LLM, and Hugging
+Face vision-text are first-party optional add-ins.
 
-Operators can start with the shorter [Native Runtime Providers](../user-guide/native-runtime-providers.md)
-guide and the [runnable pair example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/runtime_providers).
-This page defines the complete provider settings, qualification, and claim
-boundary.
+!!! info "Reference"
 
-## Included Providers
+    - **Surface:** Runtime-provider ABI `1`, typed identities, settings, resources, discovery, and conformance
+    - **Stability:** Providers must match versioned ABI `1` exactly; first-party settings and capability declarations are closed
+    - **Use this page when:** Selecting, configuring, implementing, or validating a runtime provider
 
-| Provider | Artifact | Execution integration | Installation |
-| --- | --- | --- | --- |
-| `hf_transformers` | Immutable Hugging Face snapshot or local checkpoint tree | Built-in in-process adapter around an already loaded model, adapter, and scorer | `pip install "invarlock[hf]"` |
-| `llama_cpp` | One authenticated GGUF file | First-party process-isolated `llama-completion` provider | Shipped connector plus the pinned GGUF runtime image |
-| `tensorrt_llm` | Authenticated TensorRT-LLM engine bundle plus external tokenizer contract | First-party process-isolated runner protocol | Shipped connector plus the pinned TensorRT-LLM runtime image |
+## Provider protocol
 
-All three use the same `invarlock.runtime_providers` entry-point registry and
-ship as first-party InvarLock connectors. Hugging Face is not a separate
-add-in package: its connector is built in, while its Python backend is enabled
-by the optional `[hf]` dependency extra. GGUF and TensorRT-LLM likewise ship
-their lightweight connectors in the package, while their native backends stay
-inside separately pinned OCI images.
+A provider implements `RuntimeProvider` with an exact `name` and
+`abi_version`, then supplies:
 
-The GGUF and TensorRT-LLM integrations do not use the Hugging Face adapter or
-import PyTorch into the InvarLock provider process. Their backend dependencies
-belong in separately built, reviewed runtime images:
-
-```bash
-make runtime-image-gguf \
-  GGUF_BLACKBOX_MODEL=/path/to/stories15M-q4_0.gguf
-make runtime-image-tensorrt-llm \
-  TENSORRT_LLM_FIXTURE_MODEL_DIR=/path/to/pinned-snapshot \
-  TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256=<reviewed-64-hex-inventory> \
-  TENSORRT_LLM_PRIMARY_DOCKER_GPUS=device=0 \
-  TENSORRT_LLM_SECONDARY_DOCKER_GPUS=device=1
+```python
+def validate_config(spec: ModelRuntimeSpec) -> None: ...
+def capabilities() -> RuntimeProviderCapabilities: ...
+def identify_artifact(spec: ModelRuntimeSpec) -> ModelArtifactIdentity: ...
+def prepare_execution(
+    spec: ModelRuntimeSpec,
+    resources: RuntimeArtifactResources,
+) -> RuntimeExecutionContext: ...
+def open(spec: ModelRuntimeSpec, context: RuntimeExecutionContext) -> RuntimeSession: ...
 ```
 
-The build targets use pinned backend inputs. Record the resulting image's
-immutable `sha256:...` digest through an independent build or review channel;
-do not treat a mutable local image tag as a trust anchor. The plugin inventory's
-`ready` status means the lightweight Python connector is importable; it does not
-probe the backend executable, image, GPU, or a particular model artifact.
-Machine-readable inventory makes that distinction explicit:
-`connector_status` reports connector availability, `backend_delivery` reports
-whether the backend comes from a Python extra or OCI image, and the metadata-only
-inventory always reports `runtime_qualification: not_probed`. Running a
-platform-specific qualification flow does not mutate that inventory. Its result
-must be reviewed separately. Likewise, plugin maturity and
-`strict_assurance_allowed` describe connector ownership and strict-contract
-eligibility; neither field proves that a backend, image, platform, or model
-artifact was qualified.
+The opened session provides `score(batch)`, `runtime_receipt()`, and `close()`.
+Provider state is opaque. Backend imports must be lazy so discovery and contract
+inspection remain usable without loading a model runtime.
 
-The Docker image definitions, Make targets, and black-box release script are
-source-tree qualification tooling rather than installed-package commands. Use the matching
-InvarLock source tag (or an authenticated checkout of that exact tag) when
-building these images; a PyPI wheel or sdist alone does not contain that
-tooling.
+| Method | Input | Required result or effect |
+| --- | --- | --- |
+| `validate_config` | Closed `ModelRuntimeSpec` | Reject unknown, missing, malformed, or inconsistent settings |
+| `capabilities` | None | Return closed artifact, task, metric, and execution-mode declarations |
+| `identify_artifact` | Validated spec | Return a typed portable identity reproducible from authenticated inputs |
+| `prepare_execution` | Spec and caller-owned resources | Authenticate local resources and return an immutable execution context |
+| `open` | Spec and context | Open one session without changing the authenticated identity |
+| `session.score` | Ordered `EvaluationBatch` | Return one ordered `ScoringObservation` for that batch |
+| `session.runtime_receipt` | Completed scoring state | Return a receipt bound to the latest complete observation |
+| `session.close` | None | Release resources; repeated close calls must be safe |
 
-The TensorRT-LLM image is based on NVIDIA's pinned NGC 1.2.1 container. Building
-it requires access to `nvcr.io` and compliance with the applicable NVIDIA NGC
-license terms. Running its smoke or provider path additionally requires Docker
-with the NVIDIA Container Toolkit, a compatible NVIDIA driver, and a supported
-NVIDIA GPU. Building the image alone is not hardware qualification.
+## Capabilities and current scope
 
-The TensorRT-LLM flow first checks the reviewed model inventory, output
-location, image tags, source epoch, and GPU selectors. A fixed exact-base probe
-then resolves both selectors to distinct physical GPUs and requires compute
-capability 9.0 before the candidate build starts. The candidate image must pass
-the CUDA/runtime smoke before either GPU builds an engine. The flow derives and
-binds the engine-tree, tokenizer, and fixed-output digests.
-Each canary runs two single-rank scores of the fixed `InvarLock` prompt through
-fresh provider sessions on each GPU, requires byte-identical canonical
-observations and provider receipts between those two sessions, and then
-requires the canonical provider-receipt digest to match across GPUs before
-tagging the configured stable local image. Missing or malformed inputs fail
-before building; any fixture, output, evidence-replay,
-hardware-binding, or determinism mismatch fails before promotion. If runtime
-qualification fails after the candidate is built, the target retains that
-candidate for diagnosis. No failure path creates or replaces the stable tag.
+Capabilities are closed over:
 
-Both native providers use the `first_party_experimental` plugin-maturity tier.
-GGUF currently targets Linux CPU execution with the pinned llama.cpp build and
-records the CPU identity observed inside the execution environment. TensorRT-LLM
-targets Linux with an NVIDIA GPU; its runner observes the CUDA device, compute
-capability, driver, and runtime, then requires the observed compute capability
-to match the engine target. Each isolated score requires InvarLock's
-`FORCE_DETERMINISTIC=1` execution marker and fixed greedy decoding settings. The
-canary establishes per-GPU repeatability for its reviewed fixture by requiring
-byte-identical evidence across two fresh sessions, then binds cross-GPU
-canonical provider-receipt equality into the qualification summary. The closed
-environment also sets backend telemetry and usage-reporting opt-out variables.
+- artifact formats: `hf_snapshot`, `gguf`, `tensorrt_llm_engine`;
+- canonical tasks declared by each provider, currently `text_causal` and
+  `vision_text_generation` across shipped integrations;
+- metrics: `exact_match` and `normalized_nll_per_utf8_byte`; and
+- execution modes: `in_process`, `local_process`, `container`.
 
-## End-to-End Behavioral Journey
+The request loader rejects a built-in metric the selected provider does not
+declare. A scorer extension is not a provider metric: the provider collects
+authenticated output text through its declared exact-match path, and an
+explicitly authorized verifier-replay scorer derives unit-interval values from
+those text facts after collection.
+Strict evidence execution further requires a real offline container and
+`batch_size=1`, regardless of a provider's broader capability declaration.
 
-Start from two closed JSON inputs. `dataset-identity.json` contains exactly
-`provider`, `dataset_name`, `config_name`, `revision`, and `split`.
-`behavioral-records.json` is an array whose records contain exactly
-`record_id`, `input_text`, and `expected_output`. Build the authenticated
-schedule without supplying record hashes yourself:
+| Shipped provider | Distribution | Artifact | Metric | Declared mode | Strict device |
+| --- | --- | --- | --- | --- | --- |
+| `hf_transformers` | `invarlock` | `hf_snapshot` | `exact_match`, `normalized_nll_per_utf8_byte` | `in_process` | `cpu` or `cuda`, inside its authenticated side worker |
+| `llama_cpp` | `invarlock-runtime-gguf` | `gguf` | `exact_match` | `container`, `local_process` | `cpu`; strict evidence uses an authenticated side worker |
+| `tensorrt_llm` | `invarlock-runtime-tensorrt-llm` | `tensorrt_llm_engine` | `exact_match` | `container` | `cuda` in an authenticated side worker |
+| `hf_vision_text` | `invarlock-runtime-hf-vision-text` | `hf_snapshot` | `exact_match` | `container` | `cuda` in an authenticated side worker |
 
-```bash
-invarlock advanced runtime-behavior build-schedule \
-  --records behavioral-records.json \
-  --dataset-identity dataset-identity.json \
-  --out behavioral-schedule.json \
-  --json
-```
+The built-in HF scorer computes log-probability facts by teacher-forcing a
+target token sequence that must decode as the exact schedule `expected_output`
+when appended to the prompt tokens. Boundary-unstable encodings fail closed.
+It binds the target token count and verifier-checkable UTF-8 byte count in each
+scoring record. Normalized NLL divides by expected-output bytes, so it remains
+comparable across tokenizers. It measures teacher-forced expected-continuation
+likelihood regression rather than general model quality. When authenticated
+tokenizer digests and paired token counts match, the verifier may render a
+token-weighted perplexity ratio as an interpretation without giving it policy
+authority. The GGUF add-in
+does not declare normalized NLL: its authenticated execution surface is
+the raw `llama-completion` executable, which emits generated bytes but no
+deterministic per-target-token log probabilities. TensorRT-LLM and Hugging Face
+vision-text likewise remain exact-match only. A provider may not emit a metric it did not advertise, and
+request loading rejects that mismatch before execution.
 
-The builder derives every input digest, validates the closed material through
-the canonical schedule builder, and writes canonical JSON without replacing an
-existing output.
+## Artifact identity
 
-Derive each native provider's settings inside the exact reviewed image with the
-provider-owned `inspect-inputs` command. This is the authoritative derivation
-path: do not hand-assemble artifact, backend, tokenizer, build, or device hashes.
-The image must be launched network-disabled with the authenticated container
-marker and exact image bindings. The runnable example shows the complete Docker
-launches. Inside those launches, use:
+Providers return one typed identity:
 
-```bash
-invarlock advanced runtime-behavior inspect-inputs \
-  --provider llama_cpp \
-  --artifact /models/baseline.gguf \
-  --backend-executable /opt/llama.cpp/llama-completion \
-  --backend-source /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
-  --seed 0 \
-  --context-length 8 \
-  --batch-size 1 \
-  --max-output-tokens 1 \
-  --timeout-seconds 300 \
-  --out baseline-gguf-settings.json \
-  --json
+- Hugging Face binds a model ID, immutable revision and/or checkpoint tree,
+  plus tokenizer metadata;
+- GGUF binds the regular file bytes, GGUF metadata, tensor inventory, and
+  tokenizer metadata; and
+- TensorRT-LLM binds the engine tree, file inventory, builder configuration,
+  tokenizer metadata, engine metadata, and target compute capability.
 
-invarlock advanced runtime-behavior inspect-inputs \
-  --provider tensorrt_llm \
-  --artifact /engines/subject \
-  --backend-executable /opt/invarlock/bin/tensorrt-llm-runner \
-  --tokenizer-contract /models/subject-tokenizer.json \
-  --seed 0 \
-  --context-length 8 \
-  --batch-size 1 \
-  --max-output-tokens 1 \
-  --timeout-seconds 300 \
-  --out subject-tensorrt-settings.json \
-  --json
-```
+The identity must be reproducible from the request-side `ModelRuntimeSpec` and
+the exact artifact. The transaction compares imported identities with a fresh
+provider derivation.
 
-The command securely inspects the mounted inputs, validates that the resulting
-settings reproduce their path-free identity, refuses to replace an existing
-output, and returns the provider-required `model_id`. Pass that returned model
-ID and the unchanged generated settings to both `prepare-binding` and
-`run-side`.
-
-Next prepare one binding for each role inside its selected pinned runtime
-image. `prepare-binding` opens the provider, so it must run inside the same
-strict, network-disabled container boundary required by the corresponding side
-run. Launch the image with all three runtime-boundary variables set:
-
-```text
-INVARLOCK_CONTAINER_EXECUTION=1
-INVARLOCK_RUNTIME_IMAGE_DIGEST=sha256:<reviewed-64-hex-digest>
-INVARLOCK_RUNTIME_IMAGE=<repository>@sha256:<reviewed-64-hex-digest>
-```
-
-Pass that same reviewed digest to `--container-image-digest`. The provider
-requires the launch variables, image reference, CLI value, and later runtime
-manifest to agree; the CLI option by itself is insufficient. These values are
-consistency bindings supplied by the execution environment, not remote
-attestation that the named image or host executed.
-
-Use the same provider settings, artifact, native executable, auxiliary backend
-material, and reviewed image digest that the corresponding side run will use:
-
-```bash
-invarlock advanced runtime-behavior prepare-binding \
-  --provider llama_cpp \
-  --model-id "$BASELINE_MODEL_ID" \
-  --settings baseline-gguf-settings.json \
-  --artifact /models/baseline.gguf \
-  --backend-executable /opt/llama.cpp/llama-completion \
-  --backend-source /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
-  --container-image-digest "$REVIEWED_GGUF_IMAGE_DIGEST" \
-  --out baseline-binding.json \
-  --json
-
-invarlock advanced runtime-behavior prepare-binding \
-  --provider tensorrt_llm \
-  --model-id "$SUBJECT_MODEL_ID" \
-  --settings subject-tensorrt-settings.json \
-  --artifact /engines/subject \
-  --backend-executable /opt/invarlock/bin/tensorrt-llm-runner \
-  --tokenizer-contract /models/subject-tokenizer.json \
-  --container-image-digest "$REVIEWED_TENSORRT_IMAGE_DIGEST" \
-  --out subject-binding.json \
-  --json
-```
-
-`prepare-binding` validates and identifies the actual native inputs, opens and
-closes the provider without scoring, and derives the execution-settings digest
-through the same canonical code used by side production. It also refuses to
-replace an existing binding. Each role-binding JSON file contains exactly these
-five fields:
-
-| Field | Value |
+| Artifact format | Identity fields beyond `format` and `artifact_format` |
 | --- | --- |
-| `provider_name` | Canonical provider name, such as `llama_cpp` or `tensorrt_llm` |
-| `artifact_format` | `hf_snapshot`, `gguf`, or `tensorrt_llm_engine` |
-| `artifact_identity_sha256` | SHA-256 of the provider's canonical path-free artifact identity |
-| `outer_image_digest` | Independently reviewed `sha256:...` runtime-image digest |
-| `execution_settings_sha256` | SHA-256 of the canonical provider execution settings |
+| Hugging Face snapshot | `model_id`, `immutable_revision` and/or `checkpoint_tree_sha256`, `tokenizer_metadata_sha256` |
+| GGUF | `artifact_name`, `sha256`, `byte_length`, `gguf_metadata_sha256`, `tensor_inventory_sha256`, `tokenizer_metadata_sha256` |
+| TensorRT-LLM engine | `bundle_name`, `engine_bundle_tree_sha256`, `file_inventory_sha256`, `builder_config_sha256`, `tokenizer_metadata_sha256`, `engine_metadata_sha256`, `target_compute_capability` |
 
-Build one directed `policy-pack-v3` from the authenticated schedule and exact
-per-role bindings:
+Identity fields describe authenticated bytes, not merely a user-facing model
+name. GGUF and TensorRT-LLM use privacy-safe digest-derived model IDs in their
+runtime specs so local filenames and host paths cannot enter public evidence.
 
-```bash
-invarlock advanced runtime-behavior build-policy \
-  --schedule behavioral-schedule.json \
-  --baseline-binding baseline-binding.json \
-  --subject-binding subject-binding.json \
-  --tier balanced \
-  --minimum-subject-score 0.95 \
-  --maximum-regression 0.01 \
-  --evidence-surface behavior \
-  --evidence-surface tokenizer \
-  --out acceptance-policy-pack.json \
-  --json
+## First-party settings
+
+Settings are JSON scalars in `request.yaml`. Unknown keys fail closed.
+
+### `hf_transformers`
+
+| Setting | Requirement | Meaning |
+| --- | --- | --- |
+| `immutable_revision` | Identity: revision or checkpoint tree required | Immutable upstream revision |
+| `checkpoint_tree_sha256` | Required for local execution | Authenticated checkpoint-directory tree digest |
+| `tokenizer_metadata_sha256` | Required | Authenticated tokenizer contract digest |
+| `batch_size` | Required for strict receipt; must be `1` | Scoring batch size |
+| `context_length` | Required, positive integer | Maximum input context |
+| `max_output_tokens` | Required, positive integer | Maximum generated output |
+| `offline` | Required and `true` | Backend offline intent |
+| `seed` | Required, non-negative integer | Deterministic seed |
+| `timeout_seconds` | Required, positive integer | Per-call timeout |
+
+The provider loads only local files, disables remote code, requires
+SafeTensors-compatible loading, and authenticates the checkpoint tree and
+tokenizer contract against the declared digests. Hugging Face documents the
+underlying library's [offline-mode
+controls](https://huggingface.co/docs/transformers/installation#offline-mode);
+InvarLock additionally binds its own strict runtime and receipt conditions.
+
+### `llama_cpp`
+
+Every key is required: `artifact_byte_length`, `artifact_sha256`,
+`backend_binary_sha256`, `backend_source_sha256`, `backend_version`,
+`batch_size`, `context_length`, `gguf_metadata_sha256`, `max_output_tokens`,
+`seed`, `tensor_inventory_sha256`, `timeout_seconds`, and
+`tokenizer_metadata_sha256`. Digest values are lowercase bare SHA-256 values.
+The provider authenticates the GGUF bytes, typed metadata and tensor inventory,
+tokenizer metadata, and the pinned `llama.cpp` executable and source tree.
+
+### `tensorrt_llm`
+
+Every key is required: `backend_build_sha256`, `backend_version`, `batch_size`,
+`builder_config_sha256`, `context_length`, `engine_bundle_tree_sha256`,
+`engine_metadata_sha256`, `file_inventory_sha256`, `max_output_tokens`,
+`runner_binary_sha256`, `seed`, `target_compute_capability`, `timeout_seconds`,
+and `tokenizer_metadata_sha256`. The target compute capability uses
+`major.minor` notation and is checked against the observed GPU. The provider
+binds the engine tree, build configuration, file inventory, runner, backend,
+tokenizer, engine metadata, and GPU target. See NVIDIA's [TensorRT-LLM
+documentation](https://nvidia.github.io/TensorRT-LLM/) for backend concepts;
+the InvarLock add-in defines the evidence bindings above.
+
+## Scoring obligations
+
+For every schedule record, a provider emits one record with the same
+`record_id` and `input_sha256`, in exactly the same order. Successful records
+carry output facts, log-probability facts, or both. Failed records carry an
+error code and no measured output facts; canonical evidence rejects them.
+
+| Scoring-record field group | `ok` record | `error` record |
+| --- | --- | --- |
+| `record_id`, `input_sha256`, `status` | Required | Required |
+| Output text and output digest | Required for `exact_match` and scorer-extension collection | Forbidden |
+| `logprob_sum`, positive `token_count`, positive `utf8_byte_count` | Required for normalized NLL | Forbidden |
+| `error_code` | Forbidden | Required |
+
+The exact schema determines the allowed combinations. A batch must contain
+exactly one record for every schedule entry, with no reordering, duplication,
+omission, or replacement by positional IDs.
+
+The observation binds the provider name, artifact-identity digest, schedule
+digest, ordered records, and an aggregate-source digest computed from those
+records. Providers report facts; InvarLock owns aggregate scores and policy
+arithmetic.
+
+Provider discovery does not authorize scorer extensions. An embedding that
+selects `comparison.scorer_extension` must supply an explicit
+`ScorerExtensionRegistry` to both evaluation and verification. That registry
+may contain caller-injected scorers or may explicitly enable discovery from
+the separate `invarlock.scorers` entry-point group.
+
+The runtime receipt must agree with the provider's capabilities and bind:
+
+- plugin distribution and version;
+- backend identity with at least one source, binary, or build digest;
+- artifact identity;
+- deterministic execution settings;
+- device facts;
+- the outer image digest; and
+- the scoring-observation digest.
+
+## Caller-owned resources
+
+Requests cannot grant host permissions or name executable support resources.
+For each side, the caller supplies an absolute, non-symbolic resource root, a
+primary artifact, closed support-resource names, device kind, and container
+image digest through `RuntimeArtifactResources`. Each access repeats
+component-by-component no-follow validation.
+
+The public CLI environment resolver uses the variables listed in
+[Environment variables](environment.md). A programmatic caller can supply its
+own resource resolver to `evaluate_request_file`.
+
+## Per-side OCI execution
+
+The host owns the canonical schedule and launches one independently configured
+worker for baseline and one for subject. A shared image, digest, device, and
+entrypoint profile can provide defaults; every value also has a per-side
+override. The selected image reference and digest must agree before launch.
+
+Each worker receives only:
+
+- its read-only job and canonical schedule;
+- its read-only primary artifact and closed support resources;
+- an isolated writable side-output directory; and
+- the device mapping selected for that side.
+
+The evidence-signing and verifier keys remain on the host. After both workers
+exit successfully, the host loads exactly the six expected side files,
+reproduces the artifact and runtime bindings, derives paired records, and signs
+the closed evidence bundle.
+
+CPU workers may run concurrently. Workers on two different explicit CUDA
+indexes, such as `cuda:0` and `cuda:1`, may also run concurrently. Generic CUDA,
+a shared explicit index, and CPU/CUDA pairs run sequentially. The selected CUDA
+device only exposes hardware; the image must already contain a CUDA-capable
+runtime. See [Environment variables](environment.md#canonical-hugging-face-runtime-images)
+for the separate canonical CPU and x86_64 CUDA image targets.
+
+## Discovery and authorization
+
+Providers register in the `invarlock.runtime_providers` entry-point group. The
+registry validates entry-point name, distribution identity, module/class path,
+module-declared ABI, instance ABI, and provider name before use.
+
+Python entry-point discovery follows the [PyPA entry-points
+specification](https://packaging.python.org/en/latest/specifications/entry-points/).
+For example:
+
+```toml
+[project.entry-points."invarlock.runtime_providers"]
+example_runtime = "example_invarlock.provider:ExampleProvider"
 ```
 
-The builder derives the schedule digest and dataset identity from the schedule,
-validates both directed bindings, and writes canonical JSON without replacing
-an existing output.
+The core provider and three named first-party add-ins are recognized without
+enabling arbitrary plugins. Other installed entry points are ignored unless
+`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` is explicitly enabled. Strict evidence
+execution records that setting and requires it to be false, so enabling
+arbitrary plugins is not compatible with the strict evidence path.
 
-Run each side separately in its appropriate pinned runtime image. A side run is
-strict, offline, and role-directed: the same authenticated schedule and policy
-pack must be supplied to the baseline and subject runs. Runtime behavior
-requires `policy-pack-v3`, whose directed baseline and subject entries authorize
-the exact provider, artifact identity and format, outer image, execution
-settings, and schedule for each role. The command writes a strictly reloaded
-side bundle only after provider evidence and its runtime manifest verify.
+## First-party add-ins
 
-The examples below show the InvarLock command executed inside the selected
-runtime image. Launch that image with networking disabled, mount the artifact,
-schedule, policy pack, and settings read-only, and mount only the selected
-output directory writable.
-
-The side-run container launch uses the same three runtime-boundary variables and
-the same reviewed digest passed to `--container-image-digest` during binding
-preparation.
+Install and check GGUF discovery:
 
 ```bash
-invarlock advanced runtime-behavior run-side \
-  --role baseline \
-  --provider llama_cpp \
-  --model-id "$BASELINE_MODEL_ID" \
-  --settings baseline-gguf-settings.json \
-  --artifact /models/baseline.gguf \
-  --backend-executable /opt/llama.cpp/llama-completion \
-  --backend-source /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
-  --container-image-digest "$REVIEWED_GGUF_IMAGE_DIGEST" \
-  --schedule behavioral-schedule.json \
-  --policy-pack acceptance-policy-pack.json \
-  --out runtime-sides/baseline
-
-invarlock advanced runtime-behavior run-side \
-  --role subject \
-  --provider tensorrt_llm \
-  --model-id "$SUBJECT_MODEL_ID" \
-  --settings subject-tensorrt-settings.json \
-  --artifact /engines/subject \
-  --backend-executable /opt/invarlock/bin/tensorrt-llm-runner \
-  --tokenizer-contract /models/subject-tokenizer.json \
-  --container-image-digest "$REVIEWED_TENSORRT_IMAGE_DIGEST" \
-  --schedule behavioral-schedule.json \
-  --policy-pack acceptance-policy-pack.json \
-  --out runtime-sides/subject
+python -m pip install invarlock-runtime-gguf
+invarlock-gguf-conformance
 ```
 
-The generated settings files contain public scalar settings and expected
-identities, not host paths or secrets. The following field lists describe the
-validated output contract; they are not a recipe for constructing it manually.
-`llama_cpp` includes:
-
-- `artifact_byte_length`, `artifact_sha256`, `gguf_metadata_sha256`,
-  `tensor_inventory_sha256`, and `tokenizer_metadata_sha256`;
-- `backend_binary_sha256`, `backend_source_sha256`, and `backend_version`; and
-- `seed`, `context_length`, `batch_size`, `max_output_tokens`, and
-  `timeout_seconds`.
-
-`tensorrt_llm` includes:
-
-- `engine_bundle_tree_sha256`, `file_inventory_sha256`,
-  `builder_config_sha256`, `tokenizer_metadata_sha256`, and
-  `engine_metadata_sha256`;
-- `runner_binary_sha256`, `backend_build_sha256`, `backend_version`, and
-  `target_compute_capability`; and
-- `seed`, `context_length`, `batch_size`, `max_output_tokens`, and
-  `timeout_seconds`.
-
-Strict cross-runtime sides require `batch_size=1`, meaning one sequence per
-scheduled record. Backend-specific token-evaluation or engine build batch
-limits are not treated as a portable comparison setting.
-
-For TensorRT-LLM, `--tokenizer-contract` is a closed
-`invarlock/tensorrt-llm-tokenizer-contract-v1` wrapper. It contains exactly the
-nested `tokenizer_json`, `eos_token_id`, `pad_token_id`,
-`add_special_tokens=false`, `skip_special_tokens=true`, and
-`clean_up_tokenization_spaces=false`; the SHA-256 of the full wrapper bytes is
-`tokenizer_metadata_sha256`. The canonical runner records the device name,
-compute capability, driver version, and CUDA runtime version that it observes,
-and it requires the observed compute capability to match
-`target_compute_capability`. Its backend-build digest is derived from pinned
-backend content and checked against the expected `backend_build_sha256` in the
-settings. `runner_binary_sha256` authenticates the installed launcher wrapper.
-Each session executes that fixed launcher through the vendor Python interpreter
-supplied by the reviewed runtime image only after verifying that both reside on
-the same read-only root mount, no-new-privileges is active, and every process
-capability set is empty. Launcher and interpreter identities are rechecked
-around each invocation. The connector module, interpreter, and dependency
-closure remain bound by the reviewed outer image digest. The outer image digest
-remains an independently supplied binding;
-the receipt is not remote attestation of the execution host or image.
-
-After both sides exist, verify them in a separate process or trust domain. This
-command reloads both bundles, replays their observations against the same
-schedule and policy, and writes a positive, digest-only receipt. It does not
-modify either side bundle.
+Install and check TensorRT-LLM discovery:
 
 ```bash
-invarlock advanced runtime-behavior verify-pair \
-  --baseline runtime-sides/baseline \
-  --subject runtime-sides/subject \
-  --schedule behavioral-schedule.json \
-  --policy-pack acceptance-policy-pack.json \
-  --receipt runtime-sides/paired-receipt.json \
-  --json
+python -m pip install invarlock-runtime-tensorrt-llm
+invarlock-tensorrt-llm-conformance
 ```
 
-Commands fail closed with exit status `2`. `--json` emits one versioned object
-and never emits a positive receipt for a failed pair.
-
-The verifier proves that two distinct, closed side directories satisfy their
-directed policy bindings; it does not prove that they were produced by
-independent hosts or operators. A policy may intentionally authorize the same
-artifact on both sides for a no-change compatibility check. Use isolated
-producers or attestation when execution independence itself is required.
-
-## Runtime Qualification
-
-Build and smoke the backend image on the platform where it will run:
+Install and check Hugging Face vision-text discovery:
 
 ```bash
-make runtime-smoke-gguf
-make runtime-smoke-tensorrt-llm
-make runtime-canary-tensorrt-llm
+python -m pip install 'invarlock-runtime-hf-vision-text[runtime]'
+invarlock-hf-vision-text-conformance
 ```
 
-The GGUF stable-image build requires its 19,077,344-byte black-box fixture,
-which is not vendored. Supply the local `stories15M-q4_0.gguf` file from
-`ggml-org/tiny-llamas` revision
-`99dd1a73db5a37100bd4ae633f4cfce6560e1567`; the target requires SHA-256
-`6151b1929d7f5aa3385d9ddef3393e55587c0a55de661562322bc51dfda93a04`
-and never downloads it:
+Each command returns a JSON object whose `ok` value must be true and whose
+provider and ABI must match the installed core. Conformance checks packaging,
+entry-point identity, protocol structure, and lightweight contract behavior; it
+does not execute a representative model or certify GPU compatibility.
 
-```bash
-make runtime-blackbox-gguf \
-  GGUF_BLACKBOX_MODEL=/path/to/stories15M-q4_0.gguf
+Artifact inspection for either native add-in executes backend code. Run it in
+the exact digest-pinned, network-disabled runtime image with read-only artifact
+mounts. TensorRT-LLM inspection also requires the target GPU. The add-in READMEs
+contain the binding constructors and inspection examples.
+
+The conformance output is one JSON object:
+
+```json
+{
+  "abi_version": "1",
+  "errors": [],
+  "ok": true,
+  "provider": "llama_cpp"
+}
 ```
 
-The stable-image target runs this black-box on the candidate before assigning
-the stable local tag. The black-box resolves the image tag to its actual image
-digest, launches two
-separate read-only and network-disabled containers, and invokes the installed
-wheel without a source-tree mount or `PYTHONPATH`. It requires the pinned prompt
-output and byte-identical canonical observations and provider receipts across
-both runs.
+`ok: true` proves lightweight packaging, discovery, and protocol compatibility.
+It does not prove that a model artifact loads, that native binaries match an
+image, or that a representative score succeeds. Follow it with a digest-pinned
+runtime canary for the exact artifact/backend/device combination.
 
-The TensorRT-LLM smoke requires Docker with the NVIDIA Container Toolkit and a
-visible CUDA device. It checks the pinned package/image environment and the
-runner information protocol. The required dual-GPU canary then authenticates
-the generated engine tree and tokenizer file, executes real scores in fresh
-provider sessions on both GPUs, and requires byte-identical canonical
-observations and receipts across two sessions on each GPU, then requires the
-canonical provider-receipt digest to match across GPUs. Those checks qualify
-the local image tag, but do not establish a behavioral claim for a particular
-schedule. That claim still requires a real `run-side` using the intended engine
-and tokenizer, followed by `verify-pair` against the intended schedule and
-policy.
+The GGUF package documents a tiny `evaluate -> verify` canary using a real GGUF
+artifact and `llama.cpp`. The Hugging Face vision-text package documents a
+prompt-and-image `evaluate -> verify -> report` qualification using a local
+checkpoint and authenticated content store. The TensorRT-LLM package ships
+`python -m invarlock_addins.tensorrt_llm.canary`, which checks the authenticated
+engine bundle, exact runner protocol, selected GPU, image digest, and one
+representative request. Run either only inside the intended digest-pinned
+runtime; neither command supplies or qualifies a production model fixture.
 
-The maintained multi-GPU fixture target starts from the pinned NVIDIA NGC
-image and an already local TinyLlama snapshot at revision
-`fe8a4ea1ffedaf415f4da2f062534de366a451e6`. Review the snapshot inventory
-digest before running it:
+The TensorRT-LLM runner protocol accepts one canonical JSON request on standard
+input and returns one canonical JSON response on standard output. Inspection
+and evaluation are separate modes, nonzero exit is failure, unknown response
+fields fail closed, and configured input/output byte and timeout bounds apply.
+The add-in README is the normative operator example for those bounds.
 
-```bash
-make runtime-image-tensorrt-llm-dual \
-  TENSORRT_LLM_FIXTURE_MODEL_DIR=/path/to/pinned-snapshot \
-  TENSORRT_LLM_FIXTURE_MODEL_INVENTORY_SHA256=<reviewed-64-hex-inventory> \
-  TENSORRT_LLM_PRIMARY_DOCKER_GPUS=device=0 \
-  TENSORRT_LLM_SECONDARY_DOCKER_GPUS=device=1
+## Authoring an ABI provider
+
+Third-party authors implement the protocol against the stable ABI module, keep
+backend imports behind `prepare_execution` or `open`, and publish one entry
+point. This minimal shape illustrates the boundary; it omits the required typed
+constructors and validation logic:
+
+```python
+from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI
+
+
+class ExampleProvider:
+    name = "example_runtime"
+    abi_version = INVARLOCK_RUNTIME_PROVIDER_ABI
+
+    def validate_config(self, spec):
+        ...
+
+    def capabilities(self):
+        ...
+
+    def identify_artifact(self, spec):
+        ...
+
+    def prepare_execution(self, spec, resources):
+        ...
+
+    def open(self, spec, context):
+        ...
 ```
 
-The target copies the model and fixture worker into a new owned snapshot,
-builds an engine independently on each selected GPU, and freezes the primary
-engine only after both GPUs can execute it with identical fixed output. The two
-engine serializations may differ in bytes; the manifest records that result
-without treating byte identity as a requirement. Qualification resolves the
-candidate tag once, executes the immutable image ID, validates closed result
-schemas and artifact bindings on both GPUs, and assigns the stable tag from the
-qualified image digest rather than from the mutable candidate tag. Outputs
-under `artifacts/runtime-qualification/` are local qualification material and
-are not public evidence packs.
+Use the exported typed value classes rather than free-form dictionaries. Core
+does not ship a generic third-party conformance executable: an author owns the
+provider test harness and can use the first-party add-in suites as examples.
+Tests should cover unknown settings, each identity mismatch, no-follow resource access,
+record order and failure shapes, receipt-to-observation binding, deterministic
+canonical bytes, session cleanup, and discovery without importing the backend.
 
-A qualified fixture or canary still does not establish schedule-level behavior;
-that requires `run-side` and `verify-pair` with the intended policy.
+A non-first-party provider can be discovered only when
+`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` is enabled. Strict evidence execution
+requires that switch to be false. Consequently, the public ABI supports
+experimentation and conformance, but a third-party distribution does not become
+an authorized strict-evidence provider merely by installing an entry point.
 
-## Hugging Face Use
+The execution transaction observes this switch before opening any provider and
+rejects when it is enabled. It never records a disabled value merely because a
+provider returned otherwise valid records. A deployment that adds a provider
+to its authorized first-party set must change and test its own
+authorization boundary; environment opt-in is deliberately insufficient.
 
-Hugging Face remains the built-in model-loading path for `invarlock evaluate`
-when the `[hf]` extra is installed. The runtime-provider Python API also accepts
-`hf_transformers`, but strict runtime-behavior evidence does not accept an
-arbitrary scorer. It requires the provider-owned
-`HFTransformersCausalScorer`, bound to the exact native model and artifact, a
-materialized local checkpoint tree in canonical safetensors form, the live
-tokenizer contract digest, eval-mode model modules, deterministic greedy causal
-scoring, and `batch_size=1`.
+## Provider conformance checklist
 
-The installed `runtime-behavior run-side` command deliberately does not create
-those in-process objects from paths. Use `invarlock evaluate` for the normal HF
-journey, or call `invarlock.runtime_behavior.run_side` from a controlled Python
-integration with pre-bound objects. This avoids an ambiguous command that would
-silently load remote code or invent an unauthenticated adapter.
-These stricter runtime-behavior requirements do not change the normal
-`invarlock evaluate` Hugging Face path.
+A provider is suitable for the strict path only when it:
 
-## Claim Scope
+1. declares and matches ABI `1` at module and instance level;
+2. keeps discovery free of eager backend imports;
+3. returns only closed typed capabilities and identities;
+4. authenticates local artifact and support resources without following links;
+5. runs offline in an observed digest-pinned container;
+6. emits one schedule-ordered scoring record per input;
+7. binds its receipt to the exact artifact, observation, settings, device, and
+   outer image; and
+8. closes the session on both success and failure.
 
-The cross-provider claim is narrow: deterministic record IDs and expected
-outputs are replayed under the authenticated schedule, and the provider reports
-the `exact_match` metric. Policy decides whether the paired result is
-acceptable.
+## Related documentation
 
-It does **not** establish:
-
-- weight, tensor, spectral, RMT, activation, or quantization equivalence;
-- token-level, log-probability, latency, throughput, or numerical equivalence;
-- general model quality outside the authenticated records;
-- correctness of TensorRT, TensorRT-LLM, llama.cpp, CUDA, or a model export; or
-- remote attestation that the declared runtime image actually executed.
-
-Artifact, backend, tokenizer, schedule, policy, observed device, and declared
-image bindings make mismatches visible to replay within the execution trust
-boundary. The receipt records what the local provider observes; it does not
-attest a potentially compromised host. None of these bindings expands the
-behavioral measurement beyond exact match and the policy pack's declared claim.
+- [Public contracts](contracts.md) defines the provider-emitted document
+  schemas and canonical-byte rules.
+- [Environment variables](environment.md) lists caller-owned GGUF and
+  TensorRT-LLM resources.
+- [Python API](api-guide.md) identifies the provider ABI types exported through
+  the stable facade.
+- [Release verification](release-verification.md) explains add-in version and
+  conformance checks.

@@ -8,10 +8,16 @@
 >
   <title id="title">InvarLock evaluate, verify, and report flow</title>
   <desc id="desc">
-    Baseline and subject checkpoints plus evaluation configuration enter the
-    evaluate command. Raw run reports and a canonical report bundle feed
-    independent strict verification, while the canonical report can also be
-    rendered as HTML for review.
+    A closed request declares the baseline, subject, pinned JSONL source or
+    canonical schedule, runtime integrations, policy, execution mode, and
+    output. Evaluation prepares the schedule, executes each side in its pinned
+    OCI runtime or imports complete observations, derives the selected built-in
+    metric or replays an authorized text scorer, derives its paired interval,
+    and publishes a signed evidence bundle. Independent
+    verification applies caller-owned artifact, schedule, policy, runtime, and
+    expected-signer anchors, replays the comparison, and signs a completed
+    verification statement when one can be formed. Reporting verifies the
+    bundle's embedded signature and renders its canonical comparison report.
   </desc>
   <defs>
     <marker
@@ -26,10 +32,6 @@
       <path d="M 0.75 1 L 9.5 5 L 0.75 9 z" fill="#1b2b25" />
     </marker>
     <style>
-      .title {
-        fill: #1b2b25;
-        font: 700 42px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
       .section-label {
         font: 700 25px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
@@ -39,11 +41,15 @@
       }
       .box-text {
         fill: #1b2b25;
-        font: 19px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font: 18px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       }
       .small-text {
         fill: #5a675f;
         font: 17px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .micro-text {
+        fill: #5a675f;
+        font: 14px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .band-input {
         fill: #fff8ea;
@@ -89,87 +95,110 @@
     </style>
   </defs>
 
-  <rect width="1600" height="855" rx="0" fill="#f3ecde" />
+  <rect width="1600" height="855" fill="#f3ecde" />
 
-  <rect x="70" y="45" width="1460" height="320" rx="22" class="band-input" />
-  <text x="105" y="188" class="section-label" fill="#0f7669">1. Inputs /</text>
-  <text x="105" y="222" class="section-label" fill="#0f7669">Evaluation</text>
+  <rect x="70" y="45" width="1460" height="300" rx="22" class="band-input" />
+  <text x="105" y="165" class="section-label" fill="#0f7669">1. Request /</text>
+  <text x="105" y="199" class="section-label" fill="#0f7669">Evaluate</text>
 
-  <rect x="300" y="75" width="280" height="56" rx="10" class="box-input" />
-  <text x="440" y="111" text-anchor="middle" class="box-title">Baseline checkpoint</text>
+  <rect x="300" y="71" width="280" height="56" rx="10" class="box-input" />
+  <text x="440" y="107" text-anchor="middle" class="box-title">Baseline artifact</text>
 
-  <rect x="660" y="75" width="280" height="56" rx="10" class="box-input" />
-  <text x="800" y="111" text-anchor="middle" class="box-title">Subject checkpoint</text>
-
-  <rect x="1020" y="75" width="280" height="56" rx="10" class="box-input" />
-  <text x="1160" y="111" text-anchor="middle" class="box-title">Evaluation config</text>
-
-  <rect x="605" y="175" width="390" height="78" rx="12" class="box-input" />
-  <text x="800" y="208" text-anchor="middle" class="box-title">invarlock evaluate</text>
-  <text x="800" y="234" text-anchor="middle" class="small-text">
-    container by default; host opt-in
+  <rect x="620" y="57" width="360" height="84" rx="10" class="box-input" />
+  <text x="800" y="84" text-anchor="middle" class="box-title">request.yaml</text>
+  <text x="800" y="108" text-anchor="middle" class="micro-text">
+    artifacts · JSONL or schedule · metric or scorer · policy
+  </text>
+  <text x="800" y="128" text-anchor="middle" class="micro-text">
+    runtime settings · run/import mode · output
   </text>
 
-  <rect x="475" y="281" width="650" height="66" rx="12" class="box-input" />
-  <text x="800" y="309" text-anchor="middle" class="box-title">
-    deterministic paired windows
-  </text>
-  <text x="800" y="333" text-anchor="middle" class="box-text">
-    invariants -&gt; spectral -&gt; RMT -&gt; variance -&gt; invariants
-  </text>
+  <rect x="1020" y="71" width="280" height="56" rx="10" class="box-input" />
+  <text x="1160" y="107" text-anchor="middle" class="box-title">Subject artifact</text>
 
-  <path d="M 440 131 C 440 159 620 160 673 175" class="arrow" />
-  <path d="M 800 131 L 800 175" class="arrow" />
-  <path d="M 1160 131 C 1160 159 980 160 927 175" class="arrow" />
-  <path d="M 800 253 L 800 281" class="arrow" />
-
-  <rect x="70" y="385" width="1460" height="205" rx="22" class="band-output" />
-  <text x="105" y="475" class="section-label" fill="#2d7a5f">2. Reports /</text>
-  <text x="105" y="509" class="section-label" fill="#2d7a5f">Artifacts</text>
-
-  <rect x="300" y="425" width="400" height="90" rx="12" class="box-input" />
-  <text x="500" y="461" text-anchor="middle" class="box-text">runs/.../report.json</text>
-  <text x="500" y="493" text-anchor="middle" class="small-text">raw baseline + subject reports</text>
-
-  <rect x="850" y="425" width="445" height="90" rx="12" class="box-output" />
-  <text x="1072" y="461" text-anchor="middle" class="box-text">
-    reports/&lt;name&gt;/evaluation.report.json
-  </text>
-  <text x="1072" y="493" text-anchor="middle" class="box-text">
-    reports/&lt;name&gt;/runtime.manifest.json
+  <rect x="605" y="163" width="390" height="78" rx="12" class="box-input" />
+  <text x="800" y="196" text-anchor="middle" class="box-title">invarlock evaluate</text>
+  <text x="800" y="222" text-anchor="middle" class="micro-text">
+    prepare schedule · run pinned OCI sides or import evidence
   </text>
 
-  <rect x="850" y="535" width="445" height="48" rx="10" class="box-output" />
-  <text x="1072" y="557" text-anchor="middle" class="box-text">invarlock report html</text>
-  <text x="1072" y="578" text-anchor="middle" class="small-text">review rendering from canonical JSON</text>
+  <rect x="425" y="263" width="750" height="66" rx="12" class="box-input" />
+  <text x="800" y="291" text-anchor="middle" class="box-title">
+    Paired comparison and interval
+  </text>
+  <text x="800" y="315" text-anchor="middle" class="box-text">
+    built-in metric or authorized text scorer → paired interval
+  </text>
 
-  <path d="M 690 347 C 690 395 565 403 510 425" class="arrow" />
-  <path d="M 930 347 C 930 395 1015 402 1065 425" class="arrow" />
-  <path d="M 1072 515 L 1072 535" class="arrow" />
+  <path d="M 580 99 L 620 99" class="arrow" />
+  <path d="M 1020 99 L 980 99" class="arrow" />
+  <path d="M 800 141 L 800 163" class="arrow" />
+  <path d="M 800 241 L 800 263" class="arrow" />
 
-  <rect x="70" y="610" width="1460" height="230" rx="22" class="band-verify" />
-  <text x="105" y="697" class="section-label" fill="#b56a3d">3. Independent</text>
-  <text x="105" y="731" class="section-label" fill="#b56a3d">Verification</text>
+  <rect x="70" y="365" width="1460" height="170" rx="22" class="band-output" />
+  <text x="105" y="435" class="section-label" fill="#2d7a5f">2. Canonical</text>
+  <text x="105" y="469" class="section-label" fill="#2d7a5f">Evidence</text>
 
-  <rect x="300" y="630" width="420" height="112" rx="12" class="box-verify" />
-  <text x="510" y="660" text-anchor="middle" class="box-title">Independent verifier inputs</text>
-  <text x="510" y="686" text-anchor="middle" class="small-text">raw baseline report</text>
-  <text x="510" y="708" text-anchor="middle" class="small-text">acceptance policy pack</text>
-  <text x="510" y="730" text-anchor="middle" class="small-text">expected runtime-image digest</text>
+  <rect x="410" y="382" width="780" height="136" rx="12" class="box-output" />
+  <text x="800" y="416" text-anchor="middle" class="box-title">Canonical signed evidence bundle</text>
+  <text x="800" y="449" text-anchor="middle" class="box-text">evidence directory · evidence-pack-v1</text>
+  <text x="800" y="478" text-anchor="middle" class="micro-text">
+    normalized request · artifact/runtime/dataset identities · policy/schedule
+  </text>
+  <text x="800" y="500" text-anchor="middle" class="micro-text">
+    runtime evidence · paired records/report · manifest/checksums/signature
+  </text>
 
-  <rect x="830" y="630" width="400" height="112" rx="12" class="box-verify" />
-  <text x="1030" y="660" text-anchor="middle" class="box-title">invarlock verify</text>
-  <text x="1030" y="691" text-anchor="middle" class="small-text">schema + pairing + recomputation</text>
-  <text x="1030" y="716" text-anchor="middle" class="small-text">policy + guards + runtime binding</text>
+  <path d="M 800 329 L 800 382" class="arrow" />
 
-  <rect x="650" y="770" width="270" height="48" rx="10" class="box-output" />
-  <text x="785" y="802" text-anchor="middle" class="box-title">exit 0: verified</text>
+  <rect x="70" y="555" width="1460" height="285" rx="22" class="band-verify" />
+  <text x="105" y="685" class="section-label" fill="#b56a3d">3. Verify /</text>
+  <text x="105" y="719" class="section-label" fill="#b56a3d">Report</text>
 
-  <rect x="1080" y="770" width="280" height="48" rx="10" class="box-verify" />
-  <text x="1220" y="802" text-anchor="middle" class="box-title">nonzero: rejected</text>
+  <rect x="300" y="555" width="390" height="100" rx="12" class="box-verify" />
+  <text x="495" y="584" text-anchor="middle" class="box-title">Independent trust inputs</text>
+  <text x="495" y="609" text-anchor="middle" class="micro-text">
+    baseline + subject artifact digests · schedule digest
+  </text>
+  <text x="495" y="629" text-anchor="middle" class="micro-text">
+    policy · runtime digests · signer fingerprint
+  </text>
+  <text x="495" y="649" text-anchor="middle" class="micro-text">
+    verifier key · verifier identity
+  </text>
 
-  <path d="M 720 686 L 830 686" class="arrow" />
-  <path d="M 1295 470 C 1440 500 1430 686 1230 686" class="arrow" />
-  <path d="M 985 742 C 950 756 865 762 820 770" class="arrow" />
-  <path d="M 1075 742 C 1110 756 1170 762 1200 770" class="arrow" />
+  <rect x="300" y="675" width="390" height="78" rx="12" class="box-verify" />
+  <text x="495" y="708" text-anchor="middle" class="box-title">invarlock verify</text>
+  <text x="495" y="734" text-anchor="middle" class="micro-text">
+    authenticate pack · replay pairs and interval under anchors
+  </text>
+
+  <rect x="910" y="665" width="390" height="78" rx="12" class="box-output" />
+  <text x="1105" y="698" text-anchor="middle" class="box-title">invarlock report</text>
+  <text x="1105" y="724" text-anchor="middle" class="micro-text">
+    authenticate signed bundle · render canonical report
+  </text>
+
+  <rect x="220" y="765" width="420" height="62" rx="10" class="box-output" />
+  <text x="430" y="790" text-anchor="middle" class="box-title">Signed verification receipt</text>
+  <text x="430" y="813" text-anchor="middle" class="micro-text">
+    anchors · replay verdict · verifier signature
+  </text>
+
+  <rect x="660" y="765" width="260" height="62" rx="10" class="box-verify" />
+  <text x="790" y="790" text-anchor="middle" class="box-title">Acceptance result</text>
+  <text x="790" y="813" text-anchor="middle" class="micro-text">scoped pass or rejection</text>
+
+  <rect x="980" y="765" width="330" height="62" rx="10" class="box-output" />
+  <text x="1145" y="790" text-anchor="middle" class="box-title">Console · optional HTML</text>
+  <text x="1145" y="813" text-anchor="middle" class="micro-text">
+    human-readable evidence view
+  </text>
+
+  <path d="M 495 655 L 495 675" class="arrow" />
+  <path d="M 700 518 C 700 555 730 575 730 625 C 730 680 715 714 690 714" class="arrow" />
+  <path d="M 950 518 C 950 575 1040 620 1105 665" class="arrow" />
+  <path d="M 430 753 L 430 765" class="arrow" />
+  <path d="M 610 753 C 650 758 740 760 790 765" class="arrow" />
+  <path d="M 1105 743 C 1105 755 1130 760 1145 765" class="arrow" />
 </svg>

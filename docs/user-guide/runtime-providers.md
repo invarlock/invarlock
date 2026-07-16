@@ -1,0 +1,529 @@
+# Runtime providers
+
+The runtime-provider ABI connects artifact-specific identity and execution to
+one common evidence transaction. A provider authenticates an artifact,
+prepares a session from caller-owned resources, scores the ordered schedule,
+and emits typed records. InvarLock owns pairing, metric arithmetic, policy
+evaluation, bundle publication, and independent verification.
+
+!!! tip "User guide"
+
+    **Outcome:** Select, inspect, and configure a provider so both artifacts
+    emit contract-complete records for one independently verifiable comparison.
+
+    **Audience:** Runtime integration engineers and evaluation operators working
+    with Hugging Face text, Hugging Face vision-text, GGUF/`llama.cpp`,
+    TensorRT-LLM, or complete imported provider material.
+
+    **Prerequisites:** Materialized artifacts and support files, a canonical
+    schedule and caller-approved policy, a provider-compatible offline environment,
+    and caller-owned runtime-image and device configuration.
+
+## Choose a provider path
+
+| Artifact you need to evaluate | Provider | Packaging | Start with |
+| --- | --- | --- | --- |
+| Local Hugging Face safetensors checkpoint | `hf_transformers` | Built into `invarlock`; execution dependencies in `invarlock[hf]` | Run mode |
+| Local Hugging Face vision-text checkpoint | `hf_vision_text` | `invarlock-runtime-hf-vision-text` add-in | Run mode with authenticated image content store |
+| GGUF file used by `llama.cpp` | `llama_cpp` | `invarlock-runtime-gguf` add-in | Run mode after runtime inspection |
+| TensorRT-LLM engine bundle | `tensorrt_llm` | `invarlock-runtime-tensorrt-llm` add-in | Run mode after GPU-bound inspection |
+| Complete provider sidecars produced elsewhere | Provider named by the sidecars | Matching provider package must be installed | Import mode |
+
+The text integrations declare `text_causal`; the vision-text add-in declares
+`vision_text_generation`. All shipped integrations declare `exact_match`. The
+built-in `hf_transformers` integration also declares
+`normalized_nll_per_utf8_byte`, using teacher-forced expected-continuation
+likelihoods over the authenticated local checkpoint. When authenticated
+tokenizer contracts and paired token counts are comparable, the verifier may
+render a token-weighted perplexity ratio as interpretation only. The GGUF,
+TensorRT-LLM, and vision-text add-ins remain exact-match only.
+
+| Metric | Hugging Face text | Vision-text | GGUF | TensorRT-LLM | Use when |
+| --- | --- | --- | --- | --- | --- |
+| `exact_match` | Yes | Yes | Yes | Yes | Exact generated text is the release criterion |
+| `normalized_nll_per_utf8_byte` | Yes | No | No | No | Expected-continuation likelihood regression is the release criterion; tokenizers may differ |
+
+## Common provider workflow
+
+Every run-mode provider follows the same operator sequence:
+
+1. Materialize the artifact and every support file before evaluation.
+2. Pin the provider package, backend, and outer OCI image.
+3. Inspect the exact artifact and backend to derive request settings; do not
+   transcribe digests by hand.
+4. Put artifact and support resources beneath caller-owned, non-symbolic roots.
+5. Build one request whose baseline and subject use the same schedule and a
+   provider-supported built-in or collection metric.
+6. Run in the digest-pinned, network-disabled container.
+7. Verify the resulting bundle with runtime digests obtained from independently maintained
+   configuration, not copied from the bundle.
+
+Provider conformance and evidence verification answer different questions:
+
+- a conformance command checks package discovery, ABI compatibility, and
+  lightweight provider behavior;
+- an evaluation authenticates one concrete artifact and execution record; and
+- `invarlock verify` replays one concrete bundle under independent anchors.
+
+A conformance pass is therefore a prerequisite, not evidence that a model or
+engine ran successfully.
+
+## Hugging Face Transformers
+
+`hf_transformers` is the canonical built-in provider. Install its runtime
+dependencies with:
+
+```bash
+python -m pip install "invarlock[hf]"
+```
+
+Strict run mode expects locally materialized safetensors and tokenizer files.
+It binds the immutable revision or checkpoint-tree digest, tokenizer metadata
+digest, deterministic scalar settings, backend and device facts, and the outer
+runtime image digest.
+
+### Prepare local material
+
+Resolve any Hub revision to an immutable commit before the transaction, then
+make the snapshot available locally. Hugging Face documents both
+[`local_files_only=True` and offline mode](https://huggingface.co/docs/transformers/installation#offline-mode).
+InvarLock additionally disables remote model code in its strict provider path.
+
+A run-mode request side includes a request-relative artifact path:
+
+```yaml
+artifact:
+  path: artifacts/baseline
+  model_id: org/baseline
+  locator: hf://org/baseline@0123456789abcdef0123456789abcdef01234567
+runtime:
+  provider: hf_transformers
+  settings:
+    batch_size: 1
+    checkpoint_tree_sha256: PINNED_64_HEX_DIGEST
+    context_length: 2048
+    immutable_revision: 0123456789abcdef0123456789abcdef01234567
+    max_output_tokens: 64
+    offline: true
+    seed: 0
+    timeout_seconds: 300
+    tokenizer_metadata_sha256: PINNED_64_HEX_DIGEST
+```
+
+Derive both fields from the exact local checkpoint with the stable engine
+helpers. Run this in the same pinned HF environment used for evaluation:
+
+```python
+import json
+from pathlib import Path
+
+from transformers import AutoTokenizer
+
+from invarlock.engine import (
+    checkpoint_tree_sha256,
+    hf_tokenizer_contract_sha256,
+)
+
+checkpoint = Path("artifacts/baseline").resolve()
+tokenizer = AutoTokenizer.from_pretrained(
+    checkpoint,
+    local_files_only=True,
+    trust_remote_code=False,
+)
+print(
+    json.dumps(
+        {
+            "checkpoint_tree_sha256": checkpoint_tree_sha256(
+                checkpoint
+            ).removeprefix("sha256:"),
+            "tokenizer_metadata_sha256": hf_tokenizer_contract_sha256(
+                tokenizer
+            ),
+        },
+        indent=2,
+        sort_keys=True,
+    )
+)
+```
+
+Repeat for the subject and copy the printed bare lowercase digests into the
+matching request side. `checkpoint_tree_sha256` rejects links, special files,
+tree changes during the scan, and unsafe path transitions. The tokenizer digest
+binds vocabulary, added vocabulary, special tokens, tokenizer backend contract,
+chat template, padding/truncation sides, and stable tokenizer settings. A digest
+mismatch is a reason to stop and inspect the material, not to update the
+request until it passes.
+
+The strict loader accepts canonical single-file or indexed SafeTensors layouts.
+For an indexed checkpoint, every declared shard must be present, every storage
+key must map consistently, no undeclared shard may be substituted, and the
+loaded tensor/config binding is checked again before and after scoring. Pickled
+model weights, remote code, symbolic links, and a tokenizer that cannot expose
+a stable contract fail closed.
+
+### Build or obtain the runtime image
+
+The repository maintains separate CPU and x86_64 CUDA images. Both include the
+core wheel plus a provider-matched pinned Hugging Face runtime closure:
+
+```bash
+RUNTIME_SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
+  make runtime-image
+make runtime-smoke
+
+RUNTIME_SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
+  make runtime-image-cuda
+make runtime-smoke-cuda
+```
+
+The CPU target uses `runtime/Dockerfile`; the NVIDIA CUDA 12.8 target uses
+`runtime/Dockerfile.cuda`. A CUDA device flag only exposes a GPU to a
+CUDA-capable image.
+
+The default local tag is a mutable build handle. Strict execution accepts an
+exact content-addressed local image ID or `repository@sha256:...` reference and
+requires the same digest through `INVARLOCK_RUNTIME_IMAGE_DIGEST`. For portable
+public evidence, publish or obtain the pinned image through the operator's
+registry process and record its registry manifest reference; a local image ID
+identifies local bytes but does not give another verifier a fetchable runtime.
+
+Invoke `evaluate` on the host with the pinned image and device. The CLI creates
+the closed Docker or Podman boundary and re-enters the transaction inside it:
+
+```bash
+invarlock evaluate request.yaml \
+  --signing-key ../private/evidence-signer.pem \
+  --baseline-runtime-image 'registry.example/invarlock-runtime-cuda@sha256:BASELINE_DIGEST' \
+  --baseline-runtime-image-digest 'sha256:BASELINE_DIGEST' \
+  --subject-runtime-image 'registry.example/invarlock-runtime-cuda@sha256:SUBJECT_DIGEST' \
+  --subject-runtime-image-digest 'sha256:SUBJECT_DIGEST' \
+  --baseline-runtime-device cuda:0 \
+  --subject-runtime-device cuda:1
+```
+
+Each image reference and digest must agree. Shared image, digest, device, and
+entrypoint options remain convenient defaults when both sides use the same
+configuration. The OCI project defines digests as content-addressed descriptor identities in the
+[OCI Image Format](https://github.com/opencontainers/image-spec). Digest
+agreement identifies the declared image; it does not attest that a trusted host
+executed it.
+
+The host prepares the authenticated schedule, then launches one local worker
+per side with `--pull=never`, disabled networking, a read-only container root,
+dropped Linux capabilities, side-specific read-only inputs, and an isolated
+writable output. The host validates the outputs, publishes the no-clobber
+evidence destination, and signs it with a key never exposed to model workers.
+Workers sharing a generic or identical CUDA selector run sequentially;
+explicitly different CUDA indexes can run in parallel. Strict mode also
+observes container markers and rejects network, remote-code, or
+arbitrary-provider enablement. Embedding applications that call the Python
+transaction directly remain responsible for establishing an equivalent runtime
+boundary.
+
+## Hugging Face vision-text
+
+Install the optional provider and its image-decoding runtime:
+
+```bash
+python -m pip install 'invarlock-runtime-hf-vision-text[runtime]'
+invarlock-hf-vision-text-conformance
+```
+
+`hf_vision_text` evaluates `vision_text_generation` schedules containing one
+`prompt` text part and one `image` content part per record. Schedule content
+parts carry a canonical content ID, media type, positive byte length, and
+SHA-256 rather than a host path. The provider resolves each ID beneath the
+caller-authorized content store, opens it without following links, and verifies
+file identity, length, digest, image format, frame count, and dimensions before
+local inference.
+
+Set the content resources outside `request.yaml` because they authorize host
+material rather than express comparison intent:
+
+```bash
+export INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT=/pinned/vision-inputs
+export INVARLOCK_HF_VISION_TEXT_CONTENT_STORE=images
+```
+
+Both request sides use `provider: hf_vision_text` and declare
+`checkpoint_tree_sha256`, `tokenizer_metadata_sha256`,
+`processor_metadata_sha256`, `batch_size: 1`, context and output limits, seed,
+timeout, and `offline: true`. Derive the processor digest from the exact locally
+loaded processor with `processor_contract_sha256`; the provider loads the
+checkpoint and processor with local-files-only behavior, disabled remote code,
+and safetensors.
+
+Build the add-in image from the exact digest of the canonical CUDA image and
+qualify it through `evaluate`, `verify`, and `report` on the target GPU. The
+[add-in guide](https://github.com/invarlock/invarlock/blob/main/addins/multimodal/README.md)
+contains the build, content-contract, and qualification commands.
+
+## GGUF and `llama.cpp`
+
+Install and check the optional provider:
+
+```bash
+python -m pip install invarlock-runtime-gguf
+invarlock-gguf-conformance
+```
+
+The provider authenticates the GGUF file, its structured metadata and tensor
+inventory, tokenizer metadata, a pinned `llama.cpp` executable, and a source
+archive for the backend. The upstream
+[GGUF specification](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
+defines the file structure, while
+[`llama.cpp`](https://github.com/ggml-org/llama.cpp) is the native executor.
+
+Derive the request settings inside the exact runtime image:
+
+```python
+from pathlib import Path
+
+from invarlock_addins.gguf.provider import LlamaCppProvider
+from invarlock_addins.gguf.session import LlamaCppRuntimeBindings
+
+bindings = LlamaCppRuntimeBindings(
+    gguf_path=Path("model.gguf"),
+    executable_path=Path("llama-cli"),
+    source_archive_path=Path("llama.cpp-source.tar"),
+)
+spec = LlamaCppProvider().inspect_runtime_spec(
+    bindings,
+    seed=0,
+    context_length=2048,
+    batch_size=1,
+    max_output_tokens=64,
+    timeout_seconds=300,
+)
+print(spec.model_id)
+print(spec.settings)
+```
+
+Use those exact values for the request side with `provider: llama_cpp`. At
+evaluation time, map the same pinned files through caller-owned resources:
+
+```bash
+export INVARLOCK_GGUF_RESOURCE_ROOT=/pinned/gguf-runtime
+export INVARLOCK_GGUF_BACKEND_EXECUTABLE=bin/llama-cli
+export INVARLOCK_GGUF_BACKEND_SOURCE=source/llama.cpp-source.tar
+export INVARLOCK_RUNTIME_IMAGE='registry.example/invarlock-gguf@sha256:PINNED_DIGEST'
+export INVARLOCK_RUNTIME_IMAGE_DIGEST='sha256:PINNED_DIGEST'
+```
+
+The resource root is an absolute local directory. The executable and source
+values are portable relative names beneath it. That root must enclose the
+request-resolved GGUF artifact as well as both support files. The GGUF artifact
+itself is the request-side `artifact.path`; backend paths are not published as
+host paths in the canonical bundle.
+
+## TensorRT-LLM
+
+Install and check the optional provider in a compatible CUDA environment:
+
+```bash
+python -m pip install invarlock-runtime-tensorrt-llm
+invarlock-tensorrt-llm-conformance
+```
+
+The provider binds the engine tree and inventory, builder configuration,
+tokenizer contract, engine metadata, target compute capability, runner, and
+outer image. TensorRT-LLM engines are runtime artifacts created by a build
+workflow; NVIDIA documents that separation in the official
+[TensorRT-LLM build workflow](https://nvidia.github.io/TensorRT-LLM/architecture/workflow.html)
+and [architecture overview](https://nvidia.github.io/TensorRT-LLM/architecture/overview.html).
+
+Inspect the exact engine on the target GPU inside the pinned image:
+
+```python
+from pathlib import Path
+
+from invarlock_addins.tensorrt_llm.provider import TensorRTLLMProvider
+from invarlock_addins.tensorrt_llm.session import TensorRTLLMRuntimeBindings
+
+bindings = TensorRTLLMRuntimeBindings(
+    engine_bundle_path=Path("engine"),
+    tokenizer_contract_path=Path("tokenizer-contract.json"),
+    runner_executable_path=Path("invarlock-tensorrt-llm-runner"),
+)
+spec = TensorRTLLMProvider().inspect_runtime_spec(
+    bindings,
+    seed=0,
+    context_length=2048,
+    batch_size=1,
+    max_output_tokens=64,
+    timeout_seconds=300,
+)
+print(spec.model_id)
+print(spec.settings)
+```
+
+Use those values for a request side with `provider: tensorrt_llm`, then supply
+the same support resources during evaluation:
+
+```bash
+export INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT=/pinned/tensorrt-runtime
+export INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT=tokenizer/tokenizer-contract.json
+export INVARLOCK_TENSORRT_LLM_RUNNER_EXECUTABLE=bin/invarlock-tensorrt-llm-runner
+export INVARLOCK_RUNTIME_IMAGE='registry.example/invarlock-tensorrt@sha256:PINNED_DIGEST'
+export INVARLOCK_RUNTIME_IMAGE_DIGEST='sha256:PINNED_DIGEST'
+export INVARLOCK_RUNTIME_DEVICE=cuda
+```
+
+The TensorRT-LLM resource root must enclose the request-resolved engine bundle,
+tokenizer contract, and runner. All three are re-opened through root-confined,
+no-follow resource paths.
+
+Reinspect and re-evaluate when the engine, tokenizer contract, runner, image,
+GPU compute capability, or builder configuration changes. A serialized engine
+is not assumed portable across incompatible TensorRT, CUDA, or accelerator
+targets.
+
+## Import provider evidence
+
+Import mode is appropriate when execution occurs outside the core transaction
+but the evaluation environment can supply the complete provider contract. It requires, for
+both sides, the artifact identity, provider receipt, scoring observation,
+runtime-side report, runtime manifest, runtime configuration, schedule, and
+paired-record file.
+
+Import is not a generic endpoint adapter and does not accept a score summary.
+The installed provider must reproduce the artifact identity from request
+settings, and InvarLock re-derives the pairs and report. See
+[Evaluation request](evaluation-request.md#import-mode) for the exact shape and
+the [offline example](https://github.com/invarlock/invarlock/blob/main/examples/README.md)
+for runnable fixtures.
+
+### Adapt per-record output without hand-assembling evidence
+
+The stable Python facade provides a neutral record adapter for integrations
+that already emit one result for every frozen schedule entry. A JSONL line uses
+the runtime scoring-record fields, for example:
+
+```json
+{"input_sha256":"<64 lowercase hex>","output_sha256":"<64 lowercase hex>","output_text":"A","record_id":"sample-001","status":"ok"}
+```
+
+Log-probability integrations may instead include `logprob_sum`, `token_count`,
+and `utf8_byte_count`. Every line is converted to a typed record. Blank lines,
+unknown fields, aggregate metrics, missing schedule IDs, reordered IDs, input
+digest mismatches, failed records, and output digest mismatches are rejected.
+
+The following is the core of a reference adapter. The identity and provenance
+values must come from inspection of the exact artifact and execution, not from
+the comparison request or from a later evidence bundle:
+
+```python
+import hashlib
+from pathlib import Path
+
+from invarlock.engine import (
+    HFSnapshotArtifactIdentity,
+    RuntimeBackendIdentity,
+    RuntimeDeviceFacts,
+    RuntimeExecutionSettings,
+    RuntimeProviderCapabilities,
+    RuntimeProviderPluginIdentity,
+    load_external_scoring_records_jsonl,
+    load_runtime_behavioral_schedule,
+    write_runtime_import_side,
+)
+
+schedule = load_runtime_behavioral_schedule(Path("schedule.json"))
+records = load_external_scoring_records_jsonl(
+    "baseline-records.jsonl",
+    schedule=schedule,
+)
+policy_digest = "sha256:" + hashlib.sha256(
+    Path("policy.json").read_bytes()
+).hexdigest()
+
+baseline = write_runtime_import_side(
+    "imports/baseline",
+    role="baseline",
+    schedule=schedule,
+    policy_digest=policy_digest,
+    artifact_identity=HFSnapshotArtifactIdentity(
+        model_id="org/baseline",
+        immutable_revision="<pinned 40-64 character revision>",
+        checkpoint_tree_sha256="<pinned 64 character digest>",
+        tokenizer_metadata_sha256="<pinned 64 character digest>",
+    ),
+    records=records,
+    plugin=RuntimeProviderPluginIdentity(
+        name="hf_transformers",
+        distribution="invarlock",
+        distribution_version="<installed version>",
+    ),
+    backend=RuntimeBackendIdentity(
+        name="transformers",
+        version="<installed version>",
+        source_sha256="<pinned 64 character digest>",
+        binary_sha256=None,
+        build_sha256=None,
+    ),
+    capabilities=RuntimeProviderCapabilities(
+        provider_name="hf_transformers",
+        artifact_formats=("hf_snapshot",),
+        tasks=("text_causal",),
+        metrics=("exact_match",),
+        execution_modes=("in_process",),
+        required_extra="hf",
+        required_image=None,
+    ),
+    execution_settings=RuntimeExecutionSettings(
+        seed=0,
+        context_length=2048,
+        batch_size=1,
+        max_output_tokens=64,
+        timeout_seconds=300,
+        allow_network=False,
+    ),
+    device=RuntimeDeviceFacts(
+        device_kind="cuda",
+        device_name="<observed device name>",
+        compute_capability="<observed major.minor>",
+    ),
+    runtime_image_ref=(
+        "registry.example/pinned-evaluator@sha256:<pinned image digest>"
+    ),
+    runtime_image_digest="sha256:<pinned image digest>",
+    generated_at_utc="<observed ISO 8601 UTC timestamp>",
+)
+```
+
+Repeat the call for the subject, then invoke
+`write_runtime_import_paired_records` with both returned side objects. That
+function derives scores from the authenticated records and expected schedule
+outputs; it has no parameter for caller-supplied aggregate values. Put its
+output and the two complete side directories into the import request tree.
+
+The authoring API makes the format reproducible and removes hand-built Docker
+command sequences. A separate verifier establishes acceptance with
+independently managed artifact identities, canonical schedule, policy,
+runtime-image identities, evidence signer, and verifier signer.
+
+## Validate the provider outcome and recover failures
+
+| Symptom | First check |
+| --- | --- |
+| Provider is not discovered | Install the matching add-in and run its conformance command in the same environment as `invarlock`. |
+| Artifact identity mismatch | Re-run inspection over the exact artifact; look for changed files, metadata, tokenizer material, or request settings. |
+| Backend digest mismatch | Confirm the executable, source archive, or runner came from the pinned runtime root. |
+| Runtime image mismatch | Resolve the image reference to an immutable digest and make the reference and separate digest agree. |
+| Device or compute-capability mismatch | Rebuild or select an engine for the actual accelerator and repeat controlled inspection. |
+| Records are missing or reordered | Fix the provider execution; do not patch paired records or the comparison report. |
+
+A usable provider outcome has a complete record for every schedule ID in the
+original order, authenticated artifact and runtime identities, and no
+provider-side substitution of aggregate results for typed observations. Run
+independent bundle verification after evaluation; provider success alone is
+not an acceptance result.
+
+If validation fails, preserve the original error and any unpublished
+workspace, correct the artifact or runtime boundary, reinspect the exact
+material, and evaluate into a new destination. Never repair provider records
+inside a published evidence bundle.
+
+For environment-variable details, see
+[Environment variables](../reference/environment.md). For ABI and receipt
+obligations, see [Runtime providers reference](../reference/runtime-providers.md).
