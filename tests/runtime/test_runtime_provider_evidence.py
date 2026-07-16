@@ -70,9 +70,6 @@ def _capabilities(*, provider_name: str = "llama_cpp") -> RuntimeProviderCapabil
         execution_modes=("container",),
         required_extra=None,
         required_image="ghcr.io/invarlock/runtime-llama-cpp@sha256:" + "b" * 64,
-        platform_constraints=("linux",),
-        evidence_surfaces=("behavior", "tokenizer"),
-        supported_claim_sets=("invarlock-runtime-behavioral-regression-v1",),
     )
 
 

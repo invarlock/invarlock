@@ -8,18 +8,12 @@ import stat
 import tempfile
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any
 
-from invarlock.evidence_pack_contracts.probes import (
-    PROBE_FILENAMES,
-    ProbeValidationError,
-    validate_probe_payload,
-)
 from invarlock.evidence_pack_json import StrictJsonError, load_json_object
-from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 
 @dataclass(frozen=True)
@@ -119,114 +113,6 @@ def _capture_entry(
         ),
         None,
     )
-
-
-def _manifest_reference_paths(payload: dict[str, Any]) -> set[str]:
-    """Return manifest-declared JSON inputs that influence verification."""
-
-    paths: set[str] = set()
-
-    def add_reference(value: Any) -> None:
-        if not isinstance(value, dict):
-            return
-        relative_path = value.get("path")
-        if (
-            isinstance(relative_path, str)
-            and relative_path
-            and relative_path.lower().endswith(".json")
-        ):
-            paths.add(relative_path)
-
-    add_reference(payload.get("subject"))
-    add_reference(payload.get("environment"))
-    add_reference(payload.get("verification_policy_pack"))
-    invocation = payload.get("invocation")
-    if isinstance(invocation, dict):
-        add_reference(invocation.get("config_source"))
-    for field in ("materials", "verification_baselines"):
-        values = payload.get(field)
-        if isinstance(values, list):
-            for value in values:
-                add_reference(value)
-    return paths
-
-
-def _structural_json_paths(entries: list[SnapshotEntry]) -> set[str]:
-    """Identify pack files whose JSON semantics drive package verification."""
-
-    paths = {
-        "metadata/manifest.json",
-        "manifest.signature.json",
-        "metadata/manifest.signature.json",
-        "metadata/scenarios.json",
-    }
-    for entry in entries:
-        relative = entry.relative_path
-        filename = PurePosixPath(relative).name
-        if relative.startswith("results/") and filename == "final_verdict.json":
-            paths.add(relative)
-        if relative.startswith("reports/") and filename in {
-            "evaluation.report.json",
-            RUNTIME_MANIFEST_FILENAME,
-            *PROBE_FILENAMES,
-        }:
-            paths.add(relative)
-        if relative.startswith("baselines/") and filename in {
-            "evaluation.report.json",
-            RUNTIME_MANIFEST_FILENAME,
-        }:
-            paths.add(relative)
-    return paths
-
-
-def _validate_pack_json_inputs(
-    entries: list[SnapshotEntry],
-) -> tuple[list[SnapshotEntry], dict[str, Any], list[str]]:
-    """Strictly parse all JSON that can affect package verification decisions."""
-
-    by_relative = {entry.relative_path: entry for entry in entries}
-    manifest = by_relative.get("manifest.json")
-    required = _structural_json_paths(entries)
-    if manifest is not None and isinstance(manifest.parsed_json, dict):
-        required.update(_manifest_reference_paths(manifest.parsed_json))
-
-    parsed: dict[str, Any] = {
-        entry.relative_path: entry.parsed_json
-        for entry in entries
-        if entry.json_error is None
-    }
-    replacements: dict[str, SnapshotEntry] = {}
-    errors: list[str] = []
-    for relative in sorted(required):
-        # ``manifest.json`` is parsed during capture so its existing format
-        # diagnostics are returned by the verifier's format phase.
-        if relative == "manifest.json":
-            continue
-        entry = by_relative.get(relative)
-        if entry is None:
-            continue
-        payload, error = _parse_json_once(
-            entry.snapshot_path,
-            label=f"evidence-pack JSON input {relative}",
-        )
-        if error is not None:
-            errors.append(f"unsafe evidence-pack JSON input {relative}: {error}")
-            continue
-        parsed[relative] = payload
-        if PurePosixPath(relative).name in PROBE_FILENAMES:
-            try:
-                validate_probe_payload(PurePosixPath(relative).name, payload)
-            except ProbeValidationError as exc:
-                errors.append(f"unsafe evidence-pack JSON input {relative}: {exc}")
-                continue
-        replacements[relative] = replace(
-            entry,
-            parsed_json=payload,
-            json_error=None,
-        )
-    if replacements:
-        entries = [replacements.get(entry.relative_path, entry) for entry in entries]
-    return entries, parsed, errors
 
 
 @dataclass(frozen=True)
@@ -398,13 +284,11 @@ class PackSnapshot:
         if errors:
             storage.cleanup()
             return None, errors
-        if validate_structural_json:
-            entries, parsed, json_errors = _validate_pack_json_inputs(entries)
-            if json_errors:
-                storage.cleanup()
-                return None, json_errors
-        else:
-            parsed = {}
+        parsed = {
+            entry.relative_path: entry.parsed_json
+            for entry in entries
+            if entry.json_error is None
+        }
         snapshot = cls(
             source_root=pack_dir,
             files=ImmutableFileSnapshot(

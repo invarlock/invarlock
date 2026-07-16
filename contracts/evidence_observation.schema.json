@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evidence_observation.schema.json",
+  "title": "InvarLock Authenticated Observation",
+  "type": "object",
+  "required": [
+    "format",
+    "observation_id",
+    "kind",
+    "scope",
+    "authority",
+    "bindings",
+    "payload"
+  ],
+  "properties": {
+    "format": {"const": "invarlock/evidence-observation-v1"},
+    "observation_id": {"$ref": "#/$defs/observationIdentifier"},
+    "kind": {"$ref": "#/$defs/kind"},
+    "scope": {"enum": ["baseline", "subject", "comparison"]},
+    "authority": {"const": "observation"},
+    "bindings": {
+      "type": "object",
+      "required": [
+        "comparison_id",
+        "schedule_digest",
+        "policy_digest",
+        "artifact_digests"
+      ],
+      "properties": {
+        "comparison_id": {"$ref": "#/$defs/identifier"},
+        "schedule_digest": {"$ref": "#/$defs/digest"},
+        "policy_digest": {"$ref": "#/$defs/digest"},
+        "artifact_digests": {
+          "type": "object",
+          "required": ["baseline", "subject"],
+          "properties": {
+            "baseline": {"$ref": "#/$defs/digest"},
+            "subject": {"$ref": "#/$defs/digest"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "payload": {
+      "type": "object",
+      "maxProperties": 256
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "observationIdentifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    }
+  }
+}

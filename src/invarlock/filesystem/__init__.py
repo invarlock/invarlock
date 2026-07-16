@@ -1,4 +1,4 @@
-"""Filesystem safety primitives shared by evidence producers."""
+"""Filesystem safety primitives shared by evidence publication paths."""
 
 from .atomic_directory import (
     AtomicDirectoryExistsError,

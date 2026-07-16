@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 from typing import Any, cast
 
 import pytest
 
 from invarlock.core.runtime_provider.types import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     GGUFArtifactIdentity,
     ModelRuntimeSpec,
@@ -20,6 +22,8 @@ from invarlock.core.runtime_provider.types import (
     RuntimeScoringRecord,
     ScoringObservation,
     canonical_artifact_identity_json,
+    canonical_evaluation_input_parts_json,
+    evaluation_input_parts_sha256,
     runtime_execution_settings_from_mapping,
 )
 
@@ -36,9 +40,6 @@ def _capabilities() -> RuntimeProviderCapabilities:
         execution_modes=("local_process",),
         required_extra=None,
         required_image="ghcr.io/example/runtime@" + _IMAGE_DIGEST,
-        platform_constraints=("linux",),
-        evidence_surfaces=("behavior", "tokenizer"),
-        supported_claim_sets=("runtime-behavioral",),
     )
 
 
@@ -59,6 +60,26 @@ def _evaluation_record(record_id: str = "record-1") -> EvaluationRecord:
         input_text="prompt",
         input_sha256=_SHA256,
         expected_output="answer",
+    )
+
+
+def _structured_parts() -> tuple[EvaluationInputPart, ...]:
+    prompt = "What is shown?"
+    return (
+        EvaluationInputPart(
+            kind="content",
+            role="image",
+            content_id="sample_image",
+            media_type="image/png",
+            byte_length=137,
+            sha256="b" * 64,
+        ),
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=prompt,
+            sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        ),
     )
 
 
@@ -99,12 +120,6 @@ def test_capabilities_reject_empty_nontuple_duplicate_and_whitespace() -> None:
 
     with pytest.raises(ValueError, match="artifact_formats must be a non-empty tuple"):
         dataclasses.replace(capabilities, artifact_formats=cast(Any, []))
-    with pytest.raises(ValueError, match="supported_claim_sets must be a tuple"):
-        dataclasses.replace(capabilities, supported_claim_sets=())
-    with pytest.raises(
-        ValueError, match="platform_constraints must not contain duplicate"
-    ):
-        dataclasses.replace(capabilities, platform_constraints=("linux", "linux"))
     with pytest.raises(ValueError, match="required_image must not contain whitespace"):
         dataclasses.replace(capabilities, required_image="image with-space")
 
@@ -140,6 +155,111 @@ def test_evaluation_record_rejects_nontext_fields() -> None:
         dataclasses.replace(record, input_text=cast(Any, 7))
     with pytest.raises(ValueError, match="expected_output must be a string or null"):
         dataclasses.replace(record, expected_output=cast(Any, 7))
+
+
+def test_structured_input_parts_have_exact_canonical_serialization() -> None:
+    parts = _structured_parts()
+    canonical = canonical_evaluation_input_parts_json(parts)
+
+    assert canonical == (
+        b'[{"byte_length":137,"content_id":"sample_image","kind":"content",'
+        b'"media_type":"image/png","role":"image","sha256":"'
+        + b"b" * 64
+        + b'"},{"kind":"text","role":"prompt","sha256":"'
+        + parts[1].sha256.encode("ascii")
+        + b'","text":"What is shown?"}]'
+    )
+    assert evaluation_input_parts_sha256(parts) == hashlib.sha256(canonical).hexdigest()
+    assert evaluation_input_parts_sha256(tuple(reversed(parts))) != (
+        evaluation_input_parts_sha256(parts)
+    )
+
+
+@pytest.mark.parametrize("parts", [(), cast(Any, [])])
+def test_canonical_input_parts_require_nonempty_immutable_order(parts: Any) -> None:
+    with pytest.raises(ValueError, match="non-empty tuple"):
+        canonical_evaluation_input_parts_json(parts)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ({"kind": "binary"}, "kind must be text or content"),
+        ({"role": "Image"}, "canonical provider name"),
+        ({"sha256": "A" * 64}, "lowercase sha256"),
+        ({"text": "tampered"}, "sha256 does not match text"),
+        ({"content_id": "unexpected"}, "must not contain content fields"),
+    ],
+)
+def test_text_input_part_rejects_ambiguous_or_unauthenticated_material(
+    mutation: dict[str, object], message: str
+) -> None:
+    part = _structured_parts()[1]
+
+    with pytest.raises(ValueError, match=message):
+        dataclasses.replace(part, **cast(Any, mutation))
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ({"text": "inline bytes"}, "must not contain inline text"),
+        ({"content_id": "../image"}, "canonical provider name"),
+        ({"media_type": "IMAGE/PNG"}, "media_type must be canonical"),
+        ({"byte_length": True}, "positive integer"),
+        ({"byte_length": 0}, "positive integer"),
+    ],
+)
+def test_content_input_part_rejects_inline_or_noncanonical_material(
+    mutation: dict[str, object], message: str
+) -> None:
+    part = _structured_parts()[0]
+
+    with pytest.raises(ValueError, match=message):
+        dataclasses.replace(part, **cast(Any, mutation))
+
+
+def test_structured_record_binds_roles_text_and_ordered_part_digest() -> None:
+    parts = _structured_parts()
+    record = EvaluationRecord(
+        record_id="vision-1",
+        input_text="What is shown?",
+        input_sha256=evaluation_input_parts_sha256(parts),
+        expected_output="A chart.",
+        input_parts=parts,
+    )
+
+    assert record.input_parts == parts
+    with pytest.raises(ValueError, match="roles must be unique"):
+        dataclasses.replace(
+            record,
+            input_parts=(parts[0], dataclasses.replace(parts[1], role="image")),
+        )
+    with pytest.raises(ValueError, match="requires at least one text part"):
+        dataclasses.replace(
+            record,
+            input_text="",
+            input_sha256=evaluation_input_parts_sha256((parts[0],)),
+            input_parts=(parts[0],),
+        )
+    with pytest.raises(ValueError, match="match the first structured text part"):
+        dataclasses.replace(record, input_text="different")
+    with pytest.raises(ValueError, match="ordered input_parts"):
+        dataclasses.replace(record, input_sha256="0" * 64)
+    with pytest.raises(ValueError, match="input_parts must be a tuple"):
+        dataclasses.replace(record, input_parts=cast(Any, list(parts)))
+
+
+def test_batch_accepts_future_task_identity_but_rejects_noncanonical_task() -> None:
+    batch = EvaluationBatch(
+        schedule_sha256=_SHA256,
+        records=(_evaluation_record(),),
+        task="audio_transcription_review",
+    )
+
+    assert batch.task == "audio_transcription_review"
+    with pytest.raises(ValueError, match="canonical task identifier"):
+        dataclasses.replace(batch, task="audio/transcription")
 
 
 @pytest.mark.parametrize("records", [(), cast(Any, [])])

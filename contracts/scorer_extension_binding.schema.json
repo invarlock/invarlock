@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/scorer_extension_binding.schema.json",
+  "title": "InvarLock verifier-replayable scorer binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "scorer_abi",
+    "scorer_id",
+    "scorer_version",
+    "descriptor_sha256",
+    "configuration",
+    "configuration_sha256"
+  ],
+  "properties": {
+    "format_version": {"const": "invarlock/scorer-extension-binding-v1"},
+    "scorer_abi": {"const": "1"},
+    "scorer_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+$"
+    },
+    "scorer_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "descriptor_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "configuration": {"type": "object"},
+    "configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from invarlock.core.runtime_provider.behavioral_schedule import (
+    MAX_RUNTIME_BEHAVIORAL_INPUT_PARTS,
     MAX_RUNTIME_BEHAVIORAL_RECORD_ID_CHARACTERS,
     MAX_RUNTIME_BEHAVIORAL_SCHEDULE_BYTES,
     MAX_RUNTIME_BEHAVIORAL_SCHEDULE_RECORDS,
@@ -20,14 +21,24 @@ from invarlock.core.runtime_provider.behavioral_schedule import (
     load_runtime_behavioral_schedule,
     parse_runtime_behavioral_schedule_json,
 )
+from invarlock.core.runtime_provider.types import evaluation_input_parts_sha256
 from invarlock.evidence_pack_json import StrictJsonError
 
 
-def _record(record_id: str, input_text: str, expected_output: str) -> dict[str, str]:
+def _record(record_id: str, input_text: str, expected_output: str) -> dict[str, Any]:
+    part = {
+        "kind": "text",
+        "role": "prompt",
+        "text": input_text,
+        "sha256": hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+    }
+    parts_json = json.dumps(
+        [part], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
     return {
         "record_id": record_id,
-        "input_text": input_text,
-        "input_sha256": hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+        "input_parts": [part],
+        "input_sha256": hashlib.sha256(parts_json).hexdigest(),
         "expected_output": expected_output,
     }
 
@@ -35,6 +46,7 @@ def _record(record_id: str, input_text: str, expected_output: str) -> dict[str, 
 def _payload() -> dict[str, Any]:
     return {
         "format_version": RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
+        "task": "text_causal",
         "dataset_identity": {
             "provider": "hf_text",
             "dataset_name": "allenai/ai2_arc",
@@ -73,7 +85,7 @@ def test_build_schedule_from_material_derives_digest_in_canonical_builder() -> N
     records = [
         {
             "record_id": record["record_id"],
-            "input_text": record["input_text"],
+            "input_text": record["input_parts"][0]["text"],
             "expected_output": record["expected_output"],
         }
         for record in payload["records"]
@@ -102,16 +114,137 @@ def test_build_schedule_from_material_rejects_caller_supplied_digest() -> None:
         )
 
 
+def test_structured_schedule_authenticates_ordered_text_and_media_parts() -> None:
+    prompt = "What is shown?"
+    text_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    parts = [
+        {
+            "kind": "text",
+            "role": "prompt",
+            "text": prompt,
+            "sha256": text_sha,
+        },
+        {
+            "kind": "content",
+            "role": "image",
+            "content_id": "sample_image",
+            "media_type": "image/png",
+            "byte_length": 137,
+            "sha256": "b" * 64,
+        },
+    ]
+    schedule = build_runtime_behavioral_schedule_from_material(
+        task="vision_text_generation",
+        dataset_identity=_payload()["dataset_identity"],
+        records=[
+            {
+                "record_id": "vision/1",
+                "input_parts": parts,
+                "expected_output": "A chart",
+            }
+        ],
+    )
+
+    assert schedule.task == "vision_text_generation"
+    assert schedule.evaluation_batch().task == "vision_text_generation"
+    assert schedule.records[0].input_text == prompt
+    assert schedule.records[0].input_parts[1].content_id == "sample_image"
+    assert schedule.to_payload()["records"][0]["input_sha256"] == (
+        evaluation_input_parts_sha256(schedule.records[0].input_parts)
+    )
+
+    reordered = copy.deepcopy(schedule.to_payload())
+    reordered["records"][0]["input_parts"].reverse()
+    reordered["records"][0]["input_sha256"] = evaluation_input_parts_sha256(
+        tuple(reversed(schedule.records[0].input_parts))
+    )
+    assert (
+        build_runtime_behavioral_schedule(reordered).schedule_sha256
+        != schedule.schedule_sha256
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("content_id", "/tmp/image.png", "canonical provider name"),
+        ("content_id", "../image", "canonical provider name"),
+        ("content_id", "C:\\image.png", "canonical provider name"),
+        ("media_type", "IMAGE/PNG", "media_type must be canonical"),
+        ("byte_length", 0, "positive integer"),
+    ],
+)
+def test_structured_schedule_rejects_unsafe_or_ambiguous_content_descriptors(
+    field: str, value: object, message: str
+) -> None:
+    prompt = "Describe the image"
+    parts: list[dict[str, object]] = [
+        {
+            "kind": "text",
+            "role": "prompt",
+            "text": prompt,
+            "sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+        },
+        {
+            "kind": "content",
+            "role": "image",
+            "content_id": "image_1",
+            "media_type": "image/png",
+            "byte_length": 1,
+            "sha256": "c" * 64,
+        },
+    ]
+    parts[1][field] = value
+    with pytest.raises(ValueError, match=message):
+        build_runtime_behavioral_schedule_from_material(
+            task="vision_text_generation",
+            dataset_identity=_payload()["dataset_identity"],
+            records=[
+                {
+                    "record_id": "vision/1",
+                    "input_parts": parts,
+                    "expected_output": "image",
+                }
+            ],
+        )
+
+
+def test_schedule_accepts_future_canonical_task_without_contract_change() -> None:
+    schedule = build_runtime_behavioral_schedule_from_material(
+        task="audio_text_generation",
+        dataset_identity=_payload()["dataset_identity"],
+        records=[
+            {
+                "record_id": "future/1",
+                "input_text": "Transcribe the authenticated audio input.",
+                "expected_output": "hello",
+            }
+        ],
+    )
+    assert schedule.task == "audio_text_generation"
+
+    payload = schedule.to_payload()
+    payload["task"] = "audio/text"
+    with pytest.raises(ValueError, match="canonical task identifier"):
+        build_runtime_behavioral_schedule(payload)
+
+
+def test_schedule_rejects_too_many_input_parts() -> None:
+    payload = _payload()
+    payload["records"][0]["input_parts"] = payload["records"][0]["input_parts"] * (
+        MAX_RUNTIME_BEHAVIORAL_INPUT_PARTS + 1
+    )
+    with pytest.raises(ValueError, match="must not exceed 64 parts"):
+        build_runtime_behavioral_schedule(payload)
+
+
 def test_schedule_digest_binds_order_and_exact_record_material() -> None:
     original = _payload()
     reordered = copy.deepcopy(original)
     reordered["records"].reverse()
     mutated = copy.deepcopy(original)
     mutated_text = "Question one, revised?"
-    mutated["records"][0]["input_text"] = mutated_text
-    mutated["records"][0]["input_sha256"] = hashlib.sha256(
-        mutated_text.encode("utf-8")
-    ).hexdigest()
+    mutated["records"][0] = _record("arc/1", mutated_text, "A")
 
     original_schedule = build_runtime_behavioral_schedule(original)
     reordered_schedule = build_runtime_behavioral_schedule(reordered)
@@ -125,18 +258,16 @@ def test_schedule_digest_binds_order_and_exact_record_material() -> None:
     ]
 
 
-@pytest.mark.parametrize(
-    ("field", "replacement"),
-    [
-        ("input_text", "tampered prompt"),
-        ("input_sha256", "0" * 64),
-    ],
-)
-def test_schedule_rejects_input_or_hash_tampering(field: str, replacement: str) -> None:
+def test_schedule_rejects_input_or_hash_tampering() -> None:
     payload = _payload()
-    payload["records"][0][field] = replacement
+    payload["records"][0]["input_parts"][0]["text"] = "tampered prompt"
 
-    with pytest.raises(ValueError, match="does not match input_text"):
+    with pytest.raises(ValueError, match="sha256 does not match text"):
+        build_runtime_behavioral_schedule(payload)
+
+    payload = _payload()
+    payload["records"][0]["input_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="does not match ordered input_parts"):
         build_runtime_behavioral_schedule(payload)
 
 
@@ -162,18 +293,22 @@ def test_schedule_rejects_unknown_fields(location: str) -> None:
         build_runtime_behavioral_schedule(payload)
 
 
-@pytest.mark.parametrize("field", ["input_text", "expected_output"])
 @pytest.mark.parametrize("value", ["", " \n\t"])
-def test_schedule_rejects_empty_or_whitespace_only_claim_material(
-    field: str, value: str
-) -> None:
+def test_schedule_rejects_empty_or_whitespace_only_text_part(value: str) -> None:
     payload = _payload()
-    payload["records"][0][field] = value
-    if field == "input_text":
-        payload["records"][0]["input_sha256"] = hashlib.sha256(
-            value.encode("utf-8")
-        ).hexdigest()
+    payload["records"][0]["input_parts"][0]["text"] = value
+    payload["records"][0]["input_parts"][0]["sha256"] = hashlib.sha256(
+        value.encode("utf-8")
+    ).hexdigest()
 
+    with pytest.raises(ValueError, match="must contain non-empty text"):
+        build_runtime_behavioral_schedule(payload)
+
+
+@pytest.mark.parametrize("value", ["", " \n\t"])
+def test_schedule_rejects_empty_expected_output(value: str) -> None:
+    payload = _payload()
+    payload["records"][0]["expected_output"] = value
     with pytest.raises(ValueError, match="must be non-empty text"):
         build_runtime_behavioral_schedule(payload)
 
@@ -189,7 +324,7 @@ def test_schedule_enforces_record_and_text_bounds() -> None:
     long_text = "x" * (MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS + 1)
     oversized_text = _payload()
     oversized_text["records"][0] = _record("arc/1", long_text, "A")
-    with pytest.raises(ValueError, match="input_text must not exceed"):
+    with pytest.raises(ValueError, match="text must not exceed"):
         build_runtime_behavioral_schedule(oversized_text)
 
     oversized_id = _payload()

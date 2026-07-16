@@ -1,4 +1,4 @@
-"""Deterministic identities for model inputs used by assurance reports."""
+"""Deterministic identities for model inputs bound into evidence."""
 
 from __future__ import annotations
 
@@ -14,11 +14,6 @@ from typing import Any
 
 REMOTE_REVISION_RE = re.compile(r"^[0-9a-f]{40,64}$")
 CHECKPOINT_TREE_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-LEGACY_MODEL_IDENTITY_FIELDS = (
-    "revision",
-    "model_revision",
-    "model_checkpoint_tree_sha256",
-)
 
 _HASH_DOMAIN = b"invarlock-model-checkpoint-tree-v1\0"
 _WEIGHT_SUFFIXES = frozenset(
@@ -376,7 +371,7 @@ def resolve_model_identity(
     strict: bool,
     side: str,
 ) -> dict[str, str] | None:
-    """Resolve a producer-side remote revision or local checkpoint identity."""
+    """Resolve a request-side remote revision or local checkpoint identity."""
 
     local_path = Path(model_id).expanduser()
     if local_path.exists() or local_path.is_symlink():
@@ -423,7 +418,6 @@ def validated_model_identity(value: object) -> dict[str, str] | None:
 __all__ = [
     "CheckpointObservation",
     "CheckpointIdentityError",
-    "LEGACY_MODEL_IDENTITY_FIELDS",
     "canonical_checkpoint_tree_digest",
     "canonical_remote_revision",
     "checkpoint_tree_sha256",

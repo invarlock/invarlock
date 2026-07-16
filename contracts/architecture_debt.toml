@@ -1,7 +1,0 @@
-schema = "invarlock/architecture-debt/v1"
-
-# Temporary exceptions use [[entries]] records. Each record must name one
-# deterministic finding key, its current ceiling, an owner, a reason, and an
-# ISO expiry date. Entries are diagnostic only and never suppress release
-# blockers. New releases require this ledger to remain empty.
-entries = []

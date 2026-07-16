@@ -15,14 +15,23 @@ def _record(
     input_text: object = "Return the literal answer.",
     expected_output: object = "answer",
 ) -> dict[str, object]:
-    digest = (
+    text_digest = (
         hashlib.sha256(input_text.encode("utf-8")).hexdigest()
         if isinstance(input_text, str)
         else "a" * 64
     )
+    part = {
+        "kind": "text",
+        "role": "prompt",
+        "text": input_text,
+        "sha256": text_digest,
+    }
+    digest = hashlib.sha256(
+        json.dumps([part], sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     return {
         "record_id": record_id,
-        "input_text": input_text,
+        "input_parts": [part],
         "input_sha256": digest,
         "expected_output": expected_output,
     }
@@ -31,6 +40,7 @@ def _record(
 def _payload() -> dict[str, Any]:
     return {
         "format_version": schedule_module.RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
+        "task": "text_causal",
         "dataset_identity": {
             "provider": "local_manifest",
             "dataset_name": None,

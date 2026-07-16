@@ -3,7 +3,7 @@
 Evidence packs are adversarial inputs at verification time.  Python's default
 ``json`` decoder silently accepts duplicate object members and non-standard
 numeric constants, which makes a signed byte stream ambiguous to different
-consumers.  This module provides the small, dependency-free reader shared by
+readers.  This module provides the small, dependency-free reader shared by
 the package verifier and its immutable snapshot boundary.
 """
 
@@ -193,7 +193,7 @@ def parse_json_bytes(payload: bytes, *, label: str) -> Any:
         )
     except StrictJsonError:
         raise
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (RecursionError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise StrictJsonError(f"{label} is not valid JSON") from exc
 
 
@@ -226,7 +226,7 @@ def read_json_object_snapshot(
 ) -> tuple[bytes, dict[str, Any]]:
     """Read and parse one strict JSON object from exactly one file snapshot.
 
-    The returned bytes are the authenticated regular-file read.  Consumers can
+    The returned bytes are the authenticated regular-file read.  Callers can
     safely derive a digest with :func:`sha256_prefixed` and use the returned
     object without a second path-based read, closing the hash/parse TOCTOU gap
     for direct evidence staging helpers.

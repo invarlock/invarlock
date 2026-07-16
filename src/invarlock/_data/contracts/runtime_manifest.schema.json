@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_manifest.schema.json",
   "title": "InvarLock Runtime Manifest",
   "type": "object",
   "required": [
@@ -9,85 +10,88 @@
     "report",
     "config",
     "execution_mode",
-    "runtime"
+    "outer_container",
+    "runtime_provider"
   ],
   "properties": {
-    "manifest_version": {
-      "const": 1
-    },
+    "manifest_version": {"const": 1},
     "generated_at_utc": {
       "type": "string",
       "format": "date-time",
       "minLength": 20
     },
-    "verifier_contract_version": {
-      "const": "runtime-manifest-v1"
+    "verifier_contract_version": {"const": "runtime-manifest-v1"},
+    "report": {"$ref": "#/$defs/reportReference"},
+    "config": {"$ref": "#/$defs/configReference"},
+    "execution_mode": {"const": "container"},
+    "outer_container": {"$ref": "#/$defs/outerContainer"},
+    "runtime_provider": {"$ref": "#/$defs/runtimeProviderBindings"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     },
-    "report": {
+    "imageDigest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "basename": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\\\u0000-\\u001f]+$",
+      "not": {"enum": [".", ".."]}
+    },
+    "portableImageReference": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)[^\\\\\\u0000-\\u001f]+$"
+    },
+    "reportReference": {
       "type": "object",
-      "required": [
-        "path",
-        "filename",
-        "sha256"
-      ],
+      "required": ["path", "filename", "sha256"],
       "properties": {
-        "path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "filename": {
-          "type": "string",
-          "minLength": 1
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        }
+        "path": {"$ref": "#/$defs/basename"},
+        "filename": {"$ref": "#/$defs/basename"},
+        "sha256": {"$ref": "#/$defs/sha256"}
       },
       "additionalProperties": false
     },
-    "config": {
+    "configReference": {
       "type": "object",
-      "required": [
-        "path",
-        "sha256",
-        "source"
-      ],
+      "required": ["path", "sha256", "source"],
       "properties": {
         "path": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [{"type": "null"}, {"$ref": "#/$defs/basename"}]
         },
         "sha256": {
-          "anyOf": [
-            {
-              "type": "null"
-            },
-            {
-              "type": "string",
-              "pattern": "^[a-f0-9]{64}$"
+          "anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+        },
+        "source": {"enum": ["file", "inline", "missing"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"source": {"const": "missing"}}},
+          "then": {
+            "properties": {
+              "path": {"const": null},
+              "sha256": {"const": null}
             }
-          ]
+          },
+          "else": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}}
         },
-        "source": {
-          "enum": [
-            "file",
-            "inline",
-            "missing"
-          ]
+        {
+          "if": {"properties": {"source": {"const": "file"}}},
+          "then": {"properties": {"path": {"$ref": "#/$defs/basename"}}}
+        },
+        {
+          "if": {"properties": {"source": {"const": "inline"}}},
+          "then": {"properties": {"path": {"const": null}}}
         }
-      },
+      ],
       "additionalProperties": false
     },
-    "execution_mode": {
-      "enum": [
-        "container",
-        "host-bypass"
-      ]
-    },
-    "runtime": {
+    "outerContainer": {
       "type": "object",
       "required": [
         "image_ref",
@@ -98,39 +102,33 @@
         "allow_third_party_plugins"
       ],
       "properties": {
-        "image_ref": {
-          "type": "string",
-          "minLength": 1
-        },
-        "image_digest": {
-          "anyOf": [
-            {
-              "type": "null"
-            },
-            {
-              "type": "string",
-              "pattern": "^sha256:[a-f0-9]{64}$"
-            }
-          ]
-        },
-        "container_execution": {
-          "type": "boolean"
-        },
-        "allow_network": {
-          "type": "boolean"
-        },
-        "allow_remote_code": {
-          "type": "boolean"
-        },
-        "allow_third_party_plugins": {
-          "type": "boolean"
-        }
+        "image_ref": {"$ref": "#/$defs/portableImageReference"},
+        "image_digest": {"$ref": "#/$defs/imageDigest"},
+        "container_execution": {"const": true},
+        "allow_network": {"type": "boolean"},
+        "allow_remote_code": {"type": "boolean"},
+        "allow_third_party_plugins": {"type": "boolean"}
       },
       "additionalProperties": false
     },
-    "context": {
+    "sidecarReference": {
       "type": "object",
-      "additionalProperties": true
+      "required": ["filename", "sha256"],
+      "properties": {
+        "filename": {"$ref": "#/$defs/basename"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "runtimeProviderBindings": {
+      "type": "object",
+      "required": ["receipt", "scoring_observation", "artifact_identity"],
+      "properties": {
+        "receipt": {"$ref": "#/$defs/sidecarReference"},
+        "scoring_observation": {"$ref": "#/$defs/sidecarReference"},
+        "artifact_identity": {"$ref": "#/$defs/sidecarReference"}
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

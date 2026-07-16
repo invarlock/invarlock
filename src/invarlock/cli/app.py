@@ -1,720 +1,436 @@
-"""
-InvarLock CLI Main Entry Point (unified namespace)
-=============================================
+"""The InvarLock command line.
 
-Modern CLI with clean command interface using modular command structure.
-
-Import guard: set `INVARLOCK_LIGHT_IMPORT=1` to avoid heavy plugin discovery and
-third‑party imports during docs/tests. This keeps `import invarlock.cli.app` safe in
-minimal environments.
+The public workflow intentionally has three transactions: evaluate one closed
+request, independently verify its evidence, and render that verified evidence.
+Provider qualification and repository maintenance are separate tools rather than
+alternate user journeys hidden behind this CLI.
 """
 
 from __future__ import annotations
 
-import os
-from enum import StrEnum
-from importlib.metadata import PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 import click
 import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
-from invarlock.core.report_inputs import (
-    ReportInputError,
-    resolve_report_input_path,
-)
-from invarlock.security import (
-    enforce_default_security,
-    enforce_network_policy,
-    network_policy_allows,
-)
-
-# Lightweight import mode disables heavy side effects in some modules, but we no
-# longer force plugin discovery off globally here; individual commands may gate
-# discovery based on their own flags.
-LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-}
+from invarlock.security import enforce_default_security
 
 
-class ExecutionMode(StrEnum):
-    CONTAINER = "container"
-    HOST = "host"
+class CoreCommandGroup(TyperGroup):
+    """Keep the public journey in semantic order."""
 
-
-class RuntimeProvenanceMode(StrEnum):
-    CONTAINER = "container"
-    HOST = "host"
-
-
-# Deterministic help ordering
-class OrderedGroup(TyperGroup):
     def list_commands(self, ctx: click.Context) -> list[str]:
-        return [
-            "evaluate",
-            "report",
-            "verify",
-            "doctor",
-            "advanced",
-            "version",
-        ]
-
-    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
-        command = super().get_command(ctx, cmd_name)
-        if command is not None:
-            return command
-        if _load_lazy_subapp(self, cmd_name):
-            return super().get_command(ctx, cmd_name)
-        return None
+        del ctx
+        return ["evaluate", "verify", "report"]
 
 
-class AdvancedGroup(TyperGroup):
-    def list_commands(self, ctx: click.Context) -> list[str]:
-        return [
-            "evidence-catalog",
-            "evidence-pack",
-            "policy",
-            "plugins",
-            "calibrate",
-            "runtime-behavior",
-            "runtime-verify",
-            "inputs",
-        ]
-
-    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
-        command = super().get_command(ctx, cmd_name)
-        if command is not None:
-            return command
-        if _load_advanced_subapp(self, cmd_name):
-            return super().get_command(ctx, cmd_name)
-        return None
-
-
-# Initialize CLI app
 app = typer.Typer(
     name="invarlock",
-    help=(
-        "InvarLock — evaluate model changes with deterministic pairing and safety gates.\n"
-        "Core path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
-        "Then: invarlock verify <REPORT> and invarlock report html -i <REPORT> -o <HTML>\n"
-        "Advanced workflows live under: invarlock advanced\n"
-        "Tip: enable downloads with --allow-network when fetching.\n"
-        "Exit codes:\n"
-        "  0=success\n"
-        "  1=generic failure\n"
-        "  2=schema invalid\n"
-        "  3=hard abort with structured error code\n"
-        "  4-7=advanced evidence-pack failure classes\n"
-        "  8=advanced evidence-pack integrity-only diagnostic (not report verification)."
-    ),
+    cls=CoreCommandGroup,
+    add_completion=False,
     no_args_is_help=True,
-    cls=OrderedGroup,
+    help=(
+        "InvarLock authenticates a paired model evaluation, produces one portable "
+        "evidence pack, independently verifies it, and renders one human report.\n"
+        "\n"
+        "  invarlock evaluate request.yaml\n"
+        "  invarlock verify evidence/\n"
+        "  invarlock report evidence/"
+    ),
 )
-
 console = Console()
-advanced_app = typer.Typer(
-    help=(
-        "Advanced and maintenance workflows. "
-        "These commands are intentionally outside the core evaluate/verify/report path."
-    ),
-    no_args_is_help=True,
-    cls=AdvancedGroup,
-)
-_VERSION_IMPORT_ERRORS = (
-    AttributeError,
-    ImportError,
-    ModuleNotFoundError,
-    PackageNotFoundError,
-)
-
-
-def _resolve_schema_version() -> str | None:
-    try:
-        from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
-    except _VERSION_IMPORT_ERRORS:
-        return None
-    return (
-        REPORT_SCHEMA_VERSION
-        if isinstance(REPORT_SCHEMA_VERSION, str) and REPORT_SCHEMA_VERSION
-        else None
-    )
-
-
-def _resolve_package_version() -> str | None:
-    try:
-        from importlib.metadata import version as _pkg_version
-    except _VERSION_IMPORT_ERRORS:
-        return None
-    try:
-        resolved = _pkg_version("invarlock")
-    except _VERSION_IMPORT_ERRORS:
-        return None
-    return resolved if isinstance(resolved, str) and resolved else None
-
-
-def _resolve_module_version() -> str | None:
-    try:
-        from invarlock import __version__
-    except _VERSION_IMPORT_ERRORS:
-        return None
-    return __version__ if isinstance(__version__, str) and __version__ else None
 
 
 def _emit_version() -> None:
-    """Emit the InvarLock version string."""
-    # Prefer package metadata when available so CLI reflects wheel truth
-    package_version = _resolve_package_version()
-    if package_version is not None:
-        msg = f"InvarLock {package_version}"
-        schema = _resolve_schema_version()
-        if schema:
-            msg += f" · schema={schema}"
-        console.print(msg)
-        return
-    module_version = _resolve_module_version()
-    if module_version is not None:
-        console.print(f"InvarLock {module_version}")
-        return
-    console.print("InvarLock version unknown")
+    try:
+        resolved = version("invarlock")
+    except PackageNotFoundError:
+        try:
+            from invarlock import __version__ as resolved
+        except (ImportError, ModuleNotFoundError):
+            resolved = "unknown"
+    console.print(f"InvarLock {resolved}")
 
 
-@app.callback(invoke_without_command=True)
-def _root(
-    ctx: typer.Context,
-    show_version: bool = typer.Option(
-        False,
-        "--version",
-        "-V",
-        help="Show version and exit.",
-        is_eager=True,
-    ),
-) -> None:
-    was_allowed = network_policy_allows()
-    enforce_default_security()
-    ctx.call_on_close(lambda: enforce_network_policy(was_allowed))
-    if show_version:
+def _version_callback(value: bool) -> None:
+    if value:
         _emit_version()
         raise typer.Exit()
 
 
-@app.command()
-def version():
-    """Show InvarLock version."""
-    _emit_version()
+@app.callback()
+def _root(
+    version_requested: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the installed InvarLock version and exit.",
+    ),
+) -> None:
+    """Apply the fail-closed process defaults shared by all commands."""
 
-
-"""Register command modules and groups in the desired help order.
-
-Order: evaluate → report → verify → doctor → advanced → version
-"""
+    del version_requested
+    enforce_default_security()
 
 
 @app.command(
     name="evaluate",
-    help=(
-        "Evaluate a subject model against a baseline and generate an evaluation report. "
-        "Use when you have two model snapshots and want pass/fail gating."
-    ),
+    help="Execute or import one closed request and atomically publish one evidence pack.",
 )
-def _evaluate_lazy(
-    baseline: str = typer.Option(
-        ..., "--baseline", help="Baseline model dir or Hub ID"
-    ),
-    subject: str = typer.Option(..., "--subject", help="Subject model dir or Hub ID"),
-    baseline_report: str | None = typer.Option(
-        None,
-        "--baseline-report",
-        help=(
-            "Reuse an existing baseline run report.json file (explicit path; skips baseline evaluation). "
-            "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
-        ),
-    ),
-    baseline_revision: str | None = typer.Option(
-        None,
-        "--baseline-revision",
-        help="Immutable 40-64 character lowercase hexadecimal revision for a remote baseline.",
-    ),
-    subject_revision: str | None = typer.Option(
-        None,
-        "--subject-revision",
-        help="Immutable 40-64 character lowercase hexadecimal revision for a remote subject.",
-    ),
-    baseline_adapter: str = typer.Option(
-        "auto",
-        "--baseline-adapter",
-        help="Adapter for the baseline side, or 'auto' to resolve from baseline.",
-    ),
-    subject_adapter: str = typer.Option(
-        "auto",
-        "--subject-adapter",
-        help="Adapter for the subject side, or 'auto' to resolve from subject.",
-    ),
-    baseline_runtime_provider: str = typer.Option(
-        "hf_transformers",
-        "--baseline-runtime-provider",
-        help=(
-            "Runtime provider for the baseline side; currently only "
-            "'hf_transformers' is accepted. For GGUF or TensorRT-LLM, use "
-            "'invarlock advanced runtime-behavior'."
-        ),
-    ),
-    subject_runtime_provider: str = typer.Option(
-        "hf_transformers",
-        "--subject-runtime-provider",
-        help=(
-            "Runtime provider for the subject side; currently only "
-            "'hf_transformers' is accepted. For GGUF or TensorRT-LLM, use "
-            "'invarlock advanced runtime-behavior'."
-        ),
-    ),
-    device: str | None = typer.Option(
-        None, "--device", help="Device override for runs (auto|cuda|mps|cpu)"
-    ),
-    profile: str = typer.Option("ci", "--profile", help="Profile (ci|release)"),
-    tier: str = typer.Option("balanced", "--tier", help="Tier label for context"),
-    preset: str | None = typer.Option(
-        None,
-        "--preset",
-        help=(
-            "Universal preset path to use (defaults to causal or masked preset "
-            "based on the subject adapter)"
-        ),
-    ),
-    evaluation_input_binding: str | None = typer.Option(
-        None,
-        "--evaluation-input-binding",
-        help="Closed catalog/input binding to propagate into evaluation provenance.",
-    ),
-    out: str = typer.Option("runs", "--out", help="Base output directory"),
-    report_out: str = typer.Option(
-        "reports/eval", "--report-out", help="Evaluation report output directory"
-    ),
-    edit_config: str | None = typer.Option(
-        None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
-    ),
-    edit_label: str | None = typer.Option(
-        None,
-        "--edit-label",
-        help=(
-            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
-            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
-        ),
-    ),
-    clean_selection_config: str | None = typer.Option(
-        None,
-        "--clean-selection-config",
-        help="Frozen clean-transformation selection config for a candidate evaluation.",
-    ),
-    clean_selection_execution_receipt: str | None = typer.Option(
-        None,
-        "--clean-selection-execution-receipt",
-        help="Pre-evaluation candidate execution receipt (required with clean selection).",
-    ),
-    clean_selection_replay: str | None = typer.Option(
-        None,
-        "--clean-selection-replay",
-        help="Independent candidate transformation replay sidecar.",
-    ),
-    clean_selection_runtime_proof: str | None = typer.Option(
-        None,
-        "--clean-selection-runtime-proof",
-        help="Two-reload candidate runtime proof sidecar.",
-    ),
-    clean_selection_repeat_index: int | None = typer.Option(
-        None,
-        "--clean-selection-repeat-index",
-        help="Zero-based repeat index in the frozen clean-selection schedule.",
-    ),
-    clean_pruning_selection_config: str | None = typer.Option(
-        None,
-        "--clean-pruning-selection-config",
-        help="Frozen clean-pruning selection config for a candidate evaluation.",
-    ),
-    clean_pruning_selection_execution_receipt: str | None = typer.Option(
-        None,
-        "--clean-pruning-selection-execution-receipt",
-        help="Pre-evaluation pruning candidate receipt (required with clean pruning selection).",
-    ),
-    clean_pruning_selection_replay: str | None = typer.Option(
-        None,
-        "--clean-pruning-selection-replay",
-        help="Independent exact pruning candidate replay sidecar.",
-    ),
-    clean_pruning_selection_runtime_proof: str | None = typer.Option(
-        None,
-        "--clean-pruning-selection-runtime-proof",
-        help="Two-reload pruning candidate runtime proof sidecar.",
-    ),
-    clean_pruning_selection_repeat_index: int | None = typer.Option(
-        None,
-        "--clean-pruning-selection-repeat-index",
-        help="Zero-based repeat index in the frozen clean-pruning schedule.",
-    ),
-    quiet: bool = typer.Option(
-        False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Verbose output (include debug details)"
-    ),
-    banner: bool = typer.Option(
-        True, "--banner/--no-banner", help="Show header banner"
-    ),
-    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
-    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
-    timing_json: str | None = typer.Option(
-        None,
-        "--timing-json",
-        help="Write machine-readable evaluate timing data to this JSON path.",
-    ),
-    defer_report_rendering: bool = typer.Option(
-        False,
-        "--defer-report-rendering",
-        help=(
-            "Write JSON evidence sidecars only; skip markdown/evidence bundle "
-            "rendering in the hot path."
-        ),
-    ),
-    progress: bool = typer.Option(
-        True, "--progress/--no-progress", help="Show progress done messages"
-    ),
-    execution_mode: ExecutionMode = typer.Option(
-        ExecutionMode.CONTAINER,
-        "--execution-mode",
-        help="Execution mode for evaluation (container|host).",
-        case_sensitive=False,
-    ),
-    assurance: str = typer.Option(
-        "strict",
-        "--assurance",
-        help="Assurance mode for evaluation (strict|off).",
-    ),
-    no_color: bool = typer.Option(
-        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
-    ),
-    allow_network: bool = typer.Option(
-        False,
-        "--allow-network",
-        help="Allow network access, including runtime-image pulls and model fetches.",
-    ),
-    allow_remote_code: bool = typer.Option(
-        False,
-        "--allow-remote-code",
-        help="Allow trust_remote_code-style model loading for this command.",
-    ),
-):
-    from .commands.evaluate import evaluate_command as _eval
-
-    return _eval(
-        baseline=baseline,
-        subject=subject,
-        baseline_report=baseline_report,
-        baseline_revision=baseline_revision,
-        subject_revision=subject_revision,
-        baseline_adapter=baseline_adapter,
-        subject_adapter=subject_adapter,
-        baseline_runtime_provider=baseline_runtime_provider,
-        subject_runtime_provider=subject_runtime_provider,
-        device=device,
-        profile=profile,
-        tier=tier,
-        preset=preset,
-        evaluation_input_binding=evaluation_input_binding,
-        out=out,
-        report_out=report_out,
-        edit_config=edit_config,
-        edit_label=edit_label,
-        clean_selection_config=clean_selection_config,
-        clean_selection_execution_receipt=clean_selection_execution_receipt,
-        clean_selection_replay=clean_selection_replay,
-        clean_selection_runtime_proof=clean_selection_runtime_proof,
-        clean_selection_repeat_index=clean_selection_repeat_index,
-        clean_pruning_selection_config=clean_pruning_selection_config,
-        clean_pruning_selection_execution_receipt=(
-            clean_pruning_selection_execution_receipt
-        ),
-        clean_pruning_selection_replay=clean_pruning_selection_replay,
-        clean_pruning_selection_runtime_proof=clean_pruning_selection_runtime_proof,
-        clean_pruning_selection_repeat_index=clean_pruning_selection_repeat_index,
-        quiet=quiet,
-        verbose=verbose,
-        banner=banner,
-        style=style,
-        timing=timing,
-        timing_json=timing_json,
-        defer_report_rendering=defer_report_rendering,
-        progress=progress,
-        execution_mode=execution_mode.value,
-        assurance=assurance,
-        no_color=no_color,
-        allow_network=allow_network,
-        allow_remote_code=allow_remote_code,
-    )
-
-
-def _register_subapps() -> None:
-    # Keep single-command registration light; group-style subapps are loaded on
-    # demand by OrderedGroup.get_command().
-    pass
-
-
-@advanced_app.callback(invoke_without_command=True)
-def _advanced_root() -> None:
-    """Advanced command namespace."""
-
-
-def _missing_dependency_subapp(name: str, missing: str) -> typer.Typer:
-    subapp = typer.Typer(help=f"{name} requires optional dependency {missing!r}.")
-
-    @subapp.callback(invoke_without_command=True)
-    def _missing() -> None:
-        raise click.UsageError(
-            f"`invarlock advanced {name}` requires optional dependency {missing!r}."
-        )
-
-    return subapp
-
-
-def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
-    def _register(sub_name: str, subapp: typer.Typer) -> bool:
-        command = typer.main.get_command(subapp)
-        command.name = sub_name
-        group.add_command(command, name=sub_name)
-        return True
-
-    def _register_command(sub_name: str, command: click.Command) -> bool:
-        command.name = sub_name
-        group.add_command(command, name=sub_name)
-        return True
-
-    if name == "evidence-pack":
-        from .commands.evidence_pack import evidence_pack_app
-
-        return _register(name, evidence_pack_app)
-    if name == "evidence-catalog":
-        from .commands.evidence_catalog import evidence_catalog_app
-
-        return _register(name, evidence_catalog_app)
-    if name == "policy":
-        from .commands.policy import policy_app
-
-        return _register(name, policy_app)
-    if name == "plugins":
-        from .commands.plugins import plugins_app
-
-        return _register(name, plugins_app)
-    if name == "calibrate":
-        try:
-            from .commands.calibrate import calibrate_app
-        except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venvs
-            missing = getattr(exc, "name", "") or "optional runtime"
-            return _register(name, _missing_dependency_subapp(name, missing))
-        return _register(name, calibrate_app)
-    if name == "runtime-verify":
-        from invarlock.cli.commands.verify import runtime_verify_app
-
-        return _register_command(name, runtime_verify_app)
-    if name == "runtime-behavior":
-        from .commands.runtime_behavior import runtime_behavior_app
-
-        return _register(name, runtime_behavior_app)
-    if name == "inputs":
-        from .commands.inputs import inputs_app
-
-        return _register(name, inputs_app)
-    return False
-
-
-def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
-    def _register_lazy(name: str, subapp: typer.Typer) -> bool:
-        command = typer.main.get_command(subapp)
-        command.name = name
-        group.add_command(command, name=name)
-        return True
-
-    if name == "report":
-        from .commands.report import report_app as _report_app
-
-        return _register_lazy(name, _report_app)
-    if name == "advanced":
-        return _register_lazy(name, advanced_app)
-    return False
-
-
-@app.command(
-    name="doctor",
-    help=(
-        "Inspect runtime health, optional dependencies, datasets, and explicit report inputs. "
-        "Optional report paths must be explicit report.json or evaluation.report.json files."
-    ),
-)
-def _doctor_typed(
-    config: str | None = typer.Option(
-        None, "--config", help="Optional config file to validate and inspect."
-    ),
-    profile: str | None = typer.Option(
-        None, "--profile", help="Optional execution profile to validate."
-    ),
-    baseline: str | None = typer.Option(
-        None, "--baseline", help="Optional baseline model path or id for quick checks."
-    ),
-    json_out: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-    tier: str | None = typer.Option(
-        None, "--tier", help="Optional tier context for config validation."
-    ),
-    baseline_report: str | None = typer.Option(
-        None,
-        "--baseline-report",
-        help="Explicit baseline report.json or evaluation.report.json path for cross-checks.",
-    ),
-    subject_report: str | None = typer.Option(
-        None,
-        "--subject-report",
-        help="Explicit subject report.json or evaluation.report.json path for cross-checks.",
-    ),
-    strict: bool = typer.Option(
-        False,
-        "--strict",
-        help="Return a non-zero exit code on warnings as well as errors.",
-    ),
-):
-    from .commands.doctor import doctor_command as _doctor
-
-    return _doctor(
-        config=config,
-        profile=profile,
-        baseline=baseline,
-        json_out=json_out,
-        tier=tier,
-        baseline_report=baseline_report,
-        subject_report=subject_report,
-        strict=strict,
-    )
-
-
-@app.command(
-    name="verify",
-    help=(
-        "Verify evaluation report JSON(s) against schema, pairing math, and gates. "
-        "Use --json for a single-line machine-readable envelope."
-    ),
-)
-def _verify_typed(
-    reports: list[str] = typer.Argument(
+def evaluate(
+    request: Path = typer.Argument(
         ...,
-        help=(
-            "One or more evaluation report JSON files or directories containing "
-            "canonical evaluation.report.json to verify."
-        ),
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="Closed evaluation request YAML.",
     ),
-    policy_pack: str | None = typer.Option(
+    signing_key: Path | None = typer.Option(
         None,
-        "--policy-pack",
-        help=(
-            "Independently supplied policy-pack-v2 JSON/YAML authorization; frozen "
-            "policy-pack-v1 inputs remain accepted. Required for strict verification "
-            "so the report cannot choose its own thresholds."
-        ),
+        "--signing-key",
+        envvar="INVARLOCK_SIGNING_KEY",
+        help="Ed25519 evidence-signing key; may also be supplied by INVARLOCK_SIGNING_KEY.",
     ),
-    baseline: str | None = typer.Option(
-        None,
-        "--baseline",
+    allow_installed_scorers: bool = typer.Option(
+        False,
+        "--allow-installed-scorers",
+        envvar="INVARLOCK_ALLOW_INSTALLED_SCORERS",
         help=(
-            "Baseline report JSON file or directory containing canonical report.json. "
-            "Required for strict verification of every primary metric. It must be the "
-            "complete independent noop baseline run report with matching provenance "
-            "and recomputable raw metric evidence."
-        ),
-    ),
-    tolerance: float = typer.Option(
-        1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
-    ),
-    profile: str | None = typer.Option(
-        None,
-        "--profile",
-        help=(
-            "Execution profile affecting parity enforcement and exit codes "
-            "(dev|ci|release). Strict verification requires explicit ci/release "
-            "and exact agreement with the report."
+            "Authorize loading the exact installed scorer extension bound by the "
+            "request and policy. Installed scorer code executes in this process."
         ),
     ),
     json_out: bool = typer.Option(
         False,
         "--json",
-        help="Emit machine-readable JSON (suppresses human-readable output)",
+        help="Emit one machine-readable result object.",
     ),
-    runtime_provenance: RuntimeProvenanceMode = typer.Option(
-        RuntimeProvenanceMode.CONTAINER,
-        "--runtime-provenance",
-        help="Runtime provenance mode for verification (container|host).",
-    ),
-    expected_runtime_image_digest: str | None = typer.Option(
+    runtime_image: str | None = typer.Option(
         None,
-        "--expected-runtime-image-digest",
-        help=(
-            "Independent sha256:... trust anchor for the runtime image. "
-            "Required for strict assurance; do not copy it from the submitted manifest."
-        ),
+        "--runtime-image",
+        envvar="INVARLOCK_RUNTIME_IMAGE",
+        help="Local OCI image reference; must be digest-bearing or paired with --runtime-image-digest.",
     ),
-    assurance: str = typer.Option(
-        "report",
-        "--assurance",
-        help="Assurance verification mode (report|strict|off).",
+    runtime_image_digest: str | None = typer.Option(
+        None,
+        "--runtime-image-digest",
+        envvar="INVARLOCK_RUNTIME_IMAGE_DIGEST",
+        help="Pinned lowercase OCI sha256 digest for delegated run execution.",
     ),
-    warning_policy: str = typer.Option(
-        "pass",
-        "--warning-policy",
-        help="Guard-warning handling mode (pass|fail).",
+    baseline_runtime_image: str | None = typer.Option(
+        None,
+        "--baseline-runtime-image",
+        envvar="INVARLOCK_BASELINE_RUNTIME_IMAGE",
+        help="Optional digest-pinned baseline image override.",
     ),
-):
-    from pathlib import Path as _Path
+    baseline_runtime_image_digest: str | None = typer.Option(
+        None,
+        "--baseline-runtime-image-digest",
+        envvar="INVARLOCK_BASELINE_RUNTIME_IMAGE_DIGEST",
+        help="Pinned baseline image digest; defaults to --runtime-image-digest.",
+    ),
+    subject_runtime_image: str | None = typer.Option(
+        None,
+        "--subject-runtime-image",
+        envvar="INVARLOCK_SUBJECT_RUNTIME_IMAGE",
+        help="Optional digest-pinned subject image override.",
+    ),
+    subject_runtime_image_digest: str | None = typer.Option(
+        None,
+        "--subject-runtime-image-digest",
+        envvar="INVARLOCK_SUBJECT_RUNTIME_IMAGE_DIGEST",
+        help="Pinned subject image digest; defaults to --runtime-image-digest.",
+    ),
+    container_engine: str | None = typer.Option(
+        None,
+        "--container-engine",
+        envvar="INVARLOCK_CONTAINER_ENGINE",
+        help="Closed OCI engine selection: docker or podman.",
+    ),
+    runtime_device: str | None = typer.Option(
+        None,
+        "--runtime-device",
+        envvar="INVARLOCK_RUNTIME_DEVICE",
+        help="Default container device: cpu, cuda, or cuda:<index>.",
+    ),
+    baseline_runtime_device: str | None = typer.Option(
+        None,
+        "--baseline-runtime-device",
+        envvar="INVARLOCK_BASELINE_RUNTIME_DEVICE",
+        help="Optional baseline device override.",
+    ),
+    subject_runtime_device: str | None = typer.Option(
+        None,
+        "--subject-runtime-device",
+        envvar="INVARLOCK_SUBJECT_RUNTIME_DEVICE",
+        help="Optional subject device override.",
+    ),
+    runtime_entrypoint: str | None = typer.Option(
+        None,
+        "--runtime-entrypoint",
+        envvar="INVARLOCK_RUNTIME_ENTRYPOINT",
+        help="Worker entrypoint profile: auto, python, or nvidia.",
+    ),
+    baseline_runtime_entrypoint: str | None = typer.Option(
+        None,
+        "--baseline-runtime-entrypoint",
+        envvar="INVARLOCK_BASELINE_RUNTIME_ENTRYPOINT",
+        help="Optional baseline worker entrypoint profile override.",
+    ),
+    subject_runtime_entrypoint: str | None = typer.Option(
+        None,
+        "--subject-runtime-entrypoint",
+        envvar="INVARLOCK_SUBJECT_RUNTIME_ENTRYPOINT",
+        help="Optional subject worker entrypoint profile override.",
+    ),
+) -> None:
+    """Produce the canonical evidence pack described by REQUEST."""
 
-    from .commands.verify import verify_command as _verify
-
-    try:
-        report_paths = [
-            resolve_report_input_path(_Path(p), expected_kind="evaluation")
-            for p in reports
-        ]
-        baseline_path = (
-            resolve_report_input_path(_Path(baseline), expected_kind="any")
-            if isinstance(baseline, str)
-            else None
-        )
-        policy_pack_path = (
-            _Path(policy_pack).expanduser().resolve()
-            if isinstance(policy_pack, str)
-            else None
-        )
-        if policy_pack_path is not None and not policy_pack_path.is_file():
-            raise ReportInputError("not_found", policy_pack_path)
-    except ReportInputError as exc:
-        console.print(f"FAIL {exc}")
-        raise typer.Exit(2) from exc
-    return _verify(
-        reports=report_paths,
-        baseline=baseline_path,
-        policy_pack=policy_pack_path,
-        tolerance=tolerance,
-        profile=profile,
-        json_out=json_out,
-        runtime_provenance=runtime_provenance.value,
-        assurance=assurance,
-        warning_policy=warning_policy,
-        expected_runtime_image_digest=expected_runtime_image_digest,
+    from invarlock.core.scorer_extension import ScorerExtensionRegistry
+    from invarlock.evaluation_oci import (
+        OciEvaluationError,
+        OciRuntimeExecutor,
+        evaluation_request_execution_mode,
+        launch_from_environment,
+    )
+    from invarlock.evaluation_transaction import (
+        EvaluationTransactionError,
+        evaluate_request_file,
     )
 
+    try:
+        runtime_executor = None
+        if evaluation_request_execution_mode(request) == "run":
+            runtime_executor = OciRuntimeExecutor(
+                launch_from_environment(
+                    engine=container_engine,
+                    image_ref=runtime_image,
+                    image_digest=runtime_image_digest,
+                    baseline_image_ref=baseline_runtime_image,
+                    baseline_image_digest=baseline_runtime_image_digest,
+                    subject_image_ref=subject_runtime_image,
+                    subject_image_digest=subject_runtime_image_digest,
+                    default_device=runtime_device,
+                    baseline_device=baseline_runtime_device,
+                    subject_device=subject_runtime_device,
+                    runtime_entrypoint=runtime_entrypoint,
+                    baseline_entrypoint=baseline_runtime_entrypoint,
+                    subject_entrypoint=subject_runtime_entrypoint,
+                )
+            )
+        result = evaluate_request_file(
+            request,
+            signing_key_path=signing_key,
+            runtime_executor=runtime_executor,
+            scorer_registry=(
+                ScorerExtensionRegistry(allow_installed=True)
+                if allow_installed_scorers
+                else None
+            ),
+        )
+    except (EvaluationTransactionError, OciEvaluationError) as exc:
+        failure = (
+            exc
+            if isinstance(exc, EvaluationTransactionError)
+            else EvaluationTransactionError(str(exc))
+        )
+        if json_out:
+            typer.echo(failure.as_json())
+        else:
+            console.print(f"FAIL {failure}")
+        raise typer.Exit(failure.exit_code) from exc
+    if json_out:
+        typer.echo(result.as_json())
+    else:
+        console.print("PASS Evidence pack published")
+        console.print(str(result.evidence_path))
 
-_register_subapps()
+
+@app.command(
+    name="verify",
+    help="Independently verify one evidence pack against caller-supplied trust anchors.",
+)
+def verify(
+    evidence: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        help="Canonical evidence-pack directory.",
+    ),
+    policy: Path | None = typer.Option(
+        None,
+        "--policy",
+        envvar="INVARLOCK_POLICY",
+        help="Independent policy input; never taken from the submitted pack.",
+    ),
+    expected_baseline_artifact: str | None = typer.Option(
+        None,
+        "--expected-baseline-artifact",
+        envvar="INVARLOCK_EXPECTED_BASELINE_ARTIFACT",
+        help="Independent expected baseline artifact-identity digest.",
+    ),
+    expected_subject_artifact: str | None = typer.Option(
+        None,
+        "--expected-subject-artifact",
+        envvar="INVARLOCK_EXPECTED_SUBJECT_ARTIFACT",
+        help="Independent expected subject artifact-identity digest.",
+    ),
+    expected_schedule: str | None = typer.Option(
+        None,
+        "--expected-schedule",
+        envvar="INVARLOCK_EXPECTED_SCHEDULE",
+        help="Independent expected canonical schedule digest.",
+    ),
+    expected_baseline_runtime: str | None = typer.Option(
+        None,
+        "--expected-baseline-runtime",
+        envvar="INVARLOCK_EXPECTED_BASELINE_RUNTIME",
+        help="Independent expected baseline runtime digest.",
+    ),
+    expected_subject_runtime: str | None = typer.Option(
+        None,
+        "--expected-subject-runtime",
+        envvar="INVARLOCK_EXPECTED_SUBJECT_RUNTIME",
+        help="Independent expected subject runtime digest.",
+    ),
+    expected_signer: str | None = typer.Option(
+        None,
+        "--expected-signer",
+        envvar="INVARLOCK_EXPECTED_SIGNER",
+        help="Independent expected evidence-signing fingerprint.",
+    ),
+    receipt: Path | None = typer.Option(
+        None,
+        "--receipt",
+        help="Write the signed verification receipt outside the pack.",
+    ),
+    verifier_signing_key: Path | None = typer.Option(
+        None,
+        "--verifier-signing-key",
+        envvar="INVARLOCK_VERIFIER_SIGNING_KEY",
+        help="Independent Ed25519 verifier key used only for the receipt.",
+    ),
+    verifier_identity: str | None = typer.Option(
+        None,
+        "--verifier-identity",
+        envvar="INVARLOCK_VERIFIER_IDENTITY",
+        help="Stable identity asserted by the independent verifier.",
+    ),
+    allow_installed_scorers: bool = typer.Option(
+        False,
+        "--allow-installed-scorers",
+        envvar="INVARLOCK_ALLOW_INSTALLED_SCORERS",
+        help=(
+            "Authorize loading the exact installed scorer extension bound by the "
+            "evidence, policy, and request. Installed scorer code executes in this "
+            "process."
+        ),
+    ),
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit one machine-readable verification result.",
+    ),
+) -> None:
+    """Verify EVIDENCE without trusting its own policy or runtime declarations."""
+
+    from invarlock.core.scorer_extension import ScorerExtensionRegistry
+    from invarlock.evidence_verification import (
+        EvidenceVerificationError,
+        verify_evidence,
+    )
+
+    try:
+        result = verify_evidence(
+            evidence,
+            policy_path=policy,
+            expected_baseline_artifact=expected_baseline_artifact,
+            expected_subject_artifact=expected_subject_artifact,
+            expected_schedule=expected_schedule,
+            expected_baseline_runtime=expected_baseline_runtime,
+            expected_subject_runtime=expected_subject_runtime,
+            expected_signer=expected_signer,
+            receipt_path=receipt,
+            verifier_signing_key_path=verifier_signing_key,
+            verifier_identity=verifier_identity,
+            scorer_registry=(
+                ScorerExtensionRegistry(allow_installed=True)
+                if allow_installed_scorers
+                else None
+            ),
+        )
+    except EvidenceVerificationError as exc:
+        if json_out:
+            typer.echo(exc.as_json())
+        else:
+            console.print(f"FAIL {exc}")
+            signed_receipt = exc.payload.get("signed_receipt")
+            if isinstance(signed_receipt, str):
+                console.print(f"Receipt {signed_receipt}")
+        raise typer.Exit(exc.exit_code) from exc
+    if json_out:
+        typer.echo(result.as_json())
+    else:
+        console.print("PASS Evidence verified")
+        console.print(result.summary)
+
+
+@app.command(
+    name="report",
+    help="Render one human-readable report from the canonical report in an evidence pack.",
+)
+def report(
+    evidence: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        help="Canonical evidence-pack directory.",
+    ),
+    html: Path | None = typer.Option(
+        None,
+        "--html",
+        help="Write a self-contained HTML report outside the evidence pack.",
+    ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Include a concise explanation of the decision and evidence bindings.",
+    ),
+) -> None:
+    """Render EVIDENCE without changing any evidence-pack byte."""
+
+    from invarlock.evidence_reporting import EvidenceReportError, render_evidence
+
+    try:
+        result = render_evidence(evidence, html_path=html, explain=explain)
+    except EvidenceReportError as exc:
+        console.print(f"FAIL {exc}")
+        raise typer.Exit(exc.exit_code) from exc
+    console.print(result.text)
+    if result.html_path is not None:
+        console.print(f"HTML {result.html_path}")
 
 
 def main() -> None:
-    """Main entry point for the InvarLock CLI."""
-    enforce_default_security()
+    """Run the installed command-line entry point."""
+
     app()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
+
+
+__all__ = ["app", "main"]

@@ -14,16 +14,13 @@ from invarlock.evidence_pack_json import (
     read_regular_file_bytes,
 )
 from invarlock.public_contracts import (
-    RUNTIME_MANIFEST_V2_CONTRACT_VERSION,
     load_model_artifact_identity_schema,
     load_runtime_manifest_schema,
-    load_runtime_manifest_v2_schema,
     load_runtime_provider_capabilities_schema,
     load_runtime_provider_receipt_schema,
     load_runtime_scoring_observation_schema,
 )
 from invarlock.runtime_security_helpers import (
-    RUNTIME_MANIFEST_V2_VERSION,
     RUNTIME_MANIFEST_VERSION,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
@@ -73,12 +70,7 @@ def _declared_image_digest(manifest: dict[str, object]) -> str | None:
     the independently pinned image digest from another.
     """
 
-    runtime_key = (
-        "outer_container"
-        if manifest.get("manifest_version") == RUNTIME_MANIFEST_V2_VERSION
-        else "runtime"
-    )
-    runtime = manifest.get(runtime_key)
+    runtime = manifest.get("outer_container")
     value = runtime.get("image_digest") if isinstance(runtime, dict) else None
     if not isinstance(value, str):
         return None
@@ -143,20 +135,13 @@ def _verify_loaded_report_manifest(
 
     manifest_version = manifest.get("manifest_version")
     contract_version = manifest.get("verifier_contract_version")
-    if manifest_version == RUNTIME_MANIFEST_V2_VERSION:
-        schema = load_runtime_manifest_v2_schema()
-        expected_contract_version = RUNTIME_MANIFEST_V2_CONTRACT_VERSION
-        runtime_key = "outer_container"
-    elif manifest_version in {None, RUNTIME_MANIFEST_VERSION}:
-        schema = load_runtime_manifest_schema()
-        expected_contract_version = RUNTIME_VERIFIER_CONTRACT_VERSION
-        runtime_key = "runtime"
-    else:
+    if manifest_version != RUNTIME_MANIFEST_VERSION:
         return [
-            "unsupported runtime manifest version pair: "
-            f"manifest_version={manifest_version!r}, "
-            f"verifier_contract_version={contract_version!r}"
+            "unsupported runtime manifest version: "
+            f"manifest_version={manifest_version!r}"
         ]
+    schema = load_runtime_manifest_schema()
+    expected_contract_version = RUNTIME_VERIFIER_CONTRACT_VERSION
     if not schema:
         return ["runtime manifest schema is unavailable"]
     try:
@@ -175,18 +160,26 @@ def _verify_loaded_report_manifest(
             f'execution_mode must be "container", got {execution_mode or "<missing>"}'
         )
 
-    runtime = manifest.get(runtime_key)
+    runtime = manifest.get("outer_container")
     if not isinstance(runtime, dict):
         runtime = {}
     if runtime.get("container_execution") is not True:
-        errors.append(f"{runtime_key}.container_execution must be true")
-    if not str(runtime.get("image_digest") or "").strip():
-        errors.append(f"{runtime_key}.image_digest must be present")
+        errors.append("outer_container.container_execution must be true")
+    image_digest = runtime.get("image_digest")
+    image_ref = runtime.get("image_ref")
+    if not isinstance(image_digest, str) or not image_digest.strip():
+        errors.append("outer_container.image_digest must be present")
+    elif not isinstance(image_ref, str) or (
+        image_ref != image_digest
+        and (
+            image_ref.count("@") != 1
+            or not image_ref.split("@", 1)[0]
+            or image_ref.rsplit("@", 1)[1] != image_digest
+        )
+    ):
+        errors.append("outer_container.image_ref must bind image_digest")
     if require_strict_runtime:
-        if (
-            manifest_version == RUNTIME_MANIFEST_V2_VERSION
-            and runtime.get("allow_network") is not False
-        ):
+        if runtime.get("allow_network") is not False:
             errors.append("strict runtime forbids allow_network=true")
         if runtime.get("allow_remote_code") is not False:
             errors.append("strict runtime forbids allow_remote_code=true")
@@ -208,53 +201,50 @@ def _verify_loaded_report_manifest(
     if not report_bytes:
         errors.append("report file is empty")
 
-    if manifest_version == RUNTIME_MANIFEST_V2_VERSION:
-        config = manifest.get("config")
-        if (
-            require_strict_runtime
-            and isinstance(config, dict)
-            and config.get("source") != "file"
-        ):
-            errors.append(
-                "strict runtime manifest v2 requires a verifiable file config"
-            )
-        expected_report_name = report_path.name
-        if report.get("path") != expected_report_name:
-            errors.append(
-                "report.path does not match the verified report filename: "
-                f"manifest={report.get('path')!r} actual={expected_report_name!r}"
-            )
-        if report.get("filename") != expected_report_name:
-            errors.append(
-                "report.filename does not match the verified report filename: "
-                f"manifest={report.get('filename')!r} actual={expected_report_name!r}"
-            )
-        collision_errors = _v2_reference_collision_errors(
-            manifest,
-            report_path=report_path,
-            manifest_path=manifest_path,
+    config = manifest.get("config")
+    if (
+        require_strict_runtime
+        and isinstance(config, dict)
+        and config.get("source") != "file"
+    ):
+        errors.append("strict runtime manifest requires a verifiable file config")
+    expected_report_name = report_path.name
+    if report.get("path") != expected_report_name:
+        errors.append(
+            "report.path does not match the verified report filename: "
+            f"manifest={report.get('path')!r} actual={expected_report_name!r}"
         )
-        if collision_errors:
-            errors.extend(collision_errors)
-            return errors
-        provider_evidence, provider_errors = _load_runtime_provider_evidence(
-            manifest,
-            manifest_path=manifest_path,
+    if report.get("filename") != expected_report_name:
+        errors.append(
+            "report.filename does not match the verified report filename: "
+            f"manifest={report.get('filename')!r} actual={expected_report_name!r}"
         )
-        errors.extend(provider_errors)
-        if provider_evidence is not None:
-            errors.extend(
-                _runtime_provider_cross_binding_errors(
-                    provider_evidence,
-                    manifest=manifest,
-                )
-            )
+    collision_errors = _reference_collision_errors(
+        manifest,
+        report_path=report_path,
+        manifest_path=manifest_path,
+    )
+    if collision_errors:
+        errors.extend(collision_errors)
+        return errors
+    provider_evidence, provider_errors = _load_runtime_provider_evidence(
+        manifest,
+        manifest_path=manifest_path,
+    )
+    errors.extend(provider_errors)
+    if provider_evidence is not None:
         errors.extend(
-            _verify_v2_file_config_binding(
-                manifest,
-                manifest_path=manifest_path,
+            _runtime_provider_cross_binding_errors(
+                provider_evidence,
+                manifest=manifest,
             )
         )
+    errors.extend(
+        _verify_file_config_binding(
+            manifest,
+            manifest_path=manifest_path,
+        )
+    )
 
     errors.extend(
         _expected_image_digest_errors(
@@ -268,7 +258,7 @@ def _verify_loaded_report_manifest(
     return errors
 
 
-def _v2_reference_collision_errors(
+def _reference_collision_errors(
     manifest: dict[str, object],
     *,
     report_path: Path,
@@ -507,7 +497,7 @@ def _verify_sibling_digest_reference(
     return []
 
 
-def _verify_v2_file_config_binding(
+def _verify_file_config_binding(
     manifest: dict[str, object], *, manifest_path: Path
 ) -> list[str]:
     config = manifest.get("config")

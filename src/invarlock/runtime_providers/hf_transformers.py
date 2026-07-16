@@ -1,15 +1,15 @@
-"""Hugging Face reference runtime provider.
+"""Built-in Hugging Face provider for authenticated local checkpoints.
 
-This provider reuses the adapter and model already resolved by the established
-execution path. Non-strict sessions may wrap the existing scorer. Strict behavioral
-evidence instead requires the provider-owned scorer plus an independently checked
-local checkpoint/model/tokenizer binding. The module keeps optional backend imports
-lazy and never performs a second model load.
+The provider loads a resolved local checkpoint, records its model and tokenizer
+identity, and emits per-record scoring facts for independent verification.
+Optional backend imports remain lazy so the core package stays Torch-free.
 """
 
 from __future__ import annotations
 
+import hashlib
 import importlib
+import math
 import re
 import time
 from collections.abc import Callable, Mapping
@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any, cast
 
 from invarlock import __version__ as INVARLOCK_VERSION
-from invarlock.core.api import ModelAdapter
 from invarlock.core.checkpoint_identity import (
     CheckpointIdentityError,
     checkpoint_tree_sha256,
@@ -28,6 +27,7 @@ from invarlock.core.runtime_provider import (
     EvaluationBatch,
     HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
+    RuntimeArtifactResources,
     RuntimeBackendIdentity,
     RuntimeDeviceFacts,
     RuntimeExecutionContext,
@@ -38,10 +38,19 @@ from invarlock.core.runtime_provider import (
     RuntimeScoringRecord,
     ScoringObservation,
     artifact_identity_sha256,
+    exact_match_output_text,
 )
-from invarlock.core.runtime_provider.types import JSONScalar, RuntimeScorer
-from invarlock.reporting.validation.runtime_behavioral_observation import (
+from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
+)
+from invarlock.core.runtime_provider.types import (
+    JSONScalar,
+    RuntimeScorer,
+    evaluation_input_parts_sha256,
+)
+from invarlock.runtime_providers._hf_safetensors_identity import (
+    HFSafetensorsIdentityError,
+    safetensors_storage_keys,
 )
 from invarlock.runtime_providers._hf_transformers_identity import (
     _installed_backend_identity,
@@ -230,10 +239,6 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
     try:
         from safetensors import safe_open
 
-        from invarlock.transformation_runtime_proof import (
-            RuntimeReloadProofError,
-            artifact_storage_keys,
-        )
     except ImportError as exc:  # pragma: no cover - optional dependency boundary
         raise RuntimeError(
             "strict HF artifact binding requires the safetensors runtime"
@@ -250,8 +255,8 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
         raise RuntimeError("strict HF native model state is unavailable")
 
     try:
-        authenticated_keys = artifact_storage_keys(checkpoint)
-    except RuntimeReloadProofError as exc:
+        authenticated_keys = safetensors_storage_keys(checkpoint)
+    except HFSafetensorsIdentityError as exc:
         raise RuntimeError(
             "strict HF checkpoint must use a canonical safetensors layout"
         ) from exc
@@ -363,17 +368,20 @@ def _require_model_eval_mode(model: object) -> None:
         )
 
 
-def _require_loaded_model_binding(
+def require_loaded_hf_checkpoint_binding(
     *,
     spec: ModelRuntimeSpec,
     identity: HFSnapshotArtifactIdentity,
     model: object,
     tokenizer: object,
+    checkpoint: Path | None = None,
 ) -> None:
     """Bind the live model/tokenizer to one locally authenticated checkpoint."""
 
-    checkpoint = Path(spec.model_id).expanduser()
-    if not _is_local_path_like(spec.model_id) or not checkpoint.is_dir():
+    checkpoint = (
+        Path(spec.model_id).expanduser() if checkpoint is None else Path(checkpoint)
+    )
+    if not checkpoint.is_dir():
         raise RuntimeError(
             "strict HF runtime-behavior evidence requires a materialized local "
             "checkpoint; a remote revision alone cannot bind the loaded model"
@@ -418,10 +426,16 @@ class HFTransformersCausalScorer:
     model: object = field(repr=False, compare=False)
     tokenizer: object = field(repr=False, compare=False)
     artifact_identity_sha256: str
+    checkpoint_path: Path | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if _SHA256.fullmatch(self.artifact_identity_sha256) is None:
             raise ValueError("artifact_identity_sha256 must be a sha256 digest")
+        if self.checkpoint_path is not None:
+            checkpoint = Path(self.checkpoint_path)
+            if not checkpoint.is_absolute():
+                raise ValueError("checkpoint_path must be absolute")
+            object.__setattr__(self, "checkpoint_path", checkpoint)
 
     def require_binding(self, *, model: object, artifact_identity_sha256: str) -> None:
         if self.model is not model:
@@ -467,12 +481,29 @@ class HFTransformersCausalScorer:
                     torch.cuda.manual_seed_all(settings.seed)
                 for record in batch.records:
                     deadline = time.monotonic() + settings.timeout_seconds
-                    if (
-                        _sha256(record.input_text.encode("utf-8"))
-                        != record.input_sha256
-                    ):
+                    if batch.task != "text_causal":
                         raise ValueError(
-                            "runtime evaluation input text does not match input_sha256"
+                            "built-in HF execution supports only text_causal"
+                        )
+                    if record.input_parts:
+                        if len(record.input_parts) != 1 or (
+                            record.input_parts[0].kind != "text"
+                            or record.input_parts[0].role != "prompt"
+                        ):
+                            raise ValueError(
+                                "built-in HF causal execution requires one prompt "
+                                "text input part"
+                            )
+                        expected_input_sha256 = evaluation_input_parts_sha256(
+                            record.input_parts
+                        )
+                    else:
+                        expected_input_sha256 = hashlib.sha256(
+                            record.input_text.encode("utf-8")
+                        ).hexdigest()
+                    if expected_input_sha256 != record.input_sha256:
+                        raise ValueError(
+                            "runtime evaluation input does not match input_sha256"
                         )
                     encoded = tokenizer_call(
                         record.input_text,
@@ -503,55 +534,182 @@ class HFTransformersCausalScorer:
                         raise RuntimeError(
                             "strict HF tokenizer returned empty input_ids"
                         )
-                    generated = input_ids
-                    new_tokens: list[int] = []
-                    eos_token_id = getattr(self.tokenizer, "eos_token_id", None)
-                    for _ in range(settings.max_output_tokens):
-                        if time.monotonic() >= deadline:
-                            raise TimeoutError("strict HF causal scoring timed out")
-                        window = generated[:, -settings.context_length :]
-                        attention_mask = torch.ones_like(window)
-                        result = self.model(
-                            input_ids=window,
-                            attention_mask=attention_mask,
-                            return_dict=True,
-                            use_cache=False,
+                    nll_facts: tuple[float, int, int] | None = None
+                    if batch.metric == "normalized_nll_per_utf8_byte":
+                        if record.expected_output is None:
+                            raise ValueError(
+                                "strict HF normalized NLL requires expected_output"
+                            )
+                        target = tokenizer_call(
+                            record.expected_output,
+                            add_special_tokens=False,
+                            return_tensors="pt",
+                            truncation=False,
                         )
-                        logits = getattr(result, "logits", None)
+                        if not isinstance(target, Mapping) or "input_ids" not in target:
+                            raise RuntimeError(
+                                "strict HF tokenizer did not return target input_ids"
+                            )
+                        target_ids = target["input_ids"]
+                        if hasattr(target_ids, "to"):
+                            target_ids = target_ids.to(device)
                         if (
-                            logits is None
-                            or logits.ndim != 3
-                            or logits.shape[0] != 1
-                            or logits.shape[1] != window.shape[1]
-                            or not bool(torch.isfinite(logits[:, -1, :]).all())
+                            not hasattr(target_ids, "ndim")
+                            or target_ids.ndim != 2
+                            or target_ids.shape[0] != 1
+                            or target_ids.shape[1] < 1
                         ):
                             raise RuntimeError(
-                                "strict HF model returned invalid causal logits"
+                                "strict HF tokenizer returned invalid target input_ids"
                             )
-                        next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
-                        token_id = int(next_token.item())
-                        new_tokens.append(token_id)
-                        generated = torch.cat((generated, next_token), dim=1)
+                        target_count = int(target_ids.shape[1])
+                        if target_count > settings.max_output_tokens:
+                            raise ValueError(
+                                "strict HF normalized NLL target exceeds "
+                                "max_output_tokens"
+                            )
+                        prompt_token_ids = [
+                            int(input_ids[0, index].item())
+                            for index in range(int(input_ids.shape[1]))
+                        ]
+                        target_token_ids = [
+                            int(target_ids[0, index].item())
+                            for index in range(target_count)
+                        ]
+                        decoded_prompt = decode(
+                            prompt_token_ids,
+                            clean_up_tokenization_spaces=False,
+                            skip_special_tokens=False,
+                        )
+                        decoded_continuation = decode(
+                            prompt_token_ids + target_token_ids,
+                            clean_up_tokenization_spaces=False,
+                            skip_special_tokens=False,
+                        )
                         if (
-                            isinstance(eos_token_id, int)
-                            and not isinstance(eos_token_id, bool)
-                            and token_id == eos_token_id
+                            not isinstance(decoded_prompt, str)
+                            or not isinstance(decoded_continuation, str)
+                            or decoded_continuation
+                            != decoded_prompt + record.expected_output
                         ):
-                            break
-                    output_text = decode(
-                        new_tokens,
-                        clean_up_tokenization_spaces=False,
-                        skip_special_tokens=False,
-                    )
-                    if not isinstance(output_text, str):
-                        raise RuntimeError("strict HF tokenizer returned invalid text")
+                            raise ValueError(
+                                "strict HF normalized NLL target is not an exact "
+                                "tokenizer continuation of the prompt"
+                            )
+                        history = input_ids
+                        target_logprobs: list[float] = []
+                        for target_index in range(target_count):
+                            if time.monotonic() >= deadline:
+                                raise TimeoutError(
+                                    "strict HF normalized NLL scoring timed out"
+                                )
+                            window = history[:, -settings.context_length :]
+                            attention_mask = torch.ones_like(window)
+                            result = self.model(
+                                input_ids=window,
+                                attention_mask=attention_mask,
+                                return_dict=True,
+                                use_cache=False,
+                            )
+                            logits = getattr(result, "logits", None)
+                            if (
+                                logits is None
+                                or logits.ndim != 3
+                                or logits.shape[0] != 1
+                                or logits.shape[1] != window.shape[1]
+                                or not bool(torch.isfinite(logits[:, -1, :]).all())
+                            ):
+                                raise RuntimeError(
+                                    "strict HF model returned invalid causal logits"
+                                )
+                            target_token = target_ids[
+                                :, target_index : target_index + 1
+                            ]
+                            if (
+                                int(target_token.item()) < 0
+                                or int(target_token.item()) >= logits.shape[-1]
+                            ):
+                                raise RuntimeError(
+                                    "strict HF target token is outside the model vocabulary"
+                                )
+                            token_logprob = torch.log_softmax(
+                                logits[:, -1, :], dim=-1
+                            ).gather(1, target_token)
+                            value = float(token_logprob.item())
+                            if not math.isfinite(value) or value > 0:
+                                raise RuntimeError(
+                                    "strict HF model returned an invalid target logprob"
+                                )
+                            target_logprobs.append(value)
+                            history = torch.cat((history, target_token), dim=1)
+                        nll_facts = (
+                            math.fsum(target_logprobs),
+                            target_count,
+                            len(record.expected_output.encode("utf-8")),
+                        )
+                    output_text: str | None = None
+                    if batch.metric == "exact_match":
+                        generated = input_ids
+                        new_tokens: list[int] = []
+                        eos_token_id = getattr(self.tokenizer, "eos_token_id", None)
+                        for _ in range(settings.max_output_tokens):
+                            if time.monotonic() >= deadline:
+                                raise TimeoutError("strict HF causal scoring timed out")
+                            window = generated[:, -settings.context_length :]
+                            attention_mask = torch.ones_like(window)
+                            result = self.model(
+                                input_ids=window,
+                                attention_mask=attention_mask,
+                                return_dict=True,
+                                use_cache=False,
+                            )
+                            logits = getattr(result, "logits", None)
+                            if (
+                                logits is None
+                                or logits.ndim != 3
+                                or logits.shape[0] != 1
+                                or logits.shape[1] != window.shape[1]
+                                or not bool(torch.isfinite(logits[:, -1, :]).all())
+                            ):
+                                raise RuntimeError(
+                                    "strict HF model returned invalid causal logits"
+                                )
+                            next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
+                            token_id = int(next_token.item())
+                            new_tokens.append(token_id)
+                            generated = torch.cat((generated, next_token), dim=1)
+                            if (
+                                isinstance(eos_token_id, int)
+                                and not isinstance(eos_token_id, bool)
+                                and token_id == eos_token_id
+                            ):
+                                break
+                        assert callable(decode)
+                        output_text = decode(
+                            new_tokens,
+                            clean_up_tokenization_spaces=False,
+                            skip_special_tokens=True,
+                        )
+                        try:
+                            output_text = exact_match_output_text(output_text)
+                        except ValueError as exc:
+                            raise RuntimeError(
+                                "strict HF tokenizer returned invalid user-visible text"
+                            ) from exc
                     records.append(
                         RuntimeScoringRecord(
                             record_id=record.record_id,
                             input_sha256=record.input_sha256,
                             status="ok",
                             output_text=output_text,
-                            output_sha256=_sha256(output_text.encode("utf-8")),
+                            output_sha256=(
+                                _sha256(output_text.encode("utf-8"))
+                                if output_text is not None
+                                else None
+                            ),
+                            logprob_sum=(nll_facts[0] if nll_facts else None),
+                            token_count=(nll_facts[1] if nll_facts else None),
+                            utf8_byte_count=(nll_facts[2] if nll_facts else None),
                         )
                     )
         finally:
@@ -584,17 +742,18 @@ def _require_strict_execution_binding(
             "HFTransformersCausalScorer; arbitrary scorer callbacks are not "
             "authenticated"
         )
-    assert context.native_model is not None
+    assert context.provider_state is not None
     expected_identity_sha256 = artifact_identity_sha256(identity)
     scorer.require_binding(
-        model=context.native_model,
+        model=context.provider_state,
         artifact_identity_sha256=expected_identity_sha256,
     )
-    _require_loaded_model_binding(
+    require_loaded_hf_checkpoint_binding(
         spec=spec,
         identity=identity,
-        model=context.native_model,
+        model=context.provider_state,
         tokenizer=scorer.tokenizer,
+        checkpoint=scorer.checkpoint_path,
     )
     return scorer
 
@@ -612,8 +771,6 @@ class _HFReceiptProvenance:
 
 @dataclass
 class _HFTransformersSession:
-    _adapter: ModelAdapter
-    _model: object
     _scorer: RuntimeScorer
     _close_callback: Callable[[], None] | None = None
     _artifact_identity_sha256: str | None = None
@@ -635,10 +792,10 @@ class _HFTransformersSession:
         self._latest_observation_sha256 = None
         provenance = self._receipt_provenance
         if provenance is None:
-            legacy_scorer = cast(
+            direct_scorer = cast(
                 Callable[[EvaluationBatch], ScoringObservation], self._scorer
             )
-            observation = legacy_scorer(batch)
+            observation = direct_scorer(batch)
         else:
             if self._revalidate_binding is not None:
                 self._revalidate_binding()
@@ -702,18 +859,6 @@ class _HFTransformersSession:
             scoring_observation_sha256=self._latest_observation_sha256,
         )
 
-    def model_adapter(self) -> ModelAdapter:
-        """Return the exact adapter selected by the existing HF execution path."""
-
-        self._require_open()
-        return self._adapter
-
-    def native_model(self) -> object:
-        """Return the exact already-loaded model; never create a second instance."""
-
-        self._require_open()
-        return self._model
-
     def close(self) -> None:
         """Run the existing lifecycle callback at most once."""
 
@@ -735,13 +880,6 @@ class HFTransformersProvider:
             raise ValueError(
                 f"provider_name must be {self.name!r}, got {spec.provider_name!r}"
             )
-        adapter_name = spec.adapter_name
-        if adapter_name is not None and not (
-            adapter_name in {"auto", "auto_hf"} or adapter_name.startswith("hf_")
-        ):
-            raise ValueError(
-                "hf_transformers adapter_name must be auto, auto_hf, or hf_*"
-            )
         unknown = set(spec.settings) - _ALLOWED_SETTINGS
         if unknown:
             rendered = ", ".join(sorted(unknown))
@@ -753,23 +891,13 @@ class HFTransformersProvider:
             provider_name=self.name,
             artifact_formats=("hf_snapshot",),
             tasks=("text_causal",),
-            metrics=("exact_match", "multiple_choice_accuracy"),
+            metrics=(
+                "exact_match",
+                "normalized_nll_per_utf8_byte",
+            ),
             execution_modes=("in_process",),
             required_extra="hf",
             required_image=None,
-            platform_constraints=("python",),
-            evidence_surfaces=(
-                "behavior",
-                "tokenizer",
-                "weights",
-                "modules",
-                "activations",
-                "build",
-            ),
-            supported_claim_sets=(
-                "invarlock-weight-edit-regression-v2",
-                "invarlock-runtime-behavioral-regression-v1",
-            ),
         )
 
     def identify_artifact(self, spec: ModelRuntimeSpec) -> HFSnapshotArtifactIdentity:
@@ -803,6 +931,87 @@ class HFTransformersProvider:
             tokenizer_metadata_sha256=tokenizer_metadata_sha256,
         )
 
+    def prepare_execution(
+        self,
+        spec: ModelRuntimeSpec,
+        resources: RuntimeArtifactResources,
+    ) -> RuntimeExecutionContext:
+        """Load and authenticate one local checkpoint without network or remote code."""
+
+        self.validate_config(spec)
+        resources.require_support_names(frozenset())
+        checkpoint = resources.primary_path()
+        if not checkpoint.is_dir():
+            raise ValueError("hf_transformers primary artifact must be a directory")
+        identity = self.identify_artifact(spec)
+        expected_tree = identity.checkpoint_tree_sha256
+        if expected_tree is None:
+            raise ValueError(
+                "hf_transformers preparation requires checkpoint_tree_sha256"
+            )
+        try:
+            observed_tree = checkpoint_tree_sha256(checkpoint).removeprefix("sha256:")
+        except (CheckpointIdentityError, OSError) as exc:
+            raise ValueError(
+                "hf_transformers checkpoint could not be authenticated"
+            ) from exc
+        if observed_tree != expected_tree:
+            raise ValueError(
+                "hf_transformers primary artifact does not match checkpoint_tree_sha256"
+            )
+
+        transformers = importlib.import_module("transformers")
+        auto_tokenizer = getattr(transformers, "AutoTokenizer", None)
+        tokenizer_from_pretrained = getattr(auto_tokenizer, "from_pretrained", None)
+        auto_model = getattr(transformers, "AutoModelForCausalLM", None)
+        model_from_pretrained = getattr(auto_model, "from_pretrained", None)
+        if not callable(tokenizer_from_pretrained):
+            raise RuntimeError("transformers AutoTokenizer is unavailable")
+        if not callable(model_from_pretrained):
+            raise RuntimeError("transformers AutoModelForCausalLM is unavailable")
+        tokenizer = tokenizer_from_pretrained(
+            str(checkpoint),
+            local_files_only=True,
+            trust_remote_code=False,
+        )
+        model = model_from_pretrained(
+            str(checkpoint),
+            local_files_only=True,
+            trust_remote_code=False,
+            use_safetensors=True,
+        )
+        move_to_device = getattr(model, "to", None)
+        if not callable(move_to_device):
+            raise RuntimeError("loaded HF model does not expose to()")
+        model = move_to_device(resources.device_kind)
+        evaluate = getattr(model, "eval", None)
+        if not callable(evaluate):
+            raise RuntimeError("loaded HF model does not expose eval()")
+        evaluate()
+        identity_sha256 = artifact_identity_sha256(identity)
+        scorer = HFTransformersCausalScorer(
+            model=model,
+            tokenizer=tokenizer,
+            artifact_identity_sha256=identity_sha256,
+            checkpoint_path=checkpoint,
+        )
+        require_loaded_hf_checkpoint_binding(
+            spec=spec,
+            identity=identity,
+            model=model,
+            tokenizer=tokenizer,
+            checkpoint=checkpoint,
+        )
+        return RuntimeExecutionContext(
+            strict=True,
+            allow_network=False,
+            container_image_digest=resources.container_image_digest,
+            device_kind=resources.device_kind,
+            artifact_identity_sha256=identity_sha256,
+            provider_state=model,
+            scorer=scorer,
+        )
+
     def open(
         self,
         spec: ModelRuntimeSpec,
@@ -815,7 +1024,7 @@ class HFTransformersProvider:
             raise ValueError(
                 "strict hf_transformers execution requires artifact_identity_sha256"
             )
-        for field_name in ("model_adapter", "native_model", "scorer"):
+        for field_name in ("provider_state", "scorer"):
             if getattr(context, field_name) is None:
                 raise ValueError(
                     f"hf_transformers requires prebound {field_name} in context"
@@ -839,9 +1048,9 @@ class HFTransformersProvider:
             image_digest = context.container_image_digest
             assert image_digest is not None
             execution_settings = _strict_execution_settings(spec)
-            backend = _installed_backend_identity(context.native_model)
+            backend = _installed_backend_identity(context.provider_state)
             device = _observed_device_facts(
-                context.native_model,
+                context.provider_state,
                 expected_device_kind=context.device_kind,
             )
             provenance = _HFReceiptProvenance(
@@ -858,20 +1067,19 @@ class HFTransformersProvider:
                 outer_image_digest=image_digest,
             )
             if isinstance(runtime_scorer, HFTransformersCausalScorer):
-                model = context.native_model
+                model = context.provider_state
                 tokenizer = runtime_scorer.tokenizer
 
                 def revalidate_binding() -> None:
-                    _require_loaded_model_binding(
+                    require_loaded_hf_checkpoint_binding(
                         spec=spec,
                         identity=identity,
                         model=model,
                         tokenizer=tokenizer,
+                        checkpoint=runtime_scorer.checkpoint_path,
                     )
 
         return _HFTransformersSession(
-            _adapter=cast(ModelAdapter, context.model_adapter),
-            _model=context.native_model,
             _scorer=runtime_scorer,
             _close_callback=context.close_callback,
             _artifact_identity_sha256=context.artifact_identity_sha256,
@@ -880,65 +1088,10 @@ class HFTransformersProvider:
         )
 
 
-@dataclass(frozen=True)
-class HFTransformersSessionFactory:
-    """Bind the existing HF load once and accept the scorer at its later boundary.
-
-    Core orchestration resolves and loads the adapter/model before its guarded scorer
-    exists. This factory is the narrow hand-off between those phases: it stores the
-    exact objects and never calls an adapter loader. Once the scorer is available,
-    ``open`` creates the provider session without duplicating model state.
-    """
-
-    spec: ModelRuntimeSpec
-    authenticated_artifact_identity: HFSnapshotArtifactIdentity
-    model_adapter: object = field(repr=False, compare=False)
-    native_model: object = field(repr=False, compare=False)
-    strict: bool
-    allow_network: bool
-    container_image_digest: str | None
-    device_kind: str
-    artifact_identity_sha256: str = field(init=False)
-
-    def __post_init__(self) -> None:
-        provider = HFTransformersProvider()
-        provider.validate_config(self.spec)
-        declared_identity = provider.identify_artifact(self.spec)
-        if self.authenticated_artifact_identity != declared_identity:
-            raise ValueError(
-                "authenticated artifact identity does not match the runtime spec"
-            )
-        identity_sha256 = artifact_identity_sha256(self.authenticated_artifact_identity)
-        object.__setattr__(self, "artifact_identity_sha256", identity_sha256)
-
-    def open(
-        self,
-        scorer: RuntimeScorer,
-        *,
-        close_callback: Callable[[], None] | None = None,
-    ) -> _HFTransformersSession:
-        """Open over an injected scorer and the exact prebound adapter/model."""
-
-        return HFTransformersProvider().open(
-            self.spec,
-            RuntimeExecutionContext(
-                strict=self.strict,
-                allow_network=self.allow_network,
-                container_image_digest=self.container_image_digest,
-                device_kind=self.device_kind,
-                artifact_identity_sha256=self.artifact_identity_sha256,
-                model_adapter=self.model_adapter,
-                native_model=self.native_model,
-                scorer=scorer,
-                close_callback=close_callback,
-            ),
-        )
-
-
 __all__ = [
     "HFTransformersCausalScorer",
     "HFTransformersProvider",
-    "HFTransformersSessionFactory",
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
     "hf_tokenizer_contract_sha256",
+    "require_loaded_hf_checkpoint_binding",
 ]

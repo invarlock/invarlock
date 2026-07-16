@@ -8,6 +8,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 
@@ -15,24 +16,42 @@ from ..dataset_identity import (
     HOSTED_DATASET_PROVIDERS,
     canonical_dataset_revision,
 )
-from .types import EvaluationBatch, EvaluationRecord
+from .types import (
+    EvaluationBatch,
+    EvaluationInputPart,
+    EvaluationRecord,
+    RuntimeMetric,
+    RuntimeTask,
+    evaluation_input_parts_sha256,
+    require_runtime_task,
+)
 
 RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT = "invarlock/runtime-behavioral-schedule-v1"
 MAX_RUNTIME_BEHAVIORAL_SCHEDULE_BYTES = 16 * 1024 * 1024
 MAX_RUNTIME_BEHAVIORAL_SCHEDULE_RECORDS = 10_000
+MAX_RUNTIME_BEHAVIORAL_INPUT_PARTS = 64
 MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS = 65_536
 MAX_RUNTIME_BEHAVIORAL_RECORD_ID_CHARACTERS = 256
 MAX_RUNTIME_BEHAVIORAL_DATASET_COORDINATE_CHARACTERS = 512
 MAX_RUNTIME_BEHAVIORAL_SPLIT_CHARACTERS = 128
 
-_ROOT_FIELDS = frozenset({"format_version", "dataset_identity", "records"})
+_ROOT_FIELDS = frozenset({"format_version", "task", "dataset_identity", "records"})
 _DATASET_IDENTITY_FIELDS = frozenset(
     {"provider", "dataset_name", "config_name", "revision", "split"}
 )
 _RECORD_FIELDS = frozenset(
-    {"record_id", "input_text", "input_sha256", "expected_output"}
+    {"record_id", "input_parts", "input_sha256", "expected_output"}
 )
-_RECORD_MATERIAL_FIELDS = frozenset({"record_id", "input_text", "expected_output"})
+_LEGACY_RECORD_MATERIAL_FIELDS = frozenset(
+    {"record_id", "input_text", "expected_output"}
+)
+_STRUCTURED_RECORD_MATERIAL_FIELDS = frozenset(
+    {"record_id", "input_parts", "expected_output"}
+)
+_TEXT_PART_FIELDS = frozenset({"kind", "role", "text", "sha256"})
+_CONTENT_PART_FIELDS = frozenset(
+    {"kind", "role", "content_id", "media_type", "byte_length", "sha256"}
+)
 _PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
@@ -169,6 +188,15 @@ class RuntimeBehavioralDatasetIdentity:
         }
 
 
+def _record_payload(record: EvaluationRecord) -> dict[str, object]:
+    return {
+        "record_id": record.record_id,
+        "input_parts": [part.to_payload() for part in record.input_parts],
+        "input_sha256": record.input_sha256,
+        "expected_output": record.expected_output,
+    }
+
+
 @dataclass(frozen=True)
 class RuntimeBehavioralSchedule:
     """Validated ordered schedule plus its recomputed canonical digest."""
@@ -176,29 +204,27 @@ class RuntimeBehavioralSchedule:
     dataset_identity: RuntimeBehavioralDatasetIdentity
     records: tuple[EvaluationRecord, ...]
     schedule_sha256: str
+    task: RuntimeTask
     format_version: str = field(default=RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT, init=False)
 
     def to_payload(self) -> dict[str, object]:
         return {
             "format_version": self.format_version,
+            "task": self.task,
             "dataset_identity": self.dataset_identity.to_payload(),
-            "records": [
-                {
-                    "record_id": record.record_id,
-                    "input_text": record.input_text,
-                    "input_sha256": record.input_sha256,
-                    "expected_output": record.expected_output,
-                }
-                for record in self.records
-            ],
+            "records": [_record_payload(record) for record in self.records],
         }
 
-    def evaluation_batch(self) -> EvaluationBatch:
+    def evaluation_batch(
+        self, metric: RuntimeMetric = "exact_match"
+    ) -> EvaluationBatch:
         """Return the provider-neutral batch bound to this schedule digest."""
 
         return EvaluationBatch(
             schedule_sha256=self.schedule_sha256,
             records=self.records,
+            metric=metric,
+            task=self.task,
         )
 
 
@@ -243,6 +269,64 @@ def _build_dataset_identity(value: object) -> RuntimeBehavioralDatasetIdentity:
     )
 
 
+def _build_input_part(value: object, *, field_name: str) -> EvaluationInputPart:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field_name} must be an object")
+    kind = value.get("kind")
+    if kind == "text":
+        _require_exact_fields(
+            value,
+            expected=_TEXT_PART_FIELDS,
+            field_name=field_name,
+        )
+        text = value["text"]
+        if isinstance(text, str) and len(text) > MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS:
+            raise ValueError(
+                f"{field_name}.text must not exceed "
+                f"{MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS} characters"
+            )
+        return EvaluationInputPart(
+            kind="text",
+            role=value["role"],
+            text=text,
+            sha256=value["sha256"],
+        )
+    if kind == "content":
+        _require_exact_fields(
+            value,
+            expected=_CONTENT_PART_FIELDS,
+            field_name=field_name,
+        )
+        return EvaluationInputPart(
+            kind="content",
+            role=value["role"],
+            content_id=value["content_id"],
+            media_type=value["media_type"],
+            byte_length=value["byte_length"],
+            sha256=value["sha256"],
+        )
+    raise ValueError(f"{field_name}.kind must be text or content")
+
+
+def _build_input_parts(
+    value: object, *, field_name: str
+) -> tuple[EvaluationInputPart, ...]:
+    if (
+        not isinstance(value, Sequence)
+        or isinstance(value, (str, bytes, bytearray))
+        or not value
+    ):
+        raise ValueError(f"{field_name} must be a non-empty array")
+    if len(value) > MAX_RUNTIME_BEHAVIORAL_INPUT_PARTS:
+        raise ValueError(
+            f"{field_name} must not exceed {MAX_RUNTIME_BEHAVIORAL_INPUT_PARTS} parts"
+        )
+    return tuple(
+        _build_input_part(part, field_name=f"{field_name}[{index}]")
+        for index, part in enumerate(value)
+    )
+
+
 def _build_record(value: object, *, index: int) -> EvaluationRecord:
     field_name = f"records[{index}]"
     if not isinstance(value, Mapping):
@@ -253,15 +337,7 @@ def _build_record(value: object, *, index: int) -> EvaluationRecord:
         field_name=f"{field_name}.record_id",
         max_characters=MAX_RUNTIME_BEHAVIORAL_RECORD_ID_CHARACTERS,
     )
-    input_text = value["input_text"]
     expected_output = value["expected_output"]
-    if not isinstance(input_text, str) or not input_text.strip():
-        raise ValueError(f"{field_name}.input_text must be non-empty text")
-    if len(input_text) > MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS:
-        raise ValueError(
-            f"{field_name}.input_text must not exceed "
-            f"{MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS} characters"
-        )
     if not isinstance(expected_output, str) or not expected_output.strip():
         raise ValueError(f"{field_name}.expected_output must be non-empty text")
     if len(expected_output) > MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS:
@@ -269,15 +345,25 @@ def _build_record(value: object, *, index: int) -> EvaluationRecord:
             f"{field_name}.expected_output must not exceed "
             f"{MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS} characters"
         )
+    input_parts = _build_input_parts(
+        value["input_parts"], field_name=f"{field_name}.input_parts"
+    )
+    expected_sha256 = evaluation_input_parts_sha256(input_parts)
     input_sha256 = value["input_sha256"]
-    expected_sha256 = hashlib.sha256(input_text.encode("utf-8")).hexdigest()
     if input_sha256 != expected_sha256:
-        raise ValueError(f"{field_name}.input_sha256 does not match input_text")
+        raise ValueError(
+            f"{field_name}.input_sha256 does not match ordered input_parts"
+        )
+    text_parts = [part for part in input_parts if part.kind == "text"]
+    if not text_parts:
+        raise ValueError(f"{field_name}.input_parts requires at least one text part")
+    input_text = cast(str, text_parts[0].text)
     return EvaluationRecord(
         record_id=record_id,
         input_text=input_text,
         input_sha256=expected_sha256,
         expected_output=expected_output,
+        input_parts=input_parts,
     )
 
 
@@ -291,6 +377,7 @@ def build_runtime_behavioral_schedule(
     _require_exact_fields(payload, expected=_ROOT_FIELDS, field_name="schedule")
     if payload["format_version"] != RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT:
         raise ValueError("runtime behavioral schedule format_version is unsupported")
+    task = require_runtime_task(payload["task"], field_name="schedule.task")
     dataset_identity = _build_dataset_identity(payload["dataset_identity"])
     raw_records = payload["records"]
     if (
@@ -309,19 +396,11 @@ def build_runtime_behavioral_schedule(
     record_ids = [record.record_id for record in records]
     if len(record_ids) != len(set(record_ids)):
         raise ValueError("record IDs must be unique within a schedule")
-
     canonical_payload: dict[str, object] = {
         "format_version": RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
+        "task": task,
         "dataset_identity": dataset_identity.to_payload(),
-        "records": [
-            {
-                "record_id": record.record_id,
-                "input_text": record.input_text,
-                "input_sha256": record.input_sha256,
-                "expected_output": record.expected_output,
-            }
-            for record in records
-        ],
+        "records": [_record_payload(record) for record in records],
     }
     canonical_payload_json = _canonical_payload_json(canonical_payload)
     if len(canonical_payload_json) > MAX_RUNTIME_BEHAVIORAL_SCHEDULE_BYTES:
@@ -334,6 +413,7 @@ def build_runtime_behavioral_schedule(
         dataset_identity=dataset_identity,
         records=records,
         schedule_sha256=schedule_sha256,
+        task=task,
     )
 
 
@@ -341,6 +421,7 @@ def build_runtime_behavioral_schedule_from_material(
     *,
     dataset_identity: Mapping[str, object],
     records: Sequence[object],
+    task: RuntimeTask = "text_causal",
 ) -> RuntimeBehavioralSchedule:
     """Build canonical schedule material while deriving every input digest."""
 
@@ -349,25 +430,43 @@ def build_runtime_behavioral_schedule_from_material(
         field_name = f"records[{index}]"
         if not isinstance(value, Mapping):
             raise ValueError(f"{field_name} must be an object")
-        _require_exact_fields(
-            value,
-            expected=_RECORD_MATERIAL_FIELDS,
-            field_name=field_name,
-        )
-        input_text = value["input_text"]
-        if not isinstance(input_text, str):
-            raise ValueError(f"{field_name}.input_text must be text")
+        record_fields = frozenset(value)
+        input_parts: tuple[EvaluationInputPart, ...]
+        if record_fields == _LEGACY_RECORD_MATERIAL_FIELDS:
+            input_text = value["input_text"]
+            if not isinstance(input_text, str):
+                raise ValueError(f"{field_name}.input_text must be text")
+            text_part = EvaluationInputPart(
+                kind="text",
+                role="prompt",
+                text=input_text,
+                sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+            )
+            input_parts = (text_part,)
+        elif record_fields == _STRUCTURED_RECORD_MATERIAL_FIELDS:
+            input_parts = _build_input_parts(
+                value["input_parts"], field_name=f"{field_name}.input_parts"
+            )
+        else:
+            expected = (
+                _STRUCTURED_RECORD_MATERIAL_FIELDS
+                if "input_parts" in value
+                else _LEGACY_RECORD_MATERIAL_FIELDS
+            )
+            _require_exact_fields(value, expected=expected, field_name=field_name)
+            raise AssertionError("unreachable record material validation")
         materialized_records.append(
             {
                 "record_id": value["record_id"],
-                "input_text": input_text,
-                "input_sha256": hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                "input_parts": [part.to_payload() for part in input_parts],
+                "input_sha256": evaluation_input_parts_sha256(input_parts),
                 "expected_output": value["expected_output"],
             }
         )
     return build_runtime_behavioral_schedule(
         {
             "format_version": RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT,
+            "task": task,
             "dataset_identity": dict(dataset_identity),
             "records": materialized_records,
         }
@@ -410,6 +509,7 @@ def load_runtime_behavioral_schedule(
 __all__ = [
     "MAX_RUNTIME_BEHAVIORAL_DATASET_COORDINATE_CHARACTERS",
     "MAX_RUNTIME_BEHAVIORAL_RECORD_ID_CHARACTERS",
+    "MAX_RUNTIME_BEHAVIORAL_INPUT_PARTS",
     "MAX_RUNTIME_BEHAVIORAL_SCHEDULE_BYTES",
     "MAX_RUNTIME_BEHAVIORAL_SCHEDULE_RECORDS",
     "MAX_RUNTIME_BEHAVIORAL_SPLIT_CHARACTERS",

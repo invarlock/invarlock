@@ -37,10 +37,8 @@ from invarlock.core.runtime_provider import (
 )
 from invarlock.core.runtime_provider.types import (
     ArtifactFormat,
-    EvidenceSurface,
     RuntimeExecutionMode,
     RuntimeMetric,
-    RuntimeTask,
 )
 from invarlock.evidence_pack_json import (
     StrictJsonError,
@@ -75,7 +73,7 @@ class RuntimeProviderEvidenceError(ValueError):
 
 @dataclass(frozen=True)
 class RuntimeProviderEvidencePaths:
-    """The three sibling files required by runtime manifest v2."""
+    """The three sibling files required by the runtime manifest."""
 
     artifact_identity: Path
     scoring_observation: Path
@@ -225,7 +223,7 @@ def _capabilities_from_payload(
         artifact_formats=cast(
             tuple[ArtifactFormat, ...], _string_tuple(payload["artifact_formats"])
         ),
-        tasks=cast(tuple[RuntimeTask, ...], _string_tuple(payload["tasks"])),
+        tasks=_string_tuple(payload["tasks"]),
         metrics=cast(tuple[RuntimeMetric, ...], _string_tuple(payload["metrics"])),
         execution_modes=cast(
             tuple[RuntimeExecutionMode, ...],
@@ -233,14 +231,6 @@ def _capabilities_from_payload(
         ),
         required_extra=_optional_text(payload["required_extra"]),
         required_image=_optional_text(payload["required_image"]),
-        platform_constraints=_string_tuple(payload["platform_constraints"]),
-        evidence_surfaces=cast(
-            tuple[EvidenceSurface, ...],
-            _string_tuple(payload["evidence_surfaces"]),
-        ),
-        supported_claim_sets=_string_tuple(payload["supported_claim_sets"]),
-        degraded_modes=_string_tuple(payload["degraded_modes"]),
-        unavailable_modes=_string_tuple(payload["unavailable_modes"]),
     )
 
 

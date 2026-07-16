@@ -96,7 +96,6 @@ def _spec(**settings: JSONScalar) -> ModelRuntimeSpec:
     return ModelRuntimeSpec(
         provider_name="hf_transformers",
         model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        adapter_name="hf_causal",
         settings=merged_settings,
     )
 
