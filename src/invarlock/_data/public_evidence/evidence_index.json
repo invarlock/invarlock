@@ -1,0 +1,12 @@
+{
+  "carrier_policy": {
+    "installed_wheel": "compact_index_only"
+  },
+  "entries": [],
+  "evidence_count": 0,
+  "evidence_file_count": 0,
+  "evidence_size_bytes": 0,
+  "format_version": "invarlock/public-evidence-index-v1",
+  "status": "not_created",
+  "status_label": "Evidence not yet created"
+}

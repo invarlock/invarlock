@@ -1,2 +1,0 @@
--r ../../../../requirements/workflows/runtime-image.in
-compressed-tensors>=0.10.0

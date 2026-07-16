@@ -1,86 +1,30 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "checks" / "sync_packaged_public_evidence.py"
+import pytest
+
+SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "checks"
+    / "sync_packaged_public_evidence.py"
+)
 
 
-def _write_json(path: Path, payload: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-
-
-def _write_fixture(root: Path) -> tuple[Path, Path]:
-    source_root = root / "public_evidence"
-    support_matrix = root / "contracts" / "support_matrix.json"
-    evidence_dir = source_root / "catalog_evidence" / "demo"
-    evidence_dir.mkdir(parents=True)
-    (source_root / "README.md").write_text("# Public evidence\n", encoding="utf-8")
-    (evidence_dir / "evidence_pack").mkdir()
-    (evidence_dir / "evidence_pack" / "manifest.json").write_text(
-        "{}\n", encoding="utf-8"
-    )
-    (evidence_dir / "evidence_pack" / "evaluation.report.json").write_text(
-        "report\n", encoding="utf-8"
-    )
-    (evidence_dir / "evidence_pack" / "runtime.manifest.json").write_text(
-        "manifest\n", encoding="utf-8"
-    )
-    _write_json(
-        evidence_dir / "evidence.meta.json",
-        {
-            "evidence_class": "strict_pass_fixture",
-            "summary": "fixture report",
-            "artifact_paths": {
-                "evaluation_report": "evidence_pack/evaluation.report.json",
-                "runtime_manifest": "evidence_pack/runtime.manifest.json",
-                "evidence_pack": "evidence_pack",
-            },
-        },
-    )
-    _write_json(
-        support_matrix,
-        {
-            "lanes": [
-                {
-                    "lane_id": "demo-lane",
-                    "support_tier": "maintained_catalog",
-                    "evidence": {
-                        "evaluation_report_fixture": (
-                            "public_evidence/catalog_evidence/demo/"
-                            "evidence_pack/evaluation.report.json"
-                        )
-                    },
-                }
-            ]
-        },
-    )
-    return source_root, support_matrix
-
-
-def _run(
-    *,
-    source_root: Path,
-    support_matrix: Path,
-    packaged_root: Path,
-    args: list[str],
-) -> subprocess.CompletedProcess[str]:
+def _run(source: Path, packaged: Path, mode: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             sys.executable,
             str(SCRIPT),
             "--source-root",
-            str(source_root),
-            "--support-matrix",
-            str(support_matrix),
+            str(source),
             "--packaged-root",
-            str(packaged_root),
-            *args,
+            str(packaged),
+            mode,
         ],
         capture_output=True,
         text=True,
@@ -88,126 +32,209 @@ def _run(
     )
 
 
-def test_sync_packaged_public_evidence_write_and_check(tmp_path: Path) -> None:
-    source_root, support_matrix = _write_fixture(tmp_path)
-    packaged_root = tmp_path / "packaged"
+def test_sync_writes_and_checks_explicit_empty_index(tmp_path: Path) -> None:
+    source = tmp_path / "public_evidence"
+    source.mkdir()
+    packaged = tmp_path / "packaged"
 
-    written = _run(
-        source_root=source_root,
-        support_matrix=support_matrix,
-        packaged_root=packaged_root,
-        args=["--write"],
-    )
+    written = _run(source, packaged, "--write")
+    checked = _run(source, packaged, "--check")
 
-    assert written.returncode == 0, written.stderr
-    index = json.loads(
-        (packaged_root / "catalog_evidence_index.json").read_text(encoding="utf-8")
-    )
-    assert index["format_version"] == "public-evidence-index-v2"
-    assert index["carrier_policy"]["installed_wheel"] == "compact_index_only"
-    assert index["entries"][0]["lanes"] == ["demo-lane"]
-    assert index["entries"][0]["artifacts"]["evaluation_report"]["sha256"].startswith(
-        "sha256:"
-    )
-    unique_files = sorted(
-        path for path in (source_root / "catalog_evidence").rglob("*") if path.is_file()
-    )
-    assert index["catalog_evidence_file_count"] == 4 == len(unique_files)
-    assert index["catalog_evidence_size_bytes"] == sum(
-        path.stat().st_size for path in unique_files
-    )
-
-    checked = _run(
-        source_root=source_root,
-        support_matrix=support_matrix,
-        packaged_root=packaged_root,
-        args=["--check"],
-    )
-
-    assert checked.returncode == 0, checked.stderr
-    assert "in sync" in checked.stdout
+    assert written.returncode == checked.returncode == 0
+    payload = json.loads((packaged / "evidence_index.json").read_text(encoding="utf-8"))
+    assert payload["entries"] == []
+    assert payload["status_label"] == "Evidence not yet created"
 
 
-def test_sync_packaged_public_evidence_rejects_drift_and_legacy_tree(
+def test_sync_indexes_only_canonical_pack_and_signed_receipt(tmp_path: Path) -> None:
+    source = tmp_path / "public_evidence"
+    entry = source / "evidence" / "demo"
+    pack = entry / "pack"
+    pack.mkdir(parents=True)
+    for name in ("manifest.json", "manifest.signature.json", "checksums.sha256"):
+        (pack / name).write_text("{}\n", encoding="utf-8")
+    (entry / "verification-receipt.json").write_text("{}\n", encoding="utf-8")
+    (entry / "evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "format_version": "invarlock/public-evidence-meta-v1",
+                "summary": "Verified demo",
+                "artifact_paths": {
+                    "evidence_pack": "pack",
+                    "verification_receipt": "verification-receipt.json",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    packaged = tmp_path / "packaged"
+
+    result = _run(source, packaged, "--write")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads((packaged / "evidence_index.json").read_text(encoding="utf-8"))
+    assert payload["evidence_count"] == 1
+    assert payload["entries"][0]["evidence_class"] == "signed_evidence_pack"
+    assert set(payload["entries"][0]["artifacts"]) == {
+        "evidence_pack",
+        "verification_receipt",
+    }
+    assert (source / "evidence_index.json").read_bytes() == (
+        packaged / "evidence_index.json"
+    ).read_bytes()
+
+
+def test_sync_preserves_external_entries_beside_derived_local_entries(
     tmp_path: Path,
 ) -> None:
-    source_root, support_matrix = _write_fixture(tmp_path)
-    packaged_root = tmp_path / "packaged"
-    packaged_root.mkdir()
-    _write_json(packaged_root / "catalog_evidence_index.json", {"stale": True})
-    (packaged_root / "catalog_evidence" / "demo").mkdir(parents=True)
+    source = tmp_path / "public_evidence"
+    entry = source / "evidence" / "local"
+    pack = entry / "pack"
+    pack.mkdir(parents=True)
+    for name in ("manifest.json", "manifest.signature.json", "checksums.sha256"):
+        (pack / name).write_text("{}\n", encoding="utf-8")
+    (entry / "verification-receipt.json").write_text("{}\n", encoding="utf-8")
+    (entry / "evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "format_version": "invarlock/public-evidence-meta-v1",
+                "summary": "Local evidence",
+                "artifact_paths": {
+                    "evidence_pack": "pack",
+                    "verification_receipt": "verification-receipt.json",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    digest = "sha256:" + "a" * 64
+    external = {
+        "slug": "external",
+        "path": "public_evidence/evidence/external",
+        "evidence_class": "signed_evidence_pack",
+        "summary": "External evidence",
+        "artifacts": {
+            "evidence_pack": {
+                "kind": "directory",
+                "path": "public_evidence/evidence/external/evidence",
+                "file_count": 3,
+                "size_bytes": 30,
+                "control_hashes": {"manifest.json": digest},
+                "external_asset": {
+                    "url": "https://example.com/evidence.tar.zst",
+                    "sha256": digest,
+                },
+            },
+            "verification_receipt": {
+                "kind": "file",
+                "path": "public_evidence/evidence/external/verification.receipt.json",
+                "size_bytes": 10,
+                "sha256": digest,
+                "external_asset": {
+                    "url": "https://example.com/verification.receipt.json",
+                    "sha256": digest,
+                },
+            },
+        },
+    }
+    (source / "evidence_index.json").write_text(
+        json.dumps(
+            {
+                "format_version": "invarlock/public-evidence-index-v1",
+                "status": "available",
+                "status_label": "Evidence available",
+                "carrier_policy": {"installed_wheel": "compact_index_only"},
+                "evidence_count": 1,
+                "evidence_file_count": 4,
+                "evidence_size_bytes": 40,
+                "entries": [external],
+            }
+        ),
+        encoding="utf-8",
+    )
+    packaged = tmp_path / "packaged"
 
-    checked = _run(
-        source_root=source_root,
-        support_matrix=support_matrix,
-        packaged_root=packaged_root,
-        args=["--check"],
+    result = _run(source, packaged, "--write")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads((source / "evidence_index.json").read_text(encoding="utf-8"))
+    assert [entry["slug"] for entry in payload["entries"]] == ["external", "local"]
+    assert payload["evidence_file_count"] == 8
+    assert payload["evidence_size_bytes"] == 52
+    assert (source / "evidence_index.json").read_bytes() == (
+        packaged / "evidence_index.json"
+    ).read_bytes()
+
+
+def test_sync_rejects_legacy_metadata_shape(tmp_path: Path) -> None:
+    source = tmp_path / "public_evidence"
+    entry = source / "evidence" / "demo"
+    entry.mkdir(parents=True)
+    (entry / "evidence.meta.json").write_text(
+        json.dumps({"evidence_class": "historical_archived_fixture"}),
+        encoding="utf-8",
     )
 
-    assert checked.returncode == 1
-    combined = checked.stdout + checked.stderr
-    assert "full packaged public evidence tree must be removed" in combined
-    assert "out-of-sync packaged public evidence index" in combined
+    result = _run(source, tmp_path / "packaged", "--write")
+
+    assert result.returncode == 1
+    assert "unsupported metadata format" in result.stdout
 
 
-def test_sync_packaged_public_evidence_write_removes_legacy_tree(
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ({"note": "undeclared"}, "metadata fields are not closed"),
+        ({"summary": ""}, "summary must be concise plain text"),
+        (
+            {
+                "artifact_paths": {
+                    "evidence_pack": "/tmp/other",
+                    "verification_receipt": "receipt.json",
+                }
+            },
+            "invalid direct-child evidence_pack path",
+        ),
+        (
+            {
+                "artifact_paths": {
+                    "evidence_pack": "../other",
+                    "verification_receipt": "receipt.json",
+                }
+            },
+            "invalid direct-child evidence_pack path",
+        ),
+        (
+            {
+                "artifact_paths": {
+                    "evidence_pack": "nested/pack",
+                    "verification_receipt": "receipt.json",
+                }
+            },
+            "invalid direct-child evidence_pack path",
+        ),
+    ],
+)
+def test_sync_rejects_open_or_escaping_metadata(
     tmp_path: Path,
+    mutation: dict[str, object],
+    message: str,
 ) -> None:
-    source_root, support_matrix = _write_fixture(tmp_path)
-    packaged_root = tmp_path / "packaged"
-    (packaged_root / "catalog_evidence" / "demo").mkdir(parents=True)
+    source = tmp_path / "public_evidence"
+    entry = source / "evidence" / "demo"
+    entry.mkdir(parents=True)
+    metadata: dict[str, object] = {
+        "format_version": "invarlock/public-evidence-meta-v1",
+        "summary": "Verified demo",
+        "artifact_paths": {
+            "evidence_pack": "pack",
+            "verification_receipt": "receipt.json",
+        },
+    }
+    metadata.update(mutation)
+    (entry / "evidence.meta.json").write_text(json.dumps(metadata), encoding="utf-8")
 
-    written = _run(
-        source_root=source_root,
-        support_matrix=support_matrix,
-        packaged_root=packaged_root,
-        args=["--write"],
-    )
+    result = _run(source, tmp_path / "packaged", "--write")
 
-    assert written.returncode == 0, written.stderr
-    assert "removed_full_tree=True" in written.stdout
-    assert not (packaged_root / "catalog_evidence").exists()
-
-
-def test_sync_packaged_public_evidence_uses_source_index_after_externalization(
-    tmp_path: Path,
-) -> None:
-    source_root, support_matrix = _write_fixture(tmp_path)
-    packaged_root = tmp_path / "packaged"
-
-    written = _run(
-        source_root=source_root,
-        support_matrix=support_matrix,
-        packaged_root=packaged_root,
-        args=[
-            "--write",
-            "--write-source-index",
-            "--external-asset-url",
-            "https://github.com/example/repo/releases/download/public-evidence/"
-            "catalog-evidence.tar.gz",
-            "--external-asset-sha256",
-            "sha256:" + "a" * 64,
-            "--external-asset-size-bytes",
-            "12345",
-        ],
-    )
-
-    assert written.returncode == 0, written.stderr
-    source_index_path = source_root / "catalog_evidence_index.json"
-    index = json.loads(source_index_path.read_text(encoding="utf-8"))
-    artifact = index["entries"][0]["artifacts"]["evaluation_report"]
-    assert artifact["external_asset"]["archive_path"] == (
-        "public_evidence/catalog_evidence/demo/evidence_pack/evaluation.report.json"
-    )
-    assert artifact["external_asset"]["sha256"] == "sha256:" + "a" * 64
-
-    shutil.rmtree(source_root / "catalog_evidence")
-    checked = _run(
-        source_root=source_root,
-        support_matrix=support_matrix,
-        packaged_root=packaged_root,
-        args=["--check"],
-    )
-
-    assert checked.returncode == 0, checked.stderr
-    assert "in sync" in checked.stdout
+    assert result.returncode == 1
+    assert message in result.stdout
