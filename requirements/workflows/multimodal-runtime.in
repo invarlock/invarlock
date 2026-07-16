@@ -1,0 +1,2 @@
+# Image decoding used only by the optional Hugging Face vision-text runtime.
+pillow==12.3.0

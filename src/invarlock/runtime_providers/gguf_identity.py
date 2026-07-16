@@ -48,7 +48,7 @@ _GGML_TENSOR_BLOCK_SIZES = {
     # GGMLQuantizationType -> (elements per block, encoded bytes per block).
     # Keep this fail-closed table synchronized with llama.cpp's canonical
     # GGML_QUANT_SIZES. Removed or future types are deliberately rejected until
-    # their layout is reviewed here.
+    # their layout is inspected here.
     0: (1, 4),  # F32
     1: (1, 2),  # F16
     2: (32, 18),  # Q4_0

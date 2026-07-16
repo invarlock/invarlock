@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=83.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "invarlock-runtime-gguf"
+version = "0.12.1"
+description = "First-party GGUF runtime provider add-in for InvarLock"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = ["invarlock>=0.12.1,<0.13"]
+
+[project.entry-points."invarlock.runtime_providers"]
+llama_cpp = "invarlock_addins.gguf.provider:LlamaCppProvider"
+
+[project.scripts]
+invarlock-gguf-conformance = "invarlock_addins.gguf.conformance:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["invarlock_addins.gguf*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"invarlock_addins.gguf" = ["py.typed"]

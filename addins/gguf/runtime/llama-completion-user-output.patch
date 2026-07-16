@@ -1,0 +1,12 @@
+diff --git a/tools/completion/completion.cpp b/tools/completion/completion.cpp
+--- a/tools/completion/completion.cpp
++++ b/tools/completion/completion.cpp
+@@ -968,7 +968,8 @@ int main(int argc, char ** argv) {
+
+         // end of generation
+         if (!embd.empty() && llama_vocab_is_eog(vocab, embd.back()) && !(params.interactive)) {
+-            LOG(" [end of text]\n");
++            // InvarLock evidence records user-visible generated text only. The
++            // EOG token is termination control and must not enter stdout.
+             break;
+         }
