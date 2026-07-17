@@ -61,7 +61,7 @@ Cryptographic validity alone is therefore necessary but not sufficient.
 
 | Role | Controls | Signed or rendered output | Reliance |
 | --- | --- | --- | --- |
-| Evidence signer | Closed request, model artifacts, provider execution or imported records, and evidence-signing key | Immutable `evidence-pack-v1` | Authorized to state what evidence it produced; not automatically trusted to choose acceptance anchors or report truthful execution |
+| Evidence signer | Closed request, model artifacts, provider execution or imported records, and evidence-signing key | Immutable `invarlock/evidence-pack-v1` | Authorized to state what evidence it produced; not automatically trusted to choose acceptance anchors or report truthful execution |
 | Verifier | Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, explicitly authorized scorer registry when selected, verifier identity, and verifier key | External signed verification receipt | Authorized to make the scoped acceptance statement under independently managed anchors and scorer authorization |
 | Renderer | Submitted evidence pack and presentation destination | Console or HTML view | Presents the authenticated canonical report; acceptance authority remains with independent verification and its receipt |
 
@@ -82,6 +82,7 @@ bundle makes the check circular.
 | Baseline runtime digest | Pinned image/build record | The baseline evidence declares the expected image identity | The image executed |
 | Subject runtime digest | Pinned image/build record | The subject evidence declares the expected image identity | The image executed |
 | Verifier identity/fingerprint | Independently maintained verifier-identity record | The receipt was signed by the expected verifier key | The verifier host and process were free of compromise |
+| Trust-profile digest | Canonical digest of an independently maintained `invarlock/trust-inputs-v1` profile | The receipt records the exact closed profile used for verification | The profile's anchors were authorized or scientifically sufficient |
 
 An anchor source must be protected from the evidence submitter for the threat
 it addresses. Merely storing the same value in two files does not create
@@ -161,8 +162,10 @@ policy pins the scorer ID, version, descriptor digest, and configuration
 digest. The registry must resolve that exact binding, and replay must produce
 the same canonical result twice. Scorer code is part of the verifier's trusted
 computing base: review and distribute it with the same discipline as verifier
-code. V1 acceptance scorers cannot use a network, external model, human
-judgment, or LLM judge.
+code. An acceptance scorer must not use a network, external model, human
+judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
+deterministic replay; it does not sandbox extension code or prove those
+operational restrictions.
 
 ### Authorization lifecycle
 

@@ -457,7 +457,11 @@ def test_gguf_identity_rejects_file_mutation_during_read(
         digest = original(descriptor, expected_size)
         with path.open("r+b") as handle:
             handle.seek(-1, os.SEEK_END)
-            handle.write(b"X")
+            original_byte = handle.read(1)
+            handle.seek(-1, os.SEEK_END)
+            handle.write(bytes([original_byte[0] ^ 0xFF]))
+            handle.flush()
+            os.fsync(handle.fileno())
         return digest
 
     monkeypatch.setattr(gguf_identity, "_stream_file_sha256", mutate_after_hash)

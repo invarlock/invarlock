@@ -1,6 +1,6 @@
 # Publish public evidence
 
-Public evidence is a curated index of immutable `evidence-pack-v1` directories
+Public evidence is a curated index of immutable `invarlock/evidence-pack-v1` directories
 and independently signed verification receipts. An empty index intentionally
 says **Evidence not yet created**; publication begins only after a pack and
 receipt pass strict verification and disclosure review.
@@ -31,7 +31,7 @@ Choose a stable, portable slug and stage exactly three objects:
 
 ```text
 public_evidence/evidence/example-comparison/
-├── evidence/                       # immutable evidence-pack-v1 directory
+├── evidence/                       # immutable invarlock/evidence-pack-v1 directory
 ├── verification.receipt.json      # separately signed receipt
 └── evidence.meta.json              # publication metadata
 ```

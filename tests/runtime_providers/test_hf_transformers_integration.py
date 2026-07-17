@@ -271,3 +271,34 @@ def test_hf_strict_open_rejects_loaded_weights_from_another_checkpoint(
                 scorer=scorer,
             ),
         )
+
+
+def test_hf_strict_loader_rejects_real_partial_checkpoint(tmp_path: Path) -> None:
+    pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    config = transformers.GPT2Config(
+        vocab_size=32,
+        n_positions=8,
+        n_embd=8,
+        n_layer=1,
+        n_head=1,
+        bos_token_id=1,
+        eos_token_id=2,
+        pad_token_id=0,
+    )
+    model = transformers.GPT2LMHeadModel(config)
+    checkpoint = tmp_path / "partial-hf"
+    checkpoint.mkdir()
+    config.save_pretrained(checkpoint)
+    safetensors_torch.save_file(
+        {"transformer.wte.weight": model.state_dict()["transformer.wte.weight"]},
+        checkpoint / "model.safetensors",
+        metadata={"format": "pt"},
+    )
+
+    with pytest.raises(ValueError, match="loading reported missing"):
+        hf_transformers.load_hf_model_with_strict_loading_info(
+            transformers.AutoModelForCausalLM.from_pretrained,
+            checkpoint,
+        )

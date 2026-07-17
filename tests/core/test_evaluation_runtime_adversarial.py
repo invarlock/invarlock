@@ -6,6 +6,7 @@ from typing import cast
 
 import pytest
 
+from invarlock._optional_runtime_profiles import OPTIONAL_RUNTIME_PROVIDER_PROFILES
 from invarlock.core.evaluation_request import (
     ArtifactRequest,
     ComparisonSideRequest,
@@ -20,6 +21,31 @@ from invarlock.evaluation_runtime import (
 )
 
 _DIGEST = "sha256:" + "e" * 64
+
+
+def test_optional_runtime_provider_profiles_are_closed_and_immutable() -> None:
+    assert tuple(OPTIONAL_RUNTIME_PROVIDER_PROFILES) == (
+        "hf_vision_text",
+        "llama_cpp",
+        "tensorrt_llm",
+    )
+    assert OPTIONAL_RUNTIME_PROVIDER_PROFILES[
+        "hf_vision_text"
+    ].support_resource_environment == (
+        ("content_store", "INVARLOCK_HF_VISION_TEXT_CONTENT_STORE"),
+    )
+    assert OPTIONAL_RUNTIME_PROVIDER_PROFILES[
+        "llama_cpp"
+    ].support_resource_environment == (
+        ("backend_executable", "INVARLOCK_GGUF_BACKEND_EXECUTABLE"),
+        ("backend_source", "INVARLOCK_GGUF_BACKEND_SOURCE"),
+    )
+    tensorrt = OPTIONAL_RUNTIME_PROVIDER_PROFILES["tensorrt_llm"]
+    assert tensorrt.automatic_entrypoint == "nvidia"
+    assert tensorrt.scratch_profile == "tensorrt_engine"
+
+    with pytest.raises(TypeError):
+        OPTIONAL_RUNTIME_PROVIDER_PROFILES["other"] = tensorrt  # type: ignore[index]
 
 
 def _side(
@@ -113,7 +139,6 @@ def test_environment_requires_image_digest_and_loads_complete_optional_bindings(
     monkeypatch.setenv("INVARLOCK_GGUF_BACKEND_SOURCE", "src/llama.cpp.tar")
     monkeypatch.setenv("INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT", str(tmp_path / "trt"))
     monkeypatch.setenv("INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT", "tokenizer.json")
-    monkeypatch.setenv("INVARLOCK_TENSORRT_LLM_RUNNER_EXECUTABLE", "runner")
 
     resources = caller_runtime_resources_from_environment()
 
@@ -131,6 +156,9 @@ def test_environment_requires_image_digest_and_loads_complete_optional_bindings(
         "backend_executable": "bin/llama-cli",
         "backend_source": "src/llama.cpp.tar",
     }
+    assert dict(resources.provider_bindings["tensorrt_llm"].support_resources) == {
+        "tokenizer_contract": "tokenizer.json"
+    }
 
 
 def test_environment_fails_closed_when_tensorrt_support_is_partial(
@@ -139,8 +167,7 @@ def test_environment_fails_closed_when_tensorrt_support_is_partial(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _DIGEST)
     monkeypatch.setenv("INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT", str(tmp_path))
-    monkeypatch.setenv("INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT", "tokenizer.json")
-    monkeypatch.delenv("INVARLOCK_TENSORRT_LLM_RUNNER_EXECUTABLE", raising=False)
+    monkeypatch.delenv("INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT", raising=False)
 
-    with pytest.raises(RuntimeResourceResolutionError, match="RUNNER_EXECUTABLE"):
+    with pytest.raises(RuntimeResourceResolutionError, match="TOKENIZER_CONTRACT"):
         caller_runtime_resources_from_environment()

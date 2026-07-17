@@ -33,6 +33,7 @@ def test_evaluate_accepts_one_request_instead_of_model_flag_sprawl() -> None:
     assert "--allow-network" not in help_text
     assert "--allow-remote-code" not in help_text
     assert "--allow-installed-scorers" in help_text
+    assert "--preflight" in help_text
 
 
 def test_verify_uses_the_bundle_and_independent_trust_anchors() -> None:
@@ -50,6 +51,7 @@ def test_verify_uses_the_bundle_and_independent_trust_anchors() -> None:
     assert "--verifier-signing-key" in help_text
     assert "--verifier-identity" in help_text
     assert "--allow-installed-scorers" in help_text
+    assert "--trust-profile" in help_text
     assert "--baseline" not in help_text
 
 

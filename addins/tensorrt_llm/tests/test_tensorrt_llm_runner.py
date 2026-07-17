@@ -560,3 +560,26 @@ def test_runner_score_cli_emits_strict_response(
         "format_version": "invarlock/tensorrt-llm-runner-response-v1",
         "output_text": "OUT:hello world",
     }
+
+
+def test_runner_cli_maps_known_and_unknown_failures_to_closed_status(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        runner,
+        "_info_payload",
+        lambda: (_ for _ in ()).throw(
+            runner.TensorRTLLMRunnerError("unavailable runtime")
+        ),
+    )
+    assert runner.main(["--invarlock-runtime-info-v1"]) == 70
+    assert "failed closed: unavailable runtime" in capsys.readouterr().err
+
+    monkeypatch.setattr(
+        runner,
+        "_info_payload",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected")),
+    )
+    assert runner.main(["--invarlock-runtime-info-v1"]) == 70
+    assert capsys.readouterr().err == "TensorRT-LLM runner failed closed\n"

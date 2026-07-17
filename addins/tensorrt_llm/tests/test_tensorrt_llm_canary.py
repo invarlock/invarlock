@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import asdict
 from pathlib import Path
 
@@ -72,6 +73,25 @@ def test_runner_info_contract_rejects_unknown_or_unpinned_values() -> None:
         canary._validate_runner_info(wrong_version)  # noqa: SLF001
 
 
+@pytest.mark.parametrize(
+    "value",
+    [None, "", " padded", "padded ", "contains\ncontrol"],
+)
+def test_runner_info_text_fields_must_be_closed(value: object) -> None:
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="is invalid"):
+        canary._required_text({"field": value}, "field")  # noqa: SLF001
+
+
+def test_runner_info_rejects_malformed_build_and_compute_facts() -> None:
+    malformed_build = {**_runner_info(), "backend_build_sha256": "not-a-digest"}
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="build digest"):
+        canary._validate_runner_info(malformed_build)  # noqa: SLF001
+
+    malformed_compute = {**_runner_info(), "cuda_compute_capability": "H100"}
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="compute capability"):
+        canary._validate_runner_info(malformed_compute)  # noqa: SLF001
+
+
 def test_nonofficial_runner_is_rejected_without_execution(tmp_path: Path) -> None:
     marker = tmp_path / "executed"
     runner = tmp_path / "untrusted-runner"
@@ -86,6 +106,15 @@ def test_nonofficial_runner_is_rejected_without_execution(tmp_path: Path) -> Non
     assert not marker.exists()
 
 
+def test_candidate_digest_reader_fails_closed_for_missing_input(tmp_path: Path) -> None:
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="cannot be authenticated"):
+        canary._read_digest(  # noqa: SLF001
+            tmp_path / "missing-tokenizer.json",
+            label="candidate tokenizer contract",
+            max_bytes=32,
+        )
+
+
 def test_image_binding_requires_exact_digest_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -97,6 +126,19 @@ def test_image_binding_requires_exact_digest_environment(
 
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", "sha256:" + "8" * 64)
     with pytest.raises(canary.TensorRTLLMCanaryError, match="exact candidate"):
+        canary._require_image_binding()  # noqa: SLF001
+
+
+def test_image_binding_rejects_missing_or_noncanonical_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", raising=False)
+    monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE", raising=False)
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="canonical image digest"):
+        canary._require_image_binding()  # noqa: SLF001
+
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", "9" * 64)
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="canonical image digest"):
         canary._require_image_binding()  # noqa: SLF001
 
 
@@ -331,6 +373,76 @@ def test_candidate_qualification_rejects_mismatched_fixture_digests(
             expected_tokenizer_sha256=tokenizer_sha256,
             expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
         )
+
+
+def test_candidate_qualification_closes_engine_identity_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _IMAGE_DIGEST)
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", _IMAGE_DIGEST)
+    tokenizer = tmp_path / "tokenizer.json"
+    tokenizer.write_bytes(b"{}")
+    runner = tmp_path / "runner"
+    runner.write_bytes(b"runner")
+    runner.chmod(0o755)
+    tokenizer_sha256 = hashlib.sha256(tokenizer.read_bytes()).hexdigest()
+    monkeypatch.setattr(
+        canary,
+        "_raw_runner_info",
+        lambda _runner: (_runner_info(), hashlib.sha256(b"runner").hexdigest()),
+    )
+    monkeypatch.setattr(
+        canary,
+        "read_tensorrt_llm_artifact_identity",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad engine")),
+    )
+
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="cannot be authenticated"):
+        canary.qualify_candidate(
+            engine_bundle=tmp_path / "engine",
+            tokenizer_contract=tokenizer,
+            runner=runner,
+            expected_engine_tree_sha256="b" * 64,
+            expected_tokenizer_sha256=tokenizer_sha256,
+            expected_output_sha256="c" * 64,
+        )
+
+
+def test_canary_main_emits_closed_success_and_failure_results(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    arguments = [
+        "--engine-bundle",
+        "engine",
+        "--tokenizer-contract",
+        "tokenizer.json",
+        "--runner",
+        "runner",
+        "--expected-engine-tree-sha256",
+        "a" * 64,
+        "--expected-tokenizer-sha256",
+        "b" * 64,
+        "--expected-output-sha256",
+        "c" * 64,
+    ]
+    expected = {"format_version": "test", "ok": True}
+    monkeypatch.setattr(canary, "qualify_candidate", lambda **_kwargs: expected)
+
+    assert canary.main(arguments) == 0
+    assert json.loads(capsys.readouterr().out) == expected
+
+    monkeypatch.setattr(
+        canary,
+        "qualify_candidate",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            canary.TensorRTLLMCanaryError("candidate mismatch")
+        ),
+    )
+    assert canary.main(arguments) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "candidate qualification failed: candidate mismatch" in captured.err
 
 
 def test_candidate_qualification_fails_closed_on_session_device_drift(

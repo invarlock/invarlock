@@ -23,11 +23,12 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Operating System :: OS Independent",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
   "Typing :: Typed",
 ]
 dependencies = [
-    "typer>=0.15",
+    "typer>=0.24.1",
     "click>=8.3.3",
     "cryptography>=48.0.1",
     "rich>=13.0",
@@ -58,6 +59,7 @@ dev = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
+  "pillow>=11.3,<13",
   "ruff==0.15.21",
   "mypy>=1.0",
   "types-jsonschema>=4.26",
@@ -77,6 +79,7 @@ ci = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
+  "pillow>=11.3,<13",
   "hypothesis>=6.98",
   "ruff==0.15.21",
   "mypy>=1.0",
@@ -210,6 +213,8 @@ markers = [
 ]
 [tool.coverage.run]
 branch = true
+parallel = true
+patch = ["subprocess"]
 source = ["src/invarlock"]
 omit = [
     "*/tests/*",

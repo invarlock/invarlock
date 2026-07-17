@@ -17,8 +17,9 @@ cannot substitute a different schema.
 | File | Format | Purpose |
 | --- | --- | --- |
 | `evaluation_request.schema.json` | `invarlock/evaluation-request-v1` | One closed run-or-import request |
-| `evidence_pack.schema.json` | `evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
+| `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
+| `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
 
 ## Provider contracts
 
@@ -42,6 +43,7 @@ from invarlock.public_contracts import (
     load_evaluation_request_schema,
     load_evidence_observation_schema,
     load_evidence_pack_schema,
+    load_trust_inputs_schema,
     load_model_artifact_identity_schema,
     load_runtime_behavioral_schedule_schema,
     load_runtime_manifest_schema,
@@ -54,13 +56,28 @@ from invarlock.public_contracts import (
 Each loader returns a new dictionary decoded from the package-owned contract.
 `ContractLoadError` identifies a missing, malformed, or non-object packaged
 contract. Format constants such as `EVALUATION_REQUEST_FORMAT_VERSION`,
-`EVIDENCE_PACK_FORMAT_VERSION`, and `RUNTIME_PROVIDER_ABI_VERSION` are exported
-from the same module for exact comparisons.
+`EVIDENCE_PACK_FORMAT_VERSION`, `TRUST_INPUTS_FORMAT_VERSION`, and
+`RUNTIME_PROVIDER_ABI_VERSION` are exported from the same module for exact
+comparisons.
 
 The schemas use [JSON Schema Draft
 2020-12](https://json-schema.org/draft/2020-12). Every contract object is
 closed: fields not named by its schema or exact code-enforced shape are
 rejected rather than ignored.
+
+## Independent trust-input profile
+
+`invarlock/trust-inputs-v1` is the portable caller-owned input to independent
+verification. It contains the policy path, baseline and subject artifact
+digests, schedule digest, both runtime digests, evidence-signer fingerprint,
+verifier identity, verifier signing-key path, and installed-scorer
+authorization. The object and all nested objects are closed.
+
+Policy and key paths are safe relative paths resolved from the profile's
+directory. Absolute paths, traversal, symlinks, duplicate JSON members,
+unknown fields, and missing files are rejected. Formatting does not affect the
+profile digest: the loader hashes canonical JSON and the verifier records that
+digest in its signed receipt. The profile never contains private-key bytes.
 
 ## Evaluation request fields
 
@@ -333,9 +350,9 @@ separate JSON Schema file:
 | `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
 | `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
 | `invarlock/comparison-report-v1` | Canonical means, point comparison, metric-specific paired interval, threshold, and verdict |
-| `evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
-| `evidence-pack-verify-v1` | Machine-readable independent verification result |
-| `invarlock/evidence-verification-receipt-v1` | Signed statement binding the pack, artifact/schedule/policy/runtime/signer anchors, verifier, and verdict |
+| `invarlock/evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
+| `invarlock/evidence-pack-verify-v1` | Machine-readable independent verification result |
+| `invarlock/evidence-verification-receipt-v1` | Signed statement binding the pack, artifact/schedule/policy/runtime/signer anchors, verifier, optional trust-profile digest, and verdict |
 | `invarlock/evidence-verification-receipt-signature-v1` | Ed25519 envelope for the receipt statement |
 
 These are documented for inspection and interchange, not as permission to
@@ -409,7 +426,7 @@ a new format identifier and explicit reader behavior. Runtime providers must
 also match ABI `1` exactly.
 
 Core and first-party add-ins are released at the same package version. Provider
-add-ins declare a bounded compatible core range, while the provider ABI remains
+add-ins declare the exact coordinated core release, while the provider ABI remains
 the runtime compatibility gate. See [Release verification](release-verification.md).
 
 ## Related documentation

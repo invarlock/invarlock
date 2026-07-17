@@ -37,26 +37,44 @@ def test_first_party_distribution_versions_match_core() -> None:
         assert _module_version(path, name) == core_version
 
 
-def test_provider_addins_require_the_matching_core_release_line() -> None:
-    core_version = str(_project(REPO_ROOT)["version"])
-    major, minor, _patch = (int(part) for part in core_version.split("."))
-    expected = f"invarlock>={core_version},<{major}.{minor + 1}"
+def test_local_distribution_gate_validates_all_first_party_source_parity() -> None:
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    dist_check = makefile.split("dist-check:", 1)[1].split("addins-install-smoke:", 1)[
+        0
+    ]
 
-    for name in ("gguf", "multimodal", "tensorrt_llm"):
+    assert "first_party_distribution_validation.py" in dist_check
+    assert "--core-dist-dir dist" in dist_check
+    assert "--addin-dist-dir dist/addins" in dist_check
+
+
+def test_provider_addins_require_the_exact_matching_core_release() -> None:
+    core_version = str(_project(REPO_ROOT)["version"])
+    expected = f"invarlock=={core_version}"
+
+    for name in ("gguf", "tensorrt_llm"):
         dependencies = _project(ADDINS[name])["dependencies"]
         assert isinstance(dependencies, list)
         assert dependencies == [expected]
 
     multimodal_project = _project(ADDINS["multimodal"])
+    multimodal_base = multimodal_project["dependencies"]
+    assert isinstance(multimodal_base, list)
+    assert multimodal_base[0] == expected
+    assert any(str(item).startswith("pillow>=") for item in multimodal_base)
+    assert not any(
+        str(item).startswith(("torch", "transformers")) for item in multimodal_base
+    )
     multimodal_dependencies = multimodal_project["optional-dependencies"]
     assert isinstance(multimodal_dependencies, dict)
     multimodal_runtime = multimodal_dependencies["runtime"]
     assert isinstance(multimodal_runtime, list)
-    assert any(str(item).startswith("pillow>=") for item in multimodal_runtime)
+    assert not any(str(item).startswith("pillow>=") for item in multimodal_runtime)
     assert any(str(item).startswith("protobuf>=") for item in multimodal_runtime)
     assert any(str(item).startswith("sentencepiece>=") for item in multimodal_runtime)
     assert any(str(item).startswith("tiktoken>=") for item in multimodal_runtime)
     assert any(str(item).startswith("torch>=") for item in multimodal_runtime)
+    assert any(str(item).startswith("torchvision>=") for item in multimodal_runtime)
     assert any(str(item).startswith("transformers>=") for item in multimodal_runtime)
 
 

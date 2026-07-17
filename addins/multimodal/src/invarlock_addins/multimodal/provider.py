@@ -32,6 +32,7 @@ from invarlock.core.runtime_provider import (
     ModelRuntimeSpec,
     RuntimeArtifactResources,
     RuntimeBackendIdentity,
+    RuntimeBehavioralSchedule,
     RuntimeDeviceFacts,
     RuntimeExecutionContext,
     RuntimeExecutionSettings,
@@ -53,6 +54,7 @@ from invarlock.runtime_provider_evidence import (
 )
 from invarlock.runtime_providers.hf_transformers import (
     hf_tokenizer_contract_sha256,
+    load_hf_model_with_strict_loading_info,
     require_loaded_hf_checkpoint_binding,
 )
 from invarlock.runtime_security_helpers import (
@@ -74,6 +76,9 @@ _MEDIA_FORMATS = {
 }
 _MAX_IMAGE_BYTES = 64 * 1024 * 1024
 _MAX_IMAGE_PIXELS = 50_000_000
+_MAX_UNIQUE_IMAGES = 2_048
+_MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
+_MAX_TOTAL_IMAGE_PIXELS = 200_000_000
 _ALLOWED_SETTINGS = frozenset(
     {
         "batch_size",
@@ -346,6 +351,93 @@ def _record_material(
     if _sha256(prompt.encode("utf-8")) != getattr(prompt_part, "sha256", None):
         raise ValueError("vision-text prompt digest does not match")
     return prompt, image_part, record.input_sha256
+
+
+def _validate_schedule_content(
+    schedule: RuntimeBehavioralSchedule,
+    *,
+    content_store: Path,
+) -> None:
+    """Authenticate and safely decode schedule-bound media without loading a model."""
+
+    if schedule.task != "vision_text_generation":
+        raise ValueError("hf_vision_text requires vision_text_generation")
+    observed: dict[str, tuple[str, int, str]] = {}
+    total_bytes = 0
+    total_pixels = 0
+    for record in schedule.records:
+        try:
+            _prompt, image_part, _input_digest = _record_material(record)
+            content_id = image_part.content_id
+            media_type = image_part.media_type
+            byte_length = image_part.byte_length
+            digest = image_part.sha256
+            if (
+                not isinstance(content_id, str)
+                or not isinstance(media_type, str)
+                or isinstance(byte_length, bool)
+                or not isinstance(byte_length, int)
+                or not isinstance(digest, str)
+            ):
+                raise ValueError("vision content binding is incomplete")
+            binding = (media_type, byte_length, digest)
+            prior = observed.get(content_id)
+            if prior is not None:
+                if prior != binding:
+                    raise ValueError(
+                        "vision content_id has conflicting authenticated bindings"
+                    )
+                continue
+            if len(observed) >= _MAX_UNIQUE_IMAGES:
+                raise ValueError("vision schedule exceeds the unique image limit")
+            total_bytes += byte_length
+            if total_bytes > _MAX_TOTAL_IMAGE_BYTES:
+                raise ValueError("vision schedule exceeds the total image byte limit")
+            payload = _read_content_bytes(
+                content_store,
+                content_id=content_id,
+                expected_sha256=digest,
+                expected_byte_length=byte_length,
+            )
+            image = _decode_image(payload, media_type=media_type)
+            close = getattr(image, "close", None)
+            if not callable(close):
+                raise ValueError("decoded vision content cannot be safely closed")
+            try:
+                size = getattr(image, "size", None)
+                if (
+                    not isinstance(size, tuple)
+                    or len(size) != 2
+                    or any(
+                        isinstance(value, bool) or not isinstance(value, int)
+                        for value in size
+                    )
+                ):
+                    raise ValueError("decoded vision content dimensions are invalid")
+                total_pixels += size[0] * size[1]
+                if total_pixels > _MAX_TOTAL_IMAGE_PIXELS:
+                    raise ValueError(
+                        "vision schedule exceeds the total decoded pixel limit"
+                    )
+            finally:
+                close()
+            observed[content_id] = binding
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            content_label = getattr(
+                next(
+                    (
+                        part
+                        for part in getattr(record, "input_parts", ())
+                        if getattr(part, "kind", None) == "content"
+                    ),
+                    None,
+                ),
+                "content_id",
+                "unknown",
+            )
+            raise ValueError(
+                f"record {record.record_id!r} content {content_label!r}: {exc}"
+            ) from exc
 
 
 def _model_device(model: object) -> object:
@@ -768,6 +860,39 @@ class HFVisionTextProvider:
             ),
         )
 
+    def authenticate_artifact(
+        self, spec: ModelRuntimeSpec, artifact_path: Path
+    ) -> HFSnapshotArtifactIdentity:
+        """Authenticate local checkpoint bytes without loading the model."""
+
+        identity = self.identify_artifact(spec)
+        try:
+            observed_tree = checkpoint_tree_sha256(artifact_path).removeprefix(
+                "sha256:"
+            )
+        except (CheckpointIdentityError, OSError) as exc:
+            raise ValueError(
+                "hf_vision_text checkpoint could not be authenticated"
+            ) from exc
+        if observed_tree != identity.checkpoint_tree_sha256:
+            raise ValueError("hf_vision_text checkpoint tree digest does not match")
+        return identity
+
+    def validate_evaluation_inputs(
+        self,
+        spec: ModelRuntimeSpec,
+        resources: RuntimeArtifactResources,
+        schedule: RuntimeBehavioralSchedule,
+    ) -> None:
+        """Authenticate schedule-bound media before any model or GPU initialization."""
+
+        self.validate_config(spec)
+        resources.require_support_names(frozenset({"content_store"}))
+        content_store = resources.support_path("content_store")
+        if not content_store.is_dir():
+            raise ValueError("hf_vision_text content directory is unavailable")
+        _validate_schedule_content(schedule, content_store=content_store)
+
     def prepare_execution(
         self, spec: ModelRuntimeSpec, resources: RuntimeArtifactResources
     ) -> RuntimeExecutionContext:
@@ -779,15 +904,7 @@ class HFVisionTextProvider:
             raise ValueError(
                 "hf_vision_text requires checkpoint and content directories"
             )
-        identity = self.identify_artifact(spec)
-        try:
-            observed_tree = checkpoint_tree_sha256(checkpoint).removeprefix("sha256:")
-        except (CheckpointIdentityError, OSError) as exc:
-            raise ValueError(
-                "hf_vision_text checkpoint could not be authenticated"
-            ) from exc
-        if observed_tree != identity.checkpoint_tree_sha256:
-            raise ValueError("hf_vision_text checkpoint tree digest does not match")
+        identity = self.authenticate_artifact(spec, checkpoint)
         transformers = importlib.import_module("transformers")
         processor_loader = getattr(transformers, "AutoProcessor", None)
         processor_from_pretrained = getattr(processor_loader, "from_pretrained", None)
@@ -805,11 +922,9 @@ class HFVisionTextProvider:
         processor = processor_from_pretrained(
             str(checkpoint), local_files_only=True, trust_remote_code=False
         )
-        model = model_from_pretrained(
-            str(checkpoint),
-            local_files_only=True,
-            trust_remote_code=False,
-            use_safetensors=True,
+        model = load_hf_model_with_strict_loading_info(
+            model_from_pretrained,
+            checkpoint,
         )
         move = getattr(model, "to", None)
         evaluate = getattr(model, "eval", None)
@@ -842,7 +957,7 @@ class HFVisionTextProvider:
             raise ValueError(
                 "hf_vision_text checkpoint could not be reauthenticated"
             ) from exc
-        if final_tree != observed_tree:
+        if final_tree != identity.checkpoint_tree_sha256:
             raise RuntimeError("hf_vision_text checkpoint changed during loading")
         identity_sha = artifact_identity_sha256(identity)
         return RuntimeExecutionContext(

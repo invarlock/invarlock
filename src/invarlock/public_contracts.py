@@ -16,8 +16,9 @@ PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
 )
 
 EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v1"
-EVIDENCE_PACK_FORMAT_VERSION = "evidence-pack-v1"
+EVIDENCE_PACK_FORMAT_VERSION = "invarlock/evidence-pack-v1"
 EVIDENCE_OBSERVATION_FORMAT_VERSION = "invarlock/evidence-observation-v1"
+TRUST_INPUTS_FORMAT_VERSION = "invarlock/trust-inputs-v1"
 RUNTIME_MANIFEST_CONTRACT_VERSION = "runtime-manifest-v1"
 RUNTIME_PROVIDER_ABI_VERSION = "1"
 RUNTIME_PROVIDER_CAPABILITIES_FORMAT_VERSION = "runtime-provider-capabilities-v1"
@@ -72,6 +73,10 @@ def load_evidence_observation_schema() -> dict[str, Any]:
     return _load_object_contract("evidence_observation.schema.json")
 
 
+def load_trust_inputs_schema() -> dict[str, Any]:
+    return _load_object_contract("trust_inputs.schema.json")
+
+
 def load_runtime_manifest_schema() -> dict[str, Any]:
     return _load_object_contract("runtime_manifest.schema.json")
 
@@ -124,9 +129,11 @@ __all__ = [
     "SCORER_EXTENSION_BINDING_FORMAT_VERSION",
     "SCORER_EXTENSION_DESCRIPTOR_FORMAT_VERSION",
     "SCORER_EXTENSION_RESULT_FORMAT_VERSION",
+    "TRUST_INPUTS_FORMAT_VERSION",
     "load_evaluation_request_schema",
     "load_evidence_pack_schema",
     "load_evidence_observation_schema",
+    "load_trust_inputs_schema",
     "load_model_artifact_identity_schema",
     "load_runtime_behavioral_schedule_schema",
     "load_runtime_manifest_schema",

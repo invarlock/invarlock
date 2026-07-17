@@ -343,6 +343,97 @@ def test_registry_is_lazy_and_replays_valid_extension_twice(
     assert [record.value for record in result.record_results] == [0.5, 1.0]
 
 
+def test_registry_qualifies_exact_binding_without_replaying_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_calls = 0
+
+    def replay(request: ScorerReplayRequest) -> ScorerExtensionResult:
+        nonlocal replay_calls
+        replay_calls += 1
+        return _valid_replay(request)
+
+    registry, entry = _install_scorer(monkeypatch, replay=replay)
+    binding = _request().binding
+
+    registry.validate_binding(
+        binding,
+        task="text_causal",
+        input_kinds=("text",),
+        output_kind="text",
+    )
+
+    assert entry.load_count == 1
+    assert replay_calls == 0
+
+
+def test_registry_binding_qualification_rejects_installed_descriptor_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = _request().binding
+    registry, _entry = _install_scorer(
+        monkeypatch,
+        descriptor=lambda: _descriptor(scorer_version="2.0.0"),
+    )
+
+    with pytest.raises(ScorerExtensionError, match="installed descriptor"):
+        registry.validate_binding(
+            binding,
+            task="text_causal",
+            input_kinds=("text",),
+            output_kind="text",
+        )
+
+
+def test_registry_binding_qualification_requires_typed_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry, _entry = _install_scorer(monkeypatch)
+
+    with pytest.raises(ScorerExtensionError, match="ScorerExtensionBinding"):
+        registry.validate_binding(
+            cast(ScorerExtensionBinding, object()),
+            task="text_causal",
+            input_kinds=("text",),
+            output_kind="text",
+        )
+
+
+@pytest.mark.parametrize(
+    ("task", "input_kinds", "output_kind", "configuration", "message"),
+    [
+        ("vision_text_generation", ("text",), "text", {"scale": 2.0}, "task"),
+        ("text_causal", ("content",), "text", {"scale": 2.0}, "input kinds"),
+        ("text_causal", ("text",), "structured", {"scale": 2.0}, "output kind"),
+        (
+            "text_causal",
+            ("text",),
+            "text",
+            {"scale": -1.0},
+            "bound schema",
+        ),
+    ],
+)
+def test_registry_binding_qualification_rejects_incompatible_request(
+    monkeypatch: pytest.MonkeyPatch,
+    task: str,
+    input_kinds: tuple[str, ...],
+    output_kind: str,
+    configuration: dict[str, object],
+    message: str,
+) -> None:
+    registry, _entry = _install_scorer(monkeypatch)
+    binding = build_scorer_binding(_descriptor(), configuration)
+
+    with pytest.raises(ScorerExtensionError, match=message):
+        registry.validate_binding(
+            binding,
+            task=task,
+            input_kinds=input_kinds,
+            output_kind=output_kind,
+        )
+
+
 def test_registry_requires_explicit_installed_plugin_authorization(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

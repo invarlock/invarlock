@@ -34,6 +34,12 @@ _VENDOR_PYTHON = Path("/opt/invarlock/bin/vendor-python")
 _REQUIRED_EXECUTABLE_OWNER = (0, 0)
 
 
+def official_tensorrt_llm_runner_path() -> Path:
+    """Return the image-owned runner path used by execution transactions."""
+
+    return Path(_OFFICIAL_RUNNER_PATH)
+
+
 class TensorRTLLMExecutionError(RuntimeError):
     """Raised when authenticated TensorRT-LLM execution cannot continue."""
 
@@ -523,6 +529,7 @@ class _RunDirectory:
     def environment(self) -> dict[str, str]:
         self.recheck()
         rendered = str(self.path)
+        numeric_uid = str(os.getuid())
         return {
             "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
             "DO_NOT_TRACK": "1",
@@ -535,15 +542,19 @@ class _RunDirectory:
             "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8",
             "LD_LIBRARY_PATH": _TENSORRT_LLM_LD_LIBRARY_PATH,
+            "LOGNAME": numeric_uid,
             "NO_COLOR": "1",
             "NO_PROXY": "*",
             "OPAL_PREFIX": _TENSORRT_LLM_OPAL_PREFIX,
             "PATH": _TENSORRT_LLM_PATH,
             "TELEMETRY_DISABLED": "1",
             "TOKENIZERS_PARALLELISM": "false",
+            "TORCHINDUCTOR_CACHE_DIR": f"{rendered}/torchinductor",
             "TRANSFORMERS_OFFLINE": "1",
+            "TRITON_CACHE_DIR": f"{rendered}/triton",
             "TRTLLM_NO_USAGE_STATS": "1",
             "TMPDIR": rendered,
+            "USER": numeric_uid,
             "XDG_CACHE_HOME": rendered,
         }
 

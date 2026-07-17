@@ -30,7 +30,7 @@ Let:
 
 | Symbol | Meaning |
 | --- | --- |
-| $E$ | Submitted `evidence-pack-v1` directory |
+| $E$ | Submitted `invarlock/evidence-pack-v1` directory |
 | $M$ | Canonical manifest in $E$ |
 | $\pi_v$ | Policy bytes independently supplied by the verifier |
 | $A_B, A_S$ | Independently supplied baseline and subject artifact-identity digests |
@@ -135,7 +135,7 @@ contract does not re-evaluate one existing pack under different policy bytes.
 
 A passing signed verification receipt establishes that:
 
-- the verifier authenticated the exact `evidence-pack-v1` manifest named by
+- the verifier authenticated the exact `invarlock/evidence-pack-v1` manifest named by
   the receipt;
 - the bundle was signed by the evidence-signing key whose fingerprint the verifier
   independently expected;

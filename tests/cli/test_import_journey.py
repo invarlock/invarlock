@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
+from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
     HFSnapshotArtifactIdentity,
     RuntimeBackendIdentity,
@@ -112,11 +113,12 @@ def _side_evidence(
     runtime_digest: str,
     policy_digest: str,
     capability_metrics: tuple[str, ...] | None = None,
+    checkpoint_digest: str = "a" * 64,
 ) -> RuntimeImportSideEvidence:
     identity = HFSnapshotArtifactIdentity(
         model_id=model_id,
         immutable_revision="b" * 40,
-        checkpoint_tree_sha256="a" * 64,
+        checkpoint_tree_sha256=checkpoint_digest,
         tokenizer_metadata_sha256="c" * 64,
     )
     capabilities = HFTransformersProvider().capabilities()
@@ -800,8 +802,10 @@ def test_evaluate_rejects_invalid_observation_before_import_replay(
     assert not (tmp_path / "artifacts/evidence").exists()
 
 
+@pytest.mark.parametrize("runtime_binding_matches", [True, False])
 def test_run_executor_converges_through_the_same_host_verifier_and_publication(
     tmp_path: Path,
+    runtime_binding_matches: bool,
 ) -> None:
     """Live side workers cannot bypass the import-grade host convergence path."""
 
@@ -850,6 +854,17 @@ def test_run_executor_converges_through_the_same_host_verifier_and_publication(
 
     worker_root = tmp_path / "worker-output"
     worker_root.mkdir()
+    checkpoint_digests: dict[str, str] = {}
+    for role in ("baseline", "subject"):
+        checkpoint = tmp_path / "models" / role
+        checkpoint.mkdir(parents=True)
+        checkpoint.joinpath("config.json").write_text(
+            json.dumps({"model_type": "gpt2", "role": role}),
+            encoding="utf-8",
+        )
+        checkpoint_digests[role] = checkpoint_tree_sha256(checkpoint).removeprefix(
+            "sha256:"
+        )
     baseline = _side_evidence(
         worker_root / "baseline",
         role="baseline",
@@ -858,6 +873,7 @@ def test_run_executor_converges_through_the_same_host_verifier_and_publication(
         records=records(("A", "B")),
         runtime_digest=runtime_digests["baseline"],
         policy_digest=policy_digest,
+        checkpoint_digest=checkpoint_digests["baseline"],
     )
     subject = _side_evidence(
         worker_root / "subject",
@@ -867,18 +883,19 @@ def test_run_executor_converges_through_the_same_host_verifier_and_publication(
         records=records(("A", "wrong")),
         runtime_digest=runtime_digests["subject"],
         policy_digest=policy_digest,
+        checkpoint_digest=checkpoint_digests["subject"],
     )
-    (tmp_path / "models/baseline").mkdir(parents=True)
-    (tmp_path / "models/subject").mkdir(parents=True)
 
     def side(role: str) -> dict[str, object]:
+        settings = _settings()
+        settings["checkpoint_tree_sha256"] = checkpoint_digests[role]
         return {
             "artifact": {
                 "path": f"models/{role}",
                 "model_id": f"org/{role}",
                 "locator": f"hf://org/{role}@{'b' * 40}",
             },
-            "runtime": {"provider": "hf_transformers", "settings": _settings()},
+            "runtime": {"provider": "hf_transformers", "settings": settings},
         }
 
     request = {
@@ -909,6 +926,8 @@ def test_run_executor_converges_through_the_same_host_verifier_and_publication(
     class Executor:
         def execute(self, _request, *, registry, schedule_bytes, policy_digest):
             del registry
+            assert (tmp_path / "artifacts").is_dir()
+            assert not (tmp_path / "artifacts/evidence").exists()
             assert schedule_bytes == canonical_runtime_behavioral_schedule_json(
                 schedule
             )
@@ -921,13 +940,42 @@ def test_run_executor_converges_through_the_same_host_verifier_and_publication(
             )
 
     evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+    expected_runtime_digests = (
+        runtime_digests
+        if runtime_binding_matches
+        else {
+            "baseline": "sha256:" + "8" * 64,
+            "subject": "sha256:" + "9" * 64,
+        }
+    )
+    if not runtime_binding_matches:
+        with pytest.raises(
+            EvaluationTransactionError,
+            match="validated runtime digest does not match preflight",
+        ):
+            evaluate_request_file(
+                request_path,
+                signing_key_path=evidence_key,
+                runtime_executor=Executor(),  # type: ignore[arg-type]
+                runtime_image_digests=expected_runtime_digests,
+            )
+        assert not (tmp_path / "artifacts/evidence").exists()
+        return
+
     result = evaluate_request_file(
         request_path,
         signing_key_path=evidence_key,
         runtime_executor=Executor(),  # type: ignore[arg-type]
+        runtime_image_digests=expected_runtime_digests,
     )
 
     assert result.evidence_path == (tmp_path / "artifacts/evidence").resolve()
+    assert result.pack_manifest_digest == (
+        "sha256:"
+        + hashlib.sha256(
+            result.evidence_path.joinpath("manifest.json").read_bytes()
+        ).hexdigest()
+    )
     assert (
         result.evidence_path / "providers/baseline/runtime-provider.receipt.json"
     ).is_file()

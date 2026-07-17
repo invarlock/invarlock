@@ -173,6 +173,13 @@ content-safe identifier, media type, byte length, and digest. `input_sha256` is
 derived from the entire ordered part list, so changing a prompt, reordering
 parts, or changing a content binding changes the schedule identity.
 
+The schedule authenticates the declaration, not the host object by itself. In
+run mode, preflight resolves the caller-authorized provider store and proves
+that each selected content ID currently names matching bytes and valid media.
+The worker repeats that validation from the exact parsed schedule before model
+preparation, and the scorer reopens the object before use. No host path or store
+authority enters the portable schedule.
+
 ### Comparison sides
 
 Each side has the same shape:
@@ -371,6 +378,9 @@ CLI options or environment variables provide:
 | Baseline image override | `--baseline-runtime-image`, `--baseline-runtime-image-digest` |
 | Subject image override | `--subject-runtime-image`, `--subject-runtime-image-digest` |
 | OCI engine | `--container-engine` (`docker` or `podman`) |
+| Per-worker CPU ceiling | `--runtime-cpus` (default `4`) |
+| Per-worker memory ceiling | `--runtime-memory-mib` (default `65536`) |
+| Non-root worker identity | `--runtime-user` (default `65532:65532`) |
 | Shared device | `--runtime-device` (`cpu`, `cuda`, or `cuda:<index>`) |
 | Per-side override | `--baseline-runtime-device`, `--subject-runtime-device` |
 | Shared or per-side worker profile | `--runtime-entrypoint`, `--baseline-runtime-entrypoint`, `--subject-runtime-entrypoint` |
@@ -378,7 +388,9 @@ CLI options or environment variables provide:
 The host authenticates the source and prepares the canonical schedule before
 launching one constrained worker per side. The launcher uses `--pull=never`,
 disables container networking, drops capabilities, and sets a read-only
-container root. Each worker receives only its own artifact and support
+container root. It also applies caller-owned CPU and memory ceilings, a numeric
+non-root identity, and a finite deadline derived from the provider timeout and
+authenticated schedule length. Each worker receives only its own artifact and support
 resources read-only plus an isolated writable output directory. The host
 validates both outputs, publishes `output.evidence`, and signs it; the signing
 key is never mounted into either worker.
@@ -388,9 +400,9 @@ allow different digest-pinned images or devices. Workers that share a generic
 or identical CUDA selector run sequentially; workers assigned explicitly
 different CUDA indexes can run in parallel.
 
-The request cannot enable network or remote code. Runtime-image identity and
-device selection remain caller-controlled so submitted YAML cannot grant itself
-host capabilities.
+The request cannot enable network or remote code. Runtime-image identity,
+device selection, resource ceilings, and worker identity remain
+caller-controlled so submitted YAML cannot grant itself host capabilities.
 
 ## Import mode
 

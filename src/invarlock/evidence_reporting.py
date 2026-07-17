@@ -60,6 +60,7 @@ class EvidenceReport:
     text: str
     html_path: Path | None
     evidence_signer: str
+    pack_manifest_digest: str
     observations: tuple[dict[str, Any], ...] = ()
 
 
@@ -1080,6 +1081,15 @@ def render_evidence(
     evidence = Path(evidence_path)
     if not evidence.is_dir() or evidence.is_symlink():
         raise EvidenceReportError("evidence must be a real directory")
+    if html_path is not None:
+        try:
+            Path(html_path).absolute().resolve().relative_to(evidence.resolve())
+        except ValueError:
+            pass
+        else:
+            raise EvidenceReportError(
+                "HTML destination must remain outside the immutable evidence pack"
+            )
     snapshot, capture_errors = PackSnapshot.capture(
         evidence, validate_structural_json=False
     )
@@ -1114,6 +1124,9 @@ def render_evidence(
     stability_errors = [*materialized_errors, *snapshot.stability_errors()]
     if stability_errors:
         raise EvidenceReportError("; ".join(stability_errors))
+    manifest_entry = snapshot.files.entry("manifest.json")
+    if manifest_entry is None:  # pragma: no cover - capture contract owns inventory
+        raise EvidenceReportError("evidence manifest snapshot is unavailable")
     output = (
         _write_html_no_clobber(html_path, rendered_html)
         if html_path is not None and rendered_html is not None
@@ -1123,6 +1136,7 @@ def render_evidence(
         text=text,
         html_path=output,
         evidence_signer=evidence_signer,
+        pack_manifest_digest="sha256:" + manifest_entry.sha256,
         observations=tuple(observations),
     )
 

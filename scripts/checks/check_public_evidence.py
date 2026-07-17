@@ -158,6 +158,7 @@ def _check_signed_receipt(
     if not isinstance(verifier, dict) or set(verifier) != {
         "identity",
         "signing_key_fingerprint",
+        "trust_profile_digest",
     }:
         errors.append(f"{receipt}: signed receipt verifier fields are invalid")
         recorded_fingerprint = None
@@ -168,6 +169,9 @@ def _check_signed_receipt(
         recorded_fingerprint = verifier.get("signing_key_fingerprint")
         if not _valid_digest(recorded_fingerprint):
             errors.append(f"{receipt}: signed receipt verifier fingerprint is invalid")
+        profile_digest = verifier.get("trust_profile_digest")
+        if profile_digest is not None and not _valid_digest(profile_digest):
+            errors.append(f"{receipt}: signed receipt trust profile digest is invalid")
 
     verdict = statement.get("verdict")
     if not isinstance(verdict, dict) or set(verdict) != {
@@ -384,8 +388,10 @@ def _check_local_entry(errors: list[str], entry_root: Path) -> None:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         errors.append(str(exc))
         return
-    if manifest.get("format") != "evidence-pack-v1":
-        errors.append(f"{pack}: only the canonical evidence-pack-v1 is publishable")
+    if manifest.get("format") != "invarlock/evidence-pack-v1":
+        errors.append(
+            f"{pack}: only the canonical invarlock/evidence-pack-v1 is publishable"
+        )
     _check_signed_receipt(
         errors,
         receipt=receipt,

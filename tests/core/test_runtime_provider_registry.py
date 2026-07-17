@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from importlib.metadata import EntryPoint
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -21,7 +22,7 @@ def test_builtin_runtime_provider_catalog_declares_only_canonical_hf() -> None:
             "HFTransformersProvider",
         ),
     ]
-    assert [spec.required_deps for spec in specs] == [("torch", "transformers")]
+    assert [spec.required_deps for spec in specs] == [()]
 
 
 def test_registry_lists_builtin_runtime_provider_without_importing_backend(
@@ -49,7 +50,7 @@ def test_registry_lists_builtin_runtime_provider_without_importing_backend(
         "name": "hf_transformers",
         "module": "invarlock.runtime_providers.hf_transformers",
         "class_name": "HFTransformersProvider",
-        "required_deps": ("torch", "transformers"),
+        "required_deps": (),
         "available": True,
         "package": "invarlock",
         "version": registry_mod.INVARLOCK_VERSION,
@@ -65,6 +66,28 @@ def test_registry_loads_hf_reference_provider_only_on_request() -> None:
 
     assert provider.name == "hf_transformers"
     assert provider.abi_version == "1"
+
+
+def test_base_install_keeps_hf_import_identity_available_without_backend_packages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_find_spec = registry_mod.importlib.util.find_spec
+
+    def without_execution_backends(name: str, *args, **kwargs):
+        if name in {"torch", "transformers"}:
+            return None
+        return real_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(
+        registry_mod.importlib.util, "find_spec", without_execution_backends
+    )
+    registry = registry_mod.CoreRegistry()
+
+    assert (
+        registry.get_plugin_info("hf_transformers", "runtime_providers")["available"]
+        is True
+    )
+    assert registry.get_runtime_provider("hf_transformers").name == "hf_transformers"
 
 
 def test_runtime_provider_entry_point_discovery_is_lazy(
@@ -152,6 +175,47 @@ def test_exact_first_party_addins_are_discovered_without_third_party_opt_in(
         assert info["entry_point"] == name
 
 
+def test_qualification_ignores_stale_first_party_addin_entry_points(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate_site = tmp_path / "candidate-site"
+    stale_site = tmp_path / "stale-site"
+    candidate_site.mkdir()
+    stale_site.mkdir()
+
+    class LocatedDist(DistStub):
+        def __init__(self, location: Path) -> None:
+            super().__init__("invarlock-runtime-gguf", registry_mod.INVARLOCK_VERSION)
+            self.location = location
+
+        def locate_file(self, path: str) -> Path:
+            return self.location / path
+
+    stale = EntryPointStub(
+        name="llama_cpp",
+        value="invarlock_addins.gguf.provider:LlamaCppProvider",
+        dist=LocatedDist(stale_site),
+    )
+    candidate = EntryPointStub(
+        name="llama_cpp",
+        value="invarlock_addins.gguf.provider:LlamaCppProvider",
+        dist=LocatedDist(candidate_site),
+    )
+    monkeypatch.setenv("INVARLOCK_QUALIFICATION_CANDIDATE_SITE", str(candidate_site))
+    monkeypatch.setattr(registry_mod, "third_party_plugins_allowed", lambda: False)
+    monkeypatch.setattr(
+        registry_mod,
+        "entry_points",
+        lambda: SelectEntryPoints(runtime_providers=[stale, candidate]),
+    )
+
+    registry = registry_mod.CoreRegistry()
+
+    assert registry.list_runtime_providers() == ["hf_transformers", "llama_cpp"]
+    assert registry._runtime_providers["llama_cpp"].entry_point is candidate
+
+
 @pytest.mark.parametrize(
     ("name", "distribution", "value"),
     [
@@ -209,6 +273,25 @@ def test_reserved_first_party_addin_names_reject_distribution_or_value_spoofs(
         registry_mod.CoreRegistry().list_runtime_providers()
 
 
+def test_first_party_addin_version_must_match_core(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry_point = EntryPointStub(
+        name="llama_cpp",
+        value="invarlock_addins.gguf.provider:LlamaCppProvider",
+        dist=DistStub("invarlock-runtime-gguf", "0.0.0"),
+    )
+    monkeypatch.setattr(registry_mod, "third_party_plugins_allowed", lambda: False)
+    monkeypatch.setattr(
+        registry_mod,
+        "entry_points",
+        lambda: SelectEntryPoints(runtime_providers=[entry_point]),
+    )
+
+    with pytest.raises(RuntimeError, match="at version"):
+        registry_mod.CoreRegistry().list_runtime_providers()
+
+
 def test_runtime_provider_entry_point_name_must_match_public_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -257,6 +340,9 @@ def test_runtime_provider_loading_requires_separate_exact_abi_and_identity(
             return None
 
         def identify_artifact(self, spec):  # noqa: ANN001
+            return None
+
+        def authenticate_artifact(self, spec, artifact_path):  # noqa: ANN001
             return None
 
         def prepare_execution(self, spec, resources):  # noqa: ANN001

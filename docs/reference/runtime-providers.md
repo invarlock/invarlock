@@ -20,6 +20,10 @@ A provider implements `RuntimeProvider` with an exact `name` and
 def validate_config(spec: ModelRuntimeSpec) -> None: ...
 def capabilities() -> RuntimeProviderCapabilities: ...
 def identify_artifact(spec: ModelRuntimeSpec) -> ModelArtifactIdentity: ...
+def authenticate_artifact(
+    spec: ModelRuntimeSpec,
+    artifact_path: Path,
+) -> ModelArtifactIdentity: ...
 def prepare_execution(
     spec: ModelRuntimeSpec,
     resources: RuntimeArtifactResources,
@@ -36,6 +40,7 @@ inspection remain usable without loading a model runtime.
 | `validate_config` | Closed `ModelRuntimeSpec` | Reject unknown, missing, malformed, or inconsistent settings |
 | `capabilities` | None | Return closed artifact, task, metric, and execution-mode declarations |
 | `identify_artifact` | Validated spec | Return a typed portable identity reproducible from authenticated inputs |
+| `authenticate_artifact` | Validated spec and local artifact path | Read the local bytes without loading the backend, require their canonical identity to equal the spec, and return that identity |
 | `prepare_execution` | Spec and caller-owned resources | Authenticate local resources and return an immutable execution context |
 | `open` | Spec and context | Open one session without changing the authenticated identity |
 | `session.score` | Ordered `EvaluationBatch` | Return one ordered `ScoringObservation` for that batch |
@@ -233,6 +238,14 @@ device only exposes hardware; the image must already contain a CUDA-capable
 runtime. See [Environment variables](environment.md#canonical-hugging-face-runtime-images)
 for the separate canonical CPU and x86_64 CUDA image targets.
 
+The host applies the same caller-owned `OciWorkerLimits` to each side: a
+positive CPU decimal, an integer MiB memory ceiling, and a numeric non-root
+`UID:GID`. Defaults are four CPUs, 65536 MiB, and `65532:65532`. The submitted
+request cannot alter them. A worker also receives a finite outer deadline
+derived from its validated per-record `timeout_seconds` and the authenticated
+schedule length, capped at 24 hours; expiry stops or kills the exact container
+before the side fails closed.
+
 ## Discovery and authorization
 
 Providers register in the `invarlock.runtime_providers` entry-point group. The
@@ -248,6 +261,12 @@ For example:
 example_runtime = "example_invarlock.provider:ExampleProvider"
 ```
 
+Entry-point metadata belongs to an installed distribution. Making a source
+tree importable with `PYTHONPATH` does not register a provider and cannot
+satisfy this authorization boundary. The interpreter that performs provider
+discovery must contain the matching-version core distribution and the exact
+add-in wheel selected for the transaction.
+
 The core provider and three named first-party add-ins are recognized without
 enabling arbitrary plugins. Other installed entry points are ignored unless
 `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` is explicitly enabled. Strict evidence
@@ -256,25 +275,30 @@ arbitrary plugins is not compatible with the strict evidence path.
 
 ## First-party add-ins
 
-Install and check GGUF discovery:
+Install the exact GGUF wheel into the qualification host interpreter and check
+discovery through that interpreter:
 
 ```bash
-python -m pip install invarlock-runtime-gguf
-invarlock-gguf-conformance
+"$PYTHON" -m pip install /wheelhouse/invarlock_runtime_gguf-EXACT.whl
+"$PYTHON" -m invarlock_addins.gguf.conformance
 ```
 
-Install and check TensorRT-LLM discovery:
+Install and check the exact TensorRT-LLM wheel the same way:
 
 ```bash
-python -m pip install invarlock-runtime-tensorrt-llm
-invarlock-tensorrt-llm-conformance
+"$PYTHON" -m pip install /wheelhouse/invarlock_runtime_tensorrt_llm-EXACT.whl
+"$PYTHON" -m invarlock_addins.tensorrt_llm.conformance
 ```
 
-Install and check Hugging Face vision-text discovery:
+Install and check the exact Hugging Face vision-text base wheel. Its declared
+Pillow dependency supports host preflight; the inference stack remains in the
+runtime image:
 
 ```bash
-python -m pip install 'invarlock-runtime-hf-vision-text[runtime]'
-invarlock-hf-vision-text-conformance
+"$PYTHON" -m pip install \
+  /wheelhouse/Pillow-EXACT.whl \
+  /wheelhouse/invarlock_runtime_hf_vision_text-EXACT.whl
+"$PYTHON" -m invarlock_addins.multimodal.conformance
 ```
 
 Each command returns a JSON object whose `ok` value must be true and whose
@@ -303,14 +327,115 @@ It does not prove that a model artifact loads, that native binaries match an
 image, or that a representative score succeeds. Follow it with a digest-pinned
 runtime canary for the exact artifact/backend/device combination.
 
+### Candidate wheel manifest
+
+Maintained qualification executes caller-selected wheel artifacts, not an
+arbitrary first-party installation already visible to the host interpreter.
+Build the coordinated distributions, then use the maintained helper to create
+one no-clobber manifest. For example, a GGUF transaction authenticates the core
+and GGUF wheels together:
+
+```bash
+make dist-check
+install -d -m 700 qualification
+python scripts/qualification_candidate_wheels.py \
+  --wheel dist/invarlock-*.whl \
+  --wheel dist/addins/invarlock_runtime_gguf-*.whl \
+  --output "$PWD/qualification/gguf-candidate-wheels.json"
+export CANDIDATE_WHEEL_MANIFEST="$PWD/qualification/gguf-candidate-wheels.json"
+```
+
+The helper accepts one `--wheel` per artifact, resolves only real `.whl` files,
+captures their SHA-256 digests, and creates a new
+`invarlock/qualification-candidate-wheels-v1` document with restrictive file
+permissions. The driver then requires the manifest to contain the core wheel
+and every maintained add-in used by the request, with unique distributions, a
+single version, and contents matching the authenticated source archive. A
+built-in Hugging Face transaction needs only the core wheel; GGUF,
+TensorRT-LLM, and vision-text transactions also need their selected add-in
+wheel. Recreate the manifest whenever any wheel changes, and pass the same
+`CANDIDATE_WHEEL_MANIFEST` to canary, readiness, and evidence qualification.
+
+`PYTHON` owns the third-party dependency environment used by qualification.
+It must provide the dependencies declared by the candidate wheels, such as
+cryptography and JSON Schema support from the core or Pillow for vision-text
+host preflight. It does not select the first-party candidate. The driver
+extracts the authenticated wheels into a private site, places that site before
+the interpreter's dependency paths, and probes the expected distribution and
+provider entry-point metadata before running the public transaction. An older
+installed InvarLock or maintained add-in therefore cannot substitute for a
+manifest wheel. Model-runtime dependencies such as Torch, Transformers, or
+TensorRT-LLM remain inside the digest-pinned runtime image.
+
 The GGUF package documents a tiny `evaluate -> verify` canary using a real GGUF
 artifact and `llama.cpp`. The Hugging Face vision-text package documents a
 prompt-and-image `evaluate -> verify -> report` qualification using a local
-checkpoint and authenticated content store. The TensorRT-LLM package ships
+checkpoint and authenticated content store. Its host preflight uses the same
+frozen caller-owned side resources as execution and authenticates every
+schedule-selected media object before any worker or GPU starts; workers repeat
+the check before model preparation. The TensorRT-LLM package ships
 `python -m invarlock_addins.tensorrt_llm.canary`, which checks the authenticated
 engine bundle, exact runner protocol, selected GPU, image digest, and one
-representative request. Run either only inside the intended digest-pinned
-runtime; neither command supplies or qualifies a production model fixture.
+representative request. Run each qualification only inside its intended
+digest-pinned runtime. None of these commands supplies or qualifies a
+production model fixture.
+
+Maintained qualification adds a signed image prerequisite around those
+provider checks. Run `runtime-qualification-canary` at the repository root, or
+the provider's `qualify-canary` target, once for a small representative request
+through one exact image digest. Retain its evidence, signed verification
+receipt, and verifier-owned trust profile. Subsequent readiness and evidence
+targets require those paths as `CANARY_EVIDENCE`, `CANARY_RECEIPT`, and
+`CANARY_TRUST_PROFILE`; they strictly reverify the canary and require its
+runtime-image digest to equal the image being qualified. The retained canary
+may be reused while that exact digest remains unchanged.
+
+This signed canary is a real end-to-end transaction. By contrast, readiness is
+execution-free and starts no model worker. The sequence prevents many jobs
+from being launched through an image that cannot complete one representative
+strict transaction. It does not prove that another model loads, fits device
+memory, satisfies backend-specific compatibility, or completes its own run.
+
+The maintained qualification targets delegate to one repository driver rather
+than assembling separate shell transactions. The driver authenticates the Git
+source archive against the execution files in the named local Git commit,
+requires matching source labels on the runtime
+image, executes every child from a private archive-backed source snapshot and
+empty working directory, matches the caller-digested candidate wheels to that
+source, and executes their core and maintained add-in code through an isolated
+interpreter bootstrap. The qualification summary binds the candidate manifest,
+candidate wheel digests, and selected interpreter digest in addition to the
+normalized request digest returned by preflight.
+
+Qualification assumes a controlled host: the selected Python dependency
+closure, container daemon, kernel, driver, and device stack remain trusted
+computing base. Release qualification therefore uses a fresh hash-locked Linux
+environment, the real container journey, and a signed canary for each claimed
+provider/task class. Stronger host claims require an independent rerun or
+measured-execution attestation.
+
+Completion also requires strict pack verification plus an independent check of
+the signed receipt and the renderer-observed pack identity. Readiness mode
+performs the same source, image, request, trust, output, provider, and
+runtime-availability checks without starting a model worker, after reverifying
+the required signed canary. Create the exact archive with
+`scripts/qualification_source.py create`; maintained image builds reject absent
+or malformed source bindings before invoking Docker or Podman.
+
+For these targets, `QUALIFICATION_DRIVER_PYTHON` launches the standard-library
+driver while `PYTHON` supplies the dependency paths used by provider discovery,
+preflight, and the public CLI children. First-party distribution and
+entry-point metadata come from `CANDIDATE_WHEEL_MANIFEST`, not from
+`PYTHONPATH` or an installed core/add-in package. The vision-text host
+environment additionally needs Pillow; its Torch and Transformers inference
+dependencies remain in the runtime image.
+
+The root and first-party add-in wrappers forward one shared resource-control
+surface: `QUALIFICATION_DEVICE`, `QUALIFICATION_CPUS`,
+`QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER`. The root wrapper requires
+an explicit device; add-in wrappers use provider-appropriate defaults when it
+is omitted. Keep the resolved image and digest plus all supplied resource
+controls identical across signed canary, readiness, and evidence.
 
 The TensorRT-LLM runner protocol accepts one canonical JSON request on standard
 input and returns one canonical JSON response on standard output. Inspection
@@ -342,6 +467,9 @@ class ExampleProvider:
     def identify_artifact(self, spec):
         ...
 
+    def authenticate_artifact(self, spec, artifact_path):
+        ...
+
     def prepare_execution(self, spec, resources):
         ...
 
@@ -352,9 +480,10 @@ class ExampleProvider:
 Use the exported typed value classes rather than free-form dictionaries. Core
 does not ship a generic third-party conformance executable: an author owns the
 provider test harness and can use the first-party add-in suites as examples.
-Tests should cover unknown settings, each identity mismatch, no-follow resource access,
-record order and failure shapes, receipt-to-observation binding, deterministic
-canonical bytes, session cleanup, and discovery without importing the backend.
+Tests should cover unknown settings, byte-authentication and each identity mismatch,
+no-follow resource access, record order and failure shapes, receipt-to-observation
+binding, deterministic canonical bytes, session cleanup, and discovery without
+importing the backend.
 
 A non-first-party provider can be discovered only when
 `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` is enabled. Strict evidence execution

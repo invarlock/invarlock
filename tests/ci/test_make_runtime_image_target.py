@@ -22,9 +22,13 @@ def test_make_exposes_the_canonical_cpu_runtime_image_build() -> None:
 
     assert 'test -n "$(CONTAINER_ENGINE)"' in block
     assert 'test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
-    assert "$(CONTAINER_ENGINE) build" in block
-    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
-    assert "-f runtime/Dockerfile -t $(RUNTIME_IMAGE) ." in block
+    assert "scripts/authenticated_runtime_build.py" in block
+    assert '--source-bundle "$(RUNTIME_SOURCE_BUNDLE)"' in block
+    assert "--dockerfile runtime/Dockerfile" in block
+    assert '--image "$(RUNTIME_IMAGE)"' in block
+    assert '--build-arg "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
+    assert '--statement "$(RUNTIME_BUILD_STATEMENT)"' in block
+    assert "$(CONTAINER_ENGINE) build" not in block
     assert "runtime-image-quant" not in data
 
 
@@ -34,10 +38,14 @@ def test_make_exposes_a_separate_minimal_cuda_runtime_image_build() -> None:
 
     assert 'test -n "$(CONTAINER_ENGINE)"' in block
     assert 'test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
-    assert "$(CONTAINER_ENGINE) build" in block
+    assert "scripts/authenticated_runtime_build.py" in block
+    assert '--source-bundle "$(RUNTIME_SOURCE_BUNDLE)"' in block
     assert "--platform linux/amd64" in block
-    assert "--build-arg SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" in block
-    assert "-f runtime/Dockerfile.cuda -t $(RUNTIME_IMAGE_CUDA) ." in block
+    assert '--build-arg "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
+    assert '--statement "$(RUNTIME_BUILD_STATEMENT)"' in block
+    assert "--dockerfile runtime/Dockerfile.cuda" in block
+    assert '--image "$(RUNTIME_IMAGE_CUDA)"' in block
+    assert "$(CONTAINER_ENGINE) build" not in block
     assert "runtime-image-cuda-quant" not in data
 
 
@@ -46,6 +54,11 @@ def test_make_runtime_smoke_uses_the_built_image_offline() -> None:
     block = _target_block(data, "runtime-smoke")
 
     assert "$(CONTAINER_ENGINE) run --rm --network none" in block
+    assert "--pull=never --read-only --cap-drop=ALL" in block
+    assert "--security-opt no-new-privileges --pids-limit 1024" in block
+    assert "--user 65532:65532" in block
+    assert '--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g"' in block
+    assert "--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1" in block
     assert "--entrypoint python $(RUNTIME_IMAGE)" in block
     assert "import torch, transformers, safetensors" in block
 

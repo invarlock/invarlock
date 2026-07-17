@@ -6,6 +6,21 @@ from pathlib import Path
 ROOT = Path.cwd()
 
 
+def test_every_maintained_runtime_image_rejects_unbound_source_identity() -> None:
+    for relative in (
+        "runtime/Dockerfile",
+        "runtime/Dockerfile.cuda",
+        "addins/gguf/runtime/Dockerfile",
+        "addins/multimodal/runtime/Dockerfile",
+        "addins/tensorrt_llm/runtime/Dockerfile",
+    ):
+        text = ROOT.joinpath(relative).read_text(encoding="utf-8")
+        assert "INVARLOCK_SOURCE_BUNDLE_SHA256=unbound" not in text
+        assert "INVARLOCK_SOURCE_COMMIT=unbound" not in text
+        assert "invalid INVARLOCK_SOURCE_COMMIT" in text
+        assert "invalid INVARLOCK_SOURCE_BUNDLE_SHA256" in text
+
+
 def test_runtime_dockerfile_builds_and_installs_one_final_wheel() -> None:
     text = ROOT.joinpath("runtime", "Dockerfile").read_text(encoding="utf-8")
 
@@ -18,6 +33,10 @@ def test_runtime_dockerfile_builds_and_installs_one_final_wheel() -> None:
     assert 'ENTRYPOINT ["python", "-m", "invarlock"]' in text
     assert "pip install --no-deps -e" not in text
     assert "PYTHONPATH=/" not in text
+    assert 'org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"' in text
+    assert (
+        'dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}"' in text
+    )
 
 
 def test_runtime_dockerfile_has_one_hf_runtime_dependency_surface() -> None:
@@ -128,6 +147,10 @@ def test_cuda_runtime_is_a_separate_minimal_hf_image() -> None:
     assert "runtime-image-quant" not in text
     assert "bitsandbytes" not in text
     assert "gptq" not in text.lower()
+    assert 'org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"' in text
+    assert (
+        'dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}"' in text
+    )
 
 
 def test_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
@@ -174,7 +197,10 @@ def test_make_exposes_separate_cuda_build_and_gpu_smoke_targets() -> None:
 
     assert "RUNTIME_IMAGE_CUDA ?= invarlock-runtime:hf-cuda-local" in text
     assert "runtime-image-cuda:" in text
-    assert "-f runtime/Dockerfile.cuda -t $(RUNTIME_IMAGE_CUDA)" in text
+    assert "scripts/authenticated_runtime_build.py" in text
+    assert "--dockerfile runtime/Dockerfile.cuda" in text
+    assert '--image "$(RUNTIME_IMAGE_CUDA)"' in text
+    assert '--source-bundle "$(RUNTIME_SOURCE_BUNDLE)"' in text
     assert "--platform linux/amd64" in text
     assert "runtime-smoke-cuda:" in text
     assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in text

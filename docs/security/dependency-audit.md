@@ -57,6 +57,8 @@ Each entry must answer:
 | Field | Review question |
 | --- | --- |
 | Advisory/package identity | Which exact finding is being excepted? |
+| Affected version | Which exact locked version is covered? |
+| Allowed sources | Which exact repository lock files may use the exception? |
 | Rationale | Why is the vulnerable path not currently release-blocking? |
 | Compensating control | What concrete boundary reduces exposure? |
 | Owner | Who is accountable for removal or renewal? |

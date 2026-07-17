@@ -48,7 +48,7 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, dict[str, str], str]:
     pack = tmp_path / "evidence"
     pack.mkdir()
     (pack / "manifest.json").write_text(
-        '{"format":"evidence-pack-v1"}\n', encoding="utf-8"
+        '{"format":"invarlock/evidence-pack-v1"}\n', encoding="utf-8"
     )
     policy = tmp_path / "policy.json"
     policy.write_text('{"policy":"test"}\n', encoding="utf-8")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +25,12 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
         '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
     ) in text
     assert text.count("--torch-backend cpu") == 2
-    assert text.count("--torch-backend cu128") == 1
+    assert text.count("--torch-backend cu128") == 2
+    assert (
+        '"${WORKFLOW_DIR}/multimodal-runtime.in" \\\n'
+        '    "${WORKFLOW_DIR}/multimodal-runtime-py312.txt"'
+    ) in text
+    assert "--no-deps" in text
 
 
 def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
@@ -71,6 +77,38 @@ def test_runtime_wheel_build_lock_is_retained() -> None:
 
     assert lock.is_file()
     assert "--hash=sha256:" in lock.read_text(encoding="utf-8")
+
+
+def test_multimodal_runtime_lock_pins_cuda_matched_torchvision() -> None:
+    text = (WORKFLOW_REQUIREMENTS / "multimodal-runtime-py312.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "torchvision==0.26.0+cu128" in text
+    assert "pillow==12.3.0" in text
+    assert "torch==" not in text
+    assert "--hash=sha256:" in text
+
+
+def test_declared_typer_floor_matches_the_maintained_runtime_version() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    dependencies = project["dependencies"]
+    assert isinstance(dependencies, list)
+    typer_requirement = next(
+        dependency for dependency in dependencies if dependency.startswith("typer")
+    )
+    runtime_input = (WORKFLOW_REQUIREMENTS / "runtime-image.in").read_text(
+        encoding="utf-8"
+    )
+    locked_typer = next(
+        line.removeprefix("typer==")
+        for line in runtime_input.splitlines()
+        if line.startswith("typer==")
+    )
+
+    assert typer_requirement == f"typer>={locked_typer}"
 
 
 def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:

@@ -507,6 +507,53 @@ def probe_llama_cpp_version(
     return _normalize_version_output(stdout, stderr)
 
 
+def _close_backend_resources(
+    resources: Sequence[_PinnedFile | _RunDirectory],
+    *,
+    operation: str,
+) -> None:
+    cleanup_errors: list[Exception] = []
+    for resource in reversed(resources):
+        try:
+            resource.close()
+        except Exception as exc:  # cleanup must continue across resources
+            cleanup_errors.append(exc)
+    if cleanup_errors:
+        raise LlamaCppExecutionError(
+            f"llama.cpp {operation} cleanup did not complete"
+        ) from cleanup_errors[0]
+
+
+def authenticate_llama_cpp_backend_files(
+    bindings: LlamaCppRuntimeBindings,
+    *,
+    expected_binary_sha256: str,
+    expected_source_sha256: str,
+) -> None:
+    """Authenticate backend bytes without starting the native executable."""
+
+    if not isinstance(bindings, LlamaCppRuntimeBindings):
+        raise ValueError("llama_cpp authentication requires native runtime bindings")
+    resources: list[_PinnedFile | _RunDirectory] = []
+    try:
+        executable = _PinnedFile.open(
+            bindings.executable_path,
+            expected_sha256=expected_binary_sha256,
+            require_executable=True,
+        )
+        resources.append(executable)
+        source = _PinnedFile.open(
+            bindings.source_archive_path,
+            expected_sha256=expected_source_sha256,
+            require_executable=False,
+        )
+        resources.append(source)
+        executable.recheck()
+        source.recheck()
+    finally:
+        _close_backend_resources(resources, operation="backend authentication")
+
+
 def inspect_llama_cpp_backend(
     bindings: LlamaCppRuntimeBindings,
 ) -> LlamaCppBackendInspection:
@@ -539,16 +586,7 @@ def inspect_llama_cpp_backend(
             version=version,
         )
     finally:
-        cleanup_errors: list[Exception] = []
-        for resource in reversed(resources):
-            try:
-                resource.close()
-            except Exception as exc:  # cleanup must continue across resources
-                cleanup_errors.append(exc)
-        if cleanup_errors:
-            raise LlamaCppExecutionError(
-                "llama.cpp inspection cleanup did not complete"
-            ) from cleanup_errors[0]
+        _close_backend_resources(resources, operation="inspection")
 
 
 def _records_sha256(records: tuple[RuntimeScoringRecord, ...]) -> str:
@@ -854,6 +892,7 @@ class LlamaCppSession:
 
 
 __all__ = [
+    "authenticate_llama_cpp_backend_files",
     "inspect_llama_cpp_backend",
     "LlamaCppBackendInspection",
     "LlamaCppExecutionError",

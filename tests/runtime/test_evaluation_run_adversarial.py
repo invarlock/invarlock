@@ -18,11 +18,35 @@ from invarlock.core.evaluation_request import (
     RuntimeRequest,
 )
 from invarlock.core.registry import CoreRegistry
-from invarlock.core.runtime_provider import RuntimeProvider
+from invarlock.core.runtime_provider import (
+    RuntimeProvider,
+    build_runtime_behavioral_schedule_from_material,
+    canonical_runtime_behavioral_schedule_json,
+)
 from invarlock.evaluation_runtime import RuntimeResourceResolver
 
 _BASELINE_DIGEST = "sha256:" + "a" * 64
 _SUBJECT_DIGEST = "sha256:" + "b" * 64
+
+
+def _schedule_bytes() -> bytes:
+    schedule = build_runtime_behavioral_schedule_from_material(
+        dataset_identity={
+            "provider": "local",
+            "dataset_name": None,
+            "config_name": None,
+            "revision": None,
+            "split": "qualification",
+        },
+        records=[
+            {
+                "record_id": "record/1",
+                "input_text": "Return A",
+                "expected_output": "A",
+            }
+        ],
+    )
+    return canonical_runtime_behavioral_schedule_json(schedule)
 
 
 def _request(root: Path) -> EvaluationRequest:
@@ -149,14 +173,14 @@ def test_execute_runtime_comparison_binds_both_sides_and_copies_exact_bytes(
         _request(tmp_path),
         registry=cast(CoreRegistry, registry),
         resource_resolver=cast(RuntimeResourceResolver, resolver),
-        schedule_bytes=b'{"format":"schedule"}\n',
+        schedule_bytes=_schedule_bytes(),
         policy_digest="sha256:" + "c" * 64,
     )
 
     assert registry.lookups == ["hf_transformers", "hf_transformers"]
     assert resolver.roles == ["baseline", "subject"]
     assert [call["role"] for call in calls] == ["baseline", "subject"]
-    assert all(call["schedule_bytes"] == b'{"format":"schedule"}\n' for call in calls)
+    assert all(call["schedule_bytes"] == _schedule_bytes() for call in calls)
     assert result.baseline.run_report == b"baseline-report"
     assert result.baseline.runtime_manifest == b"baseline-manifest"
     assert result.baseline.provider_receipt == b"baseline-receipt"
@@ -187,8 +211,53 @@ def test_execute_runtime_comparison_rejects_receipt_without_outer_image_digest(
             _request(tmp_path),
             registry=cast(CoreRegistry, _Registry(provider)),
             resource_resolver=cast(RuntimeResourceResolver, _Resolver()),
-            schedule_bytes=b"{}\n",
+            schedule_bytes=_schedule_bytes(),
             policy_digest="sha256:" + "c" * 64,
         )
 
     assert [call["role"] for call in calls] == ["baseline", "subject"]
+
+
+def test_input_preflight_rejects_before_in_process_model_preparation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RejectingProvider(_Provider):
+        def validate_evaluation_inputs(
+            self, _spec: object, _resources: object, _schedule: object
+        ) -> None:
+            raise ValueError("authenticated content is unavailable")
+
+        def prepare_execution(self, spec: object, resources: object) -> object:
+            pytest.fail("model preparation must not run after input-preflight failure")
+
+    schedule = build_runtime_behavioral_schedule_from_material(
+        dataset_identity={
+            "provider": "local",
+            "dataset_name": None,
+            "config_name": None,
+            "revision": None,
+            "split": "qualification",
+        },
+        records=[
+            {
+                "record_id": "record/1",
+                "input_text": "Return A",
+                "expected_output": "A",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        evaluation_run,
+        "run_evidence_side",
+        lambda **_kwargs: pytest.fail("runtime scoring must not start"),
+    )
+
+    with pytest.raises(ValueError, match="authenticated content is unavailable"):
+        evaluation_run.execute_runtime_comparison(
+            _request(tmp_path),
+            registry=cast(CoreRegistry, _Registry(RejectingProvider())),
+            resource_resolver=cast(RuntimeResourceResolver, _Resolver()),
+            schedule_bytes=canonical_runtime_behavioral_schedule_json(schedule),
+            policy_digest="sha256:" + "c" * 64,
+        )

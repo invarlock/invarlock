@@ -19,6 +19,10 @@ on:
         description: "Existing release tag to rebuild/publish (for example v0.5.0)"
         type: string
         default: ""
+      promotion_run_id:
+        description: "Successful TestPyPI release run ID required for PyPI"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -35,20 +39,19 @@ jobs:
       - name: Resolve release ref
         id: resolve_release_ref
         shell: bash
+        env:
+          INVARLOCK_EVENT_SHA: ${{ github.sha }}
+          INVARLOCK_MANUAL_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
 
           remote="https://github.com/${GITHUB_REPOSITORY}.git"
           resolve_sha() {
             local tag="$1"
-            case "${tag}" in
-              v*)
-                ;;
-              *)
-                echo "release_tag must start with v" >&2
-                exit 1
-                ;;
-            esac
+            if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+              echo "release_tag must be a version tag such as v1.2.3" >&2
+              exit 1
+            fi
 
             mapfile -t remote_refs < <(
               git ls-remote --tags "${remote}" "refs/tags/${tag}" "refs/tags/${tag}^{}" || true
@@ -82,7 +85,7 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
             tag="${GITHUB_REF_NAME}"
           else
-            tag="${{ inputs.release_tag }}"
+            tag="${INVARLOCK_MANUAL_RELEASE_TAG}"
             if [ -z "${tag}" ]; then
               echo "release_tag is required for manual release dispatch" >&2
               exit 1
@@ -90,6 +93,15 @@ jobs:
           fi
 
           sha="$(resolve_sha "${tag}")"
+          if [[ ! "${INVARLOCK_EVENT_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "workflow event SHA is malformed" >&2
+            exit 1
+          fi
+          if [ "${sha}" != "${INVARLOCK_EVENT_SHA}" ]; then
+            echo "release tag no longer identifies the workflow event commit" >&2
+            exit 1
+          fi
+          sha="${INVARLOCK_EVENT_SHA}"
 
           echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "release_sha=${sha}" >> "$GITHUB_OUTPUT"
@@ -97,9 +109,15 @@ jobs:
   build_check:
     needs: resolve_release_ref
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: default
     permissions:
       contents: read
+    outputs:
+      dist_ledger_sha256: ${{ steps.dist_digests.outputs.ledger_sha256 }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -108,8 +126,27 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '22'
+          cache: npm
       - name: Install build tooling
-        run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
+          npm ci
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Run complete repository gates
+        run: make verify
+      - name: Enforce release coverage
+        run: make coverage-enforce
+      - name: Lint release workflows
+        run: |
+          gopath="$(go env GOPATH)"
+          export PATH="${gopath}/bin:$PATH"
+          make workflow-lint
       - name: Cache gitleaks binary
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
@@ -133,7 +170,16 @@ jobs:
           previous_tag="$(git describe --tags --match 'v[0-9]*' --abbrev=0 "${release_sha}^" 2>/dev/null || true)"
           echo "previous_tag=${previous_tag}" >> "$GITHUB_OUTPUT"
           if [ -n "${previous_tag}" ]; then
-            echo "log_opts=${previous_tag}..${release_sha}" >> "$GITHUB_OUTPUT"
+            if [[ ! "${previous_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+              echo "previous release tag is not a valid version tag" >&2
+              exit 1
+            fi
+            previous_sha="$(git rev-parse "${previous_tag}^{commit}")"
+            if [[ ! "${previous_sha}" =~ ^[0-9a-f]{40,64}$ ]]; then
+              echo "previous release tag did not resolve to a commit" >&2
+              exit 1
+            fi
+            echo "log_opts=${previous_sha}..${release_sha}" >> "$GITHUB_OUTPUT"
           else
             echo "log_opts=" >> "$GITHUB_OUTPUT"
             echo "No previous release tag found; scanning full reachable history."
@@ -141,10 +187,12 @@ jobs:
       - name: Run gitleaks release delta scan
         id: gitleaks_scan
         shell: bash
+        env:
+          INVARLOCK_GITLEAKS_LOG_OPTS: ${{ steps.gitleaks_range.outputs.log_opts }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/supply-chain
-          log_opts="${{ steps.gitleaks_range.outputs.log_opts }}"
+          log_opts="${INVARLOCK_GITLEAKS_LOG_OPTS}"
           cmd=(
             gitleaks git .
             --config .gitleaks.toml
@@ -167,83 +215,6 @@ jobs:
             printf '[]\n' > artifacts/supply-chain/gitleaks.json
           fi
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-      - name: Build first-party distributions
-        run: |
-          rm -rf build dist
-          python -m build --no-isolation
-          python -m build --no-isolation --outdir dist/addins addins/diagnostics
-          python -m build --no-isolation --outdir dist/addins addins/gguf
-          python -m build --no-isolation --outdir dist/addins addins/multimodal
-          python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
-      - name: Twine check
-        run: |
-          python -m twine check dist/*.whl dist/*.tar.gz
-          python -m twine check dist/addins/*
-      - name: Install smoke from wheel
-        env:
-          INVARLOCK_LIGHT_IMPORT: "1"
-        run: |
-          python -m venv .venv
-          . .venv/bin/activate
-          python - <<'PY'
-          import hashlib
-          from pathlib import Path
-
-          wheel = next(Path("dist").glob("*.whl"))
-          digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-          print(f"Wheel digest verified: {digest}")
-          PY
-          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
-          python -m pip install dist/*.whl dist/addins/*.whl
-          invarlock --help
-          python -c "import invarlock.cli.app"
-          invarlock-gguf-conformance
-          invarlock-hf-vision-text-conformance
-          invarlock-tensorrt-llm-conformance
-          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
-          python -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"
-      - name: Create release install-surface venv
-        id: install_surface
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .artifact-venv
-          python -m venv .artifact-venv
-          . .artifact-venv/bin/activate
-          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
-          python -m pip install dist/*.whl dist/addins/*.whl
-          site_packages="$(python - <<'PY'
-          import site
-          paths = site.getsitepackages()
-          print(paths[0] if paths else site.getusersitepackages())
-          PY
-          )"
-          echo "python=.artifact-venv/bin/python" >> "$GITHUB_OUTPUT"
-          echo "site_packages=${site_packages}" >> "$GITHUB_OUTPUT"
-      - name: Run release pip-audit
-        run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
-      - name: Generate release install-surface SBOM
-        run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
-      - name: Upload dist artifacts
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: dist
-          path: |
-            dist/*.whl
-            dist/*.tar.gz
-            dist/addins/*.whl
-            dist/addins/*.tar.gz
-          if-no-files-found: error
-          retention-days: 3
-      - name: Upload SBOM artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-sbom
-          path: artifacts/supply-chain/sbom.json
-          if-no-files-found: error
-          retention-days: 3
       - name: Upload gitleaks artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -265,20 +236,280 @@ jobs:
             echo "gitleaks detected secrets; see uploaded artifact for details" >&2
             exit 1
           fi
+      - name: Build first-party distributions
+        run: |
+          rm -rf build dist
+          python -m build --no-isolation
+          python -m build --no-isolation --outdir dist/addins addins/diagnostics
+          python -m build --no-isolation --outdir dist/addins addins/gguf
+          python -m build --no-isolation --outdir dist/addins addins/multimodal
+          python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
+      - name: Record distribution digests
+        id: dist_digests
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
 
-  publish:
+          dist = Path("dist")
+          distributions = sorted(
+              path
+              for path in dist.rglob("*")
+              if path.is_file()
+              and (path.suffix == ".whl" or path.name.endswith(".tar.gz"))
+          )
+          wheels = [path for path in distributions if path.suffix == ".whl"]
+          source_archives = [
+              path for path in distributions if path.name.endswith(".tar.gz")
+          ]
+          if len(wheels) != 5 or len(source_archives) != 5:
+              raise SystemExit(
+                  "expected five wheels and five source distributions, found "
+                  f"{len(wheels)} wheels and {len(source_archives)} source archives"
+              )
+          lines = [
+              f"{hashlib.sha256(path.read_bytes()).hexdigest()}  "
+              f"{path.relative_to(dist).as_posix()}\n"
+              for path in distributions
+          ]
+          (dist / "SHA256SUMS").write_text("".join(lines), encoding="utf-8")
+          PY
+          echo "ledger_sha256=$(sha256sum dist/SHA256SUMS | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Twine check
+        run: |
+          python -m twine check dist/*.whl dist/*.tar.gz
+          python -m twine check dist/addins/*
+      - name: Validate first-party distribution source parity
+        env:
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: >-
+          python scripts/release/first_party_distribution_validation.py
+          --repo-root .
+          --expected-version "${INVARLOCK_RELEASE_TAG#v}"
+          --core-dist-dir dist
+          --addin-dist-dir dist/addins
+      - name: Run clean-checkout release preflight
+        env:
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          temporary_root="$(mktemp -d)"
+          release_checkout="${temporary_root}/checkout"
+          hash_manifest="${temporary_root}/SHA256SUMS"
+          cleanup() {
+            git worktree remove --force "${release_checkout}" >/dev/null 2>&1 || true
+            rm -rf "${temporary_root}"
+          }
+          trap cleanup EXIT
+
+          git worktree add --detach "${release_checkout}" "${INVARLOCK_RELEASE_SHA}"
+          (
+            cd dist
+            sha256sum invarlock-*.whl invarlock-*.tar.gz
+          ) > "${hash_manifest}"
+          python "${release_checkout}/scripts/release/release_preflight.py" \
+            --repo-root "${release_checkout}" \
+            --release-sha "${INVARLOCK_RELEASE_SHA}" \
+            --expected-version "${INVARLOCK_RELEASE_TAG#v}" \
+            --dist-dir "${GITHUB_WORKSPACE}/dist" \
+            --hash-manifest "${hash_manifest}" \
+            --json
+      - name: Install smoke from wheel
+        env:
+          INVARLOCK_LIGHT_IMPORT: "1"
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
+          python -m pip install --no-deps dist/*.whl dist/addins/*.whl
+          python -m pip check
+          invarlock --help
+          python -c "import invarlock.cli.app"
+          invarlock-gguf-conformance
+          invarlock-hf-vision-text-conformance
+          invarlock-tensorrt-llm-conformance
+          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
+          python -c "from importlib import import_module; from pathlib import Path; from sysconfig import get_path; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
+          python - <<'PY'
+          import os
+          from importlib.metadata import version
+
+          projects = (
+              "invarlock",
+              "invarlock-diagnostics",
+              "invarlock-runtime-gguf",
+              "invarlock-runtime-hf-vision-text",
+              "invarlock-runtime-tensorrt-llm",
+          )
+          observed = {project: version(project) for project in projects}
+          expected = observed["invarlock"]
+          if any(candidate != expected for candidate in observed.values()):
+              raise SystemExit(f"first-party version mismatch: {observed}")
+          release_version = os.environ["INVARLOCK_RELEASE_TAG"].removeprefix("v")
+          if expected != release_version:
+              raise SystemExit(
+                  f"release tag/version mismatch: tag={release_version}, packages={observed}"
+              )
+          PY
+      - name: Create release install-surface venv
+        id: install_surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .artifact-venv
+          python -m venv .artifact-venv
+          . .artifact-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
+          python -m pip install --no-deps dist/*.whl dist/addins/*.whl
+          python -m pip check
+          site_packages="$(python - <<'PY'
+          import site
+          paths = site.getsitepackages()
+          print(paths[0] if paths else site.getusersitepackages())
+          PY
+          )"
+          echo "python=.artifact-venv/bin/python" >> "$GITHUB_OUTPUT"
+          echo "site_packages=${site_packages}" >> "$GITHUB_OUTPUT"
+      - name: Run release pip-audit
+        run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
+      - name: Generate release install-surface SBOM
+        run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
+      - name: Verify distribution digests before artifact upload
+        env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ steps.dist_digests.outputs.ledger_sha256 }}
+        run: |
+          set -euo pipefail
+          cd dist
+          printf '%s  %s\n' "${EXPECTED_DIST_LEDGER_SHA256}" SHA256SUMS | sha256sum --check -
+          sha256sum --check SHA256SUMS
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/addins/*.whl
+            dist/addins/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-sbom
+          path: artifacts/supply-chain/sbom.json
+          if-no-files-found: error
+          retention-days: 3
+  authorize_candidate:
     needs: [build_check, resolve_release_ref]
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.release_tag != ''
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: ${{ github.event_name == 'push' && 'pypi' || inputs.target }}
     permissions:
+      actions: read
+      contents: read
+    outputs:
+      artifact_run_id: ${{ steps.authorize.outputs.artifact_run_id }}
+      dist_ledger_sha256: ${{ steps.authorize.outputs.dist_ledger_sha256 }}
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+      - name: Set up promotion Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Validate publication inputs
+        id: validate_publication
+        shell: bash
+        env:
+          INVARLOCK_PROMOTION_RUN_ID: ${{ inputs.promotion_run_id }}
+          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          if [ "${INVARLOCK_PUBLISH_TARGET}" = "testpypi" ]; then
+            if [ -n "${INVARLOCK_PROMOTION_RUN_ID}" ]; then
+              echo "promotion_run_id must be empty for TestPyPI" >&2
+              exit 1
+            fi
+            echo "candidate_run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+          elif [ "${INVARLOCK_PUBLISH_TARGET}" = "pypi" ]; then
+            if [[ ! "${INVARLOCK_PROMOTION_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "promotion_run_id must identify a successful TestPyPI run" >&2
+              exit 1
+            fi
+            if [ "${INVARLOCK_PROMOTION_RUN_ID}" = "${GITHUB_RUN_ID}" ]; then
+              echo "production promotion must use an earlier TestPyPI run" >&2
+              exit 1
+            fi
+            echo "candidate_run_id=${INVARLOCK_PROMOTION_RUN_ID}" >> "$GITHUB_OUTPUT"
+          else
+            echo "unsupported publication target" >&2
+            exit 1
+          fi
+      - name: Download promoted candidate authorization
+        if: ${{ inputs.target == 'pypi' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: testpypi-promotion
+          path: _promotion
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.validate_publication.outputs.candidate_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Authorize exact publication candidate
+        id: authorize
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INVARLOCK_BUILD_LEDGER_SHA256: ${{ needs.build_check.outputs.dist_ledger_sha256 }}
+          INVARLOCK_CANDIDATE_RUN_ID: ${{ steps.validate_publication.outputs.candidate_run_id }}
+          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [ "${INVARLOCK_PUBLISH_TARGET}" = "testpypi" ]; then
+            python scripts/release/testpypi_promotion.py current \
+              --candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}" \
+              --dist-ledger-sha256 "${INVARLOCK_BUILD_LEDGER_SHA256}" \
+              --github-output "${GITHUB_OUTPUT}"
+          else
+            python scripts/release/testpypi_promotion.py authorize \
+              --manifest _promotion/promotion.json \
+              --release-sha "${INVARLOCK_RELEASE_SHA}" \
+              --release-tag "${INVARLOCK_RELEASE_TAG}" \
+              --candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}" \
+              --repository "${GITHUB_REPOSITORY}" \
+              --api-url "${GITHUB_API_URL}" \
+              --github-output "${GITHUB_OUTPUT}"
+          fi
+
+  publish:
+    needs: [authorize_candidate, resolve_release_ref]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.target }}
+    permissions:
+      actions: read
       contents: read
       id-token: write
       attestations: write
     if: >-
       ${{
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.release_tag != '')
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.release_tag != ''
       }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -293,6 +524,9 @@ jobs:
         with:
           name: dist
           path: _release_dist
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.authorize_candidate.outputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Stage publish distributions
         run: |
           set -euo pipefail
@@ -305,16 +539,59 @@ jobs:
       - name: Resolve publish target
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "publish_target=pypi" >> "$GITHUB_OUTPUT"
-            echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
-          elif [ "${{ inputs.target }}" = "testpypi" ]; then
+          if [ "${{ inputs.target }}" = "testpypi" ]; then
             echo "publish_target=testpypi" >> "$GITHUB_OUTPUT"
             echo "publish_repository_url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
           else
             echo "publish_target=pypi" >> "$GITHUB_OUTPUT"
             echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
           fi
+      - name: Verify distribution digests before publish
+        env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          ledger = Path("_release_dist/SHA256SUMS")
+          expected_ledger_digest = os.environ["EXPECTED_DIST_LEDGER_SHA256"]
+          if len(expected_ledger_digest) != 64 or any(
+              character not in "0123456789abcdef"
+              for character in expected_ledger_digest
+          ):
+              raise SystemExit("build distribution ledger digest is malformed")
+          observed_ledger_digest = hashlib.sha256(ledger.read_bytes()).hexdigest()
+          if observed_ledger_digest != expected_ledger_digest:
+              raise SystemExit("distribution digest ledger changed after build")
+          expected: dict[str, str] = {}
+          for line in ledger.read_text(encoding="utf-8").splitlines():
+              digest, separator, relative = line.partition("  ")
+              if not separator or len(digest) != 64 or any(
+                  character not in "0123456789abcdef" for character in digest
+              ):
+                  raise SystemExit("distribution digest ledger is malformed")
+              name = Path(relative).name
+              if name in expected:
+                  raise SystemExit(f"duplicate distribution filename in ledger: {name}")
+              expected[name] = digest
+
+          staged = {
+              path.name: path
+              for path in Path("publish-dist").iterdir()
+              if path.is_file()
+          }
+          if set(staged) != set(expected):
+              raise SystemExit(
+                  "staged distribution set does not match the build digest ledger"
+              )
+          for name, path in sorted(staged.items()):
+              observed = hashlib.sha256(path.read_bytes()).hexdigest()
+              if observed != expected[name]:
+                  raise SystemExit(f"distribution digest mismatch: {name}")
+              print(f"{name}: OK")
+          PY
       - name: Attest release artifacts
         id: attest_release
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
@@ -327,20 +604,45 @@ jobs:
           path: ${{ steps.attest_release.outputs.bundle-path }}
           if-no-files-found: error
           retention-days: 3
+      - name: Reconfirm immutable release tag
+        env:
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          annotated="$(git ls-remote --tags origin "refs/tags/${INVARLOCK_RELEASE_TAG}^{}" | awk 'NR == 1 {print $1}')"
+          direct="$(git ls-remote --tags origin "refs/tags/${INVARLOCK_RELEASE_TAG}" | awk 'NR == 1 {print $1}')"
+          observed="${annotated:-${direct}}"
+          if [ "${observed}" != "${INVARLOCK_RELEASE_SHA}" ]; then
+            echo "release tag changed after candidate authorization" >&2
+            exit 1
+          fi
       - name: Publish to TestPyPI/PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
           skip-existing: true
+      - name: Verify hosted release artifacts match build
+        env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
+          INVARLOCK_PUBLISH_TARGET: ${{ steps.vars.outputs.publish_target }}
+          INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          python scripts/release/verify_hosted_distributions.py \
+            --ledger _release_dist/SHA256SUMS \
+            --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
+            --target "${INVARLOCK_PUBLISH_TARGET}" \
+            --version "${INVARLOCK_RELEASE_VERSION}"
 
   testpypi_smoke:
-    needs: [publish, resolve_release_ref]
+    needs: [authorize_candidate, publish, resolve_release_ref]
     if: >-
       ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -350,20 +652,45 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
-      - name: Download published TestPyPI wheels
+      - name: Download candidate distribution ledger
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+        with:
+          name: dist
+          path: _release_dist
+          run-id: ${{ needs.authorize_candidate.outputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download ledger-selected TestPyPI wheels
         env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
           INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           set -euo pipefail
-          mkdir -p wheelhouse
+          python scripts/release/verify_hosted_distributions.py \
+            --ledger _release_dist/SHA256SUMS \
+            --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
+            --target testpypi \
+            --version "${INVARLOCK_RELEASE_VERSION}" \
+            --wheelhouse wheelhouse
+      - name: Install published wheel and smoke test
+        env:
+          INVARLOCK_LIGHT_IMPORT: "1"
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
+          python -m pip install --no-deps wheelhouse/*.whl
+          python -m pip check
+          invarlock --help
+          python -c "import invarlock.cli.app"
+          invarlock-gguf-conformance
+          invarlock-hf-vision-text-conformance
+          invarlock-tensorrt-llm-conformance
+          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
+          python -c "from importlib import import_module; from pathlib import Path; from sysconfig import get_path; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
           python - <<'PY'
-          import hashlib
-          import json
-          import os
-          import urllib.request
-          from pathlib import Path
+          from importlib.metadata import version
 
-          version = os.environ["INVARLOCK_RELEASE_VERSION"].removeprefix("v")
           projects = (
               "invarlock",
               "invarlock-diagnostics",
@@ -371,48 +698,52 @@ jobs:
               "invarlock-runtime-hf-vision-text",
               "invarlock-runtime-tensorrt-llm",
           )
-          requirements = []
-          for project in projects:
-              metadata_url = (
-                  f"https://test.pypi.org/pypi/{project}/{version}/json"
-              )
-              with urllib.request.urlopen(metadata_url) as response:
-                  payload = json.load(response)
-
-              wheel = next(
-                  item
-                  for item in payload["urls"]
-                  if item["filename"].endswith(".whl")
-              )
-              destination = Path("wheelhouse") / wheel["filename"]
-              with urllib.request.urlopen(wheel["url"]) as response:
-                  destination.write_bytes(response.read())
-
-              digest = hashlib.sha256(destination.read_bytes()).hexdigest()
-              if digest != wheel["digests"]["sha256"]:
-                  raise SystemExit(f"TestPyPI digest mismatch for {project}")
-              requirements.append(
-                  f"{destination.resolve()} --hash=sha256:{digest}\n"
-              )
-              print(f"Downloaded {destination.name}")
-
-          Path("wheelhouse/requirements.txt").write_text(
-              "".join(requirements),
-              encoding="utf-8",
-          )
+          observed = {project: version(project) for project in projects}
+          expected = observed["invarlock"]
+          if any(candidate != expected for candidate in observed.values()):
+              raise SystemExit(f"first-party version mismatch: {observed}")
           PY
-      - name: Install published wheel and smoke test
+
+  record_testpypi_promotion:
+    needs: [authorize_candidate, resolve_release_ref, testpypi_smoke]
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.target == 'testpypi' &&
+        needs.testpypi_smoke.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+      - name: Set up promotion Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Record exact TestPyPI promotion candidate
         env:
-          INVARLOCK_LIGHT_IMPORT: "1"
+          INVARLOCK_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
-          python -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
-          python -m pip install wheelhouse/*.whl
-          invarlock --help
-          python -c "import invarlock.cli.app"
-          invarlock-gguf-conformance
-          invarlock-hf-vision-text-conformance
-          invarlock-tensorrt-llm-conformance
-          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
-          python -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"
+          set -euo pipefail
+          mkdir -p promotion
+          python scripts/release/testpypi_promotion.py record \
+            --output promotion/promotion.json \
+            --release-sha "${INVARLOCK_RELEASE_SHA}" \
+            --release-tag "${INVARLOCK_RELEASE_TAG}" \
+            --dist-ledger-sha256 "${INVARLOCK_DIST_LEDGER_SHA256}" \
+            --source-run-id "${GITHUB_RUN_ID}"
+      - name: Upload TestPyPI promotion authorization
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: testpypi-promotion
+          path: promotion/promotion.json
+          if-no-files-found: error
+          retention-days: 14

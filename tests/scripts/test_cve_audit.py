@@ -100,10 +100,13 @@ def test_findings_include_all_matched_advisories_and_allowlist_classified() -> N
         {component.key: [vuln]},
         allowlist={
             "CVE-2020-0001": {
+                "allowed_sources": ["uv.lock"],
                 "expires": "2026-06-01",
                 "owner": "security-maintainers",
+                "packages": ["urllib3"],
                 "tracking_issue": "https://github.com/example/repo/issues/1",
                 "reason": "fixture",
+                "versions": ["2.6.3"],
             }
         },
         today=date(2026, 5, 15),
@@ -127,6 +130,45 @@ def test_blocking_findings_excludes_only_current_acceptances() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("name", "version", "sources"),
+    [
+        ("other", "2.6.3", {"uv.lock"}),
+        ("urllib3", "2.6.2", {"uv.lock"}),
+        ("urllib3", "2.6.3", {"requirements/other.txt"}),
+        ("urllib3", "2.6.3", {"uv.lock", "requirements/other.txt"}),
+    ],
+)
+def test_allowlist_never_expands_beyond_package_version_and_sources(
+    name: str, version: str, sources: set[str]
+) -> None:
+    module = _load_script_module()
+    component = module.Component(
+        ecosystem="PyPI", name=name, version=version, sources=sources
+    )
+    allowlist = {
+        "CVE-2020-0001": {
+            "allowed_sources": ["uv.lock"],
+            "expires": "2026-06-01",
+            "owner": "security-maintainers",
+            "packages": ["urllib3"],
+            "tracking_issue": "https://github.com/example/repo/issues/1",
+            "reason": "fixture",
+            "versions": ["2.6.3"],
+        }
+    }
+
+    status, entry = module.classify_status(
+        ["CVE-2020-0001"],
+        allowlist,
+        date(2026, 5, 15),
+        component=component,
+    )
+
+    assert status == "unpatched"
+    assert entry is None
+
+
 def test_load_allowlist_uses_strict_pip_audit_policy(tmp_path: Path) -> None:
     module = _load_script_module()
     allowlist = tmp_path / "allowlist.json"
@@ -137,11 +179,14 @@ def test_load_allowlist_uses_strict_pip_audit_policy(tmp_path: Path) -> None:
                 "entries": [
                     {
                         "advisory": "GHSA-test-test-test",
+                        "allowed_sources": ["requirements/test.txt"],
                         "compensating_control": "isolated test surface",
                         "owner": "security-maintainers",
                         "expires": (date.today() + timedelta(days=7)).isoformat(),
+                        "packages": ["example-package"],
                         "tracking_issue": "https://github.com/example/repo/pull/1",
                         "reason": "fixture",
+                        "versions": ["1.0.0"],
                     }
                 ],
             }

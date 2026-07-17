@@ -24,7 +24,13 @@ RUN python -m pip install --require-hashes --no-deps -r /tmp/runtime-wheel-build
     && touch -h -d "@${SOURCE_DATE_EPOCH}" "$1"
 
 FROM ${RUNTIME_BASE_IMAGE}
+ARG INVARLOCK_SOURCE_BUNDLE_SHA256
+ARG INVARLOCK_SOURCE_COMMIT
 ARG SOURCE_DATE_EPOCH
+RUN python -c 'import re,sys; commit,digest=sys.argv[1:]; re.fullmatch(r"[0-9a-f]{40,64}", commit) or sys.exit("invalid INVARLOCK_SOURCE_COMMIT"); re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or sys.exit("invalid INVARLOCK_SOURCE_BUNDLE_SHA256")' \
+      "${INVARLOCK_SOURCE_COMMIT}" "${INVARLOCK_SOURCE_BUNDLE_SHA256}"
+LABEL dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}" \
+      org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"
 ENV HF_HUB_OFFLINE=1 \
     INVARLOCK_ALLOW_NETWORK=0 \
     INVARLOCK_ALLOW_REMOTE_CODE=0 \
@@ -40,14 +46,16 @@ COPY --from=runtime-inputs /requirements/multimodal-runtime-py312.txt /opt/invar
 COPY --from=addin-wheel /wheelhouse /opt/invarlock/addin-wheels
 RUN python -m pip install \
       --no-compile \
+      --no-deps \
       --require-hashes \
       --only-binary=:all: \
+      --extra-index-url https://download.pytorch.org/whl/cu128 \
       -r /opt/invarlock/requirements/multimodal-runtime-py312.txt \
     && set -- /opt/invarlock/addin-wheels/invarlock_runtime_hf_vision_text-*.whl \
     && test "$#" -eq 1 \
     && python -m pip install --no-compile --no-deps --no-index "$1" \
     && python -m invarlock_addins.multimodal.conformance \
-    && python -c "from PIL import Image; assert Image.__version__ == '12.3.0'" \
+    && python -c "from PIL import Image; import torchvision; from transformers import Qwen2VLImageProcessor, Qwen2VLVideoProcessor; assert Image.__version__ == '12.3.0'; assert torchvision.__version__ == '0.26.0+cu128'; assert Qwen2VLImageProcessor().to_dict(); assert Qwen2VLVideoProcessor().to_dict()" \
     && find /opt/invarlock /usr/local/lib/python3.12 /usr/local/bin \
       -xdev -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 WORKDIR /work

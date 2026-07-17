@@ -11,7 +11,10 @@ from invarlock.evidence_pack_contract import (
     build_comparison_report,
     derive_paired_records,
 )
-from invarlock.evidence_pack_publication import publish_comparison_evidence
+from invarlock.evidence_pack_publication import (
+    EvidencePublication,
+    publish_comparison_evidence,
+)
 from invarlock.evidence_pack_verification import verify_comparison_evidence
 
 __all__ = [
@@ -22,6 +25,7 @@ __all__ = [
     "EvidenceObservation",
     "InputIdentity",
     "RuntimeSideEvidence",
+    "EvidencePublication",
     "build_comparison_report",
     "derive_paired_records",
     "publish_comparison_evidence",

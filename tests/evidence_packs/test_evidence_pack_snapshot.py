@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock import evidence_pack_snapshot as snapshot_module
 from invarlock.evidence_pack_snapshot import PackSnapshot
 
 
@@ -12,7 +13,7 @@ def _pack(tmp_path: Path) -> Path:
     root = tmp_path / "pack"
     root.mkdir()
     (root / "manifest.json").write_text(
-        '{"format":"evidence-pack-v1"}\n', encoding="utf-8"
+        '{"format":"invarlock/evidence-pack-v1"}\n', encoding="utf-8"
     )
     nested = root / "records"
     nested.mkdir()
@@ -32,7 +33,9 @@ def test_pack_snapshot_materializes_authenticated_immutable_bytes(
     assert snapshot.files.inventory == frozenset(
         {"manifest.json", "records/paired.json"}
     )
-    assert snapshot.files.parsed_json["manifest.json"] == {"format": "evidence-pack-v1"}
+    assert snapshot.files.parsed_json["manifest.json"] == {
+        "format": "invarlock/evidence-pack-v1"
+    }
     manifest = snapshot.files.entry("manifest.json")
     assert manifest is not None
     assert manifest.read_bytes() == (root / "manifest.json").read_bytes()
@@ -145,3 +148,68 @@ def test_structural_json_validation_can_be_disabled(tmp_path: Path) -> None:
     assert opaque_snapshot is not None and errors == []
     assert opaque_snapshot.files.entry("manifest.json").json_error == "not requested"  # type: ignore[union-attr]
     opaque_snapshot.files.cleanup()
+
+
+def test_pack_snapshot_rejects_entry_and_file_count_over_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _pack(tmp_path)
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_ENTRIES", 2)
+
+    snapshot, errors = PackSnapshot.capture(root)
+
+    assert snapshot is None
+    assert "2-entry snapshot limit" in " ".join(errors)
+
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_ENTRIES", 20)
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_FILES", 1)
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is None
+    assert "1-file snapshot limit" in " ".join(errors)
+
+
+def test_pack_snapshot_rejects_file_and_total_bytes_before_copying(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _pack(tmp_path)
+    copied: list[Path] = []
+
+    def record_copy(*args, **kwargs):
+        copied.append(args[0])
+        raise AssertionError("over-budget files must not be copied")
+
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_FILE_BYTES", 1)
+    monkeypatch.setattr(snapshot_module, "copy_regular_file_snapshot", record_copy)
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is None
+    assert "file manifest.json exceeds the 1-byte" in " ".join(errors)
+    assert copied == []
+
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_FILE_BYTES", 1024)
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_TOTAL_BYTES", 1)
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is None
+    assert "1-byte total snapshot limit" in " ".join(errors)
+    assert copied == []
+
+
+def test_pack_snapshot_bounds_a_file_that_grows_after_enumeration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "pack"
+    root.mkdir()
+    manifest = root / "manifest.json"
+    manifest.write_bytes(b"x")
+    real_copy = snapshot_module.copy_regular_file_snapshot
+
+    def grow_before_copy(source: Path, destination: Path, **kwargs):
+        source.write_bytes(b"12345")
+        return real_copy(source, destination, **kwargs)
+
+    monkeypatch.setattr(snapshot_module, "MAX_PACK_SNAPSHOT_FILE_BYTES", 4)
+    monkeypatch.setattr(snapshot_module, "copy_regular_file_snapshot", grow_before_copy)
+
+    snapshot, errors = PackSnapshot.capture(root)
+
+    assert snapshot is None
+    assert errors == ["unable to snapshot input safely: manifest.json"]

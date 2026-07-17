@@ -803,6 +803,7 @@ def load_evaluation_request(
     path: str | Path,
     *,
     provider_resolver: ProviderResolver | None = None,
+    request_root: Path | None = None,
 ) -> EvaluationRequest:
     """Load one strict request anchored to its file's real parent directory.
 
@@ -819,7 +820,7 @@ def load_evaluation_request(
             label="evaluation request",
             max_bytes=MAX_EVALUATION_REQUEST_BYTES,
         )
-        root = request_path.parent.resolve(strict=True)
+        root = (request_root or request_path.parent).resolve(strict=True)
     except (OSError, StrictJsonError) as exc:
         raise EvaluationRequestError(str(exc)) from exc
     value = _load_yaml(payload)

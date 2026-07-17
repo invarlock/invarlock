@@ -233,6 +233,11 @@ def test_release_preflight_runs_all_independent_gates(
     monkeypatch.setattr(module, "_git_output", fake_git)
     monkeypatch.setattr(module, "_probe_installed_wheel", fake_probe)
     monkeypatch.setattr(
+        module,
+        "validate_first_party_addin_distributions",
+        lambda **_kwargs: calls.append("add-in-distributions") or [],
+    )
+    monkeypatch.setattr(
         module, "_run_current_public_evidence_audit", fake_public_evidence_audit
     )
 
@@ -241,6 +246,7 @@ def test_release_preflight_runs_all_independent_gates(
     assert calls == [
         "git:rev-parse",
         "git:status",
+        "add-in-distributions",
         "installed-wheel",
         "public-evidence-audit",
         "git:rev-parse",
@@ -553,6 +559,9 @@ def test_post_gate_checkout_recheck_rejects_source_toctou(
     monkeypatch.setattr(
         module, "_probe_installed_wheel", lambda *_: _passing_import(module)
     )
+    monkeypatch.setattr(
+        module, "validate_first_party_addin_distributions", lambda **_: []
+    )
     monkeypatch.setattr(module, "_run_current_public_evidence_audit", lambda _: None)
 
     with pytest.raises(module.ReleasePreflightError, match="not clean"):
@@ -588,6 +597,9 @@ def test_preflight_summary_has_no_checkout_paths(
     )
     monkeypatch.setattr(
         module, "_probe_installed_wheel", lambda *_: _passing_import(module)
+    )
+    monkeypatch.setattr(
+        module, "validate_first_party_addin_distributions", lambda **_: []
     )
     monkeypatch.setattr(module, "_run_current_public_evidence_audit", lambda _: None)
 

@@ -58,13 +58,17 @@ from invarlock.evaluation_oci import (
     OciEvaluationLaunch,
     OciRuntimeExecutor,
     OciSideLaunch,
+    OciWorkerLimits,
     launch_from_environment,
 )
 from invarlock.evaluation_runtime import RuntimeResourceResolver
 from invarlock.evaluation_transaction import (
+    EvaluationPreflightError,
+    EvaluationPreflightResult,
     EvaluationTransactionError,
     EvaluationTransactionResult,
     evaluate_request_file,
+    preflight_evaluation_request,
 )
 from invarlock.evidence_pack_contract import EvidenceObservation
 from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
@@ -95,6 +99,7 @@ from invarlock.runtime_import_authoring import (
     write_runtime_import_side,
 )
 from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sha256
+from invarlock.trust_inputs import TrustInputs, TrustInputsError, load_trust_inputs
 
 __all__ = [
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
@@ -103,6 +108,8 @@ __all__ = [
     "EvaluationRecord",
     "EvaluationRequest",
     "EvaluationRequestError",
+    "EvaluationPreflightError",
+    "EvaluationPreflightResult",
     "EvaluationTransactionError",
     "EvaluationTransactionResult",
     "EvidencePackResult",
@@ -122,6 +129,7 @@ __all__ = [
     "OciEvaluationLaunch",
     "OciRuntimeExecutor",
     "OciSideLaunch",
+    "OciWorkerLimits",
     "ProviderResolver",
     "RuntimeArtifactResources",
     "RuntimeBackendIdentity",
@@ -152,6 +160,8 @@ __all__ = [
     "build_scorer_result",
     "ScoringObservation",
     "TensorRTLLMArtifactIdentity",
+    "TrustInputs",
+    "TrustInputsError",
     "build_runtime_import_observation",
     "build_runtime_import_receipt",
     "checkpoint_tree_sha256",
@@ -161,8 +171,10 @@ __all__ = [
     "load_evaluation_request",
     "load_runtime_behavioral_schedule",
     "load_runtime_import_side",
+    "load_trust_inputs",
     "launch_from_environment",
     "prepare_local_evaluation_schedule",
+    "preflight_evaluation_request",
     "render_evidence",
     "verify_evidence",
     "verify_signed_verification_receipt",

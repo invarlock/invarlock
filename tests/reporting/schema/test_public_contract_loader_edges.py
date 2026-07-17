@@ -20,6 +20,10 @@ def test_all_shipped_contract_loaders_return_independent_json_objects() -> None:
             public_contracts.load_evidence_observation_schema,
             "invarlock/evidence-observation-v1",
         ),
+        (
+            public_contracts.load_trust_inputs_schema,
+            "invarlock/trust-inputs-v1",
+        ),
         (public_contracts.load_runtime_manifest_schema, None),
         (public_contracts.load_runtime_provider_capabilities_schema, None),
         (public_contracts.load_model_artifact_identity_schema, None),

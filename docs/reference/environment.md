@@ -61,6 +61,9 @@ mirror the `evaluate` options:
 | `INVARLOCK_RUNTIME_ENTRYPOINT` | `auto` | Shared entrypoint profile: `auto`, `python`, or `nvidia` |
 | `INVARLOCK_BASELINE_RUNTIME_ENTRYPOINT` | Shared profile | Optional baseline entrypoint override |
 | `INVARLOCK_SUBJECT_RUNTIME_ENTRYPOINT` | Shared profile | Optional subject entrypoint override |
+| `INVARLOCK_RUNTIME_CPUS` | `4` | Positive decimal CPU ceiling applied to each worker; at most three decimal places |
+| `INVARLOCK_RUNTIME_MEMORY_MIB` | `65536` | Integer MiB memory ceiling applied to each worker |
+| `INVARLOCK_RUNTIME_USER` | `65532:65532` | Numeric non-root `UID:GID` used by each worker |
 
 If the image reference contains `@sha256:...`, it must agree with
 `INVARLOCK_RUNTIME_IMAGE_DIGEST` when both are supplied. If the image reference
@@ -70,10 +73,16 @@ the immutable reference. Mutable tags without a pinned digest are rejected.
 Each side image must already exist locally. The launcher uses `--pull=never`,
 disables networking, sets a read-only container root, drops capabilities,
 enables `no-new-privileges`, bounds process count, and provides a temporary
-filesystem. The prepared job and schedule, side artifact, and side support
+filesystem. It also applies caller-owned CPU and memory ceilings and a numeric
+non-root identity. The prepared job and schedule, side artifact, and side support
 resources are mounted read-only. Each worker receives its own writable output
 directory and cannot read the other side's artifact. The host validates the
 closed side results before it computes, signs, or publishes evidence.
+
+The submitted request cannot set these host controls. Its validated provider
+`timeout_seconds` and authenticated schedule length determine a finite outer
+worker deadline, capped at 24 hours. Timeout cleanup addresses the exact
+engine-issued container ID before terminating the attached engine process.
 
 `cuda` exposes all available GPUs to the selected side worker. An indexed
 selection such as `cuda:1` exposes that host GPU as `cuda` inside that worker.
@@ -93,7 +102,9 @@ attestation and does not prove which physical host executed them.
 ## Canonical Hugging Face runtime images
 
 The repository has distinct CPU and CUDA image definitions. They are not
-interchangeable:
+interchangeable. Both build targets require the authenticated source commit,
+bundle path, and bundle digest described in the
+[runtime-provider guide](../user-guide/runtime-providers.md#build-or-obtain-the-runtime-image):
 
 | Runtime | Definition | Build | Smoke check |
 | --- | --- | --- | --- |
@@ -146,13 +157,12 @@ The GGUF (`llama_cpp`) add-in requires all three values together:
 | `INVARLOCK_GGUF_BACKEND_EXECUTABLE` | Safe relative `backend_executable` resource beneath that root |
 | `INVARLOCK_GGUF_BACKEND_SOURCE` | Safe relative `backend_source` resource beneath that root |
 
-The TensorRT-LLM add-in requires all three values together:
+The TensorRT-LLM add-in requires both values together:
 
 | Variable | Meaning |
 | --- | --- |
-| `INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT` | Caller-owned absolute root containing engine and support files |
+| `INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT` | Caller-owned absolute root containing the engine and tokenizer contract |
 | `INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT` | Safe relative tokenizer-contract resource beneath that root |
-| `INVARLOCK_TENSORRT_LLM_RUNNER_EXECUTABLE` | Safe relative runner resource beneath that root |
 
 The Hugging Face vision-text add-in requires both values together:
 
@@ -166,8 +176,9 @@ be portable relative paths beneath the root. Missing members, extra partial
 configuration, path escape, and symbolic-link transitions fail closed.
 
 The primary artifact path remains in `request.yaml`. Executable, source, and
-tokenizer-support resources remain caller-controlled because a submitted
-request is data, not authorization to choose host code.
+tokenizer-support resources remain caller-controlled when they are provider
+inputs. The TensorRT-LLM runner is instead installed in and authenticated from
+the selected runtime image; a submitted request cannot replace it.
 
 ## Security switches
 

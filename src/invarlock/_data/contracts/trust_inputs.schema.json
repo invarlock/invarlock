@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/trust_inputs.schema.json",
+  "title": "InvarLock Independent Trust Inputs v1",
+  "type": "object",
+  "required": [
+    "format",
+    "policy",
+    "anchors",
+    "verifier",
+    "allow_installed_scorers"
+  ],
+  "properties": {
+    "format": {"const": "invarlock/trust-inputs-v1"},
+    "policy": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safeRelativePath"}
+      },
+      "additionalProperties": false
+    },
+    "anchors": {
+      "type": "object",
+      "required": [
+        "baseline_artifact_digest",
+        "subject_artifact_digest",
+        "schedule_digest",
+        "baseline_runtime_digest",
+        "subject_runtime_digest",
+        "evidence_signer_fingerprint"
+      ],
+      "properties": {
+        "baseline_artifact_digest": {"$ref": "#/$defs/digest"},
+        "subject_artifact_digest": {"$ref": "#/$defs/digest"},
+        "schedule_digest": {"$ref": "#/$defs/digest"},
+        "baseline_runtime_digest": {"$ref": "#/$defs/digest"},
+        "subject_runtime_digest": {"$ref": "#/$defs/digest"},
+        "evidence_signer_fingerprint": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "verifier": {
+      "type": "object",
+      "required": ["identity", "signing_key_path"],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+        },
+        "signing_key_path": {"$ref": "#/$defs/safeRelativePath"}
+      },
+      "additionalProperties": false
+    },
+    "allow_installed_scorers": {"type": "boolean"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[A-Za-z0-9._/-]+$"
+    }
+  }
+}

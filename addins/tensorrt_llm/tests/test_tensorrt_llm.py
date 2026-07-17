@@ -38,8 +38,12 @@ from invarlock.core.runtime_provider import (
     EvaluationRecord,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
+    RuntimeBehavioralSchedule,
     RuntimeProvider,
+    RuntimeProviderInputPreflight,
     RuntimeSession,
+    TensorRTLLMArtifactIdentity,
+    build_runtime_behavioral_schedule_from_material,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
@@ -103,6 +107,7 @@ def test_tensorrt_llm_closed_environment_pins_vendor_runtime(
     monkeypatch.setenv("OPAL_PREFIX", "/tmp/ambient-opal")
     monkeypatch.setenv("PATH", "/tmp/ambient-bin")
     monkeypatch.setenv("INVARLOCK_TEST_SECRET", "must-not-cross-boundary")
+    monkeypatch.setattr(tensorrt_llm_execution.os, "getuid", lambda: 12001)
     run_directory = tensorrt_llm_execution._RunDirectory(  # noqa: SLF001
         path=tmp_path,
         descriptor=-1,
@@ -125,15 +130,19 @@ def test_tensorrt_llm_closed_environment_pins_vendor_runtime(
         "LANG": "C.UTF-8",
         "LC_ALL": "C.UTF-8",
         "LD_LIBRARY_PATH": "/usr/local/tensorrt/lib",
+        "LOGNAME": "12001",
         "NO_COLOR": "1",
         "NO_PROXY": "*",
         "OPAL_PREFIX": "/opt/hpcx/ompi",
         "PATH": "/opt/hpcx/ompi/bin:/usr/bin:/bin",
         "TELEMETRY_DISABLED": "1",
         "TOKENIZERS_PARALLELISM": "false",
+        "TORCHINDUCTOR_CACHE_DIR": f"{rendered}/torchinductor",
         "TRANSFORMERS_OFFLINE": "1",
+        "TRITON_CACHE_DIR": f"{rendered}/triton",
         "TRTLLM_NO_USAGE_STATS": "1",
         "TMPDIR": rendered,
+        "USER": "12001",
         "XDG_CACHE_HOME": rendered,
     }
     fixed_paths = [environment["OPAL_PREFIX"]]
@@ -277,9 +286,6 @@ def test_tensorrt_llm_prepare_execution_binds_root_confined_resources(
             root=root,
             primary_artifact=str(bindings.engine_bundle_path).removeprefix("/"),
             support_resources={
-                "runner_executable": str(bindings.runner_executable_path).removeprefix(
-                    "/"
-                ),
                 "tokenizer_contract": str(
                     bindings.tokenizer_contract_path
                 ).removeprefix("/"),
@@ -302,15 +308,213 @@ def test_tensorrt_llm_prepare_execution_rejects_missing_tokenizer(
     resources = RuntimeArtifactResources(
         root=root,
         primary_artifact=str(bindings.engine_bundle_path).removeprefix("/"),
-        support_resources={
-            "runner_executable": str(bindings.runner_executable_path).removeprefix("/")
-        },
+        support_resources={},
         device_kind="cuda",
         container_image_digest=_IMAGE_DIGEST,
     )
 
     with pytest.raises(ValueError, match="tokenizer_contract"):
         TensorRTLLMProvider().prepare_execution(spec, resources)
+
+
+def test_tensorrt_llm_authenticates_engine_without_loading_backend(
+    tmp_path: Path,
+) -> None:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    provider = TensorRTLLMProvider()
+
+    assert provider.authenticate_artifact(spec, bindings.engine_bundle_path) == (
+        provider.identify_artifact(spec)
+    )
+
+    bindings.engine_bundle_path.joinpath("rank0.engine").write_bytes(b"changed")
+    with pytest.raises(ValueError, match="identity does not match"):
+        provider.authenticate_artifact(spec, bindings.engine_bundle_path)
+
+
+def _tensorrt_llm_preflight_inputs(
+    tmp_path: Path,
+) -> tuple[ModelRuntimeSpec, RuntimeArtifactResources]:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    return spec, RuntimeArtifactResources(
+        root=tmp_path,
+        primary_artifact=bindings.engine_bundle_path.relative_to(tmp_path).as_posix(),
+        support_resources={
+            "tokenizer_contract": bindings.tokenizer_contract_path.relative_to(
+                tmp_path
+            ).as_posix(),
+        },
+        device_kind="cuda",
+        container_image_digest=_IMAGE_DIGEST,
+    )
+
+
+def _tensorrt_llm_preflight_schedule(
+    *, task: str = "text_causal"
+) -> RuntimeBehavioralSchedule:
+    return build_runtime_behavioral_schedule_from_material(
+        dataset_identity={
+            "provider": "local",
+            "dataset_name": None,
+            "config_name": None,
+            "revision": None,
+            "split": "qualification",
+        },
+        records=[
+            {
+                "record_id": "qualification/0",
+                "input_text": "Prompt",
+                "expected_output": "A",
+            }
+        ],
+        task=task,
+    )
+
+
+def test_tensorrt_llm_input_preflight_authenticates_without_runtime_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+    provider = TensorRTLLMProvider()
+
+    def unexpected_runtime_probe(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("input preflight must not probe the runner or GPU")
+
+    monkeypatch.setattr(
+        tensorrt_llm_provider,
+        "inspect_tensorrt_llm_inputs",
+        unexpected_runtime_probe,
+    )
+    monkeypatch.setattr(
+        tensorrt_llm_provider,
+        "official_tensorrt_llm_runner_path",
+        unexpected_runtime_probe,
+    )
+
+    assert isinstance(provider, RuntimeProviderInputPreflight)
+    assert (
+        provider.validate_evaluation_inputs(
+            spec, resources, _tensorrt_llm_preflight_schedule()
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"batch_size": 9}, "batch_size exceeds the engine build limit"),
+        ({"context_length": 257}, "context_length exceeds the engine build limit"),
+        (
+            {"max_output_tokens": 257},
+            "context and output lengths exceed the engine sequence limit",
+        ),
+    ],
+)
+def test_tensorrt_llm_input_preflight_enforces_engine_limits(
+    tmp_path: Path, overrides: dict[str, object], message: str
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+    bounded_spec = replace(spec, settings={**spec.settings, **overrides})
+
+    with pytest.raises(ValueError, match=message):
+        TensorRTLLMProvider().validate_evaluation_inputs(
+            bounded_spec, resources, _tensorrt_llm_preflight_schedule()
+        )
+
+
+def test_tensorrt_llm_input_preflight_rejects_unsupported_schedule_task(
+    tmp_path: Path,
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+
+    with pytest.raises(ValueError, match="does not support schedule task"):
+        TensorRTLLMProvider().validate_evaluation_inputs(
+            spec,
+            resources,
+            _tensorrt_llm_preflight_schedule(task="vision_text_generation"),
+        )
+
+
+@pytest.mark.parametrize(
+    ("resource_name", "message"),
+    [
+        ("tokenizer", "tokenizer contract fields are not closed"),
+        ("engine_config", "engine config fields are not closed"),
+    ],
+)
+def test_tensorrt_llm_input_preflight_rejects_malformed_static_contracts(
+    tmp_path: Path, resource_name: str, message: str
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+    resource_path = (
+        resources.support_path("tokenizer_contract")
+        if resource_name == "tokenizer"
+        else resources.primary_path() / "config.json"
+    )
+    resource_path.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(TensorRTLLMExecutionError, match=message):
+        TensorRTLLMProvider().validate_evaluation_inputs(
+            spec, resources, _tensorrt_llm_preflight_schedule()
+        )
+
+
+def test_tensorrt_llm_input_preflight_rejects_tokenizer_digest_mismatch(
+    tmp_path: Path,
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+    mismatched_spec = replace(
+        spec,
+        settings={**spec.settings, "tokenizer_metadata_sha256": "0" * 64},
+    )
+
+    with pytest.raises(ValueError, match="tokenizer contract digest does not match"):
+        TensorRTLLMProvider().validate_evaluation_inputs(
+            mismatched_spec, resources, _tensorrt_llm_preflight_schedule()
+        )
+
+
+@pytest.mark.parametrize("resource_name", ["tokenizer", "engine_config"])
+def test_tensorrt_llm_input_preflight_detects_static_input_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    resource_name: str,
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+    resource_path = (
+        resources.support_path("tokenizer_contract")
+        if resource_name == "tokenizer"
+        else resources.primary_path() / "config.json"
+    )
+    real_identity_reader = tensorrt_llm_provider.read_tensorrt_llm_artifact_identity
+
+    def mutate_after_engine_authentication(
+        artifact_path: Path,
+        *,
+        target_compute_capability: str,
+        tokenizer_metadata_sha256: str,
+    ) -> TensorRTLLMArtifactIdentity:
+        identity = real_identity_reader(
+            artifact_path,
+            target_compute_capability=target_compute_capability,
+            tokenizer_metadata_sha256=tokenizer_metadata_sha256,
+        )
+        resource_path.write_bytes(resource_path.read_bytes() + b" ")
+        return identity
+
+    monkeypatch.setattr(
+        tensorrt_llm_provider,
+        "read_tensorrt_llm_artifact_identity",
+        mutate_after_engine_authentication,
+    )
+
+    with pytest.raises(
+        TensorRTLLMExecutionError, match="pinned file (identity|digest) changed"
+    ):
+        TensorRTLLMProvider().validate_evaluation_inputs(
+            spec, resources, _tensorrt_llm_preflight_schedule()
+        )
 
 
 @_REQUIRES_POSIX_PINNING
@@ -326,9 +530,6 @@ def test_tensorrt_llm_scores_in_order_and_emits_bound_receipt(
             root=root,
             primary_artifact=str(bindings.engine_bundle_path).removeprefix("/"),
             support_resources={
-                "runner_executable": str(bindings.runner_executable_path).removeprefix(
-                    "/"
-                ),
                 "tokenizer_contract": str(
                     bindings.tokenizer_contract_path
                 ).removeprefix("/"),
@@ -485,6 +686,8 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
     assert environment["TRTLLM_NO_USAGE_STATS"] == "1"
     assert environment["HOME"] == environment["TMPDIR"]
     assert environment["HOME"] == environment["XDG_CACHE_HOME"]
+    assert environment["LOGNAME"] == str(os.getuid())
+    assert environment["USER"] == str(os.getuid())
     assert "HF_TOKEN" not in environment
     assert "HTTP_PROXY" not in environment
     assert "INVARLOCK_TEST_SECRET" not in environment
@@ -507,6 +710,12 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
         assert process_environment["HOME"] == str(run_path)
         assert process_environment["TMPDIR"] == str(run_path)
         assert process_environment["XDG_CACHE_HOME"] == str(run_path)
+        assert process_environment["TORCHINDUCTOR_CACHE_DIR"] == str(
+            run_path / "torchinductor"
+        )
+        assert process_environment["TRITON_CACHE_DIR"] == str(run_path / "triton")
+        assert process_environment["LOGNAME"] == str(os.getuid())
+        assert process_environment["USER"] == str(os.getuid())
         assert keywords["shell"] is False
         assert keywords["close_fds"] is True
         assert keywords["pass_fds"] == ()

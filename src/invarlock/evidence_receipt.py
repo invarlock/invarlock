@@ -1,4 +1,4 @@
-"""Independent signatures for evidence-pack-v1 verification receipts."""
+"""Independent signatures for InvarLock evidence-pack verification receipts."""
 
 from __future__ import annotations
 
@@ -73,11 +73,27 @@ def _normalized_digest(value: str | None, *, label: str) -> str:
     return normalized
 
 
+def _normalized_optional_digest(value: str | None, *, label: str) -> str | None:
+    return None if value is None else _normalized_digest(value, label=label)
+
+
 def _safe_identity(value: str, *, label: str) -> str:
     normalized = value.strip() if isinstance(value, str) else ""
     if _IDENTITY_RE.fullmatch(normalized) is None:
         raise EvidenceReceiptError(f"{label} is invalid")
     return normalized
+
+
+def _load_private_key_bytes(payload: bytes) -> ed25519.Ed25519PrivateKey:
+    try:
+        key = serialization.load_pem_private_key(payload, password=None)
+    except (TypeError, ValueError) as exc:
+        raise EvidenceReceiptError(
+            f"could not load receipt signing key: {exc}"
+        ) from exc
+    if not isinstance(key, ed25519.Ed25519PrivateKey):
+        raise EvidenceReceiptError("verification receipt signing key must be Ed25519")
+    return key
 
 
 def _load_private_key(path: Path) -> ed25519.Ed25519PrivateKey:
@@ -87,14 +103,27 @@ def _load_private_key(path: Path) -> ed25519.Ed25519PrivateKey:
             label="verification receipt signing key",
             max_bytes=64 * 1024,
         )
-        key = serialization.load_pem_private_key(payload, password=None)
-    except (StrictJsonError, TypeError, ValueError) as exc:
+    except StrictJsonError as exc:
         raise EvidenceReceiptError(
             f"could not load receipt signing key: {exc}"
         ) from exc
-    if not isinstance(key, ed25519.Ed25519PrivateKey):
-        raise EvidenceReceiptError("verification receipt signing key must be Ed25519")
-    return key
+    return _load_private_key_bytes(payload)
+
+
+def _load_policy_bytes(path: Path, captured: bytes | None) -> bytes:
+    if captured is None:
+        return read_regular_file_bytes(
+            path,
+            label="independent policy anchor",
+            max_bytes=4 * 1024 * 1024,
+        )
+    if not isinstance(captured, bytes):
+        raise EvidenceReceiptError("independent policy bytes must be exact bytes")
+    if len(captured) > 4 * 1024 * 1024:
+        raise EvidenceReceiptError(
+            "independent policy anchor exceeds the 4194304-byte size limit"
+        )
+    return captured
 
 
 def _outside_pack(pack_dir: Path, candidate: Path) -> bool:
@@ -107,17 +136,22 @@ def _outside_pack(pack_dir: Path, candidate: Path) -> bool:
 
 def _write_no_clobber(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if os.path.lexists(path):
-        raise EvidenceReceiptError(f"receipt destination already exists: {path}")
+    created = False
     try:
         with path.open("xb") as handle:
+            created = True
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
         path.chmod(0o444)
+    except FileExistsError as exc:
+        raise EvidenceReceiptError(
+            f"receipt destination already exists: {path.name}"
+        ) from exc
     except OSError as exc:
-        path.unlink(missing_ok=True)
-        raise EvidenceReceiptError(f"could not write signed receipt: {exc}") from exc
+        if created:
+            path.unlink(missing_ok=True)
+        raise EvidenceReceiptError("could not write signed receipt") from exc
 
 
 def _statement(
@@ -131,10 +165,10 @@ def _statement(
     expected_pack_signer_fingerprint: str,
     verifier_identity: str,
     verifier_fingerprint: str,
+    trust_profile_digest: str | None,
+    policy_bytes: bytes | None,
 ) -> dict[str, object]:
-    policy = read_regular_file_bytes(
-        policy_path, label="independent policy anchor", max_bytes=4 * 1024 * 1024
-    )
+    policy = _load_policy_bytes(policy_path, policy_bytes)
     artifacts = {
         side: _normalized_digest(value, label=f"{side} artifact anchor")
         for side, value in sorted(expected_artifact_digests.items())
@@ -200,6 +234,10 @@ def _statement(
         "verifier": {
             "identity": _safe_identity(verifier_identity, label="verifier identity"),
             "signing_key_fingerprint": verifier_fingerprint,
+            "trust_profile_digest": _normalized_optional_digest(
+                trust_profile_digest,
+                label="trust profile digest",
+            ),
         },
         "verdict": {
             "ok": bool(result.payload.get("ok")),
@@ -222,8 +260,15 @@ def write_signed_verification_receipt(
     expected_pack_signer_fingerprint: str,
     verifier_identity: str,
     verifier_signing_key_path: Path,
+    trust_profile_digest: str | None = None,
+    policy_bytes: bytes | None = None,
+    verifier_signing_key_bytes: bytes | None = None,
 ) -> str:
-    """Sign explicit caller anchors and a completed verification verdict."""
+    """Sign explicit caller anchors and a completed verification verdict.
+
+    Captured policy and key bytes are used by trust-profile mode. Explicit
+    path mode retains its existing file-loading behavior.
+    """
 
     pack_dir = Path(pack_dir)
     receipt_path = Path(receipt_path)
@@ -235,7 +280,18 @@ def write_signed_verification_receipt(
         result.manifest_digest,
         label="verification result manifest digest",
     )
-    private_key = _load_private_key(verifier_signing_key_path)
+    if verifier_signing_key_bytes is None:
+        private_key = _load_private_key(verifier_signing_key_path)
+    else:
+        if not isinstance(verifier_signing_key_bytes, bytes):
+            raise EvidenceReceiptError(
+                "verification receipt signing key bytes must be exact bytes"
+            )
+        if len(verifier_signing_key_bytes) > 64 * 1024:
+            raise EvidenceReceiptError(
+                "verification receipt signing key exceeds the 65536-byte size limit"
+            )
+        private_key = _load_private_key_bytes(verifier_signing_key_bytes)
     public_key = private_key.public_key()
     fingerprint = public_key_fingerprint(public_key)
     statement = _statement(
@@ -248,6 +304,8 @@ def write_signed_verification_receipt(
         expected_pack_signer_fingerprint=expected_pack_signer_fingerprint,
         verifier_identity=verifier_identity,
         verifier_fingerprint=fingerprint,
+        trust_profile_digest=trust_profile_digest,
+        policy_bytes=policy_bytes,
     )
     statement_bytes = _canonical_json_bytes(statement)
     receipt = {
@@ -295,6 +353,7 @@ def verify_signed_verification_receipt(
     expected_pack_signer_fingerprint: str,
     expected_verifier_identity: str,
     expected_verifier_fingerprint: str,
+    expected_trust_profile_digest: str | None = None,
     require_signed: bool = True,
 ) -> ReceiptVerification:
     """Verify a receipt only against independently supplied trust anchors."""
@@ -352,12 +411,16 @@ def verify_signed_verification_receipt(
     if not isinstance(verifier, dict) or set(verifier) != {
         "identity",
         "signing_key_fingerprint",
+        "trust_profile_digest",
     }:
         errors.append("signed receipt verifier fields are invalid")
     recorded_fingerprint = (
         verifier.get("signing_key_fingerprint") if isinstance(verifier, dict) else None
     )
     recorded_identity = verifier.get("identity") if isinstance(verifier, dict) else None
+    recorded_profile_digest = (
+        verifier.get("trust_profile_digest") if isinstance(verifier, dict) else None
+    )
     try:
         expected_identity = _safe_identity(
             expected_verifier_identity, label="expected verifier identity"
@@ -367,6 +430,16 @@ def verify_signed_verification_receipt(
         expected_identity = None
     if recorded_identity != expected_identity:
         errors.append("receipt verifier identity does not match caller expectation")
+    try:
+        expected_profile_digest = _normalized_optional_digest(
+            expected_trust_profile_digest,
+            label="expected trust profile digest",
+        )
+    except EvidenceReceiptError as exc:
+        errors.append(str(exc))
+        expected_profile_digest = None
+    if recorded_profile_digest != expected_profile_digest:
+        errors.append("receipt trust profile does not match caller expectation")
 
     verdict = statement.get("verdict")
     if not isinstance(verdict, dict) or set(verdict) != {

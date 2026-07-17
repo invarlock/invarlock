@@ -37,10 +37,18 @@ RUN python -m pip install \
 
 FROM ${RUNTIME_BASE_IMAGE}
 ARG TARGETARCH
+ARG INVARLOCK_SOURCE_BUNDLE_SHA256
+ARG INVARLOCK_SOURCE_COMMIT
 ARG RUNTIME_REQUIREMENTS_AMD64
 ARG RUNTIME_REQUIREMENTS_ARM64
 ARG PYTORCH_EXTRA_INDEX_URL
 ARG SOURCE_DATE_EPOCH
+
+RUN python -c 'import re,sys; commit,digest=sys.argv[1:]; re.fullmatch(r"[0-9a-f]{40,64}", commit) or sys.exit("invalid INVARLOCK_SOURCE_COMMIT"); re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or sys.exit("invalid INVARLOCK_SOURCE_BUNDLE_SHA256")' \
+      "${INVARLOCK_SOURCE_COMMIT}" "${INVARLOCK_SOURCE_BUNDLE_SHA256}"
+
+LABEL dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}" \
+      org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"
 
 ENV HF_HUB_OFFLINE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

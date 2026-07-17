@@ -80,6 +80,16 @@ def test_manifest_validator_reports_closed_field_and_binding_failures() -> None:
         assert message in " ".join(verification._validate_manifest(candidate)), index
 
 
+def test_manifest_validator_rejects_historical_unnamespaced_format_clearly() -> None:
+    manifest = _manifest()
+    manifest["format"] = "evidence-pack-v1"
+
+    assert verification._validate_manifest(manifest) == [
+        "unsupported manifest format 'evidence-pack-v1'; expected "
+        "'invarlock/evidence-pack-v1'"
+    ]
+
+
 def test_json_object_loader_rejects_nonobject_oversized_and_symlink(
     tmp_path: Path,
 ) -> None:
@@ -255,6 +265,7 @@ def test_top_level_verifier_collects_independent_anchor_and_manifest_errors(
     assert "schedule anchor must be a sha256" in joined
     assert "signer anchor" in joined
     assert "manifest.json is unavailable" in joined
+    assert str(tmp_path) not in json.dumps(result.payload, sort_keys=True)
 
 
 def test_top_level_verifier_rejects_invalid_policy_runtime_and_noncanonical_manifest(
@@ -299,6 +310,7 @@ def test_result_authenticity_and_policy_status_are_independent(tmp_path: Path) -
         errors=[],
         signer_fingerprint=fingerprint,
         comparison_id="comparison",
+        request_digest=None,
         anchors=anchors,
         status=EvidencePackStatus.INTEGRITY,
         policy_verdict="pass",
@@ -308,6 +320,7 @@ def test_result_authenticity_and_policy_status_are_independent(tmp_path: Path) -
         errors=[],
         signer_fingerprint=fingerprint,
         comparison_id="comparison",
+        request_digest=None,
         anchors=anchors,
         status=EvidencePackStatus.INTEGRITY,
         policy_verdict="fail",
@@ -317,6 +330,7 @@ def test_result_authenticity_and_policy_status_are_independent(tmp_path: Path) -
         errors=["tampered"],
         signer_fingerprint="sha256:" + "b" * 64,
         comparison_id=None,
+        request_digest=None,
         anchors=anchors,
         status=EvidencePackStatus.SIGNATURE,
     )

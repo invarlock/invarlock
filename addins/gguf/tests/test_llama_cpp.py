@@ -26,8 +26,10 @@ from invarlock.core.runtime_provider import (
     RuntimeExecutionContext,
     RuntimeExecutionSettings,
     RuntimeProvider,
+    RuntimeProviderInputPreflight,
     RuntimeSession,
     artifact_identity_sha256,
+    build_runtime_behavioral_schedule_from_material,
     evaluation_input_parts_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
@@ -272,6 +274,143 @@ def _batch(*records: EvaluationRecord) -> EvaluationBatch:
     return EvaluationBatch(schedule_sha256="b" * 64, records=tuple(records))
 
 
+def _schedule(*, task: str = "text_causal"):
+    return build_runtime_behavioral_schedule_from_material(
+        dataset_identity={
+            "provider": "local",
+            "dataset_name": "gguf-preflight-fixture",
+            "config_name": None,
+            "revision": "a" * 40,
+            "split": "validation",
+        },
+        records=[
+            {
+                "record_id": "qualification/0",
+                "input_text": "Prompt",
+                "expected_output": "A",
+            }
+        ],
+        task=task,
+    )
+
+
+def _preflight_resources(
+    tmp_path: Path,
+    bindings: LlamaCppRuntimeBindings,
+    *,
+    device_kind: str = "cpu",
+) -> RuntimeArtifactResources:
+    return RuntimeArtifactResources(
+        root=tmp_path,
+        primary_artifact=bindings.gguf_path.name,
+        support_resources={
+            "backend_executable": bindings.executable_path.name,
+            "backend_source": bindings.source_archive_path.name,
+        },
+        device_kind=device_kind,
+        container_image_digest=_IMAGE_DIGEST,
+    )
+
+
+def test_llama_cpp_input_preflight_authenticates_static_runtime_without_native_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    provider = LlamaCppProvider()
+
+    def unexpected_probe(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("input preflight must not execute llama.cpp")
+
+    monkeypatch.setattr(llama_cpp, "inspect_llama_cpp_backend", unexpected_probe)
+    monkeypatch.setattr(llama_cpp_session, "probe_llama_cpp_version", unexpected_probe)
+
+    assert isinstance(provider, RuntimeProviderInputPreflight)
+    assert (
+        provider.validate_evaluation_inputs(
+            spec,
+            _preflight_resources(tmp_path, bindings),
+            _schedule(),
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("binary", "pinned file digest does not match"),
+        ("source", "pinned file digest does not match"),
+        ("executable", "binary is not executable"),
+    ],
+)
+def test_llama_cpp_input_preflight_rejects_backend_drift(
+    tmp_path: Path, mutation: str, message: str
+) -> None:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    if mutation == "binary":
+        bindings.executable_path.write_bytes(b"changed executable")
+        bindings.executable_path.chmod(0o700)
+    elif mutation == "source":
+        bindings.source_archive_path.write_bytes(b"changed source")
+    else:
+        bindings.executable_path.chmod(0o600)
+
+    with pytest.raises(LlamaCppExecutionError, match=message):
+        LlamaCppProvider().validate_evaluation_inputs(
+            spec,
+            _preflight_resources(tmp_path, bindings),
+            _schedule(),
+        )
+
+
+def test_llama_cpp_input_preflight_rechecks_backend_after_both_files_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    real_open = llama_cpp_session._PinnedFile.open  # noqa: SLF001
+
+    def open_and_mutate(path: Path, **kwargs: object):  # noqa: ANN202
+        pinned = real_open(path, **kwargs)  # type: ignore[arg-type]
+        if Path(path) == bindings.source_archive_path:
+            bindings.executable_path.write_bytes(b"replaced after first hash")
+            bindings.executable_path.chmod(0o700)
+        return pinned
+
+    monkeypatch.setattr(
+        llama_cpp_session._PinnedFile,  # noqa: SLF001
+        "open",
+        staticmethod(open_and_mutate),
+    )
+
+    with pytest.raises(LlamaCppExecutionError, match="pinned file identity changed"):
+        LlamaCppProvider().validate_evaluation_inputs(
+            spec,
+            _preflight_resources(tmp_path, bindings),
+            _schedule(),
+        )
+
+
+def test_llama_cpp_input_preflight_rejects_wrong_task_or_device(
+    tmp_path: Path,
+) -> None:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    provider = LlamaCppProvider()
+
+    with pytest.raises(ValueError, match="does not support schedule task"):
+        provider.validate_evaluation_inputs(
+            spec,
+            _preflight_resources(tmp_path, bindings),
+            _schedule(task="text_seq2seq"),
+        )
+
+    with pytest.raises(ValueError, match="requires a CPU device"):
+        provider.validate_evaluation_inputs(
+            spec,
+            _preflight_resources(tmp_path, bindings, device_kind="cuda"),
+            _schedule(),
+        )
+
+
 def test_llama_cpp_observes_linux_cpu_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -352,6 +491,57 @@ def test_llama_cpp_config_identity_capabilities_and_private_bindings(
     assert str(bindings.executable_path) not in repr(bindings)
     assert str(bindings.source_archive_path) not in repr(bindings)
     assert all("path" not in name for name in spec.settings)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("provider", "provider_name"),
+        ("unknown", "unsupported llama_cpp setting"),
+        ("missing", "missing llama_cpp setting"),
+        ("digest", "lowercase sha256 digest"),
+        ("boolean", "positive integer"),
+        ("zero", "positive integer"),
+        ("negative", "non-negative integer"),
+        ("empty_text", "non-empty trimmed printable string"),
+        ("model_id", "privacy-safe full GGUF digest name"),
+    ],
+)
+def test_llama_cpp_config_rejects_ambiguous_or_unbound_settings(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    spec, _bindings, _context = _runtime_inputs(tmp_path)
+    settings = dict(spec.settings)
+    provider_name = spec.provider_name
+    model_id = spec.model_id
+    if mutation == "provider":
+        provider_name = "other_provider"
+    elif mutation == "unknown":
+        settings["unreviewed_setting"] = "enabled"
+    elif mutation == "missing":
+        del settings["artifact_sha256"]
+    elif mutation == "digest":
+        settings["artifact_sha256"] = "A" * 64
+    elif mutation == "boolean":
+        settings["batch_size"] = True
+    elif mutation == "zero":
+        settings["batch_size"] = 0
+    elif mutation == "negative":
+        settings["seed"] = -1
+    elif mutation == "empty_text":
+        settings["backend_version"] = ""
+    elif mutation == "model_id":
+        model_id = "private/model-name"
+    invalid = ModelRuntimeSpec(
+        provider_name=provider_name,
+        model_id=model_id,
+        settings=settings,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        LlamaCppProvider().validate_config(invalid)
 
 
 @pytest.mark.parametrize(
@@ -619,6 +809,21 @@ def test_llama_cpp_prepare_execution_rejects_missing_backend_resource(
 
     with pytest.raises(ValueError, match="backend_source"):
         LlamaCppProvider().prepare_execution(spec, resources)
+
+
+def test_llama_cpp_authenticates_gguf_without_starting_backend(
+    tmp_path: Path,
+) -> None:
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    provider = LlamaCppProvider()
+
+    assert provider.authenticate_artifact(spec, bindings.gguf_path) == (
+        provider.identify_artifact(spec)
+    )
+
+    bindings.gguf_path.write_bytes(bindings.gguf_path.read_bytes() + b"changed")
+    with pytest.raises(ValueError, match="identity does not match"):
+        provider.authenticate_artifact(spec, bindings.gguf_path)
 
 
 def test_llama_cpp_prepare_execution_binds_root_confined_resources(

@@ -16,6 +16,7 @@ from _support import (
     _write_fake_vendor_python,
 )
 from invarlock_addins.tensorrt_llm import execution as tensorrt_llm_execution
+from invarlock_addins.tensorrt_llm import inspection as tensorrt_llm_inspection
 from invarlock_addins.tensorrt_llm import provider as tensorrt_llm_provider
 from invarlock_addins.tensorrt_llm import session as tensorrt_llm_session
 from invarlock_addins.tensorrt_llm.provider import TensorRTLLMProvider
@@ -241,6 +242,140 @@ def test_tensorrt_llm_inspection_json_rejects_float_overflow() -> None:
         tensorrt_llm_session._strict_json_object(  # noqa: SLF001
             b'{"value":1e100000}', label="tokenizer contract"
         )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (b"\xff", "not UTF-8"),
+        (b'{"value":1,"value":2}', "duplicate key"),
+        (b'{"value":NaN}', "non-finite JSON number"),
+        (b"not-json", "not strict JSON"),
+        (b"[]", "must be a JSON object"),
+    ],
+)
+def test_static_inspection_json_rejects_ambiguous_inputs(
+    payload: bytes, message: str
+) -> None:
+    with pytest.raises(TensorRTLLMExecutionError, match=message):
+        tensorrt_llm_inspection._strict_json_object(  # noqa: SLF001
+            payload, label="static input"
+        )
+
+
+def test_static_inspection_json_enforces_depth_and_item_budgets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nested: object = {"leaf": True}
+    for _ in range(66):
+        nested = {"child": nested}
+    with pytest.raises(TensorRTLLMExecutionError, match="nesting depth"):
+        tensorrt_llm_inspection._strict_json_object(  # noqa: SLF001
+            json.dumps(nested).encode(), label="static input"
+        )
+
+    monkeypatch.setattr(tensorrt_llm_inspection, "_MAX_JSON_ITEMS", 2)
+    with pytest.raises(TensorRTLLMExecutionError, match="item count"):
+        tensorrt_llm_inspection._strict_json_object(  # noqa: SLF001
+            b'{"values":[1,2]}', label="static input"
+        )
+
+
+@pytest.mark.parametrize("value", [True, -1, 2**31, "1"])
+def test_static_inspection_integer_bounds_are_closed(value: object) -> None:
+    with pytest.raises(TensorRTLLMExecutionError, match="supported bound"):
+        tensorrt_llm_inspection._nonnegative_integer(  # noqa: SLF001
+            value, label="value"
+        )
+    with pytest.raises(TensorRTLLMExecutionError, match="supported bound"):
+        tensorrt_llm_inspection._positive_integer(  # noqa: SLF001
+            value, label="value", maximum=16
+        )
+
+
+def _valid_tokenizer_contract() -> dict[str, object]:
+    return {
+        "add_special_tokens": False,
+        "clean_up_tokenization_spaces": False,
+        "eos_token_id": 1,
+        "format_version": "invarlock/tensorrt-llm-tokenizer-contract-v1",
+        "pad_token_id": 0,
+        "skip_special_tokens": True,
+        "tokenizer_json": {"model": {"type": "BPE"}, "version": "1.0"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        (("format_version",), "unknown", "version is unsupported"),
+        (("add_special_tokens",), True, "add_special_tokens=false"),
+        (("skip_special_tokens",), False, "skip_special_tokens=true"),
+        (
+            ("clean_up_tokenization_spaces",),
+            True,
+            "clean_up_tokenization_spaces=false",
+        ),
+        (("eos_token_id",), True, "supported bound"),
+        (("tokenizer_json",), {}, "non-empty object"),
+        (("tokenizer_json", "version"), " ", "non-empty version"),
+        (("tokenizer_json", "model"), {}, "non-empty model"),
+        (("tokenizer_json", "model", "type"), " ", "non-empty type"),
+    ],
+)
+def test_tokenizer_contract_rejects_incompatible_semantics(
+    path: tuple[str, ...], value: object, message: str
+) -> None:
+    payload = _valid_tokenizer_contract()
+    target: dict[str, object] = payload
+    for component in path[:-1]:
+        child = target[component]
+        assert isinstance(child, dict)
+        target = child
+    target[path[-1]] = value
+
+    with pytest.raises(TensorRTLLMExecutionError, match=message):
+        tensorrt_llm_inspection._validate_tokenizer_contract(payload)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda config: config.update(extra=True), "fields are not closed"),
+        (
+            lambda config: config.update(pretrained_config=[]),
+            "sections must be objects",
+        ),
+        (
+            lambda config: config["pretrained_config"].update(mapping=[]),
+            "mapping must be an object",
+        ),
+        (
+            lambda config: config["pretrained_config"]["mapping"].update(
+                world_size=True
+            ),
+            "single-rank engines",
+        ),
+    ],
+)
+def test_engine_contract_rejects_incompatible_structure(
+    mutation: Callable[[dict[str, Any]], None], message: str
+) -> None:
+    config: dict[str, Any] = {
+        "build_config": {
+            "max_batch_size": 1,
+            "max_input_len": 8,
+            "max_seq_len": 16,
+        },
+        "pretrained_config": {
+            "mapping": {"cp_size": 1, "pp_size": 1, "tp_size": 1, "world_size": 1}
+        },
+        "version": "1.0.0",
+    }
+    mutation(config)
+
+    with pytest.raises(TensorRTLLMExecutionError, match=message):
+        tensorrt_llm_inspection._validate_engine_contract(config)  # noqa: SLF001
 
 
 def _remove_tp_size(config: dict[str, Any]) -> None:

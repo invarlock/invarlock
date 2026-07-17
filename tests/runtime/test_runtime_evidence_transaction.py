@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 from dataclasses import asdict, dataclass
@@ -13,6 +14,7 @@ from invarlock.core.runtime_provider import (
     HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
     RuntimeBackendIdentity,
+    RuntimeBehavioralSchedule,
     RuntimeDeviceFacts,
     RuntimeExecutionContext,
     RuntimeExecutionSettings,
@@ -28,7 +30,12 @@ from invarlock.core.runtime_provider import (
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
 )
+from invarlock.filesystem.atomic_directory import (
+    AtomicDirectoryExistsError,
+    AtomicDirectoryPublicationError,
+)
 from invarlock.runtime_behavior import run_evidence_side
+from invarlock.runtime_behavior.transaction import RuntimeEvidenceError
 from invarlock.runtime_provider_evidence import encode_scoring_observation
 from invarlock.runtime_verify import verify_runtime_manifest
 
@@ -140,6 +147,12 @@ class _Provider:
         self.validate_config(spec)
         return _identity()
 
+    def authenticate_artifact(
+        self, spec: ModelRuntimeSpec, artifact_path: Path
+    ) -> HFSnapshotArtifactIdentity:
+        self.validate_config(spec)
+        return _identity()
+
     def open(
         self, spec: ModelRuntimeSpec, context: RuntimeExecutionContext
     ) -> _Session:
@@ -148,10 +161,13 @@ class _Provider:
         return self.session
 
 
-def test_runtime_evidence_side_contract_publishes_typed_strict_files(
+def _run_fixture_side(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-) -> None:
+    *,
+    validated_schedule: RuntimeBehavioralSchedule | None = None,
+    path_schedule: RuntimeBehavioralSchedule | None = None,
+) -> tuple[object, _Provider]:
     # This is a contract test. The real HF prepare/open/score test is separate;
     # release trust still requires the unmocked Docker journey.
     monkeypatch.setattr(
@@ -176,7 +192,9 @@ def test_runtime_evidence_side_contract_publishes_typed_strict_files(
         ],
     )
     schedule_path = tmp_path / "schedule.json"
-    schedule_path.write_bytes(canonical_runtime_behavioral_schedule_json(schedule))
+    schedule_path.write_bytes(
+        canonical_runtime_behavioral_schedule_json(path_schedule or schedule)
+    )
     provider = _Provider()
     spec = ModelRuntimeSpec(
         provider_name=provider.name,
@@ -205,7 +223,16 @@ def test_runtime_evidence_side_contract_publishes_typed_strict_files(
         schedule_path=schedule_path,
         policy_digest="sha256:" + "1" * 64,
         output_directory=tmp_path / "baseline",
+        _validated_schedule=validated_schedule,
     )
+    return bundle, provider
+
+
+def test_runtime_evidence_side_contract_publishes_typed_strict_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle, provider = _run_fixture_side(monkeypatch, tmp_path)
 
     assert provider.session.closed is True
     assert json.loads(bundle.report_path.read_bytes())["format"] == (
@@ -221,3 +248,75 @@ def test_runtime_evidence_side_contract_publishes_typed_strict_files(
         require_strict_runtime=True,
     )
     assert verified.ok, verified.errors
+
+
+def test_runtime_side_scores_the_validated_schedule_snapshot_not_changed_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def schedule(record_id: str) -> RuntimeBehavioralSchedule:
+        return build_runtime_behavioral_schedule_from_material(
+            dataset_identity={
+                "provider": "local",
+                "dataset_name": "contract",
+                "config_name": None,
+                "revision": "f" * 40,
+                "split": "validation",
+            },
+            records=[
+                {
+                    "record_id": record_id,
+                    "input_text": "Return A",
+                    "expected_output": "A",
+                }
+            ],
+        )
+
+    validated = schedule("validated")
+    changed_path = schedule("changed-on-disk")
+
+    bundle, provider = _run_fixture_side(
+        monkeypatch,
+        tmp_path,
+        validated_schedule=validated,
+        path_schedule=changed_path,
+    )
+
+    assert provider.session.observation is not None
+    assert provider.session.observation.schedule_sha256 == validated.schedule_sha256
+    assert provider.session.observation.records[0].record_id == "validated"
+    assert json.loads(bundle.report_path.read_bytes())["schedule_sha256"] == (
+        validated.schedule_sha256
+    )
+
+
+@pytest.mark.parametrize(
+    ("publication_error", "message"),
+    [
+        (
+            AtomicDirectoryExistsError(errno.EEXIST, "destination exists"),
+            "without clobber",
+        ),
+        (
+            AtomicDirectoryPublicationError(errno.EACCES, "permission denied"),
+            "atomic publication failed:.*permission denied",
+        ),
+    ],
+)
+def test_runtime_evidence_side_classifies_atomic_publication_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    publication_error: AtomicDirectoryPublicationError,
+    message: str,
+) -> None:
+    def reject_publication(_staging: Path, _destination: Path) -> None:
+        raise publication_error
+
+    monkeypatch.setattr(
+        runtime_transaction,
+        "publish_directory_no_replace",
+        reject_publication,
+    )
+
+    with pytest.raises(RuntimeEvidenceError, match=message):
+        _run_fixture_side(monkeypatch, tmp_path)

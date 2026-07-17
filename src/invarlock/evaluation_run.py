@@ -9,7 +9,11 @@ from typing import Protocol
 
 from invarlock.core.evaluation_request import ComparisonSideRequest, EvaluationRequest
 from invarlock.core.registry import CoreRegistry
-from invarlock.core.runtime_provider import ModelRuntimeSpec
+from invarlock.core.runtime_provider import (
+    ModelRuntimeSpec,
+    parse_runtime_behavioral_schedule_json,
+    validate_runtime_evaluation_inputs,
+)
 from invarlock.evaluation_runtime import RuntimeResourceResolver, RuntimeSideRole
 from invarlock.evidence_pack import RuntimeSideEvidence
 from invarlock.runtime_behavior.transaction import run_evidence_side
@@ -106,6 +110,14 @@ def execute_runtime_comparison(
 
     evidence: dict[RuntimeSideRole, RuntimeSideEvidence] = {}
     runtime_digests: dict[RuntimeSideRole, str] = {}
+    try:
+        validated_schedule = parse_runtime_behavioral_schedule_json(
+            schedule_bytes.decode("utf-8")
+        )
+    except (UnicodeError, ValueError) as exc:
+        raise ValueError(
+            "canonical schedule is invalid before runtime execution"
+        ) from exc
     with tempfile.TemporaryDirectory(prefix="invarlock-evaluate-") as temporary:
         work = Path(temporary)
         schedule_path = work / "schedule.json"
@@ -127,6 +139,9 @@ def execute_runtime_comparison(
                 side=side,
                 provider=provider,
             )
+            validate_runtime_evaluation_inputs(
+                provider, spec, resources, validated_schedule
+            )
             context = provider.prepare_execution(spec, resources)
             bundle = run_evidence_side(
                 role=role,
@@ -137,6 +152,7 @@ def execute_runtime_comparison(
                 policy_digest=policy_digest,
                 output_directory=work / role,
                 metric=request.comparison.collection_metric,
+                _validated_schedule=validated_schedule,
             )
             runtime_digest = bundle.evidence.receipt.outer_image_digest
             if runtime_digest is None:

@@ -99,6 +99,15 @@ def test_core_distribution_registers_only_canonical_hf_provider() -> None:
     assert "invarlock-tensorrt-llm-runner" not in scripts
 
 
+def test_core_distribution_declares_its_supported_posix_platforms() -> None:
+    metadata = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+    classifiers = set(metadata["project"]["classifiers"])
+
+    assert "Operating System :: OS Independent" not in classifiers
+    assert "Operating System :: MacOS :: MacOS X" in classifiers
+    assert "Operating System :: POSIX :: Linux" in classifiers
+
+
 def test_native_provider_implementations_live_in_optional_addin_distributions() -> None:
     core_provider_root = REPO_ROOT / "src/invarlock/runtime_providers"
     forbidden_core_files = (

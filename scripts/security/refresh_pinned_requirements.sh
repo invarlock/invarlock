@@ -110,6 +110,28 @@ compile_req_platform() {
   )
 }
 
+compile_release_install() {
+  local output="$1"
+  local python_version="$2"
+  local python_tag="${python_version/./}"
+  local output_arg="$1"
+  if [[ "${output}" == "${ROOT_DIR}/"* ]]; then
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile \
+      requirements/workflows/release-install.in \
+      --python-platform x86_64-unknown-linux-gnu \
+      --python-version "${python_version}" \
+      --constraints requirements/workflows/release-security-py313.txt \
+      --constraints "requirements/workflows/ci-hf-py${python_tag}.txt" \
+      --generate-hashes \
+      --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows" \
+      --output-file "${output_arg}"
+  )
+}
+
 run_workflow_locks() {
   compile_pyproject "${WORKFLOW_DIR}/ci-hf-py312.txt" \
     --python-version 3.12 \
@@ -158,7 +180,9 @@ run_workflow_locks() {
     "${WORKFLOW_DIR}/multimodal-runtime.in" \
     "${WORKFLOW_DIR}/multimodal-runtime-py312.txt" \
     --python-version 3.12 \
-    --python-platform x86_64-unknown-linux-gnu
+    --python-platform x86_64-unknown-linux-gnu \
+    --torch-backend cu128 \
+    --no-deps
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \
@@ -168,6 +192,9 @@ run_workflow_locks() {
     --python-version 3.13 \
     --extra release-ci \
     --extra security-ci
+
+  compile_release_install "${WORKFLOW_DIR}/release-install-py312.txt" 3.12
+  compile_release_install "${WORKFLOW_DIR}/release-install-py313.txt" 3.13
 
   compile_pyproject "${WORKFLOW_DIR}/security-ci-py313.txt" \
     --python-version 3.13 \

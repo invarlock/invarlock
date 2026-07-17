@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import EntryPoint, PackageNotFoundError, entry_points
 from importlib.metadata import version as metadata_version
+from pathlib import Path
 from typing import Any, cast
 
 from invarlock import __version__ as INVARLOCK_VERSION
@@ -35,6 +37,7 @@ _FIRST_PARTY_RUNTIME_ADDINS = {
         "invarlock_addins.tensorrt_llm.provider:TensorRTLLMProvider",
     ),
 }
+_QUALIFICATION_CANDIDATE_SITE = "INVARLOCK_QUALIFICATION_CANDIDATE_SITE"
 
 
 @dataclass
@@ -70,6 +73,36 @@ def _normalized_distribution_name(value: str) -> str:
     return re.sub(r"[-_.]+", "-", value).lower()
 
 
+def _qualification_candidate_site() -> Path | None:
+    value = os.environ.get(_QUALIFICATION_CANDIDATE_SITE)
+    if value is None:
+        return None
+    lexical = Path(os.path.abspath(value))
+    try:
+        resolved = lexical.resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError("Qualification candidate site is unavailable") from exc
+    if resolved != lexical or not resolved.is_dir():
+        raise RuntimeError("Qualification candidate site is invalid")
+    return resolved
+
+
+def _entry_point_is_from(
+    entry_point: EntryPoint,
+    *,
+    candidate_site: Path,
+) -> bool:
+    dist = getattr(entry_point, "dist", None)
+    locate_file = getattr(dist, "locate_file", None)
+    if not callable(locate_file):
+        return False
+    try:
+        location = Path(locate_file("")).resolve(strict=True)
+    except (OSError, TypeError, ValueError):
+        return False
+    return location == candidate_site or location.is_relative_to(candidate_site)
+
+
 def _is_shipped_entry_point(entry_point: EntryPoint) -> bool:
     dist = getattr(entry_point, "dist", None)
     dist_name = getattr(dist, "name", None)
@@ -93,17 +126,19 @@ def _is_approved_first_party_addin(entry_point: EntryPoint) -> bool:
         return False
     dist = getattr(entry_point, "dist", None)
     dist_name = getattr(dist, "name", None)
+    dist_version = getattr(dist, "version", None)
     value = getattr(entry_point, "value", None)
     expected_distribution, expected_value = expected
     if (
         not isinstance(dist_name, str)
         or _normalized_distribution_name(dist_name) != expected_distribution
+        or dist_version != INVARLOCK_VERSION
         or value != expected_value
     ):
         raise RuntimeError(
             "Invalid first-party runtime add-in entry point: "
             f"{entry_point.name!r} must come from {expected_distribution!r} "
-            f"and resolve to {expected_value!r}"
+            f"at version {INVARLOCK_VERSION!r} and resolve to {expected_value!r}"
         )
     return True
 
@@ -125,7 +160,17 @@ class CoreRegistry:
         try:
             candidates = _select_entry_points(entry_points())
             allow_third_party = third_party_plugins_allowed()
+            candidate_site = _qualification_candidate_site()
             for entry_point in candidates:
+                if (
+                    candidate_site is not None
+                    and entry_point.name in _FIRST_PARTY_RUNTIME_ADDINS
+                    and not _entry_point_is_from(
+                        entry_point,
+                        candidate_site=candidate_site,
+                    )
+                ):
+                    continue
                 first_party = _is_approved_first_party_addin(entry_point)
                 if first_party or allow_third_party:
                     self._register_entry_point(entry_point)

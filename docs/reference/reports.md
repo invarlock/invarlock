@@ -228,7 +228,7 @@ they have no verdict authority.
 
 ## Verification result
 
-`invarlock verify --json` emits an `evidence-pack-verify-v1` result. Important
+`invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
 fields include:
 
 | Field | Meaning |
@@ -245,7 +245,8 @@ fields include:
 | `warnings`, `errors` | Closed diagnostic arrays |
 
 The high-level transaction adds `signed_receipt`, `verifier_identity`, and
-`verifier_fingerprint`. Stdout is useful process output; the separately signed
+`verifier_fingerprint`. Profile-based verification also adds
+`trust_profile_digest`. Stdout is useful process output; the separately signed
 receipt is the portable verifier assertion.
 
 Do not infer acceptance from `integrity_ok` alone. Require status `0`,
@@ -276,7 +277,8 @@ The receipt contains a `statement` and `signature`. The statement format is
   },
   "verifier": {
     "identity": "release-verifier",
-    "signing_key_fingerprint": "sha256:..."
+    "signing_key_fingerprint": "sha256:...",
+    "trust_profile_digest": "sha256:..."
   },
   "verdict": {
     "ok": true,
@@ -293,7 +295,9 @@ the verifier public key in PEM form, and signs canonical statement bytes. The
 embedded key is verification material, not a trust source. A receipt reader
 must still supply the expected verifier identity and fingerprint, pack, policy,
 artifact digests, schedule digest, runtime digests, and expected evidence
-signer.
+signer. For profile-based verification, it must also supply the expected
+canonical trust-profile digest. Explicit-option receipts record `null` for that
+field.
 
 A receipt is written for a completed policy or integrity rejection when the
 transaction can form a safe statement, then the command exits nonzero. A
@@ -314,6 +318,7 @@ Downstream readers use
 | Expected evidence-signer fingerprint | Receipt anchor and authenticated evidence signature |
 | Expected verifier identity | Receipt statement identity |
 | Expected verifier fingerprint | Embedded receipt public key and receipt signature |
+| Expected trust-profile digest or `null` | Receipt verifier profile binding |
 
 ## Human report
 

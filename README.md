@@ -158,20 +158,46 @@ output:
   evidence: artifacts/evidence-001
 ```
 
+`evaluate` always performs the complete execution-free validation before it
+starts model runtimes. Use `--preflight` to stop after that validation and
+inspect its machine-readable result without creating output:
+
+```bash
+invarlock evaluate request.yaml --signing-key evidence-signer.pem \
+  --runtime-image registry.example/invarlock-runtime@sha256:... \
+  --preflight --json
+```
+
+Preflight checks configuration and local availability; continuing with the real
+evaluation is still required to establish runtime execution and the policy
+result.
+
 Replace the illustrative digests with values derived from the exact inputs.
 Then invoke the host CLI. In run mode, the host prepares the authenticated
 schedule and launches a separately pinned worker for each side; Docker is the
 default engine and Podman is supported.
 
-Build and smoke-test the image that matches the intended device before running:
+Build the authenticated Git source bundle as shown in the
+[runtime-provider guide](docs/user-guide/runtime-providers.md#build-or-obtain-the-runtime-image),
+then build and smoke-test the image that matches the intended device:
 
 ```bash
+mkdir -p artifacts
+
 # CPU, including Apple Silicon through the matching multi-architecture lock
-make runtime-image
+make runtime-image \
+  RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
+  RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+  RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+  RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cpu.json"
 make runtime-smoke
 
 # x86_64 NVIDIA CUDA 12.8
-make runtime-image-cuda
+make runtime-image-cuda \
+  RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
+  RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+  RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+  RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cuda.json"
 make runtime-smoke-cuda
 ```
 
@@ -202,28 +228,23 @@ sequentially; explicitly different CUDA indexes can run in parallel.
 ## Verify and report
 
 Verification supplies the expected artifact identities, canonical schedule,
-policy, runtime identities, and evidence signer independently of the bundle:
+policy, runtime identities, and evidence signer independently of the bundle.
+Keep those inputs in one closed verifier-owned profile:
 
 ```bash
 invarlock verify artifacts/evidence-001/ \
-  --policy policy/acceptance.json \
-  --expected-baseline-artifact sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc \
-  --expected-subject-artifact sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
-  --expected-schedule sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-  --expected-baseline-runtime sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  --expected-subject-runtime sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  --expected-signer sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
-  --receipt verification.receipt.json \
-  --verifier-signing-key verifier.pem \
-  --verifier-identity release-verifier
+  --trust-profile trust/trust-inputs.json \
+  --receipt verification.receipt.json
 
 invarlock report artifacts/evidence-001/ --html evidence.html --explain
 ```
 
 The evidence signer authenticates the comparison bytes. The verifier decides
 whether those bytes satisfy the independently maintained anchors and signs a
-separate receipt. `report` renders the signature-authenticated comparison;
-independent verification remains the acceptance record.
+separate receipt that binds the profile digest. `report` renders the
+signature-authenticated comparison; independent verification remains the
+acceptance record. The [CLI reference](docs/reference/cli.md#verify) defines
+the closed profile and the equivalent explicit options.
 
 ## Import existing measurements
 

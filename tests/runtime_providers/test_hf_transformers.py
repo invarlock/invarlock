@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
+from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.registry import CoreRegistry
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
@@ -391,6 +393,37 @@ def test_hf_provider_identifies_bound_snapshot_without_exposing_path() -> None:
     assert identity.immutable_revision == "1" * 40
     assert identity.checkpoint_tree_sha256 == "a" * 64
     assert identity.tokenizer_metadata_sha256 == "b" * 64
+
+
+def test_hf_provider_authenticates_local_checkpoint_bytes(tmp_path: Path) -> None:
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    config = checkpoint / "config.json"
+    config.write_text('{"model_type":"test"}\n', encoding="utf-8")
+    digest = checkpoint_tree_sha256(checkpoint).removeprefix("sha256:")
+    spec = _spec(checkpoint_tree_sha256=digest)
+    provider = HFTransformersProvider()
+
+    assert provider.authenticate_artifact(spec, checkpoint) == (
+        provider.identify_artifact(spec)
+    )
+
+    config.write_text('{"model_type":"changed"}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="tree digest does not match"):
+        provider.authenticate_artifact(spec, checkpoint)
+
+
+def test_hf_provider_artifact_authentication_requires_digest_and_readable_tree(
+    tmp_path: Path,
+) -> None:
+    provider = HFTransformersProvider()
+    revision_only = _spec(checkpoint_tree_sha256=None)
+
+    with pytest.raises(ValueError, match="requires checkpoint_tree_sha256"):
+        provider.authenticate_artifact(revision_only, tmp_path / "checkpoint")
+
+    with pytest.raises(ValueError, match="could not be authenticated"):
+        provider.authenticate_artifact(_spec(), tmp_path / "missing")
 
 
 def test_hf_provider_pseudonymizes_local_path_from_authenticated_tree_digest(

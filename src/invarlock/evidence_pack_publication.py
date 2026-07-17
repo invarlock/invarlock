@@ -1,4 +1,4 @@
-"""Atomic publication for the canonical evidence-pack-v1 envelope."""
+"""Atomic publication for the canonical InvarLock evidence-pack envelope."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -48,11 +49,24 @@ from invarlock.evidence_pack_contract import (
     sha256_digest,
 )
 from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
+from invarlock.filesystem import (
+    AtomicDirectoryExistsError,
+    AtomicDirectoryPublicationError,
+    publish_directory_no_replace,
+)
 from invarlock.runtime_provider_evidence import (
     RuntimeProviderEvidenceError,
     decode_artifact_identity,
 )
 from invarlock.runtime_verify import verify_runtime_manifest_snapshot
+
+
+@dataclass(frozen=True)
+class EvidencePublication:
+    """One atomically published pack and its pre-publication manifest identity."""
+
+    evidence_path: Path
+    pack_manifest_digest: str
 
 
 def _write_new(path: Path, payload: bytes, *, mode: int = 0o444) -> None:
@@ -126,28 +140,17 @@ def _fsync_directory(path: Path) -> None:
 
 
 def _publish_directory_no_clobber(staging: Path, destination: Path) -> None:
-    lock_path = destination.parent / f".{destination.name}.publish.lock"
     try:
-        descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as exc:
+        publish_directory_no_replace(staging, destination)
+    except AtomicDirectoryExistsError as exc:
         raise EvidencePackError(
-            f"evidence destination is already being published: {destination}"
+            f"evidence destination already exists: {destination}"
         ) from exc
-    try:
-        os.close(descriptor)
-        if os.path.lexists(destination):
-            raise EvidencePackError(
-                f"evidence destination already exists: {destination}"
-            )
-        try:
-            os.rename(staging, destination)
-        except OSError as exc:
-            raise EvidencePackError(
-                f"could not atomically publish evidence pack: {exc}"
-            ) from exc
-        _fsync_directory(destination.parent)
-    finally:
-        lock_path.unlink(missing_ok=True)
+    except AtomicDirectoryPublicationError as exc:
+        raise EvidencePackError(
+            f"could not atomically publish evidence pack: {exc}"
+        ) from exc
+    _fsync_directory(destination.parent)
 
 
 def _side_payloads(side: str, evidence: RuntimeSideEvidence) -> dict[str, bytes]:
@@ -299,7 +302,7 @@ def publish_comparison_evidence(
     observations: Sequence[EvidenceObservation] = (),
     scorer_registry: ScorerExtensionRegistry | None = None,
     expected_paired_records: Mapping[str, object] | None = None,
-) -> Path:
+) -> EvidencePublication:
     """Derive, preflight, sign, and atomically publish one comparison."""
 
     destination = Path(destination)
@@ -532,7 +535,10 @@ def publish_comparison_evidence(
     finally:
         if not published and staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
-    return destination
+    return EvidencePublication(
+        evidence_path=destination,
+        pack_manifest_digest=sha256_digest(manifest_bytes),
+    )
 
 
-__all__ = ["publish_comparison_evidence"]
+__all__ = ["EvidencePublication", "publish_comparison_evidence"]

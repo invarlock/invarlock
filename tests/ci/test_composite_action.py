@@ -107,6 +107,10 @@ def test_action_calls_current_verify_and_report_transactions() -> None:
     assert "--html" in report
     assert "--explain" in report
     assert "report html" not in report
+    assert _step(action, "Render InvarLock HTML report")["if"] == (
+        "${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && "
+        "env.INVARLOCK_VERIFY_EXIT_CODE == '0' }}"
+    )
 
 
 def test_action_preserves_review_outputs_without_uploading_the_verifier_key() -> None:
@@ -115,7 +119,8 @@ def test_action_preserves_review_outputs_without_uploading_the_verifier_key() ->
     uploaded_paths = upload["with"]["path"]
 
     assert upload["if"] == (
-        "${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' }}"
+        "${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && "
+        "env.INVARLOCK_VERIFY_EXIT_CODE == '0' }}"
     )
     assert upload["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
@@ -129,6 +134,21 @@ def test_action_preserves_review_outputs_without_uploading_the_verifier_key() ->
         assert expected in uploaded_paths
     assert "verifier-signing-key" not in uploaded_paths
     assert "inputs.policy" not in uploaded_paths
+
+    failure_upload = _step(action, "Upload InvarLock verification failure")
+    assert failure_upload["if"] == (
+        "${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && "
+        "env.INVARLOCK_VERIFY_EXIT_CODE != '0' }}"
+    )
+    assert failure_upload["with"]["path"] == "${{ inputs.verify-output }}"
+    assert failure_upload["with"]["name"].endswith("-verification-failure")
+    for private_input in (
+        "inputs.evidence",
+        "inputs.receipt-output",
+        "inputs.html-output",
+        "inputs.verifier-signing-key",
+    ):
+        assert private_input not in failure_upload["with"]["path"]
 
     enforce = _step(action, "Enforce InvarLock verification result")["run"]
     assert "INVARLOCK_VERIFY_EXIT_CODE:-1" in enforce

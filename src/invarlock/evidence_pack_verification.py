@@ -1,4 +1,4 @@
-"""Independent verification for canonical evidence-pack-v1 bundles."""
+"""Independent verification for canonical InvarLock evidence packs."""
 
 from __future__ import annotations
 
@@ -73,6 +73,12 @@ def _load_json_object(
 def _validate_manifest(payload: object) -> list[str]:
     if not isinstance(payload, dict):
         return ["manifest must decode to a JSON object"]
+    manifest_format = payload.get("format")
+    if manifest_format != EVIDENCE_PACK_FORMAT:
+        return [
+            f"unsupported manifest format {manifest_format!r}; expected "
+            f"{EVIDENCE_PACK_FORMAT!r}"
+        ]
     schema_errors = sorted(
         Draft202012Validator(load_evidence_pack_schema()).iter_errors(payload),
         key=lambda error: tuple(str(part) for part in error.absolute_path),
@@ -98,8 +104,6 @@ def _validate_manifest(payload: object) -> list[str]:
         frozenset({*expected_fields, "observations"}),
     }:
         errors.append("manifest fields are invalid")
-    if payload.get("format") != EVIDENCE_PACK_FORMAT:
-        errors.append(f"manifest format must be {EVIDENCE_PACK_FORMAT!r}")
     comparison_id = payload.get("comparison_id")
     if not isinstance(comparison_id, str) or not _IDENTIFIER_RE.fullmatch(
         comparison_id
@@ -496,6 +500,7 @@ def _result(
     errors: list[str],
     signer_fingerprint: str | None,
     comparison_id: str | None,
+    request_digest: str | None,
     anchors: Mapping[str, object],
     status: EvidencePackStatus,
     policy_verdict: str | None = None,
@@ -512,9 +517,10 @@ def _result(
     return EvidencePackResult(
         payload={
             "format_version": EVIDENCE_PACK_VERIFY_FORMAT,
-            "pack": str(pack_dir),
+            "pack": pack_dir.name,
             "pack_format": EVIDENCE_PACK_FORMAT,
             "comparison_id": comparison_id,
+            "request_digest": request_digest,
             "ok": ok,
             "integrity_ok": integrity_ok,
             "reports_verified": integrity_ok,
@@ -556,7 +562,6 @@ def _snapshot_failure_result(
     """Return a closed failure when immutable snapshot handling fails."""
 
     anchors: dict[str, object] = {
-        "policy_path": str(policy_path) if policy_path is not None else None,
         "policy_digest": None,
         "artifact_digests": (
             dict(expected_artifact_digests)
@@ -578,6 +583,7 @@ def _snapshot_failure_result(
         errors=errors,
         signer_fingerprint=None,
         comparison_id=None,
+        request_digest=None,
         anchors=anchors,
         status=EvidencePackStatus.INTEGRITY,
     )
@@ -597,7 +603,7 @@ def _with_snapshot_errors(
     observed.extend(errors)
     payload.update(
         {
-            "pack": str(pack_dir),
+            "pack": pack_dir.name,
             "ok": False,
             "integrity_ok": False,
             "reports_verified": False,
@@ -617,6 +623,7 @@ def _verify_comparison_evidence_snapshot(
     pack_dir: Path,
     *,
     policy_path: Path | None,
+    policy_bytes: bytes | None,
     expected_artifact_digests: Mapping[str, str] | None,
     expected_schedule_digest: str | None,
     expected_runtime_digests: Mapping[str, str] | None,
@@ -629,19 +636,32 @@ def _verify_comparison_evidence_snapshot(
     errors: list[str] = []
     policy_payload: dict[str, Any] | None = None
     policy_digest: str | None = None
-    if policy_path is None:
+    if policy_bytes is not None:
+        if len(policy_bytes) > 4 * 1024 * 1024:
+            errors.append(
+                "independent policy anchor exceeds the 4194304-byte size limit"
+            )
+        else:
+            try:
+                policy_payload = parse_json_object(
+                    policy_bytes, label="independent policy anchor"
+                )
+                policy_digest = sha256_digest(policy_bytes)
+            except (EvidencePackError, StrictJsonError) as exc:
+                errors.append(str(exc))
+    elif policy_path is None:
         errors.append("independent policy_path anchor is required")
     else:
         try:
-            policy_bytes = read_regular_file_bytes(
+            loaded_policy_bytes = read_regular_file_bytes(
                 Path(policy_path),
                 label="independent policy anchor",
                 max_bytes=4 * 1024 * 1024,
             )
             policy_payload = parse_json_object(
-                policy_bytes, label="independent policy anchor"
+                loaded_policy_bytes, label="independent policy anchor"
             )
-            policy_digest = sha256_digest(policy_bytes)
+            policy_digest = sha256_digest(loaded_policy_bytes)
         except (EvidencePackError, StrictJsonError) as exc:
             errors.append(str(exc))
     artifacts: dict[str, str] = {}
@@ -690,7 +710,6 @@ def _verify_comparison_evidence_snapshot(
     if normalized_signer is None:
         errors.append("independent signer anchor must be a sha256:... fingerprint")
     anchors: dict[str, object] = {
-        "policy_path": str(policy_path) if policy_path is not None else None,
         "policy_digest": policy_digest,
         "artifact_digests": artifacts,
         "schedule_digest": schedule_digest,
@@ -708,6 +727,7 @@ def _verify_comparison_evidence_snapshot(
             errors=errors,
             signer_fingerprint=None,
             comparison_id=None,
+            request_digest=None,
             anchors=anchors,
             status=EvidencePackStatus.FORMAT,
         )
@@ -717,6 +737,7 @@ def _verify_comparison_evidence_snapshot(
     errors.extend(format_errors)
     signer_fingerprint: str | None = None
     policy_verdict: str | None = None
+    request_digest: str | None = None
     verified_observations: list[dict[str, str]] = []
     if not format_errors:
         signature_errors, _warnings, signer_fingerprint = integrity.verify_signature(
@@ -770,6 +791,7 @@ def _verify_comparison_evidence_snapshot(
                 )
                 if canonical_json_bytes(request) != loaded["request"]:
                     errors.append("normalized request is not canonical JSON")
+                request_digest = sha256_digest(loaded["request"])
                 errors.extend(evaluation_request_errors(request))
                 metric = request_metric(request)
                 scorer_binding = request_scorer_binding(request)
@@ -982,6 +1004,7 @@ def _verify_comparison_evidence_snapshot(
             if isinstance(manifest.get("comparison_id"), str)
             else None
         ),
+        request_digest=request_digest,
         anchors=anchors,
         status=(
             EvidencePackStatus.FORMAT if format_errors else EvidencePackStatus.INTEGRITY
@@ -1000,8 +1023,13 @@ def verify_comparison_evidence(
     expected_runtime_digests: Mapping[str, str] | None,
     expected_signer_fingerprint: str | None,
     scorer_registry: ScorerExtensionRegistry | None = None,
+    policy_bytes: bytes | None = None,
 ) -> EvidencePackResult:
-    """Verify one immutable pack snapshot against caller-owned trust roots."""
+    """Verify one immutable pack snapshot against caller-owned trust roots.
+
+    ``policy_bytes`` is an already authenticated snapshot used by trust-profile
+    mode. Explicit path mode retains its existing ``policy_path`` behavior.
+    """
 
     source = Path(pack_dir)
     snapshot, capture_errors = PackSnapshot.capture(
@@ -1029,6 +1057,7 @@ def verify_comparison_evidence(
             result = _verify_comparison_evidence_snapshot(
                 snapshot_root,
                 policy_path=policy_path,
+                policy_bytes=policy_bytes,
                 expected_artifact_digests=expected_artifact_digests,
                 expected_schedule_digest=expected_schedule_digest,
                 expected_runtime_digests=expected_runtime_digests,
@@ -1059,7 +1088,7 @@ def verify_comparison_evidence(
             manifest_digest=manifest_digest,
         )
     payload = dict(result.payload)
-    payload["pack"] = str(source)
+    payload["pack"] = source.name
     return EvidencePackResult(payload, result.status, manifest_digest)
 
 

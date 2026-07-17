@@ -227,6 +227,24 @@ def test_load_run_request_resolves_two_closed_runtime_sides(tmp_path: Path) -> N
         request.comparison.subject.runtime.settings["batch_size"] = 8  # type: ignore[index]
 
 
+@pytest.mark.parametrize(
+    "host_control",
+    ["runtime_cpus", "runtime_memory_mib", "runtime_user", "container_engine"],
+)
+def test_run_request_cannot_select_caller_owned_oci_host_controls(
+    tmp_path: Path,
+    host_control: str,
+) -> None:
+    _materialize_run_inputs(tmp_path)
+    payload = _request_payload()
+    execution = payload["execution"]
+    assert isinstance(execution, dict)
+    execution[host_control] = "untrusted-request-value"
+
+    with pytest.raises(EvaluationRequestError, match="does not match"):
+        load_evaluation_request(_write_request(tmp_path / "request.yaml", payload))
+
+
 def test_request_resolves_optional_observation_payloads_without_embedding_paths(
     tmp_path: Path,
 ) -> None:

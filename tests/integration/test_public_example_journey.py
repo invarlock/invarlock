@@ -69,10 +69,12 @@ _EXPECTED_REQUEST_INPUTS = {
 }
 
 
-def _git(*arguments: str) -> subprocess.CompletedProcess[bytes]:
+def _git(
+    *arguments: str, repository: Path = REPO_ROOT
+) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         ["git", *arguments],
-        cwd=REPO_ROOT,
+        cwd=repository,
         check=False,
         capture_output=True,
     )
@@ -93,11 +95,15 @@ def _request_file_inputs(value: object) -> set[str]:
     return references
 
 
-def _export_git_index_examples(destination: Path) -> Path:
-    tree = _git("write-tree")
-    assert tree.returncode == 0, tree.stderr.decode("utf-8", errors="replace")
-    tree_id = tree.stdout.decode("ascii").strip()
-    archived = _git("archive", "--format=tar", tree_id, "examples")
+def _export_committed_examples(
+    destination: Path, *, repository: Path = REPO_ROOT
+) -> Path:
+    head = _git("rev-parse", "--verify", "HEAD^{tree}", repository=repository)
+    assert head.returncode == 0, head.stderr.decode("utf-8", errors="replace")
+    tree_id = head.stdout.decode("ascii").strip()
+    archived = _git(
+        "archive", "--format=tar", tree_id, "examples", repository=repository
+    )
     assert archived.returncode == 0, archived.stderr.decode("utf-8", errors="replace")
     destination.mkdir()
     with tarfile.open(fileobj=io.BytesIO(archived.stdout), mode="r:") as archive:
@@ -105,10 +111,38 @@ def _export_git_index_examples(destination: Path) -> Path:
     return destination / "examples"
 
 
+def test_example_export_uses_committed_head_not_staged_index(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    assert _git("init", "--quiet", repository=repository).returncode == 0
+    assert (
+        _git(
+            "config", "user.email", "test@example.invalid", repository=repository
+        ).returncode
+        == 0
+    )
+    assert _git("config", "user.name", "Test", repository=repository).returncode == 0
+    examples = repository / "examples"
+    examples.mkdir()
+    fixture = examples / "fixture.txt"
+    fixture.write_text("committed\n", encoding="utf-8")
+    assert _git("add", "examples/fixture.txt", repository=repository).returncode == 0
+    assert (
+        _git("commit", "--quiet", "-m", "fixture", repository=repository).returncode
+        == 0
+    )
+    fixture.write_text("staged drift\n", encoding="utf-8")
+    assert _git("add", "examples/fixture.txt", repository=repository).returncode == 0
+
+    exported = _export_committed_examples(tmp_path / "exported", repository=repository)
+
+    assert exported.joinpath("fixture.txt").read_text(encoding="utf-8") == "committed\n"
+
+
 @pytest.mark.parametrize(
     ("request_name", "expected_inputs"), _EXPECTED_REQUEST_INPUTS.items()
 )
-def test_every_example_request_input_is_present_in_the_git_index(
+def test_every_example_request_input_is_present_in_committed_head(
     request_name: str, expected_inputs: set[str]
 ) -> None:
     request_path = REPO_ROOT / "examples" / request_name
@@ -116,7 +150,7 @@ def test_every_example_request_input_is_present_in_the_git_index(
     references = _request_file_inputs(request)
     assert references == expected_inputs
 
-    tracked = _git("ls-files", "--cached", "--", "examples")
+    tracked = _git("ls-tree", "-r", "--name-only", "HEAD", "--", "examples")
     assert tracked.returncode == 0, tracked.stderr.decode("utf-8", errors="replace")
     tracked_paths = set(tracked.stdout.decode("utf-8").splitlines())
     for reference in sorted(references):
@@ -124,7 +158,7 @@ def test_every_example_request_input_is_present_in_the_git_index(
         assert ".." not in Path(reference).parts
         repository_path = f"examples/{reference}"
         assert repository_path in tracked_paths, (
-            f"{request_name} input is absent from the Git index: {repository_path}"
+            f"{request_name} input is absent from committed HEAD: {repository_path}"
         )
         assert (REPO_ROOT / repository_path).is_file()
 
@@ -163,7 +197,7 @@ def test_only_fixed_runtime_receipts_are_unignored() -> None:
 def test_checked_in_example_completes_the_public_signed_journey(
     tmp_path: Path,
 ) -> None:
-    example = _export_git_index_examples(tmp_path / "exported-tree")
+    example = _export_committed_examples(tmp_path / "exported-tree")
 
     generated = subprocess.run(
         [
@@ -278,7 +312,7 @@ def test_checked_in_example_completes_the_public_signed_journey(
     assert report["subject"] == {"mean_score": 1.0}
     assert report["comparison"] == {
         "kind": "exact_match_delta_pp",
-        "minimum": -10.0,
+        "minimum": 0.0,
         "value": 0.0,
     }
     assert report["verdict"] == "pass"
@@ -287,7 +321,7 @@ def test_checked_in_example_completes_the_public_signed_journey(
 def test_trust_boundary_demo_accepts_rejects_and_detects_tampering(
     tmp_path: Path,
 ) -> None:
-    example = _export_git_index_examples(tmp_path / "exported-tree")
+    example = _export_committed_examples(tmp_path / "exported-tree")
     workspace = tmp_path / "trust-boundary"
 
     completed = subprocess.run(

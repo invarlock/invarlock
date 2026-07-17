@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      PYTHONPATH: ${{ github.workspace }}/src
+      CONTAINER_ENGINE: docker
       INVARLOCK_RUNTIME_IMAGE: invarlock-runtime:local
     steps:
       - name: Checkout
@@ -40,5 +40,47 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
 
-      - name: Exercise evaluate, verify, and report
-        run: make container-front-door-smoke
+      - name: Install candidate wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf wheelhouse
+          python -m build --no-isolation --wheel --outdir wheelhouse
+          python -m pip install --no-deps --force-reinstall wheelhouse/*.whl
+          python -c 'from pathlib import Path; import invarlock; assert not Path(invarlock.__file__).resolve().is_relative_to(Path.cwd().resolve())'
+
+      - name: Authenticate runtime source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          source_bundle="$RUNNER_TEMP/invarlock-source.tar"
+          source_result="$(python scripts/qualification_source.py create \
+            --repository . \
+            --commit "$source_commit" \
+            --output "$source_bundle")"
+          source_digest="$(python -c 'import json,sys; print(json.load(sys.stdin)["source_bundle_sha256"])' \
+            <<<"$source_result")"
+          python scripts/qualification_source.py verify \
+            --repository . \
+            --commit "$source_commit" \
+            --bundle "$source_bundle" \
+            --bundle-sha256 "$source_digest" >/dev/null
+          {
+            echo "RUNTIME_SOURCE_COMMIT=$source_commit"
+            echo "RUNTIME_SOURCE_BUNDLE=$source_bundle"
+            echo "RUNTIME_SOURCE_BUNDLE_SHA256=$source_digest"
+          } >> "$GITHUB_ENV"
+
+      - name: Exercise installed-wheel OCI and signed canary journey
+        shell: bash
+        run: |
+          set -euo pipefail
+          make runtime-image
+          INVARLOCK_RUN_CONTAINER_SMOKE=1 \
+          INVARLOCK_CONTAINER_SMOKE_INSTALLED_WHEEL=1 \
+          INVARLOCK_CONTAINER_ENGINE="$CONTAINER_ENGINE" \
+          INVARLOCK_RUNTIME_IMAGE="$INVARLOCK_RUNTIME_IMAGE" \
+          PYTHONPATH='' \
+          python -m pytest -q -m integration \
+            tests/integration/test_container_front_door_journey.py

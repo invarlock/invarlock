@@ -15,6 +15,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, Protocol
 
+from invarlock._optional_runtime_profiles import OPTIONAL_RUNTIME_PROVIDER_PROFILES
 from invarlock.core.evaluation_request import ComparisonSideRequest
 from invarlock.core.runtime_provider import RuntimeArtifactResources, RuntimeProvider
 from invarlock.runtime_security_helpers import resolve_runtime_image_digest
@@ -183,32 +184,13 @@ def caller_runtime_resources_from_environment() -> CallerRuntimeResources:
         if value is not None:
             side_devices[role] = value
     provider_bindings: dict[str, ProviderResourceBinding] = {}
-    vision_text = _optional_provider_binding(
-        root_variable="INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT",
-        support_variables={
-            "content_store": "INVARLOCK_HF_VISION_TEXT_CONTENT_STORE",
-        },
-    )
-    if vision_text is not None:
-        provider_bindings["hf_vision_text"] = vision_text
-    gguf = _optional_provider_binding(
-        root_variable="INVARLOCK_GGUF_RESOURCE_ROOT",
-        support_variables={
-            "backend_executable": "INVARLOCK_GGUF_BACKEND_EXECUTABLE",
-            "backend_source": "INVARLOCK_GGUF_BACKEND_SOURCE",
-        },
-    )
-    if gguf is not None:
-        provider_bindings["llama_cpp"] = gguf
-    tensorrt = _optional_provider_binding(
-        root_variable="INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT",
-        support_variables={
-            "tokenizer_contract": "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT",
-            "runner_executable": "INVARLOCK_TENSORRT_LLM_RUNNER_EXECUTABLE",
-        },
-    )
-    if tensorrt is not None:
-        provider_bindings["tensorrt_llm"] = tensorrt
+    for profile in OPTIONAL_RUNTIME_PROVIDER_PROFILES.values():
+        binding = _optional_provider_binding(
+            root_variable=profile.resource_root_environment,
+            support_variables=dict(profile.support_resource_environment),
+        )
+        if binding is not None:
+            provider_bindings[profile.provider_name] = binding
     return CallerRuntimeResources(
         container_image_digest=image_digest,
         default_device=default_device,

@@ -66,7 +66,7 @@ type, byte length, and digest. It serializes the validated schedule and
 recomputes `schedule_sha256`.
 
 The schedule digest serves as the dataset material identity in
-`evidence-pack-v1`. Dataset coordinates explain the declared source; the
+`invarlock/evidence-pack-v1`. Dataset coordinates explain the declared source; the
 digest identifies the exact ordered schedule evaluated. Coordinates alone are
 not a material identity.
 
@@ -170,7 +170,7 @@ a paired subset.
 Run mode asks installed providers to authenticate and score both artifacts.
 Import mode accepts complete provider evidence created elsewhere. Both modes
 converge on the same pair derivation, canonical report, and
-`evidence-pack-v1` publication path.
+`invarlock/evidence-pack-v1` publication path.
 
 Import mode is not a relaxed path. Imported paired records must equal the pairs
 derived from the imported schedule and provider observations. All provider,

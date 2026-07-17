@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -175,6 +176,19 @@ def _validate_tokenizer_contract(payload: dict[str, object]) -> None:
         )
 
 
+def authenticate_tensorrt_llm_tokenizer_contract(payload: bytes) -> str:
+    """Validate one closed tokenizer contract and return its byte digest."""
+
+    if len(payload) > _MAX_TOKENIZER_CONTRACT_BYTES:
+        raise TensorRTLLMExecutionError(
+            "tokenizer contract exceeds the configured size bound"
+        )
+    _validate_tokenizer_contract(
+        _strict_json_object(payload, label="tokenizer contract")
+    )
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _validate_engine_contract(config: dict[str, object]) -> tuple[int, int, int]:
     if set(config) != {"build_config", "pretrained_config", "version"}:
         raise TensorRTLLMExecutionError("engine config fields are not closed")
@@ -260,12 +274,13 @@ def _open_validated_tensorrt_llm_static_inputs(
             require_executable=False,
             max_bytes=_MAX_ENGINE_CONFIG_BYTES,
         )
-        _validate_tokenizer_contract(
-            _strict_json_object(
-                _read_pinned_bytes(tokenizer, label="tokenizer contract"),
-                label="tokenizer contract",
+        tokenizer_payload = _read_pinned_bytes(tokenizer, label="tokenizer contract")
+        if authenticate_tensorrt_llm_tokenizer_contract(tokenizer_payload) != (
+            tokenizer.sha256
+        ):
+            raise TensorRTLLMExecutionError(
+                "tokenizer contract changed while being authenticated"
             )
-        )
         engine_limits = _validate_engine_contract(
             _strict_json_object(
                 _read_pinned_bytes(engine_config, label="engine config"),

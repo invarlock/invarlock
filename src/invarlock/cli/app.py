@@ -8,6 +8,7 @@ alternate user journeys hidden behind this CLI.
 
 from __future__ import annotations
 
+import json
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -84,6 +85,7 @@ def _root(
 def evaluate(
     request: Path = typer.Argument(
         ...,
+        metavar="REQUEST",
         exists=True,
         file_okay=True,
         dir_okay=False,
@@ -110,6 +112,20 @@ def evaluate(
         False,
         "--json",
         help="Emit one machine-readable result object.",
+    ),
+    preflight: bool = typer.Option(
+        False,
+        "--preflight",
+        help=(
+            "Validate request, authenticated inputs, provider resources, local "
+            "runtime images, key, and destination without workers or publication."
+        ),
+    ),
+    request_root: Path | None = typer.Option(
+        None,
+        "--request-root",
+        hidden=True,
+        help="Resolve request-relative inputs against this authenticated directory.",
     ),
     runtime_image: str | None = typer.Option(
         None,
@@ -189,57 +205,122 @@ def evaluate(
         envvar="INVARLOCK_SUBJECT_RUNTIME_ENTRYPOINT",
         help="Optional subject worker entrypoint profile override.",
     ),
+    runtime_cpus: str | None = typer.Option(
+        None,
+        "--runtime-cpus",
+        envvar="INVARLOCK_RUNTIME_CPUS",
+        help="Hard CPU limit applied independently to each OCI worker.",
+    ),
+    runtime_memory_mib: str | None = typer.Option(
+        None,
+        "--runtime-memory-mib",
+        envvar="INVARLOCK_RUNTIME_MEMORY_MIB",
+        help="Hard memory limit in MiB applied independently to each OCI worker.",
+    ),
+    runtime_user: str | None = typer.Option(
+        None,
+        "--runtime-user",
+        envvar="INVARLOCK_RUNTIME_USER",
+        help="Non-root numeric UID:GID used by both OCI workers.",
+    ),
 ) -> None:
     """Produce the canonical evidence pack described by REQUEST."""
 
+    from invarlock.core.evaluation_request import (
+        EvaluationRequestError,
+        load_evaluation_request,
+    )
+    from invarlock.core.registry import CoreRegistry
     from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evaluation_oci import (
         OciEvaluationError,
         OciRuntimeExecutor,
-        evaluation_request_execution_mode,
         launch_from_environment,
+        preflight_oci_launch,
     )
     from invarlock.evaluation_transaction import (
+        EvaluationPreflightError,
+        EvaluationPreflightResult,
         EvaluationTransactionError,
+        EvaluationTransactionResult,
         evaluate_request_file,
+        preflight_evaluation_request,
     )
 
+    result: EvaluationPreflightResult | EvaluationTransactionResult
     try:
-        runtime_executor = None
-        if evaluation_request_execution_mode(request) == "run":
-            runtime_executor = OciRuntimeExecutor(
-                launch_from_environment(
-                    engine=container_engine,
-                    image_ref=runtime_image,
-                    image_digest=runtime_image_digest,
-                    baseline_image_ref=baseline_runtime_image,
-                    baseline_image_digest=baseline_runtime_image_digest,
-                    subject_image_ref=subject_runtime_image,
-                    subject_image_digest=subject_runtime_image_digest,
-                    default_device=runtime_device,
-                    baseline_device=baseline_runtime_device,
-                    subject_device=subject_runtime_device,
-                    runtime_entrypoint=runtime_entrypoint,
-                    baseline_entrypoint=baseline_runtime_entrypoint,
-                    subject_entrypoint=subject_runtime_entrypoint,
-                )
-            )
-        result = evaluate_request_file(
+        scorer_registry = (
+            ScorerExtensionRegistry(allow_installed=True)
+            if allow_installed_scorers
+            else None
+        )
+        registry = CoreRegistry()
+        loaded_request = load_evaluation_request(
             request,
-            signing_key_path=signing_key,
-            runtime_executor=runtime_executor,
-            scorer_registry=(
-                ScorerExtensionRegistry(allow_installed=True)
-                if allow_installed_scorers
-                else None
-            ),
+            provider_resolver=registry.get_runtime_provider,
+            request_root=request_root,
         )
-    except (EvaluationTransactionError, OciEvaluationError) as exc:
-        failure = (
-            exc
-            if isinstance(exc, EvaluationTransactionError)
-            else EvaluationTransactionError(str(exc))
-        )
+        runtime_executor = None
+        launch = None
+        if loaded_request.execution.mode == "run":
+            launch = launch_from_environment(
+                engine=container_engine,
+                image_ref=runtime_image,
+                image_digest=runtime_image_digest,
+                baseline_image_ref=baseline_runtime_image,
+                baseline_image_digest=baseline_runtime_image_digest,
+                subject_image_ref=subject_runtime_image,
+                subject_image_digest=subject_runtime_image_digest,
+                default_device=runtime_device,
+                baseline_device=baseline_runtime_device,
+                subject_device=subject_runtime_device,
+                runtime_entrypoint=runtime_entrypoint,
+                baseline_entrypoint=baseline_runtime_entrypoint,
+                subject_entrypoint=subject_runtime_entrypoint,
+                runtime_cpus=runtime_cpus,
+                runtime_memory_mib=runtime_memory_mib,
+                runtime_user=runtime_user,
+            )
+            runtime_executor = OciRuntimeExecutor(launch)
+        if preflight:
+            runtime_digests = preflight_oci_launch(launch) if launch else None
+            result = preflight_evaluation_request(
+                loaded_request,
+                signing_key_path=signing_key,
+                scorer_registry=scorer_registry,
+                runtime_image_digests=runtime_digests,
+                resource_resolver=runtime_executor,
+                registry=registry,
+            )
+        else:
+            runtime_digests = preflight_oci_launch(launch) if launch else None
+            result = evaluate_request_file(
+                loaded_request,
+                signing_key_path=signing_key,
+                runtime_executor=runtime_executor,
+                runtime_image_digests=runtime_digests,
+                scorer_registry=scorer_registry,
+                registry=registry,
+            )
+    except (
+        EvaluationPreflightError,
+        EvaluationRequestError,
+        EvaluationTransactionError,
+        OciEvaluationError,
+    ) as exc:
+        failure: EvaluationPreflightError | EvaluationTransactionError
+        if preflight:
+            failure = (
+                exc
+                if isinstance(exc, EvaluationPreflightError)
+                else EvaluationPreflightError(str(exc))
+            )
+        else:
+            failure = (
+                exc
+                if isinstance(exc, EvaluationTransactionError)
+                else EvaluationTransactionError(str(exc))
+            )
         if json_out:
             typer.echo(failure.as_json())
         else:
@@ -247,7 +328,11 @@ def evaluate(
         raise typer.Exit(failure.exit_code) from exc
     if json_out:
         typer.echo(result.as_json())
+    elif preflight:
+        console.print("PASS Preflight complete")
+        console.print("No execution or publication was performed")
     else:
+        assert isinstance(result, EvaluationTransactionResult)
         console.print("PASS Evidence pack published")
         console.print(str(result.evidence_path))
 
@@ -257,14 +342,24 @@ def evaluate(
     help="Independently verify one evidence pack against caller-supplied trust anchors.",
 )
 def verify(
+    ctx: typer.Context,
     evidence: Path = typer.Argument(
         ...,
+        metavar="EVIDENCE",
         exists=True,
         file_okay=False,
         dir_okay=True,
         readable=True,
         resolve_path=True,
         help="Canonical evidence-pack directory.",
+    ),
+    trust_profile: Path | None = typer.Option(
+        None,
+        "--trust-profile",
+        help=(
+            "Closed invarlock/trust-inputs-v1 profile. Explicit trust-anchor "
+            "options cannot be mixed with this profile."
+        ),
     ),
     policy: Path | None = typer.Option(
         None,
@@ -346,10 +441,75 @@ def verify(
     from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evidence_verification import (
         EvidenceVerificationError,
+        _require_outside_evidence,
         verify_evidence,
     )
+    from invarlock.trust_inputs import TrustInputsError, load_trust_inputs
 
     try:
+        trust_profile_digest: str | None = None
+        policy_bytes: bytes | None = None
+        verifier_signing_key_bytes: bytes | None = None
+        if trust_profile is not None:
+            explicit_names = (
+                "policy",
+                "expected_baseline_artifact",
+                "expected_subject_artifact",
+                "expected_schedule",
+                "expected_baseline_runtime",
+                "expected_subject_runtime",
+                "expected_signer",
+                "verifier_signing_key",
+                "verifier_identity",
+                "allow_installed_scorers",
+            )
+            conflicts = [
+                name.replace("_", "-")
+                for name in explicit_names
+                if getattr(
+                    ctx.get_parameter_source(name),
+                    "name",
+                    None,
+                )
+                == "COMMANDLINE"
+            ]
+            if conflicts:
+                rendered = ", ".join(f"--{name}" for name in conflicts)
+                raise EvidenceVerificationError(
+                    f"--trust-profile cannot be mixed with {rendered}"
+                )
+            _require_outside_evidence(
+                evidence,
+                trust_profile,
+                label="independent trust profile",
+            )
+            try:
+                loaded = load_trust_inputs(trust_profile)
+            except TrustInputsError as exc:
+                raise EvidenceVerificationError(str(exc)) from exc
+            _require_outside_evidence(
+                evidence,
+                loaded.policy_path,
+                label="independent policy",
+            )
+            _require_outside_evidence(
+                evidence,
+                loaded.verifier_signing_key_path,
+                label="verifier Ed25519 signing key",
+            )
+            policy = loaded.policy_path
+            policy_bytes = loaded.policy_bytes
+            expected_baseline_artifact = loaded.expected_artifact_digests["baseline"]
+            expected_subject_artifact = loaded.expected_artifact_digests["subject"]
+            expected_schedule = loaded.expected_schedule_digest
+            expected_baseline_runtime = loaded.expected_runtime_digests["baseline"]
+            expected_subject_runtime = loaded.expected_runtime_digests["subject"]
+            expected_signer = loaded.expected_signer_fingerprint
+            verifier_signing_key = loaded.verifier_signing_key_path
+            verifier_signing_key_bytes = loaded.verifier_signing_key_bytes
+            verifier_identity = loaded.verifier_identity
+            allow_installed_scorers = loaded.allow_installed_scorers
+            trust_profile_digest = loaded.profile_digest
         result = verify_evidence(
             evidence,
             policy_path=policy,
@@ -362,11 +522,14 @@ def verify(
             receipt_path=receipt,
             verifier_signing_key_path=verifier_signing_key,
             verifier_identity=verifier_identity,
+            trust_profile_digest=trust_profile_digest,
             scorer_registry=(
                 ScorerExtensionRegistry(allow_installed=True)
                 if allow_installed_scorers
                 else None
             ),
+            policy_bytes=policy_bytes,
+            verifier_signing_key_bytes=verifier_signing_key_bytes,
         )
     except EvidenceVerificationError as exc:
         if json_out:
@@ -391,6 +554,7 @@ def verify(
 def report(
     evidence: Path = typer.Argument(
         ...,
+        metavar="EVIDENCE",
         exists=True,
         file_okay=False,
         dir_okay=True,
@@ -408,6 +572,11 @@ def report(
         "--explain",
         help="Include a concise explanation of the decision and evidence bindings.",
     ),
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit one machine-readable rendering result object.",
+    ),
 ) -> None:
     """Render EVIDENCE without changing any evidence-pack byte."""
 
@@ -418,9 +587,26 @@ def report(
     except EvidenceReportError as exc:
         console.print(f"FAIL {exc}")
         raise typer.Exit(exc.exit_code) from exc
-    console.print(result.text)
-    if result.html_path is not None:
-        console.print(f"HTML {result.html_path}")
+    if json_out:
+        typer.echo(
+            json.dumps(
+                {
+                    "format_version": "invarlock/evidence-report-v1",
+                    "ok": True,
+                    "pack_manifest_digest": result.pack_manifest_digest,
+                    "html": (
+                        str(result.html_path) if result.html_path is not None else None
+                    ),
+                },
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        console.print(result.text)
+        if result.html_path is not None:
+            console.print(f"HTML {result.html_path}")
 
 
 def main() -> None:

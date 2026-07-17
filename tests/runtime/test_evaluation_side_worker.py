@@ -8,7 +8,11 @@ from typing import Any, cast
 import pytest
 
 import invarlock.evaluation_side_worker as worker
-from invarlock.core.runtime_provider import RuntimeProvider
+from invarlock.core.runtime_provider import (
+    RuntimeProvider,
+    build_runtime_behavioral_schedule_from_material,
+    canonical_runtime_behavioral_schedule_json,
+)
 from invarlock.evaluation_side_worker import RuntimeSideWorkerError, execute_job
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
@@ -20,7 +24,26 @@ def _job(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     resources.mkdir()
     (resources / "model").mkdir()
     schedule = tmp_path / "schedule.json"
-    schedule.write_text("{}\n")
+    schedule.write_bytes(
+        canonical_runtime_behavioral_schedule_json(
+            build_runtime_behavioral_schedule_from_material(
+                dataset_identity={
+                    "provider": "local",
+                    "dataset_name": None,
+                    "config_name": None,
+                    "revision": None,
+                    "split": "qualification",
+                },
+                records=[
+                    {
+                        "record_id": "record/1",
+                        "input_text": "Return A",
+                        "expected_output": "A",
+                    }
+                ],
+            )
+        )
+    )
     payload: dict[str, object] = {
         "format_version": "invarlock/runtime-side-job-v1",
         "role": "baseline",
@@ -76,6 +99,119 @@ def test_worker_executes_one_closed_job_without_a_signing_key(
     resources = observed["resources"]
     assert resources.container_image_digest == _DIGEST
     assert resources.primary_artifact == "model"
+
+
+def test_worker_input_preflight_rejects_before_model_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job, payload = _job(tmp_path)
+    schedule = build_runtime_behavioral_schedule_from_material(
+        dataset_identity={
+            "provider": "local",
+            "dataset_name": None,
+            "config_name": None,
+            "revision": None,
+            "split": "qualification",
+        },
+        records=[
+            {
+                "record_id": "record/1",
+                "input_text": "Return A",
+                "expected_output": "A",
+            }
+        ],
+    )
+    Path(cast(str, payload["schedule"])).write_bytes(
+        canonical_runtime_behavioral_schedule_json(schedule)
+    )
+
+    class Provider:
+        name = "hf_transformers"
+
+        def validate_evaluation_inputs(
+            self, _spec: object, _resources: object, _schedule: object
+        ) -> None:
+            raise ValueError("authenticated content is unavailable")
+
+        def prepare_execution(self, _spec: object, _resources: object) -> object:
+            pytest.fail("model preparation must not run after input-preflight failure")
+
+    class Registry:
+        def get_runtime_provider(self, _name: str) -> RuntimeProvider:
+            return cast(RuntimeProvider, Provider())
+
+    monkeypatch.setattr(worker, "CoreRegistry", Registry)
+    monkeypatch.setattr(
+        worker,
+        "run_evidence_side",
+        lambda **_kwargs: pytest.fail("runtime scoring must not start"),
+    )
+
+    with pytest.raises(RuntimeSideWorkerError, match="authenticated content"):
+        execute_job(job)
+    assert not (tmp_path / "output").exists()
+
+
+def test_worker_scores_the_exact_schedule_snapshot_validated_before_model_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job, payload = _job(tmp_path)
+
+    def schedule(record_id: str):  # noqa: ANN202
+        return build_runtime_behavioral_schedule_from_material(
+            dataset_identity={
+                "provider": "local",
+                "dataset_name": None,
+                "config_name": None,
+                "revision": None,
+                "split": "qualification",
+            },
+            records=[
+                {
+                    "record_id": record_id,
+                    "input_text": "Return A",
+                    "expected_output": "A",
+                }
+            ],
+        )
+
+    original = schedule("record/original")
+    replacement = schedule("record/replaced")
+    schedule_path = Path(cast(str, payload["schedule"]))
+    schedule_path.write_bytes(canonical_runtime_behavioral_schedule_json(original))
+
+    class Provider:
+        name = "hf_transformers"
+
+        def validate_evaluation_inputs(
+            self, _spec: object, _resources: object, observed: object
+        ) -> None:
+            assert observed.records[0].record_id == "record/original"  # type: ignore[attr-defined]
+            schedule_path.write_bytes(
+                canonical_runtime_behavioral_schedule_json(replacement)
+            )
+
+        def prepare_execution(self, _spec: object, _resources: object) -> object:
+            return {"context": True}
+
+    class Registry:
+        def get_runtime_provider(self, _name: str) -> RuntimeProvider:
+            return cast(RuntimeProvider, Provider())
+
+    def run(**kwargs: object) -> object:
+        validated = kwargs["_validated_schedule"]
+        assert validated.records[0].record_id == "record/original"  # type: ignore[attr-defined]
+        assert schedule_path.read_bytes() == canonical_runtime_behavioral_schedule_json(
+            replacement
+        )
+        output = cast(Path, kwargs["output_directory"])
+        output.mkdir()
+        return SimpleNamespace(directory=output)
+
+    monkeypatch.setattr(worker, "CoreRegistry", Registry)
+    monkeypatch.setattr(worker, "run_evidence_side", run)
+
+    assert execute_job(job) == tmp_path / "output"
 
 
 def test_worker_rejects_noncanonical_unknown_or_mixed_jobs(tmp_path: Path) -> None:

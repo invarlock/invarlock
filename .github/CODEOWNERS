@@ -9,7 +9,7 @@
 .github/WORKFLOWS.md @invarlock/core-maintainers
 docs/security/ @invarlock/core-maintainers
 requirements/workflows/*security*.txt @invarlock/core-maintainers
-requirements/workflows/pip-bootstrap-py313.txt @invarlock/core-maintainers
+requirements/workflows/pip-bootstrap.txt @invarlock/core-maintainers
 scripts/security/generate_sbom.sh @invarlock/core-maintainers
 scripts/security/refresh_pinned_requirements.sh @invarlock/core-maintainers
 scripts/security/ @invarlock/core-maintainers

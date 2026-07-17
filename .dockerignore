@@ -13,6 +13,7 @@
 !requirements/workflows/runtime-image-py312-cu128.txt
 !requirements/workflows/runtime-wheel-build-py312.txt
 !requirements/workflows/core-py312.txt
+!requirements/workflows/multimodal-runtime-py312.txt
 !runtime/
 !runtime/Dockerfile
 !runtime/Dockerfile.cuda
@@ -30,6 +31,12 @@
 !addins/tensorrt_llm/src/
 !addins/tensorrt_llm/src/**
 !addins/tensorrt_llm/runtime/Dockerfile
+!addins/multimodal/
+!addins/multimodal/pyproject.toml
+!addins/multimodal/README.md
+!addins/multimodal/src/
+!addins/multimodal/src/**
+!addins/multimodal/runtime/Dockerfile
 !src/
 !src/**
 src/**/__pycache__/

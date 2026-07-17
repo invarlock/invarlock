@@ -8,6 +8,7 @@ import jsonschema
 import pytest
 
 from invarlock.public_contracts import (
+    EVIDENCE_PACK_FORMAT_VERSION,
     load_evidence_observation_schema,
     load_evidence_pack_schema,
 )
@@ -52,7 +53,7 @@ def _manifest() -> dict[str, object]:
         ),
     }
     return {
-        "format": "evidence-pack-v1",
+        "format": "invarlock/evidence-pack-v1",
         "comparison_id": "acceptance-001",
         "inputs": {
             name: {
@@ -85,8 +86,15 @@ def test_source_and_packaged_manifest_contracts_are_identical() -> None:
     )
 
     assert source == packaged == load_evidence_pack_schema()
+    assert EVIDENCE_PACK_FORMAT_VERSION == "invarlock/evidence-pack-v1"
+    assert source["properties"]["format"] == {"const": EVIDENCE_PACK_FORMAT_VERSION}
     jsonschema.Draft202012Validator.check_schema(source)
     jsonschema.validate(_manifest(), source)
+
+    historical = _manifest()
+    historical["format"] = "evidence-pack-v1"
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(historical, source)
 
 
 def test_source_and_packaged_observation_contracts_are_identical() -> None:

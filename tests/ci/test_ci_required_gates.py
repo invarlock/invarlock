@@ -36,13 +36,22 @@ def test_ci_runs_the_repository_gates() -> None:
 
     fast = jobs["verify-fast"]
     assert _step(fast, "Run fast repository gates")["run"] == "make verify-fast"
+    assert _step(fast, "Build, install, and validate distributions")["run"] == (
+        "make addins-install-smoke"
+    )
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
     minimum = jobs["minimum-python"]
     python = _step(minimum, "Set up Python")
     assert python["with"]["python-version"] == "3.12"
-    assert _step(minimum, "Run minimum-Python tests")["run"] == "make test-fast"
+    assert _step(minimum, "Run minimum-Python tests")["run"] == (
+        "make test-fast addins-test PYTEST_WORKERS=auto"
+    )
     assert _step(minimum, "Check command surface")["run"] == "make cli-smoke-core"
+    assert _step(minimum, "Build, install, and validate distributions")["run"] == (
+        "make addins-install-smoke"
+    )
+    assert minimum["timeout-minutes"] >= 35
 
     coverage = jobs["coverage"]
     assert _step(coverage, "Enforce coverage")["run"] == "make coverage-enforce"
@@ -55,7 +64,9 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
     assert "workflow_dispatch" in full["if"]
     assert _step(full, "Install documentation linters")["run"] == "npm ci"
     assert _step(full, "Run complete repository gates")["run"] == "make verify"
-    assert _step(full, "Build and validate distributions")["run"] == "make dist-check"
+    assert _step(full, "Build, install, and validate distributions")["run"] == (
+        "make addins-install-smoke"
+    )
 
 
 def test_ci_has_no_retired_product_workflows_or_jobs() -> None:

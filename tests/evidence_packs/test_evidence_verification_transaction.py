@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -65,6 +66,15 @@ def test_independent_verification_user_journey_emits_a_signed_external_receipt(
     assert verified.receipt_path == receipt.resolve()
     assert receipt.is_file()
     assert verified.payload["ok"] is True
+    assert verified.payload["pack"] == pack.name
+    assert verified.payload["signed_receipt"] == receipt.name
+    receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert (
+        verified.payload["pack_manifest_digest"]
+        == receipt_payload["statement"]["pack_manifest_digest"]
+    )
+    assert "policy_path" not in verified.payload["anchors"]
+    assert str(tmp_path) not in verified.as_json()
     assert verified.payload["verifier_identity"] == "invarlock-verifier/release"
     assert "Evidence:" in verified.summary
     assert "Comparison: single-comparison" in verified.summary
@@ -148,6 +158,31 @@ def test_verification_rejects_unsafe_evidence_policy_key_and_receipt_paths(
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "message"),
+    [
+        ("policy_path", "independent policy"),
+        (
+            "verifier_signing_key_path",
+            "verifier Ed25519 signing key",
+        ),
+    ],
+)
+def test_file_backed_trust_material_must_remain_outside_submitted_evidence(
+    tmp_path: Path,
+    field: str,
+    message: str,
+) -> None:
+    pack, kwargs = _verify_kwargs(tmp_path)
+    kwargs[field] = pack / "manifest.json"
+
+    with pytest.raises(
+        EvidenceVerificationError,
+        match=rf"{message} must remain outside",
+    ):
+        verify_evidence(pack, **kwargs)  # type: ignore[arg-type]
+
+
 def test_verification_maps_receipt_write_failure_to_public_error(
     tmp_path: Path,
 ) -> None:
@@ -177,3 +212,72 @@ def test_verification_error_default_payload_is_stable_json() -> None:
         '"format_version":"invarlock/evidence-verification-error-v1",'
         '"ok":false,"warnings":[]}'
     )
+
+
+def test_captured_policy_and_key_bytes_do_not_require_live_paths(
+    tmp_path: Path,
+) -> None:
+    pack, kwargs = _verify_kwargs(tmp_path)
+    policy_bytes = Path(kwargs["policy_path"]).read_bytes()
+    key_bytes = Path(kwargs["verifier_signing_key_path"]).read_bytes()
+    kwargs.update(
+        {
+            "policy_path": None,
+            "policy_bytes": policy_bytes,
+            "verifier_signing_key_path": None,
+            "verifier_signing_key_bytes": key_bytes,
+        }
+    )
+
+    verified = verify_evidence(pack, **kwargs)  # type: ignore[arg-type]
+
+    assert verified.payload["ok"] is True
+    assert Path(kwargs["receipt_path"]).is_file()
+
+
+def test_captured_bytes_do_not_reopen_or_validate_source_label_paths(
+    tmp_path: Path,
+) -> None:
+    pack, kwargs = _verify_kwargs(tmp_path)
+    policy_bytes = Path(kwargs["policy_path"]).read_bytes()
+    key_bytes = Path(kwargs["verifier_signing_key_path"]).read_bytes()
+    # Captured bytes are already the caller's authenticated trust material. The
+    # optional paths are labels only in this mode and must not be reopened.
+    kwargs.update(
+        {
+            "policy_path": pack / "captured-policy-label.json",
+            "policy_bytes": policy_bytes,
+            "verifier_signing_key_path": pack / "captured-key-label.pem",
+            "verifier_signing_key_bytes": key_bytes,
+        }
+    )
+
+    verified = verify_evidence(pack, **kwargs)  # type: ignore[arg-type]
+
+    assert verified.payload["ok"] is True
+    assert Path(kwargs["receipt_path"]).is_file()
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"policy_bytes": "{}"}, "policy bytes must be exact bytes"),
+        (
+            {"verifier_signing_key_bytes": "private-key"},
+            "signing key bytes must be exact bytes",
+        ),
+        (
+            {"policy_bytes": b"x" * (4 * 1024 * 1024 + 1)},
+            "size limit",
+        ),
+        ({"policy_bytes": b"not-json"}, "not valid JSON"),
+    ],
+)
+def test_captured_trust_material_rejects_wrong_type_size_and_format(
+    tmp_path: Path, overrides: dict[str, object], message: str
+) -> None:
+    pack, kwargs = _verify_kwargs(tmp_path)
+    kwargs.update(overrides)
+
+    with pytest.raises(EvidenceVerificationError, match=message):
+        verify_evidence(pack, **kwargs)  # type: ignore[arg-type]

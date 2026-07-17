@@ -54,7 +54,7 @@
   metric-specific paired interval, threshold, and finite-schedule verdict.
 
 **Evidence pack**
-: The immutable `evidence-pack-v1` directory containing the request,
+: The immutable `invarlock/evidence-pack-v1` directory containing the request,
   identities, provider material, schedule, paired records, report, inventory,
   checksums, and evidence signature.
 

@@ -17,6 +17,7 @@ from typing import Literal, TypeAliasType
 
 from invarlock.core.runtime_provider import (
     ModelRuntimeSpec,
+    RuntimeBehavioralSchedule,
     RuntimeExecutionContext,
     RuntimeMetric,
     RuntimeProvider,
@@ -25,6 +26,7 @@ from invarlock.core.runtime_provider import (
     load_runtime_behavioral_schedule,
 )
 from invarlock.filesystem.atomic_directory import (
+    AtomicDirectoryExistsError,
     AtomicDirectoryPublicationError,
     publish_directory_no_replace,
 )
@@ -213,6 +215,7 @@ def run_evidence_side(
     policy_digest: str,
     output_directory: Path,
     metric: RuntimeMetric = "exact_match",
+    _validated_schedule: RuntimeBehavioralSchedule | None = None,
 ) -> RuntimeEvidenceSideBundle:
     """Execute, authenticate, and atomically publish one side evidence bundle."""
 
@@ -220,6 +223,10 @@ def run_evidence_side(
         raise RuntimeEvidenceError("role must be baseline or subject")
     if not isinstance(spec, ModelRuntimeSpec):
         raise TypeError("spec must be ModelRuntimeSpec")
+    if _validated_schedule is not None and not isinstance(
+        _validated_schedule, RuntimeBehavioralSchedule
+    ):
+        raise TypeError("_validated_schedule must be RuntimeBehavioralSchedule")
     if (
         not policy_digest.startswith("sha256:")
         or len(policy_digest) != 71
@@ -227,7 +234,11 @@ def run_evidence_side(
     ):
         raise RuntimeEvidenceError("policy_digest must be a sha256 digest")
     execution = _observed_execution(context)
-    schedule = load_runtime_behavioral_schedule(Path(schedule_path))
+    schedule = (
+        load_runtime_behavioral_schedule(Path(schedule_path))
+        if _validated_schedule is None
+        else _validated_schedule
+    )
     provider.validate_config(spec)
     if provider.name != spec.provider_name:
         raise RuntimeEvidenceError("provider and model spec do not agree")
@@ -349,9 +360,13 @@ def run_evidence_side(
                 + "; ".join(verification.errors)
             )
         publish_directory_no_replace(staging, output)
-    except AtomicDirectoryPublicationError as exc:
+    except AtomicDirectoryExistsError as exc:
         raise RuntimeEvidenceError(
             "could not publish runtime evidence without clobber"
+        ) from exc
+    except AtomicDirectoryPublicationError as exc:
+        raise RuntimeEvidenceError(
+            f"runtime evidence atomic publication failed: {exc}"
         ) from exc
     finally:
         if staging.exists():

@@ -68,6 +68,56 @@ Provider conformance and evidence verification answer different questions:
 A conformance pass is therefore a prerequisite, not evidence that a model or
 engine ran successfully.
 
+### Qualification host environment
+
+The maintained qualification targets use two Python variables with different
+roles. `QUALIFICATION_DRIVER_PYTHON` launches the orchestration driver;
+`PYTHON` runs provider discovery, preflight, `evaluate`, `verify`, and
+`report`. The environment selected by `PYTHON` must contain the
+matching-version InvarLock core wheel and the exact wheel for every optional
+provider used by the request. Install those wheels into that interpreter, for
+example with `"$PYTHON" -m pip install /path/to/wheel.whl`.
+
+```bash
+export PYTHON=/path/to/qualification-venv/bin/python
+export QUALIFICATION_DRIVER_PYTHON="$PYTHON"
+```
+
+Adding package source directories to `PYTHONPATH` is not an installation and
+is not sufficient. First-party provider authorization checks installed
+distribution and `invarlock.runtime_providers` entry-point metadata in addition
+to importing provider code. Using one isolated environment for `PYTHON` and
+`QUALIFICATION_DRIVER_PYTHON` avoids interpreter drift.
+
+Use the wrapper maintained beside the selected provider. Optional-provider
+wrappers add the installed entry-point check and required provider resources;
+do not substitute the root wrapper for them.
+
+Ordinary `invarlock evaluate` receives its immutable image reference and digest
+directly through CLI options or the embedding API. The first-party optional
+provider Makefile wrappers expose a mutable `IMAGE` build/smoke handle, but
+their signed `qualify-*` targets pass `QUALIFICATION_IMAGE`. That value defaults
+to `IMAGE_DIGEST`; override it with an exact `repository@sha256:...` reference
+when the qualification must remain fetchable across hosts. A mutable tag is
+never a strict qualification identity.
+
+| Provider | Signed canary | Readiness | Evidence |
+| --- | --- | --- | --- |
+| `hf_transformers` | `make runtime-qualification-canary` | `make runtime-qualification-readiness` | `make runtime-qualification-evidence` |
+| `hf_vision_text` | `make -C addins/multimodal qualify-canary` | `make -C addins/multimodal qualify-preflight` | `make -C addins/multimodal qualify-evidence` |
+| `llama_cpp` | `make -C addins/gguf qualify-canary` | `make -C addins/gguf qualify-preflight` | `make -C addins/gguf qualify-evidence` |
+| `tensorrt_llm` | `make -C addins/tensorrt_llm qualify-canary` | `make -C addins/tensorrt_llm qualify-preflight` | `make -C addins/tensorrt_llm qualify-evidence` |
+
+All four paths accept the same resource controls:
+`QUALIFICATION_DEVICE`, `QUALIFICATION_CPUS`,
+`QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER`. Set them once and keep
+them unchanged across canary, readiness, and evidence. The root wrapper
+requires an explicit device. The add-in wrappers have provider-appropriate
+device defaults, but an explicit `cpu` or `cuda:<index>` keeps the execution
+contract reviewable. Vision-text additionally requires `RESOURCE_ROOT` and
+`CONTENT_STORE`; GGUF and TensorRT-LLM use the provider resource variables
+documented in their sections below.
+
 ## Hugging Face Transformers
 
 `hf_transformers` is the canonical built-in provider. Install its runtime
@@ -167,12 +217,32 @@ The repository maintains separate CPU and x86_64 CUDA images. Both include the
 core wheel plus a provider-matched pinned Hugging Face runtime closure:
 
 ```bash
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+mkdir -p artifacts/source
+SOURCE_BUNDLE="$PWD/artifacts/source/invarlock-$SOURCE_COMMIT.tar"
+python scripts/qualification_source.py create \
+  --commit "$SOURCE_COMMIT" --output "$SOURCE_BUNDLE" \
+  > "$SOURCE_BUNDLE.json"
+SOURCE_BUNDLE_SHA256="$(
+  python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source_bundle_sha256"])' \
+    "$SOURCE_BUNDLE.json"
+)"
+mkdir -p artifacts/runtime-build
+
 RUNTIME_SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
-  make runtime-image
+  make runtime-image \
+    RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
+    RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+    RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+    RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build/cpu.json"
 make runtime-smoke
 
 RUNTIME_SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
-  make runtime-image-cuda
+  make runtime-image-cuda \
+    RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
+    RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+    RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+    RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build/cuda.json"
 make runtime-smoke-cuda
 ```
 
@@ -180,12 +250,44 @@ The CPU target uses `runtime/Dockerfile`; the NVIDIA CUDA 12.8 target uses
 `runtime/Dockerfile.cuda`. A CUDA device flag only exposes a GPU to a
 CUDA-capable image.
 
+Each build statement records the authenticated source identity, Dockerfile
+digest, normalized build arguments, requested platform and base image, and
+final immutable image ID. Retain it beside the image digest used by
+qualification.
+
+The final image ID is a local OCI config identity. It can be used directly for
+local inspection, smoke, and qualification, but it is not a valid Dockerfile
+`FROM` reference. A layered runtime such as the vision-text add-in requires a
+named `repository@sha256:...` manifest reference for its base; publish or obtain
+that exact manifest through the operator's registry process before building the
+layer.
+
 The default local tag is a mutable build handle. Strict execution accepts an
 exact content-addressed local image ID or `repository@sha256:...` reference and
 requires the same digest through `INVARLOCK_RUNTIME_IMAGE_DIGEST`. For portable
 public evidence, publish or obtain the pinned image through the operator's
 registry process and record its registry manifest reference; a local image ID
 identifies local bytes but does not give another verifier a fetchable runtime.
+
+Select exactly one image and resolve it before qualification. For a local CPU
+image:
+
+```bash
+IMAGE_TAG=invarlock-runtime:local
+export QUALIFICATION_DEVICE=cpu
+export QUALIFICATION_CPUS=8
+export QUALIFICATION_MEMORY_MIB=65536
+export QUALIFICATION_USER=65532:65532
+IMAGE="$(docker image inspect --format '{{.Id}}' "$IMAGE_TAG")"
+DIGEST="$IMAGE"
+```
+
+For the local CUDA image, use
+`IMAGE_TAG=invarlock-runtime:hf-cuda-local` and an explicit device such as
+`export QUALIFICATION_DEVICE=cuda:0`. For a portable registry image, set
+`IMAGE=registry.example/invarlock-runtime@sha256:PINNED_DIGEST` and
+`DIGEST="${IMAGE##*@}"`. Keep the selected `IMAGE`, `DIGEST`, and
+`QUALIFICATION_DEVICE` unchanged through all three qualification stages.
 
 Invoke `evaluate` on the host with the pinned image and device. The CLI creates
 the closed Docker or Podman boundary and re-enters the transaction inside it:
@@ -220,22 +322,112 @@ arbitrary-provider enablement. Embedding applications that call the Python
 transaction directly remain responsible for establishing an equivalent runtime
 boundary.
 
-## Hugging Face vision-text
-
-Install the optional provider and its image-decoding runtime:
+Before running a group of qualifications, bootstrap one small, representative
+signed canary through the exact runtime image. This is a real
+`evaluate -> verify` transaction, not an execution-free check:
 
 ```bash
-python -m pip install 'invarlock-runtime-hf-vision-text[runtime]'
-invarlock-hf-vision-text-conformance
+make dist-check
+install -d -m 700 "$PWD/qualification"
+python scripts/qualification_candidate_wheels.py \
+  --wheel dist/invarlock-*.whl \
+  --output "$PWD/qualification/candidate-wheels.json"
+CANDIDATE_WHEEL_MANIFEST="$PWD/qualification/candidate-wheels.json"
+
+CANARY_EVIDENCE="$PWD/canary/evidence"
+CANARY_RECEIPT="$PWD/canary/verification-receipt.json"
+CANARY_TRUST_PROFILE="$PWD/canary/trust-inputs.json"
+mkdir -p "$PWD/canary" "$PWD/output"
+
+make runtime-qualification-canary \
+  REQUEST="$PWD/canary/request.yaml" \
+  SIGNING_KEY="$PWD/private/evidence.key" \
+  IMAGE="$IMAGE" IMAGE_DIGEST="$DIGEST" \
+  EVIDENCE="$CANARY_EVIDENCE" \
+  TRUST_PROFILE="$CANARY_TRUST_PROFILE" \
+  RECEIPT="$CANARY_RECEIPT" \
+  SUMMARY="$PWD/canary/qualification-summary.json" \
+  QUALIFICATION_DEVICE="$QUALIFICATION_DEVICE" \
+  SOURCE_COMMIT="$SOURCE_COMMIT" SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+  SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+  CANDIDATE_WHEEL_MANIFEST="$CANDIDATE_WHEEL_MANIFEST"
 ```
+
+Retain the canary evidence, its strictly verified signed receipt, and the
+verifier-owned trust profile together. They may be reused by later readiness
+and evidence targets only while `IMAGE_DIGEST` is unchanged. A new image digest
+requires a new signed canary.
+
+Next, run readiness for each planned request with the same source binding,
+image, verifier inputs, fresh destinations, and retained canary inputs:
+
+```bash
+make runtime-qualification-readiness \
+  REQUEST="$PWD/request.yaml" SIGNING_KEY="$PWD/private/evidence.key" \
+  IMAGE="$IMAGE" IMAGE_DIGEST="$DIGEST" \
+  EVIDENCE="$PWD/output/evidence" \
+  TRUST_PROFILE="$PWD/trust/trust-inputs.json" \
+  RECEIPT="$PWD/output/verification-receipt.json" \
+  CANARY_EVIDENCE="$CANARY_EVIDENCE" \
+  CANARY_RECEIPT="$CANARY_RECEIPT" \
+  CANARY_TRUST_PROFILE="$CANARY_TRUST_PROFILE" \
+  QUALIFICATION_DEVICE="$QUALIFICATION_DEVICE" \
+  SOURCE_COMMIT="$SOURCE_COMMIT" SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+  SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+  CANDIDATE_WHEEL_MANIFEST="$CANDIDATE_WHEEL_MANIFEST"
+```
+
+`REQUEST`, `SIGNING_KEY`, `SOURCE_BUNDLE`, and `TRUST_PROFILE` may be in
+read-only directories. The evidence, receipt, optional report, and summary
+must be distinct absent paths with existing real parent directories. They may
+not use symlinked parents or be placed inside the evidence destination. The
+source archive is limited to 512 MiB and 50,000 members; an execution-source
+file is limited to 32 MiB. Readiness starts no model worker and publishes no
+result. It also strictly reverifies the retained canary and its exact image
+binding. Use the same variables with `make runtime-qualification-evidence`
+plus `SUMMARY` and optional `REPORT` only after readiness succeeds. Carry the
+same `QUALIFICATION_DEVICE`, and any CPU, memory, or user controls, into that
+command.
+
+`CANDIDATE_WHEEL_MANIFEST` is a strict
+`invarlock/qualification-candidate-wheels-v1` JSON object whose `wheels` array
+contains an absolute or manifest-relative `path` and expected `sha256` for the
+core wheel and any maintained add-in wheels used by the request. Qualification
+matches their package sources to the authenticated Git archive, extracts them
+privately, and executes them with an isolated interpreter bootstrap. Dependencies
+may be installed in the selected interpreter, but an older installed InvarLock
+core or maintained add-in is not used as the qualification candidate.
+
+The signed canary prevents image-wide fan-out after a basic image, provider, or
+end-to-end transaction failure. It does not establish that every model fits
+memory, loads under that provider, supports its tokenizer or processor, or
+completes successfully. Readiness remains request-specific configuration
+qualification, and each model run can still fail closed.
+
+## Hugging Face vision-text
+
+Install the optional provider into the interpreter used by the host
+qualification transaction. Its base wheel includes the Pillow dependency
+needed for execution-free media preflight:
+
+```bash
+"$PYTHON" -m pip install \
+  /wheelhouse/Pillow-EXACT.whl \
+  /wheelhouse/invarlock_runtime_hf_vision_text-EXACT.whl
+"$PYTHON" -m invarlock_addins.multimodal.conformance
+```
+
+The heavier Torch and Transformers inference dependencies belong in the
+digest-pinned runtime image. The `[runtime]` extra is for development that
+executes the model outside that maintained image.
 
 `hf_vision_text` evaluates `vision_text_generation` schedules containing one
 `prompt` text part and one `image` content part per record. Schedule content
 parts carry a canonical content ID, media type, positive byte length, and
-SHA-256 rather than a host path. The provider resolves each ID beneath the
-caller-authorized content store, opens it without following links, and verifies
-file identity, length, digest, image format, frame count, and dimensions before
-local inference.
+SHA-256 rather than a host path. The provider resolves each ID as the exact
+filename beneath the caller-authorized content store, opens it without following
+links, and verifies file identity, length, digest, image format, frame count,
+dimensions, and aggregate media limits before local inference.
 
 Set the content resources outside `request.yaml` because they authorize host
 material rather than express comparison intent:
@@ -244,6 +436,13 @@ material rather than express comparison intent:
 export INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT=/pinned/vision-inputs
 export INVARLOCK_HF_VISION_TEXT_CONTENT_STORE=images
 ```
+
+Both bindings are required for host preflight and execution, and every selected
+content object must already exist. Preflight uses the execution resolver and
+Pillow to authenticate and safely decode the bytes without importing Torch or
+Transformers, loading a model, or initializing CUDA. The side worker repeats
+validation before model preparation, while the scorer reopens the content at
+use time to detect later replacement.
 
 Both request sides use `provider: hf_vision_text` and declare
 `checkpoint_tree_sha256`, `tokenizer_metadata_sha256`,
@@ -263,8 +462,8 @@ contains the build, content-contract, and qualification commands.
 Install and check the optional provider:
 
 ```bash
-python -m pip install invarlock-runtime-gguf
-invarlock-gguf-conformance
+"$PYTHON" -m pip install /wheelhouse/invarlock_runtime_gguf-EXACT.whl
+"$PYTHON" -m invarlock_addins.gguf.conformance
 ```
 
 The provider authenticates the GGUF file, its structured metadata and tensor
@@ -321,8 +520,8 @@ host paths in the canonical bundle.
 Install and check the optional provider in a compatible CUDA environment:
 
 ```bash
-python -m pip install invarlock-runtime-tensorrt-llm
-invarlock-tensorrt-llm-conformance
+"$PYTHON" -m pip install /wheelhouse/invarlock_runtime_tensorrt_llm-EXACT.whl
+"$PYTHON" -m invarlock_addins.tensorrt_llm.conformance
 ```
 
 The provider binds the engine tree and inventory, builder configuration,
@@ -343,7 +542,7 @@ from invarlock_addins.tensorrt_llm.session import TensorRTLLMRuntimeBindings
 bindings = TensorRTLLMRuntimeBindings(
     engine_bundle_path=Path("engine"),
     tokenizer_contract_path=Path("tokenizer-contract.json"),
-    runner_executable_path=Path("invarlock-tensorrt-llm-runner"),
+    runner_executable_path=Path("/opt/invarlock/bin/tensorrt-llm-runner"),
 )
 spec = TensorRTLLMProvider().inspect_runtime_spec(
     bindings,
@@ -363,20 +562,19 @@ the same support resources during evaluation:
 ```bash
 export INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT=/pinned/tensorrt-runtime
 export INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT=tokenizer/tokenizer-contract.json
-export INVARLOCK_TENSORRT_LLM_RUNNER_EXECUTABLE=bin/invarlock-tensorrt-llm-runner
 export INVARLOCK_RUNTIME_IMAGE='registry.example/invarlock-tensorrt@sha256:PINNED_DIGEST'
 export INVARLOCK_RUNTIME_IMAGE_DIGEST='sha256:PINNED_DIGEST'
 export INVARLOCK_RUNTIME_DEVICE=cuda
 ```
 
-The TensorRT-LLM resource root must enclose the request-resolved engine bundle,
-tokenizer contract, and runner. All three are re-opened through root-confined,
-no-follow resource paths.
+The TensorRT-LLM resource root must enclose the request-resolved engine bundle
+and tokenizer contract. Both are re-opened through root-confined, no-follow
+resource paths. The runner is image-owned at the fixed authenticated path.
 
-Reinspect and re-evaluate when the engine, tokenizer contract, runner, image,
-GPU compute capability, or builder configuration changes. A serialized engine
-is not assumed portable across incompatible TensorRT, CUDA, or accelerator
-targets.
+Reinspect and re-evaluate when the engine, tokenizer contract, installed
+runner, outer image, GPU compute capability, or builder configuration changes.
+A serialized engine is not assumed portable across incompatible TensorRT,
+CUDA, or accelerator targets.
 
 ## Import provider evidence
 

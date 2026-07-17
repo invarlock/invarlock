@@ -84,53 +84,29 @@ _PROBED_INVARLOCK_MODULES = frozenset(
 
 
 try:
-    from scripts.release.release_distribution_validation import (  # noqa: F401
-        DistributionArtifacts,
+    from scripts.release.first_party_distribution_validation import (
+        validate_first_party_addin_distributions,
+    )
+    from scripts.release.release_distribution_validation import (
         InstalledWheelImport,
         ReleasePreflightConfig,
         ReleasePreflightError,
-        _CaseSensitiveConfigParser,
-        _checkout_runtime_files,
-        _directory_is_needed,
-        _entry_point_group,
-        _expected_entry_points,
-        _find_distribution_artifacts,
-        _is_import_affecting_path,
         _is_within,
-        _load_hash_manifest,
-        _parse_entry_points,
-        _parse_package_metadata,
         _require_executable_file,
         _require_regular_file,
-        _resolve_from_repo,
-        _safe_archive_member_name,
-        _sha256,
-        _tar_member_sha256,
-        _validate_checkout_bound_sdist_member,
-        _validate_distribution_checkout_binding,
-        _validate_egg_info_member,
-        _validate_entry_points,
-        _validate_generated_sdist_setup_cfg,
-        _validate_sdist_entry_points,
-        _validate_sdist_metadata,
-        _validate_sdist_surface,
-        _validate_wheel_entry_points,
-        _validate_wheel_metadata,
-        _validate_wheel_package_directories,
-        _validate_wheel_record,
-        _validate_wheel_surface,
-        _zip_member_sha256,
         validate_distributions,
     )
 except ImportError:  # pragma: no cover - direct script execution path
-    from release_distribution_validation import (  # noqa: F401
+    from first_party_distribution_validation import (  # type: ignore[import-not-found, no-redef]
+        validate_first_party_addin_distributions,
+    )
+    from release_distribution_validation import (  # type: ignore[import-not-found, no-redef]  # noqa: F401
         InstalledWheelImport,
         ReleasePreflightConfig,
         ReleasePreflightError,
         _is_within,
         _require_executable_file,
         _require_regular_file,
-        _resolve_from_repo,
         validate_distributions,
     )
 
@@ -469,6 +445,11 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
     """Validate a release candidate and return only portable result details."""
     validate_clean_exact_checkout(config)
     artifacts = validate_distributions(config)
+    addin_artifacts = validate_first_party_addin_distributions(
+        repo_root=config.repo_root,
+        expected_version=config.expected_version,
+        dist_dir=config.dist_dir / "addins",
+    )
     _probe_installed_wheel(config, artifacts.wheel)
     _run_current_public_evidence_audit(config)
     validate_clean_exact_checkout(config)
@@ -487,6 +468,14 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
                 "sha256": artifacts.hashes[artifacts.sdist.name],
             },
         ],
+        "first_party_addins": [
+            {
+                "name": item.distribution,
+                "sdist": item.sdist,
+                "wheel": item.wheel,
+            }
+            for item in addin_artifacts
+        ],
         "installed_wheel_import": "isolated_venv_from_candidate_wheel",
         "installed_wheel_runtime_surface": "passed",
         "current_public_evidence": "passed",
@@ -504,14 +493,34 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _resolve_release_input(repo_root: Path, value: Path) -> Path:
+    candidate = value if value.is_absolute() else repo_root / value
+    lexical = Path(os.path.abspath(os.fspath(candidate)))
+    if lexical.is_symlink():
+        raise ReleasePreflightError("release input must not be a symbolic link")
+    try:
+        canonical_parent = lexical.parent.resolve(strict=True)
+    except OSError as exc:
+        raise ReleasePreflightError("release input parent is unavailable") from exc
+    resolved = canonical_parent / lexical.name
+    if resolved.is_symlink():
+        raise ReleasePreflightError("release input must not be a symbolic link")
+    return resolved
+
+
 def _config_from_args(args: argparse.Namespace) -> ReleasePreflightConfig:
-    repo_root = args.repo_root.resolve()
+    try:
+        repo_root = args.repo_root.resolve(strict=True)
+    except OSError as exc:
+        raise ReleasePreflightError("release checkout is unavailable") from exc
+    if not repo_root.is_dir():
+        raise ReleasePreflightError("release checkout must be a directory")
     return ReleasePreflightConfig(
         repo_root=repo_root,
         release_sha=args.release_sha,
         expected_version=args.expected_version,
-        dist_dir=_resolve_from_repo(repo_root, args.dist_dir),
-        hash_manifest=_resolve_from_repo(repo_root, args.hash_manifest),
+        dist_dir=_resolve_release_input(repo_root, args.dist_dir),
+        hash_manifest=_resolve_release_input(repo_root, args.hash_manifest),
     )
 
 

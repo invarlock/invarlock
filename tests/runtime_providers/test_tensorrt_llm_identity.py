@@ -124,6 +124,20 @@ def test_identity_accepts_closed_multi_rank_layout_and_hides_bundle_name(
         assert set(digest) <= set("0123456789abcdef")
 
 
+def test_tree_reader_authenticates_the_same_closed_bundle_in_one_pass(
+    tmp_path: Path,
+) -> None:
+    bundle = _bundle(tmp_path / "bundle", world_size=2)
+
+    tree_sha256 = tensorrt_llm_identity.read_tensorrt_llm_engine_tree_sha256(bundle)
+    identity = _read(bundle)
+
+    assert tree_sha256 == (
+        "2f02ce5c32a0a4010040f6fada330f3e7bd34c856ab4d1d35b3ec6610e39b85a"
+    )
+    assert tree_sha256 == identity.engine_bundle_tree_sha256
+
+
 def test_identity_partitions_tree_builder_metadata_tokenizer_and_compute_capability(
     tmp_path: Path,
 ) -> None:
@@ -375,6 +389,41 @@ def test_identity_rejects_root_and_intermediate_symlink(tmp_path: Path) -> None:
         tensorrt_llm_identity.TensorRTLLMIdentityError, match="traversal"
     ):
         _read(traversal)
+
+
+def test_identity_open_tolerates_safe_directory_metadata_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = _bundle(tmp_path / "bundle")
+    original_open = os.open
+    changed = False
+
+    def open_after_sibling_churn(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        nonlocal changed
+        if path == bundle.name and kwargs.get("dir_fd") is not None and not changed:
+            changed = True
+            transient = bundle / ".transient-sibling"
+            transient.write_bytes(b"temporary")
+            transient.unlink()
+        return original_open(path, flags, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(tensorrt_llm_identity.os, "open", open_after_sibling_churn)
+
+    descriptor = tensorrt_llm_identity._open_root_without_symlinks(bundle)
+    try:
+        assert changed is True
+        opened = os.fstat(descriptor)
+        assert (opened.st_dev, opened.st_ino) == (
+            bundle.stat().st_dev,
+            bundle.stat().st_ino,
+        )
+    finally:
+        os.close(descriptor)
 
 
 def test_identity_rejects_mutation_during_hashing(

@@ -9,8 +9,15 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from pathlib import Path
 
 from invarlock_addins.tensorrt_llm import __version__ as ADDIN_VERSION
+from invarlock_addins.tensorrt_llm.execution import (
+    official_tensorrt_llm_runner_path,
+)
+from invarlock_addins.tensorrt_llm.inspection import (
+    _open_validated_tensorrt_llm_static_inputs,
+)
 from invarlock_addins.tensorrt_llm.session import (
     TensorRTLLMRuntimeBindings,
     TensorRTLLMSession,
@@ -22,6 +29,7 @@ from invarlock.core.runtime_provider import (
     INVARLOCK_RUNTIME_PROVIDER_ABI,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
+    RuntimeBehavioralSchedule,
     RuntimeExecutionContext,
     RuntimeProviderCapabilities,
     RuntimeProviderPluginIdentity,
@@ -256,34 +264,93 @@ class TensorRTLLMProvider:
             ),
         )
 
+    def authenticate_artifact(
+        self, spec: ModelRuntimeSpec, artifact_path: Path
+    ) -> TensorRTLLMArtifactIdentity:
+        """Authenticate one local engine bundle without loading TensorRT-LLM."""
+
+        expected = self.identify_artifact(spec)
+        observed = read_tensorrt_llm_artifact_identity(
+            artifact_path,
+            target_compute_capability=expected.target_compute_capability,
+            tokenizer_metadata_sha256=expected.tokenizer_metadata_sha256,
+        )
+        if observed != expected:
+            raise ValueError(
+                "primary TensorRT-LLM artifact identity does not match spec"
+            )
+        return observed
+
+    def validate_evaluation_inputs(
+        self,
+        spec: ModelRuntimeSpec,
+        resources: RuntimeArtifactResources,
+        schedule: RuntimeBehavioralSchedule,
+    ) -> None:
+        """Authenticate static runtime inputs without probing a GPU or runner."""
+
+        self.validate_config(spec)
+        if schedule.task not in self.capabilities().tasks:
+            raise ValueError(
+                f"tensorrt_llm does not support schedule task {schedule.task!r}"
+            )
+        resources.require_support_names(frozenset({"tokenizer_contract"}))
+        if resources.device_kind != "cuda":
+            raise ValueError("tensorrt_llm input preflight requires a CUDA device")
+
+        engine_bundle = resources.primary_path()
+        tokenizer_contract = resources.support_path("tokenizer_contract")
+        static_inputs = _open_validated_tensorrt_llm_static_inputs(
+            engine_bundle_path=engine_bundle,
+            tokenizer_contract_path=tokenizer_contract,
+        )
+        try:
+            expected_tokenizer_sha256 = _required_digest(
+                spec.settings, "tokenizer_metadata_sha256"
+            )
+            if static_inputs.tokenizer_sha256 != expected_tokenizer_sha256:
+                raise ValueError(
+                    "tokenizer contract digest does not match tensorrt_llm spec"
+                )
+
+            batch_size = _required_integer(spec.settings, "batch_size", positive=True)
+            context_length = _required_integer(
+                spec.settings, "context_length", positive=True
+            )
+            max_output_tokens = _required_integer(
+                spec.settings, "max_output_tokens", positive=True
+            )
+            if batch_size > static_inputs.engine_max_batch_size:
+                raise ValueError("batch_size exceeds the engine build limit")
+            if context_length > static_inputs.engine_max_input_len:
+                raise ValueError("context_length exceeds the engine build limit")
+            if context_length + max_output_tokens > static_inputs.engine_max_seq_len:
+                raise ValueError(
+                    "context and output lengths exceed the engine sequence limit"
+                )
+
+            self.authenticate_artifact(spec, engine_bundle)
+            static_inputs.recheck()
+        finally:
+            static_inputs.close()
+
     def prepare_execution(
         self,
         spec: ModelRuntimeSpec,
         resources: RuntimeArtifactResources,
     ) -> RuntimeExecutionContext:
-        """Bind one root-confined engine bundle to its tokenizer and runner."""
+        """Bind one root-confined engine bundle to its tokenizer and image runner."""
 
         self.validate_config(spec)
-        resources.require_support_names(
-            frozenset({"runner_executable", "tokenizer_contract"})
-        )
+        resources.require_support_names(frozenset({"tokenizer_contract"}))
         if resources.device_kind != "cuda":
             raise ValueError("tensorrt_llm preparation requires a CUDA device")
         bindings = TensorRTLLMRuntimeBindings(
             engine_bundle_path=resources.primary_path(),
             tokenizer_contract_path=resources.support_path("tokenizer_contract"),
-            runner_executable_path=resources.support_path("runner_executable"),
+            runner_executable_path=official_tensorrt_llm_runner_path(),
         )
-        identity = self.identify_artifact(spec)
-        observed_identity = read_tensorrt_llm_artifact_identity(
-            bindings.engine_bundle_path,
-            target_compute_capability=identity.target_compute_capability,
-            tokenizer_metadata_sha256=identity.tokenizer_metadata_sha256,
-        )
-        if observed_identity != identity:
-            raise ValueError(
-                "primary TensorRT-LLM resource identity does not match spec"
-            )
+        identity = self.authenticate_artifact(spec, bindings.engine_bundle_path)
         return RuntimeExecutionContext(
             strict=True,
             allow_network=False,

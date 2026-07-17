@@ -55,14 +55,18 @@ RUN python -m pip download \
 # beneath an authenticated provider receipt.
 FROM nvcr.io/nvidia/tensorrt-llm/release:1.2.1@sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9
 
+ARG INVARLOCK_SOURCE_BUNDLE_SHA256
+ARG INVARLOCK_SOURCE_COMMIT
 ARG SOURCE_DATE_EPOCH
 ARG TENSORRT_LLM_VERSION=1.2.1
 ARG TENSORRT_LLM_SOURCE_COMMIT=376f7e1bd8ed543f75014309e3fd4b237e9b0e73
 ARG TENSORRT_LLM_BASE_DIGEST=sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9
 
+RUN python -c 'import re,sys; commit,digest=sys.argv[1:]; re.fullmatch(r"[0-9a-f]{40,64}", commit) or sys.exit("invalid INVARLOCK_SOURCE_COMMIT"); re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or sys.exit("invalid INVARLOCK_SOURCE_BUNDLE_SHA256")' \
+      "${INVARLOCK_SOURCE_COMMIT}" "${INVARLOCK_SOURCE_BUNDLE_SHA256}"
+
 ENV HF_HUB_OFFLINE=1 \
     INVARLOCK_ALLOW_NETWORK=0 \
-    INVARLOCK_TENSORRT_LLM_RUNNER=/opt/invarlock/bin/tensorrt-llm-runner \
     PATH="/opt/invarlock/cli-venv/bin:${PATH}" \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -74,12 +78,14 @@ ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1
 
 LABEL dev.invarlock.runtime-provider="tensorrt_llm" \
+      dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}" \
       dev.invarlock.runtime-runner="/opt/invarlock/bin/tensorrt-llm-runner" \
       dev.invarlock.tensorrt-llm.base-digest="${TENSORRT_LLM_BASE_DIGEST}" \
       dev.invarlock.tensorrt-llm.base-url="https://catalog.ngc.nvidia.com/orgs/nvidia/tensorrt-llm/containers/release/1.2.1" \
       dev.invarlock.tensorrt-llm.source-commit="${TENSORRT_LLM_SOURCE_COMMIT}" \
       dev.invarlock.tensorrt-llm.source-url="https://github.com/NVIDIA/TensorRT-LLM/releases/tag/v1.2.1" \
-      dev.invarlock.tensorrt-llm.version="${TENSORRT_LLM_VERSION}"
+      dev.invarlock.tensorrt-llm.version="${TENSORRT_LLM_VERSION}" \
+      org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"
 
 COPY --from=runtime-inputs /requirements/workflows/core-py312.txt /opt/invarlock/requirements/core-py312.txt
 COPY --from=public-wheel /wheelhouse /opt/invarlock/artifacts

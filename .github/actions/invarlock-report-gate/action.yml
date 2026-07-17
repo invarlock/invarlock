@@ -194,7 +194,7 @@ runs:
         printf 'INVARLOCK_VERIFY_EXIT_CODE=%s\n' "$status" >> "$GITHUB_ENV"
 
     - name: Render InvarLock HTML report
-      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' }}
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && env.INVARLOCK_VERIFY_EXIT_CODE == '0' }}
       shell: bash
       env:
         INVARLOCK_ACTION_PYTHON: ${{ inputs.python }}
@@ -226,7 +226,7 @@ runs:
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload InvarLock evidence
-      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' }}
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && env.INVARLOCK_VERIFY_EXIT_CODE == '0' }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ inputs.artifact-name }}
@@ -236,6 +236,14 @@ runs:
           ${{ inputs.verify-output }}
           ${{ inputs.receipt-output }}
           ${{ inputs.html-output }}
+
+    - name: Upload InvarLock verification failure
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && env.INVARLOCK_VERIFY_EXIT_CODE != '0' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: ${{ inputs.artifact-name }}-verification-failure
+        if-no-files-found: warn
+        path: ${{ inputs.verify-output }}
 
     - name: Enforce InvarLock verification result
       if: ${{ always() }}

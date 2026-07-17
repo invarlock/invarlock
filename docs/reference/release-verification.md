@@ -16,7 +16,7 @@ InvarLock ships five coordinated Python distributions:
 | `invarlock-runtime-hf-vision-text` | Optional Hugging Face vision-text provider |
 | `invarlock-diagnostics` | Optional observation-only numeric diagnostics |
 
-All five use the same release version. Provider add-ins declare a bounded core
+All five use the same release version. Provider add-ins declare that exact core
 dependency and must also match runtime-provider ABI `1` when loaded.
 
 | Compatibility dimension | Required check |
@@ -32,27 +32,39 @@ dependency and must also match runtime-provider ABI `1` when loaded.
 For a tagged or explicitly selected release commit, the repository workflow:
 
 1. resolves the exact tag commit;
-2. scans the release history range for secrets;
-3. builds one wheel and source distribution for the core and every first-party
+2. requires the workflow event commit to equal the resolved tag commit;
+3. runs the complete repository, coverage, documentation, contract, and
+   workflow gates;
+4. scans the release history range for secrets;
+5. builds one wheel and source distribution for the core and every first-party
    add-in;
-4. runs `twine check` on every distribution;
-5. installs the built wheels together in a clean environment;
-6. exercises the public CLI, all provider conformance commands, diagnostics,
+6. validates every archive against the exact checkout and runs the release
+   preflight again from a clean detached checkout;
+7. runs `twine check` on every distribution;
+8. installs the built wheels together in a clean environment;
+9. exercises the public CLI, all provider conformance commands, diagnostics,
    and entry-point discovery;
-7. audits the installed dependency surface and generates an SBOM;
-8. attaches build-provenance attestations to the distributions before
+10. audits the installed dependency surface and generates an SBOM;
+11. attaches build-provenance attestations to the distributions before
    publication; and
-9. for a TestPyPI release, downloads the published wheels, verifies index
-   hashes, installs them together, and repeats the conformance smoke.
+12. for a TestPyPI release, verifies every hosted archive against the build
+    ledger, installs the hosted wheels together, repeats the conformance smoke,
+    and records the immutable run and ledger authorized for promotion.
 
 These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
 Those belong to the evaluate/verify trust model.
 
 The workflow resolves and checks out the release tag's exact commit before it
-builds. A tag push publishes to PyPI after the build job succeeds. A manual run
-requires an existing tag and publishes only when its explicit publish input is
-enabled; TestPyPI additionally runs the index-download smoke.
+builds. A tag push validates the candidate but does not publish it. Publication
+is an explicit manual action against an existing tag, and the manual workflow
+must be dispatched with that tag as its workflow ref so the event commit and
+resolved tag commit are identical. TestPyPI publication uses
+the distributions built and gated by that run. Production publication requires
+the successful TestPyPI run ID and reuses that run's immutable distribution
+artifact after authenticating its workflow result, release tag, commit, and
+digest ledger. The distribution and promotion artifacts are retained for 14
+days, so production promotion must complete within that interval.
 
 Build provenance uses GitHub's [artifact-attestation
 mechanism](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
@@ -62,14 +74,19 @@ signer/workflow identity, and trusted transparency or provenance policy.
 ## Local preflight before a tag
 
 Run the release checks from a clean checkout whose `HEAD` is the candidate
-commit. The full distribution check covers core and all four optional
-packages. The read-only preflight then inspects the core wheel and source
-distribution against a separately generated `sha256sum`-format manifest,
-installs the candidate wheel in isolation, exercises its runtime surface, and
-reruns the public-evidence audit:
+commit. The coordinated install smoke builds the core and all four optional
+packages, installs their pinned base dependency closure and all five wheels in
+a disposable virtual environment, runs `pip check`, and exercises provider
+discovery and conformance without the checkout or user site on `sys.path`.
+The smoke selects the maintained Python 3.12 or 3.13 lock for the invoking
+interpreter and fails closed when no matching lock exists.
+The read-only preflight then inspects the core wheel and source distribution
+against a separately generated `sha256sum`-format manifest, installs the
+candidate wheel in isolation, exercises its runtime surface, and reruns the
+public-evidence audit:
 
 ```bash
-make dist-check
+make addins-install-smoke
 
 HASH_MANIFEST="$(mktemp)"
 trap 'rm -f -- "$HASH_MANIFEST"' EXIT
@@ -95,23 +112,38 @@ change. A passing result is release-candidate evidence, not authorization to
 tag or publish.
 
 The local preflight intentionally validates the core pair in depth while
-`make dist-check` and the release workflow validate the coordinated five-package
-install. Keep both gates; do not describe the core-only JSON result as proof
-that every add-in archive was independently inspected by preflight.
+`make dist-check` validates every archive against its checkout source and
+`make addins-install-smoke` plus the release workflow validate the coordinated
+five-package install. Keep both kinds of gate; do not describe the core-only
+JSON result as proof that every add-in archive was independently inspected by
+preflight.
 
 ## Test index and production publication
 
-For a candidate tag, use a manual TestPyPI publication first. The workflow
+For a candidate tag, use a manual TestPyPI publication first, selecting the
+release tag itself as the workflow ref. Leave `promotion_run_id` empty for this
+run. The workflow
 downloads all five published wheels from the index, compares each download with
 the digest returned by that index, installs the set together, and reruns the
 CLI, diagnostics, provider-conformance, and entry-point smoke. Review the
-provenance bundle and SBOM produced by the same tag workflow.
+provenance bundle and SBOM produced by the same tag workflow. A successful
+smoke produces a `testpypi-promotion` artifact bound to the exact release tag,
+commit, distribution ledger, and workflow run.
 
 Publish to the production index only when the TestPyPI smoke, local preflight,
 tag-to-commit check, release notes, and security review all refer to the same
-candidate. Production publication is a separate trusted-environment action;
-copying a TestPyPI URL or its downloaded bytes is not by itself publication
-authorization.
+candidate. Start a separate manual production run with that successful
+TestPyPI run's numeric ID as `promotion_run_id`, again selecting the release
+tag as the workflow ref. The production job retrieves the immutable
+distribution artifact from that run and rejects a failed run, a different
+workflow, tag, commit, target, or digest ledger. Production publication remains
+a separate trusted-environment action; copying a TestPyPI URL or its downloaded
+bytes is not by itself publication authorization.
+
+Configure a protected `v*` tag ruleset that blocks updates and deletion, and
+protect the `pypi` environment with required reviewers and an appropriate
+deployment policy. These repository controls provide the authorization layer
+around the workflow's commit, artifact, and promotion checks.
 
 After production publication, download the five wheels again from the
 production index, compare hosted digests, install them together in a clean
@@ -143,8 +175,11 @@ invarlock-tensorrt-llm-conformance
 Each conformance command must report `ok: true`, its expected provider name,
 and the ABI accepted by the installed core. A conformance pass verifies the
 install surface and lightweight provider contract, not a native runtime model
-run. Perform a digest-pinned runtime canary before relying on a new native image
-or accelerator combination.
+run. Before qualification fan-out, produce and strictly verify one signed
+canary through the exact digest-pinned runtime image. Retain its evidence,
+signed receipt, and verifier-owned trust profile for the maintained readiness
+and evidence targets. Reuse is limited to that exact image digest; a canary does
+not establish model-specific load, memory, backend, or execution success.
 
 An example hash-enforced download/install flow is:
 

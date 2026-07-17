@@ -3,19 +3,25 @@
   "entries": [
     {
       "advisory": "CVE-2025-3000",
-      "compensating_control": "The affected package is confined to optional local model execution inside the digest-pinned, network-disabled runtime; remote code loading is disabled for strict evidence production.",
+      "packages": ["torch"],
+      "versions": ["2.11.0+cpu", "2.11.0+cu128"],
+      "allowed_sources": ["requirements/workflows/runtime-image-py312-aarch64.txt", "requirements/workflows/runtime-image-py312-cu128.txt", "requirements/workflows/runtime-image-py312.txt"],
+      "compensating_control": "The affected wheels are confined to local model execution inside digest-pinned, network-disabled CPU, CUDA, and aarch64 runtime images; remote code loading is disabled for strict evidence production.",
       "owner": "security-maintainers",
       "expires": "2026-08-13",
       "tracking_issue": "https://github.com/invarlock/invarlock/issues/72",
-      "reason": "pip-audit reports the advisory against torch 2.11.0 in the optional Hugging Face and canonical aarch64 runtime surfaces and currently lists no fixed torch release; remove when upstream publishes a fixed version."
+      "reason": "pip-audit reports the advisory against torch 2.11.0 in the canonical CPU, CUDA, and aarch64 runtime surfaces and currently lists no fixed torch release; remove when upstream publishes a fixed version."
     },
     {
       "advisory": "PYSEC-2026-3447",
-      "compensating_control": "The affected build dependency is confined to the pinned aarch64 runtime dependency surface and is not exposed as a remotely reachable service.",
+      "packages": ["setuptools"],
+      "versions": ["81.0.0"],
+      "allowed_sources": ["requirements/workflows/runtime-image-py312-aarch64.txt", "requirements/workflows/runtime-image-py312-cu128.txt", "requirements/workflows/runtime-image-py312.txt"],
+      "compensating_control": "These Linux runtime locks install hash-pinned wheels only and never build or distribute setuptools sdists; release build environments independently require setuptools 83 or newer.",
       "owner": "security-maintainers",
       "expires": "2026-08-13",
       "tracking_issue": "https://github.com/invarlock/invarlock/issues/142",
-      "reason": "The pinned aarch64 CPU runtime wheel requires setuptools below 82; retain the runtime-only lock until an upstream-compatible pairing permits setuptools 83 or later."
+      "reason": "The pinned Torch 2.11.0 CPU and CUDA wheels require setuptools below 82; retain the runtime-only locks until an upstream-compatible pairing permits setuptools 83 or later."
     }
   ]
 }

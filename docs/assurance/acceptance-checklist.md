@@ -14,7 +14,7 @@
     **Evidence:** Independently sourced anchors, a verified immutable pack, a
     signed verifier receipt, and the decision-owner-maintained decision record.
 
-Use this checklist for one `evidence-pack-v1` decision. A checked item means
+Use this checklist for one `invarlock/evidence-pack-v1` decision. A checked item means
 the decision owner established it independently; it must not mean merely that the
 bundle contains a matching assertion.
 
@@ -129,7 +129,7 @@ decision, decision owner, and decision time:
 exceptions and expiry/re-evaluation trigger:
 ```
 
-The record is review metadata, not part of `evidence-pack-v1`. If it requires
+The record is review metadata, not part of `invarlock/evidence-pack-v1`. If it requires
 cryptographic authentication, sign it through the review system rather than
 adding it to the immutable pack.
 

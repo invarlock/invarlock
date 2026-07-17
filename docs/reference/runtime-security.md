@@ -118,26 +118,33 @@ the environment switches independently and requires network disabled.
 - exact `0700` mode is a local filesystem check, not proof of storage
   encryption or host isolation.
 
-## Container user boundary
+## Container user and resource boundary
 
-The repository runtime images currently inherit the base image's default user,
-which is root. Image digest pinning authenticates those bytes but does not make
-root execution least-privileged. Operators should supply an explicit non-root
-UID/GID, read-only input mounts, a writable output mount owned by that identity,
-and only the required device access. For example:
+Repository runtime images inherit the base image's default user, which may be
+root. The automatic `invarlock evaluate` launcher overrides that default with
+numeric non-root `65532:65532`, applies four CPUs and 65536 MiB per worker, and
+accepts validated caller-owned overrides through the CLI or environment. It
+also supplies read-only input mounts, one isolated writable output mount, and
+only the selected device access. Submitted request data cannot choose or relax
+these controls.
+
+For a manual container invocation, apply equivalent controls explicitly:
 
 ```bash
 docker run --rm --network none --read-only \
   --user 10001:10001 \
+  --cpus 4 --memory 65536m \
   --mount type=bind,src="$PWD/inputs",dst=/inputs,readonly \
   --mount type=bind,src="$PWD/output",dst=/output \
   IMAGE_BY_DIGEST ...
 ```
 
 Validate the selected image and mounted paths under that identity before the
-real transaction. TensorRT-LLM images also inherit NVIDIA's entrypoint and need
-the target GPU device; least privilege must preserve only those required
-capabilities.
+real transaction. The automatic launcher also derives a finite process
+deadline from the validated per-record timeout and schedule length, caps it at
+24 hours, and stops or kills the exact engine-issued container ID on expiry.
+TensorRT-LLM images also inherit NVIDIA's entrypoint and need the target GPU
+device; least privilege must preserve only those required capabilities.
 
 ## Related documentation
 

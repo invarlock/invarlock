@@ -15,11 +15,23 @@ second product workflow.
 
 - `checks/` contains the packaged-contract synchronizer, the public-evidence
   index audit, and the source-tree cruft check.
-- `release/` validates a clean release checkout and the core wheel/sdist.
-  `make dist-check` builds and validates the core plus all four first-party
-  optional distributions. Runtime provider conformance belongs to each
-  provider add-in.
+- `release/` validates a clean release checkout and built distributions.
+  `make dist-check` binds the core wheel/sdist and all four first-party
+  optional wheel/sdist pairs to their exact checkout sources, metadata, and
+  entry points. `make addins-install-smoke` then installs the pinned base
+  dependency closure and all five wheels in a disposable environment, runs
+  `pip check`, and exercises provider discovery and conformance without using
+  the checkout or user site. It selects the maintained Python 3.12 or 3.13
+  lock for the invoking interpreter.
 - `security/` generates the SBOM and runs dependency vulnerability checks.
+- `authenticated_runtime_build.py` consumes an authenticated Git archive,
+  validates Dockerfile base overrides as named `repository@sha256:...`
+  manifest references, and can publish a no-clobber build statement. Raw local
+  config IDs remain valid execution identities but are rejected as `FROM`
+  inputs.
+- `tensorrt_llm_canary_preflight.py` authenticates the closed engine tree,
+  tokenizer contract, immutable image reference, and canonical input root
+  before the TensorRT-LLM wrapper starts a GPU container.
 - `select_workspace_python.sh` selects the repository Python interpreter used
   by the Makefile.
 
@@ -51,7 +63,7 @@ Release preflight is intentionally read-only and does not publish, tag, or
 merge:
 
 ```bash
-make dist-check
+make addins-install-smoke
 make release-preflight RELEASE_PREFLIGHT_ARGS="\
   --release-sha COMMIT_SHA \
   --expected-version X.Y.Z \

@@ -369,6 +369,46 @@ def test_config_from_args_resolves_checkout_relative_paths(tmp_path: Path) -> No
     assert config.hash_manifest == tmp_path / "hashes.txt"
 
 
+def test_config_from_args_accepts_canonical_inputs_outside_the_checkout(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    external_dist = tmp_path / "outside"
+    external_hashes = tmp_path / "hashes.txt"
+    args = argparse.Namespace(
+        repo_root=checkout,
+        release_sha="a" * 40,
+        expected_version="1.2.3",
+        dist_dir=external_dist,
+        hash_manifest=external_hashes,
+    )
+
+    config = preflight._config_from_args(args)
+
+    assert config.dist_dir == external_dist
+    assert config.hash_manifest == external_hashes
+
+
+def test_config_from_args_rejects_a_symlinked_release_path(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    target = checkout / "real-dist"
+    target.mkdir()
+    linked = checkout / "dist"
+    linked.symlink_to(target, target_is_directory=True)
+    args = argparse.Namespace(
+        repo_root=checkout,
+        release_sha="a" * 40,
+        expected_version="1.2.3",
+        dist_dir=Path("dist"),
+        hash_manifest=Path("hashes.txt"),
+    )
+
+    with pytest.raises(preflight.ReleasePreflightError, match="symbolic link"):
+        preflight._config_from_args(args)
+
+
 def test_argument_parser_accepts_complete_release_identity(tmp_path: Path) -> None:
     args = preflight._parse_args(
         [

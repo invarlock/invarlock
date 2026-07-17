@@ -7,6 +7,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from invarlock import evidence_receipt as receipt_module
 from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
 from invarlock.evidence_receipt import (
     EvidenceReceiptError,
@@ -54,6 +55,27 @@ def _mutate_receipt(receipt: Path, mutate: object) -> None:
     assert callable(mutate)
     mutate(payload)
     receipt.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_receipt_no_clobber_race_never_removes_the_other_writer_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = tmp_path / "receipt.json"
+    real_open = Path.open
+
+    def raced_open(path: Path, mode: str = "r", *args, **kwargs):
+        if path == receipt and mode == "xb":
+            with real_open(receipt, "wb") as handle:
+                handle.write(b"other writer")
+            raise FileExistsError("raced")
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", raced_open)
+
+    with pytest.raises(receipt_module.EvidenceReceiptError, match="already exists"):
+        receipt_module._write_no_clobber(receipt, b"ours")
+
+    assert receipt.read_bytes() == b"other writer"
 
 
 @pytest.mark.parametrize(
@@ -146,7 +168,8 @@ def test_receipt_verifier_rejects_invalid_external_verifier_roots(
 def test_receipt_binds_current_pack_and_policy_bytes(tmp_path: Path) -> None:
     receipt, pack, policy, runtimes, pack_signer, verifier = _write(tmp_path)
     (pack / "manifest.json").write_text(
-        '{"format":"evidence-pack-v1","tampered":true}\n', encoding="utf-8"
+        '{"format":"invarlock/evidence-pack-v1","tampered":true}\n',
+        encoding="utf-8",
     )
     policy.write_text('{"policy":"changed"}\n', encoding="utf-8")
 
@@ -294,4 +317,74 @@ def test_receipt_writer_rejects_non_ed25519_private_key(tmp_path: Path) -> None:
             expected_pack_signer_fingerprint=pack_signer,
             verifier_identity="invarlock-verifier/release",
             verifier_signing_key_path=key_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("captured", "message"),
+    [
+        ({"policy_bytes": "{}"}, "policy bytes must be exact bytes"),
+        (
+            {"policy_bytes": b"x" * (4 * 1024 * 1024 + 1)},
+            "policy anchor exceeds",
+        ),
+        (
+            {"verifier_signing_key_bytes": "private-key"},
+            "signing key bytes must be exact bytes",
+        ),
+        (
+            {"verifier_signing_key_bytes": b"x" * (64 * 1024 + 1)},
+            "signing key exceeds",
+        ),
+        ({"verifier_signing_key_bytes": b"not-a-key"}, "could not load"),
+    ],
+)
+def test_receipt_writer_rejects_unsafe_captured_trust_material(
+    tmp_path: Path, captured: dict[str, object], message: str
+) -> None:
+    pack, policy, runtimes, pack_signer = _inputs(tmp_path)
+    key, _verifier = _key(tmp_path, "verifier")
+    kwargs: dict[str, object] = {
+        "policy_path": policy,
+        **_input_anchor_kwargs(),
+        "expected_runtime_digests": runtimes,
+        "expected_pack_signer_fingerprint": pack_signer,
+        "verifier_identity": "invarlock-verifier/release",
+        "verifier_signing_key_path": key,
+        **captured,
+    }
+
+    with pytest.raises(EvidenceReceiptError, match=message):
+        write_signed_verification_receipt(
+            pack,
+            _result(pack, policy, runtimes, pack_signer),
+            tmp_path / "receipt.json",
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+
+def test_receipt_writer_rejects_captured_non_ed25519_private_key(
+    tmp_path: Path,
+) -> None:
+    pack, policy, runtimes, pack_signer = _inputs(tmp_path)
+    key, _verifier = _key(tmp_path, "verifier")
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    captured_key = private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+
+    with pytest.raises(EvidenceReceiptError, match="must be Ed25519"):
+        write_signed_verification_receipt(
+            pack,
+            _result(pack, policy, runtimes, pack_signer),
+            tmp_path / "receipt.json",
+            policy_path=policy,
+            **_input_anchor_kwargs(),
+            expected_runtime_digests=runtimes,
+            expected_pack_signer_fingerprint=pack_signer,
+            verifier_identity="invarlock-verifier/release",
+            verifier_signing_key_path=key,
+            verifier_signing_key_bytes=captured_key,
         )

@@ -118,7 +118,7 @@
 
   <rect x="628" y="205" width="344" height="170" rx="12" class="box-evidence" />
   <text x="800" y="246" text-anchor="middle" class="box-title">Canonical signed evidence</text>
-  <text x="800" y="285" text-anchor="middle" class="mono">evidence-pack-v1</text>
+  <text x="800" y="285" text-anchor="middle" class="mono">invarlock/evidence-pack-v1</text>
   <text x="800" y="322" text-anchor="middle" class="box-text">records · report · checksums</text>
   <text x="800" y="350" text-anchor="middle" class="box-text">evidence signature</text>
 

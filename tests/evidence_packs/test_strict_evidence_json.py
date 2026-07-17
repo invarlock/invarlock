@@ -97,6 +97,32 @@ def test_snapshot_copy_is_exact_no_clobber_and_preserves_requested_mode(
         )
 
 
+def test_snapshot_copy_enforces_its_streaming_byte_limit(tmp_path: Path) -> None:
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"12345")
+    destination = tmp_path / "snapshot.bin"
+
+    with pytest.raises(StrictJsonError, match="4-byte size limit"):
+        copy_regular_file_snapshot(
+            source,
+            destination,
+            label="artifact",
+            max_bytes=4,
+        )
+
+    assert not destination.exists()
+
+    empty = tmp_path / "empty.bin"
+    empty.write_bytes(b"")
+    copy_regular_file_snapshot(
+        empty,
+        destination,
+        label="empty artifact",
+        max_bytes=0,
+    )
+    assert destination.read_bytes() == b""
+
+
 def test_json_object_snapshot_binds_exact_bytes_and_requires_an_object(
     tmp_path: Path,
 ) -> None:

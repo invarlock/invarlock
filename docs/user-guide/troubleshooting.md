@@ -171,8 +171,9 @@ authority. They may be equal when both sides intentionally used one runtime.
 
 ## Provider is unavailable
 
-The core package includes the HF text provider. Install its execution
-dependencies with `invarlock[hf]`. GGUF, TensorRT-LLM, and Hugging Face
+The base package includes the HF text provider and can authenticate its local
+snapshot identity for import mode without Torch or Transformers. Install
+`invarlock[hf]` before run-mode execution. GGUF, TensorRT-LLM, and Hugging Face
 vision-text providers are separate first-party add-ins and must be installed
 and qualified in their required runtimes. A
 request naming an undiscoverable provider fails before evidence publication.

@@ -16,6 +16,7 @@ from invarlock_addins.gguf.session import (
     LlamaCppRuntimeBindings,
     LlamaCppSession,
     LlamaCppSessionConfig,
+    authenticate_llama_cpp_backend_files,
     inspect_llama_cpp_backend,
     validate_llama_cpp_backend_version,
 )
@@ -25,6 +26,7 @@ from invarlock.core.runtime_provider import (
     GGUFArtifactIdentity,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
+    RuntimeBehavioralSchedule,
     RuntimeDeviceFacts,
     RuntimeExecutionContext,
     RuntimeProviderCapabilities,
@@ -429,6 +431,51 @@ class LlamaCppProvider:
             ),
         )
 
+    def authenticate_artifact(
+        self, spec: ModelRuntimeSpec, artifact_path: Path
+    ) -> GGUFArtifactIdentity:
+        """Authenticate one local GGUF file without starting llama.cpp."""
+
+        expected = self.identify_artifact(spec)
+        observed = read_gguf_artifact_identity(artifact_path)
+        if observed != expected:
+            raise ValueError("primary GGUF artifact identity does not match spec")
+        return observed
+
+    def validate_evaluation_inputs(
+        self,
+        spec: ModelRuntimeSpec,
+        resources: RuntimeArtifactResources,
+        schedule: RuntimeBehavioralSchedule,
+    ) -> None:
+        """Authenticate static GGUF runtime inputs without starting llama.cpp."""
+
+        self.validate_config(spec)
+        if schedule.task not in self.capabilities().tasks:
+            raise ValueError(
+                f"llama_cpp does not support schedule task {schedule.task!r}"
+            )
+        resources.require_support_names(
+            frozenset({"backend_executable", "backend_source"})
+        )
+        if resources.device_kind != "cpu":
+            raise ValueError("llama_cpp input preflight requires a CPU device")
+        bindings = LlamaCppRuntimeBindings(
+            gguf_path=resources.primary_path(),
+            executable_path=resources.support_path("backend_executable"),
+            source_archive_path=resources.support_path("backend_source"),
+        )
+        self.authenticate_artifact(spec, bindings.gguf_path)
+        authenticate_llama_cpp_backend_files(
+            bindings,
+            expected_binary_sha256=_required_digest(
+                spec.settings, "backend_binary_sha256"
+            ),
+            expected_source_sha256=_required_digest(
+                spec.settings, "backend_source_sha256"
+            ),
+        )
+
     def prepare_execution(
         self,
         spec: ModelRuntimeSpec,
@@ -447,11 +494,7 @@ class LlamaCppProvider:
             executable_path=resources.support_path("backend_executable"),
             source_archive_path=resources.support_path("backend_source"),
         )
-        identity = self.identify_artifact(spec)
-        if read_gguf_artifact_identity(bindings.gguf_path) != identity:
-            raise ValueError(
-                "primary GGUF resource identity does not match llama_cpp spec"
-            )
+        identity = self.authenticate_artifact(spec, bindings.gguf_path)
         return RuntimeExecutionContext(
             strict=True,
             allow_network=False,

@@ -218,6 +218,29 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         assert retired not in all_text
 
 
+def test_runtime_qualification_docs_use_authenticated_candidate_wheels() -> None:
+    reference = _read("docs/reference/runtime-providers.md")
+    assert "scripts/qualification_candidate_wheels.py" in reference
+    assert "CANDIDATE_WHEEL_MANIFEST" in reference
+    assert "third-party dependency environment" in reference
+
+    guide = _read("docs/user-guide/runtime-providers.md")
+    assert "scripts/qualification_candidate_wheels.py" in guide
+    assert "--wheel dist/invarlock-*.whl" in guide
+
+    addin_wheels = {
+        "addins/gguf/README.md": "invarlock_runtime_gguf-*.whl",
+        "addins/multimodal/README.md": ("invarlock_runtime_hf_vision_text-*.whl"),
+        "addins/tensorrt_llm/README.md": ("invarlock_runtime_tensorrt_llm-*.whl"),
+    }
+    for relative, wheel in addin_wheels.items():
+        text = _read(relative)
+        assert "scripts/qualification_candidate_wheels.py" in text
+        assert "CANDIDATE_WHEEL_MANIFEST" in text
+        assert "dist/invarlock-*.whl" in text
+        assert wheel in text
+
+
 def test_documentation_lint_covers_maintained_markdown_surfaces() -> None:
     makefile = _read("Makefile")
     workflow = _read(".github/workflows/docs-ci.yml")
@@ -339,7 +362,7 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
         "prepare schedule · run pinned oci sides or import evidence",
         "invarlock evaluate",
         "paired comparison and interval",
-        "evidence-pack-v1",
+        "invarlock/evidence-pack-v1",
         "canonical signed evidence bundle",
         "baseline + subject artifact digests · schedule digest",
         "invarlock verify",

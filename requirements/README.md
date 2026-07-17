@@ -9,11 +9,21 @@ documentation, release, security, and runtime-image builds.
 core and tooling locks stay independent of a model runtime. Hugging Face locks
 resolve the published Torch distribution for their target platform, while
 runtime-image locks select the container's Torch backend explicitly.
+`release-install-py312.txt` and `release-install-py313.txt` are the
+Python-version-specific, hash-pinned dependency closures installed before the
+coordinated local release wheels. Both are compiled from
+`release-install.in`, which is the exact union of the external base
+dependencies declared by the core and four optional first-party
+distributions. That closure includes NumPy for diagnostics and Pillow for the
+vision-text host package. Heavy inference stacks exposed only through optional
+runtime extras are deliberately outside this coordinated base-install gate.
 
 These workflow locks cover repository automation and runtime-image builds; they
 are not a substitute for each distribution's declared metadata. The release
 build validates the `invarlock`, diagnostics, GGUF connector, Hugging Face
-vision-text connector, and TensorRT-LLM connector distributions separately.
+vision-text connector, and TensorRT-LLM connector distributions separately,
+then installs all five wheels together against the matching Python 3.12 or
+3.13 closure in a disposable environment.
 
 ## Refresh
 
@@ -26,8 +36,8 @@ bash scripts/security/refresh_pinned_requirements.sh
 That compiler owns every generated workflow lock except two deliberately
 minimal, hand-maintained bootstrap surfaces:
 
-- `pip-bootstrap-py313.txt` copies the exact `pip` version and hashes already
-  reviewed in `release-security-py313.txt`;
+- `pip-bootstrap.txt` contains the Python-version-independent pip bootstrap
+  wheel and source hashes already reviewed in `release-security-py313.txt`;
 - `runtime-wheel-build-py312.txt` contains only the versions and hashes needed
   to build the core and runtime-provider wheels without build isolation.
 

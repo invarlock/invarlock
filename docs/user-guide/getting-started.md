@@ -52,6 +52,10 @@ download for caller-controlled preparation.
 
 For a source checkout, choose the image that matches the worker device:
 
+First create and authenticate the exact Git source archive using the
+[runtime-image procedure](runtime-providers.md#build-or-obtain-the-runtime-image).
+Pass its commit, path, and digest to the build target shown below.
+
 | Device | Dockerfile | Build and smoke |
 | --- | --- | --- |
 | CPU, including the matching Apple Silicon closure | `runtime/Dockerfile` | `make runtime-image && make runtime-smoke` |
@@ -140,8 +144,8 @@ threshold.
 ## 3. Write the run request
 
 Replace every illustrative digest with the value derived from the exact input.
-Digest fields inside HF provider settings are bare 64-character lowercase
-values; runtime-image identities use the `sha256:` prefix.
+Digest fields inside HF provider settings use the exact form returned by their
+public helper; runtime-image identities always use the `sha256:` prefix.
 
 ```yaml
 format_version: invarlock/evaluation-request-v1
@@ -218,6 +222,14 @@ invarlock evaluate release-check/request.yaml \
   --subject-runtime-device cuda:1
 ```
 
+`evaluate` performs preflight before it starts either worker. Append
+`--preflight --json` when you want to stop at that boundary and inspect the
+result. It validates the request, referenced inputs, schedule, policy, runtime
+capabilities, signing key, output destination, OCI engine, and both local
+pinned images without starting a container or creating output. Rerun the same
+command without `--preflight` only when you deliberately want to continue into
+the evaluation.
+
 Use `--container-engine podman` when appropriate. Device values are `cpu`,
 `cuda`, or `cuda:<index>`. Shared `--runtime-image`,
 `--runtime-image-digest`, `--runtime-device`, and `--runtime-entrypoint`
@@ -280,7 +292,7 @@ invarlock report release-check/evidence/release-001/ \
 ```
 
 The report shows both side means, the point comparison, the selected paired
-paired interval, threshold, and canonical verdict. `report` checks the embedded
+interval, threshold, and canonical verdict. `report` checks the embedded
 evidence signature and bundle integrity before rendering, but it does not use
 the independent verifier anchors or replace the signed receipt.
 

@@ -1,7 +1,8 @@
 # Public evidence
 
 This directory is the public index for evidence created with the canonical
-InvarLock transaction. Each published entry must contain an `evidence-pack-v1`
+InvarLock transaction. Each published entry must contain an
+`invarlock/evidence-pack-v1`
 bundle and its independently signed verification receipt.
 
 No current evidence has been created yet. The index remains useful in this

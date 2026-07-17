@@ -201,6 +201,29 @@ def test_public_evidence_rejects_obsolete_and_private_markers(tmp_path: Path) ->
     assert any("private marker" in error for error in errors)
 
 
+def test_output_text_that_resembles_a_drive_prefix_is_not_a_host_path(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    _write_local_publication(module, root)
+    index = root / "evidence_index.json"
+    payload = json.loads(index.read_text(encoding="utf-8"))
+    payload["entries"][0]["summary"] = "F:\n"
+    index.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert module.check_public_evidence(root) == []
+
+
+def test_windows_host_path_is_rejected_in_a_typed_artifact_path() -> None:
+    module = _load()
+
+    assert not module._safe_logical_path(
+        "C:\\Users\\operator\\evidence.json",
+        prefix="public_evidence/evidence/example/",
+    )
+
+
 def test_public_evidence_rejects_unindexed_surfaces(tmp_path: Path) -> None:
     module = _load()
     root = tmp_path / "public_evidence"
@@ -349,7 +372,7 @@ def test_local_receipt_must_bind_the_published_manifest(tmp_path: Path) -> None:
     manifest = pack / "manifest.json"
     manifest.chmod(0o644)
     manifest.write_text(
-        json.dumps({"format": "evidence-pack-v1", "changed": True}),
+        json.dumps({"format": "invarlock/evidence-pack-v1", "changed": True}),
         encoding="utf-8",
     )
 

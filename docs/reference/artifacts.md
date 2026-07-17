@@ -1,12 +1,12 @@
 # Evidence artifacts
 
-An `evidence-pack-v1` bundle is a closed, signed evidence directory. Its paths
+An `invarlock/evidence-pack-v1` bundle is a closed, signed evidence directory. Its paths
 are fixed by the manifest schema; additional files are rejected in strict
 verification.
 
 !!! info "Reference"
 
-    - **Surface:** `evidence-pack-v1` directory, manifest, payload inventory, and external outputs
+    - **Surface:** `invarlock/evidence-pack-v1` directory, manifest, payload inventory, and external outputs
     - **Stability:** Versioned public artifact contract; fixed paths and closed inventory are verification requirements
     - **Use this page when:** Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim
 
@@ -85,7 +85,7 @@ The manifest structure is equivalent to this abbreviated, non-copyable view:
 
 ```text
 {
-  "format": "evidence-pack-v1",
+  "format": "invarlock/evidence-pack-v1",
   "comparison_id": "...",
   "inputs": {
     "baseline": {
@@ -126,7 +126,7 @@ independent expected signer.
 
 | Signature field | Meaning |
 | --- | --- |
-| `format` | `evidence-pack-signature-v1` |
+| `format` | `invarlock/evidence-pack-signature-v1` |
 | `algorithm` | Ed25519 |
 | Embedded public key | Verification material, not an independent trust anchor |
 | Public-key fingerprint | SHA-256 of the raw Ed25519 public key |

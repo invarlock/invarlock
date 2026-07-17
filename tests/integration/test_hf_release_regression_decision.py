@@ -325,6 +325,10 @@ def test_real_hf_scores_drive_accepted_and_rejected_normalized_nll_decisions(
                 request_path,
                 signing_key_path=evidence_key,
                 resource_resolver=runtime_resources,
+                runtime_image_digests={
+                    "baseline": _IMAGE_DIGEST,
+                    "subject": _IMAGE_DIGEST,
+                },
             )
             metric_reports[verdict] = _report(evaluated.evidence_path)
             receipt_path = tmp_path / f"{metric_slug}-{verdict}-receipt.json"

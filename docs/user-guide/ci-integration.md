@@ -7,7 +7,7 @@ authenticated report, and uploads the review material as one workflow artifact.
 !!! tip "User guide"
 
     **Outcome:** Add a fail-closed GitHub Actions gate for an existing
-    `evidence-pack-v1` directory.
+    `invarlock/evidence-pack-v1` directory.
 
     **Audience:** Release engineers and verifier operators automating an
     independent acceptance decision.
@@ -34,7 +34,7 @@ from the submitted evidence directory.
 
 | Input | Required | Purpose |
 | --- | --- | --- |
-| `evidence` | Yes | Immutable `evidence-pack-v1` directory to review |
+| `evidence` | Yes | Immutable `invarlock/evidence-pack-v1` directory to review |
 | `policy` | Yes | Independently approved acceptance-policy JSON |
 | `expected-baseline-artifact` | Yes | Approved baseline artifact-identity digest |
 | `expected-subject-artifact` | Yes | Approved subject artifact-identity digest |

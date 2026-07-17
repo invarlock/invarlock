@@ -4,6 +4,7 @@ import hashlib
 import importlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -99,7 +100,10 @@ def _run_host(
         "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
     ):
         environment.pop(variable, None)
-    environment["PYTHONPATH"] = str(Path(__file__).resolve().parents[2] / "src")
+    if os.environ.get("INVARLOCK_CONTAINER_SMOKE_INSTALLED_WHEEL") == "1":
+        environment.pop("PYTHONPATH", None)
+    else:
+        environment["PYTHONPATH"] = str(Path(__file__).resolve().parents[2] / "src")
     return subprocess.run(
         [sys.executable, "-m", "invarlock", *arguments],
         check=False,
@@ -243,6 +247,10 @@ def _assert_ok(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
 def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
     tmp_path: Path,
 ) -> None:
+    if os.environ.get("INVARLOCK_CONTAINER_SMOKE_INSTALLED_WHEEL") == "1":
+        package = _module("invarlock")
+        module_path = Path(str(package.__file__)).resolve()
+        assert not module_path.is_relative_to(Path(__file__).resolve().parents[2])
     engine = os.environ.get("INVARLOCK_CONTAINER_ENGINE", "docker")
     image = os.environ.get("INVARLOCK_RUNTIME_IMAGE", "invarlock-runtime:local")
     inspected = subprocess.run(
@@ -304,36 +312,161 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         for role in ("baseline", "subject", "dataset")
     }
 
-    receipt = tmp_path / "verification-receipt.json"
-    verified = _run_host(
+    trust_root = tmp_path / "canary-trust"
+    trust_root.mkdir()
+    shutil.copy2(workspace / "inputs/policy.json", trust_root / "policy.json")
+    shutil.copy2(verifier_key, trust_root / "verifier.pem")
+    canary_profile = trust_root / "profile.json"
+    canary_profile.write_text(
+        json.dumps(
+            {
+                "format": "invarlock/trust-inputs-v1",
+                "policy": {"path": "policy.json"},
+                "anchors": {
+                    "baseline_artifact_digest": input_anchors["baseline"],
+                    "subject_artifact_digest": input_anchors["subject"],
+                    "schedule_digest": input_anchors["dataset"],
+                    "baseline_runtime_digest": image_digest,
+                    "subject_runtime_digest": image_digest,
+                    "evidence_signer_fingerprint": evidence_signer_fingerprint,
+                },
+                "verifier": {
+                    "identity": "container-smoke-canary-verifier",
+                    "signing_key_path": "verifier.pem",
+                },
+                "allow_installed_scorers": False,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    canary_receipt = tmp_path / "canary-verification-receipt.json"
+    canary_verified = _run_host(
         [
             "verify",
             str(evidence),
-            "--policy",
-            str(workspace / "inputs/policy.json"),
-            "--expected-baseline-artifact",
-            input_anchors["baseline"],
-            "--expected-subject-artifact",
-            input_anchors["subject"],
-            "--expected-schedule",
-            input_anchors["dataset"],
-            "--expected-baseline-runtime",
-            image_digest,
-            "--expected-subject-runtime",
-            image_digest,
-            "--expected-signer",
-            evidence_signer_fingerprint,
+            "--trust-profile",
+            str(canary_profile),
             "--receipt",
-            str(receipt),
-            "--verifier-signing-key",
-            str(verifier_key),
-            "--verifier-identity",
-            "container-smoke-verifier",
+            str(canary_receipt),
             "--json",
-        ],
+        ]
     )
-    _assert_ok(verified)
-    assert receipt.is_file()
+    _assert_ok(canary_verified)
+
+    if os.environ.get("INVARLOCK_CONTAINER_SMOKE_INSTALLED_WHEEL") == "1":
+        candidate_wheel = next(
+            (Path(__file__).resolve().parents[2] / "wheelhouse").glob("invarlock-*.whl")
+        )
+        candidate_manifest = tmp_path / "qualification-candidate-wheels.json"
+        candidate_manifest.write_text(
+            json.dumps(
+                {
+                    "format_version": ("invarlock/qualification-candidate-wheels-v1"),
+                    "wheels": [
+                        {
+                            "path": str(candidate_wheel),
+                            "sha256": "sha256:"
+                            + hashlib.sha256(candidate_wheel.read_bytes()).hexdigest(),
+                        }
+                    ],
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        lane_request = _request(
+            workspace,
+            checkpoint_digest=checkpoint_digest,
+            tokenizer_digest=tokenizer_digest,
+            output="qualification-lane-evidence",
+        )
+        lane_evidence = workspace / "qualification-lane-evidence"
+        lane_receipt = tmp_path / "qualification-lane-receipt.json"
+        lane_summary = tmp_path / "qualification-lane-summary.json"
+        shadow_site = tmp_path / "qualification-pythonpath-shadow"
+        shadow_package = shadow_site / "invarlock"
+        shadow_package.mkdir(parents=True)
+        shadow_package.joinpath("__init__.py").write_text(
+            'raise RuntimeError("qualification child imported caller PYTHONPATH")\n',
+            encoding="utf-8",
+        )
+        lane_environment = dict(os.environ)
+        lane_environment["PYTHONPATH"] = str(shadow_site)
+        lane_run = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    Path(__file__).resolve().parents[2]
+                    / "scripts/runtime_qualification.py"
+                ),
+                "run",
+                "--python",
+                sys.executable,
+                "--request",
+                str(lane_request),
+                "--signing-key",
+                str(evidence_signer_key),
+                "--runtime-image",
+                image_digest,
+                "--runtime-image-digest",
+                image_digest,
+                "--evidence",
+                str(lane_evidence),
+                "--trust-profile",
+                str(canary_profile),
+                "--receipt",
+                str(lane_receipt),
+                "--canary-evidence",
+                str(evidence),
+                "--canary-receipt",
+                str(canary_receipt),
+                "--canary-trust-profile",
+                str(canary_profile),
+                "--source-commit",
+                os.environ["RUNTIME_SOURCE_COMMIT"],
+                "--source-bundle",
+                os.environ["RUNTIME_SOURCE_BUNDLE"],
+                "--source-bundle-sha256",
+                os.environ["RUNTIME_SOURCE_BUNDLE_SHA256"],
+                "--candidate-wheel-manifest",
+                str(candidate_manifest),
+                "--container-engine",
+                engine,
+                "--runtime-device",
+                "cpu",
+                "--runtime-cpus",
+                "2",
+                "--runtime-memory-mib",
+                "4096",
+                "--summary",
+                str(lane_summary),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            env=lane_environment,
+        )
+        lane_payload = _assert_ok(lane_run)
+        assert lane_payload["stage"] == "complete"
+        assert lane_payload["canary"]["compatibility"] == {
+            "acceptance": {
+                "kind": "builtin_metric",
+                "metric": "exact_match",
+            },
+            "device_classes": {
+                "baseline": "cpu",
+                "subject": "cpu",
+            },
+            "providers": {
+                "baseline": "hf_transformers",
+                "subject": "hf_transformers",
+            },
+            "task": "text_causal",
+        }
 
     report_path = tmp_path / "report.html"
     report = _run_host(

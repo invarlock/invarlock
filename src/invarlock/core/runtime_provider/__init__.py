@@ -6,7 +6,9 @@ and deterministic scoring. Provider internals are deliberately opaque to callers
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from collections.abc import Callable
+from pathlib import Path
+from typing import Protocol, cast, runtime_checkable
 
 from invarlock.output_text_contract import (
     ExactMatchOutputError,
@@ -88,6 +90,10 @@ class RuntimeProvider(Protocol):
 
     def identify_artifact(self, spec: ModelRuntimeSpec) -> ModelArtifactIdentity: ...
 
+    def authenticate_artifact(
+        self, spec: ModelRuntimeSpec, artifact_path: Path
+    ) -> ModelArtifactIdentity: ...
+
     def prepare_execution(
         self, spec: ModelRuntimeSpec, resources: RuntimeArtifactResources
     ) -> RuntimeExecutionContext: ...
@@ -95,6 +101,57 @@ class RuntimeProvider(Protocol):
     def open(
         self, spec: ModelRuntimeSpec, context: RuntimeExecutionContext
     ) -> RuntimeSession: ...
+
+
+@runtime_checkable
+class RuntimeProviderInputPreflight(Protocol):
+    """Optional model-free validation of authenticated schedule-bound inputs."""
+
+    def validate_evaluation_inputs(
+        self,
+        spec: ModelRuntimeSpec,
+        resources: RuntimeArtifactResources,
+        schedule: RuntimeBehavioralSchedule,
+    ) -> None: ...
+
+
+def _runtime_input_preflight_hook(
+    provider: RuntimeProvider,
+) -> (
+    Callable[
+        [ModelRuntimeSpec, RuntimeArtifactResources, RuntimeBehavioralSchedule], object
+    ]
+    | None
+):
+    hook = getattr(provider, "validate_evaluation_inputs", None)
+    if hook is None:
+        return None
+    if not callable(hook):
+        raise TypeError("runtime provider input-preflight hook must be callable")
+    return cast(
+        Callable[
+            [ModelRuntimeSpec, RuntimeArtifactResources, RuntimeBehavioralSchedule],
+            object,
+        ],
+        hook,
+    )
+
+
+def validate_runtime_evaluation_inputs(
+    provider: RuntimeProvider,
+    spec: ModelRuntimeSpec,
+    resources: RuntimeArtifactResources,
+    schedule: RuntimeBehavioralSchedule,
+) -> bool:
+    """Invoke an optional provider input-preflight hook and report its presence."""
+
+    hook = _runtime_input_preflight_hook(provider)
+    if hook is None:
+        return False
+    result = hook(spec, resources, schedule)
+    if result is not None:
+        raise TypeError("runtime provider input-preflight hook must return None")
+    return True
 
 
 __all__ = [
@@ -123,6 +180,7 @@ __all__ = [
     "RuntimeMetric",
     "RuntimeTask",
     "RuntimeProvider",
+    "RuntimeProviderInputPreflight",
     "RuntimeProviderCapabilities",
     "RuntimeProviderPluginIdentity",
     "RuntimeProviderReceipt",
@@ -142,6 +200,7 @@ __all__ = [
     "load_runtime_behavioral_schedule",
     "parse_runtime_behavioral_schedule_json",
     "runtime_scoring_records_sha256",
+    "validate_runtime_evaluation_inputs",
     "require_runtime_task",
     "verify_runtime_behavioral_observation",
 ]

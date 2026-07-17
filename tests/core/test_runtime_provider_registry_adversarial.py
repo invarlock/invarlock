@@ -187,6 +187,11 @@ def _install_provider_module(
             def identify_artifact(self, _spec: object) -> None:
                 return None
 
+            def authenticate_artifact(
+                self, _spec: object, _artifact_path: object
+            ) -> None:
+                return None
+
             def prepare_execution(self, _spec: object, resources: object) -> object:
                 return resources
 

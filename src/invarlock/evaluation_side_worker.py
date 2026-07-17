@@ -16,7 +16,12 @@ from types import MappingProxyType
 from typing import Any, Literal, cast
 
 from invarlock.core.registry import CoreRegistry
-from invarlock.core.runtime_provider import ModelRuntimeSpec, RuntimeArtifactResources
+from invarlock.core.runtime_provider import (
+    ModelRuntimeSpec,
+    RuntimeArtifactResources,
+    load_runtime_behavioral_schedule,
+    validate_runtime_evaluation_inputs,
+)
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 from invarlock.runtime_behavior.transaction import run_evidence_side
@@ -144,6 +149,15 @@ def execute_job(job_path: Path) -> Path:
         device_kind=cast(Literal["cpu", "cuda"], device_kind),
         container_image_digest=cast(str, image_digest),
     )
+    try:
+        validated_schedule = load_runtime_behavioral_schedule(schedule)
+        validate_runtime_evaluation_inputs(
+            provider, spec, resources, validated_schedule
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeSideWorkerError(
+            f"runtime provider input preflight failed: {exc}"
+        ) from exc
     context = provider.prepare_execution(spec, resources)
     bundle = run_evidence_side(
         role=cast(Literal["baseline", "subject"], role),
@@ -154,6 +168,7 @@ def execute_job(job_path: Path) -> Path:
         policy_digest=cast(str, policy_digest),
         output_directory=output,
         metric=cast(Any, metric),
+        _validated_schedule=validated_schedule,
     )
     return bundle.directory
 

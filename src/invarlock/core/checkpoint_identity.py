@@ -154,6 +154,41 @@ def _file_open_flags() -> int:
     return os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
 
 
+def _open_checkpoint_root(root: Path) -> int:
+    """Open an absolute checkpoint root without following any path component."""
+
+    if not root.is_absolute() or ".." in root.parts:
+        raise CheckpointIdentityError(
+            "local checkpoint path must be absolute without parent traversal"
+        )
+    flags = _directory_open_flags()
+    try:
+        descriptor = os.open(root.anchor, flags)
+    except OSError as exc:
+        raise CheckpointIdentityError(
+            "local checkpoint root could not be securely opened"
+        ) from exc
+    try:
+        for component in root.parts[1:]:
+            try:
+                child = os.open(component, flags, dir_fd=descriptor)
+            except OSError as exc:
+                raise CheckpointIdentityError(
+                    "local checkpoint could not be securely opened as a regular "
+                    "directory without symbolic links"
+                ) from exc
+            os.close(descriptor)
+            descriptor = child
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise CheckpointIdentityError(
+                "local checkpoint root is not a regular directory"
+            )
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
 def _scan_checkpoint_tree(root_fd: int) -> _TreeSnapshot:
     directories: list[tuple[str, _StatIdentity]] = []
     files: list[tuple[str, _StatIdentity]] = []
@@ -282,13 +317,18 @@ def _hash_checkpoint_file(
 
 def _root_path_matches_fd(root: Path, root_fd: int) -> bool:
     try:
-        path_identity = _stat_identity(root.stat(follow_symlinks=False))
+        path_fd = _open_checkpoint_root(root)
+    except CheckpointIdentityError:
+        return False
+    try:
+        path_identity = _stat_identity(os.fstat(path_fd))
         fd_identity = _stat_identity(os.fstat(root_fd))
     except OSError:
         return False
+    finally:
+        os.close(path_fd)
     return (
-        stat.S_ISDIR(path_identity.mode)
-        and path_identity.device == fd_identity.device
+        path_identity.device == fd_identity.device
         and path_identity.inode == fd_identity.inode
     )
 
@@ -307,22 +347,7 @@ def checkpoint_tree_observation(path: str | Path) -> CheckpointObservation:
         raise CheckpointIdentityError(
             "secure file-descriptor checkpoint traversal is unavailable on this platform"
         )
-    try:
-        root_lstat = root.stat(follow_symlinks=False)
-    except OSError as exc:
-        raise CheckpointIdentityError(
-            f"local checkpoint is not a regular directory: {root}"
-        ) from exc
-    if stat.S_ISLNK(root_lstat.st_mode) or not stat.S_ISDIR(root_lstat.st_mode):
-        raise CheckpointIdentityError(
-            f"local checkpoint is not a regular directory: {root}"
-        )
-    try:
-        root_fd = os.open(root, _directory_open_flags())
-    except OSError as exc:
-        raise CheckpointIdentityError(
-            f"local checkpoint could not be securely opened: {root}"
-        ) from exc
+    root_fd = _open_checkpoint_root(root)
     try:
         if not _root_path_matches_fd(root, root_fd):
             raise CheckpointIdentityError(

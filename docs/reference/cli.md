@@ -50,13 +50,39 @@ invarlock evaluate REQUEST \
   [--runtime-entrypoint auto|python|nvidia] \
   [--baseline-runtime-entrypoint PROFILE] \
   [--subject-runtime-entrypoint PROFILE] \
+  [--runtime-cpus DECIMAL] \
+  [--runtime-memory-mib INTEGER] \
+  [--runtime-user UID:GID] \
+  [--preflight] \
   [--json]
 ```
 
-`evaluate` loads one closed YAML request, prepares or validates its canonical
-schedule, executes or imports paired provider records, derives the selected
+`evaluate` loads one closed YAML request and runs the complete execution-free
+preflight before any worker starts. It then prepares or validates the canonical
+schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
 and atomically publishes the evidence directory named by the request.
+
+`--preflight` returns after that mandatory validation instead of continuing to
+execution and publication. It validates the
+request and every referenced path, prepares or authenticates the schedule,
+checks the policy shape, reproduces both declared artifact identities, checks
+provider task/metric capabilities, loads the evidence-signing key, and checks
+the output destination without creating it. In run mode it also confirms that
+the selected Docker or Podman executable and both digest-pinned images are
+already available locally. It resolves the same frozen, caller-owned per-side
+provider resources used by execution. Providers with the optional input hook
+then authenticate every selected schedule-bound external object before a worker
+or model starts. The vision-text add-in validates the content ID, regular
+no-follow file, length, SHA-256, media type, safe decode, frame count,
+dimensions, and aggregate media limits. When a scorer extension is selected, preflight loads
+the explicitly authorized scorer descriptor and configuration schema, then
+checks the exact ABI, version, descriptor, configuration, task, input-kind, and
+output-kind binding without replaying records. It does not pull an image, start
+a container, load a processor or model, initialize CUDA, run inference, create
+an output directory, or sign evidence. A successful preflight cannot prevent
+later file replacement, so each worker reopens and authenticates the same
+content before model preparation and the provider checks it again when scoring.
 
 For a valid run request, the host prepares the canonical schedule and launches
 one independently configured Docker or Podman worker for each comparison side.
@@ -83,6 +109,10 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-entrypoint PROFILE` | No | `INVARLOCK_RUNTIME_ENTRYPOINT` | Shared worker entrypoint: `auto`, `python`, or `nvidia`; defaults to `auto` |
 | `--baseline-runtime-entrypoint PROFILE` | No | `INVARLOCK_BASELINE_RUNTIME_ENTRYPOINT` | Baseline entrypoint override |
 | `--subject-runtime-entrypoint PROFILE` | No | `INVARLOCK_SUBJECT_RUNTIME_ENTRYPOINT` | Subject entrypoint override |
+| `--runtime-cpus DECIMAL` | No | `INVARLOCK_RUNTIME_CPUS` | Per-worker CPU ceiling; defaults to `4` and accepts up to three decimal places |
+| `--runtime-memory-mib INTEGER` | No | `INVARLOCK_RUNTIME_MEMORY_MIB` | Per-worker memory ceiling in MiB; defaults to `65536` |
+| `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
+| `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v1` |
 | `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
 
 The signing key must be a real regular file. The request and every referenced
@@ -98,10 +128,20 @@ schedule path and must match `execution.schedule`.
 Each OCI worker uses its selected local image only (`--pull=never`), disables
 networking, uses a read-only container root, drops capabilities, enables
 `no-new-privileges`, bounds process count, and receives a temporary filesystem.
+The launcher also applies the caller-owned CPU and memory ceilings and numeric
+non-root identity above. Submitted request data cannot relax these host
+controls.
 The job description, canonical schedule, side artifact, and closed support
 resources are mounted read-only. Only an isolated side-output directory is
 writable. The worker never receives the other side's artifact or the signing
 key.
+
+Each provider's validated `timeout_seconds` setting remains a per-record
+deadline. The host derives an additional worker-process deadline from that
+value and the authenticated schedule size, including two timeout intervals for
+startup and cleanup, with a final 24-hour cap. On expiry it stops the container
+by its engine-issued ID, escalates to a kill when necessary, and reports a
+failed side instead of waiting indefinitely.
 
 CPU workers add no GPU mapping. `--runtime-device cuda` or a per-side CUDA
 override exposes the selected GPU to that worker; it does not add CUDA support
@@ -116,23 +156,76 @@ the other first-party providers. Explicit per-side profiles are available when
 an authenticated image requires one of those known launch forms.
 
 Text success output identifies the published directory. JSON success output
-contains `format_version`, `ok`, `comparison_id`, and `evidence`. JSON failures
-use the same format version with `ok: false` and an `errors` array.
+contains `format_version`, `ok`, `comparison_id`, `evidence`, and the immutable
+`pack_manifest_digest` calculated from the canonical manifest bytes before
+publication. JSON failures use the same format version with `ok: false` and an
+`errors` array.
 
 ```json
 {
   "comparison_id": "cmp-...",
   "evidence": "artifacts/evidence",
   "format_version": "invarlock/evaluation-result-v1",
-  "ok": true
+  "ok": true,
+  "pack_manifest_digest": "sha256:..."
 }
 ```
 
 The displayed evidence path is the host-side destination from the request.
-Treat it as an opaque location; the signed manifest, rather than the path name,
-carries the comparison identity.
+Treat it as an opaque location. The manifest digest, rather than the path name,
+binds automation to the exact pack produced by this evaluation; the signed
+manifest carries the comparison identity.
+
+Preflight success reports the mode, relative output destination, schedule and
+policy digests, record count, providers, completed check classes, and run-mode
+runtime-image digests. `runtime_resources` appears in `checks` when both sides
+were resolved against the inspected image digests; optional provider hooks also
+authenticate schedule-bound resources. Preflight removes predictable configuration failures;
+it cannot prove that a backend will initialize, that inference will finish, or
+that the comparison will pass policy. Those claims require the real evaluation
+and independently verified evidence.
 
 ## `verify`
+
+```text
+invarlock verify EVIDENCE \
+  --trust-profile PATH \
+  --receipt verification.receipt.json \
+  [--json]
+```
+
+The preferred form uses one closed `invarlock/trust-inputs-v1` object:
+
+```json
+{
+  "allow_installed_scorers": false,
+  "anchors": {
+    "baseline_artifact_digest": "sha256:...",
+    "baseline_runtime_digest": "sha256:...",
+    "evidence_signer_fingerprint": "sha256:...",
+    "schedule_digest": "sha256:...",
+    "subject_artifact_digest": "sha256:...",
+    "subject_runtime_digest": "sha256:..."
+  },
+  "format": "invarlock/trust-inputs-v1",
+  "policy": {"path": "acceptance.json"},
+  "verifier": {
+    "identity": "release-verifier",
+    "signing_key_path": "verifier.pem"
+  }
+}
+```
+
+Policy and key paths resolve relative to the profile. The loader rejects
+absolute paths, traversal, symlinks, duplicate members, unknown fields,
+missing files, and malformed anchors. Environment variables do not override a
+profile. Supplying any explicit trust-anchor option with `--trust-profile` is
+an error. The profile, its policy, and its verifier key must remain outside the
+submitted evidence directory. The canonical profile digest is included in the
+signed receipt.
+
+For systems that already keep each anchor separately, the equivalent explicit
+form remains available:
 
 ```text
 invarlock verify EVIDENCE \
@@ -156,6 +249,7 @@ from the caller and writes a signed receipt outside the bundle.
 | Input | Required | Environment alternative | Meaning |
 | --- | --- | --- | --- |
 | `EVIDENCE` | Yes | None | Existing readable evidence-pack directory |
+| `--trust-profile PATH` | Preferred trust-input form | None | Closed verifier-owned policy, anchors, identity, key path, and scorer authorization |
 | `--policy PATH` | Yes | `INVARLOCK_POLICY` | Independently sourced policy bytes |
 | `--expected-baseline-artifact DIGEST` | Yes | `INVARLOCK_EXPECTED_BASELINE_ARTIFACT` | Approved baseline artifact-identity digest |
 | `--expected-subject-artifact DIGEST` | Yes | `INVARLOCK_EXPECTED_SUBJECT_ARTIFACT` | Approved subject artifact-identity digest |
@@ -169,8 +263,9 @@ from the caller and writes a signed receipt outside the bundle.
 | `--allow-installed-scorers` | Only for scorer-bound evidence | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Independently authorize loading and replaying the exact installed scorer pinned by the request and policy |
 | `--json` | No | None | Emit one compact verification result |
 
-`--receipt` has no environment alternative. The destination must be outside the
-evidence directory and must not already exist.
+Use either `--trust-profile` or all explicit trust-anchor options, never both.
+`--receipt` has no environment alternative. The destination must be outside
+the evidence directory and must not already exist.
 
 Verification checks the closed manifest, evidence signature, checksums and
 inventory; caller-approved artifact and schedule identities; all input and
@@ -186,9 +281,11 @@ descriptor digest, configuration digest, task, and policy pins bound by the
 transaction. Evaluation and independent verification must authorize and load
 the same scorer identity separately.
 
-`--json` emits `evidence-pack-verify-v1` plus the signed-receipt path and
-verifier identity. Exit status `0` means the evidence passed both integrity and
-policy verification. Any nonzero status must be treated as rejection.
+`--json` emits `invarlock/evidence-pack-verify-v1`, the signed-receipt path,
+verifier identity, and `pack_manifest_digest`. That digest is the same immutable
+manifest identity signed into the receipt. Exit status `0` means the evidence
+passed both integrity and policy verification. Any nonzero status must be
+treated as rejection.
 
 The result distinguishes integrity from acceptance. For example, a correctly
 signed and internally consistent pack can have `integrity_ok: true`,

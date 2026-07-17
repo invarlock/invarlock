@@ -19,6 +19,7 @@ from invarlock.core.runtime_provider import (
 )
 from invarlock.core.schedule_preparation import validate_local_dataset_preparation
 from invarlock.core.scorer_extension import (
+    SCORER_REPLAY_OUTPUT_KIND,
     AuthenticatedScorerRecord,
     ScorerExtensionBinding,
     ScorerExtensionError,
@@ -49,7 +50,7 @@ from invarlock.runtime_provider_evidence import (
     runtime_provider_evidence_errors,
 )
 
-EVIDENCE_PACK_VERIFY_FORMAT = "evidence-pack-verify-v1"
+EVIDENCE_PACK_VERIFY_FORMAT = "invarlock/evidence-pack-verify-v1"
 EVIDENCE_INPUT_IDENTITY_FORMAT = "invarlock/evidence-input-identity-v1"
 PAIRED_RECORDS_FORMAT = "invarlock/paired-records-v1"
 COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v1"
@@ -441,7 +442,8 @@ def request_metric(request: Mapping[str, object]) -> str:
     metric = comparison.get("metric") if isinstance(comparison, Mapping) else None
     if metric == "multiple_choice_accuracy":
         raise EvidencePackError(
-            "multiple_choice_accuracy is not supported by evidence-pack-v1; "
+            "multiple_choice_accuracy is not supported by "
+            "invarlock/evidence-pack-v1; "
             "its option contract is not yet canonical"
         )
     if metric == "exact_match":
@@ -752,7 +754,7 @@ def derive_paired_records(
                         binding=scorer_binding,
                         task=schedule.task,
                         input_kinds=input_kinds,
-                        output_kind="text",
+                        output_kind=SCORER_REPLAY_OUTPUT_KIND,
                         schedule_sha256=schedule.schedule_sha256,
                         records=tuple(records),
                     )

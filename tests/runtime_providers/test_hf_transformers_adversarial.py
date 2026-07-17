@@ -127,25 +127,125 @@ def test_safetensors_binding_requires_callable_mapping_state_dict(
 
 def test_safetensors_binding_rejects_missing_and_non_tensor_live_values(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(hf, "safetensors_storage_keys", lambda _path: {"weight"})
-    with pytest.raises(ValueError, match="missing authenticated"):
-        hf._require_safetensors_match(
-            tmp_path,
-            model=SimpleNamespace(state_dict=lambda: {}),
-        )
-
     torch = pytest.importorskip("torch")
     safetensors_torch = pytest.importorskip("safetensors.torch")
     safetensors_torch.save_file(
         {"weight": torch.tensor([1])},
         tmp_path / "model.safetensors",
     )
+    with pytest.raises(ValueError, match="missing authenticated"):
+        hf._require_safetensors_match(
+            tmp_path,
+            model=SimpleNamespace(state_dict=lambda: {}),
+        )
+
     with pytest.raises(RuntimeError, match="non-tensor value"):
         hf._require_safetensors_match(
             tmp_path,
             model=SimpleNamespace(state_dict=lambda: {"weight": object()}),
+        )
+
+
+def test_safetensors_binding_authenticates_base_prefix_and_live_buffers(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    weight = torch.tensor([1.0, 2.0])
+    attention_mask = torch.tensor([[True, False], [True, True]])
+    safetensors_torch.save_file(
+        {"attention.bias": attention_mask, "weight": weight},
+        tmp_path / "model.safetensors",
+    )
+    buffers = {"transformer.attention.bias": attention_mask.clone()}
+    model = SimpleNamespace(
+        base_model_prefix="transformer",
+        state_dict=lambda: {"transformer.weight": weight.clone()},
+        get_buffer=lambda name: buffers[name],
+    )
+
+    hf._require_safetensors_match(tmp_path, model=model)
+
+    buffers["transformer.attention.bias"] = torch.logical_not(attention_mask)
+    with pytest.raises(ValueError, match="tensors do not match"):
+        hf._require_safetensors_match(tmp_path, model=model)
+
+
+def test_safetensors_binding_authenticates_language_component_mapping(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    weight = torch.tensor([1.0, 2.0])
+    safetensors_torch.save_file(
+        {"model.weight": weight},
+        tmp_path / "model.safetensors",
+    )
+    live = {"model.language_model.weight": weight.clone()}
+    model = SimpleNamespace(
+        base_model_prefix="model",
+        state_dict=lambda: live,
+    )
+
+    hf._require_safetensors_match(tmp_path, model=model)
+
+    live["model.language_model.weight"] = torch.tensor([2.0, 1.0])
+    with pytest.raises(ValueError, match="tensors do not match"):
+        hf._require_safetensors_match(tmp_path, model=model)
+
+
+def test_safetensors_binding_authenticates_removed_gpt2_causal_masks(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    weight = torch.tensor([1.0, 2.0])
+    causal_mask = torch.ones((1, 1, 4, 4), dtype=torch.float32).tril()
+    model = SimpleNamespace(
+        base_model_prefix="transformer",
+        config=SimpleNamespace(
+            max_position_embeddings=4,
+            model_type="gpt2",
+            num_hidden_layers=1,
+        ),
+        state_dict=lambda: {"transformer.weight": weight.clone()},
+    )
+    safetensors_torch.save_file(
+        {"h.0.attn.bias": causal_mask, "weight": weight},
+        tmp_path / "model.safetensors",
+    )
+
+    hf._require_safetensors_match(tmp_path, model=model)
+
+    invalid_mask = causal_mask.clone()
+    invalid_mask[0, 0, 0, 1] = 1
+    safetensors_torch.save_file(
+        {"h.0.attn.bias": invalid_mask, "weight": weight},
+        tmp_path / "model.safetensors",
+    )
+    with pytest.raises(ValueError, match="missing authenticated"):
+        hf._require_safetensors_match(tmp_path, model=model)
+
+
+def test_safetensors_binding_rejects_untrusted_base_prefix_mapping(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    weight = torch.tensor([1.0])
+    safetensors_torch.save_file(
+        {"weight": weight},
+        tmp_path / "model.safetensors",
+    )
+
+    with pytest.raises(ValueError, match="missing authenticated"):
+        hf._require_safetensors_match(
+            tmp_path,
+            model=SimpleNamespace(
+                base_model_prefix="../transformer",
+                state_dict=lambda: {"../transformer.weight": weight},
+            ),
         )
 
 
@@ -247,6 +347,62 @@ def test_model_config_binding_rejects_class_and_payload_drift(
         hf._require_model_config_match(
             tmp_path,
             model=SimpleNamespace(config=LiveConfig({"layers": 2})),
+        )
+
+    loader.from_pretrained = lambda *_args, **_kwargs: LiveConfig(
+        {"layers": 2, "dtype": "bfloat16"}
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(config=LiveConfig({"layers": 2, "dtype": "float32"})),
+        )
+
+
+def test_model_config_binding_accepts_dtype_inferred_from_bound_weights(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Config:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def to_dict(self) -> dict[str, object]:
+            return self.payload
+
+    loader = SimpleNamespace(
+        from_pretrained=lambda *_args, **_kwargs: Config({"layers": 2, "dtype": None})
+    )
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(AutoConfig=loader),
+    )
+
+    hf._require_model_config_match(
+        tmp_path,
+        model=SimpleNamespace(config=Config({"layers": 2, "dtype": "float32"})),
+    )
+
+    loader.from_pretrained = lambda *_args, **_kwargs: Config(
+        {"vision_config": {"dtype": None, "layers": 4}}
+    )
+    hf._require_model_config_match(
+        tmp_path,
+        model=SimpleNamespace(
+            config=Config({"vision_config": {"dtype": "bfloat16", "layers": 4}})
+        ),
+    )
+
+    loader.from_pretrained = lambda *_args, **_kwargs: Config(
+        {"vision_config": {"dtype": "bfloat16", "layers": 4}}
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=Config({"vision_config": {"dtype": "float32", "layers": 4}})
+            ),
         )
 
 

@@ -374,6 +374,7 @@
       "oneOf": [
         {
           "type": "object",
+          "$comment": "Run requests select the provider work but cannot select host OCI images, devices, CPU or memory ceilings, container users, or engine policy. Those remain caller-owned launch controls.",
           "required": ["mode"],
           "properties": {
             "mode": {"const": "run"}

@@ -44,26 +44,17 @@ def test_signing_key_loader_rejects_malformed_and_non_ed25519_keys(
         publication._load_private_key(non_ed)
 
 
-def test_publish_lock_and_destination_are_no_clobber(tmp_path: Path) -> None:
+def test_publish_destination_is_no_clobber(tmp_path: Path) -> None:
     staging = tmp_path / "staging"
     staging.mkdir()
     destination = tmp_path / "evidence"
-    lock = tmp_path / ".evidence.publish.lock"
-    lock.write_text("owner", encoding="utf-8")
-
-    with pytest.raises(EvidencePackError, match="already being published"):
-        publication._publish_directory_no_clobber(staging, destination)
-    assert staging.is_dir()
-
-    lock.unlink()
     destination.mkdir()
     with pytest.raises(EvidencePackError, match="already exists"):
         publication._publish_directory_no_clobber(staging, destination)
-    assert not lock.exists()
     assert staging.is_dir()
 
 
-def test_publish_maps_atomic_rename_failure_and_removes_lock(
+def test_publish_maps_atomic_no_replace_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     staging = tmp_path / "staging"
@@ -71,12 +62,27 @@ def test_publish_maps_atomic_rename_failure_and_removes_lock(
     destination = tmp_path / "evidence"
 
     def denied(_source: Path, _destination: Path) -> None:
-        raise OSError("denied")
+        raise publication.AtomicDirectoryPublicationError("denied")
 
-    monkeypatch.setattr(publication.os, "rename", denied)
+    monkeypatch.setattr(publication, "publish_directory_no_replace", denied)
     with pytest.raises(EvidencePackError, match="atomically publish"):
         publication._publish_directory_no_clobber(staging, destination)
-    assert not (tmp_path / ".evidence.publish.lock").exists()
+
+
+def test_publish_maps_atomic_destination_race(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    destination = tmp_path / "evidence"
+
+    def raced(_source: Path, _destination: Path) -> None:
+        raise publication.AtomicDirectoryExistsError("raced")
+
+    monkeypatch.setattr(publication, "publish_directory_no_replace", raced)
+    with pytest.raises(EvidencePackError, match="already exists"):
+        publication._publish_directory_no_clobber(staging, destination)
+    assert staging.is_dir()
 
 
 def test_publication_rejects_symlink_parent_and_invalid_external_digests(

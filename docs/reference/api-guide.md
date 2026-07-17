@@ -99,15 +99,17 @@ The result types are:
 
 | Type | Important fields |
 | --- | --- |
-| `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `as_json()` |
+| `EvaluationPreflightResult` | `execution_mode`, `output`, input digests, providers, checks, `as_json()` |
+| `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, `as_json()` |
 | `EvidenceVerification` | `evidence_path`, `payload`, `receipt_path`, `summary`, `as_json()` |
 | `EvidenceReport` | `text`, `html_path`, `evidence_signer` |
 | `ReceiptVerification` | `ok`, `signed`, `statement`, `verifier_fingerprint`, `errors` |
 
-`EvaluationTransactionError`, `EvidenceVerificationError`, and
-`EvidenceReportError` carry CLI-compatible `exit_code` values. The first two
-also expose machine-readable JSON behavior. Applications should treat every
-exception or verification payload with `ok != true` as rejection.
+`EvaluationPreflightError`, `EvaluationTransactionError`,
+`EvidenceVerificationError`, and `EvidenceReportError` carry CLI-compatible
+`exit_code` values. The first three also expose machine-readable JSON behavior.
+Applications should treat every exception or verification payload with
+`ok != true` as rejection.
 
 `EvidenceReceiptError` is also exported for failures that prevent safe receipt
 processing. Ordinary receipt authenticity or anchor mismatches are reported in
@@ -127,8 +129,18 @@ evaluate_request_file(
     signing_key_path: Path | None,
     resource_resolver: RuntimeResourceResolver | None = None,
     runtime_executor: OciRuntimeExecutor | None = None,
+    runtime_image_digests: Mapping[str, str] | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
 ) -> EvaluationTransactionResult
+
+preflight_evaluation_request(
+    request_path: Path,
+    *,
+    signing_key_path: Path | None,
+    scorer_registry: ScorerExtensionRegistry | None = None,
+    runtime_image_digests: Mapping[str, str] | None = None,
+    resource_resolver: RuntimeResourceResolver | None = None,
+) -> EvaluationPreflightResult
 
 load_evaluation_request(
     path: str | Path,
@@ -149,7 +161,10 @@ verify_evidence(
     receipt_path: Path | None = None,
     verifier_signing_key_path: Path | None = None,
     verifier_identity: str | None = None,
+    trust_profile_digest: str | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
+    policy_bytes: bytes | None = None,
+    verifier_signing_key_bytes: bytes | None = None,
 ) -> EvidenceVerification
 
 render_evidence(
@@ -165,6 +180,27 @@ signature; the public evidence-pack v1 transaction requires every artifact,
 schedule, policy, runtime, signer, receipt, verifier-key, and verifier-identity
 input. Missing values raise `EvidenceVerificationError` rather than reducing
 assurance.
+
+`evaluate_request_file` always completes the same request, input, schedule,
+policy, runtime, key, and output preflight before it calls a run-mode executor.
+Every programmatic run must supply both independently inspected
+`runtime_image_digests`; neither an executor nor a resource resolver can
+self-assert those trust inputs. `preflight_evaluation_request` exposes that gate separately when an
+application wants to inspect the result without executing a runtime or mutating
+the output tree. Embedders must independently confirm that run-mode images are
+local before supplying their digests; the CLI performs that inspection through
+Docker or Podman without starting a container. For a scorer-bound request,
+preflight also loads the explicitly authorized scorer's deterministic
+descriptor and schema and validates the exact binding and task/input/output
+compatibility without calling scorer replay.
+
+Applications evaluating a run request that selects a runtime input hook must
+pass a side-aware `RuntimeResourceResolver` to the public transaction. The hook
+authenticates schedule-bound external resources without loading the model.
+Successful resolution of both sides against their inspected image digests is
+recorded as `runtime_resources` in `EvaluationPreflightResult.checks`. The OCI executor implements both execution
+and resource resolution so its frozen per-side image, device, root, and support
+bindings cannot drift between baseline and subject validation.
 
 When a request selects `comparison.scorer_extension`, the embedding must pass
 an explicit `ScorerExtensionRegistry` to both `evaluate_request_file` and
@@ -205,6 +241,7 @@ from invarlock.engine import (
     OciEvaluationLaunch,
     OciRuntimeExecutor,
     OciSideLaunch,
+    OciWorkerLimits,
 )
 
 baseline_digest = "sha256:" + "1" * 64
@@ -212,6 +249,11 @@ subject_digest = "sha256:" + "2" * 64
 executor = OciRuntimeExecutor(
     OciEvaluationLaunch(
         engine="docker",
+        worker_limits=OciWorkerLimits(
+            cpus="8",
+            memory_mib=16384,
+            user="12001:12001",
+        ),
         baseline=OciSideLaunch(
             image_ref=f"registry.example/invarlock-runtime@{baseline_digest}",
             image_digest=baseline_digest,
@@ -229,14 +271,17 @@ executor = OciRuntimeExecutor(
 ```
 
 Each worker receives read-only job, schedule, artifact, and support mounts plus
-one isolated writable output mount. The launcher may run two CPU workers or two
-different explicit CUDA indexes concurrently. Generic CUDA selection, a shared
-index, and CPU/CUDA pairs run sequentially. CUDA selection exposes a device but
-does not make a CPU-only image CUDA-capable; use the x86_64 image built from
-`runtime/Dockerfile.cuda` for canonical CUDA Hugging Face execution.
+one isolated writable output mount. `OciWorkerLimits` applies validated CPU,
+memory, and numeric non-root user controls independently to each worker; its
+defaults are `4`, 65536 MiB, and `65532:65532`. The launcher may run two CPU
+workers or two different explicit CUDA indexes concurrently. Generic CUDA
+selection, a shared index, and CPU/CUDA pairs run sequentially. CUDA selection
+exposes a device but does not make a CPU-only image CUDA-capable; use the x86_64
+image built from `runtime/Dockerfile.cuda` for canonical CUDA Hugging Face
+execution.
 
 `launch_from_environment` resolves the common and per-side image, digest,
-device, and entrypoint variables documented in [Environment
+device, entrypoint, and common worker-limit variables documented in [Environment
 variables](environment.md). Explicit function arguments take precedence over
 environment values.
 
@@ -448,6 +493,44 @@ obligations.
 
 ## Verify a signed receipt
 
+`load_trust_inputs` loads a closed `invarlock/trust-inputs-v1` profile for
+applications that want the same verifier-owned input grouping as the CLI. It
+returns `TrustInputs`, including the policy and verifier-key bytes captured
+through descriptor-relative reads, their display paths, normalized anchors,
+scorer authorization, and the formatting-independent profile digest. Unsafe
+paths, symlinks, duplicate JSON members, unknown fields, and missing files
+raise `TrustInputsError` before verification.
+
+Pass the captured `policy_bytes` and `verifier_signing_key_bytes` to
+`verify_evidence`; do not reopen the display paths after loading the profile.
+This keeps verification and receipt signing bound to the exact bytes that were
+accepted during the profile read:
+
+```python
+trust = load_trust_inputs(Path("trust/trust-inputs.json"))
+verification = verify_evidence(
+    evidence_path,
+    policy_path=trust.policy_path,
+    policy_bytes=trust.policy_bytes,
+    expected_baseline_artifact=trust.expected_artifact_digests["baseline"],
+    expected_subject_artifact=trust.expected_artifact_digests["subject"],
+    expected_schedule=trust.expected_schedule_digest,
+    expected_baseline_runtime=trust.expected_runtime_digests["baseline"],
+    expected_subject_runtime=trust.expected_runtime_digests["subject"],
+    expected_signer=trust.expected_signer_fingerprint,
+    receipt_path=Path("verification.receipt.json"),
+    verifier_signing_key_path=trust.verifier_signing_key_path,
+    verifier_signing_key_bytes=trust.verifier_signing_key_bytes,
+    verifier_identity=trust.verifier_identity,
+    trust_profile_digest=trust.profile_digest,
+    scorer_registry=(
+        ScorerExtensionRegistry(allow_installed=True)
+        if trust.allow_installed_scorers
+        else None
+    ),
+)
+```
+
 `verify_signed_verification_receipt` is the stable downstream receipt reader.
 It accepts the receipt and pack paths plus independently supplied policy,
 baseline and subject artifact-identity digests, canonical schedule digest,
@@ -473,6 +556,7 @@ verify_signed_verification_receipt(
     expected_pack_signer_fingerprint: str,
     expected_verifier_identity: str,
     expected_verifier_fingerprint: str,
+    expected_trust_profile_digest: str | None = None,
     require_signed: bool = True,
 ) -> ReceiptVerification
 ```
@@ -518,10 +602,12 @@ promise that every enum member is emitted by every public command. Accept only
 | Exception | When raised | Machine-readable behavior |
 | --- | --- | --- |
 | `EvaluationRequestError` | Request parsing, schema, path, provider, or capability failure | Message only at request-loader boundary |
+| `EvaluationPreflightError` | Execution-free request, input, runtime-availability, key, or output qualification fails | `as_json()` uses `invarlock/evaluation-preflight-v1` |
 | `EvaluationTransactionError` | Execute/import/publication cannot produce evidence | `exit_code`; `as_json()` uses `invarlock/evaluation-result-v1` |
 | `EvidenceVerificationError` | Trust input, pack replay, receipt write, or acceptance failure | `exit_code`, `payload`, and `as_json()` |
 | `EvidenceReportError` | Signature-authenticated report cannot be rendered safely | `exit_code` |
 | `EvidenceReceiptError` | Receipt parsing or processing cannot complete safely | Exception; ordinary authenticity mismatches remain in `ReceiptVerification.errors` |
+| `TrustInputsError` | Trust profile parsing, schema, path, or referenced-file validation fails | Message only; no verification is attempted |
 
 Do not catch `ValueError` broadly and continue with partial output. Catch the
 documented transaction exception, log its closed message or payload, and reject

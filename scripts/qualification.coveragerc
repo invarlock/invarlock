@@ -1,0 +1,16 @@
+[run]
+branch = True
+parallel = True
+patch = subprocess
+include =
+    scripts/authenticated_runtime_build.py
+    scripts/qualification_precheck.py
+    scripts/qualification_candidate_wheels.py
+    scripts/qualification_receipt_check.py
+    scripts/qualification_source.py
+    scripts/runtime_qualification.py
+    scripts/tensorrt_llm_canary_preflight.py
+
+[report]
+show_missing = True
+precision = 2

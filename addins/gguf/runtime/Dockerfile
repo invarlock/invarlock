@@ -55,6 +55,7 @@ RUN install -d \
     && apt_get() { \
       set -- \
         -o "APT::Snapshot=${LLAMA_CPP_APT_SNAPSHOT}" \
+        -o "Acquire::Check-Valid-Until=false" \
         -o "Dir::Cache::archives=/tmp/llama-apt-cache/archives" \
         -o "Dir::Log=/tmp/llama-apt-log" \
         -o "Dir::State::lists=/tmp/llama-apt-state/lists" \
@@ -117,9 +118,14 @@ RUN tar -xzf /tmp/llama.cpp.tar.gz -C /tmp \
 
 FROM ${RUNTIME_BASE_IMAGE}
 
+ARG INVARLOCK_SOURCE_BUNDLE_SHA256
+ARG INVARLOCK_SOURCE_COMMIT
 ARG SOURCE_DATE_EPOCH
 ARG LLAMA_CPP_SOURCE_SHA256=5ab75e394f4c71425ecce64a213dab3b8e3e9cfe0f19d0dcda4d5a4f7733da83
 ARG LLAMA_CPP_SOURCE_COMMIT=12127defda4f41b7679cb2477a4b0d65ee6a0c8f
+
+RUN python -c 'import re,sys; commit,digest=sys.argv[1:]; re.fullmatch(r"[0-9a-f]{40,64}", commit) or sys.exit("invalid INVARLOCK_SOURCE_COMMIT"); re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or sys.exit("invalid INVARLOCK_SOURCE_BUNDLE_SHA256")' \
+      "${INVARLOCK_SOURCE_COMMIT}" "${INVARLOCK_SOURCE_BUNDLE_SHA256}"
 
 ENV PATH="/opt/llama.cpp:${PATH}" \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -130,8 +136,10 @@ ENV PATH="/opt/llama.cpp:${PATH}" \
     SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 
 LABEL dev.invarlock.runtime-provider="llama_cpp" \
+      dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}" \
       dev.invarlock.llama-cpp.source-commit="${LLAMA_CPP_SOURCE_COMMIT}" \
-      dev.invarlock.llama-cpp.source-sha256="${LLAMA_CPP_SOURCE_SHA256}"
+      dev.invarlock.llama-cpp.source-sha256="${LLAMA_CPP_SOURCE_SHA256}" \
+      org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"
 
 COPY --from=runtime-inputs /requirements/workflows/core-py312.txt /opt/invarlock/requirements/core-py312.txt
 COPY --from=public-wheel /wheelhouse /opt/invarlock/artifacts

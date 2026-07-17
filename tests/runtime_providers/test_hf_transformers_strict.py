@@ -36,6 +36,167 @@ from tests.runtime_providers._hf_transformers_helpers import (
 )
 
 
+def test_hf_strict_binding_rejects_loader_initialized_live_parameters(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    authenticated_weight = torch.tensor([1.0, 2.0])
+    safetensors_torch.save_file(
+        {"transformer.wte.weight": authenticated_weight},
+        tmp_path / "model.safetensors",
+    )
+
+    # Transformers accepts partial checkpoints by initializing missing model
+    # parameters. Strict binding must reject that live-only execution state.
+    model = SimpleNamespace(
+        base_model_prefix="transformer",
+        state_dict=lambda: {
+            "transformer.wte.weight": authenticated_weight.clone(),
+            "transformer.wpe.weight": torch.tensor([3.0, 4.0]),
+        },
+    )
+
+    with pytest.raises(ValueError, match="unauthenticated live model tensors"):
+        hf_transformers._require_safetensors_match(tmp_path, model=model)
+
+
+def test_hf_strict_binding_rejects_ambiguous_exact_and_nested_candidates(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    authenticated_weight = torch.tensor([1.0, 2.0])
+    safetensors_torch.save_file(
+        {"model.weight": authenticated_weight},
+        tmp_path / "model.safetensors",
+    )
+    model = SimpleNamespace(
+        base_model_prefix="model",
+        state_dict=lambda: {
+            "model.weight": authenticated_weight.clone(),
+            "model.language_model.weight": torch.tensor([2.0, 1.0]),
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="ambiguous authenticated checkpoint tensor mapping",
+    ):
+        hf_transformers._require_safetensors_match(tmp_path, model=model)
+
+
+def test_hf_strict_binding_allows_proven_tied_live_parameter_alias(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    tied_weight = torch.tensor([1.0, 2.0])
+    safetensors_torch.save_file(
+        {"transformer.wte.weight": tied_weight},
+        tmp_path / "model.safetensors",
+    )
+    model = SimpleNamespace(
+        base_model_prefix="transformer",
+        state_dict=lambda: {
+            "transformer.wte.weight": tied_weight,
+            "lm_head.weight": tied_weight.view_as(tied_weight),
+        },
+    )
+
+    hf_transformers._require_safetensors_match(tmp_path, model=model)
+
+
+def test_hf_strict_binding_rejects_shifted_live_parameter_view(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    shared_storage = torch.tensor([1.0, 2.0, 3.0])
+    authenticated_weight = shared_storage[:2]
+    safetensors_torch.save_file(
+        {"transformer.wte.weight": authenticated_weight},
+        tmp_path / "model.safetensors",
+    )
+    model = SimpleNamespace(
+        base_model_prefix="transformer",
+        state_dict=lambda: {
+            "transformer.wte.weight": authenticated_weight,
+            "lm_head.weight": shared_storage[1:],
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="unauthenticated live model tensors",
+    ):
+        hf_transformers._require_safetensors_match(tmp_path, model=model)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("missing_keys", {"transformer.wpe.weight"}),
+        ("unexpected_keys", {"unbound.weight"}),
+        ("mismatched_keys", {"transformer.wte.weight"}),
+        ("error_msgs", ["loader failure"]),
+    ],
+)
+def test_hf_strict_loader_rejects_incomplete_loading_info(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    model = SimpleNamespace(base_model_prefix="transformer")
+    loading_info: dict[str, object] = {
+        "missing_keys": set(),
+        "unexpected_keys": set(),
+        "mismatched_keys": set(),
+        "error_msgs": [],
+    }
+    loading_info[field] = value
+
+    with pytest.raises(ValueError, match="loading reported missing"):
+        hf_transformers.load_hf_model_with_strict_loading_info(
+            lambda *_args, **_kwargs: (model, loading_info),
+            tmp_path,
+        )
+
+
+def test_hf_strict_loader_requires_and_returns_complete_loading_info(
+    tmp_path: Path,
+) -> None:
+    model = SimpleNamespace(base_model_prefix="transformer")
+    observed: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def loader(*args: object, **kwargs: object) -> object:
+        observed.append((args, kwargs))
+        return model, {
+            "missing_keys": set(),
+            "unexpected_keys": set(),
+            "mismatched_keys": set(),
+            "error_msgs": [],
+        }
+
+    loaded = hf_transformers.load_hf_model_with_strict_loading_info(
+        loader,
+        tmp_path,
+    )
+
+    assert loaded is model
+    assert observed == [
+        (
+            (str(tmp_path),),
+            {
+                "local_files_only": True,
+                "trust_remote_code": False,
+                "use_safetensors": True,
+                "output_loading_info": True,
+            },
+        )
+    ]
+
+
 def test_hf_strict_open_rejects_arbitrary_scorer_callback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -7,9 +7,12 @@ import json
 import os
 import re
 import stat
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock.core.evaluation_request import (
     ComparisonSideRequest,
@@ -23,8 +26,10 @@ from invarlock.core.runtime_provider import (
     ModelRuntimeSpec,
     RuntimeBehavioralSchedule,
     RuntimeProvider,
+    RuntimeProviderInputPreflight,
     artifact_identity_sha256,
     build_runtime_behavioral_schedule,
+    validate_runtime_evaluation_inputs,
 )
 from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
@@ -32,6 +37,8 @@ from invarlock.core.schedule_preparation import (
     prepare_local_evaluation_schedule_bytes,
 )
 from invarlock.core.scorer_extension import (
+    SCORER_REPLAY_OUTPUT_KIND,
+    ScorerExtensionError,
     ScorerExtensionRegistry,
     scorer_binding_payload,
 )
@@ -41,6 +48,7 @@ from invarlock.evaluation_run import (
 )
 from invarlock.evaluation_runtime import (
     RuntimeResourceResolver,
+    RuntimeSideRole,
     caller_runtime_resources_from_environment,
 )
 from invarlock.evidence_pack import (
@@ -57,16 +65,19 @@ from invarlock.evidence_pack_contract import (
     PAIRED_RECORDS_FORMAT,
     build_comparison_report,
     canonical_json_bytes,
+    normalize_digest,
     runtime_side_config_errors,
     schedule_bytes,
     sha256_digest,
 )
+from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.evidence_pack_publication import _load_private_key
 from invarlock.runtime_provider_evidence import (
     RuntimeProviderEvidenceError,
     decode_artifact_identity,
     decode_runtime_provider_receipt,
+    encode_artifact_identity,
 )
 from invarlock.runtime_security_helpers import (
     network_allowed,
@@ -107,6 +118,25 @@ class EvaluationTransactionError(ValueError):
         )
 
 
+class EvaluationPreflightError(ValueError):
+    """Raised when execution-free evaluation qualification fails."""
+
+    exit_code = 2
+
+    def as_json(self) -> str:
+        return json.dumps(
+            {
+                "format_version": "invarlock/evaluation-preflight-v1",
+                "ok": False,
+                "errors": [str(self)],
+            },
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+
+
 def _require_closed_runtime_switches() -> None:
     """Reject process-wide execution opt-ins before provider discovery."""
 
@@ -129,6 +159,17 @@ class EvaluationTransactionResult:
 
     evidence_path: Path
     comparison_id: str
+    pack_manifest_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "pack_manifest_digest",
+            normalize_digest(
+                self.pack_manifest_digest,
+                label="published evidence manifest digest",
+            ),
+        )
 
     def as_json(self) -> str:
         return json.dumps(
@@ -137,12 +178,71 @@ class EvaluationTransactionResult:
                 "ok": True,
                 "comparison_id": self.comparison_id,
                 "evidence": str(self.evidence_path),
+                "pack_manifest_digest": self.pack_manifest_digest,
             },
             allow_nan=False,
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
         )
+
+
+@dataclass(frozen=True)
+class EvaluationPreflightResult:
+    """Successful execution-free qualification of one evaluation request."""
+
+    execution_mode: str
+    output: str
+    schedule_digest: str
+    policy_digest: str
+    artifact_digests: dict[str, str]
+    evidence_signer_fingerprint: str
+    request_digest: str
+    record_count: int
+    providers: dict[str, str]
+    checks: tuple[str, ...]
+    runtime_image_digests: dict[str, str] | None = None
+    format_version: str = "invarlock/evaluation-preflight-v1"
+
+    def as_json(self) -> str:
+        payload: dict[str, object] = {
+            "format_version": self.format_version,
+            "ok": True,
+            "execution_mode": self.execution_mode,
+            "output": self.output,
+            "schedule_digest": self.schedule_digest,
+            "policy_digest": self.policy_digest,
+            "artifact_digests": self.artifact_digests,
+            "evidence_signer_fingerprint": self.evidence_signer_fingerprint,
+            "request_digest": self.request_digest,
+            "record_count": self.record_count,
+            "providers": self.providers,
+            "checks": list(self.checks),
+        }
+        if self.runtime_image_digests is not None:
+            payload["runtime_image_digests"] = self.runtime_image_digests
+        return json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+
+
+@dataclass(frozen=True)
+class _PreparedEvaluation:
+    signing_key: ed25519.Ed25519PrivateKey
+    registry: CoreRegistry
+    request: EvaluationRequest
+    schedule: RuntimeBehavioralSchedule
+    canonical_schedule: bytes
+    policy_bytes: bytes
+    policy_digest: str
+    artifact_digests: dict[str, str] | None
+    evidence_signer_fingerprint: str
+    selected_metric: str
+    observations: tuple[EvidenceObservation, ...]
 
 
 @dataclass
@@ -653,86 +753,447 @@ def _preflight_policy(
     )
 
 
+def _validate_output_destination(request: EvaluationRequest) -> None:
+    """Check that publication can begin without creating any output component."""
+
+    destination = request.output.evidence
+    if os.path.lexists(destination):
+        raise EvaluationTransactionError("output.evidence already exists")
+    candidate = destination.parent
+    while not candidate.exists():
+        if candidate == request.root or candidate.parent == candidate:
+            break
+        candidate = candidate.parent
+    if candidate.is_symlink() or not candidate.is_dir():
+        raise EvaluationTransactionError(
+            "output.evidence parent is not a real directory"
+        )
+    try:
+        candidate.relative_to(request.root)
+    except ValueError as exc:
+        raise EvaluationTransactionError(
+            "output.evidence parent escapes the request root"
+        ) from exc
+    if not os.access(candidate, os.W_OK | os.X_OK):
+        raise EvaluationTransactionError(
+            "output.evidence parent is not writable by the caller"
+        )
+
+
+def _prepare_evaluation_inputs(
+    request_path: Path | EvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    scorer_registry: ScorerExtensionRegistry | None,
+    authenticate_artifacts: bool = False,
+    registry: CoreRegistry | None = None,
+) -> _PreparedEvaluation:
+    if signing_key_path is None:
+        raise EvaluationTransactionError("an Ed25519 evidence-signing key is required")
+    _require_closed_runtime_switches()
+    signing_key = _load_private_key(Path(signing_key_path))
+    selected_registry = registry if registry is not None else CoreRegistry()
+    request = (
+        request_path
+        if isinstance(request_path, EvaluationRequest)
+        else load_evaluation_request(
+            request_path,
+            provider_resolver=selected_registry.get_runtime_provider,
+        )
+    )
+    artifact_digests: dict[str, str] | None = None
+    if authenticate_artifacts and request.execution.mode == "run":
+        artifact_digests = {}
+        for side_name, side in (
+            ("baseline", request.comparison.baseline),
+            ("subject", request.comparison.subject),
+        ):
+            provider = selected_registry.get_runtime_provider(side.runtime.provider)
+            artifact_path = side.artifact.path
+            assert artifact_path is not None
+            try:
+                identity = provider.authenticate_artifact(
+                    ModelRuntimeSpec(
+                        provider_name=side.runtime.provider,
+                        model_id=side.artifact.model_id,
+                        settings=side.runtime.settings,
+                    ),
+                    artifact_path,
+                )
+                artifact_digests[side_name] = sha256_digest(
+                    encode_artifact_identity(identity)
+                )
+            except (TypeError, ValueError) as exc:
+                raise EvaluationTransactionError(
+                    f"{side_name} artifact could not be authenticated: {exc}"
+                ) from exc
+
+    if request.execution.mode == "import":
+        schedule_path = request.execution.schedule
+        assert schedule_path is not None
+        schedule_raw = _read_request_file(
+            request.root, schedule_path, label="canonical schedule"
+        )
+        schedule_payload = _parse_object(schedule_raw, label="canonical schedule")
+        schedule = build_runtime_behavioral_schedule(schedule_payload)
+        if schedule.task != request.comparison.task:
+            raise EvaluationTransactionError(
+                "imported schedule task does not match comparison.task"
+            )
+        canonical_schedule = schedule_bytes(schedule)
+        if schedule_raw != canonical_schedule:
+            raise EvaluationTransactionError(
+                "canonical schedule bytes are not canonical"
+            )
+        dataset_path = request.comparison.dataset
+        assert isinstance(dataset_path, Path)
+        dataset_raw = _read_request_file(
+            request.root, dataset_path, label="dataset input"
+        )
+        if dataset_raw != canonical_schedule:
+            raise EvaluationTransactionError(
+                "dataset input must be the exact canonical imported schedule"
+            )
+    else:
+        dataset_source = request.comparison.dataset
+        assert isinstance(dataset_source, LocalDatasetRequest)
+        dataset_raw = _read_request_file(
+            request.root,
+            dataset_source.path,
+            label="local evaluation dataset",
+        )
+        schedule = prepare_local_evaluation_schedule_bytes(
+            dataset_source,
+            dataset_raw,
+            task=request.comparison.task,
+        )
+        canonical_schedule = schedule_bytes(schedule)
+
+    policy_bytes = _read_request_file(
+        request.root,
+        request.comparison.policy,
+        label="policy input",
+        max_bytes=_MAX_POLICY_BYTES,
+    )
+    policy_payload = _parse_object(policy_bytes, label="policy input")
+    policy_digest = sha256_digest(policy_bytes)
+    selected_metric = (
+        request.comparison.scorer_extension.scorer_id
+        if request.comparison.scorer_extension is not None
+        else request.comparison.metric
+    )
+    assert selected_metric is not None
+    _preflight_policy(
+        policy_payload,
+        metric=selected_metric,
+        policy_digest=policy_digest,
+        scorer_binding=request.comparison.scorer_extension,
+    )
+    if request.comparison.scorer_extension is not None:
+        if scorer_registry is None:
+            raise EvaluationTransactionError(
+                "request requires an explicitly authorized scorer registry"
+            )
+        try:
+            available_scorers = scorer_registry.list_scorers()
+        except ScorerExtensionError as exc:
+            raise EvaluationTransactionError(str(exc)) from exc
+        if request.comparison.scorer_extension.scorer_id not in available_scorers:
+            raise EvaluationTransactionError(
+                "required scorer extension is not installed or enabled"
+            )
+    observations = _load_request_observations(request)
+    _validate_output_destination(request)
+    return _PreparedEvaluation(
+        signing_key=signing_key,
+        registry=selected_registry,
+        request=request,
+        schedule=schedule,
+        canonical_schedule=canonical_schedule,
+        policy_bytes=policy_bytes,
+        policy_digest=policy_digest,
+        artifact_digests=artifact_digests,
+        evidence_signer_fingerprint=public_key_fingerprint(signing_key.public_key()),
+        selected_metric=selected_metric,
+        observations=observations,
+    )
+
+
+def preflight_evaluation_request(
+    request_path: Path | EvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    scorer_registry: ScorerExtensionRegistry | None = None,
+    runtime_image_digests: Mapping[str, str] | None = None,
+    resource_resolver: RuntimeResourceResolver | None = None,
+    registry: CoreRegistry | None = None,
+) -> EvaluationPreflightResult:
+    """Validate an evaluation transaction without execution or filesystem mutation."""
+
+    try:
+        prepared = _prepare_evaluation_inputs(
+            request_path,
+            signing_key_path=signing_key_path,
+            scorer_registry=scorer_registry,
+            authenticate_artifacts=True,
+            registry=registry,
+        )
+        request = prepared.request
+        checks = [
+            "request",
+            "artifacts",
+            "dataset_schedule",
+            "policy",
+            "provider_capabilities",
+            "signing_key",
+            "output_destination",
+        ]
+        scorer_binding = request.comparison.scorer_extension
+        if scorer_binding is not None:
+            assert scorer_registry is not None
+            input_kinds = tuple(
+                sorted(
+                    {
+                        part.kind
+                        for scheduled in prepared.schedule.records
+                        for part in scheduled.input_parts
+                    }
+                    or {"text"}
+                )
+            )
+            try:
+                scorer_registry.validate_binding(
+                    scorer_binding,
+                    task=prepared.schedule.task,
+                    input_kinds=input_kinds,
+                    output_kind=SCORER_REPLAY_OUTPUT_KIND,
+                )
+            except ScorerExtensionError as exc:
+                raise EvaluationTransactionError(str(exc)) from exc
+            checks.append("scorer_binding")
+        normalized_runtime_digests: dict[str, str] | None = None
+        artifact_digests = prepared.artifact_digests
+        if request.execution.mode == "run":
+            if runtime_image_digests is None or set(runtime_image_digests) != {
+                "baseline",
+                "subject",
+            }:
+                raise EvaluationTransactionError(
+                    "run preflight requires both locally available runtime images"
+                )
+            normalized_runtime_digests = {
+                side: normalize_digest(
+                    str(runtime_image_digests[side]),
+                    label=f"{side} runtime image digest",
+                )
+                for side in ("baseline", "subject")
+            }
+            checks.append("runtime_images")
+            sides: tuple[tuple[RuntimeSideRole, ComparisonSideRequest], ...] = (
+                ("baseline", request.comparison.baseline),
+                ("subject", request.comparison.subject),
+            )
+            providers = tuple(
+                (
+                    side_name,
+                    side,
+                    prepared.registry.get_runtime_provider(side.runtime.provider),
+                )
+                for side_name, side in sides
+            )
+            if resource_resolver is None:
+                if any(
+                    isinstance(provider, RuntimeProviderInputPreflight)
+                    for _side_name, _side, provider in providers
+                ):
+                    raise EvaluationTransactionError(
+                        "run preflight requires caller-owned runtime resources for "
+                        "provider input validation"
+                    )
+            else:
+                for side_name, side, provider in providers:
+                    spec = ModelRuntimeSpec(
+                        provider_name=side.runtime.provider,
+                        model_id=side.artifact.model_id,
+                        settings=side.runtime.settings,
+                    )
+                    try:
+                        resources = resource_resolver.resolve(
+                            request_root=request.root,
+                            role=side_name,
+                            side=side,
+                            provider=provider,
+                        )
+                    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+                        raise EvaluationTransactionError(
+                            f"{side_name} caller-owned runtime resources are "
+                            f"invalid: {exc}"
+                        ) from exc
+                    expected_runtime_digest = normalized_runtime_digests[side_name]
+                    if resources.container_image_digest != expected_runtime_digest:
+                        raise EvaluationTransactionError(
+                            f"{side_name} caller-owned runtime resources do not "
+                            "match the inspected runtime image digest"
+                        )
+                    try:
+                        validate_runtime_evaluation_inputs(
+                            provider, spec, resources, prepared.schedule
+                        )
+                    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+                        raise EvaluationTransactionError(
+                            f"{side_name} provider {provider.name!r} input "
+                            f"preflight failed: {exc}"
+                        ) from exc
+                checks.append("runtime_resources")
+        else:
+            assert request.execution.baseline is not None
+            assert request.execution.subject is not None
+            imported_sides = {
+                "baseline": _side_evidence(
+                    request,
+                    request.execution.baseline,
+                    side="baseline",
+                ),
+                "subject": _side_evidence(
+                    request,
+                    request.execution.subject,
+                    side="subject",
+                ),
+            }
+            artifact_digests = {
+                side: sha256_digest(evidence.artifact_identity)
+                for side, evidence in imported_sides.items()
+            }
+            for side_name, side in (
+                ("baseline", request.comparison.baseline),
+                ("subject", request.comparison.subject),
+            ):
+                _validate_import_side(
+                    side,
+                    imported_sides[side_name],
+                    side=side_name,
+                    provider=prepared.registry.get_runtime_provider(
+                        side.runtime.provider
+                    ),
+                    task=request.comparison.task,
+                    metric=request.comparison.collection_metric,
+                    schedule=prepared.schedule,
+                    policy_digest=prepared.policy_digest,
+                )
+            assert request.execution.records is not None
+            records_raw = _read_request_file(
+                request.root,
+                request.execution.records,
+                label="imported paired records",
+            )
+            records_payload = _parse_object(
+                records_raw,
+                label="imported paired records",
+            )
+            if records_raw != canonical_json_bytes(records_payload):
+                raise EvaluationTransactionError(
+                    "imported paired records must use canonical JSON"
+                )
+        assert artifact_digests is not None
+        assert set(artifact_digests) == {"baseline", "subject"}
+        normalized_request = _normalized_request(
+            request,
+            prepared.schedule,
+            prepared.observations,
+        )
+        return EvaluationPreflightResult(
+            execution_mode=request.execution.mode,
+            output=request.output.evidence.relative_to(request.root).as_posix(),
+            schedule_digest=f"sha256:{prepared.schedule.schedule_sha256}",
+            policy_digest=prepared.policy_digest,
+            artifact_digests=artifact_digests,
+            evidence_signer_fingerprint=prepared.evidence_signer_fingerprint,
+            request_digest=sha256_digest(canonical_json_bytes(normalized_request)),
+            record_count=len(prepared.schedule.records),
+            providers={
+                "baseline": request.comparison.baseline.runtime.provider,
+                "subject": request.comparison.subject.runtime.provider,
+            },
+            checks=tuple(checks),
+            runtime_image_digests=normalized_runtime_digests,
+        )
+    except EvaluationPreflightError:
+        raise
+    except (
+        EvaluationRequestError,
+        EvaluationTransactionError,
+        EvidencePackError,
+        KeyError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise EvaluationPreflightError(str(exc)) from exc
+
+
 def evaluate_request_file(
-    request_path: Path,
+    request_path: Path | EvaluationRequest,
     *,
     signing_key_path: Path | None,
     resource_resolver: RuntimeResourceResolver | None = None,
     runtime_executor: RuntimeComparisonExecutor | None = None,
+    runtime_image_digests: Mapping[str, str] | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
+    registry: CoreRegistry | None = None,
 ) -> EvaluationTransactionResult:
     """Execute or import, authenticate, and publish one closed request."""
 
-    if signing_key_path is None:
-        raise EvaluationTransactionError("an Ed25519 evidence-signing key is required")
-    _require_closed_runtime_switches()
     try:
-        signing_key = _load_private_key(Path(signing_key_path))
-        registry = CoreRegistry()
-        request = load_evaluation_request(
-            request_path, provider_resolver=registry.get_runtime_provider
+        prepared = _prepare_evaluation_inputs(
+            request_path,
+            signing_key_path=signing_key_path,
+            scorer_registry=scorer_registry,
+            registry=registry,
         )
-        if request.execution.mode == "import":
-            schedule_path = request.execution.schedule
-            assert schedule_path is not None
-            schedule_raw = _read_request_file(
-                request.root, schedule_path, label="canonical schedule"
-            )
-            schedule_payload = _parse_object(schedule_raw, label="canonical schedule")
-            schedule = build_runtime_behavioral_schedule(schedule_payload)
-            if schedule.task != request.comparison.task:
+        signing_key = prepared.signing_key
+        registry = prepared.registry
+        request = prepared.request
+        schedule = prepared.schedule
+        canonical_schedule = prepared.canonical_schedule
+        policy_bytes = prepared.policy_bytes
+        policy_digest = prepared.policy_digest
+        selected_metric = prepared.selected_metric
+        observations = prepared.observations
+        execution_resolver = resource_resolver
+        preflight_resolver = resource_resolver
+        if request.execution.mode == "run":
+            if runtime_executor is not None and resource_resolver is not None:
                 raise EvaluationTransactionError(
-                    "imported schedule task does not match comparison.task"
+                    "runtime executor and direct resource resolver are mutually exclusive"
                 )
-            canonical_schedule = schedule_bytes(schedule)
-            if schedule_raw != canonical_schedule:
+            if runtime_executor is not None and callable(
+                getattr(runtime_executor, "resolve", None)
+            ):
+                preflight_resolver = runtime_executor  # type: ignore[assignment]
+            if runtime_executor is None and execution_resolver is None:
+                execution_resolver = caller_runtime_resources_from_environment()
+                preflight_resolver = execution_resolver
+            if runtime_image_digests is None:
                 raise EvaluationTransactionError(
-                    "canonical schedule bytes are not canonical"
+                    "run evaluation requires both preflight runtime image digests"
                 )
-            dataset_path = request.comparison.dataset
-            assert isinstance(dataset_path, Path)
-            dataset_raw = _read_request_file(
-                request.root, dataset_path, label="dataset input"
-            )
-            if dataset_raw != canonical_schedule:
-                raise EvaluationTransactionError(
-                    "dataset input must be the exact canonical imported schedule"
-                )
-        else:
-            dataset_source = request.comparison.dataset
-            assert isinstance(dataset_source, LocalDatasetRequest)
-            dataset_raw = _read_request_file(
-                request.root,
-                dataset_source.path,
-                label="local evaluation dataset",
-            )
-            schedule = prepare_local_evaluation_schedule_bytes(
-                dataset_source,
-                dataset_raw,
-                task=request.comparison.task,
-            )
-            canonical_schedule = schedule_bytes(schedule)
-        policy_bytes = _read_request_file(
-            request.root,
-            request.comparison.policy,
-            label="policy input",
-            max_bytes=_MAX_POLICY_BYTES,
+        preflight_result = preflight_evaluation_request(
+            request,
+            signing_key_path=signing_key_path,
+            scorer_registry=scorer_registry,
+            runtime_image_digests=runtime_image_digests,
+            resource_resolver=preflight_resolver,
+            registry=registry,
         )
-        policy_payload = _parse_object(policy_bytes, label="policy input")
-        policy_digest = sha256_digest(policy_bytes)
-        selected_metric = (
-            request.comparison.scorer_extension.scorer_id
-            if request.comparison.scorer_extension is not None
-            else request.comparison.metric
-        )
-        assert selected_metric is not None
-        _preflight_policy(
-            policy_payload,
-            metric=selected_metric,
-            policy_digest=policy_digest,
-            scorer_binding=request.comparison.scorer_extension,
-        )
-        observations = _load_request_observations(request)
+        output_probe = _prepare_output_parent(request.root, request.output.evidence)
+        try:
+            _revalidate_output_parent(
+                output_probe,
+                request.output.evidence,
+                published=False,
+            )
+        finally:
+            os.close(output_probe.descriptor)
         if request.execution.mode == "import":
             assert request.execution.records is not None
             assert request.execution.baseline is not None
@@ -744,10 +1205,6 @@ def evaluate_request_file(
                 request, request.execution.subject, side="subject"
             )
         else:
-            if runtime_executor is not None and resource_resolver is not None:
-                raise EvaluationTransactionError(
-                    "runtime executor and direct resource resolver are mutually exclusive"
-                )
             if runtime_executor is not None:
                 executed = runtime_executor.execute(
                     request,
@@ -756,15 +1213,11 @@ def evaluate_request_file(
                     policy_digest=policy_digest,
                 )
             else:
-                resolver = (
-                    resource_resolver
-                    if resource_resolver is not None
-                    else caller_runtime_resources_from_environment()
-                )
+                assert execution_resolver is not None
                 executed = execute_runtime_comparison(
                     request,
                     registry=registry,
-                    resource_resolver=resolver,
+                    resource_resolver=execution_resolver,
                     schedule_bytes=canonical_schedule,
                     policy_digest=policy_digest,
                 )
@@ -798,6 +1251,16 @@ def evaluate_request_file(
             policy_digest=policy_digest,
         )
         if request.execution.mode == "run":
+            expected_runtime_digests = preflight_result.runtime_image_digests
+            assert expected_runtime_digests is not None
+            if baseline_runtime != expected_runtime_digests["baseline"]:
+                raise EvaluationTransactionError(
+                    "baseline validated runtime digest does not match preflight"
+                )
+            if subject_runtime != expected_runtime_digests["subject"]:
+                raise EvaluationTransactionError(
+                    "subject validated runtime digest does not match preflight"
+                )
             if baseline_runtime != executed.baseline_runtime_digest:
                 raise EvaluationTransactionError(
                     "baseline worker runtime digest does not match its validated receipt"
@@ -855,7 +1318,7 @@ def evaluate_request_file(
             _revalidate_output_parent(
                 output_anchor, request.output.evidence, published=False
             )
-            published = publish_comparison_evidence(
+            publication = publish_comparison_evidence(
                 request.output.evidence,
                 comparison_id=comparison_id,
                 baseline=InputIdentity(
@@ -919,12 +1382,17 @@ def evaluate_request_file(
     ) as exc:
         raise EvaluationTransactionError(str(exc)) from exc
     return EvaluationTransactionResult(
-        evidence_path=published.resolve(), comparison_id=comparison_id
+        evidence_path=publication.evidence_path.resolve(),
+        comparison_id=comparison_id,
+        pack_manifest_digest=publication.pack_manifest_digest,
     )
 
 
 __all__ = [
+    "EvaluationPreflightError",
+    "EvaluationPreflightResult",
     "EvaluationTransactionError",
     "EvaluationTransactionResult",
     "evaluate_request_file",
+    "preflight_evaluation_request",
 ]

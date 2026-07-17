@@ -15,7 +15,7 @@ independent acceptance record.
 
     **Prerequisites:** A complete evidence directory, independently obtained
     policy, runtime digests and evidence-signer fingerprint, plus an independently
-    independently selected verifier key and identity when issuing a receipt.
+    selected verifier key and identity when issuing a receipt.
 
 ## Artifact lifecycle at a glance
 
@@ -127,6 +127,11 @@ Equivalent environment variables exist for the policy, artifact, schedule,
 runtime, evidence-signer, verifier-key, and verifier-identity inputs. Supplying
 explicit arguments makes a recorded invocation easier to review. `--receipt`
 is kept explicit because its output is transaction-specific.
+
+For routine use, place the same independent values in a closed
+`invarlock/trust-inputs-v1` profile and replace the explicit trust options with
+`--trust-profile trust/trust-inputs.json`. Environment variables cannot
+override a profile, and the signed receipt records its canonical digest.
 
 ### Obtain each anchor independently
 

@@ -88,6 +88,17 @@ def test_all_concordant_pairs_have_no_mcnemar_signal() -> None:
     assert statistics.effect_size_confidence_interval.upper_pp == pytest.approx(0.0)
 
 
+@pytest.mark.parametrize("outcome", [False, True])
+def test_degenerate_concordant_pairs_have_zero_width_difference_interval(
+    outcome: bool,
+) -> None:
+    statistics = paired_exact_match_statistics([outcome] * 50, [outcome] * 50)
+
+    assert statistics.effect_size_pp == 0.0
+    assert statistics.effect_size_confidence_interval.lower_pp == pytest.approx(0.0)
+    assert statistics.effect_size_confidence_interval.upper_pp == pytest.approx(0.0)
+
+
 def test_small_sample_intervals_are_bounded_and_contain_the_paired_effect() -> None:
     for baseline in product((False, True), repeat=4):
         for subject in product((False, True), repeat=4):

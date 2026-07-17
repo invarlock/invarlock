@@ -15,9 +15,25 @@ import invarlock.evaluation_transaction as evaluation_transaction
 import invarlock.evidence_reporting as evidence_reporting
 import invarlock.evidence_verification as evidence_verification
 from invarlock.cli.app import app
+from invarlock.core import evaluation_request as evaluation_request_module
 
 cli_module = importlib.import_module("invarlock.cli.app")
 _RUNNER = CliRunner()
+
+
+def _mock_loaded_import_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        evaluation_request_module,
+        "load_evaluation_request",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            execution=SimpleNamespace(mode="import")
+        ),
+    )
+    monkeypatch.setattr(
+        evaluation_transaction,
+        "preflight_evaluation_request",
+        lambda *_args, **_kwargs: SimpleNamespace(),
+    )
 
 
 def test_version_callback_emits_installed_and_source_fallback_versions(
@@ -53,12 +69,14 @@ def test_evaluate_renders_success_in_human_and_json_modes(
     result = evaluation_transaction.EvaluationTransactionResult(
         evidence_path=evidence,
         comparison_id="comparison-123",
+        pack_manifest_digest="sha256:" + ("a" * 64),
     )
     monkeypatch.setattr(
         evaluation_transaction,
         "evaluate_request_file",
         lambda *_args, **_kwargs: result,
     )
+    _mock_loaded_import_request(monkeypatch)
 
     human = _RUNNER.invoke(app, ["evaluate", str(request)])
     machine = _RUNNER.invoke(app, ["evaluate", str(request), "--json"])
@@ -86,6 +104,7 @@ def test_evaluate_preserves_transaction_failure_code_and_diagnostics(
         )
 
     monkeypatch.setattr(evaluation_transaction, "evaluate_request_file", fail)
+    _mock_loaded_import_request(monkeypatch)
     arguments = ["evaluate", str(request)]
     if json_out:
         arguments.append("--json")
@@ -207,6 +226,7 @@ def test_report_renders_text_and_html_location(
             text="# InvarLock comparison report",
             html_path=html,
             evidence_signer="sha256:" + "a" * 64,
+            pack_manifest_digest="sha256:" + "b" * 64,
         ),
     )
 
@@ -218,6 +238,40 @@ def test_report_renders_text_and_html_location(
     assert result.exit_code == 0
     assert "# InvarLock comparison report" in result.stdout
     assert f"HTML {html}" in result.stdout.replace("\n", "")
+
+
+def test_report_json_binds_the_rendered_pack(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    html = tmp_path / "report.html"
+    digest = "sha256:" + "b" * 64
+    monkeypatch.setattr(
+        evidence_reporting,
+        "render_evidence",
+        lambda *_args, **_kwargs: evidence_reporting.EvidenceReport(
+            text="# InvarLock comparison report",
+            html_path=html,
+            evidence_signer="sha256:" + "a" * 64,
+            pack_manifest_digest=digest,
+        ),
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        ["report", str(evidence), "--html", str(html), "--json"],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "format_version": "invarlock/evidence-report-v1",
+        "html": str(html),
+        "ok": True,
+        "pack_manifest_digest": digest,
+    }
 
 
 def test_report_preserves_renderer_failure_code(

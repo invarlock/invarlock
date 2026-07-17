@@ -233,8 +233,285 @@ def _require_strict_runtime_boundary(context: RuntimeExecutionContext) -> None:
         )
 
 
+def _live_tensor_candidates(key: str, prefix: str | None) -> tuple[str, ...]:
+    candidates = [key]
+    if prefix is not None:
+        prefix_marker = f"{prefix}."
+        if not key.startswith(prefix_marker):
+            candidates.append(f"{prefix}.{key}")
+        else:
+            suffix = key[len(prefix_marker) :]
+            candidates.extend(
+                f"{prefix}.{component}.{suffix}"
+                for component in ("language_model", "text_model")
+            )
+    return tuple(dict.fromkeys(candidates))
+
+
+def _is_legacy_gpt2_causal_mask_key(
+    key: str,
+    *,
+    model: object,
+    prefix: str | None,
+) -> bool:
+    config = getattr(model, "config", None)
+    if getattr(config, "model_type", None) != "gpt2":
+        return False
+    positions = getattr(config, "max_position_embeddings", None)
+    layers = getattr(config, "num_hidden_layers", None)
+    if (
+        isinstance(positions, bool)
+        or not isinstance(positions, int)
+        or positions <= 0
+        or isinstance(layers, bool)
+        or not isinstance(layers, int)
+        or layers <= 0
+    ):
+        return False
+    normalized_key = key
+    if prefix is not None and key.startswith(f"{prefix}."):
+        normalized_key = key[len(prefix) + 1 :]
+    match = re.fullmatch(r"h\.(0|[1-9][0-9]*)\.attn\.bias", normalized_key)
+    return match is not None and int(match.group(1)) < layers
+
+
+def _is_authenticated_legacy_gpt2_causal_mask(
+    key: str,
+    tensor: object,
+    *,
+    model: object,
+    prefix: str | None,
+) -> bool:
+    if not _is_legacy_gpt2_causal_mask_key(key, model=model, prefix=prefix):
+        return False
+    positions = getattr(
+        getattr(model, "config", None),
+        "max_position_embeddings",
+        None,
+    )
+    if isinstance(positions, bool) or not isinstance(positions, int):
+        return False
+    shape = getattr(tensor, "shape", None)
+    dtype = getattr(tensor, "dtype", None)
+    new_ones = getattr(tensor, "new_ones", None)
+    equal = getattr(tensor, "equal", None)
+    if (
+        not isinstance(shape, (list, tuple))
+        or tuple(shape) != (1, 1, positions, positions)
+        or str(dtype) != "torch.float32"
+        or not callable(new_ones)
+        or not callable(equal)
+    ):
+        return False
+    expected = new_ones((1, 1, positions, positions)).tril()
+    return bool(equal(expected))
+
+
+def _tensor_storage_identity(value: object) -> tuple[object, ...] | None:
+    try:
+        detach = getattr(value, "detach", None)
+        if not callable(detach):
+            return None
+        tensor = detach()
+        pointer = tensor.untyped_storage().data_ptr()
+        if not pointer:
+            return None
+        return (
+            pointer,
+            tensor.storage_offset(),
+            tuple(tensor.shape),
+            tuple(tensor.stride()),
+            str(tensor.dtype),
+            str(tensor.device),
+        )
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return None
+
+
+def _tensors_share_exact_storage(left: object, right: object) -> bool:
+    if left is right:
+        return True
+    left_identity = _tensor_storage_identity(left)
+    return left_identity is not None and left_identity == _tensor_storage_identity(
+        right
+    )
+
+
+def load_hf_model_with_strict_loading_info(
+    loader: Callable[..., object],
+    checkpoint: Path,
+) -> object:
+    """Load one local HF model and reject incomplete or ambiguous loader state."""
+
+    loaded = loader(
+        str(checkpoint),
+        local_files_only=True,
+        trust_remote_code=False,
+        use_safetensors=True,
+        output_loading_info=True,
+    )
+    if (
+        not isinstance(loaded, tuple)
+        or len(loaded) != 2
+        or not isinstance(loaded[1], Mapping)
+    ):
+        raise RuntimeError("strict HF loader did not return loading information")
+    model, loading_info = loaded
+    fields: dict[str, tuple[object, ...]] = {}
+    for name in ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs"):
+        value = loading_info.get(name)
+        if not isinstance(value, (list, tuple, set, frozenset)):
+            raise RuntimeError("strict HF loader returned invalid loading information")
+        fields[name] = tuple(value)
+    prefix = getattr(model, "base_model_prefix", None)
+    authenticated_prefix = (
+        prefix if isinstance(prefix, str) and prefix.isidentifier() else None
+    )
+    unexpected = tuple(
+        key
+        for key in fields["unexpected_keys"]
+        if not isinstance(key, str)
+        or not _is_legacy_gpt2_causal_mask_key(
+            key,
+            model=model,
+            prefix=authenticated_prefix,
+        )
+    )
+    if (
+        fields["missing_keys"]
+        or unexpected
+        or fields["mismatched_keys"]
+        or fields["error_msgs"]
+    ):
+        raise ValueError(
+            "strict HF checkpoint loading reported missing, unexpected, "
+            "mismatched, or invalid model tensors"
+        )
+    return model
+
+
+def _bind_authenticated_live_tensors(
+    authenticated_keys: set[str],
+    *,
+    live_state: Mapping[str, object],
+    model: object,
+    prefix: str | None,
+) -> dict[str, tuple[tuple[str, object], ...]]:
+    get_buffer = getattr(model, "get_buffer", None)
+    bindings: dict[str, tuple[tuple[str, object], ...]] = {}
+    for key in sorted(authenticated_keys):
+        matches: list[tuple[str, object]] = []
+        for candidate in _live_tensor_candidates(key, prefix):
+            if candidate in live_state:
+                matches.append((candidate, live_state[candidate]))
+                continue
+            if callable(get_buffer):
+                try:
+                    matches.append((candidate, get_buffer(candidate)))
+                except (AttributeError, KeyError):
+                    continue
+                except (RuntimeError, TypeError, ValueError) as exc:
+                    raise RuntimeError(
+                        "strict HF native model buffer state is unavailable"
+                    ) from exc
+        if len(matches) > 1 and any(
+            not _tensors_share_exact_storage(matches[0][1], candidate[1])
+            for candidate in matches[1:]
+        ):
+            raise ValueError(
+                "strict HF loaded model has an ambiguous authenticated "
+                "checkpoint tensor mapping"
+            )
+        bindings[key] = tuple(matches)
+    return bindings
+
+
+def _verify_authenticated_safetensors(
+    checkpoint: Path,
+    *,
+    authenticated_keys: set[str],
+    bindings: Mapping[str, tuple[tuple[str, object], ...]],
+    model: object,
+    prefix: str | None,
+    safe_open: Callable[..., Any],
+) -> tuple[set[str], list[object]]:
+    observed_keys: set[str] = set()
+    authenticated_live_names: set[str] = set()
+    authenticated_live_tensors: list[object] = []
+    shards = sorted(checkpoint.glob("*.safetensors"), key=lambda path: path.name)
+    for shard in shards:
+        with safe_open(str(shard), framework="pt", device="cpu") as handle:
+            for key in handle.keys():
+                observed_keys.add(key)
+                stored = handle.get_tensor(key)
+                bound_matches = bindings[key]
+                if not bound_matches:
+                    if _is_authenticated_legacy_gpt2_causal_mask(
+                        key,
+                        stored,
+                        model=model,
+                        prefix=prefix,
+                    ):
+                        continue
+                    raise ValueError(
+                        "strict HF loaded model is missing authenticated "
+                        "checkpoint tensors"
+                    )
+                live = bound_matches[0][1]
+                detach = getattr(live, "detach", None)
+                if not callable(detach):
+                    raise RuntimeError(
+                        "strict HF native model state contains a non-tensor value"
+                    )
+                live_cpu = detach().to(device="cpu").contiguous()
+                if (
+                    stored.dtype != live_cpu.dtype
+                    or tuple(stored.shape) != tuple(live_cpu.shape)
+                    or not bool(stored.equal(live_cpu))
+                ):
+                    raise ValueError(
+                        "strict HF loaded model tensors do not match the "
+                        "authenticated checkpoint"
+                    )
+                authenticated_live_names.update(name for name, _value in bound_matches)
+                authenticated_live_tensors.extend(
+                    value for _name, value in bound_matches
+                )
+    if observed_keys != authenticated_keys:
+        raise RuntimeError(
+            "strict HF checkpoint tensor inventory changed during binding"
+        )
+    return authenticated_live_names, authenticated_live_tensors
+
+
+def _require_complete_live_state(
+    live_state: Mapping[str, object],
+    *,
+    authenticated_names: set[str],
+    authenticated_tensors: list[object],
+) -> None:
+    authenticated_objects = {id(value) for value in authenticated_tensors}
+    authenticated_storage = {
+        identity
+        for value in authenticated_tensors
+        if (identity := _tensor_storage_identity(value)) is not None
+    }
+    unauthenticated = []
+    for key, value in live_state.items():
+        if key in authenticated_names or id(value) in authenticated_objects:
+            continue
+        identity = _tensor_storage_identity(value)
+        if identity is not None and identity in authenticated_storage:
+            continue
+        unauthenticated.append(key)
+    if unauthenticated:
+        raise ValueError(
+            "strict HF loaded model contains unauthenticated live model tensors"
+        )
+
+
 def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
-    """Require every authenticated safetensors value in the live model state."""
+    """Bind every authenticated and live execution tensor without ambiguity."""
 
     try:
         from safetensors import safe_open
@@ -260,41 +537,29 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
         raise RuntimeError(
             "strict HF checkpoint must use a canonical safetensors layout"
         ) from exc
-    if not authenticated_keys.issubset(live_state):
-        raise ValueError(
-            "strict HF loaded model is missing authenticated checkpoint tensors"
-        )
-
-    observed_keys: set[str] = set()
-    try:
-        shards = sorted(checkpoint.glob("*.safetensors"), key=lambda path: path.name)
-        for shard in shards:
-            with safe_open(str(shard), framework="pt", device="cpu") as handle:
-                for key in handle.keys():
-                    observed_keys.add(key)
-                    stored = handle.get_tensor(key)
-                    live = live_state[key]
-                    detach = getattr(live, "detach", None)
-                    if not callable(detach):
-                        raise RuntimeError(
-                            "strict HF native model state contains a non-tensor value"
-                        )
-                    live_cpu = detach().to(device="cpu").contiguous()
-                    if (
-                        stored.dtype != live_cpu.dtype
-                        or tuple(stored.shape) != tuple(live_cpu.shape)
-                        or not bool(stored.equal(live_cpu))
-                    ):
-                        raise ValueError(
-                            "strict HF loaded model tensors do not match the "
-                            "authenticated checkpoint"
-                        )
-    except (OSError, RuntimeError, ValueError):
-        raise
-    if observed_keys != authenticated_keys:
-        raise RuntimeError(
-            "strict HF checkpoint tensor inventory changed during binding"
-        )
+    prefix = getattr(model, "base_model_prefix", None)
+    authenticated_prefix = (
+        prefix if isinstance(prefix, str) and prefix.isidentifier() else None
+    )
+    bindings = _bind_authenticated_live_tensors(
+        authenticated_keys,
+        live_state=live_state,
+        model=model,
+        prefix=authenticated_prefix,
+    )
+    authenticated_names, authenticated_tensors = _verify_authenticated_safetensors(
+        checkpoint,
+        authenticated_keys=authenticated_keys,
+        bindings=bindings,
+        model=model,
+        prefix=authenticated_prefix,
+        safe_open=safe_open,
+    )
+    _require_complete_live_state(
+        live_state,
+        authenticated_names=authenticated_names,
+        authenticated_tensors=authenticated_tensors,
+    )
 
 
 def _require_model_config_match(checkpoint: Path, *, model: object) -> None:
@@ -344,6 +609,25 @@ def _require_model_config_match(checkpoint: Path, *, model: object) -> None:
     # saved before being loaded through ``from_pretrained``.
     normalized_live.pop("_name_or_path", None)
     normalized_authenticated.pop("_name_or_path", None)
+
+    # Transformers records dtypes inferred from authenticated safetensor weights
+    # on live top-level and component configs even when the authored checkpoint
+    # leaves them unspecified. Tensor inventories and values are independently
+    # rebound below, so these same-path live-only values are not authored config.
+    def drop_inferred_dtypes(
+        live: dict[str, object], authenticated: dict[str, object]
+    ) -> None:
+        for key in tuple(authenticated):
+            authenticated_value = authenticated[key]
+            if key == "dtype" and authenticated_value is None:
+                live.pop(key, None)
+                authenticated.pop(key)
+                continue
+            live_value = live.get(key)
+            if isinstance(live_value, dict) and isinstance(authenticated_value, dict):
+                drop_inferred_dtypes(live_value, authenticated_value)
+
+    drop_inferred_dtypes(normalized_live, normalized_authenticated)
     if normalized_live != normalized_authenticated:
         raise ValueError(
             "strict HF live model config does not match the authenticated checkpoint"
@@ -931,6 +1215,29 @@ class HFTransformersProvider:
             tokenizer_metadata_sha256=tokenizer_metadata_sha256,
         )
 
+    def authenticate_artifact(
+        self, spec: ModelRuntimeSpec, artifact_path: Path
+    ) -> HFSnapshotArtifactIdentity:
+        """Authenticate local checkpoint bytes without importing model runtimes."""
+
+        identity = self.identify_artifact(spec)
+        expected_tree = identity.checkpoint_tree_sha256
+        if expected_tree is None:
+            raise ValueError(
+                "hf_transformers authentication requires checkpoint_tree_sha256"
+            )
+        try:
+            observed_tree = checkpoint_tree_sha256(artifact_path).removeprefix(
+                "sha256:"
+            )
+        except (CheckpointIdentityError, OSError) as exc:
+            raise ValueError(
+                "hf_transformers checkpoint could not be authenticated"
+            ) from exc
+        if observed_tree != expected_tree:
+            raise ValueError("hf_transformers checkpoint tree digest does not match")
+        return identity
+
     def prepare_execution(
         self,
         spec: ModelRuntimeSpec,
@@ -943,22 +1250,7 @@ class HFTransformersProvider:
         checkpoint = resources.primary_path()
         if not checkpoint.is_dir():
             raise ValueError("hf_transformers primary artifact must be a directory")
-        identity = self.identify_artifact(spec)
-        expected_tree = identity.checkpoint_tree_sha256
-        if expected_tree is None:
-            raise ValueError(
-                "hf_transformers preparation requires checkpoint_tree_sha256"
-            )
-        try:
-            observed_tree = checkpoint_tree_sha256(checkpoint).removeprefix("sha256:")
-        except (CheckpointIdentityError, OSError) as exc:
-            raise ValueError(
-                "hf_transformers checkpoint could not be authenticated"
-            ) from exc
-        if observed_tree != expected_tree:
-            raise ValueError(
-                "hf_transformers primary artifact does not match checkpoint_tree_sha256"
-            )
+        identity = self.authenticate_artifact(spec, checkpoint)
 
         transformers = importlib.import_module("transformers")
         auto_tokenizer = getattr(transformers, "AutoTokenizer", None)
@@ -974,11 +1266,9 @@ class HFTransformersProvider:
             local_files_only=True,
             trust_remote_code=False,
         )
-        model = model_from_pretrained(
-            str(checkpoint),
-            local_files_only=True,
-            trust_remote_code=False,
-            use_safetensors=True,
+        model = load_hf_model_with_strict_loading_info(
+            model_from_pretrained,
+            checkpoint,
         )
         move_to_device = getattr(model, "to", None)
         if not callable(move_to_device):
@@ -1093,5 +1383,6 @@ __all__ = [
     "HFTransformersProvider",
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
     "hf_tokenizer_contract_sha256",
+    "load_hf_model_with_strict_loading_info",
     "require_loaded_hf_checkpoint_binding",
 ]

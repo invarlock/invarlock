@@ -161,7 +161,9 @@ boundaries. Keep it deterministic and local, and reject implementations that
 use a network, external model, human judgment, SQL or code execution,
 model-based semantic similarity, or an LLM judge. Attach judge or review
 results as authenticated observations when useful; observations remain outside
-policy arithmetic.
+policy arithmetic. The extension declaration and replay checks do not provide
+process isolation; enforce these restrictions with reviewed code and the
+deployment sandbox.
 
 ### Use per-side OCI isolation
 
@@ -191,23 +193,63 @@ submitted pack:
 - verifier key authorization; and
 - verifier identity.
 
-Store them in protected CI or release configuration. Do not populate them by
-parsing the evidence immediately before verification.
+Store them in protected CI or release configuration. A closed
+`invarlock/trust-inputs-v1` profile keeps the values reviewable as one unit;
+protect the referenced verifier key separately and do not populate the profile
+by parsing the evidence immediately before verification.
+
+`invarlock evaluate` always completes its execution-free validation before it
+allocates accelerators. Run it with `--preflight` when you want to stop at that
+boundary and inspect the exact request, signing key, and runtime-image options.
+The check is local
+and non-mutating: it does not pull images, start containers, load model
+weights, run inference, publish evidence, or sign a result. Treat it as
+configuration qualification, not as evidence that execution or policy will
+pass. For a scorer-bound request, the same preflight must load the explicitly
+authorized scorer and validate its exact descriptor, configuration schema, and
+task compatibility before compute is allocated.
+
+For release qualification, first use `runtime-qualification-canary` or the
+provider's `qualify-canary` target to run one representative, strictly verified
+transaction through the exact image digest. Retain that canary's evidence,
+signed receipt, and verifier-owned trust profile. The maintained readiness and
+evidence targets reverify all three and reject a canary bound to another image.
+Changing the image digest requires a new signed canary.
+
+Then use the maintained readiness and evidence targets with the actual Git
+source archive, its digest and commit, a runtime image built with the matching
+source labels, and fresh target evidence, receipt, report, and private-summary
+destinations. The driver runs from the authenticated source archive through a
+private snapshot and empty working directory. It verifies each caller-digested
+candidate wheel against that archive, then runs the candidate core and maintained
+add-ins through an isolated interpreter bootstrap that does not process installed
+`.pth` files or `sitecustomize`. The private summary records the candidate-wheel
+and interpreter digests. It compares preflight's complete
+normalized-request digest with the strictly verified pack, independently
+validates the signed receipt, and requires the renderer to report the same pack
+identity. Fixed request material can remain read-only because the driver places
+its byte snapshot in private temporary storage while retaining the original
+request root for relative inputs. All output parents must already exist, be
+real directories without symlink ancestors, and remain outside the evidence
+destination. A readiness result authorizes the bounded execution attempt; it
+is not itself an acceptance result.
+
+The signed canary prevents broad image-level fan-out after a representative
+transaction fails. It is not evidence that a different model will load, fit
+the device, satisfy backend compatibility, or complete its own evaluation.
+Readiness remains execution-free and model-specific failures remain possible.
+
+The named commit must exist in the local qualification repository. The driver
+recreates that commit's archive with system Git and compares the complete
+execution-source inventory and bytes with the supplied bundle. A copied tar
+whose PAX comment merely names another commit is rejected.
 
 Run the complete verification transaction:
 
 ```bash
 invarlock verify evidence/ \
-  --policy policy/acceptance.json \
-  --expected-baseline-artifact sha256:BASELINE_ARTIFACT_DIGEST \
-  --expected-subject-artifact sha256:SUBJECT_ARTIFACT_DIGEST \
-  --expected-schedule sha256:SCHEDULE_DIGEST \
-  --expected-baseline-runtime sha256:BASELINE_RUNTIME_DIGEST \
-  --expected-subject-runtime sha256:SUBJECT_RUNTIME_DIGEST \
-  --expected-signer sha256:EVIDENCE_SIGNER_KEY_FINGERPRINT \
+  --trust-profile trust/trust-inputs.json \
   --receipt verification.receipt.json \
-  --verifier-signing-key evidence-verifier.pem \
-  --verifier-identity release-verifier \
   --json
 ```
 

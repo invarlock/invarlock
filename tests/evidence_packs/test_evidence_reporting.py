@@ -82,7 +82,7 @@ def _evidence(
     *,
     report_payload: dict[str, object] | None = None,
     report_extra_field: bool = False,
-    manifest_format: str = "evidence-pack-v1",
+    manifest_format: str = "invarlock/evidence-pack-v1",
     canonical_manifest: bool = True,
     checksummed_extra: bool = False,
     with_observation: bool = False,
@@ -286,6 +286,10 @@ def test_render_markdown_from_complete_evidence_signed_pack(
     assert "create the signed acceptance receipt" in result.text
     assert signer in result.text
     assert result.evidence_signer == signer
+    assert result.pack_manifest_digest == (
+        "sha256:"
+        + hashlib.sha256((evidence / "manifest.json").read_bytes()).hexdigest()
+    )
     assert result.html_path is None
 
 
@@ -302,6 +306,17 @@ def test_render_html_is_self_contained_and_no_clobber(tmp_path: Path) -> None:
     assert signer in rendered
     with pytest.raises(EvidenceReportError, match="already exists"):
         render_evidence(evidence, html_path=html)
+
+
+def test_render_html_rejects_a_destination_inside_the_evidence_pack(
+    tmp_path: Path,
+) -> None:
+    evidence, _signer = _evidence(tmp_path)
+
+    with pytest.raises(EvidenceReportError, match="outside the immutable evidence"):
+        render_evidence(evidence, html_path=evidence / "rendered.html")
+
+    assert not evidence.joinpath("rendered.html").exists()
 
 
 def test_render_authenticated_observations_separately_from_verdict(

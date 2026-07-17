@@ -14,7 +14,7 @@
     "signing_key_fingerprint"
   ],
   "properties": {
-    "format": {"const": "evidence-pack-v1"},
+    "format": {"const": "invarlock/evidence-pack-v1"},
     "comparison_id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"

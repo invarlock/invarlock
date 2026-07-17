@@ -7,6 +7,7 @@ from invarlock.evaluation_oci import (
     OciEvaluationLaunch,
     OciRuntimeExecutor,
     OciSideLaunch,
+    OciWorkerLimits,
     launch_from_environment,
 )
 from invarlock.evaluation_runtime import RuntimeResourceResolver
@@ -21,6 +22,8 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "EvaluationRecord",
         "EvaluationRequest",
         "EvaluationRequestError",
+        "EvaluationPreflightError",
+        "EvaluationPreflightResult",
         "EvaluationTransactionError",
         "EvaluationTransactionResult",
         "EvidencePackResult",
@@ -40,6 +43,7 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "OciEvaluationLaunch",
         "OciRuntimeExecutor",
         "OciSideLaunch",
+        "OciWorkerLimits",
         "ProviderResolver",
         "RuntimeArtifactResources",
         "RuntimeBackendIdentity",
@@ -70,6 +74,8 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "build_scorer_result",
         "ScoringObservation",
         "TensorRTLLMArtifactIdentity",
+        "TrustInputs",
+        "TrustInputsError",
         "build_runtime_import_observation",
         "build_runtime_import_receipt",
         "checkpoint_tree_sha256",
@@ -79,8 +85,10 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "load_evaluation_request",
         "load_runtime_behavioral_schedule",
         "load_runtime_import_side",
+        "load_trust_inputs",
         "launch_from_environment",
         "prepare_local_evaluation_schedule",
+        "preflight_evaluation_request",
         "render_evidence",
         "verify_evidence",
         "verify_signed_verification_receipt",
@@ -103,5 +111,6 @@ def test_engine_exports_host_oci_orchestration_without_worker_internals() -> Non
     assert engine.OciEvaluationLaunch is OciEvaluationLaunch
     assert engine.OciSideLaunch is OciSideLaunch
     assert engine.OciRuntimeExecutor is OciRuntimeExecutor
+    assert engine.OciWorkerLimits is OciWorkerLimits
     assert engine.launch_from_environment is launch_from_environment
     assert "compose_side_worker_command" not in engine.__all__

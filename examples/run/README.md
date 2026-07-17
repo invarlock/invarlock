@@ -9,8 +9,9 @@ authenticated tokenizer and target-token counts are comparable; that derived
 value does not control acceptance.
 
 The generated workspace keeps the closed evaluation request in `evaluation/`,
-independent verifier inputs in `verifier/`, and both private keys in `keys/`.
-The script refuses to reuse an existing workspace or evidence output.
+independent verifier inputs and its signing key in `verifier/`, and the evidence
+signing key in `keys/`. The script refuses to reuse an existing workspace or
+evidence output.
 
 Build and inspect the CPU runtime image first:
 
@@ -41,8 +42,13 @@ time, use a new workspace with `--prepare-only`:
 ```bash
 python examples/run/hf_cpu_decision.py \
   --workspace /tmp/invarlock-hf-cpu-inputs \
+  --runtime-image-digest sha256:<64-lowercase-hex> \
   --prepare-only
 ```
+
+The runtime digest is required during preparation because it is one of the
+independent anchors in the generated `invarlock/trust-inputs-v1` profile. The
+complete journey passes that profile to `invarlock verify --trust-profile`.
 
 The example is deliberately small. It demonstrates the release-regression
 transaction and trust bindings, not model quality or benchmark significance.

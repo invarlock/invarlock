@@ -20,7 +20,9 @@ BUILTIN_RUNTIME_PROVIDERS = (
         name="hf_transformers",
         module="invarlock.runtime_providers.hf_transformers",
         class_name="HFTransformersProvider",
-        required_deps=("torch", "transformers"),
+        # Identity and import-mode verification stay available in the base
+        # distribution; execution imports the optional backend lazily.
+        required_deps=(),
     ),
 )
 

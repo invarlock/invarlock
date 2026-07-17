@@ -46,6 +46,9 @@ def test_runtime_provider_protocol_accepts_complete_structural_implementations()
         def identify_artifact(self, spec):
             return None
 
+        def authenticate_artifact(self, spec, artifact_path):
+            return None
+
         def prepare_execution(self, spec, resources):
             return resources
 
@@ -54,6 +57,80 @@ def test_runtime_provider_protocol_accepts_complete_structural_implementations()
 
     assert isinstance(Session(), RuntimeSession)
     assert isinstance(Provider(), RuntimeProvider)
+
+
+def test_input_preflight_is_optional_and_noncallable_hooks_fail_closed() -> None:
+    from invarlock.core.runtime_provider import (
+        RuntimeProvider,
+        RuntimeProviderInputPreflight,
+        validate_runtime_evaluation_inputs,
+    )
+
+    class LegacyProvider:
+        name = "legacy"
+        abi_version = "1"
+
+        def validate_config(self, spec):
+            return None
+
+        def capabilities(self):
+            return None
+
+        def identify_artifact(self, spec):
+            return None
+
+        def authenticate_artifact(self, spec, artifact_path):
+            return None
+
+        def prepare_execution(self, spec, resources):
+            return resources
+
+        def open(self, spec, context):
+            return None
+
+    provider = LegacyProvider()
+    assert isinstance(provider, RuntimeProvider)
+    assert not isinstance(provider, RuntimeProviderInputPreflight)
+    assert (
+        validate_runtime_evaluation_inputs(
+            provider,
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+        is False
+    )
+
+    provider.validate_evaluation_inputs = "not callable"  # type: ignore[attr-defined]
+    with pytest.raises(TypeError, match="must be callable"):
+        validate_runtime_evaluation_inputs(
+            provider,
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+
+
+def test_input_preflight_requires_exact_none_result() -> None:
+    from invarlock.core.runtime_provider import validate_runtime_evaluation_inputs
+
+    class Provider:
+        lookups = 0
+
+        @property
+        def validate_evaluation_inputs(self):  # noqa: ANN201
+            self.lookups += 1
+            return lambda *_args: False
+
+    provider = Provider()
+    with pytest.raises(TypeError, match="must return None"):
+        validate_runtime_evaluation_inputs(
+            provider,  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+    assert provider.lookups == 1
 
 
 def test_runtime_execution_context_binds_opaque_provider_state_and_callbacks() -> None:

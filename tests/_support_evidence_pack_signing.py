@@ -16,7 +16,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-SIGNATURE_FORMAT = "evidence-pack-signature-v1"
+SIGNATURE_FORMAT = "invarlock/evidence-pack-signature-v1"
 
 
 def public_key_fingerprint(public_key: ed25519.Ed25519PublicKey) -> str:

@@ -51,6 +51,21 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
         "addins/tensorrt_llm",
     ):
         assert path in MAKEFILE
+    install_smoke = MAKEFILE.split("addins-install-smoke:", 1)[1].split(
+        "packaging-smoke-minimal:", 1
+    )[0]
+    assert "CoreRegistry" in install_smoke
+    assert "get_runtime_provider" in install_smoke
+    assert "get_plugin_info" in install_smoke
+    assert "ADDINS_SMOKE_RELEASE_LOCK" in install_smoke
+    assert "--require-hashes" in install_smoke
+    assert "--no-deps dist/*.whl dist/addins/*.whl" in install_smoke
+    assert "-m pip check" in install_smoke
+    assert "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH=" in install_smoke
+    assert ".addins-smoke-site" not in install_smoke
+
+    clean = MAKEFILE.split("clean:", 1)[1].split("docsclean:", 1)[0]
+    assert "src/*.egg-info" in clean
 
 
 def test_container_smoke_explicitly_enables_the_gated_integration_test() -> None:

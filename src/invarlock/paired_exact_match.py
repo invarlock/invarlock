@@ -133,6 +133,13 @@ def _paired_effect_confidence_interval(
     baseline_rate = baseline_pass_count / pair_count
     subject_rate = subject_pass_count / pair_count
     effect = subject_rate - baseline_rate
+    if baseline_pass_subject_fail_count == 0 and baseline_fail_subject_pass_count == 0:
+        return PairedConfidenceInterval(
+            method=PAIRED_CONFIDENCE_INTERVAL_METHOD,
+            confidence_level=PAIRED_CONFIDENCE_LEVEL,
+            lower_pp=0.0,
+            upper_pp=0.0,
+        )
 
     subject_lower, subject_upper = _wilson_score_interval(
         successes=subject_pass_count, count=pair_count
@@ -145,7 +152,12 @@ def _paired_effect_confidence_interval(
         subject_rate * (1.0 - subject_rate) * baseline_rate * (1.0 - baseline_rate)
     )
     if denominator == 0.0:
-        correlation = 0.0
+        correlation = (
+            1.0
+            if baseline_pass_subject_fail_count == 0
+            and baseline_fail_subject_pass_count == 0
+            else 0.0
+        )
     else:
         joint_pass_rate = both_pass_count / pair_count
         correlation = (joint_pass_rate - subject_rate * baseline_rate) / denominator

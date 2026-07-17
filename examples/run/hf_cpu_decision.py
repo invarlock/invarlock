@@ -32,7 +32,7 @@ from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
 )
-from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.evidence_pack_contract import canonical_json_bytes, normalize_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.runtime_providers.hf_transformers import (
     HFTransformersProvider,
@@ -75,7 +75,7 @@ def _paths(root: Path) -> ExamplePaths:
         trusted_inputs=verifier / "trusted-inputs.json",
         independent_policy=verifier / "policy" / "acceptance.json",
         evidence_key=root / "keys" / "evidence-signer.pem",
-        verifier_key=root / "keys" / "verifier.pem",
+        verifier_key=verifier / "keys" / "verifier.pem",
         receipt=verifier / "verification.receipt.json",
         html_report=root / "comparison-report.html",
     )
@@ -201,7 +201,9 @@ def _settings(checkpoint: Path, tokenizer_digest: str) -> dict[str, JSONScalar]:
     }
 
 
-def _prepare_workspace(root: Path) -> tuple[ExamplePaths, dict[str, str]]:
+def _prepare_workspace(
+    root: Path, *, runtime_image_digest: str
+) -> tuple[ExamplePaths, dict[str, str]]:
     root = root.expanduser().resolve()
     if root.exists():
         raise FileExistsError(
@@ -214,6 +216,7 @@ def _prepare_workspace(root: Path) -> tuple[ExamplePaths, dict[str, str]]:
         (paths.evaluation / "inputs").mkdir(parents=True)
         paths.independent_policy.parent.mkdir(parents=True)
         paths.evidence_key.parent.mkdir(parents=True)
+        paths.verifier_key.parent.mkdir(parents=True)
 
         checkpoints, tokenizer_digest = _create_distinct_checkpoints(paths)
         settings = {
@@ -244,9 +247,7 @@ def _prepare_workspace(root: Path) -> tuple[ExamplePaths, dict[str, str]]:
         policy_bytes = canonical_json_bytes(
             {
                 "resolved_policy": {
-                    "metrics": {
-                        "normalized_nll_per_utf8_byte": {"ratio_max": 1.0}
-                    }
+                    "metrics": {"normalized_nll_per_utf8_byte": {"ratio_max": 1.0}}
                 }
             }
         )
@@ -316,15 +317,28 @@ def _prepare_workspace(root: Path) -> tuple[ExamplePaths, dict[str, str]]:
             verifier + "\n", encoding="ascii"
         )
         anchors = {
-            "format_version": "invarlock/trusted-inputs-v1",
-            "baseline_artifact": artifact_anchors["baseline"],
-            "subject_artifact": artifact_anchors["subject"],
-            "canonical_schedule": f"sha256:{schedule.schedule_sha256}",
-            "policy_sha256": "sha256:" + hashlib.sha256(policy_bytes).hexdigest(),
-            "evidence_signer": evidence_signer,
-            "verifier": verifier,
+            "baseline_artifact_digest": artifact_anchors["baseline"],
+            "subject_artifact_digest": artifact_anchors["subject"],
+            "schedule_digest": f"sha256:{schedule.schedule_sha256}",
+            "baseline_runtime_digest": normalize_digest(
+                runtime_image_digest, label="runtime image digest"
+            ),
+            "subject_runtime_digest": normalize_digest(
+                runtime_image_digest, label="runtime image digest"
+            ),
+            "evidence_signer_fingerprint": evidence_signer,
         }
-        paths.trusted_inputs.write_bytes(canonical_json_bytes(anchors))
+        trust_profile = {
+            "format": "invarlock/trust-inputs-v1",
+            "policy": {"path": "policy/acceptance.json"},
+            "anchors": anchors,
+            "verifier": {
+                "identity": "local-hf-cpu-example",
+                "signing_key_path": "keys/verifier.pem",
+            },
+            "allow_installed_scorers": False,
+        }
+        paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
         return paths, anchors
     except Exception:
         shutil.rmtree(root)
@@ -347,7 +361,6 @@ def _run(command: list[str]) -> None:
 
 def _execute(
     paths: ExamplePaths,
-    anchors: dict[str, str],
     *,
     container_engine: str,
     runtime_image: str,
@@ -377,26 +390,10 @@ def _execute(
             *base,
             "verify",
             str(paths.evidence),
-            "--policy",
-            str(paths.independent_policy),
-            "--expected-baseline-artifact",
-            anchors["baseline_artifact"],
-            "--expected-subject-artifact",
-            anchors["subject_artifact"],
-            "--expected-schedule",
-            anchors["canonical_schedule"],
-            "--expected-baseline-runtime",
-            runtime_image_digest,
-            "--expected-subject-runtime",
-            runtime_image_digest,
-            "--expected-signer",
-            anchors["evidence_signer"],
+            "--trust-profile",
+            str(paths.trusted_inputs),
             "--receipt",
             str(paths.receipt),
-            "--verifier-signing-key",
-            str(paths.verifier_key),
-            "--verifier-identity",
-            "local-hf-cpu-example",
             "--json",
         ]
     )
@@ -445,34 +442,36 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--runtime-image-digest",
-        help="Pinned sha256 digest of the local CPU runtime image.",
+        required=True,
+        help=(
+            "Pinned sha256 digest of the local CPU runtime image; required to "
+            "close the generated verifier trust profile."
+        ),
     )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
-    if not arguments.prepare_only and (
-        not arguments.runtime_image or not arguments.runtime_image_digest
-    ):
-        raise SystemExit(
-            "full execution requires --runtime-image and --runtime-image-digest"
-        )
+    if not arguments.prepare_only and not arguments.runtime_image:
+        raise SystemExit("full execution requires --runtime-image")
     try:
-        paths, anchors = _prepare_workspace(arguments.workspace)
+        paths, _anchors = _prepare_workspace(
+            arguments.workspace,
+            runtime_image_digest=arguments.runtime_image_digest,
+        )
         print(f"Prepared: {paths.root}")
         print(f"Request: {paths.request}")
         print(f"Independent trust inputs: {paths.trusted_inputs}")
         print(f"Keys outside request tree: {paths.evidence_key.parent}")
         if arguments.prepare_only:
             print(
-                "Run evaluate, verify, and report with the paths and anchors above; "
-                "the checked-in README contains the complete commands."
+                "Use the generated request and trust profile with evaluate, verify, "
+                "and report; the checked-in README contains the complete commands."
             )
             return 0
         _execute(
             paths,
-            anchors,
             container_engine=arguments.container_engine,
             runtime_image=arguments.runtime_image,
             runtime_image_digest=arguments.runtime_image_digest,

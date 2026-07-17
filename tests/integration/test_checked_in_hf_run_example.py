@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import stat
@@ -23,9 +24,9 @@ from invarlock.core.schedule_preparation import (
 )
 from invarlock.evaluation_runtime import CallerRuntimeResources
 from invarlock.evaluation_transaction import evaluate_request_file
-from invarlock.evidence_verification import verify_evidence
 from invarlock.runtime_providers import hf_transformers
 from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
+from invarlock.trust_inputs import load_trust_inputs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = REPO_ROOT / "examples" / "run" / "hf_cpu_decision.py"
@@ -41,6 +42,8 @@ def _prepare(workspace: Path) -> subprocess.CompletedProcess[str]:
             str(EXAMPLE),
             "--workspace",
             str(workspace),
+            "--runtime-image-digest",
+            IMAGE_DIGEST,
             "--prepare-only",
         ],
         cwd=REPO_ROOT,
@@ -55,6 +58,52 @@ def _payload(path: Path) -> dict[str, Any]:
     value = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
+
+
+def _example_module() -> Any:
+    spec = importlib.util.spec_from_file_location(
+        "invarlock_checked_in_hf_example", EXAMPLE
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_checked_in_hf_run_executes_verification_through_the_trust_profile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    example = _example_module()
+    paths = example._paths(tmp_path / "workspace")
+    report = paths.evidence / "reports" / "evaluation.report.json"
+    report.parent.mkdir(parents=True)
+    report.write_text(
+        json.dumps({"verdict": "pass", "comparison": {"value": 0.5}}),
+        encoding="utf-8",
+    )
+    commands: list[list[str]] = []
+    monkeypatch.setattr(example, "_run", lambda command: commands.append(command))
+
+    example._execute(
+        paths,
+        container_engine="docker",
+        runtime_image="invarlock-runtime:local",
+        runtime_image_digest=IMAGE_DIGEST,
+    )
+
+    assert commands[1] == [
+        sys.executable,
+        "-m",
+        "invarlock",
+        "verify",
+        str(paths.evidence),
+        "--trust-profile",
+        str(paths.trusted_inputs),
+        "--receipt",
+        str(paths.receipt),
+        "--json",
+    ]
 
 
 def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
@@ -94,9 +143,21 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
         checkpoints["subject"]
     )
 
-    anchors = json.loads(
-        (workspace / "verifier" / "trusted-inputs.json").read_text(encoding="utf-8")
-    )
+    trust_profile_path = workspace / "verifier" / "trusted-inputs.json"
+    trust_profile = json.loads(trust_profile_path.read_text(encoding="utf-8"))
+    assert trust_profile["format"] == "invarlock/trust-inputs-v1"
+    assert trust_profile["policy"] == {"path": "policy/acceptance.json"}
+    assert trust_profile["verifier"] == {
+        "identity": "local-hf-cpu-example",
+        "signing_key_path": "keys/verifier.pem",
+    }
+    assert trust_profile["allow_installed_scorers"] is False
+    anchors = trust_profile["anchors"]
+    loaded_trust = load_trust_inputs(trust_profile_path)
+    assert loaded_trust.expected_runtime_digests == {
+        "baseline": IMAGE_DIGEST,
+        "subject": IMAGE_DIGEST,
+    }
     provider = HFTransformersProvider()
     for role in ("baseline", "subject"):
         side = request["comparison"][role]
@@ -109,7 +170,7 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
                 )
             )
         )
-        assert anchors[f"{role}_artifact"] == observed
+        assert anchors[f"{role}_artifact_digest"] == observed
 
     dataset = evaluation / "inputs" / "records.jsonl"
     dataset_bytes = dataset.read_bytes()
@@ -126,22 +187,23 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
         ),
         dataset_bytes,
     )
-    assert anchors["canonical_schedule"] == f"sha256:{schedule.schedule_sha256}"
+    assert anchors["schedule_digest"] == f"sha256:{schedule.schedule_sha256}"
 
     request_policy = evaluation / "inputs" / "acceptance.json"
     verifier_policy = workspace / "verifier" / "policy" / "acceptance.json"
     assert request_policy.read_bytes() == verifier_policy.read_bytes()
-    assert (
-        anchors["policy_sha256"]
-        == "sha256:" + hashlib.sha256(verifier_policy.read_bytes()).hexdigest()
-    )
+    assert loaded_trust.policy_path == verifier_policy
 
     evidence_key = workspace / "keys" / "evidence-signer.pem"
-    verifier_key = workspace / "keys" / "verifier.pem"
+    verifier_key = workspace / "verifier" / "keys" / "verifier.pem"
     assert not evidence_key.is_relative_to(evaluation)
     assert not verifier_key.is_relative_to(evaluation)
     assert stat.S_IMODE(evidence_key.stat().st_mode) == 0o600
     assert stat.S_IMODE(verifier_key.stat().st_mode) == 0o600
+    assert (
+        anchors["evidence_signer_fingerprint"]
+        == evidence_key.with_suffix(".fingerprint").read_text(encoding="ascii").strip()
+    )
 
     image_ref = f"registry.invalid/invarlock@{IMAGE_DIGEST}"
     for module in (hf_transformers, runtime_transaction):
@@ -155,23 +217,29 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
         request_path,
         signing_key_path=evidence_key,
         resource_resolver=CallerRuntimeResources(container_image_digest=IMAGE_DIGEST),
+        runtime_image_digests={
+            "baseline": IMAGE_DIGEST,
+            "subject": IMAGE_DIGEST,
+        },
     )
     receipt = workspace / "verifier" / "verification.receipt.json"
-    verified = verify_evidence(
-        evaluated.evidence_path,
-        policy_path=verifier_policy,
-        expected_baseline_artifact=anchors["baseline_artifact"],
-        expected_subject_artifact=anchors["subject_artifact"],
-        expected_schedule=anchors["canonical_schedule"],
-        expected_baseline_runtime=IMAGE_DIGEST,
-        expected_subject_runtime=IMAGE_DIGEST,
-        expected_signer=anchors["evidence_signer"],
-        receipt_path=receipt,
-        verifier_signing_key_path=verifier_key,
-        verifier_identity="checked-in-hf-run-test",
+    verified = CliRunner().invoke(
+        app,
+        [
+            "verify",
+            str(evaluated.evidence_path),
+            "--trust-profile",
+            str(trust_profile_path),
+            "--receipt",
+            str(receipt),
+            "--json",
+        ],
     )
-    assert verified.payload["ok"] is True
-    assert verified.payload["policy_verdict"] == "pass"
+    assert verified.exit_code == 0, verified.stdout
+    verified_payload = json.loads(verified.stdout)
+    assert verified_payload["ok"] is True
+    assert verified_payload["policy_verdict"] == "pass"
+    assert verified_payload["trust_profile_digest"] == loaded_trust.profile_digest
     assert receipt.is_file()
 
     report = json.loads(

@@ -44,6 +44,7 @@ SCORER_REPLAY_MODE = "authenticated_record_facts"
 SCORER_RECORD_VALUE_SEMANTICS = "unit_interval_score"
 SCORER_AGGREGATION = "arithmetic_mean"
 SCORER_DIRECTION = "higher_is_better"
+SCORER_REPLAY_OUTPUT_KIND = "text"
 MAX_SCORER_CONFIGURATION_BYTES = 64 * 1024
 
 # These metrics are implemented and replayed by core.  They are intentionally
@@ -837,9 +838,15 @@ class ScorerExtensionRegistry:
         )
 
     @staticmethod
-    def _validate_request(loaded: _LoadedScorer, request: ScorerReplayRequest) -> None:
+    def _validate_binding_contract(
+        loaded: _LoadedScorer,
+        *,
+        binding: ScorerExtensionBinding,
+        task: str,
+        input_kinds: tuple[str, ...],
+        output_kind: str,
+    ) -> None:
         descriptor = loaded.descriptor
-        binding = request.binding
         if (
             binding.scorer_id != descriptor.scorer_id
             or binding.scorer_version != descriptor.scorer_version
@@ -849,23 +856,16 @@ class ScorerExtensionRegistry:
             raise ScorerExtensionError(
                 "scorer binding does not match the installed descriptor"
             )
-        if request.task not in descriptor.supported_tasks:
-            raise ScorerExtensionError(f"scorer does not support task {request.task!r}")
-        if not set(request.input_kinds).issubset(descriptor.supported_input_kinds):
+        if task not in descriptor.supported_tasks:
+            raise ScorerExtensionError(f"scorer does not support task {task!r}")
+        if not set(input_kinds).issubset(descriptor.supported_input_kinds):
             raise ScorerExtensionError(
                 "scorer does not support the request input kinds"
             )
-        if request.output_kind not in descriptor.supported_output_kinds:
+        if output_kind not in descriptor.supported_output_kinds:
             raise ScorerExtensionError(
-                f"scorer does not support output kind {request.output_kind!r}"
+                f"scorer does not support output kind {output_kind!r}"
             )
-        for record in request.records:
-            missing = set(descriptor.required_facts) - set(record.facts)
-            if missing:
-                raise ScorerExtensionError(
-                    f"record {record.record_id!r} lacks required fact "
-                    f"{sorted(missing)[0]!r}"
-                )
         schema_payload = json.loads(loaded.configuration_schema_json)
         if schema_payload.get("type") != "object":
             raise ScorerExtensionError(
@@ -883,6 +883,51 @@ class ScorerExtensionRegistry:
                 f"scorer configuration violates its bound schema at {path}: "
                 f"{error.message}"
             )
+
+    @staticmethod
+    def _validate_request(loaded: _LoadedScorer, request: ScorerReplayRequest) -> None:
+        ScorerExtensionRegistry._validate_binding_contract(
+            loaded,
+            binding=request.binding,
+            task=request.task,
+            input_kinds=request.input_kinds,
+            output_kind=request.output_kind,
+        )
+        for record in request.records:
+            missing = set(loaded.descriptor.required_facts) - set(record.facts)
+            if missing:
+                raise ScorerExtensionError(
+                    f"record {record.record_id!r} lacks required fact "
+                    f"{sorted(missing)[0]!r}"
+                )
+
+    def validate_binding(
+        self,
+        binding: ScorerExtensionBinding,
+        *,
+        task: str,
+        input_kinds: tuple[str, ...],
+        output_kind: str,
+    ) -> None:
+        """Qualify one exact installed binding without replaying record facts."""
+
+        if not isinstance(binding, ScorerExtensionBinding):
+            raise ScorerExtensionError("binding must be a ScorerExtensionBinding")
+        _require_name(task, field_name="task")
+        _require_name_tuple(
+            input_kinds,
+            field_name="input_kinds",
+            allowed=_INPUT_KINDS,
+        )
+        _require_name(output_kind, field_name="output_kind")
+        loaded = self._load(binding.scorer_id)
+        self._validate_binding_contract(
+            loaded,
+            binding=binding,
+            task=task,
+            input_kinds=input_kinds,
+            output_kind=output_kind,
+        )
 
     @staticmethod
     def _validate_result(
@@ -962,6 +1007,7 @@ __all__ = [
     "SCORER_DIRECTION",
     "SCORER_RECORD_VALUE_SEMANTICS",
     "SCORER_REPLAY_MODE",
+    "SCORER_REPLAY_OUTPUT_KIND",
     "ScorerExtensionBinding",
     "ScorerExtensionDescriptor",
     "ScorerExtensionError",

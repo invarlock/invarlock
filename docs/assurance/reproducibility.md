@@ -67,7 +67,7 @@ either declared execution occurred.
 
 ## Bound material
 
-An `evidence-pack-v1` binds:
+An `invarlock/evidence-pack-v1` binds:
 
 | Material | Recorded binding |
 | --- | --- |

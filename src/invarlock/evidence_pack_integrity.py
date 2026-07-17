@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from invarlock import evidence_pack_json as evidence_pack_json_mod
 
 MANIFEST_SIGNATURE_FILENAME = "manifest.signature.json"
-EVIDENCE_PACK_SIGNATURE_FORMAT = "evidence-pack-signature-v1"
+EVIDENCE_PACK_SIGNATURE_FORMAT = "invarlock/evidence-pack-signature-v1"
 CONTROL_FILES = {
     "checksums.sha256",
     "manifest.json",
