@@ -598,6 +598,68 @@ def _mount(source: Path, target: str, *, read_only: bool) -> list[str]:
     return ["--mount", ",".join(fields)]
 
 
+def _worker_readable_artifact_mount_source(
+    path: Path, *, user: str, label: str
+) -> Path:
+    resolved = _artifact_mount_source(path, label=label)
+    _assert_worker_readable(resolved, user=user, label=label)
+    return resolved
+
+
+def _worker_grants_read(
+    entry: os.stat_result, *, uid: int, gid: int, directory: bool
+) -> bool:
+    if entry.st_uid == uid:
+        read, search = stat.S_IRUSR, stat.S_IXUSR
+    elif entry.st_gid == gid:
+        read, search = stat.S_IRGRP, stat.S_IXGRP
+    else:
+        read, search = stat.S_IROTH, stat.S_IXOTH
+    if not entry.st_mode & read:
+        return False
+    return not directory or bool(entry.st_mode & search)
+
+
+def _assert_worker_readable(source: Path, *, user: str, label: str) -> None:
+    """Reject mount sources the non-root worker user cannot read."""
+
+    uid, _, gid = user.partition(":")
+    worker_uid, worker_gid = int(uid), int(gid)
+    unreadable: list[str] = []
+
+    def visit(path: Path, *, directory: bool) -> None:
+        try:
+            entry = path.stat()
+        except OSError:
+            unreadable.append(str(path.relative_to(source) if path != source else "."))
+            return
+        if not _worker_grants_read(
+            entry, uid=worker_uid, gid=worker_gid, directory=directory
+        ):
+            unreadable.append(str(path.relative_to(source) if path != source else "."))
+
+    if source.is_dir():
+        visit(source, directory=True)
+        for root, directories, files in os.walk(source):
+            for name in directories:
+                visit(Path(root) / name, directory=True)
+            for name in files:
+                visit(Path(root) / name, directory=False)
+    else:
+        visit(source, directory=False)
+
+    if unreadable:
+        shown = ", ".join(sorted(unreadable)[:3])
+        remainder = len(unreadable) - min(len(unreadable), 3)
+        if remainder:
+            shown = f"{shown} and {remainder} more"
+        raise OciEvaluationError(
+            f"{label} is not readable by the runtime worker user {user}: {shown}; "
+            "grant world-readable permissions (for example "
+            f"chmod -R a+rX {source}) or select a runtime user able to read it"
+        )
+
+
 def _provider_bindings(
     environment: Mapping[str, str],
 ) -> dict[str, ProviderResourceBinding]:
@@ -804,7 +866,11 @@ def compose_side_worker_command(
         f"/tmp:rw,noexec,nosuid,nodev,size={tmpfs_size_gib}g",
         *_gpu_arguments(launch.engine, side_launch.device),
         *_mount(
-            _artifact_mount_source(artifact_source, label="side artifact"),
+            _worker_readable_artifact_mount_source(
+                artifact_source,
+                user=launch.worker_limits.user,
+                label="side artifact",
+            ),
             "/invarlock-resources/artifact",
             read_only=True,
         ),
@@ -838,7 +904,11 @@ def compose_side_worker_command(
     for index, (_name, source) in enumerate(sorted(support_sources.items())):
         command.extend(
             _mount(
-                _artifact_mount_source(source, label="side support resource"),
+                _worker_readable_artifact_mount_source(
+                    source,
+                    user=launch.worker_limits.user,
+                    label="side support resource",
+                ),
                 f"/invarlock-resources/support-{index}",
                 read_only=True,
             )

@@ -139,6 +139,10 @@ def _tiny_checkpoint(workspace: Path) -> tuple[Path, str, str]:
     checkpoint = workspace / "models" / "tiny-hf"
     checkpoint.mkdir(parents=True)
     model.save_pretrained(checkpoint, safe_serialization=True)
+    # safetensors >= 0.8.0 writes checkpoints mode 0600, which the non-root
+    # container worker cannot read through the read-only artifact mount.
+    for artifact_file in checkpoint.iterdir():
+        artifact_file.chmod(0o644)
     vocabulary = {
         "<pad>": 0,
         "<bos>": 1,

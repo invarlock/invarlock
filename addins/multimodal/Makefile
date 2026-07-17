@@ -41,6 +41,7 @@ smoke:
 		--user 65532:65532 \
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
+		--env USER=65532 --env LOGNAME=65532 \
 		--entrypoint python "$(IMAGE)" \
 		-c "import torch, torchvision; from PIL import Image; from transformers import Qwen2VLImageProcessor, Qwen2VLVideoProcessor; assert torch.cuda.is_available(); assert Image.__version__ == '12.3.0'; assert torchvision.__version__ == '0.26.0+cu128'; assert Qwen2VLImageProcessor().to_dict(); assert Qwen2VLVideoProcessor().to_dict(); from invarlock_addins.multimodal.conformance import main; raise SystemExit(main())"
 

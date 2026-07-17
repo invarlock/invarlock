@@ -314,6 +314,10 @@ def test_build_statement_requires_an_existing_parent(harness: BuildHarness) -> N
     assert not statement.exists()
 
 
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root bypasses directory write permissions",
+)
 def test_build_statement_rejects_an_unwritable_destination(
     harness: BuildHarness,
 ) -> None:

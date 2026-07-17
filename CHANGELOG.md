@@ -95,6 +95,10 @@ can be verified independently.
 
 ### Fixed
 
+- Rejected worker-unreadable artifact and support mounts on the host before
+  container launch with an actionable permission diagnostic. Checkpoints written
+  mode `0600` (safetensors 0.8.0 and later) previously surfaced only as an
+  opaque in-container authentication failure for the non-root worker user.
 - Hardened trust profiles, policy and key loading, checkpoint traversal, evidence
   publication, verification receipts, and the reusable verification action with
   descriptor-anchored no-symlink reads, immutable captured inputs, bounded

@@ -35,6 +35,7 @@ smoke:
 		--user 65532:65532 \
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
+		--env USER=65532 --env LOGNAME=65532 \
 		--entrypoint /opt/invarlock/bin/vendor-python "$(IMAGE)" \
 		-c "import torch; assert torch.cuda.is_available(); from invarlock_addins.tensorrt_llm.conformance import main; raise SystemExit(main())"
 

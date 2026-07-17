@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 import subprocess
 import sys
@@ -760,6 +761,53 @@ def test_side_commands_are_isolated_argv_only_and_preserve_nvidia_initialization
             "invarlock.evaluation_side_worker",
             "/invarlock/job/job.json",
         ]
+
+
+def test_side_commands_reject_artifacts_the_worker_user_cannot_read(
+    tmp_path: Path,
+) -> None:
+    resources = tmp_path / "resources"
+    resources.mkdir()
+    checkpoint = resources / "model.safetensors"
+    checkpoint.write_bytes(b"weights")
+    checkpoint.chmod(0o600)
+    job = tmp_path / "job"
+    job.mkdir()
+    output_parent = tmp_path / "output-root"
+    output_parent.mkdir()
+    launch = replace(_launch(), worker_limits=OciWorkerLimits(user="12001:13001"))
+
+    compose = functools.partial(
+        compose_side_worker_command,
+        launch=launch,
+        side_launch=launch.baseline,
+        provider_name="hf_transformers",
+        artifact_source=resources,
+        support_sources={},
+        job_root=job,
+        output_root=output_parent,
+    )
+
+    with pytest.raises(
+        OciEvaluationError,
+        match=r"not readable by the runtime worker user 12001:13001.*"
+        r"model\.safetensors",
+    ):
+        compose()
+
+    checkpoint.chmod(0o644)
+    assert compose()[:3] == ["docker", "run", "--rm"]
+
+    support = tmp_path / "support"
+    support.mkdir()
+    tokenizer = support / "tokenizer.json"
+    tokenizer.write_bytes(b"{}")
+    tokenizer.chmod(0o600)
+    with pytest.raises(
+        OciEvaluationError,
+        match=r"side support resource is not readable by the runtime worker",
+    ):
+        compose(support_sources={"tokenizer": support})
 
 
 def test_tensorrt_worker_scratch_scales_with_engine_and_stays_bounded(
