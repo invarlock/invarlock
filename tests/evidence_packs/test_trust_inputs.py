@@ -110,6 +110,43 @@ def test_profile_resolves_files_and_has_formatting_independent_digest(
     assert loaded.profile_digest.startswith("sha256:")
 
 
+def test_profile_can_replay_with_an_authenticated_public_key_override(
+    tmp_path: Path,
+) -> None:
+    trust_root, payload = _material(tmp_path)
+    profile = trust_root / "trust.json"
+    profile.write_text(json.dumps(payload), encoding="utf-8")
+    original = load_trust_inputs(profile)
+    private_key = serialization.load_pem_private_key(
+        original.verifier_signing_key_bytes,
+        password=None,
+    )
+    assert isinstance(private_key, ed25519.Ed25519PrivateKey)
+    public_key_bytes = private_key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    original.verifier_signing_key_path.unlink()
+
+    replay = load_trust_inputs(
+        profile,
+        verifier_key_bytes_override=public_key_bytes,
+    )
+
+    assert replay.profile_digest == original.profile_digest
+    assert replay.verifier_signing_key_bytes == public_key_bytes
+    with pytest.raises(TrustInputsError, match="exact bytes"):
+        load_trust_inputs(
+            profile,
+            verifier_key_bytes_override="not-bytes",  # type: ignore[arg-type]
+        )
+    with pytest.raises(TrustInputsError, match="65536-byte"):
+        load_trust_inputs(
+            profile,
+            verifier_key_bytes_override=b"x" * (64 * 1024 + 1),
+        )
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [

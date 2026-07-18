@@ -178,8 +178,18 @@ def _read_relative_regular_file(
         os.close(current_fd)
 
 
-def load_trust_inputs(path: Path) -> TrustInputs:
-    """Load a closed profile without following profile or referenced-file symlinks."""
+def load_trust_inputs(
+    path: Path,
+    *,
+    verifier_key_bytes_override: bytes | None = None,
+) -> TrustInputs:
+    """Load a closed profile without following profile or referenced-file symlinks.
+
+    ``verifier_key_bytes_override`` is reserved for replaying a completed signed
+    receipt with separately captured public key bytes. The profile digest remains
+    the digest of the original profile, including its signer-key path, while the
+    caller remains responsible for authenticating the supplied override.
+    """
 
     profile = _absolute_profile(Path(path))
     parent_fd = _open_directory_without_links(
@@ -224,12 +234,21 @@ def load_trust_inputs(path: Path) -> TrustInputs:
             label="policy",
             max_bytes=_MAX_POLICY_BYTES,
         )
-        signing_key_bytes = _read_relative_regular_file(
-            parent_fd,
-            signing_key_parts,
-            label="verifier signing key",
-            max_bytes=_MAX_SIGNING_KEY_BYTES,
-        )
+        if verifier_key_bytes_override is None:
+            signing_key_bytes = _read_relative_regular_file(
+                parent_fd,
+                signing_key_parts,
+                label="verifier signing key",
+                max_bytes=_MAX_SIGNING_KEY_BYTES,
+            )
+        else:
+            if not isinstance(verifier_key_bytes_override, bytes):
+                raise TrustInputsError("verifier key override must be exact bytes")
+            if len(verifier_key_bytes_override) > _MAX_SIGNING_KEY_BYTES:
+                raise TrustInputsError(
+                    "verifier key override exceeds the 65536-byte size limit"
+                )
+            signing_key_bytes = verifier_key_bytes_override
         canonical = _canonical_json_bytes(payload)
         return TrustInputs(
             policy_path=profile.parent.joinpath(*policy_parts),

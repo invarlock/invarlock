@@ -485,6 +485,84 @@ def test_runner_rejects_multi_rank_engine(tmp_path: Path) -> None:
         runner._parse_request(payload)  # noqa: SLF001
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("extra", True, "fields are not closed"),
+        ("format_version", "unsupported", "version is unsupported"),
+        ("tokenizer_json", {}, "non-empty object"),
+        ("add_special_tokens", True, "add_special_tokens=false"),
+        ("skip_special_tokens", False, "skip_special_tokens=true"),
+        (
+            "clean_up_tokenization_spaces",
+            True,
+            "clean_up_tokenization_spaces=false",
+        ),
+    ],
+)
+def test_runner_rejects_noncanonical_tokenizer_contract_controls(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    payload, engine = _runtime_request(tmp_path)
+    tokenizer_path = engine.parent / "tokenizer.json"
+    tokenizer = json.loads(tokenizer_path.read_text(encoding="utf-8"))
+    tokenizer[field] = value
+    tokenizer_path.write_text(
+        json.dumps(tokenizer, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match=message):
+        runner._parse_request(payload)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda config: config.update({"extra": True}), "fields are not closed"),
+        (
+            lambda config: config.update({"pretrained_config": []}),
+            "sections must be objects",
+        ),
+        (
+            lambda config: config["pretrained_config"].update({"mapping": []}),
+            "mapping must be an object",
+        ),
+        (
+            lambda config: config["pretrained_config"]["mapping"].update(
+                {"world_size": 2}
+            ),
+            "single-rank engines",
+        ),
+        (
+            lambda config: config["pretrained_config"]["mapping"].update(
+                {"cp_size": 2}
+            ),
+            "single-rank engines",
+        ),
+    ],
+)
+def test_runner_rejects_open_or_multirank_engine_configuration(
+    tmp_path: Path,
+    mutation,
+    message: str,
+) -> None:  # noqa: ANN001
+    payload, engine = _runtime_request(tmp_path)
+    config_path = engine / "config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    mutation(config)
+    config_path.write_text(
+        json.dumps(config, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match=message):
+        runner._parse_request(payload)  # noqa: SLF001
+
+
 def test_runner_network_gate_accepts_only_loopback(tmp_path: Path) -> None:
     ipv4 = tmp_path / "route"
     ipv6 = tmp_path / "ipv6_route"

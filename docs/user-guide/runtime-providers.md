@@ -358,6 +358,23 @@ verifier-owned trust profile together. They may be reused by later readiness
 and evidence targets only while `IMAGE_DIGEST` is unchanged. A new image digest
 requires a new signed canary.
 
+Before destroying the verifier signing key, export its Ed25519 public key into
+the retained trust unit. The maintained checker can then replay the signed
+receipt after transfer without private material:
+
+```bash
+python scripts/qualification_receipt_check.py \
+  --receipt "$CANARY_RECEIPT" \
+  --evidence "$CANARY_EVIDENCE" \
+  --trust-profile "$CANARY_TRUST_PROFILE" \
+  --verifier-public-key "$PWD/canary/verifier-public.pem"
+```
+
+The supplied public key is authenticated by the verifier fingerprint in the
+signed receipt; a substituted key, changed profile, policy, anchor, receipt, or
+evidence manifest fails closed. The trust-profile digest remains the digest of
+the profile used when the receipt was created.
+
 Next, run readiness for each planned request with the same source binding,
 image, verifier inputs, fresh destinations, and retained canary inputs:
 

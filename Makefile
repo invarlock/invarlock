@@ -104,6 +104,11 @@ coverage:  ## Run the fast suite with branch coverage
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/cov.xml --cov-fail-under=90
+	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
+		grep -v '/__init__.py$$' | \
+		while IFS= read -r source; do \
+			$(PYTHON) -m coverage report --include="$$source" --fail-under=80 || exit $$?; \
+		done
 
 coverage-linux-check:
 	@test "$$(uname -s)" = Linux || { \
@@ -134,6 +139,11 @@ coverage-addins: coverage-linux-check  ## Enforce the branch-coverage ratchet fo
 	$(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
 		--fail-under=80
+	@git ls-files 'addins/*/src/**/*.py' | \
+		grep -v '/__init__.py$$' | \
+		while IFS= read -r source; do \
+			$(PYTHON) -m coverage report --include="$$source" --fail-under=80 || exit $$?; \
+		done
 
 coverage-qualification:  ## Enforce branch coverage for the maintained qualification transaction
 	PYTHONPATH=src:addins/tensorrt_llm/src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \

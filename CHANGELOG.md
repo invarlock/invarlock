@@ -103,7 +103,10 @@ can be verified independently.
   publication, verification receipts, and the reusable verification action with
   descriptor-anchored no-symlink reads, immutable captured inputs, bounded
   snapshots, injection-resistant arguments, atomic no-replace outputs, and
-  explicit POSIX platform metadata.
+  explicit POSIX platform metadata. Signed qualification receipts can be
+  replayed after verifier-key destruction with a separately captured Ed25519
+  public key while retaining the original trust-profile digest and independent
+  anchors.
 - Made preflight and replay fail closed across artifact authentication, provider
   and scorer capabilities, side roles, schedules, policies, OCI image digests,
   selected comparisons, and imported-record publication.
@@ -161,6 +164,8 @@ can be verified independently.
   selected-comparison contradictions, tokenizer-stable normalized-NLL
   continuations and byte counts, and exact-match confidence intervals for fully
   concordant samples.
+- Enforced at least 80% branch coverage for every maintained core and optional
+  package module in addition to the aggregate coverage gate.
 - Hardened public evidence carriers and coordinated package delivery with
   signer-authenticated pack integrity, independent anchors, byte-identical
   packaged indexes, credential-free external locators, matching add-in/core

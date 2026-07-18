@@ -241,6 +241,7 @@ def validate(
     receipt: Path,
     evidence: Path,
     trust_profile: Path,
+    verifier_public_key: Path | None = None,
     expected_runtime_image_digest: str | None = None,
     expected_request: Path | None = None,
     expected_request_root: Path | None = None,
@@ -265,14 +266,34 @@ def validate(
             handle.write(receipt_bytes)
             handle.flush()
             os.fsync(handle.fileno())
-        trust = load_trust_inputs(trust_profile)
-        key = serialization.load_pem_private_key(
-            trust.verifier_signing_key_bytes,
-            password=None,
+        public_key_bytes = (
+            read_regular_file_bytes(
+                verifier_public_key,
+                label="qualification verifier public key",
+                max_bytes=64 * 1024,
+            )
+            if verifier_public_key is not None
+            else None
         )
-        if not isinstance(key, ed25519.Ed25519PrivateKey):
-            raise ValueError("qualification verifier signing key must be Ed25519")
-        verifier_fingerprint = public_key_fingerprint(key.public_key())
+        trust = load_trust_inputs(
+            trust_profile,
+            verifier_key_bytes_override=public_key_bytes,
+        )
+        if verifier_public_key is None:
+            key = serialization.load_pem_private_key(
+                trust.verifier_signing_key_bytes,
+                password=None,
+            )
+            if not isinstance(key, ed25519.Ed25519PrivateKey):
+                raise ValueError("qualification verifier signing key must be Ed25519")
+            public_key = key.public_key()
+        else:
+            public_key = serialization.load_pem_public_key(
+                trust.verifier_signing_key_bytes
+            )
+            if not isinstance(public_key, ed25519.Ed25519PublicKey):
+                raise ValueError("qualification verifier public key must be Ed25519")
+        verifier_fingerprint = public_key_fingerprint(public_key)
         result = verify_signed_verification_receipt(
             snapshot,
             evidence,
@@ -375,6 +396,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--trust-profile", type=Path, required=True)
+    parser.add_argument(
+        "--verifier-public-key",
+        type=Path,
+        help=(
+            "Replay a completed receipt with this captured Ed25519 public key "
+            "instead of requiring the destroyed verifier signing key."
+        ),
+    )
     parser.add_argument("--expected-runtime-image-digest")
     parser.add_argument("--expected-request", type=Path)
     parser.add_argument("--expected-request-root", type=Path)
@@ -385,6 +414,7 @@ def main(argv: list[str] | None = None) -> int:
             receipt=arguments.receipt,
             evidence=arguments.evidence,
             trust_profile=arguments.trust_profile,
+            verifier_public_key=arguments.verifier_public_key,
             expected_runtime_image_digest=arguments.expected_runtime_image_digest,
             expected_request=arguments.expected_request,
             expected_request_root=arguments.expected_request_root,

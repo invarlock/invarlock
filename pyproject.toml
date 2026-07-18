@@ -220,7 +220,6 @@ omit = [
     "*/tests/*",
     "*/test_*",
     "*/__init__.py",
-    "src/*/__main__.py",
 ]
 
 [tool.coverage.report]

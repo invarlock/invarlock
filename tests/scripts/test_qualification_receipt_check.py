@@ -259,6 +259,49 @@ def test_qualification_receipt_check_binds_captured_signed_bytes(
     }
 
 
+def test_qualification_receipt_check_replays_after_private_key_destruction(
+    tmp_path: Path,
+) -> None:
+    receipt, evidence, profile, manifest_digest = _case(tmp_path)
+    verifier_key_path = profile.parent / "verifier.pem"
+    private_key = serialization.load_pem_private_key(
+        verifier_key_path.read_bytes(), password=None
+    )
+    assert isinstance(private_key, ed25519.Ed25519PrivateKey)
+    public_key_path = profile.parent / "verifier-public.pem"
+    public_key_path.write_bytes(
+        private_key.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    verifier_key_path.unlink()
+
+    result = validate(
+        receipt=receipt,
+        evidence=evidence,
+        trust_profile=profile,
+        verifier_public_key=public_key_path,
+    )
+
+    assert result["ok"] is True
+    assert result["pack_manifest_digest"] == manifest_digest
+    other_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    public_key_path.write_bytes(
+        other_key.public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    with pytest.raises(ValueError, match="does not match caller expectation"):
+        validate(
+            receipt=receipt,
+            evidence=evidence,
+            trust_profile=profile,
+            verifier_public_key=public_key_path,
+        )
+
+
 def test_qualification_receipt_check_rejects_substituted_bytes(
     tmp_path: Path,
 ) -> None:

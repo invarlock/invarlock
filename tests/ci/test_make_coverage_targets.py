@@ -14,11 +14,14 @@ def _target(name: str, next_name: str) -> str:
     return MAKEFILE.split(f"{name}:", 1)[1].split(f"{next_name}:", 1)[0]
 
 
-def test_coverage_uses_pytest_cov_without_custom_policy_code() -> None:
+def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
     block = _target("coverage", "coverage-addins")
     assert "--cov=src/invarlock" in block
     assert "--cov-branch" in block
     assert "--cov-fail-under=90" in block
+    assert "git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py'" in block
+    assert "grep -v '/__init__.py$$'" in block
+    assert '--include="$$source" --fail-under=80' in block
     assert "check_coverage_thresholds.py" not in MAKEFILE
     assert "scripts/evidence_packs" not in MAKEFILE
 
@@ -30,7 +33,10 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
         assert f"--include='addins/{package}/src/*'" in block
     assert "--cov-branch" in block
     assert "--cov-fail-under=80" in block
-    assert block.count("--fail-under=80") == 4
+    assert block.count("--fail-under=80") == 5
+    assert "git ls-files 'addins/*/src/**/*.py'" in block
+    assert "grep -v '/__init__.py$$'" in block
+    assert '--include="$$source" --fail-under=80' in block
     assert "ADDIN_COVERAGE_MIN" not in MAKEFILE
     assert "coverage-addins: coverage-linux-check" in MAKEFILE
     assert 'test "$$(uname -s)" = Linux' in MAKEFILE

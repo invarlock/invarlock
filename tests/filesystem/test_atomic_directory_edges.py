@@ -83,3 +83,39 @@ def test_missing_secure_directory_flags_fail_closed(
 
     with pytest.raises(AtomicDirectoryPublicationError, match="secure descriptor"):
         publish_directory_no_replace(staging, tmp_path / "published")
+
+
+def test_low_level_directory_open_rejects_relative_and_parent_traversal() -> None:
+    with pytest.raises(AtomicDirectoryPublicationError, match="absolute path"):
+        atomic_directory._open_directory(Path("relative"), label="test directory")
+
+    with pytest.raises(AtomicDirectoryPublicationError, match="parent traversal"):
+        atomic_directory._open_directory(
+            Path("/tmp/parent/../child"), label="test directory"
+        )
+
+
+def test_linux_directory_open_requires_path_only_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(atomic_directory.platform, "system", lambda: "Linux")
+    monkeypatch.delattr(atomic_directory.os, "O_PATH", raising=False)
+
+    with pytest.raises(AtomicDirectoryPublicationError, match="path-only"):
+        atomic_directory._directory_open_flags()
+
+
+def test_directory_binding_fails_closed_when_the_name_disappears(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "opened"
+    directory.mkdir()
+    descriptor = atomic_directory._open_directory(directory, label="test directory")
+    directory.rmdir()
+    try:
+        with pytest.raises(AtomicDirectoryPublicationError, match="identity changed"):
+            atomic_directory._require_directory_binding(
+                directory, descriptor, label="test directory"
+            )
+    finally:
+        atomic_directory.os.close(descriptor)
