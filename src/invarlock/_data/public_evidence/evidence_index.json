@@ -2,11 +2,137 @@
   "carrier_policy": {
     "installed_wheel": "compact_index_only"
   },
-  "entries": [],
-  "evidence_count": 0,
-  "evidence_file_count": 0,
-  "evidence_size_bytes": 0,
+  "entries": [
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:708366b6f9254fa3892b93aa2f0bfd2cb29edb50efb39498e202229799b4bd69",
+            "manifest.json": "sha256:04d491a65ceda40d1670a54eb8e2ab35d9f7ccd456da18ddbfed9f6a3ded429d",
+            "manifest.signature.json": "sha256:47378cbbaa0622d470346cc00aa849c768370dbbf83197cf035f63c8bddfac27"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence",
+          "size_bytes": 40290
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json",
+          "sha256": "sha256:ac185591374bf95a7380c756f40931ea29fc2aafc219bfbf5bd5b1c835c3262e",
+          "size_bytes": 1557
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/mistral-7b-weight-scale-hf",
+      "slug": "mistral-7b-weight-scale-hf",
+      "summary": "Strictly verified Mistral 7B text-causal comparison of an authenticated checkpoint and a 0.99-scaled derivative over one paired 16-record normalized-NLL schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:deb5c0b96941a34e1bcd61ef81a0df0162584ce4aa83ad8d65896a0a4cfe6a84",
+            "manifest.json": "sha256:b5fd8ff5f1a0f2dc8e819c4469f0f1254c22dc4dfe25549cee39b11a6051ac4a",
+            "manifest.signature.json": "sha256:5d524e57c241be739ed49a559ed5e070e0e44a51a0fdcd2e6889aadbd5cab38b"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/evidence",
+          "size_bytes": 22226
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/verification.receipt.json",
+          "sha256": "sha256:49c5e48297720366e40d5b83a1110d28c9615146bef01fba759db8357d353fe4",
+          "size_bytes": 1555
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal",
+      "slug": "qwen2-vl-2b-7b-multimodal",
+      "summary": "Strictly verified Qwen2-VL 2B-versus-7B vision-text exact-match runtime qualification on one authenticated paired record"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:00917fc7875bf58ca1124047704daddee3ceabc7c4c07472177ca06e8aedc6dd",
+            "manifest.json": "sha256:df2fd1f439712c3afbc42a5bf096ebe32097f9131d03a16b66750d639f552d79",
+            "manifest.signature.json": "sha256:45ac161d3eb2e1e108fdb238e4bc7b67e946382d81c4e3ba98562aa825f7c6bd"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/qwen2.5-0.5b-gguf-q8-q4/evidence",
+          "size_bytes": 23860
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/qwen2.5-0.5b-gguf-q8-q4/verification.receipt.json",
+          "sha256": "sha256:849537b9568e3dc079019a71fab5b21a6b52f001607272e51fa8c6e3c79ba0e0",
+          "size_bytes": 1551
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/qwen2.5-0.5b-gguf-q8-q4",
+      "slug": "qwen2.5-0.5b-gguf-q8-q4",
+      "summary": "Strictly verified Qwen2.5 0.5B GGUF Q8_0-versus-Q4_K_M exact-match runtime qualification on one authenticated paired record"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:aba842d5d740a3274e51df9970b472c1b91e1f999a34b32363ea350e9ddcc060",
+            "manifest.json": "sha256:91811e7063c51fb786c1848ea337a5db917bc845854b08f7db34c0c8cfee8f83",
+            "manifest.signature.json": "sha256:ff5f9cd23f27f4967f742cb4670c904f98d13a1f5a50da36ef6def4404bb2634"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/qwen2.5-14b-weight-scale-hf/evidence",
+          "size_bytes": 40152
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/qwen2.5-14b-weight-scale-hf/verification.receipt.json",
+          "sha256": "sha256:220b86fc0eeb178a44ccacceb22aea16b80687e796e0536aa04edf93ed64b0eb",
+          "size_bytes": 1558
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/qwen2.5-14b-weight-scale-hf",
+      "slug": "qwen2.5-14b-weight-scale-hf",
+      "summary": "Strictly verified Qwen2.5 14B text-causal comparison of an authenticated checkpoint and a 0.99-scaled derivative over one paired 16-record normalized-NLL schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:bd4829d7d9ff672ce23e1bf3b98264a7b21fb734897067e0a3e393ba2f586fef",
+            "manifest.json": "sha256:f350c5f1d265b0d96637004e1e9605b2f6cf97225406dc2241843a3bc99f6841",
+            "manifest.signature.json": "sha256:b90e54dc364145d5fab4393e198dce71a6dfdae43266fc430c3d893fd118d0a2"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/tinyllama-tensorrt-llm-checkpoints/evidence",
+          "size_bytes": 33348
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/tinyllama-tensorrt-llm-checkpoints/verification.receipt.json",
+          "sha256": "sha256:e7ab9fd2e68a220744396c5ee798f948777dd5ee9a135afd12bdc04351ff8530",
+          "size_bytes": 1560
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/tinyllama-tensorrt-llm-checkpoints",
+      "slug": "tinyllama-tensorrt-llm-checkpoints",
+      "summary": "Strictly verified TensorRT-LLM comparison of two authenticated TinyLlama 1.1B checkpoint engines over eight paired exact-match records"
+    }
+  ],
+  "evidence_count": 5,
+  "evidence_file_count": 130,
+  "evidence_size_bytes": 167657,
   "format_version": "invarlock/public-evidence-index-v1",
-  "status": "not_created",
-  "status_label": "Evidence not yet created"
+  "status": "available",
+  "status_label": "Evidence available"
 }

@@ -1,0 +1,8 @@
+{
+  "artifact_paths": {
+    "evidence_pack": "evidence",
+    "verification_receipt": "verification.receipt.json"
+  },
+  "format_version": "invarlock/public-evidence-meta-v1",
+  "summary": "Strictly verified Qwen2-VL 2B-versus-7B vision-text exact-match runtime qualification on one authenticated paired record"
+}

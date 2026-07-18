@@ -1,15 +1,34 @@
 # Publish public evidence
 
-Public evidence is a curated index of immutable `invarlock/evidence-pack-v1` directories
-and independently signed verification receipts. An empty index intentionally
-says **Evidence not yet created**; publication begins only after a pack and
-receipt pass strict verification and disclosure review.
+Public evidence is a curated index of immutable `invarlock/evidence-pack-v1`
+directories and independently signed verification receipts. The current index
+contains five strictly verified comparisons spanning the built-in Hugging Face
+text runtime and the first-party GGUF, vision-text, and TensorRT-LLM runtime
+packages. An empty index still has an explicit **Evidence not yet created**
+state; publication begins only after a pack and receipt pass strict
+verification and disclosure review.
 
 !!! tip "User guide"
 
     **Outcome:** Add one strictly verified evidence entry, publish it locally or as a hash-bound release asset, and keep the compact wheel index synchronized.
     **Audience:** Evidence maintainers preparing public, independently reviewable InvarLock artifacts.
     **Prerequisites:** An immutable signed evidence pack, a separately signed verification receipt, independently maintained anchors, permission to publish every record, and a clean repository checkout.
+
+## Published evidence
+
+| Comparison | Runtime | Paired records | Canonical metric |
+| --- | --- | ---: | --- |
+| Mistral 7B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 16 | Normalized NLL per expected UTF-8 byte |
+| Qwen2.5 14B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 16 | Normalized NLL per expected UTF-8 byte |
+| Qwen2.5 0.5B GGUF Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | 1 | Exact match |
+| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 1 | Exact match |
+| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 8 | Exact match |
+
+These entries qualify the signed evaluation transaction and its runtime
+bindings. The normalized-NLL entries measure expected-continuation likelihood
+over their authenticated schedules; the exact-match entries exercise the
+optional-runtime paths on bounded qualification schedules. Broader model
+quality conclusions require broader, task-specific evidence.
 
 ## Publication boundary
 

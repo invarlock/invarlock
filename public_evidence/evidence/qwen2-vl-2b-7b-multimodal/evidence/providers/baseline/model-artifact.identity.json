@@ -1,0 +1,1 @@
+{"artifact_format":"hf_snapshot","checkpoint_tree_sha256":"b364c4120702e7824d2b5b33da2309c41369ade1b46780bebdabfb4e6b343727","format_version":"invarlock/model-artifact-identity-v1","immutable_revision":"895c3a49bc3fa70a340399125c650a463535e71c","model_id":"Qwen/Qwen2-VL-2B-Instruct","tokenizer_metadata_sha256":"343a2aec7d93185db270af42c7f4ad787c0862a99e3bd5075afcf62397d68382"}

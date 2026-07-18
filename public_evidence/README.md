@@ -1,13 +1,17 @@
 # Public evidence
 
 This directory is the public index for evidence created with the canonical
-InvarLock transaction. Each published entry must contain an
-`invarlock/evidence-pack-v1`
-bundle and its independently signed verification receipt.
+InvarLock transaction. Each published entry contains an
+`invarlock/evidence-pack-v1` bundle and its independently signed verification
+receipt.
 
-No current evidence has been created yet. The index remains useful in this
-state because it distinguishes an empty evidence set from a missing or damaged
-publication surface.
+The current index carries five strictly verified comparisons across the
+built-in Hugging Face text runtime and the first-party GGUF, vision-text, and
+TensorRT-LLM runtime packages. The Hugging Face entries cover paired
+normalized-NLL schedules at 7B and 14B scale; the optional-runtime entries
+exercise their authenticated execution and evidence contracts. See the
+[publication guide](../docs/user-guide/public-evidence.md#published-evidence)
+for the complete inventory and interpretation boundary.
 
 When evidence is added, the source repository may carry the complete pack or a
 hash-bound external release asset. Installed wheels contain only the compact

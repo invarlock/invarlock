@@ -53,9 +53,10 @@ from the same canonical JSON.
   `invarlock-diagnostics` package. Their canonical outputs can be authenticated
   as observations but do not participate in acceptance.
 - Rebuilt documentation, diagrams, packaged contracts, workflows, and examples
-  around the closed transaction. The new public evidence index distinguishes
-  evidence not yet created under `invarlock/evidence-pack-v1` from a missing or
-  damaged index without relabeling evidence from earlier contracts.
+  around the closed transaction. The public index now carries five strictly
+  verified `invarlock/evidence-pack-v1` comparisons across Hugging Face text,
+  GGUF, vision-text, and TensorRT-LLM runtimes, while preserving an explicit
+  empty-state contract for future publication surfaces.
 - Coordinated source archives, core and add-in wheels, runtime images, signed
   canaries, artifact promotion, and final receipts under one reproducible
   release qualification flow, with at least 80% branch coverage required for
