@@ -46,9 +46,10 @@ Changelog = "https://github.com/invarlock/invarlock/blob/v0.12.1/CHANGELOG.md"
 # Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate
 # first-party distributions under addins/.
 hf = [
+  "accelerate>=1.14.0",
   "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
+  "transformers>=5.14.1",
+  "safetensors>=0.8.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",

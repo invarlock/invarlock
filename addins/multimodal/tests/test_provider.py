@@ -540,7 +540,11 @@ def test_scorer_executes_authenticated_vision_text_exact_match(
     class _Processor:
         def apply_chat_template(self, messages, **kwargs):  # noqa: ANN001
             assert messages[0]["content"][1]["text"] == prompt
-            assert kwargs == {"tokenize": False, "add_generation_prompt": True}
+            assert kwargs == {
+                "tokenize": False,
+                "add_generation_prompt": True,
+                "enable_thinking": False,
+            }
             return "<image>What animal is shown?"
 
         def __call__(self, **kwargs):  # noqa: ANN003

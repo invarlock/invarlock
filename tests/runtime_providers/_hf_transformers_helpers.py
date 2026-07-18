@@ -59,7 +59,7 @@ def _authenticated_test_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
         "_installed_backend_identity",
         lambda _model: RuntimeBackendIdentity(
             name="transformers+torch",
-            version="transformers=5.12.0;torch=2.11.0",
+            version="transformers=5.14.1;torch=2.11.0",
             source_sha256="3" * 64,
             binary_sha256="4" * 64,
             build_sha256="5" * 64,

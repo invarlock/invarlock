@@ -41,6 +41,7 @@ from invarlock.core.scorer_extension import (
     scorer_configuration_schema_sha256,
 )
 from invarlock.evaluation_run import EvaluationRunResult, load_runtime_side_evidence
+from invarlock.evaluation_runtime import CallerRuntimeResources
 from invarlock.evaluation_transaction import (
     EvaluationTransactionError,
     _prepare_output_parent,
@@ -924,6 +925,12 @@ def test_run_executor_converges_through_the_same_host_verifier_and_publication(
     request_path.write_text(yaml.safe_dump(request, sort_keys=False), encoding="utf-8")
 
     class Executor:
+        def resolve(self, **kwargs):
+            role = kwargs["role"]
+            return CallerRuntimeResources(
+                container_image_digest=expected_runtime_digests[role]
+            ).resolve(**kwargs)
+
         def execute(self, _request, *, registry, schedule_bytes, policy_digest):
             del registry
             assert (tmp_path / "artifacts").is_dir()

@@ -399,7 +399,7 @@ def test_backend_identity_binds_each_runtime_module(
 ) -> None:
     modules: dict[str, object] = {}
     for name, version in (
-        ("transformers", "5.12.0"),
+        ("transformers", "5.14.1"),
         ("torch", "2.11.0"),
         ("PIL", "12.3.0"),
     ):
@@ -413,7 +413,7 @@ def test_backend_identity_binds_each_runtime_module(
     identity = provider_module._backend_identity()
 
     assert identity.name == "huggingface-vision-text"
-    assert identity.version == "pillow=12.3.0;torch=2.11.0;transformers=5.12.0"
+    assert identity.version == "pillow=12.3.0;torch=2.11.0;transformers=5.14.1"
     assert identity.binary_sha256 is not None
 
     modules["PIL"].__version__ = ""  # type: ignore[attr-defined]
@@ -467,6 +467,67 @@ def test_runtime_boundary_rejects_each_untrusted_authority(
 
     with pytest.raises(ValueError, match=message):
         provider_module._require_runtime_boundary(context)
+
+
+def test_vision_text_model_loader_prefers_multimodal_auto_model() -> None:
+    multimodal_loader = SimpleNamespace(from_pretrained=lambda: None)
+    image_text_loader = SimpleNamespace(from_pretrained=lambda: None)
+    vision_seq_loader = SimpleNamespace(from_pretrained=lambda: None)
+    transformers = SimpleNamespace(
+        AutoModelForMultimodalLM=multimodal_loader,
+        AutoModelForImageTextToText=image_text_loader,
+        AutoModelForVision2Seq=vision_seq_loader,
+    )
+
+    selected = provider_module._resolve_vision_text_model_loader(transformers)
+
+    assert selected is multimodal_loader.from_pretrained
+
+
+@pytest.mark.parametrize(
+    ("transformers", "expected"),
+    [
+        pytest.param(
+            SimpleNamespace(
+                AutoModelForMultimodalLM=SimpleNamespace(from_pretrained=None),
+                AutoModelForImageTextToText=SimpleNamespace(
+                    from_pretrained=lambda: "image-text"
+                ),
+                AutoModelForVision2Seq=SimpleNamespace(
+                    from_pretrained=lambda: "vision-seq"
+                ),
+            ),
+            "image-text",
+            id="image-text-fallback",
+        ),
+        pytest.param(
+            SimpleNamespace(
+                AutoModelForVision2Seq=SimpleNamespace(
+                    from_pretrained=lambda: "vision-seq"
+                )
+            ),
+            "vision-seq",
+            id="vision-seq-fallback",
+        ),
+    ],
+)
+def test_vision_text_model_loader_uses_available_fallback(
+    transformers: SimpleNamespace, expected: str
+) -> None:
+    selected = provider_module._resolve_vision_text_model_loader(transformers)
+
+    assert selected() == expected
+
+
+def test_vision_text_model_loader_failure_names_supported_apis() -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "AutoModelForMultimodalLM.*AutoModelForImageTextToText"
+            ".*AutoModelForVision2Seq"
+        ),
+    ):
+        provider_module._resolve_vision_text_model_loader(SimpleNamespace())
 
 
 def test_prepare_open_score_receipt_and_close_lifecycle(

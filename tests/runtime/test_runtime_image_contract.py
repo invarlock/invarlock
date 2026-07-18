@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 ROOT = Path.cwd()
@@ -83,6 +84,7 @@ def test_runtime_input_is_the_core_plus_canonical_hf_dependencies() -> None:
         "rich",
         "pyyaml",
         "jsonschema",
+        "accelerate",
         "torch",
         "transformers",
         "safetensors",
@@ -97,7 +99,6 @@ def test_runtime_input_is_the_core_plus_canonical_hf_dependencies() -> None:
     }
     assert observed == required
     for retired in (
-        "accelerate",
         "autoawq",
         "bitsandbytes",
         "compressed-tensors",
@@ -110,6 +111,26 @@ def test_runtime_input_is_the_core_plus_canonical_hf_dependencies() -> None:
         "torchvision",
     ):
         assert retired not in text.lower()
+
+
+def test_hf_extra_declares_fp8_runtime_support() -> None:
+    project = tomllib.loads(ROOT.joinpath("pyproject.toml").read_text(encoding="utf-8"))
+    requirements = project["project"]["optional-dependencies"]["hf"]
+
+    assert any(str(item).startswith("accelerate>=1.14.0") for item in requirements)
+    assert any(str(item).startswith("safetensors>=0.8.0") for item in requirements)
+
+
+def test_runtime_smokes_assert_the_supported_hf_stack() -> None:
+    makefile = ROOT.joinpath("Makefile").read_text(encoding="utf-8")
+
+    for expected in (
+        "import accelerate, safetensors, torch, transformers",
+        "accelerate.__version__ == '1.14.0'",
+        "safetensors.__version__ == '0.8.0'",
+        "transformers.__version__ == '5.14.1'",
+    ):
+        assert makefile.count(expected) == 2
 
 
 def test_runtime_platform_locks_are_cpu_only_and_hash_locked() -> None:
@@ -163,9 +184,9 @@ def test_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
     assert "nvidia-cuda-runtime-cu12==" in text
     assert "triton==" in text
     assert "--hash=sha256:" in text
-    assert "transformers==5.12.0" in text
-    assert "safetensors==0.7.0" in text
-    assert "accelerate==" not in text
+    assert "accelerate==1.14.0" in text
+    assert "transformers==5.14.1" in text
+    assert "safetensors==0.8.0" in text
     assert "bitsandbytes==" not in text
     assert "gptqmodel==" not in text
 

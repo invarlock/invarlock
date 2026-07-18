@@ -70,12 +70,31 @@ def test_provider_addins_require_the_exact_matching_core_release() -> None:
     multimodal_runtime = multimodal_dependencies["runtime"]
     assert isinstance(multimodal_runtime, list)
     assert not any(str(item).startswith("pillow>=") for item in multimodal_runtime)
+    assert any(str(item).startswith("accelerate>=") for item in multimodal_runtime)
     assert any(str(item).startswith("protobuf>=") for item in multimodal_runtime)
     assert any(str(item).startswith("sentencepiece>=") for item in multimodal_runtime)
     assert any(str(item).startswith("tiktoken>=") for item in multimodal_runtime)
     assert any(str(item).startswith("torch>=") for item in multimodal_runtime)
     assert any(str(item).startswith("torchvision>=") for item in multimodal_runtime)
     assert any(str(item).startswith("transformers>=") for item in multimodal_runtime)
+    assert any(
+        str(item).startswith("safetensors>=0.8.0") for item in multimodal_runtime
+    )
+
+
+def test_multimodal_smoke_exercises_the_current_runtime_surface() -> None:
+    makefile = (ADDINS["multimodal"] / "Makefile").read_text(encoding="utf-8")
+
+    for expected in (
+        "import accelerate, safetensors, torch, torchvision, transformers",
+        "accelerate.__version__ == '1.14.0'",
+        "safetensors.__version__ == '0.8.0'",
+        "transformers.__version__ == '5.14.1'",
+        "_resolve_vision_text_model_loader",
+        "transformers.AutoModelForMultimodalLM",
+        "{'gemma4', 'qwen3_5'} <= model_types",
+    ):
+        assert expected in makefile
 
 
 def test_provider_images_expose_the_invarlock_front_door() -> None:

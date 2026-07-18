@@ -12,7 +12,7 @@ import re
 import stat
 import time
 import warnings
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import cast
@@ -107,9 +107,32 @@ _REQUIRED_SETTINGS = frozenset(
     }
 )
 
+_VISION_TEXT_MODEL_LOADERS = (
+    "AutoModelForMultimodalLM",
+    "AutoModelForImageTextToText",
+    "AutoModelForVision2Seq",
+)
+
 
 def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _resolve_vision_text_model_loader(
+    transformers: object,
+) -> Callable[..., object]:
+    """Select the first supported offline vision-text model loader."""
+
+    for name in _VISION_TEXT_MODEL_LOADERS:
+        loader = getattr(transformers, name, None)
+        candidate = getattr(loader, "from_pretrained", None)
+        if callable(candidate):
+            return cast(Callable[..., object], candidate)
+    expected = ", ".join(_VISION_TEXT_MODEL_LOADERS)
+    raise RuntimeError(
+        "transformers vision-text auto model is unavailable; expected callable "
+        f"from_pretrained on one of: {expected}"
+    )
 
 
 def _required_digest(settings: Mapping[str, JSONScalar], name: str) -> str:
@@ -558,7 +581,10 @@ class HFVisionTextScorer:
                         }
                     ]
                     rendered = apply_template(
-                        messages, tokenize=False, add_generation_prompt=True
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=True,
+                        enable_thinking=False,
                     )
                     if not isinstance(rendered, str) or not rendered:
                         raise RuntimeError("vision-text chat template returned no text")
@@ -910,15 +936,7 @@ class HFVisionTextProvider:
         processor_from_pretrained = getattr(processor_loader, "from_pretrained", None)
         if not callable(processor_from_pretrained):
             raise RuntimeError("transformers AutoProcessor is unavailable")
-        model_from_pretrained = None
-        for name in ("AutoModelForImageTextToText", "AutoModelForVision2Seq"):
-            loader = getattr(transformers, name, None)
-            candidate = getattr(loader, "from_pretrained", None)
-            if callable(candidate):
-                model_from_pretrained = candidate
-                break
-        if model_from_pretrained is None:
-            raise RuntimeError("transformers vision-text auto model is unavailable")
+        model_from_pretrained = _resolve_vision_text_model_loader(transformers)
         processor = processor_from_pretrained(
             str(checkpoint), local_files_only=True, trust_remote_code=False
         )

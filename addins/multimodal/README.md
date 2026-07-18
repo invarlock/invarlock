@@ -124,6 +124,17 @@ Both comparison sides declare these settings:
 `AutoProcessor` has been loaded locally. Runtime loading always uses
 `local_files_only=True`, `trust_remote_code=False`, and safetensors.
 
+For processors with an optional reasoning template, scoring renders the user
+turn with `enable_thinking=False`. This keeps the authenticated exact-match
+output limited to the requested answer instead of an unevaluated reasoning trace.
+Some Qwen templates represent this mode with a closed, empty `<think>` block
+inside the prompt; the scorer removes the complete prompt token prefix before
+decoding, so that control prefix is not part of the exact-match output.
+Before allocating a GPU to a new processor family, render one frozen record
+offline from the exact local snapshot and confirm that the no-thinking template
+is deterministic, contains the expected image placeholder, and differs from
+the family default only where the template intentionally adds reasoning.
+
 The add-in owns its reproducible image layer. Build it on the exact digest of a
 canonical InvarLock CUDA image, then run the offline CUDA/import smoke:
 
@@ -150,6 +161,9 @@ make -C addins/multimodal smoke IMAGE=invarlock-hf-vision-text:local
 The Dockerfile builds the add-in wheel from this checkout and installs Pillow
 12.3.0 from a generated, hash-pinned Linux lock. Torch, Transformers,
 safetensors, and the core CLI are inherited from the exact base-image digest.
+The maintained smoke also checks Accelerate 1.14.0, Transformers 5.14.1,
+Safetensors 0.8.0, and the real generic multimodal auto-model mapping for the
+Gemma 4 and Qwen 3.5/3.6 configuration families.
 
 The qualification command uses the resulting digest-pinned image:
 

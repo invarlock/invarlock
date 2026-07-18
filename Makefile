@@ -528,7 +528,7 @@ runtime-smoke:  ## Check the canonical runtime image imports
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE) \
-		-c "import torch, transformers, safetensors; print('runtime image imports ok')"
+		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; print('runtime image imports ok')"
 
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the runtime image with Podman
@@ -541,7 +541,7 @@ runtime-smoke-cuda:  ## Confirm the CUDA runtime imports and sees an NVIDIA GPU
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE_CUDA) \
-		-c "import torch, transformers, safetensors; assert torch.version.cuda == '12.8'; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
+		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.version.cuda == '12.8'; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: runtime-smoke-cuda  ## Smoke the CUDA runtime image with Podman

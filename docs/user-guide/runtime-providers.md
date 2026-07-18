@@ -469,6 +469,14 @@ loaded processor with `processor_contract_sha256`; the provider loads the
 checkpoint and processor with local-files-only behavior, disabled remote code,
 and safetensors.
 
+The scorer requests the processor's no-thinking chat-template mode before
+generation so exact-match output contains the requested answer rather than an
+unevaluated reasoning trace. A processor may encode disabled reasoning as a
+closed, empty reasoning block in the prompt; prompt tokens are excluded from
+the decoded exact-match output. For a newly qualified model family, render a
+frozen record from the exact offline processor snapshot before GPU allocation and
+confirm the template is deterministic and binds exactly one image placeholder.
+
 Build the add-in image from the exact digest of the canonical CUDA image and
 qualify it through `evaluate`, `verify`, and `report` on the target GPU. The
 [add-in guide](https://github.com/invarlock/invarlock/blob/main/addins/multimodal/README.md)
