@@ -7,179 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This release centers InvarLock on paired model release-regression evaluation:
-authenticate the inputs, execute or import both sides over the same schedule,
-derive a policy decision from replayable record facts, and publish evidence that
-can be verified independently.
+This release refocuses InvarLock on one paired model release-regression evaluation.
+A closed request authenticates the baseline and subject artifacts,
+dataset, providers, runtimes, policy, metric or deterministic scorer, execution
+mode, and evidence destination. `invarlock evaluate request.yaml` executes or
+imports both sides over one deterministic schedule, publishes a canonical
+signed evidence bundle, and records the paired policy result. `invarlock verify
+evidence/` replays that bundle against independently supplied trust anchors,
+while `invarlock report evidence/` renders the signer-authenticated comparison
+from the same canonical JSON.
 
 ### Added
 
-- Added one closed evaluation request that binds the baseline, subject, dataset,
-  runtime providers, policy, selected metric or scorer, execution mode, and
-  evidence destination. Digest-pinned JSONL input produces one deterministic
-  paired schedule with stable record IDs and input hashes.
-- Added canonical evidence bundles with Ed25519 signatures, typed provider
-  identities, per-side runtime bindings, paired records, verifier-derived
-  scores, complete inventories, and checksums. Independently signed receipts bind
-  caller-supplied artifact, schedule, policy, runtime, evidence-signer, and
-  verifier identities, with verifier-owned trust profiles providing those
-  anchors as one digest-bound unit.
-- Added execution-free preflight for request structure, authenticated local
-  artifacts, schedule preparation, policy, provider capabilities, signing keys,
-  output destinations, locally available digest-pinned runtime images, and
-  caller-owned schedule-bound resources. Side workers repeat resource
-  authentication before model preparation and use the same immutable schedule
-  snapshot for scoring. Optional-provider qualification also verifies that the
-  selected host interpreter resolves the matching installed distribution,
-  approved entry point, provider identity, and ABI before conformance or
-  runtime readiness. The public evaluation transaction always completes this
-  gate before worker launch; `--preflight` stops at that boundary for inspection.
-- Added a compact, task-bound runtime-provider ABI. Hugging Face Transformers is
-  the built-in text-causal provider; GGUF/llama.cpp, TensorRT-LLM, and Hugging
-  Face vision-text execution are first-party optional packages using the same
-  structured input, schedule, evidence, and report contracts.
-- Added paired exact-match regression statistics with baseline-pass to
-  subject-fail regressions, improvements, an exact two-sided McNemar
-  probability, and a Newcombe 95% effect-size interval. Normalized negative
-  log-likelihood per expected UTF-8 byte uses a 95% paired schedule-resampling interval.
-  Comparable tokenizer contracts enable a
-  perplexity ratio as a verifier-derived likelihood interpretation.
-- Added a bounded verifier-replayable scorer extension for deterministic text
-  output, with request- and policy-bound identity, version, configuration, and
-  descriptor digests while verdict authority remains in the core verifier.
-- Added authenticated observation attachments, a typed external-record authoring
-  kit, and the optional `invarlock-diagnostics` package for spectral,
-  random-matrix, and variance summaries outside the acceptance calculation.
-- Added the `invarlock.engine` embedding facade and offline accepted,
-  rejected, and tamper-detection examples that demonstrate independent evidence
-  signing and verification.
-- Added isolated host-to-OCI execution with digest-pinned baseline and subject
-  workers, closed CPU/CUDA selection, disabled networking, read-only inputs,
-  caller-owned CPU and memory ceilings, non-root identities, finite worker
-  deadlines, host-only signing, locked CPU and CUDA Hugging Face images, and
-  add-in-owned qualification targets for GGUF, TensorRT-LLM, and vision-text
-  runtimes.
+- Added one closed evaluation request that authenticates the baseline, subject,
+  dataset, runtime providers, policy, selected metric or scorer, execution mode,
+  and evidence destination. Digest-pinned JSONL input now produces stable record
+  identities and one immutable paired schedule shared by both sides.
+- Added paired exact-match regression statistics covering regressions,
+  improvements, an exact two-sided McNemar probability, and a paired Newcombe
+  95% effect-size interval. Normalized negative log-likelihood per expected
+  UTF-8 byte uses a paired schedule-resampling interval, with the perplexity ratio as a verifier-derived likelihood
+  interpretation when tokenizer contracts are comparable.
+- Added a bounded deterministic scorer extension whose per-record results remain
+  subject to verifier-owned aggregation, confidence intervals, policy, and
+  verdict calculation.
+- Added canonical evidence bundles with typed provider and runtime identities,
+  paired records, observations, inventories, checksums, and Ed25519 signatures.
+  Separately signed receipts and verifier-owned trust profiles bind the caller's
+  artifacts, schedule, policy, runtime, evidence signer, and verifier anchors.
+- Added execution-free preflight, isolated host-to-OCI run mode, and the
+  `invarlock.engine` embedding facade. The accepted, rejected, and tamper
+  examples now execute from a clean Git export with every required fixture
+  tracked.
 
 ### Changed
 
-- Consolidated the public workflow into `invarlock evaluate request.yaml`,
-  `invarlock verify evidence/`, and `invarlock report evidence/`; executed and
-  imported records now enter the same publication and verification transaction.
-- Centered acceptance on verifier-replayable paired behavioral comparisons under
-  verifier-owned policy. Transformation and training systems provide artifacts
-  and receipts, while other assessments can be carried as authenticated
-  observations. Normalized NLL is defined specifically as teacher-forced
-  expected-continuation likelihood regression with prompt tokens excluded from
-  the loss.
-- Replaced the earlier policy and evidence vocabulary with explicit
-  `metrics.exact_match.delta_min_pp`, `exact_match_delta_pp`, and
-  `metrics.normalized_nll_per_utf8_byte.ratio_max` fields; canonical manifest,
-  signature, and verification-result formats are now namespaced under
-  `invarlock/`, with packaged contract data as the schema authority.
-- Consolidated reporting around canonical JSON, one console renderer, and one
-  self-contained HTML renderer, and rebuilt the documentation around the
-  three-command journey, decision semantics, assurance model, key lifecycle,
-  provider packages, and embeddable engine.
-- Coordinated the core, diagnostics, GGUF, vision-text, and TensorRT-LLM
-  distributions under one release version and compatible core dependency line.
+- Consolidated the public workflow around `invarlock evaluate`, `invarlock
+  verify`, and `invarlock report`, with executed and imported records entering
+  the same canonical publication and independent-verification transaction.
+- Kept Hugging Face Transformers as the built-in text-causal provider while
+  moving GGUF/llama.cpp, TensorRT-LLM, and Hugging Face vision-text execution
+  into coordinated first-party optional distributions using the same request,
+  schedule, evidence, verification, and reporting contracts.
+- Moved spectral, random-matrix, and variance calculations to the optional
+  `invarlock-diagnostics` package. Their canonical outputs can be authenticated
+  as observations but do not participate in acceptance.
+- Rebuilt documentation, diagrams, packaged contracts, workflows, and examples
+  around the closed transaction. The new public evidence index distinguishes
+  evidence not yet created under `invarlock/evidence-pack-v1` from a missing or
+  damaged index without relabeling evidence from earlier contracts.
+- Coordinated source archives, core and add-in wheels, runtime images, signed
+  canaries, artifact promotion, and final receipts under one reproducible
+  release qualification flow, with at least 80% branch coverage required for
+  every maintained Python module as well as the aggregate suite.
 
 ### Removed
 
-- Removed the multi-command and catalog orchestration surfaces, built-in
-  edit/training/quantization workflows, the custom observability stack, and
-  duplicate report surfaces.
-- Removed the broad masked-LM, sequence-to-sequence, and multimodal adapter set
-  from built-in execution. The core provider now focuses on paired text-causal
-  decisions; vision-text execution and diagnostic measurements live in bounded
-  optional packages.
+- Removed multi-command catalog and calibration orchestration, built-in editing,
+  training and quantization producers, the custom observability stack, and
+  duplicate report formats from the core.
+- Removed broad masked-LM and sequence-to-sequence adapter surfaces from built-in
+  execution. Transformation systems now provide authenticated artifacts and
+  receipts, while bounded vision-text execution remains an optional package.
 
 ### Fixed
 
-- Rejected worker-unreadable artifact and support mounts on the host before
-  container launch with an actionable permission diagnostic. Checkpoints written
-  mode `0600` (safetensors 0.8.0 and later) previously surfaced only as an
-  opaque in-container authentication failure for the non-root worker user.
-- Hardened trust profiles, policy and key loading, checkpoint traversal, evidence
-  publication, verification receipts, and the reusable verification action with
-  descriptor-anchored no-symlink reads, immutable captured inputs, bounded
-  snapshots, injection-resistant arguments, atomic no-replace outputs, and
-  explicit POSIX platform metadata. Signed qualification receipts can be
-  replayed after verifier-key destruction with a separately captured Ed25519
-  public key while retaining the original trust-profile digest and independent
-  anchors.
-- Made preflight and replay fail closed across artifact authentication, provider
-  and scorer capabilities, side roles, schedules, policies, OCI image digests,
-  selected comparisons, and imported-record publication.
-- Hardened strict Hugging Face loading and checkpoint rebinding to reject corrupt
-  safetensors, incomplete or mismatched loader state, ambiguous tensor mappings,
-  and unauthenticated live parameters. Canonical prefix layouts,
-  storage-proven tied weights, inferred dtype metadata, non-persistent buffers,
-  and historical GPT-2 causal masks retain exact or canonical validation.
-- Hardened TensorRT-LLM engine and runner authentication against path races and
-  caller substitution, closed the runner request boundary around canonical JSON,
-  and sized bounded worker scratch from the authenticated engine bundle. Runtime
-  qualification binds verification to the exact pack published by evaluation,
-  rejects mismatched output destinations before runtime execution, requires
-  canary image references to carry the claimed digest, preserves path-valued
-  inputs and structured failure diagnostics, validates verifier trust inputs
-  before expensive execution, and centralizes runtime qualification on one
-  readiness-to-report transaction. Qualification now authenticates the Git
-  source archive and matching image labels, separates OCI config identities
-  from exact repository manifests, executes from one private archive-backed
-  source snapshot, matches candidate wheel package bytes to that source, and
-  executes the candidate core and maintained add-ins through an isolated,
-  interpreter-bound bootstrap that does not process ambient import hooks. A
-  maintained no-clobber helper creates the canonical candidate-wheel manifest.
-  The private summary binds that manifest, wheel digests, and
-  interpreter digest alongside the complete normalized request. Qualification
-  independently validates the final signed receipt and renderer-observed pack
-  identity before recording success. Non-canary qualification now requires a
-  strictly passing, independently reverified canary pack for the exact
-  runtime-image digest and matching provider/task class, while TensorRT-LLM
-  readiness authenticates its
-  tokenizer contract and engine limits before starting a worker. Maintained
-  image builds consume source bytes authenticated against the named Git object
-  instead of a live worktree and can retain a canonical statement binding the
-  Dockerfile, build arguments, platform, base image, and final image ID.
-  Layered builds require a Dockerfile-compatible named manifest for every base,
-  bind the inspected source-labelled base to the exact `FROM` argument, and
-  distinguish that manifest from local config IDs used for execution.
-  Qualification targets require an explicit
-  device while forwarding the same CPU, memory, and user limits across built-in
-  and optional providers. GGUF image builds reject malformed archive snapshots
-  and unsupported build parallelism before invoking Docker. GGUF readiness now
-  authenticates the artifact, backend executable, and backend source bytes
-  without executing native backend code. Fixed inputs can remain read-only.
-  Non-root workers and TensorRT runner subprocesses now use private writable
-  compiler caches and path-only Linux directory descriptors so model loading
-  and atomic publication retain the least-privilege boundary. TensorRT canaries
-  authenticate the complete engine tree, tokenizer contract, immutable image,
-  and canonical mount root on the host before GPU allocation, then exercise the
-  same numeric worker identity. Developer image smokes forbid implicit pulls
-  and use read-only, capability-free, resource-bounded containers. Closed
-  numeric identity labels support libraries that otherwise require a host
-  account lookup. Vision-text images also include the required build inputs and
-  CUDA-matched TorchVision.
-- Corrected metric and replay semantics for imported scorer declarations,
-  selected-comparison contradictions, tokenizer-stable normalized-NLL
-  continuations and byte counts, and exact-match confidence intervals for fully
-  concordant samples.
-- Enforced at least 80% branch coverage for every maintained core and optional
-  package module in addition to the aggregate coverage gate.
-- Hardened public evidence carriers and coordinated package delivery with
-  signer-authenticated pack integrity, independent anchors, byte-identical
-  packaged indexes, credential-free external locators, matching add-in/core
-  versions, checkout-matched wheel and source-archive payloads for every
-  first-party distribution, source-matched install metadata, a hash-pinned
-  coordinated dependency closure exercised in a disposable environment, and
-  immutable distribution digest ledgers carried through attestation and
-  publication. Secret findings stop release work before distributions are built
-  or uploaded. Post-publication verification now requires hosted filenames,
-  index digests, and downloaded bytes to match that build ledger exactly, and
-  TestPyPI smoke installs those ledger-selected bytes. Tag validation, TestPyPI
-  qualification, and production publication are separate stages; production
-  reuses the exact promoted artifacts only after binding the tag, commit,
-  workflow result, promotion run, and digest ledger.
+- Hardened trust profiles, policies, keys, checkpoint trees, provider resources,
+  evidence publication, and receipt replay with bounded descriptor-anchored
+  reads, immutable snapshots, and rejection of symlink or path substitution.
+- Hardened Hugging Face loading against corrupt or incompletely bound
+  safetensors and unauthenticated live parameters while preserving validated
+  canonical layouts and storage-proven tied weights.
+- Hardened GGUF and TensorRT-LLM readiness so authenticated models, executables,
+  engine layouts, tokenizer contracts, runner protocols, immutable images, and
+  resource limits are checked before native execution or GPU allocation.
+- Fixed worker-unreadable artifact and support mounts to fail on the host with
+  an actionable diagnostic before container launch instead of an opaque runtime
+  authentication error.
+- Fixed release qualification so deterministic source archives, matching wheel
+  bytes, image labels, signed canaries, rendered packs, verification receipts,
+  and promoted artifact digests must remain bound to the same candidate. The
+  clean-export safeguard prevents ignored local fixtures from producing a false
+  green result.
 
 ## [0.12.1] - 2026-07-05
 
