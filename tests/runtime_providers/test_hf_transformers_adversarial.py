@@ -455,8 +455,53 @@ def _qwen3_5_test_model() -> object:
     return transformers.Qwen3_5ForCausalLM(config)
 
 
+def _qwen3_5_multimodal_test_model() -> object:
+    transformers = pytest.importorskip("transformers")
+    text_config = transformers.Qwen3_5TextConfig(
+        vocab_size=32,
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=8,
+        max_position_embeddings=64,
+        layer_types=["full_attention"],
+    )
+    vision_config = transformers.Qwen3_5VisionConfig(
+        depth=1,
+        hidden_size=16,
+        intermediate_size=32,
+        num_heads=2,
+        patch_size=2,
+        spatial_merge_size=1,
+        temporal_patch_size=1,
+        out_hidden_size=16,
+        num_position_embeddings=16,
+    )
+    config = transformers.Qwen3_5Config(
+        text_config=text_config,
+        vision_config=vision_config,
+        image_token_id=30,
+        video_token_id=29,
+        vision_start_token_id=28,
+        vision_end_token_id=27,
+    )
+    return transformers.Qwen3_5ForConditionalGeneration(config)
+
+
 def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
     model = _qwen3_5_test_model()
+
+    assert hf._qwen3_5_non_executing_checkpoint_keys(
+        set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
+        live_state={"model.weight": object()},
+        model=model,
+    ) == set(_EXPECTED_QWEN3_5_MTP_KEYS)
+
+
+def test_qwen3_5_multimodal_exact_mtp_inventory_is_explicitly_non_executing() -> None:
+    model = _qwen3_5_multimodal_test_model()
 
     assert hf._qwen3_5_non_executing_checkpoint_keys(
         set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
@@ -523,6 +568,34 @@ def test_real_qwen_causal_checkpoint_accepts_exact_nonexecuting_mtp(
 
     assert type(model) is transformers.Qwen3_5ForCausalLM
     assert model.config.model_type == "qwen3_5_text"
+    assert not any(key.startswith("mtp.") for key in model.state_dict())
+    hf._require_safetensors_match(tmp_path, model=model)
+
+
+def test_real_qwen_multimodal_checkpoint_accepts_exact_nonexecuting_mtp(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for index, key in enumerate(sorted(_EXPECTED_QWEN3_5_MTP_KEYS)):
+        tensors[key] = torch.tensor([float(index)])
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    assert type(model) is transformers.Qwen3_5ForConditionalGeneration
+    assert model.config.model_type == "qwen3_5"
     assert not any(key.startswith("mtp.") for key in model.state_dict())
     hf._require_safetensors_match(tmp_path, model=model)
 

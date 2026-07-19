@@ -352,18 +352,34 @@ def _qwen3_5_non_executing_checkpoint_keys(
         qwen_module = importlib.import_module(
             "transformers.models.qwen3_5.modeling_qwen3_5"
         )
-        expected_class = qwen_module.Qwen3_5ForCausalLM
+        expected_causal_class = qwen_module.Qwen3_5ForCausalLM
+        expected_multimodal_class = qwen_module.Qwen3_5ForConditionalGeneration
     except (AttributeError, ImportError) as exc:
         raise RuntimeError(
             "strict HF native Qwen3.5 compatibility profile is unavailable"
         ) from exc
     model_class = model.__class__
     config = getattr(model, "config", None)
+    accepted_native_profiles = (
+        (
+            expected_causal_class,
+            "qwen3_5_text",
+            [r"^mtp.*", r"^model.visual.*"],
+        ),
+        (
+            expected_multimodal_class,
+            "qwen3_5",
+            [r"^mtp.*"],
+        ),
+    )
     if (
-        model_class is not expected_class
-        or getattr(config, "model_type", None) != "qwen3_5_text"
-        or getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
-        != [r"^mtp.*", r"^model.visual.*"]
+        not any(
+            model_class is native_class
+            and getattr(config, "model_type", None) == model_type
+            and getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
+            == ignored_keys
+            for native_class, model_type, ignored_keys in accepted_native_profiles
+        )
         or mtp_keys != _QWEN3_5_NON_EXECUTING_MTP_KEYS
     ):
         raise ValueError(
