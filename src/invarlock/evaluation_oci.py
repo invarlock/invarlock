@@ -9,6 +9,7 @@ import stat
 import subprocess
 import tempfile
 import threading
+import time
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -91,6 +92,8 @@ _MAX_OUTER_WORKER_TIMEOUT_SECONDS = 24 * 60 * 60
 _WORKER_TIMEOUT_ALLOWANCE_CALLS = 2
 _CONTAINER_STOP_SECONDS = 5
 _CONTAINER_CONTROL_TIMEOUT_SECONDS = 10
+_WORKER_DRAIN_JOIN_SECONDS = 0.5
+_WORKER_DRAIN_POLL_SECONDS = 0.01
 _DEFAULT_WORKER_TMPFS_GIB = 4
 _MAX_WORKER_TMPFS_GIB = 64
 _TENSORRT_ENGINE_COPY_FACTOR = 2
@@ -930,15 +933,41 @@ def compose_side_worker_command(
     return command
 
 
-def _read_bounded_stream(stream: object, destination: bytearray) -> None:
+def _read_bounded_stream(
+    stream: object, destination: bytearray, stop: threading.Event
+) -> None:
     """Drain one worker pipe while retaining only bounded diagnostics."""
 
     reader = getattr(stream, "read", None)
     if not callable(reader):
         return
-    while chunk := reader(8192):
+    fileno = getattr(stream, "fileno", None)
+    if callable(fileno):
+        try:
+            os.set_blocking(fileno(), False)
+        except (OSError, ValueError):
+            pass
+    while not stop.is_set():
+        try:
+            chunk = reader(8192)
+        except BlockingIOError:
+            stop.wait(_WORKER_DRAIN_POLL_SECONDS)
+            continue
+        except (OSError, ValueError):
+            return
+        if chunk is None:
+            stop.wait(_WORKER_DRAIN_POLL_SECONDS)
+            continue
+        if not chunk:
+            return
         if len(destination) < _MAX_WORKER_DIAGNOSTIC_BYTES:
             destination.extend(chunk[: _MAX_WORKER_DIAGNOSTIC_BYTES - len(destination)])
+
+
+def _join_worker_drains(drains: Sequence[threading.Thread]) -> None:
+    deadline = time.monotonic() + _WORKER_DRAIN_JOIN_SECONDS
+    for drain in drains:
+        drain.join(timeout=max(0.0, deadline - time.monotonic()))
 
 
 def _worker_cidfile(command: Sequence[str]) -> Path | None:
@@ -1018,6 +1047,7 @@ def run_side_worker(
             list(command),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            bufsize=0,
         )
     except OSError as exc:
         raise OciEvaluationError(
@@ -1025,18 +1055,19 @@ def run_side_worker(
         ) from exc
     stdout = bytearray()
     stderr = bytearray()
+    stop_drains = threading.Event()
     assert process.stdout is not None
     assert process.stderr is not None
     drains = (
         threading.Thread(
             target=_read_bounded_stream,
-            args=(process.stdout, stdout),
+            args=(process.stdout, stdout, stop_drains),
             name="invarlock-worker-stdout",
             daemon=True,
         ),
         threading.Thread(
             target=_read_bounded_stream,
-            args=(process.stderr, stderr),
+            args=(process.stderr, stderr, stop_drains),
             name="invarlock-worker-stderr",
             daemon=True,
         ),
@@ -1045,17 +1076,20 @@ def run_side_worker(
         drain.start()
     timed_out = False
     try:
-        returncode = process.wait(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        _terminate_timed_out_worker(process, command, cidfile)
-        returncode = 124
-    for drain in drains:
-        drain.join()
-    process.stdout.close()
-    process.stderr.close()
-    if cidfile is not None:
-        cidfile.unlink(missing_ok=True)
+        try:
+            returncode = process.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _terminate_timed_out_worker(process, command, cidfile)
+            returncode = 124
+        _join_worker_drains(drains)
+    finally:
+        stop_drains.set()
+        process.stdout.close()
+        process.stderr.close()
+        _join_worker_drains(drains)
+        if cidfile is not None:
+            cidfile.unlink(missing_ok=True)
     if timed_out:
         diagnostic = f"worker exceeded its {timeout_seconds}-second outer deadline"
         if stderr:

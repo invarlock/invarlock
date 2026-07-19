@@ -4,6 +4,7 @@ import functools
 import json
 import subprocess
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -866,6 +867,71 @@ def test_worker_diagnostics_are_drained_but_bounded() -> None:
     assert completed.returncode == 0
     assert len(completed.stdout.encode("utf-8")) == 64 * 1024
     assert len(completed.stderr.encode("utf-8")) == 64 * 1024
+
+
+def test_worker_cleanup_is_exception_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cidfile = tmp_path / "container.cid"
+    cidfile.write_text("a" * 64, encoding="ascii")
+
+    class Stream:
+        closed = False
+
+        @staticmethod
+        def read(_size: int) -> bytes:
+            return b""
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Process:
+        stdout = Stream()
+        stderr = Stream()
+
+        @staticmethod
+        def wait(*, timeout: int) -> int:
+            assert timeout == 10
+            raise RuntimeError("wait failed")
+
+    process = Process()
+
+    def popen(command: list[str], **kwargs: object) -> Process:
+        assert command[0] == "/usr/bin/docker"
+        assert kwargs["bufsize"] == 0
+        return process
+
+    monkeypatch.setattr(evaluation_oci.subprocess, "Popen", popen)
+
+    with pytest.raises(RuntimeError, match="wait failed"):
+        evaluation_oci.run_side_worker(
+            ["/usr/bin/docker", "run", "--cidfile", str(cidfile)],
+            timeout_seconds=10,
+        )
+
+    assert process.stdout.closed is True
+    assert process.stderr.closed is True
+    assert not cidfile.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX pipe inheritance contract")
+def test_worker_return_is_bounded_when_a_descendant_inherits_diagnostic_pipes() -> None:
+    started = time.monotonic()
+    completed = evaluation_oci.run_side_worker(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess, sys; "
+            "subprocess.Popen([sys.executable, '-c', "
+            "'import time; time.sleep(3)'], stdout=sys.stdout, stderr=sys.stderr); "
+            "print('parent complete')",
+        ],
+        timeout_seconds=10,
+    )
+
+    assert completed.returncode == 0
+    assert "parent complete" in completed.stdout
+    assert time.monotonic() - started < 2
 
 
 def test_worker_outer_deadline_terminates_a_hung_process() -> None:

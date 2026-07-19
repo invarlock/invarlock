@@ -18,6 +18,14 @@ from invarlock.evaluation_side_worker import RuntimeSideWorkerError, execute_job
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
 _DIGEST = "sha256:" + "a" * 64
+_OUTPUT_FILES = (
+    "model-artifact.identity.json",
+    "report.json",
+    "run.yaml",
+    "runtime-provider.receipt.json",
+    "runtime-scoring.observation.json",
+    "runtime.manifest.json",
+)
 
 
 def _job(tmp_path: Path) -> tuple[Path, dict[str, object]]:
@@ -66,6 +74,14 @@ def _job(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     return job, payload
 
 
+def _write_closed_output(output: Path) -> None:
+    output.mkdir()
+    for name in _OUTPUT_FILES:
+        path = output / name
+        path.write_text("{}", encoding="utf-8")
+        path.chmod(0o600)
+
+
 def test_worker_executes_one_closed_job_without_a_signing_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -88,19 +104,32 @@ def test_worker_executes_one_closed_job_without_a_signing_key(
     def run(**kwargs: object) -> object:
         observed.update(kwargs)
         output = cast(Path, kwargs["output_directory"])
-        output.mkdir()
+        _write_closed_output(output)
         return SimpleNamespace(directory=output)
 
     monkeypatch.setattr(worker, "CoreRegistry", Registry)
     monkeypatch.setattr(worker, "run_evidence_side", run)
 
     assert execute_job(job) == tmp_path / "output"
-    assert stat.S_IMODE((tmp_path / "output").stat().st_mode) == 0o733
+    assert stat.S_IMODE((tmp_path / "output").stat().st_mode) == 0o777
+    assert {
+        stat.S_IMODE(path.stat().st_mode) for path in (tmp_path / "output").iterdir()
+    } == {0o644}
     assert observed["role"] == "baseline"
     assert observed["metric"] == "exact_match"
     resources = observed["resources"]
     assert resources.container_image_digest == _DIGEST
     assert resources.primary_artifact == "model"
+
+
+def test_worker_refuses_to_expose_an_open_output_inventory(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    for name in (*_OUTPUT_FILES, "unexpected.json"):
+        (output / name).write_text("{}", encoding="utf-8")
+
+    with pytest.raises(RuntimeSideWorkerError, match="closed six-file bundle"):
+        worker._make_output_collectible(output)  # noqa: SLF001
 
 
 def test_worker_input_preflight_rejects_before_model_preparation(
@@ -207,7 +236,7 @@ def test_worker_scores_the_exact_schedule_snapshot_validated_before_model_load(
             replacement
         )
         output = cast(Path, kwargs["output_directory"])
-        output.mkdir()
+        _write_closed_output(output)
         return SimpleNamespace(directory=output)
 
     monkeypatch.setattr(worker, "CoreRegistry", Registry)

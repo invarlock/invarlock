@@ -26,6 +26,7 @@ from invarlock.core.runtime_provider import (
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 from invarlock.runtime_behavior.transaction import run_evidence_side
+from invarlock.runtime_provider_evidence import RuntimeProviderEvidencePaths
 
 _JOB_FORMAT = "invarlock/runtime-side-job-v1"
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -89,17 +90,53 @@ def _make_output_collectible(directory: Path) -> None:
     traversable.
     """
 
+    provider_paths = RuntimeProviderEvidencePaths.in_directory(directory)
+    expected_names = {
+        "report.json",
+        "runtime.manifest.json",
+        "run.yaml",
+        provider_paths.artifact_identity.name,
+        provider_paths.receipt.name,
+        provider_paths.scoring_observation.name,
+    }
+    directory_fd = -1
     try:
-        facts = directory.lstat()
+        directory_fd = os.open(
+            directory,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+        facts = os.fstat(directory_fd)
         if not stat.S_ISDIR(facts.st_mode):
             raise RuntimeSideWorkerError(
                 "runtime side output must remain a real directory"
             )
-        directory.chmod(0o733)
+        entries = set(os.listdir(directory_fd))
+        if entries != expected_names:
+            raise RuntimeSideWorkerError(
+                "runtime side output must remain the closed six-file bundle"
+            )
+        for name in sorted(expected_names):
+            descriptor = os.open(
+                name,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+            try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise RuntimeSideWorkerError(
+                        "runtime side output entries must remain regular files"
+                    )
+                os.fchmod(descriptor, 0o644)
+            finally:
+                os.close(descriptor)
+        os.fchmod(directory_fd, 0o777)
     except OSError as exc:
         raise RuntimeSideWorkerError(
             "runtime side output could not be made host-collectible"
         ) from exc
+    finally:
+        if directory_fd >= 0:
+            os.close(directory_fd)
 
 
 def execute_job(job_path: Path) -> Path:
