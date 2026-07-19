@@ -447,7 +447,7 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0)
         )
-        descriptor = os.open(destination.name, flags, 0o644, dir_fd=current_fd)
+        descriptor = os.open(destination.name, flags, 0o600, dir_fd=current_fd)
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             descriptor = None
             handle.write(html)
@@ -927,7 +927,7 @@ def _render_markdown(
         f"- **Verdict:** **{str(report['verdict']).upper()}**",
         "- **Bundle integrity:** embedded evidence signature verified",
         "- **Acceptance path:** `invarlock verify` records the expected signer and "
-        "independent anchors in a signed receipt",
+        + "independent anchors in a signed receipt",
         f"- **Evidence signer:** `{evidence_signer}`",
         "",
         "| Measure | Value |",
@@ -936,15 +936,15 @@ def _render_markdown(
         f"| Subject mean | {_format_number(subject['mean_score'])} |",
         f"| {comparison_label} | {_format_number(comparison['value'])} |",
         f"| {interval_label} | "
-        f"[{_format_number(uncertainty['lower'])}, "
-        f"{_format_number(uncertainty['upper'])}] |",
+        + f"[{_format_number(uncertainty['lower'])}, "
+        + f"{_format_number(uncertainty['upper'])}] |",
         f"| {limit_label} | {_format_number(limit_value)} |",
         "",
         f"Policy: `{report['policy_digest']}`",
         "",
         "This report is a human rendering of the signature-authenticated "
-        "evidence bundle. Run `invarlock verify` with independently supplied "
-        "anchors to create the signed acceptance receipt.",
+        + "evidence bundle. Run `invarlock verify` with independently supplied "
+        + "anchors to create the signed acceptance receipt.",
     ]
     paired_binary = report.get("paired_binary")
     if isinstance(paired_binary, dict):
@@ -956,16 +956,16 @@ def _render_markdown(
                 "| Paired outcome | Count |",
                 "| --- | ---: |",
                 "| Baseline pass → subject fail | "
-                f"{paired_binary['baseline_pass_subject_fail']} |",
+                + f"{paired_binary['baseline_pass_subject_fail']} |",
                 "| Baseline fail → subject pass | "
-                f"{paired_binary['baseline_fail_subject_pass']} |",
+                + f"{paired_binary['baseline_fail_subject_pass']} |",
                 f"| Both pass | {paired_binary['both_pass']} |",
                 f"| Both fail | {paired_binary['both_fail']} |",
                 "",
                 "McNemar exact two-sided p-value: "
-                f"`{_format_number(paired_binary['mcnemar_exact_two_sided_p_value'])}`.",
+                + f"`{_format_number(paired_binary['mcnemar_exact_two_sided_p_value'])}`.",
                 "The p-value describes paired asymmetry; the policy verdict uses the "
-                "effect-size confidence bound above.",
+                + "effect-size confidence bound above.",
             ]
         )
     sample_qualification = report.get("sample_qualification")
@@ -985,18 +985,18 @@ def _render_markdown(
                 "## Sample qualification",
                 "",
                 "The authenticated policy requires both enough paired records and "
-                "a sufficiently precise interval before the metric can pass.",
+                + "a sufficiently precise interval before the metric can pass.",
                 "",
                 "| Qualification | Observed | Required | Result |",
                 "| --- | ---: | ---: | --- |",
                 "| Paired records | "
-                f"{count_qualification['observed']} | "
-                f"≥ {count_qualification['minimum']} | "
-                f"{'pass' if count_qualification['passed'] else 'fail'} |",
+                + f"{count_qualification['observed']} | "
+                + f"≥ {count_qualification['minimum']} | "
+                + f"{'pass' if count_qualification['passed'] else 'fail'} |",
                 f"| {width_label} | "
-                f"{_format_number(width_qualification['observed'])} | "
-                f"≤ {_format_number(width_qualification['maximum'])} | "
-                f"{'pass' if width_qualification['passed'] else 'fail'} |",
+                + f"{_format_number(width_qualification['observed'])} | "
+                + f"≤ {_format_number(width_qualification['maximum'])} | "
+                + f"{'pass' if width_qualification['passed'] else 'fail'} |",
             ]
         )
     derived = report.get("derived_measurements")
@@ -1007,23 +1007,23 @@ def _render_markdown(
             lines.extend(
                 [
                     "The authenticated tokenizer and target token counts are comparable. "
-                    "These values are derived from the same expected-continuation "
-                    "likelihood facts but do not affect acceptance.",
+                    + "These values are derived from the same expected-continuation "
+                    + "likelihood facts but do not affect acceptance.",
                     "",
                     "| Derived measure | Value |",
                     "| --- | ---: |",
                     "| Baseline perplexity | "
-                    f"{_format_number(measurement['baseline_perplexity'])} |",
+                    + f"{_format_number(measurement['baseline_perplexity'])} |",
                     "| Subject perplexity | "
-                    f"{_format_number(measurement['subject_perplexity'])} |",
+                    + f"{_format_number(measurement['subject_perplexity'])} |",
                     f"| Perplexity ratio | {_format_number(measurement['ratio'])} |",
                 ]
             )
         else:
             lines.append(
                 "Perplexity interpretation is unavailable: "
-                f"`{measurement['reason']}`. Acceptance remains based on "
-                "normalized NLL per expected UTF-8 byte."
+                + f"`{measurement['reason']}`. Acceptance remains based on "
+                + "normalized NLL per expected UTF-8 byte."
             )
     if observations:
         lines.extend(
@@ -1032,7 +1032,7 @@ def _render_markdown(
                 "## Authenticated observations",
                 "",
                 "These authenticated observations provide supplementary context. "
-                "The paired metric and policy remain the complete acceptance calculation.",
+                + "The paired metric and policy remain the complete acceptance calculation.",
                 "",
                 "| Observation | Kind | Scope |",
                 "| --- | --- | --- |",
@@ -1041,7 +1041,7 @@ def _render_markdown(
         for observation in observations:
             lines.append(
                 f"| `{observation['observation_id']}` | "
-                f"`{observation['kind']}` | `{observation['scope']}` |"
+                + f"`{observation['kind']}` | `{observation['scope']}` |"
             )
         for observation in observations:
             payload = json.dumps(
@@ -1063,7 +1063,7 @@ def _render_markdown(
             [
                 "",
                 "The displayed verdict is the canonical report bound by the "
-                "manifest, checksums, and embedded evidence signature.",
+                + "manifest, checksums, and embedded evidence signature.",
             ]
         )
     return "\n".join(lines) + "\n"

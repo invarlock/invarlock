@@ -13,14 +13,16 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, Protocol
+from typing import Literal, Protocol, TypeAliasType
 
 from invarlock._optional_runtime_profiles import OPTIONAL_RUNTIME_PROVIDER_PROFILES
 from invarlock.core.evaluation_request import ComparisonSideRequest
 from invarlock.core.runtime_provider import RuntimeArtifactResources, RuntimeProvider
 from invarlock.runtime_security_helpers import resolve_runtime_image_digest
 
-type RuntimeSideRole = Literal["baseline", "subject"]
+RuntimeSideRole = TypeAliasType(  # noqa: UP040
+    "RuntimeSideRole", Literal["baseline", "subject"]
+)
 
 
 class RuntimeResourceResolutionError(ValueError):

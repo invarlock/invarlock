@@ -235,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except ReleasePreflightError as exc:
         parser.error(str(exc))
+        raise AssertionError("argparse error unexpectedly returned") from exc
     print(
         json.dumps(
             {

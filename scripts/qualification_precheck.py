@@ -124,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (json.JSONDecodeError, TrustInputsError, ValueError, OSError) as exc:
         parser.error(str(exc))
+        raise AssertionError("argparse error unexpectedly returned") from exc
     print(json.dumps(result, separators=(",", ":"), sort_keys=True))
     return 0
 

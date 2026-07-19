@@ -677,16 +677,21 @@ def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Pa
     leaf_flags = (
         os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     )
-    descriptors: list[int] = []
+    root_descriptor: int | None = None
+    current_descriptor: int | None = None
+    leaf_descriptor: int | None = None
     try:
-        current = os.open(root, directory_flags)
-        descriptors.append(current)
+        root_descriptor = os.open(root, directory_flags)
+        current_descriptor = root_descriptor
         for component in parts[:-1]:
-            current = os.open(component, directory_flags, dir_fd=current)
-            descriptors.append(current)
-        leaf = os.open(parts[-1], leaf_flags, dir_fd=current)
-        descriptors.append(leaf)
-        mode = os.fstat(leaf).st_mode
+            child_descriptor = os.open(
+                component, directory_flags, dir_fd=current_descriptor
+            )
+            if current_descriptor != root_descriptor:
+                os.close(current_descriptor)
+            current_descriptor = child_descriptor
+        leaf_descriptor = os.open(parts[-1], leaf_flags, dir_fd=current_descriptor)
+        mode = os.fstat(leaf_descriptor).st_mode
         if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
             raise ValueError(f"{label} must name a regular file or directory")
     except OSError as exc:
@@ -694,8 +699,12 @@ def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Pa
             f"{label} must exist beneath root without symbolic links"
         ) from exc
     finally:
-        for descriptor in reversed(descriptors):
-            os.close(descriptor)
+        if leaf_descriptor is not None:
+            os.close(leaf_descriptor)
+        if current_descriptor is not None and current_descriptor != root_descriptor:
+            os.close(current_descriptor)
+        if root_descriptor is not None:
+            os.close(root_descriptor)
     return root.joinpath(*parts)
 
 

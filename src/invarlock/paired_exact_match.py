@@ -160,12 +160,7 @@ def _paired_effect_confidence_interval_v1(
         subject_rate * (1.0 - subject_rate) * baseline_rate * (1.0 - baseline_rate)
     )
     if denominator == 0.0:
-        correlation = (
-            1.0
-            if baseline_pass_subject_fail_count == 0
-            and baseline_fail_subject_pass_count == 0
-            else 0.0
-        )
+        correlation = 0.0
     else:
         joint_pass_rate = both_pass_count / pair_count
         correlation = (joint_pass_rate - subject_rate * baseline_rate) / denominator

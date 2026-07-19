@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeAliasType, cast
 
 import jsonschema
 import yaml
@@ -41,7 +41,9 @@ MAX_EVALUATION_REQUEST_NODES = 10_000
 MAX_EVALUATION_REQUEST_DEPTH = 64
 
 type JSONScalar = str | int | float | bool | None
-type ProviderResolver = Callable[[str], RuntimeProvider]
+ProviderResolver = TypeAliasType(  # noqa: UP040
+    "ProviderResolver", Callable[[str], RuntimeProvider]
+)
 
 _JSON_INTEGER_RE = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _JSON_FLOAT_RE = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
