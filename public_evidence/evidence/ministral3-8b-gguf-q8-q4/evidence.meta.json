@@ -1,0 +1,8 @@
+{
+  "artifact_paths": {
+    "evidence_pack": "evidence",
+    "verification_receipt": "verification.receipt.json"
+  },
+  "format_version": "invarlock/public-evidence-meta-v1",
+  "summary": "Strictly verified Ministral 3 8B GGUF Q8_0-versus-Q4_K_M comparison over one paired 32-record exact-match schedule"
+}

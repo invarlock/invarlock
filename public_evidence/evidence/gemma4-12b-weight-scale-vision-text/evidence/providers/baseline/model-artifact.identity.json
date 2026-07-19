@@ -1,0 +1,1 @@
+{"artifact_format":"hf_snapshot","checkpoint_tree_sha256":"9d9e4fc5c9a6a198a1e6c7d0071d3bd50b9a76c47b43733020d5c557f4abafc2","format_version":"invarlock/model-artifact-identity-v1","immutable_revision":"12ace6d648d72bd41519e140f1185f34d38c7e3d","model_id":"google/gemma-4-12B-it","tokenizer_metadata_sha256":"3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21"}

@@ -5,15 +5,15 @@
     "source": "file"
   },
   "execution_mode": "container",
-  "generated_at_utc": "2026-07-18T19:28:55.676912+00:00",
+  "generated_at_utc": "2026-07-19T05:59:02.000141+00:00",
   "manifest_version": 1,
   "outer_container": {
     "allow_network": false,
     "allow_remote_code": false,
     "allow_third_party_plugins": false,
     "container_execution": true,
-    "image_digest": "sha256:25e34c2010fc05d93f3e503a8110f5040ad90d964da71e9233014d1f84094d14",
-    "image_ref": "sha256:25e34c2010fc05d93f3e503a8110f5040ad90d964da71e9233014d1f84094d14"
+    "image_digest": "sha256:3222c41ee2bec3490ad4c64d22c0c75159ff2724254f5b2523432de6ff9ccb1a",
+    "image_ref": "localhost:5001/invarlock-runtime-tensorrt-llm@sha256:3222c41ee2bec3490ad4c64d22c0c75159ff2724254f5b2523432de6ff9ccb1a"
   },
   "report": {
     "filename": "report.json",
@@ -27,7 +27,7 @@
     },
     "receipt": {
       "filename": "runtime-provider.receipt.json",
-      "sha256": "26a8c7560446f77205f8eecc800e48f92ee6de4e33a9b325fea2a0f139531f8a"
+      "sha256": "fffeb9b9f9eb8a8250031bce932a8138dca67a336593d880cc90239180fd088f"
     },
     "scoring_observation": {
       "filename": "runtime-scoring.observation.json",

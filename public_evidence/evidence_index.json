@@ -7,20 +7,70 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:708366b6f9254fa3892b93aa2f0bfd2cb29edb50efb39498e202229799b4bd69",
-            "manifest.json": "sha256:04d491a65ceda40d1670a54eb8e2ab35d9f7ccd456da18ddbfed9f6a3ded429d",
-            "manifest.signature.json": "sha256:47378cbbaa0622d470346cc00aa849c768370dbbf83197cf035f63c8bddfac27"
+            "checksums.sha256": "sha256:380ba4eff84524fd4fec5413666e360793f61b537e4efc011b69751e5b868f7a",
+            "manifest.json": "sha256:ab421db3eeb58227dcfe1777250d509b81c6b0cdad9c19d42fb5894ff68726a0",
+            "manifest.signature.json": "sha256:e30fc0aaf3697ea6c89a71a7e73251b296f5b1e74764c766c2ae3cae346e84fc"
+          },
+          "file_count": 26,
+          "kind": "directory",
+          "path": "public_evidence/evidence/gemma4-12b-weight-scale-vision-text/evidence",
+          "size_bytes": 75298
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/gemma4-12b-weight-scale-vision-text/verification.receipt.json",
+          "sha256": "sha256:6e99b8d0163a7b8b0cc47f16c47b6e24893a3207c771e98de77d677a89edb7af",
+          "size_bytes": 1546
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/gemma4-12b-weight-scale-vision-text",
+      "slug": "gemma4-12b-weight-scale-vision-text",
+      "summary": "Strictly verified Gemma 4 12B vision-text comparison of an authenticated checkpoint and a 0.99-scaled derivative over one paired 32-record exact-match schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:a6eb8106bda2860f99268ea794c55c62fd4b8995d9c147bd0e5ec7fac78d5450",
+            "manifest.json": "sha256:70e10ca7eda41d5b0ca8a6c93e6994ed7c9e8c74ed6e70b7a905663ce6b11d37",
+            "manifest.signature.json": "sha256:e0205acfdc60744e2a226a34cf060e6038afa83611334ac57b9884d987d6151d"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/ministral3-8b-gguf-q8-q4/evidence",
+          "size_bytes": 69830
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/ministral3-8b-gguf-q8-q4/verification.receipt.json",
+          "sha256": "sha256:45a69fc485e8162bdc384eb19a8884733f36957af81044636165a252d7a165d1",
+          "size_bytes": 1546
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/ministral3-8b-gguf-q8-q4",
+      "slug": "ministral3-8b-gguf-q8-q4",
+      "summary": "Strictly verified Ministral 3 8B GGUF Q8_0-versus-Q4_K_M comparison over one paired 32-record exact-match schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:7589e16567563704a5f852443082570c75c073e72eada55d4edd438b8ec47ddf",
+            "manifest.json": "sha256:10ee72650501c8cda8b5f4f7e421b008422d5a1c73cb57e3ff257aef4ba5a5bd",
+            "manifest.signature.json": "sha256:178a6929ccec73d015a663f3c75e930fd6c031d7eda5511488b6f665a0492e88"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence",
-          "size_bytes": 40290
+          "size_bytes": 40372
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json",
-          "sha256": "sha256:ac185591374bf95a7380c756f40931ea29fc2aafc219bfbf5bd5b1c835c3262e",
-          "size_bytes": 1557
+          "sha256": "sha256:2ad49fd557c64e71e267753d84bb0f77da36b18796e181b41c6a27a5f77746b8",
+          "size_bytes": 1546
         }
       },
       "evidence_class": "signed_evidence_pack",
@@ -32,20 +82,20 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:deb5c0b96941a34e1bcd61ef81a0df0162584ce4aa83ad8d65896a0a4cfe6a84",
-            "manifest.json": "sha256:b5fd8ff5f1a0f2dc8e819c4469f0f1254c22dc4dfe25549cee39b11a6051ac4a",
-            "manifest.signature.json": "sha256:5d524e57c241be739ed49a559ed5e070e0e44a51a0fdcd2e6889aadbd5cab38b"
+            "checksums.sha256": "sha256:5611e3c6141b68dd547ad9411793fe4268d9a31cf0b58405f838e203aafb1172",
+            "manifest.json": "sha256:f1e3805259872fb6b56ab0a639c180ada9ec5a82ea0f1d147febdd57e25e5d03",
+            "manifest.signature.json": "sha256:d81e2615b702aab50e3adb8acd63e767651fdaa4954b37f7bde892218c26240d"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/evidence",
-          "size_bytes": 22226
+          "size_bytes": 22314
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/verification.receipt.json",
-          "sha256": "sha256:49c5e48297720366e40d5b83a1110d28c9615146bef01fba759db8357d353fe4",
-          "size_bytes": 1555
+          "sha256": "sha256:ff2647dd90dae959074849a62c24388127fb3e17f5e7537a42905bccbb2a2fbe",
+          "size_bytes": 1546
         }
       },
       "evidence_class": "signed_evidence_pack",
@@ -57,20 +107,20 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:00917fc7875bf58ca1124047704daddee3ceabc7c4c07472177ca06e8aedc6dd",
-            "manifest.json": "sha256:df2fd1f439712c3afbc42a5bf096ebe32097f9131d03a16b66750d639f552d79",
-            "manifest.signature.json": "sha256:45ac161d3eb2e1e108fdb238e4bc7b67e946382d81c4e3ba98562aa825f7c6bd"
+            "checksums.sha256": "sha256:8d828b79d4170d0d2ca98f39200e6fe0beea3280ebe0c8baad62010c8451512f",
+            "manifest.json": "sha256:28e8fe484b4bc3d6585cacbcfa99fc5da2369bd0b5819b29ea65d005849eea48",
+            "manifest.signature.json": "sha256:2a76590dbd88a2f32bc104add7ccce2657983d43fa4ea0cdf9add8cc14eba47d"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/qwen2.5-0.5b-gguf-q8-q4/evidence",
-          "size_bytes": 23860
+          "size_bytes": 23936
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/qwen2.5-0.5b-gguf-q8-q4/verification.receipt.json",
-          "sha256": "sha256:849537b9568e3dc079019a71fab5b21a6b52f001607272e51fa8c6e3c79ba0e0",
-          "size_bytes": 1551
+          "sha256": "sha256:32c980cfca9ca112c0bc3b9d5e2f1bcd4ec6aa63fbb41c2bef6a8b69ab4f415a",
+          "size_bytes": 1546
         }
       },
       "evidence_class": "signed_evidence_pack",
@@ -82,20 +132,20 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:aba842d5d740a3274e51df9970b472c1b91e1f999a34b32363ea350e9ddcc060",
-            "manifest.json": "sha256:91811e7063c51fb786c1848ea337a5db917bc845854b08f7db34c0c8cfee8f83",
-            "manifest.signature.json": "sha256:ff5f9cd23f27f4967f742cb4670c904f98d13a1f5a50da36ef6def4404bb2634"
+            "checksums.sha256": "sha256:e55e7619a5e6c07916eab54c574c9e55e84149317bed2f293c21593e67ae441d",
+            "manifest.json": "sha256:462fc4543f803a6391acc0f82371a8a2f770c76785f768f8e6151d9d0780f8ca",
+            "manifest.signature.json": "sha256:faf2e9136820a8661fcad8bb7302996d2a8044674fed5ab46d7412c26c69e33b"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/qwen2.5-14b-weight-scale-hf/evidence",
-          "size_bytes": 40152
+          "size_bytes": 40234
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/qwen2.5-14b-weight-scale-hf/verification.receipt.json",
-          "sha256": "sha256:220b86fc0eeb178a44ccacceb22aea16b80687e796e0536aa04edf93ed64b0eb",
-          "size_bytes": 1558
+          "sha256": "sha256:fea7b903a793ba4d4bb64db321705c36eff816aaca879206591460502df1185b",
+          "size_bytes": 1546
         }
       },
       "evidence_class": "signed_evidence_pack",
@@ -107,20 +157,20 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:bd4829d7d9ff672ce23e1bf3b98264a7b21fb734897067e0a3e393ba2f586fef",
-            "manifest.json": "sha256:f350c5f1d265b0d96637004e1e9605b2f6cf97225406dc2241843a3bc99f6841",
-            "manifest.signature.json": "sha256:b90e54dc364145d5fab4393e198dce71a6dfdae43266fc430c3d893fd118d0a2"
+            "checksums.sha256": "sha256:4c26aa9cdd8a3b310be8b3bcd59ade1a0d3a066ee47623bee886f5934c7f32b8",
+            "manifest.json": "sha256:50e8d6e52f7d291af5619ed3a41039cfddcd8bb5212f23f89be474a9e70bf1d3",
+            "manifest.signature.json": "sha256:4afe5496546c0af51edcf0851696abf7dacda6b318f849592d944e311c2a6b61"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/tinyllama-tensorrt-llm-checkpoints/evidence",
-          "size_bytes": 33348
+          "size_bytes": 33440
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/tinyllama-tensorrt-llm-checkpoints/verification.receipt.json",
-          "sha256": "sha256:e7ab9fd2e68a220744396c5ee798f948777dd5ee9a135afd12bdc04351ff8530",
-          "size_bytes": 1560
+          "sha256": "sha256:cfabd3c2e4845fdd07b9e3aef44a0aa1a4fe302204413d397aee16189a1d1031",
+          "size_bytes": 1546
         }
       },
       "evidence_class": "signed_evidence_pack",
@@ -129,9 +179,9 @@
       "summary": "Strictly verified TensorRT-LLM comparison of two authenticated TinyLlama 1.1B checkpoint engines over eight paired exact-match records"
     }
   ],
-  "evidence_count": 5,
-  "evidence_file_count": 130,
-  "evidence_size_bytes": 167657,
+  "evidence_count": 7,
+  "evidence_file_count": 183,
+  "evidence_size_bytes": 316246,
   "format_version": "invarlock/public-evidence-index-v1",
   "status": "available",
   "status_label": "Evidence available"
