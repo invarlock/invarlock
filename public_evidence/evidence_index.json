@@ -157,6 +157,31 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
+            "checksums.sha256": "sha256:9e33cff8458c3bf147e74be187543c7f176696440b5e1412a809a8cf3beba41d",
+            "manifest.json": "sha256:4cd0c76960e7247eaca5143c0917c329b0b4065fda7032d608bd5a72e3660d13",
+            "manifest.signature.json": "sha256:4b21d0ab57f5c6607195e0fefb35db41e8104e675b28a69838981b4640b3e38e"
+          },
+          "file_count": 25,
+          "kind": "directory",
+          "path": "public_evidence/evidence/qwen3.5-27b-qwen3.6-27b-multimodal/evidence",
+          "size_bytes": 70065
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/qwen3.5-27b-qwen3.6-27b-multimodal/verification.receipt.json",
+          "sha256": "sha256:6966a20ceb1426bfc58960b710b0b7e949de373a555cebf73f20198624208a66",
+          "size_bytes": 1477
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/qwen3.5-27b-qwen3.6-27b-multimodal",
+      "slug": "qwen3.5-27b-qwen3.6-27b-multimodal",
+      "summary": "Strictly verified 32-record paired vision-text comparison of pinned Qwen 3.5 27B and Qwen 3.6 27B checkpoints"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
             "checksums.sha256": "sha256:4c26aa9cdd8a3b310be8b3bcd59ade1a0d3a066ee47623bee886f5934c7f32b8",
             "manifest.json": "sha256:50e8d6e52f7d291af5619ed3a41039cfddcd8bb5212f23f89be474a9e70bf1d3",
             "manifest.signature.json": "sha256:4afe5496546c0af51edcf0851696abf7dacda6b318f849592d944e311c2a6b61"
@@ -179,9 +204,9 @@
       "summary": "Strictly verified TensorRT-LLM comparison of two authenticated TinyLlama 1.1B checkpoint engines over eight paired exact-match records"
     }
   ],
-  "evidence_count": 7,
-  "evidence_file_count": 183,
-  "evidence_size_bytes": 316246,
+  "evidence_count": 8,
+  "evidence_file_count": 209,
+  "evidence_size_bytes": 387788,
   "format_version": "invarlock/public-evidence-index-v1",
   "status": "available",
   "status_label": "Evidence available"

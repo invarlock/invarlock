@@ -53,13 +53,15 @@ from the same canonical JSON.
   `invarlock-diagnostics` package. Their canonical outputs can be authenticated
   as observations but do not participate in acceptance.
 - Rebuilt documentation, diagrams, packaged contracts, workflows, and examples
-  around the closed transaction. The public index now carries seven strictly
+  around the closed transaction. The public index now carries eight strictly
   verified `invarlock/evidence-pack-v1` comparisons across Hugging Face text,
   GGUF, vision-text, and TensorRT-LLM runtimes. The five established runtime
   qualifications were refreshed from the final release-qualified source and
   signer, while new 32-record Gemma 4 12B vision-text and Ministral 3 8B GGUF
-  comparisons broaden the optional-runtime evidence without changing the
-  explicit empty-state contract for future publication surfaces.
+  comparisons broaden the optional-runtime evidence. A pinned 32-record Qwen
+  3.5-to-3.6 vision-text comparison also qualifies strict BF16 checkpoint
+  materialization for the current native Qwen architecture without changing
+  the explicit empty-state contract for future publication surfaces.
 - Coordinated source archives, core and add-in wheels, runtime images, signed
   canaries, artifact promotion, and final receipts under one reproducible
   release qualification flow, with at least 80% branch coverage required for
@@ -83,7 +85,11 @@ from the same canonical JSON.
   safetensors and unauthenticated live parameters while preserving validated
   canonical layouts, storage-proven tied weights, explicit runtime-added
   quantization defaults, one-to-one native checkpoint renames, and narrowly
-  audited non-executing auxiliary weights.
+  audited non-executing auxiliary weights. Authenticated Qwen 3.5 and 3.6 BF16
+  materialization now accepts only their native model/configuration classes,
+  declared BF16 runtime state, and the exact documented Qwen 3.5 mixed-storage
+  inventory; partial or additional casts and quantized runtime state fail
+  closed.
 - Hardened GGUF and TensorRT-LLM readiness so authenticated models, executables,
   engine layouts, tokenizer contracts, runner protocols, immutable images, and
   resource limits are checked before native execution or GPU allocation.

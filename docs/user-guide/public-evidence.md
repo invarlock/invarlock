@@ -2,7 +2,7 @@
 
 Public evidence is a curated index of immutable `invarlock/evidence-pack-v1`
 directories and independently signed verification receipts. The current index
-contains seven strictly verified comparisons spanning the built-in Hugging
+contains eight strictly verified comparisons spanning the built-in Hugging
 Face text runtime and the first-party GGUF, vision-text, and TensorRT-LLM
 runtime packages. An empty index still has an explicit **Evidence not yet created**
 state; publication begins only after a pack and receipt pass strict
@@ -22,6 +22,7 @@ verification and disclosure review.
 | Qwen2.5 14B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 16 | Normalized NLL per expected UTF-8 byte |
 | Gemma 4 12B checkpoint and authenticated 0.99-scaled derivative | Hugging Face vision-text add-in | 32 | Exact match |
 | Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 1 | Exact match |
+| Pinned Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints | Hugging Face vision-text add-in | 32 | Exact match |
 | Ministral 3 8B GGUF Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | 32 | Exact match |
 | Qwen2.5 0.5B GGUF Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | 1 | Exact match |
 | Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 8 | Exact match |
@@ -30,8 +31,10 @@ These entries qualify the signed evaluation transaction and its runtime
 bindings. The normalized-NLL entries measure expected-continuation likelihood
 over their authenticated schedules; the exact-match entries exercise the
 optional-runtime paths on bounded qualification schedules, including 32-record
-GGUF and vision-text comparisons. Broader model quality conclusions require
-broader, task-specific evidence.
+GGUF and vision-text comparisons. The Qwen entry records a paired release
+regression check over a deterministic synthetic color-identification schedule;
+it does not establish broader multimodal model quality. Broader model quality
+conclusions require broader, task-specific evidence.
 
 ## Publication boundary
 
