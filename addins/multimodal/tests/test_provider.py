@@ -125,6 +125,11 @@ def test_provider_declares_only_implemented_behavior() -> None:
     assert provider.identify_artifact(_spec()).checkpoint_tree_sha256 == "b" * 64
 
 
+def test_total_pixel_ceiling_admits_a_diverse_400_record_suite() -> None:
+    assert provider_module._MAX_TOTAL_IMAGE_PIXELS >= 400 * 4_000_000
+    assert provider_module._MAX_TOTAL_IMAGE_PIXELS <= 2_000_000_000
+
+
 def test_provider_authenticates_checkpoint_without_loading_model(
     tmp_path: Path,
 ) -> None:

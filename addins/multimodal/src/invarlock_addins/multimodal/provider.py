@@ -78,7 +78,10 @@ _MAX_IMAGE_BYTES = 64 * 1024 * 1024
 _MAX_IMAGE_PIXELS = 50_000_000
 _MAX_UNIQUE_IMAGES = 2_048
 _MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
-_MAX_TOTAL_IMAGE_PIXELS = 200_000_000
+# Images are decoded and scored one at a time.  This cumulative ceiling bounds
+# total work without excluding representative 400-record vision suites; the
+# per-image 50M-pixel and aggregate 512 MiB byte ceilings remain independent.
+_MAX_TOTAL_IMAGE_PIXELS = 2_000_000_000
 _ALLOWED_SETTINGS = frozenset(
     {
         "batch_size",
