@@ -188,12 +188,19 @@ biased schedule remains biased.
 
 ## Metric-specific paired intervals
 
-Exact match uses a paired Newcombe hybrid-score 95% interval over the
-subject-minus-baseline binary effect. The report also records baseline-pass to
+New `invarlock/comparison-report-v2` reports use the continuity-corrected
+paired Newcombe hybrid-score 95% interval over the subject-minus-baseline
+binary effect. The report also records baseline-pass to
 subject-fail regressions, baseline-fail to subject-pass improvements, both-pass
 and both-fail counts, and the exact two-sided McNemar probability. The policy
 uses the Newcombe interval's lower bound; the McNemar probability is supporting
 paired evidence rather than an acceptance control.
+
+Strict verification retains the original
+`newcombe_hybrid_score_paired_v1` calculation for signed
+`invarlock/comparison-report-v1` packs. New reports use
+`newcombe_hybrid_score_paired_v2`; existing evidence is not relabeled or
+reinterpreted.
 
 Normalized NLL uses the following deterministic schedule-resampling object:
 
@@ -228,7 +235,7 @@ statistical power, equivalence, non-inferiority, or production safety.
 ## Exact-match policy
 
 ```json
-{"resolved_policy":{"metrics":{"exact_match":{"delta_min_pp":-2.0}}}}
+{"resolved_policy":{"metrics":{"exact_match":{"delta_min_pp":-2.0,"maximum_interval_width_pp":10.0,"minimum_record_count":400}}}}
 ```
 
 For baseline accuracy `B` and subject accuracy `S`:
@@ -236,6 +243,8 @@ For baseline accuracy `B` and subject accuracy `S`:
 ```text
 point_delta_pp = 100 * (S - B)
 pass when interval.lower >= delta_min_pp
+  and record_count >= minimum_record_count
+  and interval.width <= maximum_interval_width_pp
 ```
 
 A value of `-2.0` requires even the paired interval's lower bound to remain at
@@ -245,7 +254,15 @@ while the verdict still fails because its interval crosses the floor.
 The paired-binary section distinguishes regressions (baseline pass, subject
 fail) from improvements (baseline fail, subject pass). It reports their exact
 two-sided McNemar probability and the Newcombe 95% interval for the effect size.
-Only the interval lower bound controls this policy.
+Only the interval lower bound controls the metric-threshold part of this
+policy; configured count and width controls remain additional requirements.
+
+The count and precision controls are optional, but they are coupled: provide
+both or neither. `minimum_record_count` must be an integer from 1 through
+10,000. `maximum_interval_width_pp` must be positive and no greater than 200.
+When present, both must pass in addition to the lower-bound rule. A 400-record
+schedule satisfies a minimum of 400, but it does not guarantee a 10-point
+interval; precision is known only after execution.
 
 | Point delta | Interval | Minimum | Result |
 | ---: | ---: | ---: | --- |
@@ -256,7 +273,7 @@ Only the interval lower bound controls this policy.
 ## Normalized-NLL policy
 
 ```json
-{"resolved_policy":{"metrics":{"normalized_nll_per_utf8_byte":{"ratio_max":1.05}}}}
+{"resolved_policy":{"metrics":{"normalized_nll_per_utf8_byte":{"maximum_interval_width_ratio":0.05,"minimum_record_count":400,"ratio_max":1.05}}}}
 ```
 
 For each record and side:
@@ -265,6 +282,8 @@ For each record and side:
 record_nll = -logprob_sum / utf8_byte_count
 point_ratio = arithmetic_mean(subject_record_nll) / arithmetic_mean(baseline_record_nll)
 pass when interval.upper <= ratio_max
+  and record_count >= minimum_record_count
+  and interval.width <= maximum_interval_width_ratio
 ```
 
 The baseline arithmetic mean must be positive. Each scheduled record has equal
@@ -274,6 +293,12 @@ byte-weighted mean, or perplexity.
 This metric is teacher-forced expected-continuation likelihood regression under
 the authenticated prompt, target, provider, and runtime. It is not a measure of
 general model quality, instruction following, factuality, or user preference.
+
+The count and ratio-width fields are optional but must be supplied together.
+The count uses the same 1-through-10,000 limit; the maximum ratio width must be
+positive. These requirements qualify the authenticated schedule size and
+observed resampling precision. They do not turn the fixed schedule into a
+population sample.
 
 | Point ratio | Interval | Maximum | Result |
 | ---: | ---: | ---: | --- |
@@ -295,7 +320,9 @@ request:
         "scorer_version": "1.0.0",
         "descriptor_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "configuration_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-        "delta_min_pp": -2.0
+        "delta_min_pp": -2.0,
+        "maximum_interval_width_pp": 10.0,
+        "minimum_record_count": 400
       }
     }
   }
@@ -311,12 +338,17 @@ baseline_mean = arithmetic_mean(baseline_record_scores)
 subject_mean = arithmetic_mean(subject_record_scores)
 delta_pp = 100 * (subject_mean - baseline_mean)
 pass when interval.lower >= delta_min_pp
+  and record_count >= minimum_record_count
+  and interval.width <= maximum_interval_width_pp
 ```
 
 The interval is the same deterministic 2,048-replicate paired
 schedule-resampling method used for normalized NLL, but it recomputes the
 percentage-point delta and uses its lower bound. Extension code cannot redefine
 aggregation, direction, interval, or verdict semantics.
+
+As with exact match, scorer count and percentage-point width controls are
+optional but coupled and use the same ranges.
 
 Potential implementations include deterministic token F1, structured-field
 extraction, and VQA answer normalization. No such package ships with InvarLock.
@@ -383,8 +415,13 @@ schedule is scientifically or operationally sufficient.
       not as a policy result.
 - [ ] The policy contains only the matching metric block and correct threshold
       unit.
+- [ ] If sample qualification is enabled, the minimum-count and matching
+      maximum-width fields are both present, use the correct units, and express
+      requirements justified before subject results are inspected.
 - [ ] Everyone using the result understands which interval bound controls the
       verdict.
+- [ ] A preflight count pass is not described as a precision pass; interval
+      width remains pending until execution.
 - [ ] The verifier has an independently distributed, byte-identical policy.
 - [ ] Representativeness, contamination, repeated-tuning, and operational
       limitations are recorded outside the bundle.

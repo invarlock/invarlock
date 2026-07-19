@@ -201,6 +201,9 @@ by parsing the evidence immediately before verification.
 `invarlock evaluate` always completes its execution-free validation before it
 allocates accelerators. Run it with `--preflight` when you want to stop at that
 boundary and inspect the exact request, signing key, and runtime-image options.
+The v2 preflight output can confirm a policy's minimum record count. It reports
+the interval-width requirement as `pending_execution`; do not treat that state
+as proof that precision or the final verdict will pass.
 The check is local
 and non-mutating: it does not pull images, start containers, load model
 weights, run inference, publish evidence, or sign a result. Treat it as

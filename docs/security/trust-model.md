@@ -141,7 +141,8 @@ Treat every file in the evidence directory as untrusted input until
 verification succeeds. The verifier checks canonical JSON, safe paths, bounded
 files, the exact inventory, checksums, signatures, versioned schemas, input
 identities, provider cross-bindings, schedule order, per-record scores, report
-arithmetic, the selected paired interval, and the policy result.
+arithmetic, the selected paired interval, optional count/width qualification,
+and the policy result.
 
 A scorer binding inside the submitted request or evidence is also untrusted.
 It identifies requested code and configuration but cannot authorize either.

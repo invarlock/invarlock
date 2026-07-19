@@ -61,7 +61,8 @@ invarlock evaluate REQUEST \
 preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
-and atomically publishes the evidence directory named by the request.
+applies any coupled count and width controls, and atomically publishes the
+evidence directory named by the request.
 
 `--preflight` returns after that mandatory validation instead of continuing to
 execution and publication. It validates the
@@ -83,6 +84,12 @@ a container, load a processor or model, initialize CUDA, run inference, create
 an output directory, or sign evidence. A successful preflight cannot prevent
 later file replacement, so each worker reopens and authenticates the same
 content before model preparation and the provider checks it again when scoring.
+
+The machine-readable success and failure format is
+`invarlock/evaluation-preflight-v2`. If the policy supplies coupled sample
+qualification fields, preflight records the observed schedule count and checks
+its minimum. It records the maximum interval width with status
+`pending_execution`, because no interval exists before paired execution.
 
 For a valid run request, the host prepares the canonical schedule and launches
 one independently configured Docker or Podman worker for each comparison side.
@@ -112,7 +119,7 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-cpus DECIMAL` | No | `INVARLOCK_RUNTIME_CPUS` | Per-worker CPU ceiling; defaults to `4` and accepts up to three decimal places |
 | `--runtime-memory-mib INTEGER` | No | `INVARLOCK_RUNTIME_MEMORY_MIB` | Per-worker memory ceiling in MiB; defaults to `65536` |
 | `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
-| `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v1` |
+| `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
 | `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
 
 The signing key must be a real regular file. The request and every referenced
@@ -272,7 +279,8 @@ inventory; caller-approved artifact and schedule identities; all input and
 evidence references; the normalized request and schedule; runtime manifests
 and provider sidecars; record ordering and input digests; derived paired
 scores; the canonical comparison report; and the policy verdict. A policy
-verdict of `fail` is a valid, integrity-checked result but is not command
+verdict includes any configured record-count and interval-width qualification.
+A verdict of `fail` is a valid, integrity-checked result but is not command
 success.
 
 An installed scorer is executable code. The flag does not authorize an

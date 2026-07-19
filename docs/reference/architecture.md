@@ -41,7 +41,7 @@ authorities without changing a byte in the evidence directory.
 | --- | --- |
 | Closed request | Select exactly two artifacts, one pinned dataset source or canonical schedule, one policy, exactly one built-in metric or scorer-extension binding, one execution mode, and one output directory |
 | Runtime integration ABI | Identify artifacts and emit typed receipts and ordered scoring observations |
-| Paired transaction | Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, and replay the paired interval |
+| Paired transaction | Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width controls |
 | Canonical bundle | Bind normalized intent, identities, provider material, paired records, report, checksums, and evidence signature |
 | Independent verifier | Recompute integrity, identities, pairs, scores, report, and policy verdict under caller-owned trust anchors |
 | Human renderer | Produce a console view and optional self-contained HTML from the authenticated canonical report |
@@ -69,7 +69,7 @@ sourced copies of the policy bytes bound into that bundle.
 | Which inputs were scored | Canonical schedule and ordered observation records | Recompute schedule digest, IDs, order, and input digests |
 | Which runtime executed each side | Runtime manifests and provider receipts | Compare both image digests to caller-owned expected values |
 | What each backend returned | Scoring observations | Validate per-record facts and observation digests |
-| What score and threshold apply | Paired records, policy, scorer binding when selected, and canonical report | Re-derive scores, means, comparison, paired interval, threshold, and conservative-bound verdict; require independently authorized scorer code when selected |
+| What score and threshold apply | Paired records, policy, scorer binding when selected, and canonical report | Re-derive scores, means, comparison, paired interval, threshold, optional count/width qualification, and verdict; require independently authorized scorer code when selected |
 | Who signed the pack | Manifest signature | Compare the public-key fingerprint to the caller anchor |
 | Who accepted or rejected it | External receipt | Verify receipt signature, identity, fingerprint, anchors, and manifest digest |
 
@@ -127,11 +127,15 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
 3. The engine computes a deterministic comparison ID and either derives one of
    two built-in paired metrics or replays one explicitly authorized
    deterministic text scorer. Exact match replays paired outcome counts, an
-   exact McNemar probability, and a Newcombe 95% interval. Normalized NLL and
+   exact McNemar probability, and the versioned Newcombe 95% interval.
+   Normalized NLL and
    scorer-extension deltas use the fixed 2,048-replicate schedule-resampling
    interval. The scorer owns only per-record values in `[0, 1]`; the core owns
    means, subject-minus-baseline percentage-point delta, interval, and policy
    arithmetic. Policy reads the conservative bound of the selected interval.
+   When the policy includes coupled sample controls, core also checks the
+   authenticated record count and observed interval width. All three
+   conditions must pass.
 4. Publication stages a closed inventory, signs the canonical manifest, and
    renames the directory into place without replacing an existing destination.
 5. Verification treats the submitted bundle as untrusted, replays all semantic

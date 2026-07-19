@@ -75,9 +75,10 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] If a perplexity ratio is displayed, confirm it is verifier-derived from
       comparable tokenizer and token-count facts and treat it as interpretation
       without policy authority.
-- [ ] For exact match, confirm the paired interval uses
-      `newcombe_hybrid_score_paired_v1`, interval mass `0.95`, and the
-      paired-binary-outcomes scope.
+- [ ] For exact match, confirm a current v2 report uses
+      `newcombe_hybrid_score_paired_v2`, interval mass `0.95`, and the
+      paired-binary-outcomes scope. For legacy v1 evidence, require exact replay
+      with `newcombe_hybrid_score_paired_v1` instead.
 - [ ] For normalized NLL, confirm the paired interval uses
       `paired_percentile_bootstrap_sha256_v1`, interval mass `0.95`, `2048`
       replicates, and the authenticated-schedule scope.
@@ -89,6 +90,9 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
       not an acceptance scorer.
 - [ ] Confirm the verdict uses the policy-relevant conservative bound: lower
       for exact-match delta and upper for normalized NLL.
+- [ ] If sample qualification is present, confirm its minimum and maximum match
+      the independently reviewed policy, the units match the selected metric,
+      and the count, width, and combined checks all pass.
 - [ ] Treat the result as a finite-schedule decision. The paired interval
       describes schedule-composition sensitivity; it does not establish
       population coverage or representativeness.

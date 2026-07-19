@@ -11,8 +11,8 @@
     One fixed schedule flows to baseline and subject runtime observations.
     InvarLock requires identical ordered record IDs and input digests, derives
     paired records and built-in scores or replays an authorized text scorer,
-    derives the paired interval, then applies the fixed policy threshold to its
-    conservative bound.
+    derives the paired interval, then applies the fixed policy threshold and
+    any configured record-count and interval-width requirements.
   </desc>
   <defs>
     <marker
@@ -138,12 +138,14 @@
   <text x="410" y="682" text-anchor="middle" class="small-text">paired outcomes · ratio or point delta</text>
 
   <rect x="635" y="595" width="330" height="100" rx="12" class="box-decision" />
-  <text x="800" y="632" text-anchor="middle" class="box-title">Paired interval</text>
-  <text x="800" y="662" text-anchor="middle" class="small-text">Newcombe 95% · deterministic resampling</text>
+  <text x="800" y="626" text-anchor="middle" class="box-title">Paired interval</text>
+  <text x="800" y="653" text-anchor="middle" class="small-text">Newcombe v2 · paired resampling</text>
+  <text x="800" y="678" text-anchor="middle" class="small-text">legacy v1 replay by report format</text>
 
   <rect x="1025" y="595" width="330" height="100" rx="12" class="box-decision" />
-  <text x="1190" y="632" text-anchor="middle" class="box-title">Policy verdict</text>
-  <text x="1190" y="662" text-anchor="middle" class="small-text">lower or upper bound vs policy</text>
+  <text x="1190" y="626" text-anchor="middle" class="box-title">Policy verdict</text>
+  <text x="1190" y="653" text-anchor="middle" class="small-text">metric bound · record count</text>
+  <text x="1190" y="678" text-anchor="middle" class="small-text">interval-width precision</text>
 
   <path d="M 800 522 C 700 550 520 560 410 595" class="arrow" />
   <path d="M 575 645 L 635 645" class="arrow" />

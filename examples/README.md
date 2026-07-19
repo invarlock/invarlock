@@ -104,11 +104,13 @@ invarlock report artifacts/evidence/
 invarlock report artifacts/evidence/ --html evidence.html --explain
 ```
 
-Expected decision: both exact-match means are `1`, their delta is `0`
-percentage points, and the policy requires a delta greater than or equal to
-`0`. The subject therefore passes without hiding a quality regression behind a
-permissive threshold. The report verifies the bundle's evidence signature but
-does not replace the independent signed verification receipt.
+Expected decision: both exact-match means are `1` and their point delta is `0`
+percentage points. The 50 paired records produce a verifier-replayed confidence
+interval of about `[-7.13, 7.13]` percentage points. The policy requires at
+least 50 records, an interval no wider than 20 percentage points, and a lower
+bound of at least `-10`; all three requirements pass. The report verifies the
+bundle's evidence signature but does not replace the independent signed
+verification receipt.
 
 ## Run the trust-boundary demonstration
 
@@ -120,7 +122,8 @@ key and separately provisioned artifact, schedule, policy, runtime, and signer
 anchors, then records:
 
 - a signed acceptance receipt for the parity comparison;
-- a signed rejection receipt for the `-50` percentage-point regression; and
+- a signed rejection receipt for the one-record (`-2` percentage-point)
+  regression whose lower confidence bound falls below the policy floor; and
 - a signed integrity rejection after changing one report byte.
 
 From the repository root:

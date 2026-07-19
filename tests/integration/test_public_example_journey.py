@@ -312,8 +312,19 @@ def test_checked_in_example_completes_the_public_signed_journey(
     assert report["subject"] == {"mean_score": 1.0}
     assert report["comparison"] == {
         "kind": "exact_match_delta_pp",
-        "minimum": 0.0,
+        "minimum": -10.0,
         "value": 0.0,
+    }
+    assert report["format"] == "invarlock/comparison-report-v2"
+    assert report["sample_qualification"] == {
+        "record_count": {"minimum": 50, "observed": 50, "passed": True},
+        "interval_width": {
+            "maximum": 20.0,
+            "observed": pytest.approx(14.26951982667173),
+            "unit": "percentage_points",
+            "passed": True,
+        },
+        "passed": True,
     }
     assert report["verdict"] == "pass"
 
@@ -363,6 +374,21 @@ def test_trust_boundary_demo_accepts_rejects_and_detects_tampering(
     assert policy_rejected["statement"]["verdict"]["policy_verdict"] == "fail"
     assert tampered["statement"]["verdict"]["integrity_ok"] is False
     assert tampered["statement"]["verdict"]["ok"] is False
+
+    rejected_report = json.loads(
+        (
+            workspace
+            / "verifier/submissions/rejected-evidence/reports/evaluation.report.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert rejected_report["format"] == "invarlock/comparison-report-v2"
+    assert rejected_report["comparison"] == {
+        "kind": "exact_match_delta_pp",
+        "minimum": -10.0,
+        "value": pytest.approx(-2.0),
+    }
+    assert rejected_report["sample_qualification"]["passed"] is True
+    assert rejected_report["verdict"] == "fail"
 
     private_keys = sorted(
         path.relative_to(workspace).as_posix() for path in workspace.rglob("*.pem")

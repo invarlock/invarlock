@@ -49,9 +49,11 @@
   It identifies one closed comparison; it is not a human authorization.
 
 **Comparison report**
-: The `invarlock/comparison-report-v1` document derived from paired records and
-  policy. It contains the baseline mean, subject mean, comparison value,
-  metric-specific paired interval, threshold, and finite-schedule verdict.
+: The current `invarlock/comparison-report-v2` document derived from paired
+  records and policy. It contains the baseline mean, subject mean, comparison
+  value, metric-specific paired interval, threshold, optional sample
+  qualification, and finite-schedule verdict. Strict verification also replays
+  signed v1 reports under their original method.
 
 **Evidence pack**
 : The immutable `invarlock/evidence-pack-v1` directory containing the request,
@@ -95,11 +97,19 @@
 
 **Metric-specific paired interval**
 : Exact match uses a paired Newcombe 95% effect-size interval whose lower bound
-  controls policy. Normalized NLL uses the deterministic 95% interval obtained
-  from 2,048 paired percentile-bootstrap replicates whose upper bound controls
-  policy. An authorized scorer extension uses the same deterministic paired-
-  resampling method over its unit-interval record values, with the lower bound
-  controlling its percentage-point delta policy.
+  controls the metric threshold. Normalized NLL uses the deterministic 95%
+  interval obtained from 2,048 paired percentile-bootstrap replicates whose
+  upper bound controls the metric threshold. An authorized scorer extension
+  uses the same deterministic paired-resampling method over its unit-interval
+  record values, with the lower bound controlling its percentage-point delta
+  threshold. Optional sample qualification adds count and width requirements.
+
+**Sample qualification**
+: Optional v2 report section derived from coupled policy fields. It records the
+  required and observed paired-record count, the allowed and observed interval
+  width, their units and individual results, and their combined result. It
+  qualifies this authenticated finite schedule; it does not establish
+  representativeness.
 
 **Paired record**
 : One schedule position whose record ID and input digest exactly match the

@@ -397,6 +397,15 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
     assert "manifest + anchors + verdict" in dependency_svg
     assert 'd="M 680 598 L 770 598"' not in dependency_svg
 
+    pairing_svg = _read("docs/assets/user-guide-pairing-contract.svg")
+    for phrase in (
+        "Newcombe v2",
+        "legacy v1 replay by report format",
+        "metric bound · record count",
+        "interval-width precision",
+    ):
+        assert phrase in pairing_svg
+
     readme = _read("README.md")
     architecture = _read("docs/reference/architecture.md")
     assert 'src="docs/assets/evaluation-verification-flow.svg"' in readme
@@ -446,6 +455,21 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
     ):
         assert fragment in example
 
+    policy = json.loads(_read("examples/policy/acceptance.json"))
+    assert policy == {
+        "resolved_policy": {
+            "metrics": {
+                "exact_match": {
+                    "delta_min_pp": -10.0,
+                    "maximum_interval_width_pp": 20.0,
+                    "minimum_record_count": 50,
+                }
+            }
+        }
+    }
+    assert "one-record (`-2` percentage-point)" in example
+    assert "`-50` percentage-point regression" not in example
+
 
 def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:
     text = "\n".join(
@@ -469,10 +493,28 @@ def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:
         "representative",
         "paired-records-v1",
         "comparison-report-v1",
+        "comparison-report-v2",
         "runtime-side-report-v1",
+        "minimum_record_count",
+        "maximum_interval_width_pp",
+        "maximum_interval_width_ratio",
         "verification receipt",
     ):
         assert phrase in text
+
+
+def test_preflight_docs_name_current_format_and_pending_precision() -> None:
+    text = "\n".join(
+        _read(path)
+        for path in (
+            "docs/reference/api-guide.md",
+            "docs/reference/cli.md",
+            "docs/security/best-practices.md",
+        )
+    )
+    assert "invarlock/evaluation-preflight-v2" in text
+    assert "pending_execution" in text
+    assert "invarlock/evaluation-preflight-v1" not in text
 
 
 def test_receipt_reader_example_does_not_self_authorize_the_verifier() -> None:

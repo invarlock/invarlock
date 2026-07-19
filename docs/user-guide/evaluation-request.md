@@ -214,8 +214,9 @@ delta_pp = 100 * (subject_mean - baseline_mean)
 
 The report also records baseline-pass to subject-fail regressions,
 baseline-fail to subject-pass improvements, both-pass and both-fail counts, and
-the exact two-sided McNemar probability. The policy passes only when the paired
-Newcombe 95% effect-size interval's lower bound is at least
+the exact two-sided McNemar probability. The metric-bound check passes only
+when the current v2 continuity-corrected paired Newcombe 95% effect-size
+interval's lower bound is at least
 `policy.metrics.exact_match.delta_min_pp`.
 
 ### `normalized_nll_per_utf8_byte`
@@ -230,7 +231,7 @@ record_nll = -logprob_sum / utf8_byte_count
 ratio = arithmetic_mean(subject_record_nll) / arithmetic_mean(baseline_record_nll)
 ```
 
-The baseline mean must be positive. The report passes only when the interval's
+The baseline mean must be positive. The metric-bound check passes only when the interval's
 upper bound is at most
 `policy.metrics.normalized_nll_per_utf8_byte.ratio_max`.
 
@@ -341,12 +342,15 @@ removing, or changing an observation cannot alter the verdict; any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
 variance summaries from `invarlock-diagnostics` use this path.
 
-## Interval-controlled verdict
+## Interval and sample-controlled verdict
 
-Exact-match reports use `newcombe_hybrid_score_paired_v1`, scope
+New exact-match reports use `newcombe_hybrid_score_paired_v2`, scope
 `paired_binary_outcomes`, and interval mass `0.95`. The lower bound controls the
 exact-match policy. Paired regression and improvement counts plus the exact
 McNemar probability provide supporting context but do not override that bound.
+Strict verification continues to reconstruct
+`newcombe_hybrid_score_paired_v1` for a signed
+`invarlock/comparison-report-v1` pack.
 
 Normalized-NLL reports use `paired_percentile_bootstrap_sha256_v1` with:
 
@@ -360,6 +364,13 @@ Each replicate resamples paired positions, so baseline and subject observations
 for one scheduled record remain coupled. The upper bound controls the
 normalized-NLL policy. A favorable point estimate cannot override an interval
 that crosses the policy limit.
+
+Each metric policy may optionally add a coupled record-count and interval-width
+requirement. Exact match and scorer extensions pair `minimum_record_count` with
+`maximum_interval_width_pp`; normalized NLL pairs it with
+`maximum_interval_width_ratio`. The final v2 report passes only when the metric
+bound, minimum count, and maximum width all pass. Preflight can validate the
+count but marks interval width pending until execution.
 
 This is a deterministic resampling interval over the authenticated finite
 schedule. It is not a population confidence interval, proof of dataset

@@ -3,8 +3,9 @@
 !!! abstract "Assurance note"
     **In plain language:** InvarLock recomputes every score from authenticated
     paired records, derives the metric's paired interval, and applies the policy
-    to the conservative bound. A favorable point value cannot override an
-    interval that crosses the threshold.
+    to the conservative bound. When the policy qualifies sample size and
+    precision, those checks must pass too. A favorable point value cannot
+    override a threshold, count, or width failure.
 
     **Question:** How are a built-in metric or authorized deterministic scorer
     converted into a reproducible policy verdict?
@@ -22,6 +23,11 @@ It reports a point comparison and a verifier-replayed paired interval. Exact
 match uses a paired Newcombe 95% effect-size interval. Normalized NLL and an
 authorized scorer extension use deterministic paired resampling over the
 authenticated schedule.
+
+New evaluations emit `invarlock/comparison-report-v2`. Strict verification
+continues to replay `invarlock/comparison-report-v1` with its original
+exact-match interval method, so signed legacy evidence keeps its original
+meaning.
 
 ## Notation
 
@@ -41,6 +47,8 @@ authenticated schedule.
 | $\tau_{N}$ | Policy ceiling `normalized_nll_per_utf8_byte.ratio_max` |
 | $\tau_{S}$ | Policy floor `scorer_extension.delta_min_pp` |
 | $[q_L,q_U]$ | Metric-specific paired interval |
+| $n_{\min}$ | Optional policy minimum `minimum_record_count` |
+| $w_{\max}$ | Optional policy maximum interval width in percentage points or ratio units |
 
 ## Shared preconditions
 
@@ -91,7 +99,11 @@ The report records `comparison.value =` $\Delta_{\mathrm{pp}}$. The policy is:
 {
   "resolved_policy": {
     "metrics": {
-      "exact_match": {"delta_min_pp": -2.0}
+      "exact_match": {
+        "delta_min_pp": -2.0,
+        "maximum_interval_width_pp": 10.0,
+        "minimum_record_count": 400
+      }
     }
   }
 }
@@ -101,11 +113,15 @@ The verdict uses the interval lower bound:
 
 $$
 \operatorname{pass}_{\mathrm{EM}}
-\iff q_L \ge \tau_{\Delta}.
+\iff q_L \ge \tau_{\Delta}
+\land n \ge n_{\min}
+\land (q_U-q_L) \le w_{\max}.
 $$
 
 The boundary is inclusive. `delta_min_pp` is an absolute percentage-point floor,
 not a relative percentage and not a floor applied only to the point estimate.
+The count and width terms apply only when the policy supplies both coupled
+fields; without them, the threshold-only policy remains valid.
 
 For every pair, InvarLock also classifies the two binary outcomes:
 
@@ -122,11 +138,12 @@ of asymmetry between regressions and improvements; it does not control the
 acceptance verdict.
 
 The exact-match interval is a paired Newcombe hybrid-score 95% interval for
-the subject-minus-baseline effect. Its canonical uncertainty object is:
+the subject-minus-baseline effect. The current v2 report uses the
+continuity-corrected method:
 
 ```json
 {
-  "method": "newcombe_hybrid_score_paired_v1",
+  "method": "newcombe_hybrid_score_paired_v2",
   "scope": "paired_binary_outcomes",
   "interval_mass": 0.95,
   "lower": -1.8,
@@ -136,6 +153,10 @@ the subject-minus-baseline effect. Its canonical uncertainty object is:
 
 The policy reads `lower`; the point delta and McNemar probability cannot
 override a lower bound below `delta_min_pp`.
+
+For a signed v1 report, strict replay instead requires
+`newcombe_hybrid_score_paired_v1` and reconstructs the legacy result exactly.
+It does not apply the v2 calculation to old evidence.
 
 ## Normalized NLL per UTF-8 byte
 
@@ -168,7 +189,11 @@ The policy is:
 {
   "resolved_policy": {
     "metrics": {
-      "normalized_nll_per_utf8_byte": {"ratio_max": 1.05}
+      "normalized_nll_per_utf8_byte": {
+        "maximum_interval_width_ratio": 0.05,
+        "minimum_record_count": 400,
+        "ratio_max": 1.05
+      }
     }
   }
 }
@@ -178,7 +203,9 @@ The verdict uses the interval upper bound:
 
 $$
 \operatorname{pass}_{\mathrm{NLL}}
-\iff q_U \le \tau_N.
+\iff q_U \le \tau_N
+\land n \ge n_{\min}
+\land (q_U-q_L) \le w_{\max}.
 $$
 
 This statistic is a ratio of arithmetic means of per-record normalized scores.
@@ -186,6 +213,10 @@ It is not pooled NLL, a byte-weighted mean, token-weighted mean, or perplexity.
 Each selected record contributes one score regardless of target length.
 It measures expected-continuation likelihood regression under the authenticated
 prompt, target, provider, and runtime; it is not a general model-quality score.
+
+The count and ratio-width terms apply only when their coupled policy fields are
+present. Their pass does not establish that the schedule represents a broader
+population.
 
 ### Worked normalized-NLL example
 
@@ -316,7 +347,9 @@ The independent policy pins the exact scorer identity and configuration:
         "scorer_version": "1.0.0",
         "descriptor_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "configuration_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-        "delta_min_pp": -2.0
+        "delta_min_pp": -2.0,
+        "maximum_interval_width_pp": 10.0,
+        "minimum_record_count": 400
       }
     }
   }
@@ -329,14 +362,23 @@ defined above to the paired unit-interval values. The verdict is:
 
 $$
 \operatorname{pass}_{S}
-\iff q_L \ge \tau_S.
+\iff q_L \ge \tau_S
+\land n \ge n_{\min}
+\land (q_U-q_L) \le w_{\max}.
 $$
 
 Potential separately implemented scorers include deterministic token F1,
-structured-field extraction, and VQA answer normalization. The v1 contract
+structured-field extraction, and VQA answer normalization. The scorer-extension v1 contract
 does not admit SQL or code execution, model-based semantic similarity, network
 services, human judgment, external models, or LLM judges. Judge outputs may be
 authenticated observations, but observations do not enter acceptance.
+
+For every metric, the sample controls are optional but indivisible. Exact
+match and scorer extensions use `maximum_interval_width_pp`, whose value must
+be positive and no greater than 200. Normalized NLL uses positive
+`maximum_interval_width_ratio`. `minimum_record_count` is an integer from 1
+through 10,000. The canonical v2 report records the minimum, maximum, observed
+values, units, individual results, and combined `sample_qualification.passed`.
 
 ## Verifier-owned replay
 
@@ -352,7 +394,7 @@ The evidence signer cannot supply an accepted aggregate directly. Verification:
   are comparable;
 - reconstructs canonical paired records;
 - recomputes side means, point comparison, the selected interval, threshold
-  application, and verdict; and
+  application, optional count/width qualification, and verdict; and
 - requires canonical equality with the stored report.
 
 The implementation is in
@@ -362,8 +404,9 @@ and independent replay is in
 
 ## Finite-schedule interpretation
 
-A pass means that the policy's conservative bound cleared its threshold for the
-authenticated records and runtime configuration. It does not establish:
+A pass means that the policy's conservative bound cleared its threshold and
+any configured count and width requirements passed for the authenticated
+records and runtime configuration. It does not establish:
 
 - equality, equivalence, or non-inferiority in a broader population;
 - representativeness of the selected prompts or targets;

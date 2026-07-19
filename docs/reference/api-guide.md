@@ -194,6 +194,13 @@ preflight also loads the explicitly authorized scorer's deterministic
 descriptor and schema and validates the exact binding and task/input/output
 compatibility without calling scorer replay.
 
+`EvaluationPreflightResult` serializes as
+`invarlock/evaluation-preflight-v2`. When policy sample qualification is
+enabled, `sample_qualification.record_count` contains the minimum, observed
+count, and `status: pass`; `sample_qualification.interval_width` contains the
+maximum, unit, and `status: pending_execution`. Applications must not convert
+that pending state into a successful precision claim.
+
 Applications evaluating a run request that selects a runtime input hook must
 pass a side-aware `RuntimeResourceResolver` to the public transaction. The hook
 authenticates schedule-bound external resources without loading the model.
@@ -602,7 +609,7 @@ promise that every enum member is emitted by every public command. Accept only
 | Exception | When raised | Machine-readable behavior |
 | --- | --- | --- |
 | `EvaluationRequestError` | Request parsing, schema, path, provider, or capability failure | Message only at request-loader boundary |
-| `EvaluationPreflightError` | Execution-free request, input, runtime-availability, key, or output qualification fails | `as_json()` uses `invarlock/evaluation-preflight-v1` |
+| `EvaluationPreflightError` | Execution-free request, input, runtime-availability, key, or output qualification fails | `as_json()` uses `invarlock/evaluation-preflight-v2` |
 | `EvaluationTransactionError` | Execute/import/publication cannot produce evidence | `exit_code`; `as_json()` uses `invarlock/evaluation-result-v1` |
 | `EvidenceVerificationError` | Trust input, pack replay, receipt write, or acceptance failure | `exit_code`, `payload`, and `as_json()` |
 | `EvidenceReportError` | Signature-authenticated report cannot be rendered safely | `exit_code` |

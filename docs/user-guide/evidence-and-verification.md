@@ -163,8 +163,8 @@ The verifier:
 - validates artifact, provider, observation, schedule, and report cross-bindings;
 - re-derives every built-in paired score from typed observation facts or,
   when selected, replays an explicitly authorized deterministic scorer twice;
-- recomputes the metric, its paired interval, threshold comparison,
-  and report; and
+- recomputes the metric, its paired interval, threshold comparison, optional
+  count/width qualification, and report; and
 - signs the complete result and caller-supplied anchors with the verifier key.
 
 Multiple verifiers may independently obtain the same policy bytes bound into
@@ -268,11 +268,14 @@ signature before rendering. It shows:
 - the metric-specific paired interval;
 - paired exact-match regressions, improvements, exact McNemar probability, and
   Newcombe 95% interval when exact match is selected;
+- sample qualification showing the required and observed paired count and
+  interval width when the policy enables those coupled controls;
 - a token-weighted perplexity interpretation when normalized-NLL tokenizer and
   token-count facts are comparable;
 - the scorer binding and deterministic per-side replay when a scorer extension
   is selected;
-- policy limit and conservative-bound verdict;
+- policy limit and the verdict formed from the conservative bound plus any
+  configured count and precision requirements;
 - policy digest; and
 - evidence-signer fingerprint.
 

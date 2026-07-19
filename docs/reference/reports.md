@@ -35,8 +35,13 @@ reconstructs the runtime-side object exactly.
 
 ## Canonical comparison report
 
-`reports/evaluation.report.json` is an
-`invarlock/comparison-report-v1` object with exactly:
+New evaluations write `reports/evaluation.report.json` as an
+`invarlock/comparison-report-v2` object. Strict verification also accepts a
+signed `invarlock/comparison-report-v1` object and reconstructs it with the
+legacy v1 exact-match interval method. A verifier never silently upgrades the
+arithmetic of an existing pack.
+
+The current report contains:
 
 - `comparison_id`, `metric`, and `record_count`;
 - baseline and subject `mean_score`;
@@ -44,7 +49,9 @@ reconstructs the runtime-side object exactly.
 - one metric-specific `uncertainty` object;
 - `paired_binary` for exact match, `derived_measurements` for normalized NLL,
   or `scorer_extension` and `scorer_replay` for an authorized extension;
-- `policy_digest`; and
+- `policy_digest`;
+- optional `sample_qualification` when the policy binds count and precision
+  requirements; and
 - `verdict`, either `pass` or `fail`.
 
 A complete exact-match report has this shape:
@@ -58,7 +65,7 @@ A complete exact-match report has this shape:
     "value": 5.0
   },
   "comparison_id": "cmp-example",
-  "format": "invarlock/comparison-report-v1",
+  "format": "invarlock/comparison-report-v2",
   "metric": "exact_match",
   "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "record_count": 20,
@@ -72,18 +79,28 @@ A complete exact-match report has this shape:
     "mcnemar_exact_two_sided_p_value": 1.0,
     "effect_size_pp": 5.0,
     "effect_size_confidence_interval": {
-      "method": "newcombe_hybrid_score_paired_v1",
+      "method": "newcombe_hybrid_score_paired_v2",
       "confidence_level": 0.95,
-      "lower_pp": -12.68873442320911,
-      "upper_pp": 22.870273364530323
+      "lower_pp": -14.975805254302834,
+      "upper_pp": 24.866848542801065
     }
+  },
+  "sample_qualification": {
+    "record_count": {"minimum": 20, "observed": 20, "passed": true},
+    "interval_width": {
+      "maximum": 50.0,
+      "observed": 39.8426537971039,
+      "unit": "percentage_points",
+      "passed": true
+    },
+    "passed": true
   },
   "uncertainty": {
     "interval_mass": 0.95,
-    "lower": -12.68873442320911,
-    "method": "newcombe_hybrid_score_paired_v1",
+    "lower": -14.975805254302834,
+    "method": "newcombe_hybrid_score_paired_v2",
     "scope": "paired_binary_outcomes",
-    "upper": 22.870273364530323
+    "upper": 24.866848542801065
   },
   "verdict": "pass"
 }
@@ -103,9 +120,10 @@ point comparison, interval bounds, threshold, or verdict.
 }
 ```
 
-`value = 100 * (subject_mean - baseline_mean)`. The report passes when
+`value = 100 * (subject_mean - baseline_mean)`. The metric-bound check passes when
 `uncertainty.lower >= comparison.minimum`, where `minimum` comes from
-`resolved_policy.metrics.exact_match.delta_min_pp`.
+`resolved_policy.metrics.exact_match.delta_min_pp`. If sample qualification is
+present, the final report passes only when its count and width checks also pass.
 
 For this metric, baseline and subject `mean_score` are literal exact-match
 accuracies between `0` and `1`. Comparison and interval bounds are percentage
@@ -115,9 +133,35 @@ points between `-100` and `100`.
 baseline-fail to subject-pass improvements, both-pass and both-fail counts, the
 number of discordant pairs, and the exact two-sided McNemar probability. Its
 effect size is the same subject-minus-baseline percentage-point delta. The
-paired Newcombe hybrid-score 95% interval is repeated as the canonical
-`uncertainty` object. The policy uses its lower bound; the McNemar probability
-does not control the verdict.
+continuity-corrected paired Newcombe hybrid-score 95% interval is repeated as
+the canonical `uncertainty` object in a v2 report. The policy uses its lower
+bound; the McNemar probability does not control the verdict. A v1 report keeps
+method `newcombe_hybrid_score_paired_v1` and is replayed only with that original
+method.
+
+### Sample and precision qualification
+
+A metric policy may omit sample qualification. If it enables qualification,
+the two fields must be supplied together:
+
+- `minimum_record_count` plus `maximum_interval_width_pp` for exact match or an
+  authorized scorer extension; or
+- `minimum_record_count` plus `maximum_interval_width_ratio` for normalized
+  NLL.
+
+`minimum_record_count` is an integer from 1 through 10,000. Percentage-point
+width must be positive and at most 200; ratio width must be positive. The
+report records the observed width as `uncertainty.upper - uncertainty.lower`.
+Its final verdict is:
+
+```text
+metric bound passes
+and observed record count >= minimum record count
+and observed interval width <= maximum interval width
+```
+
+The report therefore distinguishes a metric rejection from insufficient count
+or precision without allowing a favorable point value to bypass either gate.
 
 ### Normalized NLL per UTF-8 byte
 
@@ -132,7 +176,7 @@ does not control the verdict.
 Each side's `mean_score` is the arithmetic mean of verifier-derived per-record
 teacher-forced expected-continuation
 `-logprob_sum / utf8_byte_count`. The baseline mean must be positive and
-`value = subject_mean / baseline_mean`. The report passes when
+`value = subject_mean / baseline_mean`. The metric-bound check passes when
 `uncertainty.upper <= comparison.maximum`, where `maximum` comes from
 `resolved_policy.metrics.normalized_nll_per_utf8_byte.ratio_max`.
 
@@ -210,7 +254,8 @@ record and returns one higher-is-better value in `[0, 1]`. The engine owns the
 arithmetic mean and computes
 `value = 100 * (subject_mean - baseline_mean)`. It then applies the same fixed
 2,048-replicate paired schedule-resampling method to the paired record values.
-The report passes only when `uncertainty.lower >= comparison.minimum`, where
+The metric-bound check passes only when
+`uncertainty.lower >= comparison.minimum`, where
 `minimum` comes from `resolved_policy.metrics.scorer_extension.delta_min_pp`.
 
 `scorer_extension` records the bound scorer ID, version, descriptor digest,
@@ -219,7 +264,7 @@ replay results. Verification requires the caller to authorize the same scorer
 in a `ScorerExtensionRegistry`, runs it twice, and reconstructs the complete
 report. A stored scorer result is never accepted as an aggregate assertion.
 
-The v1 contract is suitable for separately supplied deterministic text scorers
+The scorer-extension v1 contract is suitable for separately supplied deterministic text scorers
 such as token F1, structured-field extraction, or VQA answer normalization.
 No such packages are claimed as built in. SQL or code execution, model-based
 semantic similarity, network or human services, and LLM judges are outside
@@ -344,12 +389,16 @@ A shortened text view is:
 | Baseline mean | 0.75 |
 | Subject mean | 0.8 |
 | Exact-match delta (pp) | 5 |
-| Paired Newcombe 95% interval | [-12.688734, 22.870273] |
+| Paired Newcombe 95% interval | [-14.975805, 24.866849] |
 | Minimum allowed (pp) | -15 |
+| Paired record count | 20 (minimum 20) |
+| Confidence-interval width (pp) | 39.842654 (maximum 50) |
 ```
 
 The exact-match rendering also lists regression and improvement counts, the
-discordant-pair count, and the exact two-sided McNemar probability.
+discordant-pair count, and the exact two-sided McNemar probability. When the
+policy includes sample qualification, console and HTML render the observed and
+required record count, interval width, and combined qualification result.
 
 The human view states what it is: a rendering of signature-authenticated
 evidence. Independent acceptance comes from `invarlock verify` and its signed
@@ -360,7 +409,7 @@ scrape console or HTML.
 
 | State | Integrity | Policy | Portable receipt | Interpretation |
 | --- | --- | --- | --- | --- |
-| Accepted | True | `pass` | Signed success receipt | Conservative interval bound met the policy under all supplied anchors |
+| Accepted | True | `pass` | Signed success receipt | Conservative interval bound and any configured sample/precision requirements met the policy under all supplied anchors |
 | Policy rejection | True | `fail` | Signed rejection receipt when completion reached | Authentic evidence did not meet the policy |
 | Integrity rejection | False | Unavailable or untrusted | Signed rejection receipt when safe completion reached | Pack must not be used |
 | Precondition failure | Not completed | Unavailable | May be absent | Caller input or structure prevented completed verification |

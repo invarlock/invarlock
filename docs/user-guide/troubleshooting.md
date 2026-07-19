@@ -295,6 +295,10 @@ remains authoritative; do not copy one side's tokenizer facts into the other.
 The point comparison is descriptive. Exact match passes only when the paired
 Newcombe interval's lower bound meets `delta_min_pp`; normalized NLL passes only
 when the schedule-resampling interval's upper bound meets `ratio_max`.
+If the policy enables sample qualification, the observed record count must also
+meet `minimum_record_count` and the observed width must not exceed the matching
+maximum-width field. Inspect `sample_qualification` before changing the metric
+threshold.
 Review the authenticated schedule, interval method, and record-level variation.
 Changing the threshold or schedule requires a new evidence transaction.
 

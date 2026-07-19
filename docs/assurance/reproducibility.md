@@ -75,7 +75,7 @@ An `invarlock/evidence-pack-v1` binds:
 | Dataset | Canonical schedule bytes, dataset coordinates, ordered records, input digests, and expected outputs |
 | Provider | Provider name, ABI, package identity, capabilities, backend facts, and provider receipt |
 | Runtime | Per-side image digest, execution settings, device facts, run configuration, and runtime manifest |
-| Decision | Per-record observations, derived pairs, built-in metric or scorer binding, policy bytes and digest, report arithmetic, selected paired interval, and conservative-bound verdict |
+| Decision | Per-record observations, derived pairs, built-in metric or scorer binding, policy bytes and digest, report arithmetic, selected paired interval, optional sample qualification, and verdict |
 | Actors | Evidence-signer fingerprint in the bundle and verifier identity/fingerprint in the external receipt |
 
 For the built-in Hugging Face provider, strict run mode authenticates a local
@@ -149,14 +149,18 @@ comparison rather than a strict reproduction.
 ## Numerical and output drift
 
 The paired interval is reproduced exactly from the same authenticated records,
-built-in metric or scorer binding, and algorithm version. Exact match replays
-the paired Newcombe 95%
+built-in metric or scorer binding, report format, and algorithm version. Exact
+match replays the report-version-specific paired Newcombe 95%
 interval, regression and improvement counts, and exact McNemar probability.
 Normalized NLL also binds the schedule digest used to derive 2,048 resampling
 index sequences without a platform random-number generator. A scorer extension
 also pins its ID, version, descriptor, and configuration and must replay the
 same canonical result twice. Exact replay does not make independently rerun
 model outputs deterministic across all hardware.
+
+When the policy enables sample qualification, replay also recomputes the
+observed count, interval width, individual checks, and their conjunction with
+the metric-bound decision.
 
 Even with matching recorded controls, floating-point kernels, accelerator
 generations, drivers, compiler choices, thread scheduling, and hidden backend

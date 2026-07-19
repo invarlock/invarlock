@@ -120,10 +120,17 @@ independent acceptance record.
 | `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of teacher-forced expected-continuation NLL per UTF-8 byte | Paired schedule-resampling interval upper bound is at most `metrics.normalized_nll_per_utf8_byte.ratio_max` |
 | Authorized deterministic text scorer | Difference between subject and baseline arithmetic-mean `[0,1]` scores, in percentage points | Paired schedule-resampling interval lower bound is at least `metrics.scorer_extension.delta_min_pp` |
 
-Exact match uses a paired Newcombe 95% effect-size interval. Normalized NLL
+Exact match uses the continuity-corrected paired Newcombe 95% effect-size
+interval emitted by `invarlock/comparison-report-v2`. Normalized NLL
 uses the deterministic `paired_percentile_bootstrap_sha256_v1` method with
 2,048 replicates over the authenticated finite schedule. The selected policy
 reads the conservative bound of the corresponding interval.
+
+A metric policy may additionally bind `minimum_record_count` and the matching
+maximum interval-width field. The two fields are supplied together. When they
+are present, the metric bound, record count, and precision width must all pass;
+the canonical report records each result. Preflight can qualify record count
+but leaves interval width pending until execution produces paired outcomes.
 
 Normalized NLL measures expected-continuation likelihood under teacher forcing,
 not general model quality. If tokenizer contracts and paired token counts are

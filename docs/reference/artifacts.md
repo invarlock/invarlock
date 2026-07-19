@@ -60,7 +60,7 @@ records, and canonical report are separate payloads referenced by the manifest.
 | `providers/{side}/*` | Five per side | Artifact, observation, provider, configuration, and runtime provenance |
 | `runs/{side}/report.json` | One per side | Minimal side-to-observation binding |
 | `records/paired-records.json` | One | Verifier-reproducible record scores; not an accepted aggregate |
-| `reports/evaluation.report.json` | One | Canonical means, comparison, paired interval, threshold, and verdict reproduced by verification |
+| `reports/evaluation.report.json` | One | Canonical means, comparison, paired interval, threshold, optional sample qualification, and verdict reproduced by verification |
 | `observations/*.json` | Zero to 64 | Authenticated typed context; descriptive only and excluded from policy replay |
 | `checksums.sha256` | One | Exact payload-byte inventory |
 | `manifest.json` and signature | One each | Closed references and signer authentication |
@@ -202,12 +202,21 @@ no policy, interval, or verdict authority; an unavailable interpretation does
 not invalidate the byte-normalized NLL comparison.
 
 The canonical report adds the metric-specific paired interval to the two side
-means and point comparison. Exact match also records paired regression and
-improvement counts, an exact two-sided McNemar probability, and the paired
-Newcombe 95% effect-size interval whose lower bound controls policy. Normalized
-NLL uses the upper bound of its authenticated-schedule resampling interval.
-An authorized scorer extension uses the lower bound of the same fixed paired-
-resampling method against `metrics.scorer_extension.delta_min_pp`.
+means and point comparison. New reports use
+`invarlock/comparison-report-v2`; the verifier also replays existing
+`invarlock/comparison-report-v1` packs under their original arithmetic. Exact
+match records paired regression and improvement counts, an exact two-sided
+McNemar probability, and the paired Newcombe 95% effect-size interval whose
+lower bound controls policy. Normalized NLL uses the upper bound of its
+authenticated-schedule resampling interval. An authorized scorer extension
+uses the lower bound of the same fixed paired-resampling method against
+`metrics.scorer_extension.delta_min_pp`.
+
+When the policy supplies the coupled sample controls, the v2 report also
+contains `sample_qualification`. It records the minimum and observed paired
+count, maximum and observed interval width, units, each check's result, and the
+combined result. The final verdict is the conjunction of that result and the
+metric-bound result.
 
 ## Provider sidecars
 

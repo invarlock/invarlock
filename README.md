@@ -56,10 +56,17 @@ derives one of two built-in paired comparisons:
 
 For exact match, InvarLock reports baseline-pass to subject-fail regressions,
 baseline-fail to subject-pass improvements, the exact two-sided McNemar
-probability, and a paired Newcombe 95% effect-size interval. For normalized
+probability, and a continuity-corrected paired Newcombe 95% effect-size
+interval. For normalized
 NLL, it uses 2,048 paired percentile-bootstrap replicates whose index draws are
 derived from the authenticated schedule digest. In both cases the policy reads
 the conservative interval bound, not the point value alone.
+
+A policy may also require a minimum paired-record count and a maximum interval
+width. Those controls are supplied together. When present, the report passes
+only when the metric bound, record-count minimum, and precision ceiling all
+pass. Preflight can prove the schedule count before execution; it reports the
+interval-width check as pending until paired results exist.
 
 Normalized NLL is teacher-forced expected-continuation likelihood regression.
 It does not measure general model quality. When both artifacts bind the same
@@ -168,9 +175,11 @@ invarlock evaluate request.yaml --signing-key evidence-signer.pem \
   --preflight --json
 ```
 
-Preflight checks configuration and local availability; continuing with the real
-evaluation is still required to establish runtime execution and the policy
-result.
+Preflight emits `invarlock/evaluation-preflight-v2` and checks configuration
+and local availability. When the policy includes sample qualification, it also
+reports the observed record count and leaves interval width explicitly
+`pending_execution`. Continuing with the real evaluation is still required to
+establish runtime execution, interval precision, and the policy result.
 
 Replace the illustrative digests with values derived from the exact inputs.
 Then invoke the host CLI. In run mode, the host prepares the authenticated

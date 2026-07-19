@@ -287,14 +287,22 @@ first parse cannot be replaced with a symbolic link unnoticed.
 
 The built-in comparison metrics are `exact_match` and
 `normalized_nll_per_utf8_byte`. Exact-match reports include paired outcome
-counts, an exact two-sided McNemar probability, and a paired Newcombe 95%
-interval whose lower bound controls policy. Normalized-NLL reports include the
+counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
+95% interval whose lower bound controls policy. New v2 reports use the
+continuity-corrected method; strict verification preserves the original v1
+method for legacy v1 reports. Normalized-NLL reports include the
 fixed 2,048-replicate `paired_percentile_bootstrap_sha256_v1` interval over the
 authenticated schedule and apply the policy ceiling to its upper bound. A
 scorer-extension comparison uses the same fixed paired-resampling method over
 unit-interval record values and applies `delta_min_pp` to the lower bound.
 [Decision semantics](../assurance/decision-semantics.md) defines the exact
 arithmetic.
+
+Every metric policy may contain only its threshold, or its threshold plus the
+coupled `minimum_record_count` and maximum-width fields. Exact match and scorer
+extensions use `maximum_interval_width_pp`; normalized NLL uses
+`maximum_interval_width_ratio`. A v2 report with those controls passes only
+when the threshold, count, and width checks all pass.
 
 ## Provider document field map
 
@@ -349,7 +357,8 @@ separate JSON Schema file:
 | `invarlock/scorer-extension-descriptor-v1` | One scorer's capabilities, input facts, result semantics, and trust constraints |
 | `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
 | `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
-| `invarlock/comparison-report-v1` | Canonical means, point comparison, metric-specific paired interval, threshold, and verdict |
+| `invarlock/comparison-report-v2` | Current canonical means, point comparison, metric-specific paired interval, optional sample qualification, threshold, and verdict |
+| `invarlock/comparison-report-v1` | Legacy canonical report replayed with its original exact-match interval method; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
 | `invarlock/evidence-pack-verify-v1` | Machine-readable independent verification result |
 | `invarlock/evidence-verification-receipt-v1` | Signed statement binding the pack, artifact/schedule/policy/runtime/signer anchors, verifier, optional trust-profile digest, and verdict |
@@ -407,12 +416,13 @@ Schema validity is only the first layer. The verifier also recomputes:
 - record order, input digests, and observation-record digests;
 - exact-match or normalized-NLL scores, or explicitly authorized scorer-
   extension results replayed twice from authenticated text facts;
-- paired exact-match counts, exact McNemar probability, and Newcombe interval,
+- paired exact-match counts, exact McNemar probability, and the report-version-specific Newcombe interval,
   or deterministic paired replicates and interval endpoints for normalized NLL
   and scorer-extension deltas;
 - derived perplexity facts when tokenizer and paired token counts are
   comparable;
-- comparison means, threshold arithmetic, and policy verdict; and
+- comparison means, threshold arithmetic, optional count/interval-width
+  qualification, and policy verdict; and
 - evidence signer and verifier signature bindings.
 
 A custom reader that performs schema validation alone is not equivalent to
@@ -424,6 +434,11 @@ A format identifier names one exact shape and interpretation. Additive fields
 are not silently accepted by closed objects. A breaking artifact change requires
 a new format identifier and explicit reader behavior. Runtime providers must
 also match ABI `1` exactly.
+
+The v2 comparison report is the current writer format. Strict verification
+continues to reconstruct a v1 report with the v1 exact-match method when a
+signed legacy pack identifies that format; it never applies v2 arithmetic and
+then relabels the result as v1.
 
 Core and first-party add-ins are released at the same package version. Provider
 add-ins declare the exact coordinated core release, while the provider ABI remains

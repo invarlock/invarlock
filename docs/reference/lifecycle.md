@@ -102,7 +102,10 @@ Run and import therefore converge on the same bundle and verifier semantics.
 The engine requires both observations to have the same ordered record IDs and
 input digests as the schedule. It derives built-in record scores or replays the
 authorized scorer, then derives means, the comparison value, paired interval,
-and policy verdict from the relevant lower or upper bound. The comparison ID is
+optional count/interval-width qualification, and policy verdict from the
+relevant lower or upper bound and any configured sample controls. New
+transactions write `invarlock/comparison-report-v2`; verification preserves
+the report-version-specific arithmetic of signed v1 evidence. The comparison ID is
 deterministically derived from normalized intent, both artifact identities,
 schedule, policy, runtime digests, and paired records.
 

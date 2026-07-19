@@ -28,7 +28,7 @@ invarlock report evidence/
 
 | Transaction | Reads | Writes | Result |
 | --- | --- | --- | --- |
-| `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, and evaluation-time policy verdict |
+| `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample qualification, and evaluation-time policy verdict |
 | `verify` | Untrusted evidence plus independent artifact, schedule, policy, runtime, and signer anchors; verifier identity; and verifier key | One no-clobber signed receipt outside the bundle | Independent replay and acceptance/rejection record |
 | `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Human view of the canonical comparison |
 
@@ -298,19 +298,27 @@ the independent verifier anchors or replace the signed receipt.
 
 ## Interpret the result
 
-Every canonical comparison report records:
+Every current `invarlock/comparison-report-v2` report records:
 
 - a point estimate over all authenticated records;
 - a paired Newcombe 95% interval plus regression/improvement counts and an
   exact McNemar probability for exact match, or the fixed 2,048-replicate
   `paired_percentile_bootstrap_sha256_v1` interval for normalized NLL;
 - the selected policy limit; and
-- a verdict controlled by the conservative interval bound.
+- optional record-count and interval-width qualification when the policy binds
+  those coupled requirements; and
+- a verdict controlled by the conservative interval bound and any configured
+  sample qualification.
 
 For exact match, the lower bound must clear the percentage-point floor. For
 byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its
 interval resamples paired schedule positions, so each baseline observation
 stays coupled to its subject observation.
+
+Preflight can establish that the authenticated schedule meets a configured
+minimum count, but interval width remains pending until execution. Strict
+verification also preserves exact replay of legacy
+`invarlock/comparison-report-v1` evidence with its original exact-match method.
 
 Normalized NLL is teacher-forced expected-continuation likelihood regression,
 not a general model-quality measure. A displayed token-weighted perplexity

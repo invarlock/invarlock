@@ -82,7 +82,7 @@ row succeeds.
 | --- | --- | --- |
 | The comparison names closed inputs. | The normalized request and input identities bind the baseline, subject, schedule, policy, both runtime digests, and an exact scorer binding when selected. | The request loader rejects unknown fields, unsafe paths, ambiguous YAML, missing inputs, unsupported metrics, and incomplete scorer bindings. The publisher checks the request against provider identities, material digests, and the independently authorized scorer registry. |
 | Both sides evaluated the same ordered records. | The canonical schedule contains one task, unique record IDs, authenticated ordered input parts, expected outputs, and dataset coordinates. Each provider observation binds the schedule digest and repeats the ordered record IDs and input digests. | Pair derivation rejects missing, failed, duplicated, reordered, task-mismatched, or input-mismatched records. See [Pairing and replay](pairing-and-replay.md). |
-| The decision follows the declared arithmetic. | The bundle contains runtime facts, verifier-derived paired scores, the canonical comparison report, its metric-specific paired interval, the exact policy digest, and scorer replay results when selected. | Verification reconstructs every built-in score or replays an explicitly authorized scorer twice, then reconstructs each paired statistic or interval replicate, comparison, and conservative-bound verdict from the bound records and independently supplied policy. See [Decision semantics](decision-semantics.md). |
+| The decision follows the declared arithmetic. | The bundle contains runtime facts, verifier-derived paired scores, the canonical comparison report, its metric-specific paired interval, optional sample qualification, the exact policy digest, and scorer replay results when selected. | Verification reconstructs every built-in score or replays an explicitly authorized scorer twice, then reconstructs each paired statistic or interval replicate, comparison, optional count/width checks, and verdict from the bound records and independently supplied policy. See [Decision semantics](decision-semantics.md). |
 | The published evidence has not changed. | `manifest.json`, `checksums.sha256`, the complete file inventory, and the Ed25519 evidence signature bind the bundle. | Strict verification rejects checksum gaps, extra files, unsafe paths, JSON that is not canonical, signature failure, or an evidence-signer fingerprint different from the caller's anchor. |
 | Acceptance uses an independent trust decision. | The verifier supplies the policy bytes, expected artifact identities, canonical schedule, runtime digests, evidence-signer fingerprint, verifier identity, and verifier key outside the bundle. | `invarlock verify` replays the bundle under those anchors and writes a signed receipt outside the immutable evidence directory. |
 | People see the same decision as machines. | Console and HTML output are rendered from the canonical comparison report. | `invarlock report` authenticates bundle integrity and the evidence signature before rendering; it does not alter evidence or create an acceptance verdict. |
@@ -140,12 +140,12 @@ A passing signed verification receipt establishes that:
 - the bundle was signed by the evidence-signing key whose fingerprint the verifier
   independently expected;
 - the bundle inventory, checksums, input bindings, runtime-integration bindings,
-  schedule, paired records, runtime manifests, comparison arithmetic, and
-  paired interval replayed without error;
+  schedule, paired records, runtime manifests, comparison arithmetic, paired
+  interval, and optional sample qualification replayed without error;
 - the independently supplied policy, artifact-identity, schedule, and runtime
   digests matched the bound identities; and
 - the replayed finite-schedule decision passed that policy using the required
-  conservative interval bound.
+  conservative interval bound and any configured count and width controls.
 
 The receipt also identifies the verifier key and verifier identity that made
 that statement. It does not silently upgrade the statement beyond those

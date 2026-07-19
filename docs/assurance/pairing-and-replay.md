@@ -141,7 +141,8 @@ authority.
 
 Verification derives the entire document again and requires exact equality
 with the stored canonical file. It then rebuilds the comparison report from
-those derived pairs, including the selected paired interval.
+those derived pairs, including the selected paired interval and optional
+record-count and interval-width qualification.
 
 ## Worked mismatch examples
 
