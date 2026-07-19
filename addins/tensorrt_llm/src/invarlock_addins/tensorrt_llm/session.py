@@ -56,12 +56,15 @@ _RUNNER_PROTOCOL = "invarlock/tensorrt-llm-runner-v1"
 _RUNNER_INFO_FORMAT = "invarlock/tensorrt-llm-runner-info-v1"
 _RUNNER_REQUEST_FORMAT = "invarlock/tensorrt-llm-runner-request-v1"
 _RUNNER_RESPONSE_FORMAT = "invarlock/tensorrt-llm-runner-response-v1"
+_RUNNER_BATCH_REQUEST_FORMAT = "invarlock/tensorrt-llm-runner-batch-request-v1"
+_RUNNER_BATCH_RESPONSE_FORMAT = "invarlock/tensorrt-llm-runner-batch-response-v1"
 _MAX_INPUT_BYTES = 1024 * 1024
 _MAX_BATCH_RECORDS = 1024
 _MAX_STDOUT_BYTES = 2 * 1024 * 1024
 _MAX_STDERR_BYTES = 256 * 1024
 _MAX_INFO_BYTES = 16 * 1024
 _INFO_TIMEOUT_SECONDS = 120
+_MAX_BATCH_TIMEOUT_SECONDS = 24 * 60 * 60
 _IO_CHUNK_BYTES = 64 * 1024
 _FICLONE = 0x40049409
 _ENGINE_NAME = re.compile(r"^rank(0|[1-9][0-9]*)\.engine$")
@@ -484,6 +487,72 @@ def _observation_sha256(observation: ScoringObservation) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _validated_batch_response(
+    payload: bytes,
+    *,
+    expected_record_ids: tuple[str, ...],
+) -> tuple[str, ...]:
+    response = _strict_json_object(payload, label="TensorRT-LLM batch runner response")
+    if set(response) != {"format_version", "outputs"}:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM batch runner response has unexpected fields"
+        )
+    if response.get("format_version") != _RUNNER_BATCH_RESPONSE_FORMAT:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM batch runner response format is unsupported"
+        )
+    raw_outputs = response.get("outputs")
+    if not isinstance(raw_outputs, list):
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM batch runner outputs must be a list"
+        )
+    if len(raw_outputs) != len(expected_record_ids):
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM batch runner output count does not match the batch"
+        )
+    outputs: list[str] = []
+    observed_record_ids: list[str] = []
+    for raw_output in raw_outputs:
+        if not isinstance(raw_output, dict) or set(raw_output) != {
+            "output_text",
+            "record_id",
+        }:
+            raise TensorRTLLMExecutionError(
+                "TensorRT-LLM batch runner output fields are not closed"
+            )
+        record_id = raw_output["record_id"]
+        if not isinstance(record_id, str):
+            raise TensorRTLLMExecutionError(
+                "TensorRT-LLM batch runner record_id must be text"
+            )
+        observed_record_ids.append(record_id)
+        try:
+            output_text = exact_match_output_text(raw_output["output_text"])
+        except ValueError as exc:
+            raise TensorRTLLMExecutionError(
+                "TensorRT-LLM batch runner output_text must be valid user-visible text"
+            ) from exc
+        if len(output_text.encode("utf-8")) > _MAX_STDOUT_BYTES:
+            raise TensorRTLLMExecutionError(
+                "TensorRT-LLM batch runner output_text exceeds the byte limit"
+            )
+        outputs.append(output_text)
+    if tuple(observed_record_ids) != expected_record_ids:
+        raise TensorRTLLMExecutionError(
+            "TensorRT-LLM batch runner output order does not match the batch"
+        )
+    return tuple(outputs)
+
+
+def _batch_timeout_seconds(*, per_record_timeout: int, record_count: int) -> int:
+    if record_count < 1 or record_count > _MAX_BATCH_RECORDS:
+        raise ValueError("TensorRT-LLM batch record count is outside the time bound")
+    return min(
+        per_record_timeout * record_count,
+        _MAX_BATCH_TIMEOUT_SECONDS,
+    )
+
+
 @dataclass(frozen=True)
 class TensorRTLLMSessionConfig:
     artifact_identity: TensorRTLLMArtifactIdentity
@@ -665,6 +734,56 @@ class TensorRTLLMSession:
                 "TensorRT-LLM runner output_text must be valid user-visible text"
             ) from exc
 
+    def _batch_request(self, records: tuple[EvaluationRecord, ...]) -> bytes:
+        request = {
+            "engine_bundle": str(self._engine_snapshot),
+            "format_version": _RUNNER_BATCH_REQUEST_FORMAT,
+            "protocol_version": _RUNNER_PROTOCOL,
+            "records": [
+                {"input_text": record.input_text, "record_id": record.record_id}
+                for record in records
+            ],
+            "settings": asdict(self._config.execution_settings),
+            "tokenizer_contract": str(self._tokenizer_snapshot),
+        }
+        encoded = json.dumps(
+            request,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        if len(encoded) > _MAX_INPUT_BYTES:
+            raise ValueError("TensorRT-LLM batch input exceeds the byte limit")
+        return encoded
+
+    def _execute_batch(self, records: tuple[EvaluationRecord, ...]) -> tuple[str, ...]:
+        runner, vendor_python, execution_boundary = self._require_open()
+        status, stdout, stderr = _run_bounded_process(
+            runner=runner,
+            vendor_python=vendor_python,
+            execution_boundary=execution_boundary,
+            arguments=("--invarlock-score-batch-v1",),
+            input_bytes=self._batch_request(records),
+            run_directory=self._run_directory,
+            timeout_seconds=_batch_timeout_seconds(
+                per_record_timeout=self._config.execution_settings.timeout_seconds,
+                record_count=len(records),
+            ),
+            stdout_limit=_MAX_STDOUT_BYTES,
+            stderr_limit=_MAX_STDERR_BYTES,
+        )
+        if status != 0:
+            raise TensorRTLLMExecutionError(
+                f"TensorRT-LLM batch runner exited with status {status}"
+            )
+        if stderr:
+            raise TensorRTLLMExecutionError("TensorRT-LLM batch runner emitted stderr")
+        return _validated_batch_response(
+            stdout,
+            expected_record_ids=tuple(record.record_id for record in records),
+        )
+
     def score(self, batch: EvaluationBatch) -> ScoringObservation:
         if not isinstance(batch, EvaluationBatch):
             raise TypeError("batch must be an EvaluationBatch")
@@ -699,8 +818,10 @@ class TensorRTLLMSession:
             self._recheck_runtime()
             scoring_records: list[RuntimeScoringRecord] = []
             try:
-                for record in batch.records:
-                    output_text = self._execute_record(record)
+                output_texts = self._execute_batch(batch.records)
+                for record, output_text in zip(
+                    batch.records, output_texts, strict=True
+                ):
                     output_bytes = output_text.encode("utf-8")
                     scoring_records.append(
                         RuntimeScoringRecord(

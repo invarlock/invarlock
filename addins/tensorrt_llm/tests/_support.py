@@ -85,11 +85,18 @@ INFO = {{
 if sys.argv[1:] == ["--invarlock-runtime-info-v1"]:
     print(json.dumps(INFO, sort_keys=True, separators=(",", ":")))
     raise SystemExit(0)
-if sys.argv[1:] != ["--invarlock-score-v1"]:
+batch_mode = sys.argv[1:] == ["--invarlock-score-batch-v1"]
+if not batch_mode and sys.argv[1:] != ["--invarlock-score-v1"]:
     raise SystemExit(64)
 
 request = json.load(sys.stdin)
-prompt = request["input_text"]
+request_records = (
+    request["records"]
+    if batch_mode
+    else [{{"input_text": request["input_text"], "record_id": "single"}}]
+)
+prompts = [record["input_text"] for record in request_records]
+prompt = prompts[0]
 if prompt == "__sleep__":
     time.sleep(30)
 elif prompt == "__orphan_pipe__":
@@ -114,10 +121,7 @@ elif prompt == "__detached_success__":
         pid_file.write(str(grandchild_pid))
         pid_file.flush()
         os.fsync(pid_file.fileno())
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "OUT:" + prompt,
-    }}
+    output_text = "OUT:" + prompt
 elif prompt == "__wait_for_release__":
     started_path = os.path.join(os.environ["HOME"], "score.started")
     release_path = os.path.join(os.environ["HOME"], "score.release")
@@ -127,48 +131,60 @@ elif prompt == "__wait_for_release__":
         os.fsync(started_file.fileno())
     while not os.path.exists(release_path):
         time.sleep(0.01)
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "released",
-    }}
+    output_text = "released"
 elif prompt == "__flood__":
     os.write(1, b"x" * (3 * 1024 * 1024))
     raise SystemExit(0)
 elif prompt == "__stderr__":
     os.write(2, b"unexpected diagnostic")
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "x",
-    }}
+    output_text = "x"
 elif prompt == "__fail__":
     raise SystemExit(7)
 elif prompt == "__bad_json__":
     os.write(1, b"not-json")
     raise SystemExit(0)
 elif prompt == "__duplicate__":
-    os.write(1, b'{{"format_version":"a","format_version":"b","output_text":"x"}}')
+    os.write(1, b'{{"format_version":"a","format_version":"b","outputs":[]}}')
     raise SystemExit(0)
 elif prompt == "__extra__":
-    response = {{
-        "extra": True,
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "x",
-    }}
-elif prompt == "__env__":
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": json.dumps(dict(os.environ), sort_keys=True, separators=(",", ":")),
-    }}
-elif prompt == "__request__":
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": json.dumps(request, sort_keys=True, separators=(",", ":")),
-    }}
+    if batch_mode:
+        response = {{
+            "extra": True,
+            "format_version": "invarlock/tensorrt-llm-runner-batch-response-v1",
+            "outputs": [],
+        }}
+    else:
+        response = {{
+            "extra": True,
+            "format_version": "invarlock/tensorrt-llm-runner-response-v1",
+            "output_text": "x",
+        }}
 else:
-    response = {{
-        "format_version": "invarlock/tensorrt-llm-runner-response-v1",
-        "output_text": "OUT:" + prompt,
-    }}
+    output_text = "OUT:" + prompt
+
+if prompt != "__extra__":
+    def render_output(value):
+        if value == "__env__":
+            return json.dumps(dict(os.environ), sort_keys=True, separators=(",", ":"))
+        if value == "__request__":
+            return json.dumps(request, sort_keys=True, separators=(",", ":"))
+        if len(prompts) == 1:
+            return output_text
+        return "OUT:" + value
+
+    if batch_mode:
+        response = {{
+            "format_version": "invarlock/tensorrt-llm-runner-batch-response-v1",
+            "outputs": [
+                {{"output_text": render_output(record["input_text"]), "record_id": record["record_id"]}}
+                for record in request_records
+            ],
+        }}
+    else:
+        response = {{
+            "format_version": "invarlock/tensorrt-llm-runner-response-v1",
+            "output_text": render_output(prompt),
+        }}
 print(json.dumps(response, sort_keys=True, separators=(",", ":")))
 """,
         encoding="utf-8",

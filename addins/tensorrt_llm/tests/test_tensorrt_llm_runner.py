@@ -85,13 +85,35 @@ def _runtime_request(tmp_path: Path) -> tuple[bytes, Path]:
     )
 
 
+def _runtime_batch_request(
+    tmp_path: Path,
+    *,
+    records: list[dict[str, object]] | None = None,
+) -> tuple[bytes, Path]:
+    payload, engine = _runtime_request(tmp_path)
+    request = json.loads(payload)
+    del request["input_text"]
+    request["format_version"] = "invarlock/tensorrt-llm-runner-batch-request-v1"
+    request["records"] = records or [
+        {"input_text": "hello world", "record_id": "record/0"},
+        {"input_text": "goodbye world", "record_id": "record/1"},
+    ]
+    return (
+        json.dumps(request, sort_keys=True, separators=(",", ":")).encode(),
+        engine,
+    )
+
+
 class _RawTokenizer:
     def id_to_token(self, token_id: int) -> str | None:
         return {0: "<pad>", 1: "</s>"}.get(token_id)
 
 
 class _FastTokenizer:
+    calls: list[dict[str, object]] = []
+
     def __init__(self, **kwargs: object) -> None:
+        self.calls.append(kwargs)
         self.kwargs = kwargs
         self.eos_token_id = 1
         self.pad_token_id = 0
@@ -119,9 +141,21 @@ class _FakeLLM:
 
     def generate(self, prompt: object, **kwargs: object) -> object:
         self.generate_calls.append((prompt, kwargs))
+        if isinstance(prompt, list):
+            return [
+                SimpleNamespace(
+                    finished=True,
+                    outputs=[SimpleNamespace(text="OUT:" + str(item))],
+                    prompt=item,
+                    prompt_token_ids=list(range(len(str(item).split()))),
+                )
+                for item in prompt
+            ]
         return SimpleNamespace(
             finished=True,
             outputs=[SimpleNamespace(text="OUT:" + str(prompt))],
+            prompt=prompt,
+            prompt_token_ids=list(range(len(str(prompt).split()))),
         )
 
     def shutdown(self) -> None:
@@ -134,6 +168,7 @@ def fake_backend() -> runner._Backend:  # noqa: SLF001
     _FakeLLM.generate_calls.clear()
     _FakeLLM.shutdown_calls = 0
     _FakeSamplingParams.calls.clear()
+    _FastTokenizer.calls.clear()
     return runner._Backend(  # noqa: SLF001
         llm=_FakeLLM,
         sampling_params=_FakeSamplingParams,
@@ -189,6 +224,221 @@ def test_runner_executes_pinned_single_rank_hlapi_contract(
     )
     assert _FakeLLM.generate_calls[0][1]["use_tqdm"] is False
     assert _FakeLLM.shutdown_calls == 1
+
+
+def test_runner_executes_one_ordered_batch_with_one_loaded_engine(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload, engine = _runtime_batch_request(tmp_path)
+    request = runner._parse_batch_request(payload)  # noqa: SLF001
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+
+    outputs = runner._execute_batch_request(  # noqa: SLF001
+        request, backend=fake_backend
+    )
+
+    assert outputs == (
+        ("record/0", "OUT:hello world"),
+        ("record/1", "OUT:goodbye world"),
+    )
+    assert len(_FakeLLM.calls) == 1
+    assert _FakeLLM.calls[0]["model"] == engine
+    assert len(_FastTokenizer.calls) == 1
+    assert len(_FakeSamplingParams.calls) == 1
+    assert _FakeLLM.generate_calls == [
+        (
+            ["hello world", "goodbye world"],
+            {"sampling_params": ANY, "use_tqdm": False},
+        )
+    ]
+    assert _FakeLLM.shutdown_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda request: request.update({"extra": True}), "fields are not closed"),
+        (
+            lambda request: request["records"][0].update({"extra": True}),
+            "record fields are not closed",
+        ),
+        (
+            lambda request: request["records"].append(dict(request["records"][0])),
+            "record IDs must be unique",
+        ),
+        (lambda request: request.update({"records": []}), "records count"),
+    ],
+)
+def test_runner_batch_request_schema_is_closed(
+    tmp_path: Path,
+    mutation,
+    message: str,
+) -> None:  # noqa: ANN001
+    payload, _engine = _runtime_batch_request(tmp_path)
+    request = json.loads(payload)
+    mutation(request)
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match=message):
+        runner._parse_batch_request(  # noqa: SLF001
+            json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
+        )
+
+
+def test_runner_batch_rejects_prompt_beyond_authenticated_context_before_engine_load(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload, _engine = _runtime_batch_request(
+        tmp_path,
+        records=[{"input_text": " ".join(["token"] * 65), "record_id": "too-long"}],
+    )
+    request = runner._parse_batch_request(payload)  # noqa: SLF001
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+
+    with pytest.raises(
+        runner.TensorRTLLMRunnerError,
+        match="prompt exceeds the authenticated context length",
+    ):
+        runner._execute_batch_request(request, backend=fake_backend)  # noqa: SLF001
+
+    assert _FakeLLM.calls == []
+
+
+def test_runner_batch_rejects_backend_count_mismatch(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload, _engine = _runtime_batch_request(tmp_path)
+    request = runner._parse_batch_request(payload)  # noqa: SLF001
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+
+    def one_output(_self, _prompts: object, **_kwargs: object) -> object:
+        return [SimpleNamespace(finished=True, outputs=[SimpleNamespace(text="one")])]
+
+    monkeypatch.setattr(_FakeLLM, "generate", one_output)
+
+    with pytest.raises(
+        runner.TensorRTLLMRunnerError,
+        match="output count does not match",
+    ):
+        runner._execute_batch_request(request, backend=fake_backend)  # noqa: SLF001
+
+
+def test_runner_batch_rejects_backend_output_reordering(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload, _engine = _runtime_batch_request(tmp_path)
+    request = runner._parse_batch_request(payload)  # noqa: SLF001
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+
+    def swapped_outputs(_self, prompts: object, **_kwargs: object) -> object:
+        assert isinstance(prompts, list)
+        return [
+            SimpleNamespace(
+                finished=True,
+                outputs=[SimpleNamespace(text="OUT:" + prompt)],
+                prompt=prompt,
+                prompt_token_ids=list(range(len(prompt.split()))),
+            )
+            for prompt in reversed(prompts)
+        ]
+
+    monkeypatch.setattr(_FakeLLM, "generate", swapped_outputs)
+
+    with pytest.raises(
+        runner.TensorRTLLMRunnerError,
+        match="prompt order does not match",
+    ):
+        runner._execute_batch_request(request, backend=fake_backend)  # noqa: SLF001
+
+
+def test_runner_batch_rejects_backend_prompt_token_mismatch(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload, _engine = _runtime_batch_request(
+        tmp_path,
+        records=[{"input_text": "hello world", "record_id": "record/0"}],
+    )
+    request = runner._parse_batch_request(payload)  # noqa: SLF001
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+
+    def wrong_tokens(_self, _prompts: object, **_kwargs: object) -> object:
+        return [
+            SimpleNamespace(
+                finished=True,
+                outputs=[SimpleNamespace(text="OUT:hello world")],
+                prompt="hello world",
+                prompt_token_ids=[99],
+            )
+        ]
+
+    monkeypatch.setattr(_FakeLLM, "generate", wrong_tokens)
+
+    with pytest.raises(
+        runner.TensorRTLLMRunnerError,
+        match="prompt tokens do not match",
+    ):
+        runner._execute_batch_request(request, backend=fake_backend)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("output", "message"),
+    [
+        (
+            SimpleNamespace(finished=False, outputs=[SimpleNamespace(text="x")]),
+            "did not finish",
+        ),
+        (
+            SimpleNamespace(
+                finished=True,
+                outputs=[SimpleNamespace(text=7)],
+                prompt="hello",
+                prompt_token_ids=[0],
+            ),
+            "valid user-visible text",
+        ),
+        (
+            SimpleNamespace(
+                finished=True,
+                outputs=[SimpleNamespace(text="x" * ((2 * 1024 * 1024) + 1))],
+                prompt="hello",
+                prompt_token_ids=[0],
+            ),
+            "byte limit",
+        ),
+    ],
+)
+def test_runner_batch_rejects_invalid_or_oversized_outputs(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+    output: object,
+    message: str,
+) -> None:
+    payload, _engine = _runtime_batch_request(
+        tmp_path,
+        records=[{"input_text": "hello", "record_id": "record/0"}],
+    )
+    request = runner._parse_batch_request(payload)  # noqa: SLF001
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+    monkeypatch.setattr(_FakeLLM, "generate", lambda *_args, **_kwargs: [output])
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match=message):
+        runner._execute_batch_request(request, backend=fake_backend)  # noqa: SLF001
 
 
 def test_runner_rejects_non_utf8_user_visible_output(
@@ -638,6 +888,71 @@ def test_runner_score_cli_emits_strict_response(
         "format_version": "invarlock/tensorrt-llm-runner-response-v1",
         "output_text": "OUT:hello world",
     }
+
+
+def test_runner_batch_score_cli_emits_closed_ordered_response(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    payload, _engine = _runtime_batch_request(tmp_path)
+
+    class _Input:
+        buffer = io.BytesIO(payload)
+
+    monkeypatch.setattr(runner.sys, "stdin", _Input())
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+    monkeypatch.setattr(runner, "_load_backend", lambda: fake_backend)
+
+    assert runner.main(["--invarlock-score-batch-v1"]) == 0
+    captured = capfd.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "format_version": "invarlock/tensorrt-llm-runner-batch-response-v1",
+        "outputs": [
+            {"output_text": "OUT:hello world", "record_id": "record/0"},
+            {"output_text": "OUT:goodbye world", "record_id": "record/1"},
+        ],
+    }
+
+
+def test_runner_batch_score_cli_rejects_aggregate_response_beyond_transport_bound(
+    tmp_path: Path,
+    fake_backend: runner._Backend,  # noqa: SLF001
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    payload, _engine = _runtime_batch_request(tmp_path)
+
+    class _Input:
+        buffer = io.BytesIO(payload)
+
+    large_text = "x" * ((1024 * 1024) + 64)
+
+    def aggregate_overflow(_self, prompts: object, **_kwargs: object) -> object:
+        assert isinstance(prompts, list)
+        return [
+            SimpleNamespace(
+                finished=True,
+                outputs=[SimpleNamespace(text=large_text)],
+                prompt=prompt,
+                prompt_token_ids=list(range(len(prompt.split()))),
+            )
+            for prompt in prompts
+        ]
+
+    monkeypatch.setattr(runner.sys, "stdin", _Input())
+    monkeypatch.setattr(runner, "_require_runtime_boundary", lambda: None)
+    monkeypatch.setenv("FORCE_DETERMINISTIC", "1")
+    monkeypatch.setattr(runner, "_load_backend", lambda: fake_backend)
+    monkeypatch.setattr(_FakeLLM, "generate", aggregate_overflow)
+
+    assert runner.main(["--invarlock-score-batch-v1"]) == 70
+    captured = capfd.readouterr()
+    assert captured.out == ""
+    assert "batch runner response exceeds the byte limit" in captured.err
 
 
 def test_runner_cli_maps_known_and_unknown_failures_to_closed_status(

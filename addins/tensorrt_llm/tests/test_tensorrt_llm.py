@@ -584,6 +584,132 @@ def test_tensorrt_llm_scores_in_order_and_emits_bound_receipt(
 
 
 @_REQUIRES_POSIX_PINNING
+def test_tensorrt_llm_invokes_one_runner_process_for_multi_record_score(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec, _bindings, context = _runtime_inputs(tmp_path)
+    session = TensorRTLLMProvider().open(spec, context)
+    calls: list[tuple[str, ...]] = []
+    real_popen = tensorrt_llm_execution.subprocess.Popen
+
+    def recording_popen(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        calls.append(tuple(args[0][2:]))
+        return real_popen(*args, **kwargs)
+
+    monkeypatch.setattr(tensorrt_llm_execution.subprocess, "Popen", recording_popen)
+
+    observation = session.score(
+        _batch(
+            _record("a", "alpha"),
+            _record("b", "beta"),
+            _record("c", "gamma"),
+        )
+    )
+
+    assert tuple(record.output_text for record in observation.records) == (
+        "OUT:alpha",
+        "OUT:beta",
+        "OUT:gamma",
+    )
+    assert calls == [("--invarlock-score-batch-v1",)]
+    session.close()
+
+
+def _batch_response(outputs: object, **extra: object) -> bytes:
+    return json.dumps(
+        {
+            "format_version": "invarlock/tensorrt-llm-runner-batch-response-v1",
+            "outputs": outputs,
+            **extra,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+
+
+def test_tensorrt_llm_batch_timeout_preserves_per_record_deadline_with_finite_cap() -> (
+    None
+):
+    assert (
+        tensorrt_llm_session._batch_timeout_seconds(  # noqa: SLF001
+            per_record_timeout=30,
+            record_count=8,
+        )
+        == 240
+    )
+    assert (
+        tensorrt_llm_session._batch_timeout_seconds(  # noqa: SLF001
+            per_record_timeout=3600,
+            record_count=1024,
+        )
+        == 24 * 60 * 60
+    )
+    with pytest.raises(ValueError, match="outside the time bound"):
+        tensorrt_llm_session._batch_timeout_seconds(  # noqa: SLF001
+            per_record_timeout=30,
+            record_count=0,
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (_batch_response([], extra=True), "unexpected fields"),
+        (_batch_response([]), "count does not match"),
+        (
+            _batch_response(
+                [
+                    {"output_text": "B", "record_id": "b"},
+                    {"output_text": "A", "record_id": "a"},
+                ]
+            ),
+            "order does not match",
+        ),
+        (
+            _batch_response(
+                [
+                    {"extra": True, "output_text": "A", "record_id": "a"},
+                    {"output_text": "B", "record_id": "b"},
+                ]
+            ),
+            "fields are not closed",
+        ),
+        (
+            _batch_response(
+                [
+                    {"output_text": None, "record_id": "a"},
+                    {"output_text": "B", "record_id": "b"},
+                ]
+            ),
+            "valid user-visible text",
+        ),
+        (
+            _batch_response(
+                [
+                    {
+                        "output_text": "x" * ((2 * 1024 * 1024) + 1),
+                        "record_id": "a",
+                    },
+                    {"output_text": "B", "record_id": "b"},
+                ]
+            ),
+            "byte limit",
+        ),
+    ],
+)
+def test_tensorrt_llm_batch_response_fails_closed(
+    payload: bytes,
+    message: str,
+) -> None:
+    with pytest.raises(TensorRTLLMExecutionError, match=message):
+        tensorrt_llm_session._validated_batch_response(  # noqa: SLF001
+            payload,
+            expected_record_ids=("a", "b"),
+        )
+
+
+@_REQUIRES_POSIX_PINNING
 def test_tensorrt_llm_rejects_runner_identity_mismatch(tmp_path: Path) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
     wrong_version = ModelRuntimeSpec(
@@ -661,8 +787,9 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
 
     request_record = session.score(_batch(_record("request", "__request__"))).records[0]
     request = json.loads(request_record.output_text)
-    assert request["format_version"] == "invarlock/tensorrt-llm-runner-request-v1"
+    assert request["format_version"] == "invarlock/tensorrt-llm-runner-batch-request-v1"
     assert request["protocol_version"] == "invarlock/tensorrt-llm-runner-v1"
+    assert request["records"] == [{"input_text": "__request__", "record_id": "request"}]
     assert request["settings"] == {
         "allow_network": False,
         "batch_size": 4,
@@ -697,8 +824,8 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
     run_path = session._run_directory.path  # noqa: SLF001
     assert [tuple(positional[0][2:]) for positional, _keywords in calls] == [
         ("--invarlock-runtime-info-v1",),
-        ("--invarlock-score-v1",),
-        ("--invarlock-score-v1",),
+        ("--invarlock-score-batch-v1",),
+        ("--invarlock-score-batch-v1",),
     ]
     for positional, keywords in calls:
         argv = positional[0]

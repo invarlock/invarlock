@@ -29,6 +29,8 @@ _PROTOCOL_VERSION = "invarlock/tensorrt-llm-runner-v1"
 _INFO_FORMAT_VERSION = "invarlock/tensorrt-llm-runner-info-v1"
 _REQUEST_FORMAT_VERSION = "invarlock/tensorrt-llm-runner-request-v1"
 _RESPONSE_FORMAT_VERSION = "invarlock/tensorrt-llm-runner-response-v1"
+_BATCH_REQUEST_FORMAT_VERSION = "invarlock/tensorrt-llm-runner-batch-request-v1"
+_BATCH_RESPONSE_FORMAT_VERSION = "invarlock/tensorrt-llm-runner-batch-response-v1"
 _TOKENIZER_FORMAT_VERSION = "invarlock/tensorrt-llm-tokenizer-contract-v1"
 _BACKEND_VERSION = "1.2.1"
 _MAX_REQUEST_BYTES = 1024 * 1024
@@ -37,7 +39,10 @@ _MAX_TOKENIZER_BYTES = 128 * 1024 * 1024
 _MAX_JSON_DEPTH = 64
 _MAX_JSON_ITEMS = 1_000_000
 _MAX_TEXT_BYTES = 1024 * 1024
+_MAX_RECORD_ID_BYTES = 4096
+_MAX_BATCH_RECORDS = 1024
 _MAX_OUTPUT_BYTES = 2 * 1024 * 1024
+_MAX_BATCH_RESPONSE_BYTES = 2 * 1024 * 1024
 _MAX_SETTING_VALUE = 1024 * 1024
 _MAX_TIMEOUT_SECONDS = 24 * 60 * 60
 _IPV4_ROUTE_PATH = Path("/proc/net/route")
@@ -117,6 +122,22 @@ class _ScoreRequest:
     tokenizer_contract: _TokenizerContract
     engine_config: Mapping[str, object]
     input_text: str
+    settings: _ExecutionSettings
+
+
+@dataclass(frozen=True)
+class _BatchScoreRecord:
+    record_id: str
+    input_text: str
+
+
+@dataclass(frozen=True)
+class _BatchScoreRequest:
+    engine_bundle: Path
+    tokenizer_contract_path: Path
+    tokenizer_contract: _TokenizerContract
+    engine_config: Mapping[str, object]
+    records: tuple[_BatchScoreRecord, ...]
     settings: _ExecutionSettings
 
 
@@ -401,7 +422,7 @@ def _engine_limits(config: Mapping[str, object]) -> tuple[int, int, int]:
     )
 
 
-def _parse_request(payload: bytes) -> _ScoreRequest:
+def _canonical_request(payload: bytes) -> dict[str, object]:
     request = _strict_json_object(payload, label="runner request")
     try:
         canonical = json.dumps(
@@ -415,28 +436,18 @@ def _parse_request(payload: bytes) -> _ScoreRequest:
         raise TensorRTLLMRunnerError("runner request is not canonical JSON") from exc
     if payload != canonical:
         raise TensorRTLLMRunnerError("runner request is not canonical JSON")
-    if set(request) != {
-        "engine_bundle",
-        "format_version",
-        "input_text",
-        "protocol_version",
-        "settings",
-        "tokenizer_contract",
-    }:
-        raise TensorRTLLMRunnerError("runner request fields are not closed")
-    if request["format_version"] != _REQUEST_FORMAT_VERSION:
-        raise TensorRTLLMRunnerError("runner request format is unsupported")
-    if request["protocol_version"] != _PROTOCOL_VERSION:
-        raise TensorRTLLMRunnerError("runner protocol version is unsupported")
-    input_text = request["input_text"]
-    if not isinstance(input_text, str):
-        raise TensorRTLLMRunnerError("input_text must be text")
-    try:
-        input_bytes = input_text.encode("utf-8", errors="strict")
-    except UnicodeEncodeError as exc:
-        raise TensorRTLLMRunnerError("input_text is not valid UTF-8") from exc
-    if len(input_bytes) > _MAX_TEXT_BYTES:
-        raise TensorRTLLMRunnerError("input_text exceeds the byte limit")
+    return request
+
+
+def _validated_runtime_inputs(
+    request: Mapping[str, object],
+) -> tuple[
+    Path,
+    Path,
+    _TokenizerContract,
+    Mapping[str, object],
+    _ExecutionSettings,
+]:
     engine_bundle = _canonical_path(request["engine_bundle"], label="engine bundle")
     tokenizer_path = _canonical_path(
         request["tokenizer_contract"], label="tokenizer contract"
@@ -459,12 +470,127 @@ def _parse_request(payload: bytes) -> _ScoreRequest:
         raise TensorRTLLMRunnerError(
             "context and output lengths exceed the engine sequence limit"
         )
+    return (
+        engine_bundle,
+        tokenizer_path,
+        tokenizer_contract,
+        engine_config,
+        settings,
+    )
+
+
+def _input_text(value: object) -> str:
+    if not isinstance(value, str):
+        raise TensorRTLLMRunnerError("input_text must be text")
+    try:
+        input_bytes = value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise TensorRTLLMRunnerError("input_text is not valid UTF-8") from exc
+    if len(input_bytes) > _MAX_TEXT_BYTES:
+        raise TensorRTLLMRunnerError("input_text exceeds the byte limit")
+    return value
+
+
+def _record_id(value: object) -> str:
+    if not isinstance(value, str) or not value:
+        raise TensorRTLLMRunnerError("record_id must be non-empty text")
+    try:
+        encoded = value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise TensorRTLLMRunnerError("record_id is not valid UTF-8") from exc
+    if len(encoded) > _MAX_RECORD_ID_BYTES:
+        raise TensorRTLLMRunnerError("record_id exceeds the byte limit")
+    return value
+
+
+def _parse_request(payload: bytes) -> _ScoreRequest:
+    request = _canonical_request(payload)
+    if set(request) != {
+        "engine_bundle",
+        "format_version",
+        "input_text",
+        "protocol_version",
+        "settings",
+        "tokenizer_contract",
+    }:
+        raise TensorRTLLMRunnerError("runner request fields are not closed")
+    if request["format_version"] != _REQUEST_FORMAT_VERSION:
+        raise TensorRTLLMRunnerError("runner request format is unsupported")
+    if request["protocol_version"] != _PROTOCOL_VERSION:
+        raise TensorRTLLMRunnerError("runner protocol version is unsupported")
+    input_text = _input_text(request["input_text"])
+    (
+        engine_bundle,
+        tokenizer_path,
+        tokenizer_contract,
+        engine_config,
+        settings,
+    ) = _validated_runtime_inputs(request)
     return _ScoreRequest(
         engine_bundle=engine_bundle,
         tokenizer_contract_path=tokenizer_path,
         tokenizer_contract=tokenizer_contract,
         engine_config=engine_config,
         input_text=input_text,
+        settings=settings,
+    )
+
+
+def _parse_batch_request(payload: bytes) -> _BatchScoreRequest:
+    request = _canonical_request(payload)
+    if set(request) != {
+        "engine_bundle",
+        "format_version",
+        "protocol_version",
+        "records",
+        "settings",
+        "tokenizer_contract",
+    }:
+        raise TensorRTLLMRunnerError("batch runner request fields are not closed")
+    if request["format_version"] != _BATCH_REQUEST_FORMAT_VERSION:
+        raise TensorRTLLMRunnerError("batch runner request format is unsupported")
+    if request["protocol_version"] != _PROTOCOL_VERSION:
+        raise TensorRTLLMRunnerError("runner protocol version is unsupported")
+    raw_records = request["records"]
+    if (
+        not isinstance(raw_records, list)
+        or not raw_records
+        or len(raw_records) > _MAX_BATCH_RECORDS
+    ):
+        raise TensorRTLLMRunnerError(
+            "batch records count is outside the supported bound"
+        )
+    records: list[_BatchScoreRecord] = []
+    observed_ids: set[str] = set()
+    for raw_record in raw_records:
+        if not isinstance(raw_record, dict) or set(raw_record) != {
+            "input_text",
+            "record_id",
+        }:
+            raise TensorRTLLMRunnerError("batch record fields are not closed")
+        record_id = _record_id(raw_record["record_id"])
+        if record_id in observed_ids:
+            raise TensorRTLLMRunnerError("batch record IDs must be unique")
+        observed_ids.add(record_id)
+        records.append(
+            _BatchScoreRecord(
+                record_id=record_id,
+                input_text=_input_text(raw_record["input_text"]),
+            )
+        )
+    (
+        engine_bundle,
+        tokenizer_path,
+        tokenizer_contract,
+        engine_config,
+        settings,
+    ) = _validated_runtime_inputs(request)
+    return _BatchScoreRequest(
+        engine_bundle=engine_bundle,
+        tokenizer_contract_path=tokenizer_path,
+        tokenizer_contract=tokenizer_contract,
+        engine_config=engine_config,
+        records=tuple(records),
         settings=settings,
     )
 
@@ -793,12 +919,17 @@ def _tokenizer_from_contract(contract: _TokenizerContract, backend: _Backend) ->
     return tokenizer
 
 
-def _prompt_token_count(tokenizer: object, request: _ScoreRequest) -> int:
+def _prompt_token_ids(
+    tokenizer: object,
+    input_text: str,
+    *,
+    add_special_tokens: bool,
+) -> tuple[int, ...]:
     try:
         encode = getattr(tokenizer, "encode")  # noqa: B009
         token_ids = encode(
-            request.input_text,
-            add_special_tokens=request.tokenizer_contract.add_special_tokens,
+            input_text,
+            add_special_tokens=add_special_tokens,
         )
     except Exception as exc:
         raise TensorRTLLMRunnerError("prompt tokenization failed") from exc
@@ -807,10 +938,83 @@ def _prompt_token_count(tokenizer: object, request: _ScoreRequest) -> int:
         for token_id in token_ids
     ):
         raise TensorRTLLMRunnerError("prompt tokenization returned invalid IDs")
-    return len(token_ids)
+    return tuple(token_ids)
 
 
-def _execute_request(request: _ScoreRequest, *, backend: _Backend | None = None) -> str:
+def _sampling_parameters(
+    backend: _Backend,
+    tokenizer_contract: _TokenizerContract,
+    settings: _ExecutionSettings,
+) -> object:
+    return backend.sampling_params(
+        add_special_tokens=tokenizer_contract.add_special_tokens,
+        best_of=1,
+        detokenize=True,
+        end_id=tokenizer_contract.eos_token_id,
+        exclude_input_from_output=True,
+        max_tokens=settings.max_output_tokens,
+        n=1,
+        pad_id=tokenizer_contract.pad_token_id,
+        seed=settings.seed,
+        skip_special_tokens=tokenizer_contract.skip_special_tokens,
+        temperature=0.0,
+        top_k=1,
+        use_beam_search=False,
+    )
+
+
+def _validated_generation_output(
+    output: object,
+    *,
+    expected_prompt: str | None = None,
+    expected_prompt_token_ids: tuple[int, ...] | None = None,
+) -> str:
+    if getattr(output, "finished", None) is not True:
+        raise TensorRTLLMRunnerError("generation did not finish")
+    if expected_prompt is not None:
+        if getattr(output, "prompt", None) != expected_prompt:
+            raise TensorRTLLMRunnerError(
+                "batched generation output prompt order does not match the request"
+            )
+        observed_prompt_token_ids = getattr(output, "prompt_token_ids", None)
+        if (
+            not isinstance(observed_prompt_token_ids, list)
+            or any(
+                isinstance(token_id, bool) or not isinstance(token_id, int)
+                for token_id in observed_prompt_token_ids
+            )
+            or tuple(observed_prompt_token_ids) != expected_prompt_token_ids
+        ):
+            raise TensorRTLLMRunnerError(
+                "batched generation output prompt tokens do not match the request"
+            )
+    completions = getattr(output, "outputs", None)
+    if not isinstance(completions, list) or len(completions) != 1:
+        raise TensorRTLLMRunnerError(
+            "generation returned an unsupported completion count"
+        )
+    text = getattr(completions[0], "text", None)
+    try:
+        text = exact_match_output_text(text)
+    except ValueError as exc:
+        raise TensorRTLLMRunnerError(
+            "generation output is not valid user-visible text"
+        ) from exc
+    if len(text.encode("utf-8")) > _MAX_OUTPUT_BYTES:
+        raise TensorRTLLMRunnerError("generation output exceeds the byte limit")
+    return text
+
+
+def _execute_prompts(
+    *,
+    engine_bundle: Path,
+    tokenizer_contract: _TokenizerContract,
+    engine_config: Mapping[str, object],
+    settings: _ExecutionSettings,
+    prompts: tuple[str, ...],
+    batched: bool,
+    backend: _Backend | None,
+) -> tuple[str, ...]:
     _require_runtime_boundary()
     if os.environ.get("FORCE_DETERMINISTIC") != "1":
         raise TensorRTLLMRunnerError(
@@ -821,69 +1025,61 @@ def _execute_request(request: _ScoreRequest, *, backend: _Backend | None = None)
     try:
         with _silence_backend_output():
             selected_backend = backend if backend is not None else _load_backend()
-            tokenizer = _tokenizer_from_contract(
-                request.tokenizer_contract, selected_backend
-            )
-            prompt_tokens = _prompt_token_count(tokenizer, request)
-            if prompt_tokens > request.settings.context_length:
-                raise TensorRTLLMRunnerError(
-                    "prompt exceeds the authenticated context length"
+            tokenizer = _tokenizer_from_contract(tokenizer_contract, selected_backend)
+            _max_batch, _max_input, max_seq_len = _engine_limits(engine_config)
+            prompt_token_ids: list[tuple[int, ...]] = []
+            for prompt in prompts:
+                token_ids = _prompt_token_ids(
+                    tokenizer,
+                    prompt,
+                    add_special_tokens=tokenizer_contract.add_special_tokens,
                 )
-            _max_batch, _max_input, max_seq_len = _engine_limits(request.engine_config)
-            if prompt_tokens + request.settings.max_output_tokens > max_seq_len:
-                raise TensorRTLLMRunnerError(
-                    "prompt and output exceed the engine sequence limit"
-                )
+                prompt_token_ids.append(token_ids)
+                if len(token_ids) > settings.context_length:
+                    raise TensorRTLLMRunnerError(
+                        "prompt exceeds the authenticated context length"
+                    )
+                if len(token_ids) + settings.max_output_tokens > max_seq_len:
+                    raise TensorRTLLMRunnerError(
+                        "prompt and output exceed the engine sequence limit"
+                    )
             llm = selected_backend.llm(
-                model=request.engine_bundle,
+                model=engine_bundle,
                 tokenizer=tokenizer,
                 tokenizer_mode="auto",
                 skip_tokenizer_init=False,
                 trust_remote_code=False,
                 tensor_parallel_size=1,
             )
-            sampling = selected_backend.sampling_params(
-                add_special_tokens=request.tokenizer_contract.add_special_tokens,
-                best_of=1,
-                detokenize=True,
-                end_id=request.tokenizer_contract.eos_token_id,
-                exclude_input_from_output=True,
-                max_tokens=request.settings.max_output_tokens,
-                n=1,
-                pad_id=request.tokenizer_contract.pad_token_id,
-                seed=request.settings.seed,
-                skip_special_tokens=request.tokenizer_contract.skip_special_tokens,
-                temperature=0.0,
-                top_k=1,
-                use_beam_search=False,
+            sampling = _sampling_parameters(
+                selected_backend, tokenizer_contract, settings
             )
             generate = getattr(llm, "generate")  # noqa: B009
             output = generate(
-                request.input_text,
+                list(prompts) if batched else prompts[0],
                 sampling_params=sampling,
                 use_tqdm=False,
             )
-            if isinstance(output, list):
+            if not batched and isinstance(output, list):
                 raise TensorRTLLMRunnerError(
                     "single-record generation returned a batched response"
                 )
-            if getattr(output, "finished", None) is not True:
-                raise TensorRTLLMRunnerError("generation did not finish")
-            completions = getattr(output, "outputs", None)
-            if not isinstance(completions, list) or len(completions) != 1:
-                raise TensorRTLLMRunnerError(
-                    "generation returned an unsupported completion count"
+            if batched:
+                if not isinstance(output, list) or len(output) != len(prompts):
+                    raise TensorRTLLMRunnerError(
+                        "batched generation output count does not match the request"
+                    )
+                return tuple(
+                    _validated_generation_output(
+                        item,
+                        expected_prompt=prompt,
+                        expected_prompt_token_ids=token_ids,
+                    )
+                    for item, prompt, token_ids in zip(
+                        output, prompts, prompt_token_ids, strict=True
+                    )
                 )
-            text = getattr(completions[0], "text", None)
-            try:
-                text = exact_match_output_text(text)
-            except ValueError as exc:
-                raise TensorRTLLMRunnerError(
-                    "generation output is not valid user-visible text"
-                ) from exc
-            if len(text.encode("utf-8")) > _MAX_OUTPUT_BYTES:
-                raise TensorRTLLMRunnerError("generation output exceeds the byte limit")
-            return text
+            return (_validated_generation_output(output),)
     except TensorRTLLMRunnerError:
         raise
     except Exception as exc:
@@ -896,6 +1092,42 @@ def _execute_request(request: _ScoreRequest, *, backend: _Backend | None = None)
                     shutdown()
             except Exception:
                 pass
+
+
+def _execute_request(request: _ScoreRequest, *, backend: _Backend | None = None) -> str:
+    return _execute_prompts(
+        engine_bundle=request.engine_bundle,
+        tokenizer_contract=request.tokenizer_contract,
+        engine_config=request.engine_config,
+        settings=request.settings,
+        prompts=(request.input_text,),
+        batched=False,
+        backend=backend,
+    )[0]
+
+
+def _execute_batch_request(
+    request: _BatchScoreRequest,
+    *,
+    backend: _Backend | None = None,
+) -> tuple[tuple[str, str], ...]:
+    outputs = _execute_prompts(
+        engine_bundle=request.engine_bundle,
+        tokenizer_contract=request.tokenizer_contract,
+        engine_config=request.engine_config,
+        settings=request.settings,
+        prompts=tuple(record.input_text for record in request.records),
+        batched=True,
+        backend=backend,
+    )
+    if len(outputs) != len(request.records):
+        raise TensorRTLLMRunnerError(
+            "batched generation output count does not match the request"
+        )
+    return tuple(
+        (record.record_id, output)
+        for record, output in zip(request.records, outputs, strict=True)
+    )
 
 
 def _info_payload() -> dict[str, str]:
@@ -917,7 +1149,11 @@ def _info_payload() -> dict[str, str]:
     }
 
 
-def _write_json(value: Mapping[str, object]) -> None:
+def _write_json(
+    value: Mapping[str, object],
+    *,
+    max_bytes: int | None = None,
+) -> None:
     encoded = json.dumps(
         value,
         ensure_ascii=False,
@@ -925,6 +1161,8 @@ def _write_json(value: Mapping[str, object]) -> None:
         sort_keys=True,
         separators=(",", ":"),
     )
+    if max_bytes is not None and len(encoded.encode("utf-8")) + 1 > max_bytes:
+        raise TensorRTLLMRunnerError("batch runner response exceeds the byte limit")
     sys.stdout.write(encoded + "\n")
     sys.stdout.flush()
 
@@ -935,11 +1173,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments == ("--invarlock-runtime-info-v1",):
             _write_json(_info_payload())
             return 0
-        if arguments != ("--invarlock-score-v1",):
+        if arguments not in {
+            ("--invarlock-score-v1",),
+            ("--invarlock-score-batch-v1",),
+        }:
             return 64
         payload = _read_bounded(
             sys.stdin.buffer, _MAX_REQUEST_BYTES, label="runner request"
         )
+        if arguments == ("--invarlock-score-batch-v1",):
+            batch_request = _parse_batch_request(payload)
+            outputs = _execute_batch_request(batch_request)
+            _write_json(
+                {
+                    "format_version": _BATCH_RESPONSE_FORMAT_VERSION,
+                    "outputs": [
+                        {"output_text": output_text, "record_id": record_id}
+                        for record_id, output_text in outputs
+                    ],
+                },
+                max_bytes=_MAX_BATCH_RESPONSE_BYTES,
+            )
+            return 0
         request = _parse_request(payload)
         output_text = _execute_request(request)
         _write_json(
