@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import time
 from pathlib import Path
 
 MAKEFILE = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
@@ -60,7 +62,11 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert "ADDINS_SMOKE_RELEASE_LOCK" in install_smoke
     assert "--require-hashes" in install_smoke
     assert 'mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX"' in install_smoke
-    assert "trap 'rm -rf \"$$smoke_venv\"' EXIT HUP INT TERM" in install_smoke
+    assert 'cleanup_smoke_venv() { rm -rf "$$smoke_venv"; }' in install_smoke
+    assert "trap cleanup_smoke_venv EXIT" in install_smoke
+    assert "trap 'exit 129' HUP" in install_smoke
+    assert "trap 'exit 130' INT" in install_smoke
+    assert "trap 'exit 143' TERM" in install_smoke
     assert (
         "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
         '"$$smoke_venv/bin/python" -m pip install '
@@ -72,6 +78,39 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
 
     clean = MAKEFILE.split("clean:", 1)[1].split("docsclean:", 1)[0]
     assert "src/*.egg-info" in clean
+
+
+def test_install_smoke_signal_trap_exits_and_cleans(tmp_path: Path) -> None:
+    smoke_venv = tmp_path / "smoke-venv"
+    resumed = tmp_path / "resumed"
+    smoke_venv.mkdir()
+    script = f"""
+        smoke_venv='{smoke_venv}'
+        cleanup_smoke_venv() {{ rm -rf "$smoke_venv"; }}
+        trap cleanup_smoke_venv EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        : > "$smoke_venv/ready"
+        while :; do sleep 0.05; done
+        : > '{resumed}'
+    """
+    process = subprocess.Popen(["/bin/sh", "-c", script])
+    try:
+        deadline = time.monotonic() + 5
+        while not (smoke_venv / "ready").exists():
+            assert process.poll() is None
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        process.terminate()
+        assert process.wait(timeout=5) == 143
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+
+    assert not smoke_venv.exists()
+    assert not resumed.exists()
 
 
 def test_container_smoke_explicitly_enables_the_gated_integration_test() -> None:

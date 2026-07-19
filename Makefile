@@ -482,7 +482,11 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 	@test -f $(ADDINS_SMOKE_RELEASE_LOCK) || { echo "No coordinated release lock for $(PYTHON); expected $(ADDINS_SMOKE_RELEASE_LOCK)" >&2; exit 2; }
 	@set -eu; \
 		smoke_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX")"; \
-		trap 'rm -rf "$$smoke_venv"' EXIT HUP INT TERM; \
+		cleanup_smoke_venv() { rm -rf "$$smoke_venv"; }; \
+		trap cleanup_smoke_venv EXIT; \
+		trap 'exit 129' HUP; \
+		trap 'exit 130' INT; \
+		trap 'exit 143' TERM; \
 		$(PYTHON) -m venv "$$smoke_venv"; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
