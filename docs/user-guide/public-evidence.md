@@ -1,12 +1,12 @@
 # Publish public evidence
 
 Public evidence is a curated index of immutable `invarlock/evidence-pack-v1`
-directories and independently signed verification receipts. The current index
-contains eight strictly verified comparisons spanning the built-in Hugging
-Face text runtime and the first-party GGUF, vision-text, and TensorRT-LLM
-runtime packages. An empty index still has an explicit **Evidence not yet created**
-state; publication begins only after a pack and receipt pass strict
-verification and disclosure review.
+directories and independently signed verification receipts. Every current
+entry uses a 400-record paired schedule selected from a pinned public dataset.
+The index spans the built-in Hugging Face text runtime and first-party
+vision-text and TensorRT-LLM runtime packages. A comparison remains
+**Evidence not yet created** until its pack and receipt pass strict verification
+and disclosure review.
 
 !!! tip "User guide"
 
@@ -18,23 +18,45 @@ verification and disclosure review.
 
 | Comparison | Runtime | Paired records | Canonical metric |
 | --- | --- | ---: | --- |
-| Mistral 7B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 16 | Normalized NLL per expected UTF-8 byte |
-| Qwen2.5 14B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 16 | Normalized NLL per expected UTF-8 byte |
-| Gemma 4 12B checkpoint and authenticated 0.99-scaled derivative | Hugging Face vision-text add-in | 32 | Exact match |
-| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 1 | Exact match |
-| Pinned Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints | Hugging Face vision-text add-in | 32 | Exact match |
-| Ministral 3 8B GGUF Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | 32 | Exact match |
-| Qwen2.5 0.5B GGUF Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | 1 | Exact match |
-| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 8 | Exact match |
+| Mistral 7B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 400 | Normalized NLL per expected UTF-8 byte |
+| Qwen2.5 14B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 400 | Normalized NLL per expected UTF-8 byte |
+| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 400 | Exact match |
+| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 400 | Exact match |
+
+The text suite is selected from the pinned MMLU-Pro test split and is balanced
+across 14 domains and answer choices A-J. The vision-text suite is selected
+from the pinned MMMU-Pro Vision test split and is balanced across 30 subjects
+and the same answer choices. The
+[qualification-suite manifest](../reference/qualification-suites.manifest.json)
+binds the dataset revisions, licenses, eligibility filters, deterministic
+selection algorithm, selected IDs, distributions, and schedule digests.
 
 These entries qualify the signed evaluation transaction and its runtime
-bindings. The normalized-NLL entries measure expected-continuation likelihood
-over their authenticated schedules; the exact-match entries exercise the
-optional-runtime paths on bounded qualification schedules, including 32-record
-GGUF and vision-text comparisons. The Qwen entry records a paired release
-regression check over a deterministic synthetic color-identification schedule;
-it does not establish broader multimodal model quality. Broader model quality
-conclusions require broader, task-specific evidence.
+bindings over the authenticated finite schedules. The normalized-NLL entries
+quantify expected-continuation likelihood. Mistral 7B records a subject/baseline
+ratio of 0.9979 with a 95% paired interval from 0.9970 to 0.9988;
+Qwen2.5 14B records 0.9985 with an interval from 0.9955 to 1.0015. Both remain
+within the authenticated maximum ratio of 1.05. The Qwen2-VL comparison records
+a paired 11 percentage-point
+exact-match improvement on its MMMU-Pro schedule, with a 95% paired interval
+from 6.34 to 15.67 percentage points. The TinyLlama engines both score zero on
+the MMLU-Pro schedule, and no relative exact-match difference is observed. Its
+supported conclusion is the signed finite-schedule non-regression decision and
+TensorRT-LLM runtime-path qualification, not model capability or output parity.
+Broader model-quality conclusions require broader, task-specific evidence.
+
+## Evidence not yet created
+
+The following comparisons have no pack in the current index. They may be added
+when a 400-record evaluation completes the same strict verification,
+independent-receipt, and disclosure-review path.
+
+| Comparison | Intended runtime | Publication state |
+| --- | --- | --- |
+| Gemma 4 12B vision-text checkpoint and authenticated derivative | Hugging Face vision-text add-in | Evidence not yet created |
+| Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints | Hugging Face vision-text add-in | Evidence not yet created |
+| Ministral 3 8B Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | Evidence not yet created |
+| Qwen2.5 0.5B Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | Evidence not yet created |
 
 ## Publication boundary
 

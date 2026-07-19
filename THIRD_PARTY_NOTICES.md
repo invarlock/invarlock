@@ -57,12 +57,55 @@ whose CUDA, TensorRT, and other components remain subject to their upstream
 license terms. Inspect the relevant Dockerfile, pinned requirements, image
 contents, and generated SBOM before redistributing an image.
 
+## Public qualification data
+
+The public evidence directory contains deterministic 400-record schedules
+derived from these pinned public datasets:
+
+| Dataset | Upstream license | Material represented in evidence |
+| --- | --- | --- |
+| [TIGER-Lab/MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro) | MIT | Selected question text, answer choices, expected answers, categories, and stable record identities |
+| [MMMU/MMMU-Pro Vision](https://huggingface.co/datasets/MMMU/MMMU_Pro) | Apache-2.0 | Selected record identities, expected answers, media digests, and the authenticated vision-text prompt; original media bytes remain external |
+
+The checked-in
+[qualification-suite manifest](docs/reference/qualification-suites.manifest.json)
+binds each exact upstream revision, license declaration, eligibility filter,
+selection algorithm, selected identity, and schedule digest. Those upstream
+terms continue to apply to the represented material.
+
+### MMLU-Pro selected dataset material
+
+The selected MMLU-Pro dataset material is distributed under the MIT License
+declared by the upstream dataset card.
+
+Copyright (c) 2024 MMLU-Pro authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## External artifacts
 
-The repository's runnable offline example uses synthetic records and does not
-bundle external model weights or datasets. Users who evaluate third-party
-models, tokenizers, datasets, containers, or other artifacts are responsible
-for the terms that apply to those inputs and to redistributed outputs.
+The repository's runnable offline example uses synthetic records. Apart from
+the selected public qualification schedules described above, the repository
+does not bundle external model weights or complete datasets. Users who evaluate
+third-party models, tokenizers, datasets, containers, or other artifacts are
+responsible for the terms that apply to those inputs and to redistributed
+outputs.
 
 Refresh this notice whenever declared dependencies, first-party distribution
 boundaries, runtime images, or bundled external assets change.

@@ -1,37 +1,37 @@
 {
   "config": {
     "path": "run.yaml",
-    "sha256": "ef76b94f2d0c3ca0c529c98d7db53dc2978b9337a89af99efc256ade7386e11f",
+    "sha256": "88a43493de6d4ea7deae5effd379e1a402ef603a5e92166fb620d228afa5d967",
     "source": "file"
   },
   "execution_mode": "container",
-  "generated_at_utc": "2026-07-19T06:03:28.902383+00:00",
+  "generated_at_utc": "2026-07-19T13:49:34.953001+00:00",
   "manifest_version": 1,
   "outer_container": {
     "allow_network": false,
     "allow_remote_code": false,
     "allow_third_party_plugins": false,
     "container_execution": true,
-    "image_digest": "sha256:3222c41ee2bec3490ad4c64d22c0c75159ff2724254f5b2523432de6ff9ccb1a",
-    "image_ref": "localhost:5001/invarlock-runtime-tensorrt-llm@sha256:3222c41ee2bec3490ad4c64d22c0c75159ff2724254f5b2523432de6ff9ccb1a"
+    "image_digest": "sha256:2d73b723dfaeb2eeafac2e7825db65a4fb29131208000183b47242a1dac69e0d",
+    "image_ref": "invarlock-runtime@sha256:2d73b723dfaeb2eeafac2e7825db65a4fb29131208000183b47242a1dac69e0d"
   },
   "report": {
     "filename": "report.json",
     "path": "report.json",
-    "sha256": "91e5f4599b16d9a16f462a6fb30bc07d32c6b2005d17baa4807d870db7bf3b0e"
+    "sha256": "6fb1564707f8e43f71d9f0a15f2eeb773760c1fbccbec0e1238f0c05fe3f4baa"
   },
   "runtime_provider": {
     "artifact_identity": {
       "filename": "model-artifact.identity.json",
-      "sha256": "164c24cd6d28224591fc363ee7dc32d76c02da6b3fa6d9879029118784a16960"
+      "sha256": "66a4aaf29e294307d7a5d631dd2d70f179a5f3866830d889d975153d2309bf9b"
     },
     "receipt": {
       "filename": "runtime-provider.receipt.json",
-      "sha256": "66c4202364c8943c51ebd2e34c76440d0116328a674143979d06615fbf1464fb"
+      "sha256": "dc3dd9ca1f63b7277ffbacd401c684ca33541b778013f71e44e791c750e76e18"
     },
     "scoring_observation": {
       "filename": "runtime-scoring.observation.json",
-      "sha256": "ddd25e6b6e1fb9c2305e41ca90a03ea0a8315b883835ecb490feb55d0635fca2"
+      "sha256": "75422952fda5652dc2f810fbe01d39018be6a9e3dd9acc40dc5cbb58c6d0c0d0"
     }
   },
   "verifier_contract_version": "runtime-manifest-v1"

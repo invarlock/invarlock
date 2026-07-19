@@ -1,8 +1,0 @@
-{
-  "artifact_paths": {
-    "evidence_pack": "evidence",
-    "verification_receipt": "verification.receipt.json"
-  },
-  "format_version": "invarlock/public-evidence-meta-v1",
-  "summary": "Strictly verified 32-record paired vision-text comparison of pinned Qwen 3.5 27B and Qwen 3.6 27B checkpoints"
-}

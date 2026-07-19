@@ -9,7 +9,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from invarlock.core.runtime_provider import build_runtime_behavioral_schedule
 from scripts import prepare_qualification_suites as suites
+
+ROOT = Path(__file__).resolve().parents[2]
+PUBLIC_MANIFEST = ROOT / "docs" / "reference" / "qualification-suites.manifest.json"
+PUBLIC_EVIDENCE_INDEX = ROOT / "public_evidence" / "evidence_index.json"
 
 
 def _selection_rows() -> list[dict[str, object]]:
@@ -218,3 +223,78 @@ def test_mmmu_more_than_ten_choices_is_excluded_from_a_to_j_profile() -> None:
 def test_qualification_count_is_not_operator_downgradable(tmp_path: Path) -> None:
     with pytest.raises(suites.QualificationSuiteError, match="exactly 400"):
         suites.prepare_suites(output=tmp_path / "suite", record_count=399)
+
+
+def test_checked_in_qualification_manifest_matches_the_pinned_contract() -> None:
+    payload = PUBLIC_MANIFEST.read_bytes()
+    manifest = json.loads(payload)
+
+    assert hashlib.sha256(payload).hexdigest() == (
+        "1cb979170d16328b02b69b32d0ab9670365064ba3c112eed001515c549334d44"
+    )
+    assert manifest["format_version"] == suites.FORMAT_VERSION
+    assert manifest["selection_algorithm"] == suites.SELECTION_ALGORITHM
+    assert manifest["record_count"] == suites.DEFAULT_RECORD_COUNT
+    assert manifest["sources"]["text"]["dataset"] == suites.MMLU_DATASET
+    assert manifest["sources"]["text"]["revision"] == suites.MMLU_REVISION
+    assert manifest["sources"]["multimodal"]["dataset"] == suites.MMMU_DATASET
+    assert manifest["sources"]["multimodal"]["revision"] == suites.MMMU_REVISION
+    assert set(manifest["distributions"]["text_groups"].values()) == {28, 29}
+    assert set(manifest["distributions"]["multimodal_groups"].values()) == {13, 14}
+    assert manifest["distributions"]["text_answers"] == dict.fromkeys("ABCDEFGHIJ", 40)
+    assert manifest["distributions"]["multimodal_answers"] == dict.fromkeys(
+        "ABCDEFGHIJ", 40
+    )
+    assert len(manifest["selected_ids"]["text"]) == 400
+    assert len(manifest["selected_ids"]["multimodal"]) == 400
+
+
+def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
+    manifest = json.loads(PUBLIC_MANIFEST.read_bytes())
+    index = json.loads(PUBLIC_EVIDENCE_INDEX.read_bytes())
+    qualified_suites = {
+        manifest["artifacts"]["text_raw_causal"]["sha256"]: {
+            "record_ids": manifest["selected_ids"]["text"],
+            "schedule_sha256": manifest["artifacts"]["text_raw_causal"][
+                "schedule_sha256"
+            ],
+            "task": "text_causal",
+        },
+        manifest["artifacts"]["multimodal"]["sha256"]: {
+            "record_ids": None,
+            "schedule_sha256": manifest["artifacts"]["multimodal"]["schedule_sha256"],
+            "task": "vision_text_generation",
+        },
+    }
+
+    assert index["evidence_count"] == len(index["entries"])
+    assert index["entries"]
+    for entry in index["entries"]:
+        pack = ROOT / entry["path"] / "evidence"
+        schedule = json.loads(
+            (pack / "schedule" / "runtime-behavioral-schedule.json").read_bytes()
+        )
+        paired_records = json.loads(
+            (pack / "records" / "paired-records.json").read_bytes()
+        )
+        report = json.loads((pack / "reports" / "evaluation.report.json").read_bytes())
+
+        suite = qualified_suites[schedule["dataset_identity"]["revision"]]
+        canonical_schedule = build_runtime_behavioral_schedule(schedule)
+        assert schedule["task"] == suite["task"]
+        assert len(schedule["records"]) == manifest["record_count"]
+        assert canonical_schedule.schedule_sha256 == suite["schedule_sha256"]
+        assert paired_records["schedule_sha256"] == canonical_schedule.schedule_sha256
+        if suite["record_ids"] is not None:
+            assert [record["record_id"] for record in schedule["records"]] == suite[
+                "record_ids"
+            ]
+
+        qualification = report["sample_qualification"]
+        assert report["record_count"] == manifest["record_count"]
+        assert qualification["passed"] is True
+        assert qualification["record_count"] == {
+            "minimum": manifest["record_count"],
+            "observed": manifest["record_count"],
+            "passed": True,
+        }

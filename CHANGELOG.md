@@ -52,16 +52,14 @@ from the same canonical JSON.
 - Moved spectral, random-matrix, and variance calculations to the optional
   `invarlock-diagnostics` package. Their canonical outputs can be authenticated
   as observations but do not participate in acceptance.
-- Rebuilt documentation, diagrams, packaged contracts, workflows, and examples
-  around the closed transaction. The public index now carries eight strictly
-  verified `invarlock/evidence-pack-v1` comparisons across Hugging Face text,
-  GGUF, vision-text, and TensorRT-LLM runtimes. The five established runtime
-  qualifications were refreshed from the final release-qualified source and
-  signer, while new 32-record Gemma 4 12B vision-text and Ministral 3 8B GGUF
-  comparisons broaden the optional-runtime evidence. A pinned 32-record Qwen
-  3.5-to-3.6 vision-text comparison also qualifies strict BF16 checkpoint
-  materialization for the current native Qwen architecture without changing
-  the explicit empty-state contract for future publication surfaces.
+- Rebuilt documentation, diagrams, packaged contracts, workflows, examples,
+  and public evidence around the closed transaction. The public index now
+  retains only `invarlock/evidence-pack-v1` comparisons qualified on balanced,
+  pinned 400-record MMLU-Pro or MMMU-Pro schedules, with independent signed
+  receipts and a checked-in, hash-pinned suite manifest. The refreshed set spans
+  Hugging Face text and vision-text execution plus TensorRT-LLM runtime
+  qualification; comparisons without current large-sample evidence use the
+  explicit **Evidence not yet created** state.
 - Coordinated source archives, core and add-in wheels, runtime images, signed
   canaries, artifact promotion, and final receipts under one reproducible
   release qualification flow, with at least 80% branch coverage required for

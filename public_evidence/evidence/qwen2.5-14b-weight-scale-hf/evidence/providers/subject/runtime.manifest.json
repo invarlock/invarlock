@@ -1,24 +1,24 @@
 {
   "config": {
     "path": "run.yaml",
-    "sha256": "6802b89adcd79c13b8a1febb052ded6c70adfb04bc90ceb16928721f9669bf62",
+    "sha256": "4b6eedd7f505d962ba3823bd4dafa03eb550c55707dc60dc321b8ffb18ccb996",
     "source": "file"
   },
   "execution_mode": "container",
-  "generated_at_utc": "2026-07-19T05:48:48.109684+00:00",
+  "generated_at_utc": "2026-07-19T14:04:27.630794+00:00",
   "manifest_version": 1,
   "outer_container": {
     "allow_network": false,
     "allow_remote_code": false,
     "allow_third_party_plugins": false,
     "container_execution": true,
-    "image_digest": "sha256:7add807e161b37d0ab2c299a688e63c8226005aad3a73659372c676f110f8784",
-    "image_ref": "localhost:5001/invarlock-runtime-hf-cuda@sha256:7add807e161b37d0ab2c299a688e63c8226005aad3a73659372c676f110f8784"
+    "image_digest": "sha256:e0838e97a82348d6a492b82063e8f217b476f14a89eb9d50c5a760a9777bbc01",
+    "image_ref": "invarlock-runtime@sha256:e0838e97a82348d6a492b82063e8f217b476f14a89eb9d50c5a760a9777bbc01"
   },
   "report": {
     "filename": "report.json",
     "path": "report.json",
-    "sha256": "b9df94745de919841316eb115b9fae276e2a7a0c50018b2bafc39cc95ed9e6d7"
+    "sha256": "24849aefab2c5ccaaea82f4ab9ff8f1634677a5aa5d9df7318ed37dda8f33895"
   },
   "runtime_provider": {
     "artifact_identity": {
@@ -27,11 +27,11 @@
     },
     "receipt": {
       "filename": "runtime-provider.receipt.json",
-      "sha256": "c7e0dde6a7358dfcebb010057645ed84dbdd4eeb98397a21330b9b4c01318e65"
+      "sha256": "eb4115688cbcdd5192ebc61fc5bc9fe68b710c13e8da262b519b09d0face97e9"
     },
     "scoring_observation": {
       "filename": "runtime-scoring.observation.json",
-      "sha256": "68042d9751ffd26ffd1e1d7a6e28f4826f326d1c6d5098af00dabd23beaff44c"
+      "sha256": "8f6a3a2bd0400c4a4081052c1b2ca519f1aa8e838b1b0f5919c85f27bfdad123"
     }
   },
   "verifier_contract_version": "runtime-manifest-v1"

@@ -5,13 +5,13 @@ InvarLock transaction. Each published entry contains an
 `invarlock/evidence-pack-v1` bundle and its independently signed verification
 receipt.
 
-The current index carries eight strictly verified comparisons across the
-built-in Hugging Face text runtime and the first-party GGUF, vision-text, and
-TensorRT-LLM runtime packages. The Hugging Face text entries cover paired
-normalized-NLL schedules at 7B and 14B scale. The optional-runtime entries add
-exact-match qualification schedules for GGUF models through 8B, vision-text
-models through 27B, including a pinned Qwen 3.5-to-3.6 comparison, and
-TensorRT-LLM engines. See the
+Every current entry uses a 400-record paired schedule selected from pinned
+public datasets. Text comparisons use a domain-balanced MMLU-Pro suite;
+vision-text comparisons use a subject-balanced MMMU-Pro Vision suite. Both
+suites are exactly balanced across answer choices A-J. The checked-in
+[qualification-suite manifest](../docs/reference/qualification-suites.manifest.json) records the
+source revisions, licenses, exclusions, deterministic selection algorithm,
+distributions, selected IDs, and schedule digests. See the
 [publication guide](../docs/user-guide/public-evidence.md#published-evidence)
 for the complete inventory and interpretation boundary.
 
