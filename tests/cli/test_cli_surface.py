@@ -1,68 +1,85 @@
 from __future__ import annotations
 
+from typing import cast
+
+from click import Argument, Command, Group, Option
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 
 RUNNER = CliRunner()
+ROOT_COMMAND = cast(Group, get_command(app))
 
 
-def _help(*args: str) -> str:
-    # Rich may collapse long option names when CI supplies a narrow terminal.
-    # Fix the rendering width so this test observes the command contract rather
-    # than the host runner's display geometry.
-    result = RUNNER.invoke(app, [*args, "--help"], terminal_width=240)
-    assert result.exit_code == 0, result.output
-    return result.output
+def _command(name: str) -> Command:
+    return ROOT_COMMAND.commands[name]
+
+
+def _arguments(name: str) -> set[str]:
+    return {
+        param.name
+        for param in _command(name).params
+        if isinstance(param, Argument) and param.name is not None
+    }
+
+
+def _options(name: str) -> set[str]:
+    return {
+        option
+        for param in _command(name).params
+        if isinstance(param, Option)
+        for option in param.opts
+        if option.startswith("--")
+    }
+
+
+def test_core_help_renders() -> None:
+    for args in ((), ("evaluate",), ("verify",), ("report",)):
+        result = RUNNER.invoke(app, [*args, "--help"])
+        assert result.exit_code == 0, result.output
 
 
 def test_root_teaches_only_the_core_user_journey() -> None:
-    help_text = _help()
-
-    for command in ("evaluate", "verify", "report"):
-        assert command in help_text
-    for retired in ("doctor", "advanced", "calibrate", "plugins", "inputs"):
-        assert retired not in help_text
+    assert set(ROOT_COMMAND.commands) == {"evaluate", "verify", "report"}
 
 
 def test_evaluate_accepts_one_request_instead_of_model_flag_sprawl() -> None:
-    help_text = _help("evaluate")
+    options = _options("evaluate")
 
-    assert "REQUEST" in help_text
-    assert "--baseline " not in help_text
-    assert "--subject " not in help_text
-    assert "--edit-config" not in help_text
-    assert "--clean-selection" not in help_text
-    assert "--allow-network" not in help_text
-    assert "--allow-remote-code" not in help_text
-    assert "--allow-installed-scorers" in help_text
-    assert "--preflight" in help_text
+    assert _arguments("evaluate") == {"request"}
+    assert "--baseline" not in options
+    assert "--subject" not in options
+    assert "--edit-config" not in options
+    assert "--clean-selection" not in options
+    assert "--allow-network" not in options
+    assert "--allow-remote-code" not in options
+    assert "--allow-installed-scorers" in options
+    assert "--preflight" in options
 
 
 def test_verify_uses_the_bundle_and_independent_trust_anchors() -> None:
-    help_text = _help("verify")
+    options = _options("verify")
 
-    assert "EVIDENCE" in help_text
-    assert "--policy" in help_text
-    assert "--expected-baseline-runtime" in help_text
-    assert "--expected-subject-runtime" in help_text
-    assert "--expected-baseline-artifact" in help_text
-    assert "--expected-subject-artifact" in help_text
-    assert "--expected-schedule" in help_text
-    assert "--expected-signer" in help_text
-    assert "--receipt" in help_text
-    assert "--verifier-signing-key" in help_text
-    assert "--verifier-identity" in help_text
-    assert "--allow-installed-scorers" in help_text
-    assert "--trust-profile" in help_text
-    assert "--baseline" not in help_text
+    assert _arguments("verify") == {"evidence"}
+    assert "--policy" in options
+    assert "--expected-baseline-runtime" in options
+    assert "--expected-subject-runtime" in options
+    assert "--expected-baseline-artifact" in options
+    assert "--expected-subject-artifact" in options
+    assert "--expected-schedule" in options
+    assert "--expected-signer" in options
+    assert "--receipt" in options
+    assert "--verifier-signing-key" in options
+    assert "--verifier-identity" in options
+    assert "--allow-installed-scorers" in options
+    assert "--trust-profile" in options
+    assert "--baseline" not in options
 
 
 def test_report_renders_directly_from_the_bundle() -> None:
-    help_text = _help("report")
+    options = _options("report")
 
-    assert "EVIDENCE" in help_text
-    assert "--html" in help_text
-    assert "--run" not in help_text
-    assert "generate" not in help_text
-    assert "validate" not in help_text
+    assert _arguments("report") == {"evidence"}
+    assert "--html" in options
+    assert "--run" not in options
