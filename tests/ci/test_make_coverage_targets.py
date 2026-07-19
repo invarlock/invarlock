@@ -63,7 +63,7 @@ def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> N
 
 
 def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-release", "coverage-enforce")
+    block = _target("coverage-release", "coverage-scenarios")
     for script in (
         "first_party_distribution_validation.py",
         "release_distribution_validation.py",
@@ -74,6 +74,18 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
         assert f"--include='scripts/release/{script}' --fail-under=80" in block
     assert "--cov-config=scripts/release.coveragerc" in block
     assert "--cov-branch" in block
+    assert "$(PYTEST_WORKER_ARGS)" in block
+
+
+def test_scenario_checker_has_an_individual_branch_coverage_ratchet() -> None:
+    block = _target("coverage-scenarios", "coverage-enforce")
+    assert "tests/scripts/test_check_example_scenarios.py" in block
+    assert "--cov=scripts.checks.check_example_scenarios" in block
+    assert "--cov-branch" in block
+    assert "--cov-fail-under=80" in block
+    assert (
+        "--include='scripts/checks/check_example_scenarios.py' --fail-under=80" in block
+    )
     assert "$(PYTEST_WORKER_ARGS)" in block
 
 
@@ -103,6 +115,7 @@ def test_primary_verification_and_coverage_targets_default_to_parallel() -> None
     assert "$(MAKE) coverage-addins PYTEST_WORKERS=$(PYTEST_WORKERS)" in MAKEFILE
     assert "$(MAKE) coverage-qualification PYTEST_WORKERS=$(PYTEST_WORKERS)" in MAKEFILE
     assert "$(MAKE) coverage-release PYTEST_WORKERS=$(PYTEST_WORKERS)" in MAKEFILE
+    assert "$(MAKE) coverage-scenarios PYTEST_WORKERS=$(PYTEST_WORKERS)" in MAKEFILE
     assert "$(PYTEST) $(PYTEST_WORKER_ARGS) -q" in MAKEFILE
 
 

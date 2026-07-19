@@ -1,0 +1,35 @@
+format_version: invarlock/example-scenario-v1
+scenario_id: gguf-conversion
+title: Evaluate a GGUF conversion
+audience: Teams publishing or deploying GGUF artifacts through llama.cpp-compatible runtimes
+availability: operator_recipe
+ecosystems:
+  - GGUF
+  - llama.cpp
+input_boundary:
+  kind: gguf_conversion
+  supplied_by: external_tool_or_team
+  candidate_input: The authenticated source checkpoint and the immutable GGUF file selected for deployment
+transaction:
+  task: text_causal
+  metric: exact_match
+  execution_mode: run
+  providers:
+    - hf_transformers
+    - llama_cpp
+  acceptance_question: Did the GGUF candidate preserve the paired task outcomes required by the release policy?
+workflow:
+  commands:
+    - evaluate
+    - verify
+    - report
+  runbook: README.md
+  related_paths:
+    - addins/gguf/README.md
+    - docs/user-guide/runtime-providers.md
+    - docs/user-guide/schedule-and-policy.md
+interpretation:
+  establishes:
+    - The authenticated GGUF artifact satisfied the paired task policy through the bound llama.cpp runtime.
+  boundary:
+    - Cross-tokenizer normalized NLL is outside this example; use an output-level metric or a calibrated scorer extension.

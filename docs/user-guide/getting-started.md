@@ -364,6 +364,16 @@ invarlock report artifacts/evidence/ --html evidence.html --explain
 Use this fixture to test key handling and artifact transport, not as evidence
 that a runtime-backed model comparison works.
 
+## Apply the transaction to a release change
+
+The [change-scenario guide](change-scenarios.md) and repository
+[`examples/scenarios/`](https://github.com/invarlock/invarlock/tree/main/examples/scenarios)
+catalog map common inputs to the same transaction. Recipes cover fine-tuned,
+pruned, quantized, GGUF, TensorRT-LLM, model-upgrade, multimodal,
+external-harness, serving-endpoint, and evidence-handoff workflows. They begin
+with an immutable candidate or authenticated per-record results; artifact
+creation remains in the external tool that owns it.
+
 ## Recovery and next steps
 
 Evidence, receipt, and HTML destinations are no-clobber. Do not repair a

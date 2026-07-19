@@ -11,6 +11,13 @@ trust-anchor, policy, and report contracts run without downloading a model,
 contacting a service, or using a GPU. Those fixtures test the import contract;
 they are not measurements of real models.
 
+The [`scenarios/`](scenarios/) catalog maps fine-tuning, pruning, quantization,
+GGUF conversion, TensorRT-LLM deployment, model upgrades, multimodal changes,
+external harnesses, serving endpoints, and independent evidence handoff to the
+same distilled transaction. These are neutral operator recipes: external tools
+create candidate artifacts or per-record results, while InvarLock evaluates or
+imports, verifies, and reports them.
+
 ## Run the primary Hugging Face journey
 
 Follow [`run/README.md`](run/README.md) to build and smoke-test the CPU runtime,
@@ -26,6 +33,12 @@ examples/
 ├── rejected-request.yaml
 ├── generate_keys.py
 ├── run_trust_boundary_demo.py
+├── run/
+│   └── hf_cpu_decision.py
+├── scenarios/
+│   ├── changes/
+│   ├── imports/
+│   └── journeys/
 ├── inputs/
 │   └── schedule.json
 ├── policy/
@@ -144,5 +157,6 @@ Do not delete or rewrite evidence that has already been distributed.
 
 For the contracts behind the example, read the
 [getting-started guide](../docs/user-guide/getting-started.md),
+[change-scenario guide](../docs/user-guide/change-scenarios.md),
 [schedule and policy guide](../docs/user-guide/schedule-and-policy.md), and
 [evidence and verification guide](../docs/user-guide/evidence-and-verification.md).

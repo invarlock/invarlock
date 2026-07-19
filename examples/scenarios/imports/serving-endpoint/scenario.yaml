@@ -1,0 +1,36 @@
+format_version: invarlock/example-scenario-v1
+scenario_id: serving-endpoint
+title: Evaluate a serving endpoint change
+audience: Teams changing a hosted inference service, model server, or endpoint configuration
+availability: operator_recipe
+ecosystems:
+  - OpenAI-compatible serving APIs
+  - NVIDIA Triton Inference Server
+  - vLLM
+  - Internal model gateways
+input_boundary:
+  kind: serving_endpoint
+  supplied_by: external_tool_or_team
+  candidate_input: Paired endpoint records plus authenticated service, model, configuration, and runtime receipts
+transaction:
+  task: text_causal
+  metric: exact_match
+  execution_mode: import
+  providers:
+    - runtime_provider_abi
+  acceptance_question: Did the candidate serving configuration preserve the paired task outcomes required by policy?
+workflow:
+  commands:
+    - evaluate
+    - verify
+    - report
+  runbook: README.md
+  related_paths:
+    - examples/README.md
+    - docs/reference/runtime-providers.md
+    - docs/user-guide/evaluation-request.md
+interpretation:
+  establishes:
+    - The authenticated endpoint result set satisfied the paired task policy for the recorded service configuration.
+  boundary:
+    - The result does not establish future endpoint availability or behavior after the authenticated observation window.

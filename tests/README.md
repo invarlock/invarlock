@@ -36,7 +36,8 @@ through `tests/integration/conftest.py`.
 - `tests/integration/` covers the offline public example, packaging isolation,
   and the opt-in container journey.
 - `tests/ci/`, `tests/docs/`, `tests/lint/`, and `tests/scripts/` protect
-  repository, documentation, release, and supply-chain contracts.
+  repository, documentation, example-scenario, release, and supply-chain
+  contracts.
 - `tests/filesystem/` covers atomic filesystem operations.
 - Narrow `_support*.py` helpers live beside the tests that share them;
   root-level `_repo_root.py` and `_support_evidence_pack_signing.py` provide

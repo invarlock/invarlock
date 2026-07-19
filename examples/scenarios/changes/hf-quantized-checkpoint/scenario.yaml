@@ -1,0 +1,39 @@
+format_version: invarlock/example-scenario-v1
+scenario_id: hf-quantized-checkpoint
+title: Evaluate a quantized Hugging Face checkpoint
+audience: Teams using AWQ, GPTQModel, HQQ, bitsandbytes, Quanto, TorchAO, or another quantization stack
+availability: operator_recipe
+ecosystems:
+  - AWQ
+  - GPTQModel
+  - HQQ
+  - bitsandbytes
+  - Quanto
+  - TorchAO
+input_boundary:
+  kind: hf_quantization
+  supplied_by: external_tool_or_team
+  candidate_input: The immutable full-precision baseline and the materialized quantized checkpoint or authenticated runtime records
+transaction:
+  task: text_causal
+  metric: exact_match
+  execution_mode: import
+  providers:
+    - hf_transformers
+    - runtime_provider_abi
+  acceptance_question: Did the quantized candidate preserve the paired task outcomes required by the release policy?
+workflow:
+  commands:
+    - evaluate
+    - verify
+    - report
+  runbook: README.md
+  related_paths:
+    - examples/README.md
+    - docs/reference/runtime-providers.md
+    - docs/user-guide/evaluation-request.md
+interpretation:
+  establishes:
+    - The authenticated quantized candidate satisfied the paired task policy under its bound runtime.
+  boundary:
+    - File size, throughput, memory use, and unsupported loader behavior are separate deployment properties.

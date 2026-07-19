@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/examples/scenario.schema.json",
+  "title": "InvarLock example scenario",
+  "type": "object",
+  "required": [
+    "format_version",
+    "scenario_id",
+    "title",
+    "audience",
+    "availability",
+    "input_boundary",
+    "transaction",
+    "workflow",
+    "interpretation"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "invarlock/example-scenario-v1"
+    },
+    "scenario_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100
+    },
+    "audience": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160
+    },
+    "availability": {
+      "enum": ["runnable", "operator_recipe"]
+    },
+    "ecosystems": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80
+      }
+    },
+    "input_boundary": {
+      "type": "object",
+      "required": ["kind", "supplied_by", "candidate_input"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "evidence_handoff",
+            "external_evaluation",
+            "fine_tuning",
+            "gguf_conversion",
+            "hf_quantization",
+            "model_upgrade",
+            "multimodal_upgrade",
+            "pruning",
+            "serving_endpoint",
+            "tensorrt_deployment"
+          ]
+        },
+        "supplied_by": {
+          "const": "external_tool_or_team"
+        },
+        "candidate_input": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300
+        }
+      },
+      "additionalProperties": false
+    },
+    "transaction": {
+      "type": "object",
+      "required": [
+        "task",
+        "metric",
+        "execution_mode",
+        "providers",
+        "acceptance_question"
+      ],
+      "properties": {
+        "task": {
+          "enum": ["text_causal", "vision_text_generation", "not_applicable"]
+        },
+        "metric": {
+          "enum": [
+            "exact_match",
+            "normalized_nll_per_utf8_byte",
+            "scorer_extension",
+            "not_applicable"
+          ]
+        },
+        "execution_mode": {
+          "enum": ["run", "import", "verify_existing"]
+        },
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          }
+        },
+        "acceptance_question": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 300,
+          "pattern": "\\?$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["commands", "runbook"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["evaluate", "verify", "report"]
+          }
+        },
+        "runbook": {
+          "const": "README.md"
+        },
+        "related_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000-\\u001f]+$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "interpretation": {
+      "type": "object",
+      "required": ["establishes", "boundary"],
+      "properties": {
+        "establishes": {
+          "$ref": "#/$defs/nonEmptyStatements"
+        },
+        "boundary": {
+          "$ref": "#/$defs/nonEmptyStatements"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyStatements": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 300
+      }
+    }
+  }
+}

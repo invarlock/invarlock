@@ -8,6 +8,7 @@ nav:
   - Overview: README.md
   - User guide:
       - Getting started: user-guide/getting-started.md
+      - Change scenarios: user-guide/change-scenarios.md
       - Key management: user-guide/key-management.md
       - Runtime providers: user-guide/runtime-providers.md
       - Evaluation request: user-guide/evaluation-request.md

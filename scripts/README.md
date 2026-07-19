@@ -13,8 +13,8 @@ second product workflow.
 
 ## Maintained families
 
-- `checks/` contains the packaged-contract synchronizer, the public-evidence
-  index audit, and the source-tree cruft check.
+- `checks/` contains the packaged-contract synchronizer, public-evidence and
+  example-scenario audits, and the source-tree cruft check.
 - `release/` validates a clean release checkout and built distributions.
   `make dist-check` binds the core wheel/sdist and all four first-party
   optional wheel/sdist pairs to their exact checkout sources, metadata, and

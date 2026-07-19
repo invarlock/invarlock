@@ -60,6 +60,11 @@ from the same canonical JSON.
   Hugging Face text and vision-text execution plus TensorRT-LLM runtime
   qualification; comparisons without current large-sample evidence use the
   explicit **Evidence not yet created** state.
+- Reframed the former transformation-specific examples as a closed scenario
+  catalog for fine-tuned, pruned, quantized, converted, deployed, upgraded,
+  multimodal, imported, and independently reviewed candidates. Each recipe
+  starts at the external artifact or result boundary and uses the same
+  evaluation, verification, and reporting path.
 - Coordinated source archives, core and add-in wheels, runtime images, signed
   canaries, artifact promotion, and final receipts under one reproducible
   release qualification flow, with at least 80% branch coverage required for

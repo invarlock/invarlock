@@ -266,6 +266,13 @@ requires the canonical schedule, both typed observations and runtime bindings,
 and canonical paired records; InvarLock re-derives and checks the full
 comparison before publication.
 
+For recognizable release situations, the
+[`examples/scenarios/`](https://github.com/invarlock/invarlock/tree/main/examples/scenarios)
+catalog covers fine-tuned, pruned, quantized, GGUF, TensorRT-LLM, model-upgrade,
+multimodal, external-harness, serving-endpoint, and independent-verification
+workflows. Candidate creation stays in the tool that owns it; every recipe
+converges on the same `evaluate`, `verify`, and `report` transaction.
+
 ## Providers and diagnostics
 
 Hugging Face Transformers is the built-in reference provider and supports both

@@ -42,7 +42,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/evidence_verification.py
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
-.PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-enforce coverage-enforce-parallel
+.PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-scenarios coverage-enforce coverage-enforce-parallel
 .PHONY: trust-smoke mutation-smoke trust-boundary-demo
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -52,7 +52,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
-.PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync
+.PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync example-scenarios-check
 .PHONY: clean docsclean deepclean pre-commit pre-commit-install ensure-python ensure-ruff ensure-mypy
 
 help:  ## Show maintained targets
@@ -200,12 +200,23 @@ coverage-release:  ## Enforce branch coverage for maintained release helpers
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/verify_hosted_distributions.py' --fail-under=80
 
+coverage-scenarios:  ## Enforce branch coverage for the example-scenario checker
+	PYTHONPATH=. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		tests/scripts/test_check_example_scenarios.py \
+		--cov=scripts.checks.check_example_scenarios --cov-branch \
+		--cov-report=term-missing \
+		--cov-report=xml:reports/scenarios-cov.xml \
+		--cov-fail-under=80
+	$(PYTHON) -m coverage report \
+		--include='scripts/checks/check_example_scenarios.py' --fail-under=80
+
 coverage-enforce: PYTEST_WORKERS = auto
 coverage-enforce: coverage-linux-check  ## Enforce branch coverage in parallel by default
 	$(MAKE) coverage PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-addins PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-qualification PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-release PYTEST_WORKERS=$(PYTEST_WORKERS)
+	$(MAKE) coverage-scenarios PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 coverage-enforce-parallel: PYTEST_WORKERS = auto
 coverage-enforce-parallel:  ## Enforce coverage with pytest-xdist
@@ -358,6 +369,7 @@ verify: PYTEST_WORKERS = auto
 verify:  ## Run repository, product, docs, and contract gates in parallel by default
 	$(MAKE) repo-cruft-check
 	$(MAKE) public-evidence-audit
+	$(MAKE) example-scenarios-check
 	$(MAKE) contracts-check
 	$(MAKE) test PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) addins-test PYTEST_WORKERS=$(PYTEST_WORKERS)
@@ -369,6 +381,7 @@ verify-fast: PYTEST_WORKERS = auto
 verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) repo-cruft-check
 	$(MAKE) public-evidence-audit
+	$(MAKE) example-scenarios-check
 	$(MAKE) contracts-check
 	$(MAKE) test-fast PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) addins-test PYTEST_WORKERS=$(PYTEST_WORKERS)
@@ -390,6 +403,9 @@ public-evidence-audit:  ## Validate the canonical public evidence index
 
 public-evidence-sync:  ## Refresh the packaged public evidence index
 	PYTHONPATH=src $(PYTHON) scripts/checks/sync_packaged_public_evidence.py --write
+
+example-scenarios-check:  ## Validate the neutral change and deployment recipes
+	$(PYTHON) scripts/checks/check_example_scenarios.py
 
 ##@ Documentation
 docs:  ## Build documentation strictly

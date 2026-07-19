@@ -61,6 +61,7 @@ EXPECTED_DOC_PAGES = {
     "security/trust-model.md",
     "user-guide/diagnostics.md",
     "user-guide/ci-integration.md",
+    "user-guide/change-scenarios.md",
     "user-guide/evaluation-request.md",
     "user-guide/evidence-and-verification.md",
     "user-guide/public-evidence.md",
@@ -469,6 +470,27 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
     }
     assert "one-record (`-2` percentage-point)" in example
     assert "`-50` percentage-point regression" not in example
+
+
+def test_change_scenario_guide_preserves_the_external_artifact_boundary() -> None:
+    guide = _read("docs/user-guide/change-scenarios.md")
+    catalog = _read("examples/scenarios/README.md")
+    for phrase in (
+        "fine-tuned",
+        "pruned",
+        "quantized",
+        "GGUF",
+        "TensorRT-LLM",
+        "multimodal",
+        "external-harness",
+        "serving-endpoint",
+        "evidence-handoff",
+    ):
+        assert phrase in guide
+        assert phrase in catalog
+    assert re.search(r"at least 400\s+eligible paired records", guide)
+    assert "make example-scenarios-check" in guide
+    assert "does not install a training or compression framework" in guide
 
 
 def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:

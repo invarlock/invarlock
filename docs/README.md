@@ -152,6 +152,7 @@ acceptance; judges fit the authenticated-observation path.
 | --- | --- | --- |
 | Run a first comparison | [Getting started](user-guide/getting-started.md) | [Evaluation request](user-guide/evaluation-request.md) and [schedule and policy](user-guide/schedule-and-policy.md) |
 | Run the tiny real-model example | [Hugging Face CPU example](https://github.com/invarlock/invarlock/tree/main/examples/run) | [Runtime providers](user-guide/runtime-providers.md) and [evidence and verification](user-guide/evidence-and-verification.md) |
+| Apply InvarLock to a model or runtime change | [Change scenarios](user-guide/change-scenarios.md) | [Change-scenario catalog](https://github.com/invarlock/invarlock/tree/main/examples/scenarios) and [runtime providers](user-guide/runtime-providers.md) |
 | Review or accept evidence | [Evidence and verification](user-guide/evidence-and-verification.md) | [Acceptance checklist](assurance/acceptance-checklist.md) and [decision semantics](assurance/decision-semantics.md) |
 | Automate a gate | [CI integration](user-guide/ci-integration.md) | [Key management](user-guide/key-management.md) and [CLI reference](reference/cli.md) |
 | Integrate a runtime | [Runtime providers](user-guide/runtime-providers.md) | [Provider reference](reference/runtime-providers.md) and [contracts](reference/contracts.md) |
