@@ -417,6 +417,108 @@ def _qwen3_5_non_executing_checkpoint_keys(
     return set(mtp_keys)
 
 
+def _qwen3_5_native_float32_to_bfloat16_keys(
+    model: object,
+    *,
+    authenticated_config: object | None,
+) -> set[str] | None:
+    """Return the exact native mixed-dtype inventory cast by Transformers."""
+
+    config = getattr(model, "config", None)
+    text_config = getattr(config, "text_config", None)
+    if (
+        getattr(config, "model_type", None) != "qwen3_5"
+        or getattr(text_config, "model_type", None) != "qwen3_5_text"
+    ):
+        return None
+    try:
+        qwen_module = importlib.import_module(
+            "transformers.models.qwen3_5.modeling_qwen3_5"
+        )
+        expected_class = qwen_module.Qwen3_5ForConditionalGeneration
+    except (AttributeError, ImportError) as exc:
+        raise RuntimeError(
+            "strict HF native Qwen3.5 compatibility profile is unavailable"
+        ) from exc
+    if model.__class__ is not expected_class:
+        raise ValueError("strict HF native Qwen3.5 model class is unsupported")
+    if authenticated_config is None:
+        raise RuntimeError(
+            "strict HF native Qwen3.5 authenticated configuration is unavailable"
+        )
+    authenticated_text_config = getattr(authenticated_config, "text_config", None)
+    if (
+        authenticated_config.__class__ is not config.__class__
+        or authenticated_text_config.__class__ is not text_config.__class__
+        or getattr(authenticated_config, "model_type", None) != "qwen3_5"
+        or getattr(authenticated_text_config, "model_type", None) != "qwen3_5_text"
+    ):
+        raise ValueError(
+            "strict HF native Qwen3.5 authenticated configuration is unsupported"
+        )
+    authenticated_dtype_value = getattr(authenticated_config, "dtype", None)
+    authenticated_dtype = str(authenticated_dtype_value).removeprefix("torch.")
+    authenticated_text_dtype = str(
+        getattr(authenticated_text_config, "dtype", None)
+    ).removeprefix("torch.")
+    live_dtype = str(getattr(config, "dtype", None)).removeprefix("torch.")
+    live_text_dtype = str(getattr(text_config, "dtype", None)).removeprefix("torch.")
+    if (
+        authenticated_dtype_value is not None and authenticated_dtype != "bfloat16"
+    ) or authenticated_text_dtype != "bfloat16":
+        if live_dtype == "bfloat16" or live_text_dtype == "bfloat16":
+            raise ValueError(
+                "strict HF native Qwen3.5 bfloat16 materialization is not "
+                "authorized by the checkpoint configuration"
+            )
+        return None
+    if live_dtype != "bfloat16" or live_text_dtype != "bfloat16":
+        raise ValueError(
+            "strict HF native Qwen3.5 bfloat16 materialization was not preserved"
+        )
+    if (
+        getattr(authenticated_config, "quantization_config", None) is not None
+        or getattr(config, "quantization_config", None) is not None
+        or bool(getattr(model, "is_quantized", False))
+        or getattr(model, "hf_quantizer", None) is not None
+    ):
+        raise ValueError(
+            "strict HF native Qwen3.5 dtype conversion requires an "
+            "unquantized checkpoint"
+        )
+    dtype_plan_loader = getattr(model, "_get_dtype_plan", None)
+    if not callable(dtype_plan_loader):
+        raise RuntimeError("strict HF native model dtype plan is unavailable")
+    try:
+        dtype_plan = dtype_plan_loader(getattr(authenticated_config, "dtype", None))
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("strict HF native model dtype plan is unavailable") from exc
+    if not isinstance(dtype_plan, Mapping) or dtype_plan:
+        raise ValueError(
+            "strict HF native Qwen3.5 dtype conversion plan is unsupported"
+        )
+    layer_count = getattr(authenticated_text_config, "num_hidden_layers", None)
+    layer_types = getattr(authenticated_text_config, "layer_types", None)
+    if (
+        isinstance(layer_count, bool)
+        or not isinstance(layer_count, int)
+        or layer_count <= 0
+        or not isinstance(layer_types, (list, tuple))
+        or len(layer_types) != layer_count
+        or any(
+            layer_type not in {"linear_attention", "full_attention"}
+            for layer_type in layer_types
+        )
+    ):
+        raise ValueError("strict HF native Qwen3.5 dtype conversion profile is invalid")
+    return {
+        f"model.language_model.layers.{index}.linear_attn.{suffix}"
+        for index, layer_type in enumerate(layer_types)
+        if layer_type == "linear_attention"
+        for suffix in ("A_log", "norm.weight")
+    }
+
+
 def _is_legacy_gpt2_causal_mask_key(
     key: str,
     *,
@@ -518,6 +620,7 @@ def load_hf_model_with_strict_loading_info(
         trust_remote_code=False,
         use_safetensors=True,
         output_loading_info=True,
+        dtype="auto",
     )
     if (
         not isinstance(loaded, tuple)
@@ -619,10 +722,17 @@ def _verify_authenticated_safetensors(
     prefix: str | None,
     safe_open: Callable[..., Any],
     non_executing_keys: set[str],
+    authenticated_config: object | None,
 ) -> tuple[set[str], list[object]]:
     observed_keys: set[str] = set()
     authenticated_live_names: set[str] = set()
     authenticated_live_tensors: list[object] = []
+    native_cast_profile = _qwen3_5_native_float32_to_bfloat16_keys(
+        model,
+        authenticated_config=authenticated_config,
+    )
+    allowed_native_casts = native_cast_profile or set()
+    observed_native_casts: set[str] = set()
     shards = sorted(checkpoint.glob("*.safetensors"), key=lambda path: path.name)
     for shard in shards:
         with safe_open(str(shard), framework="pt", device="cpu") as handle:
@@ -651,15 +761,48 @@ def _verify_authenticated_safetensors(
                         "strict HF native model state contains a non-tensor value"
                     )
                 live_cpu = detach().to(device="cpu").contiguous()
-                if (
-                    stored.dtype != live_cpu.dtype
-                    or tuple(stored.shape) != tuple(live_cpu.shape)
-                    or not bool(stored.equal(live_cpu))
-                ):
+                shape_matches = tuple(stored.shape) == tuple(live_cpu.shape)
+                exact_match = (
+                    stored.dtype == live_cpu.dtype
+                    and shape_matches
+                    and bool(stored.equal(live_cpu))
+                )
+                stored_is_float = bool(
+                    stored.is_floating_point() or stored.is_complex()
+                )
+                live_is_float = bool(
+                    live_cpu.is_floating_point() or live_cpu.is_complex()
+                )
+                native_cast_match = (
+                    native_cast_profile is not None
+                    and key in allowed_native_casts
+                    and str(stored.dtype) == "torch.float32"
+                    and str(live_cpu.dtype) == "torch.bfloat16"
+                    and shape_matches
+                    and bool(stored.to(dtype=live_cpu.dtype).equal(live_cpu))
+                )
+                profile_exact_match = (
+                    native_cast_profile is not None
+                    and str(stored.dtype) == "torch.bfloat16"
+                    and str(live_cpu.dtype) == "torch.bfloat16"
+                    and shape_matches
+                    and bool(stored.equal(live_cpu))
+                )
+                accepted_exact_match = (
+                    profile_exact_match
+                    if (
+                        native_cast_profile is not None
+                        and (stored_is_float or live_is_float)
+                    )
+                    else exact_match
+                )
+                if not accepted_exact_match and not native_cast_match:
                     raise ValueError(
                         "strict HF loaded model tensors do not match the "
                         "authenticated checkpoint"
                     )
+                if native_cast_match:
+                    observed_native_casts.add(key)
                 authenticated_live_names.update(name for name, _value in bound_matches)
                 authenticated_live_tensors.extend(
                     value for _name, value in bound_matches
@@ -667,6 +810,10 @@ def _verify_authenticated_safetensors(
     if observed_keys != authenticated_keys:
         raise RuntimeError(
             "strict HF checkpoint tensor inventory changed during binding"
+        )
+    if observed_native_casts and observed_native_casts != allowed_native_casts:
+        raise ValueError(
+            "strict HF checkpoint native dtype conversion profile is incomplete"
         )
     return authenticated_live_names, authenticated_live_tensors
 
@@ -697,7 +844,12 @@ def _require_complete_live_state(
         )
 
 
-def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
+def _require_safetensors_match(
+    checkpoint: Path,
+    *,
+    model: object,
+    authenticated_config: object | None = None,
+) -> None:
     """Authenticate stored tensors and bind every live execution tensor exactly."""
 
     try:
@@ -753,6 +905,7 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
         prefix=authenticated_prefix,
         safe_open=safe_open,
         non_executing_keys=non_executing_keys,
+        authenticated_config=authenticated_config,
     )
     _require_complete_live_state(
         live_state,
@@ -761,7 +914,7 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
     )
 
 
-def _require_model_config_match(checkpoint: Path, *, model: object) -> None:
+def _require_model_config_match(checkpoint: Path, *, model: object) -> object:
     """Compare the live model config with a fresh offline checkpoint load."""
 
     transformers = importlib.import_module("transformers")
@@ -895,6 +1048,7 @@ def _require_model_config_match(checkpoint: Path, *, model: object) -> None:
         raise ValueError(
             "strict HF live model config does not match the authenticated checkpoint"
         )
+    return authenticated_config
 
 
 def _require_model_eval_mode(model: object) -> None:
@@ -954,8 +1108,12 @@ def require_loaded_hf_checkpoint_binding(
             "strict HF live tokenizer does not match tokenizer_metadata_sha256"
         )
     _require_model_eval_mode(model)
-    _require_model_config_match(checkpoint, model=model)
-    _require_safetensors_match(checkpoint, model=model)
+    authenticated_config = _require_model_config_match(checkpoint, model=model)
+    _require_safetensors_match(
+        checkpoint,
+        model=model,
+        authenticated_config=authenticated_config,
+    )
     try:
         after = checkpoint_tree_sha256(checkpoint).removeprefix("sha256:")
     except (CheckpointIdentityError, OSError) as exc:

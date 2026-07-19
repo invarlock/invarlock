@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import copy
 import importlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -490,6 +492,56 @@ def _qwen3_5_multimodal_test_model() -> object:
     return transformers.Qwen3_5ForConditionalGeneration(config)
 
 
+def _qwen3_5_linear_multimodal_test_model() -> object:
+    transformers = pytest.importorskip("transformers")
+    text_config = transformers.Qwen3_5TextConfig(
+        vocab_size=32,
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=8,
+        max_position_embeddings=64,
+        layer_types=["linear_attention"],
+        linear_conv_kernel_dim=4,
+        linear_key_head_dim=8,
+        linear_value_head_dim=8,
+        linear_num_key_heads=2,
+        linear_num_value_heads=2,
+        dtype="bfloat16",
+    )
+    vision_config = transformers.Qwen3_5VisionConfig(
+        depth=1,
+        hidden_size=16,
+        intermediate_size=32,
+        num_heads=2,
+        patch_size=2,
+        spatial_merge_size=1,
+        temporal_patch_size=1,
+        out_hidden_size=16,
+        num_position_embeddings=16,
+    )
+    config = transformers.Qwen3_5Config(
+        text_config=text_config,
+        vision_config=vision_config,
+        image_token_id=30,
+        video_token_id=29,
+        vision_start_token_id=28,
+        vision_end_token_id=27,
+    )
+    return transformers.Qwen3_5ForConditionalGeneration(config)
+
+
+def _authenticated_qwen_config(checkpoint: Path) -> object:
+    transformers = pytest.importorskip("transformers")
+    return transformers.AutoConfig.from_pretrained(
+        checkpoint,
+        local_files_only=True,
+        trust_remote_code=False,
+    )
+
+
 def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
     model = _qwen3_5_test_model()
 
@@ -569,7 +621,11 @@ def test_real_qwen_causal_checkpoint_accepts_exact_nonexecuting_mtp(
     assert type(model) is transformers.Qwen3_5ForCausalLM
     assert model.config.model_type == "qwen3_5_text"
     assert not any(key.startswith("mtp.") for key in model.state_dict())
-    hf._require_safetensors_match(tmp_path, model=model)
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=_authenticated_qwen_config(tmp_path),
+    )
 
 
 def test_real_qwen_multimodal_checkpoint_accepts_exact_nonexecuting_mtp(
@@ -597,7 +653,249 @@ def test_real_qwen_multimodal_checkpoint_accepts_exact_nonexecuting_mtp(
     assert type(model) is transformers.Qwen3_5ForConditionalGeneration
     assert model.config.model_type == "qwen3_5"
     assert not any(key.startswith("mtp.") for key in model.state_dict())
-    hf._require_safetensors_match(tmp_path, model=model)
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=_authenticated_qwen_config(tmp_path),
+    )
+
+
+def test_real_qwen_multimodal_checkpoint_accepts_exact_native_bfloat16_cast(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    config_path = tmp_path / "config.json"
+    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    config_payload.pop("dtype", None)
+    config_path.write_text(
+        json.dumps(config_payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for key in (
+        "model.language_model.layers.0.linear_attn.A_log",
+        "model.language_model.layers.0.linear_attn.norm.weight",
+    ):
+        tensors[key] = tensors[key].to(torch.float32)
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    assert model.config.dtype == torch.bfloat16
+    assert model.config.text_config.dtype == torch.bfloat16
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=_authenticated_qwen_config(tmp_path),
+    )
+
+
+def test_real_qwen_multimodal_checkpoint_accepts_all_bfloat16_storage(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=_authenticated_qwen_config(tmp_path),
+    )
+
+
+@pytest.mark.parametrize("mutation", ["partial", "extra"])
+def test_qwen_native_bfloat16_cast_rejects_unexpected_storage_inventory(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    cast_keys = (
+        "model.language_model.layers.0.linear_attn.A_log",
+        "model.language_model.layers.0.linear_attn.norm.weight",
+    )
+    for key in cast_keys:
+        tensors[key] = tensors[key].to(torch.float32)
+    if mutation == "partial":
+        tensors[cast_keys[1]] = tensors[cast_keys[1]].to(torch.bfloat16)
+    else:
+        extra_key = "model.language_model.layers.0.linear_attn.dt_bias"
+        tensors[extra_key] = tensors[extra_key].to(torch.float32)
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    message = "profile is incomplete" if mutation == "partial" else "do not match"
+    with pytest.raises(ValueError, match=message):
+        hf._require_safetensors_match(
+            tmp_path,
+            model=model,
+            authenticated_config=_authenticated_qwen_config(tmp_path),
+        )
+
+
+@pytest.mark.parametrize("mutation", ["value", "live_float32"])
+def test_qwen_native_bfloat16_cast_rejects_live_tensor_drift(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for key in (
+        "model.language_model.layers.0.linear_attn.A_log",
+        "model.language_model.layers.0.linear_attn.norm.weight",
+    ):
+        tensors[key] = tensors[key].to(torch.float32)
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+    if mutation == "value":
+        with torch.no_grad():
+            model.model.language_model.layers[0].linear_attn.A_log.add_(1)
+    else:
+        model.float()
+
+    with pytest.raises(ValueError, match="do not match"):
+        hf._require_safetensors_match(
+            tmp_path,
+            model=model,
+            authenticated_config=_authenticated_qwen_config(tmp_path),
+        )
+
+
+@pytest.mark.parametrize("dtype_name", ["float16", "float64"])
+def test_qwen_native_bfloat16_profile_rejects_other_exact_floating_dtypes(
+    tmp_path: Path,
+    dtype_name: str,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    dtype = getattr(torch, dtype_name)
+    tensors = safetensors_torch.load_file(shard)
+    for key, tensor in tuple(tensors.items()):
+        if tensor.is_floating_point():
+            tensors[key] = torch.zeros_like(tensor, dtype=dtype)
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval().to(dtype)
+
+    with pytest.raises(ValueError, match="do not match"):
+        hf._require_safetensors_match(
+            tmp_path,
+            model=model,
+            authenticated_config=_authenticated_qwen_config(tmp_path),
+        )
+
+
+def test_qwen_native_bfloat16_profile_requires_authenticated_dtype(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForImageTextToText.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+    authenticated_config = _authenticated_qwen_config(tmp_path)
+    authenticated_config.dtype = None
+    authenticated_config.text_config.dtype = None
+
+    with pytest.raises(ValueError, match="not authorized"):
+        hf._require_safetensors_match(
+            tmp_path,
+            model=model,
+            authenticated_config=authenticated_config,
+        )
+
+
+def test_qwen_native_bfloat16_cast_rejects_loader_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch = pytest.importorskip("torch")
+    model = _qwen3_5_linear_multimodal_test_model()
+    model.config.dtype = torch.bfloat16
+    authenticated_config = copy.deepcopy(model.config)
+    monkeypatch.setattr(model, "_get_dtype_plan", lambda _dtype: {"weight": "float32"})
+    with pytest.raises(ValueError, match="conversion plan is unsupported"):
+        hf._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=authenticated_config,
+        )
+
+
+@pytest.mark.parametrize("marker", ["config", "is_quantized", "hf_quantizer"])
+def test_qwen_native_bfloat16_cast_rejects_quantization(marker: str) -> None:
+    torch = pytest.importorskip("torch")
+    model = _qwen3_5_linear_multimodal_test_model()
+    model.config.dtype = torch.bfloat16
+    authenticated_config = copy.deepcopy(model.config)
+    if marker == "config":
+        authenticated_config.quantization_config = {"quant_method": "unsupported"}
+    elif marker == "is_quantized":
+        model.is_quantized = True
+    else:
+        model.hf_quantizer = object()
+    with pytest.raises(ValueError, match="requires an unquantized checkpoint"):
+        hf._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=authenticated_config,
+        )
 
 
 def test_model_eval_binding_rejects_missing_unavailable_or_training_modules() -> None:

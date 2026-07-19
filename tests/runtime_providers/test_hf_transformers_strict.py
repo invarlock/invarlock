@@ -192,6 +192,7 @@ def test_hf_strict_loader_requires_and_returns_complete_loading_info(
                 "trust_remote_code": False,
                 "use_safetensors": True,
                 "output_loading_info": True,
+                "dtype": "auto",
             },
         )
     ]
