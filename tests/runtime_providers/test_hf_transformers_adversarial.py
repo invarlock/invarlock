@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -263,6 +264,269 @@ def test_safetensors_binding_detects_inventory_change_during_read(
         )
 
 
+def _native_transformers_model() -> Any:
+    model_class = type("NativeModel", (), {})
+    model_class.__module__ = "transformers.models.test.modeling_test"
+    model = model_class()
+    model.base_model_prefix = "model"
+    return model
+
+
+def _install_checkpoint_conversion_api(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    conversions: list[object],
+    rename: object,
+    weight_renaming: type[object],
+    weight_converter: type[object],
+) -> None:
+    real_import = importlib.import_module
+    conversion_module = SimpleNamespace(
+        get_model_conversion_mapping=lambda _model: conversions
+    )
+    core_module = SimpleNamespace(
+        rename_source_key=rename,
+        WeightRenaming=weight_renaming,
+        WeightConverter=weight_converter,
+    )
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name, package=None: (
+            conversion_module
+            if name == "transformers.conversion_mapping"
+            else core_module
+            if name == "transformers.core_model_loading"
+            else real_import(name, package)
+        ),
+    )
+
+
+def test_safetensors_binding_uses_authoritative_pure_renames(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+
+    class Renaming:
+        pass
+
+    class Converter:
+        pass
+
+    _install_checkpoint_conversion_api(
+        monkeypatch,
+        conversions=[Renaming()],
+        rename=lambda source, *_args: (
+            "model.current.weight" if source == "model.legacy.weight" else source,
+            None,
+        ),
+        weight_renaming=Renaming,
+        weight_converter=Converter,
+    )
+    model = _native_transformers_model()
+    live_weight = torch.tensor([1.0, 2.0])
+    live_state = {"model.current.weight": live_weight}
+    model.state_dict = lambda: live_state
+    safetensors_torch.save_file(
+        {"model.legacy.weight": live_weight.clone()},
+        tmp_path / "model.safetensors",
+    )
+
+    targets = hf._authoritative_checkpoint_key_targets(
+        {"model.legacy.weight"},
+        live_state=live_state,
+        model=model,
+    )
+    bindings = hf._bind_authenticated_live_tensors(
+        {"model.legacy.weight"},
+        live_state=live_state,
+        model=model,
+        prefix="model",
+        authoritative_targets=targets,
+    )
+
+    assert targets == {"model.legacy.weight": "model.current.weight"}
+    assert bindings == {"model.legacy.weight": (("model.current.weight", live_weight),)}
+    hf._require_safetensors_match(tmp_path, model=model)
+
+
+def test_safetensors_binding_rejects_unmapped_authoritative_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+
+    class Renaming:
+        pass
+
+    class Converter:
+        pass
+
+    _install_checkpoint_conversion_api(
+        monkeypatch,
+        conversions=[Renaming()],
+        rename=lambda _source, *_args: ("model.absent.weight", None),
+        weight_renaming=Renaming,
+        weight_converter=Converter,
+    )
+    model = _native_transformers_model()
+    model.state_dict = lambda: {"model.other.weight": torch.tensor([1.0])}
+    safetensors_torch.save_file(
+        {"model.legacy.weight": torch.tensor([1.0])},
+        tmp_path / "model.safetensors",
+    )
+
+    with pytest.raises(ValueError, match="missing authenticated"):
+        hf._require_safetensors_match(tmp_path, model=model)
+
+
+def test_safetensors_binding_rejects_conversion_and_rename_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Renaming:
+        pass
+
+    class Converter:
+        pass
+
+    model = _native_transformers_model()
+    _install_checkpoint_conversion_api(
+        monkeypatch,
+        conversions=[Converter()],
+        rename=lambda source, *_args: (source, None),
+        weight_renaming=Renaming,
+        weight_converter=Converter,
+    )
+    with pytest.raises(ValueError, match="unsupported tensor conversion"):
+        hf._authoritative_checkpoint_key_targets(
+            {"a.weight"}, live_state={"a.weight": object()}, model=model
+        )
+
+    _install_checkpoint_conversion_api(
+        monkeypatch,
+        conversions=[Renaming()],
+        rename=lambda _source, *_args: ("model.weight", None),
+        weight_renaming=Renaming,
+        weight_converter=Converter,
+    )
+    with pytest.raises(ValueError, match="not one-to-one"):
+        hf._authoritative_checkpoint_key_targets(
+            {"a.weight", "b.weight"},
+            live_state={"model.weight": object()},
+            model=model,
+        )
+
+
+_EXPECTED_QWEN3_5_MTP_KEYS = {
+    "mtp.fc.weight",
+    "mtp.layers.0.input_layernorm.weight",
+    "mtp.layers.0.mlp.down_proj.weight",
+    "mtp.layers.0.mlp.gate_proj.weight",
+    "mtp.layers.0.mlp.up_proj.weight",
+    "mtp.layers.0.post_attention_layernorm.weight",
+    "mtp.layers.0.self_attn.k_norm.weight",
+    "mtp.layers.0.self_attn.k_proj.weight",
+    "mtp.layers.0.self_attn.o_proj.weight",
+    "mtp.layers.0.self_attn.q_norm.weight",
+    "mtp.layers.0.self_attn.q_proj.weight",
+    "mtp.layers.0.self_attn.v_proj.weight",
+    "mtp.norm.weight",
+    "mtp.pre_fc_norm_embedding.weight",
+    "mtp.pre_fc_norm_hidden.weight",
+}
+
+
+def _qwen3_5_test_model() -> object:
+    transformers = pytest.importorskip("transformers")
+    config = transformers.Qwen3_5TextConfig(
+        vocab_size=32,
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=8,
+        max_position_embeddings=64,
+        layer_types=["full_attention"],
+    )
+    return transformers.Qwen3_5ForCausalLM(config)
+
+
+def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
+    model = _qwen3_5_test_model()
+
+    assert hf._qwen3_5_non_executing_checkpoint_keys(
+        set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
+        live_state={"model.weight": object()},
+        model=model,
+    ) == set(_EXPECTED_QWEN3_5_MTP_KEYS)
+
+
+@pytest.mark.parametrize("mutation", ["forged", "partial", "live"])
+def test_qwen3_5_mtp_exception_rejects_forged_partial_or_live_state(
+    mutation: str,
+) -> None:
+    keys = set(_EXPECTED_QWEN3_5_MTP_KEYS)
+    if mutation == "forged":
+        keys.add("mtp.forged.weight")
+    elif mutation == "partial":
+        keys.remove("mtp.fc.weight")
+    model = _qwen3_5_test_model()
+    live_state = {"model.weight": object()}
+    if mutation == "live":
+        live_state["mtp.hidden"] = object()
+
+    message = "overlap live" if mutation == "live" else "unsupported non-executing"
+    with pytest.raises(ValueError, match=message):
+        hf._qwen3_5_non_executing_checkpoint_keys(
+            keys,
+            live_state=live_state,
+            model=model,
+        )
+
+
+def test_real_qwen_causal_checkpoint_accepts_exact_nonexecuting_mtp(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    config = transformers.Qwen3_5TextConfig(
+        vocab_size=32,
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=8,
+        max_position_embeddings=64,
+        layer_types=["full_attention"],
+    )
+    transformers.Qwen3_5ForCausalLM(config).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for index, key in enumerate(sorted(_EXPECTED_QWEN3_5_MTP_KEYS)):
+        tensors[key] = torch.tensor([float(index)])
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    assert type(model) is transformers.Qwen3_5ForCausalLM
+    assert model.config.model_type == "qwen3_5_text"
+    assert not any(key.startswith("mtp.") for key in model.state_dict())
+    hf._require_safetensors_match(tmp_path, model=model)
+
+
 def test_model_eval_binding_rejects_missing_unavailable_or_training_modules() -> None:
     with pytest.raises(RuntimeError, match="does not expose module state"):
         hf._require_model_eval_mode(object())
@@ -402,6 +666,199 @@ def test_model_config_binding_accepts_dtype_inferred_from_bound_weights(
             tmp_path,
             model=SimpleNamespace(
                 config=Config({"vision_config": {"dtype": "float32", "layers": 4}})
+            ),
+        )
+
+
+class _TestModelConfig:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+
+    def to_dict(self) -> dict[str, object]:
+        return self.payload
+
+
+_AUTHENTICATED_FP8_CONFIG: dict[str, object] = {
+    "activation_scheme": "dynamic",
+    "fmt": "e4m3",
+    "quant_method": "fp8",
+    "weight_block_size": [128, 128],
+}
+_LIVE_FP8_CONFIG: dict[str, object] = {
+    "activation_scheme": "dynamic",
+    "dequantize": False,
+    "modules_to_not_convert": None,
+    "quant_method": "fp8",
+    "scale_fmt": "float",
+    "weight_block_size": [128, 128],
+}
+
+
+def _install_model_config_loader(
+    monkeypatch: pytest.MonkeyPatch,
+    authenticated_quantization: dict[str, object],
+) -> None:
+    real_import = importlib.import_module
+    loader = SimpleNamespace(
+        from_pretrained=lambda *_args, **_kwargs: _TestModelConfig(
+            {
+                "layers": 40,
+                "quantization_config": authenticated_quantization,
+            }
+        )
+    )
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name, package=None: (
+            SimpleNamespace(AutoConfig=loader)
+            if name == "transformers"
+            else real_import(name, package)
+        ),
+    )
+
+
+def test_model_config_binding_accepts_runtime_canonical_fp8_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_model_config_loader(monkeypatch, _AUTHENTICATED_FP8_CONFIG)
+
+    hf._require_model_config_match(
+        tmp_path,
+        model=SimpleNamespace(
+            config=_TestModelConfig(
+                {"layers": 40, "quantization_config": _LIVE_FP8_CONFIG}
+            )
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("activation_scheme", "static"),
+        ("dequantize", True),
+        ("modules_to_not_convert", ["lm_head"]),
+        ("scale_fmt", "ue8m0"),
+        ("weight_block_size", [64, 128]),
+    ],
+)
+def test_model_config_binding_rejects_runtime_fp8_semantic_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+) -> None:
+    live_quantization = dict(_LIVE_FP8_CONFIG)
+    live_quantization[field] = value
+    _install_model_config_loader(monkeypatch, _AUTHENTICATED_FP8_CONFIG)
+
+    with pytest.raises(ValueError, match="does not match"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=_TestModelConfig(
+                    {"layers": 40, "quantization_config": live_quantization}
+                )
+            ),
+        )
+
+
+def test_model_config_binding_rejects_quantization_config_class_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_model_config_loader(monkeypatch, _AUTHENTICATED_FP8_CONFIG)
+    live_quantization = {"quant_method": "fbgemm_fp8"}
+
+    with pytest.raises(ValueError, match="quantization config class"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=_TestModelConfig(
+                    {"layers": 40, "quantization_config": live_quantization}
+                )
+            ),
+        )
+
+
+@pytest.mark.parametrize("side", ["live", "authenticated", "both"])
+def test_model_config_binding_rejects_unknown_fp8_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    side: str,
+) -> None:
+    authenticated_quantization = dict(_AUTHENTICATED_FP8_CONFIG)
+    live_quantization = dict(_LIVE_FP8_CONFIG)
+    if side in {"authenticated", "both"}:
+        authenticated_quantization["future_behavior_switch"] = True
+    if side in {"live", "both"}:
+        live_quantization["future_behavior_switch"] = True
+    _install_model_config_loader(monkeypatch, authenticated_quantization)
+
+    with pytest.raises(ValueError, match="unsupported fields"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=_TestModelConfig(
+                    {"layers": 40, "quantization_config": live_quantization}
+                )
+            ),
+        )
+
+
+def test_model_config_binding_rejects_unknown_quantization_method(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_model_config_loader(monkeypatch, _AUTHENTICATED_FP8_CONFIG)
+
+    with pytest.raises(ValueError, match="quantization config class"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=_TestModelConfig(
+                    {"layers": 40, "quantization_config": {"quant_method": "unknown"}}
+                )
+            ),
+        )
+
+
+@pytest.mark.parametrize("legacy_format", [None, "other"])
+def test_model_config_binding_rejects_unsupported_fp8_legacy_format(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_format: object,
+) -> None:
+    authenticated = dict(_AUTHENTICATED_FP8_CONFIG)
+    authenticated["fmt"] = legacy_format
+    _install_model_config_loader(monkeypatch, authenticated)
+
+    with pytest.raises(ValueError, match="legacy format is unsupported"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=_TestModelConfig(
+                    {"layers": 40, "quantization_config": _LIVE_FP8_CONFIG}
+                )
+            ),
+        )
+
+
+def test_model_config_binding_rejects_live_fp8_legacy_field(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = dict(_LIVE_FP8_CONFIG)
+    live["fmt"] = "e4m3"
+    _install_model_config_loader(monkeypatch, _AUTHENTICATED_FP8_CONFIG)
+
+    with pytest.raises(ValueError, match="live fine-grained FP8 config"):
+        hf._require_model_config_match(
+            tmp_path,
+            model=SimpleNamespace(
+                config=_TestModelConfig({"layers": 40, "quantization_config": live})
             ),
         )
 

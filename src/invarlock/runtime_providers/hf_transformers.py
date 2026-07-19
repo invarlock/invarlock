@@ -248,6 +248,159 @@ def _live_tensor_candidates(key: str, prefix: str | None) -> tuple[str, ...]:
     return tuple(dict.fromkeys(candidates))
 
 
+_QWEN3_5_NON_EXECUTING_MTP_KEYS = frozenset(
+    {
+        "mtp.fc.weight",
+        "mtp.layers.0.input_layernorm.weight",
+        "mtp.layers.0.mlp.down_proj.weight",
+        "mtp.layers.0.mlp.gate_proj.weight",
+        "mtp.layers.0.mlp.up_proj.weight",
+        "mtp.layers.0.post_attention_layernorm.weight",
+        "mtp.layers.0.self_attn.k_norm.weight",
+        "mtp.layers.0.self_attn.k_proj.weight",
+        "mtp.layers.0.self_attn.o_proj.weight",
+        "mtp.layers.0.self_attn.q_norm.weight",
+        "mtp.layers.0.self_attn.q_proj.weight",
+        "mtp.layers.0.self_attn.v_proj.weight",
+        "mtp.norm.weight",
+        "mtp.pre_fc_norm_embedding.weight",
+        "mtp.pre_fc_norm_hidden.weight",
+    }
+)
+
+
+def _authoritative_checkpoint_key_targets(
+    authenticated_keys: set[str],
+    *,
+    live_state: Mapping[str, object],
+    model: object,
+) -> dict[str, str]:
+    """Apply the exact native Transformers renames used during model loading."""
+
+    model_module = model.__class__.__module__
+    if not model_module.startswith("transformers.models."):
+        return {key: key for key in authenticated_keys}
+    try:
+        conversion_mapping = importlib.import_module("transformers.conversion_mapping")
+        core_loading = importlib.import_module("transformers.core_model_loading")
+        get_mapping = conversion_mapping.get_model_conversion_mapping
+        rename_source_key = core_loading.rename_source_key
+        weight_renaming = core_loading.WeightRenaming
+        weight_converter = core_loading.WeightConverter
+        if not callable(get_mapping) or not callable(rename_source_key):
+            raise TypeError
+        conversions = get_mapping(model)
+    except (AttributeError, ImportError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "strict HF native checkpoint conversion metadata is unavailable"
+        ) from exc
+    if not isinstance(conversions, list) or any(
+        not isinstance(item, (weight_renaming, weight_converter))
+        for item in conversions
+    ):
+        raise RuntimeError("strict HF native checkpoint conversion metadata is invalid")
+    if any(isinstance(item, weight_converter) for item in conversions):
+        raise ValueError("strict HF checkpoint requires unsupported tensor conversion")
+    renamings = [item for item in conversions if isinstance(item, weight_renaming)]
+    targets: dict[str, str] = {}
+    sources_by_target: dict[str, str] = {}
+    live_snapshot = dict(live_state)
+    prefix = getattr(model, "base_model_prefix", None)
+    base_model_prefix = prefix if isinstance(prefix, str) else None
+    for source in sorted(authenticated_keys):
+        try:
+            target, converter_pattern = rename_source_key(
+                source,
+                renamings,
+                [],
+                base_model_prefix,
+                live_snapshot,
+            )
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                "strict HF native checkpoint key conversion failed"
+            ) from exc
+        if (
+            not isinstance(target, str)
+            or not target
+            or target != target.strip()
+            or converter_pattern is not None
+        ):
+            raise RuntimeError(
+                "strict HF native checkpoint conversion metadata is invalid"
+            )
+        prior_source = sources_by_target.get(target)
+        if prior_source is not None and prior_source != source:
+            raise ValueError("strict HF checkpoint key conversion is not one-to-one")
+        sources_by_target[target] = source
+        targets[source] = target
+    return targets
+
+
+def _qwen3_5_non_executing_checkpoint_keys(
+    authenticated_keys: set[str],
+    *,
+    live_state: Mapping[str, object],
+    model: object,
+) -> set[str]:
+    """Recognize the exact native Qwen3.5/3.6 inference-unused MTP inventory."""
+
+    mtp_keys = {key for key in authenticated_keys if key.startswith("mtp.")}
+    if not mtp_keys:
+        return set()
+    try:
+        qwen_module = importlib.import_module(
+            "transformers.models.qwen3_5.modeling_qwen3_5"
+        )
+        expected_class = qwen_module.Qwen3_5ForCausalLM
+    except (AttributeError, ImportError) as exc:
+        raise RuntimeError(
+            "strict HF native Qwen3.5 compatibility profile is unavailable"
+        ) from exc
+    model_class = model.__class__
+    config = getattr(model, "config", None)
+    if (
+        model_class is not expected_class
+        or getattr(config, "model_type", None) != "qwen3_5_text"
+        or getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
+        != [r"^mtp.*", r"^model.visual.*"]
+        or mtp_keys != _QWEN3_5_NON_EXECUTING_MTP_KEYS
+    ):
+        raise ValueError(
+            "strict HF checkpoint contains an unsupported non-executing "
+            "tensor inventory"
+        )
+
+    def names_from(method_name: str) -> tuple[str, ...]:
+        method = getattr(model, method_name, None)
+        if not callable(method):
+            raise RuntimeError("strict HF native model state is unavailable")
+        try:
+            entries = tuple(method())
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError("strict HF native model state is unavailable") from exc
+        names: list[str] = []
+        for entry in entries:
+            if (
+                not isinstance(entry, tuple)
+                or len(entry) != 2
+                or not isinstance(entry[0], str)
+            ):
+                raise RuntimeError("strict HF native model state is unavailable")
+            names.append(entry[0])
+        return tuple(names)
+
+    live_names = set(live_state)
+    live_names.update(names_from("named_parameters"))
+    live_names.update(names_from("named_buffers"))
+    live_names.update(names_from("named_modules"))
+    if any(name == "mtp" or name.startswith("mtp.") for name in live_names):
+        raise ValueError(
+            "strict HF non-executing checkpoint tensors overlap live model state"
+        )
+    return set(mtp_keys)
+
+
 def _is_legacy_gpt2_causal_mask_key(
     key: str,
     *,
@@ -396,12 +549,20 @@ def _bind_authenticated_live_tensors(
     live_state: Mapping[str, object],
     model: object,
     prefix: str | None,
+    authoritative_targets: Mapping[str, str],
 ) -> dict[str, tuple[tuple[str, object], ...]]:
     get_buffer = getattr(model, "get_buffer", None)
     bindings: dict[str, tuple[tuple[str, object], ...]] = {}
+    source_by_live_name: dict[str, str] = {}
     for key in sorted(authenticated_keys):
         matches: list[tuple[str, object]] = []
-        for candidate in _live_tensor_candidates(key, prefix):
+        authoritative_target = authoritative_targets[key]
+        candidates = (
+            (authoritative_target,)
+            if authoritative_target != key
+            else _live_tensor_candidates(key, prefix)
+        )
+        for candidate in candidates:
             if candidate in live_state:
                 matches.append((candidate, live_state[candidate]))
                 continue
@@ -422,6 +583,13 @@ def _bind_authenticated_live_tensors(
                 "strict HF loaded model has an ambiguous authenticated "
                 "checkpoint tensor mapping"
             )
+        for live_name, _value in matches:
+            prior_source = source_by_live_name.get(live_name)
+            if prior_source is not None and prior_source != key:
+                raise ValueError(
+                    "strict HF checkpoint key conversion is not one-to-one"
+                )
+            source_by_live_name[live_name] = key
         bindings[key] = tuple(matches)
     return bindings
 
@@ -434,6 +602,7 @@ def _verify_authenticated_safetensors(
     model: object,
     prefix: str | None,
     safe_open: Callable[..., Any],
+    non_executing_keys: set[str],
 ) -> tuple[set[str], list[object]]:
     observed_keys: set[str] = set()
     authenticated_live_names: set[str] = set()
@@ -443,8 +612,10 @@ def _verify_authenticated_safetensors(
         with safe_open(str(shard), framework="pt", device="cpu") as handle:
             for key in handle.keys():
                 observed_keys.add(key)
-                stored = handle.get_tensor(key)
                 bound_matches = bindings[key]
+                if not bound_matches and key in non_executing_keys:
+                    continue
+                stored = handle.get_tensor(key)
                 if not bound_matches:
                     if _is_authenticated_legacy_gpt2_causal_mask(
                         key,
@@ -511,7 +682,7 @@ def _require_complete_live_state(
 
 
 def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
-    """Bind every authenticated and live execution tensor without ambiguity."""
+    """Authenticate stored tensors and bind every live execution tensor exactly."""
 
     try:
         from safetensors import safe_open
@@ -541,11 +712,22 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
     authenticated_prefix = (
         prefix if isinstance(prefix, str) and prefix.isidentifier() else None
     )
+    authoritative_targets = _authoritative_checkpoint_key_targets(
+        authenticated_keys,
+        live_state=live_state,
+        model=model,
+    )
+    non_executing_keys = _qwen3_5_non_executing_checkpoint_keys(
+        authenticated_keys,
+        live_state=live_state,
+        model=model,
+    )
     bindings = _bind_authenticated_live_tensors(
         authenticated_keys,
         live_state=live_state,
         model=model,
         prefix=authenticated_prefix,
+        authoritative_targets=authoritative_targets,
     )
     authenticated_names, authenticated_tensors = _verify_authenticated_safetensors(
         checkpoint,
@@ -554,6 +736,7 @@ def _require_safetensors_match(checkpoint: Path, *, model: object) -> None:
         model=model,
         prefix=authenticated_prefix,
         safe_open=safe_open,
+        non_executing_keys=non_executing_keys,
     )
     _require_complete_live_state(
         live_state,
@@ -628,6 +811,70 @@ def _require_model_config_match(checkpoint: Path, *, model: object) -> None:
                 drop_inferred_dtypes(live_value, authenticated_value)
 
     drop_inferred_dtypes(normalized_live, normalized_authenticated)
+
+    # Fine-grained FP8 loaders replace the authored mapping with a typed runtime
+    # mapping. Normalize only the exact 5.14.1 defaults and the observed legacy
+    # ``fmt=e4m3`` marker. Unknown fields remain a hard mismatch instead of being
+    # silently discarded by the runtime's permissive ``**kwargs`` constructor.
+    live_quantization = normalized_live.get("quantization_config")
+    authenticated_quantization = normalized_authenticated.get("quantization_config")
+    if isinstance(live_quantization, dict) and isinstance(
+        authenticated_quantization, dict
+    ):
+        methods = {
+            live_quantization.get("quant_method"),
+            authenticated_quantization.get("quant_method"),
+        }
+        if "fp8" in methods:
+            if methods != {"fp8"}:
+                raise ValueError(
+                    "strict HF live model quantization config class does not "
+                    "match the checkpoint"
+                )
+            allowed = {
+                "activation_scheme",
+                "dequantize",
+                "fmt",
+                "modules_to_not_convert",
+                "quant_method",
+                "scale_fmt",
+                "weight_block_size",
+            }
+            if (set(live_quantization) | set(authenticated_quantization)) - allowed:
+                raise ValueError(
+                    "strict HF fine-grained FP8 config contains unsupported fields"
+                )
+
+            if "fmt" in live_quantization:
+                raise ValueError(
+                    "strict HF live fine-grained FP8 config contains an "
+                    "unsupported legacy field"
+                )
+
+            def normalize_fp8(
+                payload: dict[str, object], *, authenticated: bool
+            ) -> dict[str, object]:
+                normalized = dict(payload)
+                has_legacy_format = "fmt" in normalized
+                legacy_format = normalized.pop("fmt", None)
+                if has_legacy_format and (not authenticated or legacy_format != "e4m3"):
+                    raise ValueError(
+                        "strict HF fine-grained FP8 legacy format is unsupported"
+                    )
+                normalized.setdefault("activation_scheme", "dynamic")
+                normalized.setdefault("dequantize", False)
+                normalized.setdefault("modules_to_not_convert", None)
+                normalized.setdefault("quant_method", "fp8")
+                normalized.setdefault("scale_fmt", "float")
+                normalized.setdefault("weight_block_size", [128, 128])
+                return normalized
+
+            normalized_live["quantization_config"] = normalize_fp8(
+                live_quantization, authenticated=False
+            )
+            normalized_authenticated["quantization_config"] = normalize_fp8(
+                authenticated_quantization, authenticated=True
+            )
     if normalized_live != normalized_authenticated:
         raise ValueError(
             "strict HF live model config does not match the authenticated checkpoint"

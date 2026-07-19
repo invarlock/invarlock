@@ -78,7 +78,9 @@ from the same canonical JSON.
   reads, immutable snapshots, and rejection of symlink or path substitution.
 - Hardened Hugging Face loading against corrupt or incompletely bound
   safetensors and unauthenticated live parameters while preserving validated
-  canonical layouts and storage-proven tied weights.
+  canonical layouts, storage-proven tied weights, explicit runtime-added
+  quantization defaults, one-to-one native checkpoint renames, and narrowly
+  audited non-executing auxiliary weights.
 - Hardened GGUF and TensorRT-LLM readiness so authenticated models, executables,
   engine layouts, tokenizer contracts, runner protocols, immutable images, and
   resource limits are checked before native execution or GPU allocation.
