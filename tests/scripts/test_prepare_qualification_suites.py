@@ -79,6 +79,23 @@ def test_normalize_mmlu_rows_authenticates_answer_index() -> None:
         suites.normalize_mmlu_rows([row])
 
 
+def test_text_runtime_profile_excludes_only_authenticated_ineligible_record() -> None:
+    rows = [
+        {"id": "mmlu_pro_00001"},
+        {"id": "mmlu_pro_12209"},
+    ]
+
+    eligible, exclusions = suites.apply_text_runtime_profile(rows)
+
+    assert eligible == [{"id": "mmlu_pro_00001"}]
+    assert exclusions == {"prompt_exceeds_maximum_input_tokens": 1}
+
+
+def test_text_runtime_profile_rejects_source_revision_drift() -> None:
+    with pytest.raises(suites.QualificationSuiteError, match="missing source records"):
+        suites.apply_text_runtime_profile([{"id": "mmlu_pro_00001"}])
+
+
 def test_rendered_text_jsonl_round_trips_through_public_schedule(
     tmp_path: Path,
 ) -> None:

@@ -152,6 +152,7 @@ coverage-qualification:  ## Enforce branch coverage for the maintained qualifica
 		tests/ci/test_qualification_precheck.py \
 		tests/scripts/test_qualification_candidate_wheels.py \
 		tests/scripts/test_qualification_receipt_check.py \
+		tests/scripts/test_qualification_render_preflight.py \
 		tests/scripts/test_qualification_source.py \
 		tests/scripts/test_authenticated_runtime_build.py \
 		addins/tensorrt_llm/tests/test_tensorrt_llm_canary_preflight.py \
@@ -167,6 +168,8 @@ coverage-qualification:  ## Enforce branch coverage for the maintained qualifica
 		--include='scripts/qualification_candidate_wheels.py' --fail-under=80
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
 		--include='scripts/qualification_receipt_check.py' --fail-under=80
+	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
+		--include='scripts/qualification_render_preflight.py' --fail-under=80
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
 		--include='scripts/qualification_source.py' --fail-under=80
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \

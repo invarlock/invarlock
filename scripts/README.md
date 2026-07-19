@@ -32,6 +32,12 @@ second product workflow.
 - `tensorrt_llm_canary_preflight.py` authenticates the closed engine tree,
   tokenizer contract, immutable image reference, and canonical input root
   before the TensorRT-LLM wrapper starts a GPU container.
+- `qualification_render_preflight.py` authenticates a frozen qualification
+  schedule and replays the exact tokenizer or processor rendering contract
+  before an expensive runtime evaluation. It records path-free bindings and
+  token bounds for Hugging Face text, TensorRT-LLM, and vision-text inputs; the
+  GGUF profile verifies a signer-pinned live-prefix statement from the exact
+  runtime because the published GGUF image exposes no separate tokenizer API.
 - `select_workspace_python.sh` selects the repository Python interpreter used
   by the Makefile.
 

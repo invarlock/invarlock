@@ -34,6 +34,16 @@ NORMALIZATION_ALGORITHM = "outer-whitespace-only-v1"
 DEFAULT_RECORD_COUNT = 400
 MMLU_DATASET = "TIGER-Lab/MMLU-Pro"
 MMLU_REVISION = "b189ec765aa7ed75c8acfea42df31fdae71f97be"
+TEXT_RUNTIME_PROFILE = {
+    "name": "minimum-supported-text-runtime-v1",
+    "maximum_input_tokens": 1024,
+    "tokenizer_contract_sha256": (
+        "9afc79cdd1fc5f9d0ab0f2bf684f9d2754a3ab865c3a74e4705a684d66c4691f"
+    ),
+}
+TEXT_RUNTIME_EXCLUSIONS = {
+    "mmlu_pro_12209": "prompt_exceeds_maximum_input_tokens",
+}
 MMMU_DATASET = "MMMU/MMMU_Pro"
 MMMU_CONFIG = "vision"
 MMMU_REVISION = "563f3e84bb3b90893083a1f039cfa13077f2302b"
@@ -271,6 +281,30 @@ def normalize_mmlu_rows(
     return normalized
 
 
+def apply_text_runtime_profile(
+    rows: Sequence[Mapping[str, object]],
+) -> tuple[list[dict[str, object]], dict[str, int]]:
+    """Apply the frozen minimum text-runtime eligibility statement."""
+
+    eligible: list[dict[str, object]] = []
+    exclusions: dict[str, int] = defaultdict(int)
+    observed_ids = {str(row.get("id")) for row in rows}
+    missing = sorted(set(TEXT_RUNTIME_EXCLUSIONS) - observed_ids)
+    if missing:
+        raise QualificationSuiteError(
+            "text runtime eligibility references missing source records: "
+            + ", ".join(missing)
+        )
+    for row in rows:
+        identifier = str(row.get("id"))
+        reason = TEXT_RUNTIME_EXCLUSIONS.get(identifier)
+        if reason is None:
+            eligible.append(dict(row))
+        else:
+            exclusions[reason] += 1
+    return eligible, dict(sorted(exclusions.items()))
+
+
 def _image_payload(value: object, *, identifier: str) -> bytes:
     if not isinstance(value, Mapping) or set(value) != {"bytes", "path"}:
         raise QualificationSuiteError(f"{identifier} image binding is invalid")
@@ -489,7 +523,10 @@ def prepare_suites(*, output: Path, record_count: int) -> dict[str, object]:
             f"public qualification suites require exactly {DEFAULT_RECORD_COUNT} records"
         )
     mmlu_source, mmmu_source = _load_hosted_datasets()
-    normalized_text = normalize_mmlu_rows(mmlu_source)
+    normalized_text_source = normalize_mmlu_rows(mmlu_source)
+    normalized_text, text_exclusions = apply_text_runtime_profile(
+        normalized_text_source
+    )
     multimodal_exclusions: dict[str, int] = {}
     normalized_multimodal = normalize_mmmu_rows(
         mmmu_source, exclusions=multimodal_exclusions
@@ -625,6 +662,8 @@ def prepare_suites(*, output: Path, record_count: int) -> dict[str, object]:
                 "license": "MIT",
                 "source_record_count": len(mmlu_source),
                 "eligible_record_count": len(normalized_text),
+                "runtime_profile": TEXT_RUNTIME_PROFILE,
+                "exclusions": text_exclusions,
             },
             "multimodal": {
                 "dataset": MMMU_DATASET,
