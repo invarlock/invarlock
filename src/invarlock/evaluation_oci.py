@@ -1052,6 +1052,8 @@ def run_side_worker(
         returncode = 124
     for drain in drains:
         drain.join()
+    process.stdout.close()
+    process.stderr.close()
     if cidfile is not None:
         cidfile.unlink(missing_ok=True)
     if timed_out:

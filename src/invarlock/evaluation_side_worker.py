@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import sys
 from pathlib import Path
 from types import MappingProxyType
@@ -76,6 +77,29 @@ def _string_mapping(value: object, *, label: str) -> MappingProxyType[str, Any]:
     if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
         raise RuntimeSideWorkerError(f"{label} must be an object with string keys")
     return MappingProxyType(dict(value))
+
+
+def _make_output_collectible(directory: Path) -> None:
+    """Let the unprivileged host collect and remove one closed worker output.
+
+    The destination lives beneath a host-private temporary directory, but the
+    container worker owns the atomically published leaf.  Granting traversal
+    and removal on that leaf is therefore required when the host and worker
+    use different numeric identities; it does not make the private parent
+    traversable.
+    """
+
+    try:
+        facts = directory.lstat()
+        if not stat.S_ISDIR(facts.st_mode):
+            raise RuntimeSideWorkerError(
+                "runtime side output must remain a real directory"
+            )
+        directory.chmod(0o733)
+    except OSError as exc:
+        raise RuntimeSideWorkerError(
+            "runtime side output could not be made host-collectible"
+        ) from exc
 
 
 def execute_job(job_path: Path) -> Path:
@@ -170,6 +194,7 @@ def execute_job(job_path: Path) -> Path:
         metric=cast(Any, metric),
         _validated_schedule=validated_schedule,
     )
+    _make_output_collectible(bundle.directory)
     return bundle.directory
 
 

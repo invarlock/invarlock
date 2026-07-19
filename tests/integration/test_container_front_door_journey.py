@@ -186,7 +186,14 @@ def _request(
     inputs.joinpath("records.jsonl").write_bytes(dataset_bytes)
     inputs.joinpath("policy.json").write_bytes(
         canonical_json_bytes(
-            {"resolved_policy": {"metrics": {"exact_match": {"delta_min_pp": 0.0}}}}
+            {
+                "resolved_policy": {
+                    # This one-record fixture qualifies transaction plumbing,
+                    # not an effect-size claim. Real published qualification
+                    # uses the authenticated 400-record suites.
+                    "metrics": {"exact_match": {"delta_min_pp": -100.0}}
+                }
+            }
         )
     )
 

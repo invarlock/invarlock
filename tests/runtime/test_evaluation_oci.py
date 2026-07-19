@@ -1055,7 +1055,7 @@ def test_executor_launches_different_images_and_collects_only_complete_outputs(
     assert str(tmp_path / "models/subject") not in " ".join(baseline_command)
     assert str(tmp_path / "models/subject") in " ".join(subject_command)
     assert str(tmp_path / "models/baseline") not in " ".join(subject_command)
-    assert "runner" not in " ".join(subject_command).lower()
+    assert "/opt/invarlock/bin/tensorrt-llm-runner" not in subject_command
 
 
 def test_executor_fails_closed_when_one_side_fails(

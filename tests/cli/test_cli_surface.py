@@ -8,7 +8,10 @@ RUNNER = CliRunner()
 
 
 def _help(*args: str) -> str:
-    result = RUNNER.invoke(app, [*args, "--help"])
+    # Rich may collapse long option names when CI supplies a narrow terminal.
+    # Fix the rendering width so this test observes the command contract rather
+    # than the host runner's display geometry.
+    result = RUNNER.invoke(app, [*args, "--help"], terminal_width=240)
     assert result.exit_code == 0, result.output
     return result.output
 

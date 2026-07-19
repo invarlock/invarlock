@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -94,6 +95,7 @@ def test_worker_executes_one_closed_job_without_a_signing_key(
     monkeypatch.setattr(worker, "run_evidence_side", run)
 
     assert execute_job(job) == tmp_path / "output"
+    assert stat.S_IMODE((tmp_path / "output").stat().st_mode) == 0o733
     assert observed["role"] == "baseline"
     assert observed["metric"] == "exact_match"
     resources = observed["resources"]
