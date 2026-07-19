@@ -13,7 +13,7 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAliasType, cast
+from typing import Literal, TypeAliasType, TypeGuard, cast
 
 from jsonschema import Draft202012Validator
 
@@ -32,6 +32,10 @@ RuntimeBehavioralMetric = TypeAliasType(  # noqa: UP040
 _SUPPORTED_METRICS = frozenset({"exact_match", "normalized_nll_per_utf8_byte"})
 _PROVIDER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
+
+
+def _is_supported_metric(value: str) -> TypeGuard[RuntimeBehavioralMetric]:
+    return value in _SUPPORTED_METRICS
 
 
 class RuntimeBehavioralObservationError(ValueError):
@@ -286,7 +290,7 @@ def verify_runtime_behavioral_observation(
     output text.
     """
 
-    if metric not in _SUPPORTED_METRICS:
+    if not _is_supported_metric(metric):
         raise RuntimeBehavioralObservationError(
             f"unsupported metric for behavioral replay: {metric!r}"
         )
@@ -325,7 +329,7 @@ def verify_runtime_behavioral_observation(
         value = _replay_normalized_nll(records, expected_batch=expected_batch)
         correct_records = None
     return RuntimeBehavioralMetricResult(
-        metric=cast(RuntimeBehavioralMetric, metric),
+        metric=metric,
         value=value,
         correct_records=correct_records,
         total_records=total_records,

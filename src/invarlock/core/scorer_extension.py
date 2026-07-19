@@ -421,7 +421,7 @@ class AuthenticatedScorerRecord:
         assert isinstance(frozen, Mapping)
         for fact_name in frozen:
             _require_name(fact_name, field_name="fact name")
-        if set(frozen) != SCORER_AUTHENTICATED_FACTS:
+        if frozenset(frozen) != SCORER_AUTHENTICATED_FACTS:
             raise ScorerExtensionError(
                 "authenticated scorer facts must contain exactly expected_output, "
                 "output_text, and output_sha256"

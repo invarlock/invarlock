@@ -469,7 +469,7 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 	$(PYTHON) -m venv $(ADDINS_SMOKE_VENV)
 	$(ADDINS_SMOKE_VENV)/bin/python -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt
 	$(ADDINS_SMOKE_VENV)/bin/python -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK)
-	$(ADDINS_SMOKE_VENV)/bin/python -m pip install --no-deps dist/*.whl dist/addins/*.whl
+	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
 	$(ADDINS_SMOKE_VENV)/bin/python -m pip check
 	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m invarlock_addins.gguf.conformance
 	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m invarlock_addins.multimodal.conformance

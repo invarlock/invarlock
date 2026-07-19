@@ -59,7 +59,11 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert "get_plugin_info" in install_smoke
     assert "ADDINS_SMOKE_RELEASE_LOCK" in install_smoke
     assert "--require-hashes" in install_smoke
-    assert "--no-deps dist/*.whl dist/addins/*.whl" in install_smoke
+    assert (
+        "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
+        "$(ADDINS_SMOKE_VENV)/bin/python -m pip install "
+        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl" in install_smoke
+    )
     assert "-m pip check" in install_smoke
     assert "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH=" in install_smoke
     assert ".addins-smoke-site" not in install_smoke

@@ -92,7 +92,7 @@ def _required_expected_sha256(value: str, *, label: str) -> str:
 
 
 def _validate_runner_info(payload: object) -> dict[str, str]:
-    if not isinstance(payload, Mapping) or set(payload) != _INFO_KEYS:
+    if not isinstance(payload, Mapping) or frozenset(payload) != _INFO_KEYS:
         raise TensorRTLLMCanaryError("runner info has an unexpected schema")
     fixed = {
         "backend_name": "TensorRT-LLM",

@@ -665,10 +665,16 @@ def _validate_sample_qualification(
     count_passed = observed_count >= minimum
     width_passed = observed_width <= maximum_width
     qualified = count_passed and width_passed
+    recorded_count_passed = count_qualification.get("passed")
+    recorded_width_passed = width_qualification.get("passed")
+    recorded_qualified = value.get("passed")
     if (
-        count_qualification.get("passed") is not count_passed
-        or width_qualification.get("passed") is not width_passed
-        or value.get("passed") is not qualified
+        not isinstance(recorded_count_passed, bool)
+        or recorded_count_passed != count_passed
+        or not isinstance(recorded_width_passed, bool)
+        or recorded_width_passed != width_passed
+        or not isinstance(recorded_qualified, bool)
+        or recorded_qualified != qualified
     ):
         raise EvidenceReportError(
             "canonical report sample_qualification verdict is invalid"

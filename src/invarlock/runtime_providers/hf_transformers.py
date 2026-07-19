@@ -372,16 +372,13 @@ def _qwen3_5_non_executing_checkpoint_keys(
             [r"^mtp.*"],
         ),
     )
-    if (
-        not any(
-            model_class is native_class
-            and getattr(config, "model_type", None) == model_type
-            and getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
-            == ignored_keys
-            for native_class, model_type, ignored_keys in accepted_native_profiles
-        )
-        or mtp_keys != _QWEN3_5_NON_EXECUTING_MTP_KEYS
-    ):
+    if not any(
+        model_class is native_class
+        and getattr(config, "model_type", None) == model_type
+        and getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
+        == ignored_keys
+        for native_class, model_type, ignored_keys in accepted_native_profiles
+    ) or mtp_keys != set(_QWEN3_5_NON_EXECUTING_MTP_KEYS):
         raise ValueError(
             "strict HF checkpoint contains an unsupported non-executing "
             "tensor inventory"

@@ -35,6 +35,7 @@ def test_ci_runs_the_repository_gates() -> None:
     ]
 
     fast = jobs["verify-fast"]
+    assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(fast, "Run fast repository gates")["run"] == "make verify-fast"
     assert _step(fast, "Build, install, and validate distributions")["run"] == (
         "make addins-install-smoke"
@@ -42,6 +43,7 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
     minimum = jobs["minimum-python"]
+    assert _step(minimum, "Set up uv")["with"]["version"] == "0.10.10"
     python = _step(minimum, "Set up Python")
     assert python["with"]["python-version"] == "3.12"
     assert _step(minimum, "Run minimum-Python tests")["run"] == (
@@ -62,6 +64,7 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
     full = workflow["jobs"]["verify-full"]
 
     assert "workflow_dispatch" in full["if"]
+    assert _step(full, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(full, "Install documentation linters")["run"] == "npm ci"
     assert _step(full, "Run complete repository gates")["run"] == "make verify"
     assert _step(full, "Build, install, and validate distributions")["run"] == (

@@ -62,10 +62,11 @@ def _require_exact_fields(
     field_name: str,
 ) -> None:
     actual = set(payload)
-    if actual == expected:
+    expected_fields = set(expected)
+    if actual == expected_fields:
         return
-    missing = sorted(expected - actual)
-    unknown = sorted(actual - expected)
+    missing = sorted(expected_fields - actual)
+    unknown = sorted(actual - expected_fields)
     details: list[str] = []
     if missing:
         details.append(f"missing {', '.join(missing)}")
