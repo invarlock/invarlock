@@ -127,7 +127,7 @@ def test_import_preflight_validates_without_creating_output(tmp_path: Path) -> N
     )
 
     assert time.perf_counter() - started < 2.0
-    assert result.format_version == "invarlock/evaluation-preflight-v1"
+    assert result.format_version == "invarlock/evaluation-preflight-v2"
     assert result.execution_mode == "import"
     assert result.record_count == 2
     assert result.providers == {
@@ -144,6 +144,33 @@ def test_import_preflight_validates_without_creating_output(tmp_path: Path) -> N
         "output_destination",
     )
     assert not output.exists()
+
+
+def test_preflight_rejects_schedule_below_policy_minimum_record_count(
+    tmp_path: Path,
+) -> None:
+    request, signing_key = _materialize_run_request(tmp_path)
+    (tmp_path / "inputs/policy.json").write_bytes(
+        canonical_json_bytes(
+            {
+                "resolved_policy": {
+                    "metrics": {
+                        "exact_match": {
+                            "delta_min_pp": -10.0,
+                            "minimum_record_count": 400,
+                            "maximum_interval_width_pp": 10.0,
+                        }
+                    }
+                }
+            }
+        )
+    )
+
+    with pytest.raises(
+        EvaluationPreflightError,
+        match="schedule has 1 records but policy requires at least 400",
+    ):
+        preflight_evaluation_request(request, signing_key_path=signing_key)
 
 
 def test_import_preflight_qualifies_exact_scorer_binding(tmp_path: Path) -> None:
@@ -223,7 +250,7 @@ def test_cli_preflight_is_machine_readable_and_never_publishes(
 
     assert invoked.exit_code == 0, invoked.stdout
     payload = json.loads(invoked.stdout)
-    assert payload["format_version"] == "invarlock/evaluation-preflight-v1"
+    assert payload["format_version"] == "invarlock/evaluation-preflight-v2"
     assert payload["ok"] is True
     assert payload["execution_mode"] == "import"
     assert payload["output"] == "artifacts/evidence"
@@ -441,7 +468,7 @@ def test_preflight_failure_is_closed_json_and_does_not_create_parents(
     assert invoked.exit_code == 2
     payload = json.loads(invoked.stdout)
     assert payload["ok"] is False
-    assert payload["format_version"] == "invarlock/evaluation-preflight-v1"
+    assert payload["format_version"] == "invarlock/evaluation-preflight-v2"
     assert "signing key" in payload["errors"][0]
     assert not output_parent.exists()
 

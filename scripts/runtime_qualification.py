@@ -1468,7 +1468,7 @@ def _preflight(
     preflight = _successful_json(
         completed,
         stage="preflight",
-        expected_format="invarlock/evaluation-preflight-v1",
+        expected_format="invarlock/evaluation-preflight-v2",
     )
     if (
         _planned_evidence(preflight, request_root=inputs.request_root)

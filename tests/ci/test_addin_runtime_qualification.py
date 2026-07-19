@@ -534,7 +534,7 @@ if arguments and arguments[0].endswith("qualification_precheck.py"):
 elif arguments[:3] == ["-m", "invarlock", "evaluate"]:
     if "--preflight" in arguments:
         print(json.dumps({{
-            "format_version": "invarlock/evaluation-preflight-v1",
+            "format_version": "invarlock/evaluation-preflight-v2",
             "ok": True,
             "output": os.environ["QUALIFICATION_EVIDENCE"],
         }}, sort_keys=True))

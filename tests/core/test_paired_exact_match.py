@@ -8,6 +8,8 @@ import pytest
 from invarlock.paired_exact_match import (
     MAX_PAIRED_EXACT_MATCH_OUTCOMES,
     PAIRED_CONFIDENCE_INTERVAL_METHOD,
+    PAIRED_CONFIDENCE_INTERVAL_METHOD_V1,
+    PAIRED_CONFIDENCE_INTERVAL_METHOD_V2,
     PairedExactMatchError,
     paired_exact_match_statistics,
 )
@@ -72,8 +74,8 @@ def test_confidence_interval_is_deterministic_and_bounded() -> None:
 
     assert first == second
     interval = first.effect_size_confidence_interval
-    assert interval.lower_pp == pytest.approx(-41.08300125374949)
-    assert interval.upper_pp == pytest.approx(41.08300125374949)
+    assert interval.lower_pp == pytest.approx(-39.83008445872754)
+    assert interval.upper_pp == pytest.approx(39.83008445872754)
     assert -100.0 <= interval.lower_pp <= interval.upper_pp <= 100.0
 
 
@@ -84,19 +86,67 @@ def test_all_concordant_pairs_have_no_mcnemar_signal() -> None:
 
     assert statistics.mcnemar_exact_two_sided_p_value == 1.0
     assert statistics.effect_size_pp == 0.0
-    assert statistics.effect_size_confidence_interval.lower_pp == pytest.approx(0.0)
-    assert statistics.effect_size_confidence_interval.upper_pp == pytest.approx(0.0)
+    interval = statistics.effect_size_confidence_interval
+    assert interval.method == PAIRED_CONFIDENCE_INTERVAL_METHOD_V2
+    assert interval.lower_pp < 0.0 < interval.upper_pp
 
 
 @pytest.mark.parametrize("outcome", [False, True])
-def test_degenerate_concordant_pairs_have_zero_width_difference_interval(
+def test_degenerate_concordant_pairs_retain_sampling_uncertainty(
     outcome: bool,
 ) -> None:
     statistics = paired_exact_match_statistics([outcome] * 50, [outcome] * 50)
 
     assert statistics.effect_size_pp == 0.0
-    assert statistics.effect_size_confidence_interval.lower_pp == pytest.approx(0.0)
-    assert statistics.effect_size_confidence_interval.upper_pp == pytest.approx(0.0)
+    interval = statistics.effect_size_confidence_interval
+    assert interval.lower_pp < 0.0 < interval.upper_pp
+
+
+@pytest.mark.parametrize(
+    ("both_pass", "both_fail", "expected_half_width_pp"),
+    [
+        (54, 0, 6.64),
+        (53, 1, 7.29),
+        (30, 24, 3.58),
+    ],
+)
+def test_method_v2_matches_newcombe_method_10_reference_vectors(
+    both_pass: int,
+    both_fail: int,
+    expected_half_width_pp: float,
+) -> None:
+    statistics = paired_exact_match_statistics(
+        [True] * both_pass + [False] * both_fail,
+        [True] * both_pass + [False] * both_fail,
+    )
+
+    interval = statistics.effect_size_confidence_interval
+    assert interval.method == PAIRED_CONFIDENCE_INTERVAL_METHOD_V2
+    assert interval.lower_pp == pytest.approx(-expected_half_width_pp, abs=0.01)
+    assert interval.upper_pp == pytest.approx(expected_half_width_pp, abs=0.01)
+
+
+def test_legacy_v1_interval_remains_replayable_but_is_not_the_default() -> None:
+    statistics = paired_exact_match_statistics(
+        [True, False],
+        [True, False],
+        confidence_interval_method=PAIRED_CONFIDENCE_INTERVAL_METHOD_V1,
+    )
+
+    interval = statistics.effect_size_confidence_interval
+    assert PAIRED_CONFIDENCE_INTERVAL_METHOD == PAIRED_CONFIDENCE_INTERVAL_METHOD_V2
+    assert interval.method == PAIRED_CONFIDENCE_INTERVAL_METHOD_V1
+    assert interval.lower_pp == 0.0
+    assert interval.upper_pp == 0.0
+
+
+def test_unknown_confidence_interval_method_fails_closed() -> None:
+    with pytest.raises(PairedExactMatchError, match="confidence interval method"):
+        paired_exact_match_statistics(
+            [True],
+            [True],
+            confidence_interval_method="untrusted-method",
+        )
 
 
 def test_small_sample_intervals_are_bounded_and_contain_the_paired_effect() -> None:

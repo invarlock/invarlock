@@ -157,7 +157,7 @@ elif arguments[:3] == ["-m", "invarlock", "evaluate"]:
     if "--preflight" in arguments:
         fail("preflight")
         print(json.dumps({{
-            "format_version": "invarlock/evaluation-preflight-v1",
+            "format_version": "invarlock/evaluation-preflight-v2",
             "ok": True,
             "output": control.get("preflight_output") or control["evidence"],
             "artifact_digests": {{

@@ -12,6 +12,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+import invarlock.evidence_pack_publication as evidence_pack_publication
 from invarlock.core.runtime_provider import (
     GGUFArtifactIdentity,
     RuntimeBackendIdentity,
@@ -41,6 +42,7 @@ from invarlock.evidence_pack import (
     verify_comparison_evidence,
 )
 from invarlock.evidence_pack_contract import (
+    LEGACY_COMPARISON_REPORT_FORMAT,
     MAX_OBSERVATION_BYTES,
     canonical_json_bytes,
     evidence_observation_bytes,
@@ -543,6 +545,40 @@ def test_publish_and_verify_real_runtime_provider_snapshots(tmp_path: Path) -> N
     assert result.payload["authenticity"] == "pinned"
     assert result.payload["policy_verdict"] == "pass"
     assert result.payload["observations"] == []
+
+
+def test_strict_verifier_replays_legacy_comparison_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = evidence_pack_publication.build_comparison_report
+
+    def legacy_report(**kwargs: object) -> dict[str, object]:
+        return original(**kwargs, report_format=LEGACY_COMPARISON_REPORT_FORMAT)
+
+    monkeypatch.setattr(
+        evidence_pack_publication,
+        "build_comparison_report",
+        legacy_report,
+    )
+    pack, policy, fingerprint, runtimes, _key, arguments = _publish(tmp_path)
+
+    report = json.loads(
+        (pack / "reports/evaluation.report.json").read_text(encoding="utf-8")
+    )
+    assert report["format"] == LEGACY_COMPARISON_REPORT_FORMAT
+    assert report["uncertainty"]["method"] == "newcombe_hybrid_score_paired_v1"
+
+    result = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **_verification_anchors(arguments),
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+
+    assert result.status == 0
+    assert result.payload["ok"] is True
+    assert result.payload["policy_verdict"] == "pass"
 
 
 def test_authenticated_observation_is_verified_without_decision_authority(

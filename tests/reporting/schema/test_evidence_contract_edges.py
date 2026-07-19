@@ -172,7 +172,7 @@ def test_exact_match_report_replays_policy_pass_and_fail() -> None:
         "minimum": -100.0,
     }
     assert report["uncertainty"] == {
-        "method": "newcombe_hybrid_score_paired_v1",
+        "method": "newcombe_hybrid_score_paired_v2",
         "scope": "paired_binary_outcomes",
         "interval_mass": 0.95,
         "lower": pytest.approx(-90.54687942657694),
@@ -214,6 +214,60 @@ def test_normalized_nll_report_replays_ratio_policy() -> None:
         "maximum": 1.2,
     }
     assert report["verdict"] == "pass"
+
+
+def test_sample_qualification_fails_closed_on_count_or_precision() -> None:
+    report = build_comparison_report(
+        comparison_id="comparison-1",
+        paired_records=_pairs(),
+        policy={
+            "resolved_policy": {
+                "metrics": {
+                    "exact_match": {
+                        "delta_min_pp": -100.0,
+                        "minimum_record_count": 400,
+                        "maximum_interval_width_pp": 10.0,
+                    }
+                }
+            }
+        },
+        policy_digest=_digest(),
+    )
+
+    assert report["sample_qualification"] == {
+        "record_count": {"minimum": 400, "observed": 2, "passed": False},
+        "interval_width": {
+            "maximum": 10.0,
+            "observed": pytest.approx(117.804158),
+            "unit": "percentage_points",
+            "passed": False,
+        },
+        "passed": False,
+    }
+    assert report["verdict"] == "fail"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("minimum_record_count", True, "minimum_record_count"),
+        ("minimum_record_count", 0, "minimum_record_count"),
+        ("minimum_record_count", 10_001, "minimum_record_count"),
+        ("maximum_interval_width_pp", 0.0, "maximum_interval_width_pp"),
+        ("maximum_interval_width_pp", 201.0, "maximum_interval_width_pp"),
+    ],
+)
+def test_sample_qualification_policy_rejects_invalid_limits(
+    field: str, value: object, message: str
+) -> None:
+    selected: dict[str, object] = {"delta_min_pp": -10.0, field: value}
+    with pytest.raises(EvidencePackError, match=message):
+        build_comparison_report(
+            comparison_id="comparison-1",
+            paired_records=_pairs(),
+            policy={"resolved_policy": {"metrics": {"exact_match": selected}}},
+            policy_digest=_digest(),
+        )
 
 
 def test_paired_interval_is_deterministic_and_controls_the_verdict() -> None:

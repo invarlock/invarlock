@@ -66,6 +66,7 @@ from invarlock.evidence_pack_contract import (
     build_comparison_report,
     canonical_json_bytes,
     normalize_digest,
+    policy_sample_requirements,
     runtime_side_config_errors,
     schedule_bytes,
     sha256_digest,
@@ -126,7 +127,7 @@ class EvaluationPreflightError(ValueError):
     def as_json(self) -> str:
         return json.dumps(
             {
-                "format_version": "invarlock/evaluation-preflight-v1",
+                "format_version": "invarlock/evaluation-preflight-v2",
                 "ok": False,
                 "errors": [str(self)],
             },
@@ -202,7 +203,8 @@ class EvaluationPreflightResult:
     providers: dict[str, str]
     checks: tuple[str, ...]
     runtime_image_digests: dict[str, str] | None = None
-    format_version: str = "invarlock/evaluation-preflight-v1"
+    sample_qualification: dict[str, object] | None = None
+    format_version: str = "invarlock/evaluation-preflight-v2"
 
     def as_json(self) -> str:
         payload: dict[str, object] = {
@@ -221,6 +223,8 @@ class EvaluationPreflightResult:
         }
         if self.runtime_image_digests is not None:
             payload["runtime_image_digests"] = self.runtime_image_digests
+        if self.sample_qualification is not None:
+            payload["sample_qualification"] = self.sample_qualification
         return json.dumps(
             payload,
             allow_nan=False,
@@ -242,6 +246,7 @@ class _PreparedEvaluation:
     artifact_digests: dict[str, str] | None
     evidence_signer_fingerprint: str
     selected_metric: str
+    sample_requirements: dict[str, int | float]
     observations: tuple[EvidenceObservation, ...]
 
 
@@ -889,6 +894,20 @@ def _prepare_evaluation_inputs(
         policy_digest=policy_digest,
         scorer_binding=request.comparison.scorer_extension,
     )
+    sample_requirements = policy_sample_requirements(
+        policy_payload,
+        metric=selected_metric,
+        scorer_binding=request.comparison.scorer_extension,
+    )
+    minimum_record_count = sample_requirements.get("minimum_record_count")
+    if (
+        isinstance(minimum_record_count, int)
+        and len(schedule.records) < minimum_record_count
+    ):
+        raise EvaluationTransactionError(
+            f"schedule has {len(schedule.records)} records but policy requires at "
+            f"least {minimum_record_count}"
+        )
     if request.comparison.scorer_extension is not None:
         if scorer_registry is None:
             raise EvaluationTransactionError(
@@ -915,6 +934,7 @@ def _prepare_evaluation_inputs(
         artifact_digests=artifact_digests,
         evidence_signer_fingerprint=public_key_fingerprint(signing_key.public_key()),
         selected_metric=selected_metric,
+        sample_requirements=sample_requirements,
         observations=observations,
     )
 
@@ -971,6 +991,8 @@ def preflight_evaluation_request(
             except ScorerExtensionError as exc:
                 raise EvaluationTransactionError(str(exc)) from exc
             checks.append("scorer_binding")
+        if prepared.sample_requirements:
+            checks.append("sample_record_count")
         normalized_runtime_digests: dict[str, str] | None = None
         artifact_digests = prepared.artifact_digests
         if request.execution.mode == "run":
@@ -1101,6 +1123,30 @@ def preflight_evaluation_request(
             prepared.schedule,
             prepared.observations,
         )
+        sample_qualification: dict[str, object] | None = None
+        if prepared.sample_requirements:
+            minimum = prepared.sample_requirements["minimum_record_count"]
+            width_field = next(
+                field
+                for field in prepared.sample_requirements
+                if field != "minimum_record_count"
+            )
+            sample_qualification = {
+                "record_count": {
+                    "minimum": minimum,
+                    "observed": len(prepared.schedule.records),
+                    "status": "pass",
+                },
+                "interval_width": {
+                    "maximum": prepared.sample_requirements[width_field],
+                    "unit": (
+                        "ratio"
+                        if width_field.endswith("_ratio")
+                        else "percentage_points"
+                    ),
+                    "status": "pending_execution",
+                },
+            }
         return EvaluationPreflightResult(
             execution_mode=request.execution.mode,
             output=request.output.evidence.relative_to(request.root).as_posix(),
@@ -1116,6 +1162,7 @@ def preflight_evaluation_request(
             },
             checks=tuple(checks),
             runtime_image_digests=normalized_runtime_digests,
+            sample_qualification=sample_qualification,
         )
     except EvaluationPreflightError:
         raise

@@ -20,6 +20,8 @@ from invarlock.core.scorer_extension import (
     decode_scorer_binding,
 )
 from invarlock.evidence_pack_contract import (
+    COMPARISON_REPORT_FORMAT,
+    LEGACY_COMPARISON_REPORT_FORMAT,
     EvidencePackError,
     canonical_json_bytes,
     evidence_observation_errors,
@@ -32,6 +34,7 @@ from invarlock.evidence_pack_json import (
 )
 from invarlock.evidence_pack_snapshot import PackSnapshot
 from invarlock.paired_exact_match import (
+    PAIRED_CONFIDENCE_INTERVAL_METHODS,
     PairedExactMatchError,
     paired_exact_match_statistics,
 )
@@ -529,8 +532,15 @@ def _validate_paired_binary(
     subject = [True] * both_pass + [False] * regressions
     baseline += [False] * improvements + [False] * both_fail
     subject += [True] * improvements + [False] * both_fail
+    method = uncertainty.get("method")
+    if method not in PAIRED_CONFIDENCE_INTERVAL_METHODS:
+        raise EvidenceReportError("canonical report uncertainty method is invalid")
     try:
-        replayed = paired_exact_match_statistics(baseline, subject)
+        replayed = paired_exact_match_statistics(
+            baseline,
+            subject,
+            confidence_interval_method=cast(str, method),
+        )
     except PairedExactMatchError as exc:
         raise EvidenceReportError(
             f"canonical report paired_binary cannot be replayed: {exc}"
@@ -580,6 +590,92 @@ def _validate_paired_binary(
         raise EvidenceReportError("canonical report paired_binary values are invalid")
 
 
+def _validate_sample_qualification(
+    value: object,
+    *,
+    metric: str,
+    record_count: int,
+    interval_lower: float,
+    interval_upper: float,
+) -> bool:
+    """Replay the closed sample-count and interval-precision qualification."""
+
+    if not isinstance(value, dict) or set(value) != {
+        "record_count",
+        "interval_width",
+        "passed",
+    }:
+        raise EvidenceReportError("canonical report sample_qualification is invalid")
+    count_qualification = value.get("record_count")
+    width_qualification = value.get("interval_width")
+    if not isinstance(count_qualification, dict) or set(count_qualification) != {
+        "minimum",
+        "observed",
+        "passed",
+    }:
+        raise EvidenceReportError(
+            "canonical report sample_qualification record_count is invalid"
+        )
+    if not isinstance(width_qualification, dict) or set(width_qualification) != {
+        "maximum",
+        "observed",
+        "unit",
+        "passed",
+    }:
+        raise EvidenceReportError(
+            "canonical report sample_qualification interval_width is invalid"
+        )
+    minimum = _nonnegative_integer(
+        count_qualification.get("minimum"),
+        field="sample_qualification.record_count.minimum",
+    )
+    observed_count = _nonnegative_integer(
+        count_qualification.get("observed"),
+        field="sample_qualification.record_count.observed",
+    )
+    maximum_width = _number(
+        width_qualification.get("maximum"),
+        field="sample_qualification.interval_width.maximum",
+    )
+    observed_width = _number(
+        width_qualification.get("observed"),
+        field="sample_qualification.interval_width.observed",
+    )
+    expected_unit = (
+        "ratio" if metric == "normalized_nll_per_utf8_byte" else "percentage_points"
+    )
+    if (
+        minimum < 1
+        or minimum > 10_000
+        or observed_count != record_count
+        or maximum_width <= 0.0
+        or (expected_unit == "percentage_points" and maximum_width > 200.0)
+        or observed_width < 0.0
+        or width_qualification.get("unit") != expected_unit
+        or not math.isclose(
+            observed_width,
+            interval_upper - interval_lower,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        )
+    ):
+        raise EvidenceReportError(
+            "canonical report sample_qualification values are invalid"
+        )
+    count_passed = observed_count >= minimum
+    width_passed = observed_width <= maximum_width
+    qualified = count_passed and width_passed
+    if (
+        count_qualification.get("passed") is not count_passed
+        or width_qualification.get("passed") is not width_passed
+        or value.get("passed") is not qualified
+    ):
+        raise EvidenceReportError(
+            "canonical report sample_qualification verdict is invalid"
+        )
+    return qualified
+
+
 def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
     expected = {
         "format",
@@ -600,9 +696,15 @@ def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
         expected.add("derived_measurements")
     else:
         expected.update({"scorer_extension", "scorer_replay"})
+    if "sample_qualification" in report:
+        expected.add("sample_qualification")
     if set(report) != expected:
         raise EvidenceReportError("canonical comparison report fields are invalid")
-    if report.get("format") != "invarlock/comparison-report-v1":
+    report_format = report.get("format")
+    if report_format not in {
+        LEGACY_COMPARISON_REPORT_FORMAT,
+        COMPARISON_REPORT_FORMAT,
+    }:
         raise EvidenceReportError("canonical comparison report format is invalid")
     for field in ("comparison_id", "metric", "policy_digest"):
         if not isinstance(report.get(field), str) or not report[field]:
@@ -678,7 +780,12 @@ def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
             "upper",
         }:
             raise EvidenceReportError("canonical report uncertainty is invalid")
-        if uncertainty.get("method") != "newcombe_hybrid_score_paired_v1":
+        expected_method = (
+            "newcombe_hybrid_score_paired_v1"
+            if report_format == LEGACY_COMPARISON_REPORT_FORMAT
+            else "newcombe_hybrid_score_paired_v2"
+        )
+        if uncertainty.get("method") != expected_method:
             raise EvidenceReportError("canonical report uncertainty method is invalid")
         if uncertainty.get("scope") != "paired_binary_outcomes":
             raise EvidenceReportError("canonical report uncertainty scope is invalid")
@@ -760,6 +867,14 @@ def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
     if not math.isclose(comparison_value, expected_value, rel_tol=1e-12, abs_tol=1e-12):
         raise EvidenceReportError(
             "canonical report comparison value does not match the side means"
+        )
+    if "sample_qualification" in report:
+        passed = passed and _validate_sample_qualification(
+            report["sample_qualification"],
+            metric=metric,
+            record_count=count,
+            interval_lower=lower,
+            interval_upper=upper,
         )
     expected_verdict = "pass" if passed else "fail"
     if report["verdict"] != expected_verdict:
@@ -851,6 +966,37 @@ def _render_markdown(
                 f"`{_format_number(paired_binary['mcnemar_exact_two_sided_p_value'])}`.",
                 "The p-value describes paired asymmetry; the policy verdict uses the "
                 "effect-size confidence bound above.",
+            ]
+        )
+    sample_qualification = report.get("sample_qualification")
+    if isinstance(sample_qualification, dict):
+        count_qualification = cast(dict[str, Any], sample_qualification["record_count"])
+        width_qualification = cast(
+            dict[str, Any], sample_qualification["interval_width"]
+        )
+        width_label = (
+            "Confidence-interval width (pp)"
+            if width_qualification["unit"] == "percentage_points"
+            else "Resampling-interval width (ratio)"
+        )
+        lines.extend(
+            [
+                "",
+                "## Sample qualification",
+                "",
+                "The authenticated policy requires both enough paired records and "
+                "a sufficiently precise interval before the metric can pass.",
+                "",
+                "| Qualification | Observed | Required | Result |",
+                "| --- | ---: | ---: | --- |",
+                "| Paired records | "
+                f"{count_qualification['observed']} | "
+                f"≥ {count_qualification['minimum']} | "
+                f"{'pass' if count_qualification['passed'] else 'fail'} |",
+                f"| {width_label} | "
+                f"{_format_number(width_qualification['observed'])} | "
+                f"≤ {_format_number(width_qualification['maximum'])} | "
+                f"{'pass' if width_qualification['passed'] else 'fail'} |",
             ]
         )
     derived = report.get("derived_measurements")

@@ -973,17 +973,23 @@ def _verify_comparison_evidence_snapshot(
                             "observations"
                         )
                     if policy_payload is not None and policy_digest is not None:
-                        expected_report = build_comparison_report(
-                            comparison_id=manifest["comparison_id"],
-                            paired_records=derived,
-                            policy=policy_payload,
-                            policy_digest=policy_digest,
-                        )
                         report = parse_json_object(
                             loaded["evaluation_report"], label="comparison report"
                         )
                         if canonical_json_bytes(report) != loaded["evaluation_report"]:
                             errors.append("comparison report is not canonical JSON")
+                        report_format = report.get("format")
+                        if not isinstance(report_format, str):
+                            raise EvidencePackError(
+                                "comparison report format is invalid"
+                            )
+                        expected_report = build_comparison_report(
+                            comparison_id=manifest["comparison_id"],
+                            paired_records=derived,
+                            policy=policy_payload,
+                            policy_digest=policy_digest,
+                            report_format=report_format,
+                        )
                         if report != expected_report:
                             errors.append(
                                 "comparison report does not match verifier replay"

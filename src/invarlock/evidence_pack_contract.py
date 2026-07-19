@@ -8,7 +8,7 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from jsonschema import Draft202012Validator
 
@@ -31,6 +31,8 @@ from invarlock.core.scorer_extension import (
 )
 from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.paired_exact_match import (
+    PAIRED_CONFIDENCE_INTERVAL_METHOD_V1,
+    PAIRED_CONFIDENCE_INTERVAL_METHOD_V2,
     PairedExactMatchError,
     paired_exact_match_statistics,
 )
@@ -53,7 +55,11 @@ from invarlock.runtime_provider_evidence import (
 EVIDENCE_PACK_VERIFY_FORMAT = "invarlock/evidence-pack-verify-v1"
 EVIDENCE_INPUT_IDENTITY_FORMAT = "invarlock/evidence-input-identity-v1"
 PAIRED_RECORDS_FORMAT = "invarlock/paired-records-v1"
-COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v1"
+LEGACY_COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v1"
+COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v2"
+COMPARISON_REPORT_FORMATS = frozenset(
+    {LEGACY_COMPARISON_REPORT_FORMAT, COMPARISON_REPORT_FORMAT}
+)
 RUNTIME_SIDE_REPORT_FORMAT = "invarlock/runtime-side-report-v1"
 RUNTIME_SIDE_CONFIG_FORMAT = "invarlock/runtime-side-config-v1"
 EVIDENCE_OBSERVATION_FORMAT = EVIDENCE_OBSERVATION_FORMAT_VERSION
@@ -967,7 +973,22 @@ def _resolved_metric_policy(
                 "configuration_sha256",
             }
         )
-    if set(selected) != expected_fields:
+    interval_width_field = (
+        "maximum_interval_width_ratio"
+        if metric == "normalized_nll_per_utf8_byte" and scorer_binding is None
+        else "maximum_interval_width_pp"
+    )
+    sample_fields = {"minimum_record_count", interval_width_field}
+    selected_fields = set(selected)
+    if selected_fields & sample_fields and not sample_fields <= selected_fields:
+        raise EvidencePackError(
+            f"policy metrics.{metric_name}.minimum_record_count and "
+            f"{interval_width_field} must be provided together"
+        )
+    if (
+        selected_fields != expected_fields
+        and selected_fields != expected_fields | sample_fields
+    ):
         raise EvidencePackError(
             f"policy metrics.{metric_name} must contain exactly the authorized fields"
         )
@@ -982,7 +1003,99 @@ def _resolved_metric_policy(
             raise EvidencePackError(
                 "policy scorer_extension pin does not match the request binding"
             )
+    if sample_fields <= selected_fields:
+        minimum_record_count = selected.get("minimum_record_count")
+        if (
+            isinstance(minimum_record_count, bool)
+            or not isinstance(minimum_record_count, int)
+            or not 1 <= minimum_record_count <= MAX_RECORDS
+        ):
+            raise EvidencePackError(
+                f"policy metrics.{metric_name}.minimum_record_count must be an "
+                f"integer between 1 and {MAX_RECORDS}"
+            )
+        maximum_interval_width = _finite_number(
+            selected.get(interval_width_field),
+            label=f"policy metrics.{metric_name}.{interval_width_field}",
+        )
+        maximum_width = (
+            200.0 if interval_width_field == "maximum_interval_width_pp" else None
+        )
+        if maximum_interval_width <= 0.0 or (
+            maximum_width is not None and maximum_interval_width > maximum_width
+        ):
+            suffix = " and at most 200" if maximum_width is not None else ""
+            raise EvidencePackError(
+                f"policy metrics.{metric_name}.{interval_width_field} must be "
+                f"positive{suffix}"
+            )
     return selected
+
+
+def policy_sample_requirements(
+    policy: Mapping[str, object],
+    *,
+    metric: str,
+    scorer_binding: ScorerExtensionBinding | None = None,
+) -> dict[str, int | float]:
+    """Return validated sample and precision requirements for a metric policy."""
+
+    selected = _resolved_metric_policy(
+        policy,
+        metric=metric,
+        scorer_binding=scorer_binding,
+    )
+    if "minimum_record_count" not in selected:
+        return {}
+    width_field = (
+        "maximum_interval_width_ratio"
+        if metric == "normalized_nll_per_utf8_byte" and scorer_binding is None
+        else "maximum_interval_width_pp"
+    )
+    return {
+        "minimum_record_count": cast(int, selected["minimum_record_count"]),
+        width_field: cast(float, selected[width_field]),
+    }
+
+
+def _sample_qualification(
+    selected_policy: Mapping[str, object],
+    *,
+    metric: str,
+    scorer_binding: ScorerExtensionBinding | None,
+    record_count: int,
+    interval_lower: float,
+    interval_upper: float,
+) -> dict[str, object] | None:
+    """Resolve verifier-replayable sample sufficiency from an authorized policy."""
+
+    if "minimum_record_count" not in selected_policy:
+        return None
+    width_field = (
+        "maximum_interval_width_ratio"
+        if metric == "normalized_nll_per_utf8_byte" and scorer_binding is None
+        else "maximum_interval_width_pp"
+    )
+    unit = "ratio" if width_field.endswith("_ratio") else "percentage_points"
+    minimum = cast(int, selected_policy["minimum_record_count"])
+    maximum = cast(float, selected_policy[width_field])
+    observed_width = interval_upper - interval_lower
+    record_count_passed = record_count >= minimum
+    interval_width_passed = observed_width <= maximum
+    return {
+        "record_count": {
+            "minimum": minimum,
+            "observed": record_count,
+            "passed": record_count_passed,
+        },
+        "interval_width": {
+            "maximum": maximum,
+            "observed": observed_width,
+            "unit": unit,
+            "passed": interval_width_passed,
+        },
+        "passed": record_count_passed and interval_width_passed,
+    }
 
 
 def validated_derived_measurements(value: object) -> dict[str, object]:
@@ -1057,11 +1170,14 @@ def build_comparison_report(
     paired_records: Mapping[str, object],
     policy: Mapping[str, object],
     policy_digest: str,
+    report_format: str = COMPARISON_REPORT_FORMAT,
 ) -> dict[str, object]:
     """Replay the one closed comparison report from verifier-derived pairs."""
 
     if not _IDENTIFIER_RE.fullmatch(comparison_id):
         raise EvidencePackError("comparison_id is invalid")
+    if report_format not in COMPARISON_REPORT_FORMATS:
+        raise EvidencePackError("comparison report format is unsupported")
     metric = paired_records.get("metric")
     expected_fields = {"format", "metric", "schedule_sha256", "records"}
     if metric == "normalized_nll_per_utf8_byte":
@@ -1134,7 +1250,13 @@ def build_comparison_report(
     if metric == "exact_match":
         try:
             paired_statistics = paired_exact_match_statistics(
-                baseline_scores, subject_scores
+                baseline_scores,
+                subject_scores,
+                confidence_interval_method=(
+                    PAIRED_CONFIDENCE_INTERVAL_METHOD_V1
+                    if report_format == LEGACY_COMPARISON_REPORT_FORMAT
+                    else PAIRED_CONFIDENCE_INTERVAL_METHOD_V2
+                ),
             )
         except PairedExactMatchError as exc:
             raise EvidencePackError(
@@ -1241,8 +1363,18 @@ def build_comparison_report(
             "minimum": limit,
         }
         passed = interval_lower >= limit
+    sample_qualification = _sample_qualification(
+        selected_policy,
+        metric=metric,
+        scorer_binding=scorer_binding,
+        record_count=len(records),
+        interval_lower=interval_lower,
+        interval_upper=interval_upper,
+    )
+    if sample_qualification is not None:
+        passed = passed and cast(bool, sample_qualification["passed"])
     report: dict[str, object] = {
-        "format": COMPARISON_REPORT_FORMAT,
+        "format": report_format,
         "comparison_id": comparison_id,
         "metric": metric,
         "record_count": len(records),
@@ -1259,6 +1391,8 @@ def build_comparison_report(
         )
     if paired_binary is not None:
         report["paired_binary"] = paired_binary
+    if sample_qualification is not None:
+        report["sample_qualification"] = sample_qualification
     if scorer_binding is not None:
         report["scorer_extension"] = scorer_binding_payload(scorer_binding)
         assert scorer_replay is not None
@@ -1275,6 +1409,7 @@ def schedule_bytes(schedule: RuntimeBehavioralSchedule) -> bytes:
 
 __all__ = [
     "COMPARISON_REPORT_FORMAT",
+    "COMPARISON_REPORT_FORMATS",
     "DERIVED_PERPLEXITY_METHOD",
     "EVIDENCE_PACK_FORMAT",
     "EVIDENCE_OBSERVATION_FORMAT",
@@ -1284,6 +1419,7 @@ __all__ = [
     "EvidenceObservation",
     "INPUT_ROLES",
     "InputIdentity",
+    "LEGACY_COMPARISON_REPORT_FORMAT",
     "MAX_EVIDENCE_BYTES",
     "MAX_IDENTITY_BYTES",
     "MAX_OBSERVATION_BYTES",
@@ -1302,6 +1438,7 @@ __all__ = [
     "identity_payload",
     "normalize_digest",
     "parse_json_object",
+    "policy_sample_requirements",
     "request_metric",
     "request_scorer_binding",
     "schedule_bytes",
