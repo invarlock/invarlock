@@ -5,7 +5,9 @@ repos:
     rev: v4.6.0
     hooks:
       - id: end-of-file-fixer
-        exclude: '^examples/(inputs/schedule\.json|import/(baseline|subject|rejected-subject)/(model-artifact\.identity|runtime-provider\.receipt|runtime-scoring\.observation)\.json)$'
+        # Evidence-pack integrity authenticates exact file bytes. Keep structural
+        # validation active below, but never rewrite an already signed pack.
+        exclude: '^(public_evidence/evidence/|examples/(inputs/schedule\.json|import/(baseline|subject|rejected-subject)/(model-artifact\.identity|runtime-provider\.receipt|runtime-scoring\.observation)\.json)$)'
       - id: trailing-whitespace
       - id: check-yaml
         exclude: ^mkdocs\.yml$
