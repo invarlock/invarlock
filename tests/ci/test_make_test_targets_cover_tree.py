@@ -59,9 +59,11 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert "get_plugin_info" in install_smoke
     assert "ADDINS_SMOKE_RELEASE_LOCK" in install_smoke
     assert "--require-hashes" in install_smoke
+    assert 'mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX"' in install_smoke
+    assert "trap 'rm -rf \"$$smoke_venv\"' EXIT HUP INT TERM" in install_smoke
     assert (
         "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
-        "$(ADDINS_SMOKE_VENV)/bin/python -m pip install "
+        '"$$smoke_venv/bin/python" -m pip install '
         "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl" in install_smoke
     )
     assert "-m pip check" in install_smoke

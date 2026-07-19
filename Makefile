@@ -24,7 +24,6 @@ SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 DIST_RUN ?= uv run --isolated --locked --extra release-ci
 RELEASE_PREFLIGHT_ARGS ?=
-ADDINS_SMOKE_VENV ?= .addins-smoke-venv
 ADDINS_SMOKE_PYTHON_TAG := $(shell $(PYTHON) -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')
 ADDINS_SMOKE_RELEASE_LOCK ?= requirements/workflows/release-install-py$(ADDINS_SMOKE_PYTHON_TAG).txt
 
@@ -481,19 +480,21 @@ dist-check:  ## Build and validate the core and first-party add-in distributions
 
 addins-install-smoke: dist-check  ## Install and discover all five wheels in a disposable environment
 	@test -f $(ADDINS_SMOKE_RELEASE_LOCK) || { echo "No coordinated release lock for $(PYTHON); expected $(ADDINS_SMOKE_RELEASE_LOCK)" >&2; exit 2; }
-	rm -rf $(ADDINS_SMOKE_VENV)
-	$(PYTHON) -m venv $(ADDINS_SMOKE_VENV)
-	$(ADDINS_SMOKE_VENV)/bin/python -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt
-	$(ADDINS_SMOKE_VENV)/bin/python -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK)
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
-	$(ADDINS_SMOKE_VENV)/bin/python -m pip check
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m invarlock_addins.gguf.conformance
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m invarlock_addins.multimodal.conformance
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -m invarlock_addins.tensorrt_llm.conformance
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -c "from pathlib import Path; import invarlock; import sysconfig; site = Path(sysconfig.get_path('purelib')).resolve(); assert Path(invarlock.__file__).resolve().is_relative_to(site)"
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"
-	PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= $(ADDINS_SMOKE_VENV)/bin/python -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
+	@set -eu; \
+		smoke_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX")"; \
+		trap 'rm -rf "$$smoke_venv"' EXIT HUP INT TERM; \
+		$(PYTHON) -m venv "$$smoke_venv"; \
+		"$$smoke_venv/bin/python" -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt; \
+		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl; \
+		"$$smoke_venv/bin/python" -m pip check; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.gguf.conformance; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.multimodal.conformance; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.tensorrt_llm.conformance; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from pathlib import Path; import invarlock; import sysconfig; site = Path(sysconfig.get_path('purelib')).resolve(); assert Path(invarlock.__file__).resolve().is_relative_to(site)"; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
 
 packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifacts
 
