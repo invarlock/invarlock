@@ -6,6 +6,7 @@ import json
 import math
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -340,6 +341,266 @@ def test_torchao_preparation_rejects_nonfinite_materialization(
             integration="torchao-int8",
             runtime_image_digest=ZERO_DIGEST,
         )
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("tokenizer", "baseline and subject tokenizers do not match"),
+        ("identical", "subject is identical to its baseline"),
+    ),
+)
+def test_hf_checkpoint_authoring_rejects_identity_inconsistencies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    paths = integration._paths(tmp_path / case)
+    monkeypatch.setattr(
+        qwen3_profile,
+        "load_model_and_tokenizer",
+        lambda **_kwargs: (object(), object()),
+    )
+    tokenizer_digests = iter(
+        ("tokenizer-a", "tokenizer-b" if case == "tokenizer" else "tokenizer-a")
+    )
+    monkeypatch.setattr(
+        qwen3_profile,
+        "save_checkpoint",
+        lambda *_args: next(tokenizer_digests),
+    )
+    checkpoint_digests = iter(
+        ("checkpoint-a", "checkpoint-a" if case == "identical" else "checkpoint-b")
+    )
+    monkeypatch.setattr(
+        integration,
+        "checkpoint_tree_sha256",
+        lambda *_args: next(checkpoint_digests),
+    )
+    monkeypatch.setattr(
+        integration,
+        "_target_row_derivative",
+        lambda *_args, **_kwargs: (7, 1.0),
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        integration._create_hf_checkpoints(paths, expected_output=" target")
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("no-trainable", "did not expose trainable"),
+        ("initial", "non-finite initial loss"),
+        ("step", "non-finite loss"),
+        ("final", "non-finite final loss"),
+        ("no-improvement", "did not improve"),
+        ("tokenizer", "baseline and subject tokenizers do not match"),
+        ("identical", "subject is identical to its baseline"),
+    ),
+)
+def test_peft_checkpoint_authoring_rejects_training_and_identity_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    import peft
+    import torch
+    import transformers
+
+    parameter = torch.nn.Parameter(torch.ones(1))
+
+    class BaselineModel:
+        def parameters(self):
+            return iter((parameter,))
+
+        def to(self, _device: object) -> BaselineModel:
+            return self
+
+    if case == "initial":
+        losses: list[object] = [None]
+    elif case == "step":
+        losses = [torch.tensor(1.0, requires_grad=True), None]
+    elif case == "final":
+        losses = (
+            [torch.tensor(1.0, requires_grad=True)]
+            + [torch.tensor(0.5, requires_grad=True) for _ in range(12)]
+            + [None]
+        )
+    else:
+        final_loss = 1.0 if case == "no-improvement" else 0.25
+        losses = (
+            [torch.tensor(1.0, requires_grad=True)]
+            + [torch.tensor(0.5, requires_grad=True) for _ in range(12)]
+            + [torch.tensor(final_loss, requires_grad=True)]
+        )
+
+    class TrainingModel(BaselineModel):
+        def __init__(self) -> None:
+            self._losses = iter(losses)
+            self.peft_config = {"default": SimpleNamespace(base_model_name_or_path="")}
+
+        def parameters(self):
+            if case == "no-trainable":
+                return iter(())
+            return super().parameters()
+
+        def train(self) -> TrainingModel:
+            return self
+
+        def eval(self) -> TrainingModel:
+            return self
+
+        def __call__(self, **_kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(loss=next(self._losses))
+
+        def save_pretrained(self, path: Path, **_kwargs: object) -> None:
+            path.mkdir(parents=True)
+
+    class ReloadedModel:
+        def merge_and_unload(self) -> BaselineModel:
+            return BaselineModel()
+
+    class TransferValue:
+        def to(self, _device: object) -> TransferValue:
+            return self
+
+    class Optimizer:
+        def zero_grad(self, **_kwargs: object) -> None:
+            return None
+
+        def step(self) -> None:
+            return None
+
+    training_model = TrainingModel()
+    monkeypatch.setattr(
+        qwen3_profile,
+        "load_model_and_tokenizer",
+        lambda **_kwargs: (BaselineModel(), object()),
+    )
+    tokenizer_digests = iter(
+        ("tokenizer-a", "tokenizer-b" if case == "tokenizer" else "tokenizer-a")
+    )
+    monkeypatch.setattr(
+        qwen3_profile,
+        "save_checkpoint",
+        lambda *_args: next(tokenizer_digests),
+    )
+    checkpoint_digests = iter(
+        ("checkpoint-a", "checkpoint-a" if case == "identical" else "checkpoint-b")
+    )
+    monkeypatch.setattr(
+        integration,
+        "checkpoint_tree_sha256",
+        lambda *_args: next(checkpoint_digests),
+    )
+    monkeypatch.setattr(
+        integration,
+        "_continuation_training_batch",
+        lambda *_args, **_kwargs: {"input_ids": TransferValue()},
+    )
+    monkeypatch.setattr(
+        peft, "get_peft_model", lambda *_args, **_kwargs: training_model
+    )
+    monkeypatch.setattr(
+        peft.PeftModel,
+        "from_pretrained",
+        lambda *_args, **_kwargs: ReloadedModel(),
+    )
+    monkeypatch.setattr(
+        transformers.AutoModelForCausalLM,
+        "from_pretrained",
+        lambda *_args, **_kwargs: BaselineModel(),
+    )
+    monkeypatch.setattr(torch.optim, "AdamW", lambda *_args, **_kwargs: Optimizer())
+    monkeypatch.setattr(torch.cuda, "manual_seed_all", lambda *_args: None)
+    cleared: list[bool] = []
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: case == "tokenizer")
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: cleared.append(True))
+
+    with pytest.raises(RuntimeError, match=message):
+        integration._create_peft_checkpoints(integration._paths(tmp_path / case))
+    if case == "tokenizer":
+        assert cleared == [True]
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("no-quantized", "did not create any quantized tensors"),
+        ("incomplete", "state is incomplete"),
+        ("mismatch", "does not preserve TorchAO materialization"),
+    ),
+)
+def test_torchao_checkpoint_authoring_rejects_invalid_materialization_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    import torchao.quantization
+    import transformers
+
+    if case == "no-quantized":
+        monkeypatch.setattr(
+            torchao.quantization,
+            "quantize_",
+            lambda *_args, **_kwargs: None,
+        )
+    else:
+
+        class SubjectModel:
+            def eval(self) -> SubjectModel:
+                return self
+
+            def load_state_dict(
+                self, _state: object, *, strict: bool
+            ) -> SimpleNamespace:
+                assert strict is True
+                missing = ["model.layers.0.mlp.down_proj.weight"]
+                return SimpleNamespace(
+                    missing_keys=missing if case == "incomplete" else [],
+                    unexpected_keys=[],
+                )
+
+            def state_dict(self) -> dict[str, object]:
+                return {}
+
+        monkeypatch.setattr(
+            transformers.AutoModelForCausalLM,
+            "from_pretrained",
+            lambda *_args, **_kwargs: SubjectModel(),
+        )
+
+    with pytest.raises(RuntimeError, match=message):
+        integration._create_torchao_checkpoints(integration._paths(tmp_path / case))
+
+
+def test_preparation_records_absence_of_transformation_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def checkpoints(
+        paths: integration.ExamplePaths, _integration: str, **_kwargs: object
+    ):
+        created: dict[str, Path] = {}
+        for role in ("baseline", "subject"):
+            checkpoint = paths.evaluation / "models" / role
+            checkpoint.mkdir(parents=True)
+            (checkpoint / "config.json").write_text("{}\n", encoding="utf-8")
+            created[role] = checkpoint
+        return created, "a" * 64
+
+    monkeypatch.setattr(integration, "_create_checkpoints", checkpoints)
+    paths, _anchors = integration._prepare_workspace(
+        tmp_path / "no-transformation",
+        integration="hf-transformers",
+        runtime_image_digest=ZERO_DIGEST,
+    )
+
+    request = yaml.safe_load(paths.request.read_text(encoding="utf-8"))
+    assert "observations" not in request
 
 
 def test_preparation_rejects_existing_and_unknown_workspace(tmp_path: Path) -> None:
@@ -752,6 +1013,40 @@ def test_launch_runner_reports_subprocess_errors(
     )
     with pytest.raises(RuntimeError, match="status 7"):
         launch._run(["bad"], cwd=tmp_path)
+
+    monkeypatch.setattr(
+        launch.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 9, stdout="", stderr=""
+        ),
+    )
+    with pytest.raises(RuntimeError, match="status 9: silent-failure$"):
+        launch._run(["silent-failure"], cwd=tmp_path)
+
+
+def test_runtime_image_requires_source_bundle_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(
+        launch,
+        "_run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(
+            command, 0, stdout="{}", stderr=""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="did not return its digest"):
+        launch._runtime_image(
+            repository=repository,
+            build_root=build,
+            container_engine="docker",
+        )
 
 
 def test_qwen3_profile_uses_an_immutable_official_revision() -> None:

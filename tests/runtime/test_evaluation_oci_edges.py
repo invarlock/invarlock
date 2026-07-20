@@ -4,6 +4,7 @@ import json
 import os
 import stat
 import subprocess
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,6 +50,8 @@ def test_image_inspection_scalar_normalization_and_repository_validation() -> No
     for value in (1, " spaced @sha256:" + "a" * 64, "/root@sha256:" + "a" * 64):
         with _error("repository digest is invalid"):
             oci._repository_digest(value)
+    with _error("repository digest is invalid"):
+        oci._repository_digest("registry.example/model@sha256:bad")
     with _error("repository name"):
         oci._tag_repository(":latest")
 
@@ -93,6 +96,24 @@ def test_local_image_inspection_reports_process_and_payload_errors(
     completed(json.dumps({"Id": "a" * 64, "RepoDigests": {}}).encode())
     with _error("RepoDigests are invalid"):
         oci._inspect_local_image("docker", "image")
+    completed(json.dumps({"Id": "a" * 64}).encode())
+    inspection = oci._inspect_local_image("docker", "image")
+    assert inspection.repo_digests == ()
+
+
+def test_inspected_image_resolution_rejects_unbound_local_id_and_tag() -> None:
+    digest = "sha256:" + "a" * 64
+    mismatched = oci._LocalImageInspection(  # noqa: SLF001
+        config_id="sha256:" + "b" * 64,
+        repo_digests=(),
+    )
+
+    with _error("config ID and supplied digest do not agree"):
+        oci._resolve_inspected_image(digest, digest, mismatched, allow_tag=False)
+    with _error("must be an immutable"):
+        oci._resolve_inspected_image(
+            "registry/model:latest", digest, mismatched, allow_tag=False
+        )
 
 
 def test_mount_sources_reject_missing_and_unrepresentable_paths(
@@ -107,6 +128,12 @@ def test_mount_sources_reject_missing_and_unrepresentable_paths(
     directory.mkdir()
     file_path = tmp_path / "file"
     file_path.write_bytes(b"value")
+    directory_link = tmp_path / "directory-link"
+    directory_link.symlink_to(directory, target_is_directory=True)
+    with _error("must be a directory"):
+        oci._directory_mount_source(directory_link, label="resources")
+    with _error("regular file or directory"):
+        oci._artifact_mount_source(directory_link, label="artifact")
     monkeypatch.setattr(Path, "resolve", lambda self, **_kwargs: Path("/bad,path"))
     with _error("cannot be represented"):
         oci._directory_mount_source(directory, label="resources")
@@ -135,3 +162,19 @@ def test_worker_readability_lists_multiple_unreadable_entries(tmp_path: Path) ->
         os.chmod(root / f"file-{index}", 0o600)
     with _error("and 2 more"):
         oci._assert_worker_readable(root, user="65532:65532", label="artifact")
+
+
+def test_gpu_arguments_and_worker_stream_fail_closed_edges() -> None:
+    assert oci._gpu_arguments("docker", "cpu") == []
+    assert oci._gpu_arguments("docker", "cuda:2") == ["--gpus", "device=2"]
+    assert oci._gpu_arguments("podman", "cuda") == [
+        "--device",
+        "nvidia.com/gpu=all",
+    ]
+
+    destination = bytearray()
+    oci._read_bounded_stream(object(), destination, threading.Event())
+    assert destination == b""
+
+    with _error("at least one record"):
+        oci._worker_outer_timeout_seconds({"timeout_seconds": 1}, record_count=0)

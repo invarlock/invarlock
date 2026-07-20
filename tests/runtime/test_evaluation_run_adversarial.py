@@ -261,3 +261,15 @@ def test_input_preflight_rejects_before_in_process_model_preparation(
             schedule_bytes=canonical_runtime_behavioral_schedule_json(schedule),
             policy_digest="sha256:" + "c" * 64,
         )
+
+
+def test_load_runtime_side_evidence_rejects_symlinked_bundle_root(
+    tmp_path: Path,
+) -> None:
+    real_root = tmp_path / "real-output"
+    real_root.mkdir()
+    linked_root = tmp_path / "linked-output"
+    linked_root.symlink_to(real_root, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="output directory must not be a symlink"):
+        evaluation_run.load_runtime_side_evidence(linked_root)

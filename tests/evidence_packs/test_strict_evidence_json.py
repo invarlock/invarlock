@@ -291,3 +291,77 @@ def test_snapshot_copy_rejects_invalid_limit_open_failure_and_mode_failure(
     with pytest.raises(StrictJsonError, match="mode could not be preserved"):
         copy_regular_file_snapshot(source, destination, label="artifact", mode=0o440)
     assert not destination.exists()
+
+
+def test_regular_reader_rejects_nonregular_open_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "input.json"
+    source.write_bytes(b"{}")
+    real_fstat = strict_json.os.fstat
+
+    def nonregular_fstat(descriptor: int) -> os.stat_result:
+        file_stat = real_fstat(descriptor)
+        values = list(file_stat)
+        values[0] = (file_stat.st_mode & ~0o170000) | 0o040000
+        return os.stat_result(values)
+
+    monkeypatch.setattr(strict_json.os, "fstat", nonregular_fstat)
+
+    with pytest.raises(StrictJsonError, match="must be a regular file"):
+        read_regular_file_bytes(source, label="input")
+
+
+def test_regular_reader_enforces_bound_against_post_open_growth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "input.json"
+    source.write_bytes(b"1234")
+    real_fdopen = strict_json.os.fdopen
+
+    class GrowingReader:
+        def __init__(self, descriptor: int) -> None:
+            self._handle = real_fdopen(descriptor, "rb", closefd=False)
+
+        def __enter__(self) -> GrowingReader:
+            self._handle.__enter__()
+            return self
+
+        def __exit__(self, *args: object) -> object:
+            return self._handle.__exit__(*args)
+
+        def read(self, _amount: int = -1) -> bytes:
+            return b"12345"
+
+    monkeypatch.setattr(
+        strict_json.os,
+        "fdopen",
+        lambda descriptor, *_args, **_kwargs: GrowingReader(descriptor),
+    )
+
+    with pytest.raises(StrictJsonError, match="4-byte size limit"):
+        read_regular_file_bytes(source, label="input", max_bytes=4)
+
+
+def test_regular_reader_rejects_path_identity_change_after_descriptor_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "input.json"
+    source.write_bytes(b"{}")
+    real_stat = strict_json._regular_file_stat
+    calls = 0
+
+    def changed_final_identity(path: Path, *, label: str) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        file_stat = real_stat(path, label=label)
+        if calls >= 2:
+            values = list(file_stat)
+            values[1] = file_stat.st_ino + 1
+            return os.stat_result(values)
+        return file_stat
+
+    monkeypatch.setattr(strict_json, "_regular_file_stat", changed_final_identity)
+
+    with pytest.raises(StrictJsonError, match="changed while being read"):
+        read_regular_file_bytes(source, label="input")

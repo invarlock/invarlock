@@ -140,6 +140,21 @@ jobs:
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Run complete repository gates
         run: make verify
+      - name: Audit maintained dependency locks
+        run: |
+          python scripts/security/cve_audit.py \
+            --out-json artifacts/supply-chain/cve-audit.json \
+            --out-md artifacts/supply-chain/cve-audit.md
+      - name: Upload dependency audit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-cve-audit
+          path: |
+            artifacts/supply-chain/cve-audit.json
+            artifacts/supply-chain/cve-audit.md
+          if-no-files-found: error
+          retention-days: 30
       - name: Enforce release coverage
         run: make coverage-enforce
       - name: Lint release workflows
@@ -498,7 +513,9 @@ jobs:
   publish:
     needs: [authorize_candidate, resolve_release_ref]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Hosted verification can consume about 92 minutes at its documented
+    # 12 attempts, 15 serial requests per attempt, and 30-second request timeout.
+    timeout-minutes: 120
     environment: ${{ inputs.target }}
     permissions:
       actions: read
@@ -640,7 +657,8 @@ jobs:
     if: >-
       ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Leave the same bounded verification budget plus installation headroom.
+    timeout-minutes: 120
     permissions:
       actions: read
       contents: read

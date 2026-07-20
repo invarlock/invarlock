@@ -43,7 +43,8 @@ from scripts.checks.sync_packaged_public_evidence import (  # noqa: E402
 
 _DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 _IDENTITY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
-_RECEIPT_FORMAT = "invarlock/evidence-verification-receipt-v1"
+_RECEIPT_FORMAT_V1 = "invarlock/evidence-verification-receipt-v1"
+_RECEIPT_FORMAT_V2 = "invarlock/evidence-verification-receipt-v2"
 _RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
 _PRIVATE_MARKERS = (
     "/Users/",
@@ -59,6 +60,15 @@ _OBSOLETE_MARKERS = (
     "catalog_evidence_index",
     "catalog_evidence/",
 )
+_IGNORED_LOCAL_METADATA = frozenset({".DS_Store"})
+
+
+def _is_ignored_local_metadata(path: Path) -> bool:
+    return (
+        path.name in _IGNORED_LOCAL_METADATA
+        and path.is_file()
+        and not path.is_symlink()
+    )
 
 
 def _canonical_json_bytes(value: object) -> bytes:
@@ -80,6 +90,170 @@ def _sha256_bytes(value: bytes) -> str:
 
 def _valid_digest(value: object) -> bool:
     return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
+
+
+def _check_receipt_anchors(
+    errors: list[str],
+    receipt: Path,
+    anchors: object,
+    *,
+    require_request: bool = False,
+) -> None:
+    expected_fields = {
+        "policy_digest",
+        "artifact_digests",
+        "schedule_digest",
+        "runtime_digests",
+        "pack_signer_fingerprint",
+    }
+    if require_request:
+        expected_fields.add("request_digest")
+    if not isinstance(anchors, dict) or set(anchors) != expected_fields:
+        errors.append(f"{receipt}: signed receipt anchor fields are invalid")
+        return
+    if not _valid_digest(anchors.get("policy_digest")):
+        errors.append(f"{receipt}: signed receipt policy digest is invalid")
+    if not _valid_digest(anchors.get("pack_signer_fingerprint")):
+        errors.append(f"{receipt}: signed receipt pack signer is invalid")
+    artifacts = anchors.get("artifact_digests")
+    if (
+        not isinstance(artifacts, dict)
+        or set(artifacts) != {"baseline", "subject"}
+        or any(not _valid_digest(digest) for digest in artifacts.values())
+    ):
+        errors.append(f"{receipt}: signed receipt artifact anchors are invalid")
+    if not _valid_digest(anchors.get("schedule_digest")):
+        errors.append(f"{receipt}: signed receipt schedule anchor is invalid")
+    runtimes = anchors.get("runtime_digests")
+    if (
+        not isinstance(runtimes, dict)
+        or set(runtimes) != {"baseline", "subject"}
+        or any(not _valid_digest(digest) for digest in runtimes.values())
+    ):
+        errors.append(f"{receipt}: signed receipt runtime anchors are invalid")
+    if require_request and not _valid_digest(anchors.get("request_digest")):
+        errors.append(f"{receipt}: signed receipt request digest is invalid")
+
+
+def _public_pack_request_context(
+    errors: list[str], *, receipt: Path, manifest_path: Path
+) -> tuple[str | None, bool]:
+    try:
+        manifest = _read_object(manifest_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"{manifest_path}: could not read pack request binding: {exc}")
+        return None, False
+    evidence = manifest.get("evidence")
+    reference = evidence.get("request") if isinstance(evidence, dict) else None
+    if not isinstance(reference, dict):
+        return None, False
+    if reference.get("path") != "request.json":
+        errors.append(f"{manifest_path}: request reference path is invalid")
+        return None, False
+    request_path = manifest_path.parent / "request.json"
+    try:
+        raw = request_path.read_bytes()
+        request = json.loads(raw)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"{request_path}: could not read pack request: {exc}")
+        return None, False
+    digest = _sha256_bytes(raw)
+    if reference.get("digest") != digest:
+        errors.append(f"{receipt}: pack request digest does not match manifest")
+    comparison = request.get("comparison") if isinstance(request, dict) else None
+    providers: list[object] = []
+    if isinstance(comparison, dict):
+        for side in ("baseline", "subject"):
+            side_value = comparison.get(side)
+            runtime = (
+                side_value.get("runtime") if isinstance(side_value, dict) else None
+            )
+            providers.append(
+                runtime.get("provider") if isinstance(runtime, dict) else None
+            )
+    return digest, "llama_cpp" in providers
+
+
+def _check_receipt_verifier(
+    errors: list[str], receipt: Path, verifier: object
+) -> object:
+    if not isinstance(verifier, dict) or set(verifier) != {
+        "identity",
+        "signing_key_fingerprint",
+        "trust_profile_digest",
+    }:
+        errors.append(f"{receipt}: signed receipt verifier fields are invalid")
+        return None
+    identity = verifier.get("identity")
+    if not isinstance(identity, str) or _IDENTITY.fullmatch(identity) is None:
+        errors.append(f"{receipt}: signed receipt verifier identity is invalid")
+    fingerprint = verifier.get("signing_key_fingerprint")
+    if not _valid_digest(fingerprint):
+        errors.append(f"{receipt}: signed receipt verifier fingerprint is invalid")
+    profile_digest = verifier.get("trust_profile_digest")
+    if profile_digest is not None and not _valid_digest(profile_digest):
+        errors.append(f"{receipt}: signed receipt trust profile digest is invalid")
+    return fingerprint
+
+
+def _check_receipt_verdict(errors: list[str], receipt: Path, verdict: object) -> None:
+    if not isinstance(verdict, dict) or set(verdict) != {
+        "ok",
+        "integrity_ok",
+        "policy_verdict",
+        "verification_status",
+    }:
+        errors.append(f"{receipt}: signed receipt verdict fields are invalid")
+        return
+    ok = verdict.get("ok")
+    integrity_ok = verdict.get("integrity_ok")
+    policy_verdict = verdict.get("policy_verdict")
+    status = verdict.get("verification_status")
+    if not isinstance(ok, bool) or not isinstance(integrity_ok, bool):
+        errors.append(f"{receipt}: signed receipt verdict booleans are invalid")
+    if policy_verdict not in {"pass", "fail", None}:
+        errors.append(f"{receipt}: signed receipt policy verdict is invalid")
+    if isinstance(status, bool) or not isinstance(status, int) or status < 0:
+        errors.append(f"{receipt}: signed receipt verification status is invalid")
+    if not (
+        ok is True and integrity_ok is True and policy_verdict == "pass" and status == 0
+    ):
+        errors.append(
+            f"{receipt}: signed receipt must record successful strict acceptance"
+        )
+
+
+def _receipt_public_key(
+    errors: list[str], receipt: Path, signature: object
+) -> ed25519.Ed25519PublicKey | None:
+    if (
+        not isinstance(signature, dict)
+        or set(signature) != {"algorithm", "format", "public_key", "value"}
+        or signature.get("format") != _RECEIPT_SIGNATURE_FORMAT
+        or signature.get("algorithm") != "ed25519"
+    ):
+        errors.append(f"{receipt}: signed verification receipt signature is required")
+        return None
+    public_key_block = signature.get("public_key")
+    if (
+        not isinstance(public_key_block, dict)
+        or set(public_key_block) != {"encoding", "value"}
+        or public_key_block.get("encoding") != "pem"
+    ):
+        errors.append(f"{receipt}: signed receipt public key is invalid")
+        return None
+    public_key_value = public_key_block.get("value")
+    if not isinstance(public_key_value, str):
+        errors.append(f"{receipt}: signed receipt public key is invalid")
+        return None
+    try:
+        loaded = serialization.load_pem_public_key(public_key_value.encode("ascii"))
+        if not isinstance(loaded, ed25519.Ed25519PublicKey):
+            raise TypeError("public key is not Ed25519")
+        return loaded
+    except (TypeError, UnicodeEncodeError, ValueError) as exc:
+        errors.append(f"{receipt}: signed receipt public key is invalid: {exc}")
+        return None
 
 
 def _check_signed_receipt(
@@ -106,7 +280,8 @@ def _check_signed_receipt(
     }
     if set(statement) != expected_statement_fields:
         errors.append(f"{receipt}: signed receipt statement fields are invalid")
-    if statement.get("format") != _RECEIPT_FORMAT:
+    receipt_format = statement.get("format")
+    if receipt_format not in {_RECEIPT_FORMAT_V1, _RECEIPT_FORMAT_V2}:
         errors.append(f"{receipt}: signed receipt format is invalid")
 
     manifest_claim = statement.get("pack_manifest_digest")
@@ -123,118 +298,32 @@ def _check_signed_receipt(
                     f"{receipt}: signed receipt does not bind the pack manifest"
                 )
 
+    request_digest, llama_cpp = _public_pack_request_context(
+        errors, receipt=receipt, manifest_path=manifest_path
+    )
+    require_request = receipt_format == _RECEIPT_FORMAT_V2
+    if llama_cpp and not require_request:
+        errors.append(
+            f"{receipt}: llama_cpp evidence requires signed receipt format v2"
+        )
+    _check_receipt_anchors(
+        errors,
+        receipt,
+        statement.get("anchors"),
+        require_request=require_request,
+    )
     anchors = statement.get("anchors")
-    if not isinstance(anchors, dict) or set(anchors) != {
-        "policy_digest",
-        "artifact_digests",
-        "schedule_digest",
-        "runtime_digests",
-        "pack_signer_fingerprint",
-    }:
-        errors.append(f"{receipt}: signed receipt anchor fields are invalid")
-    else:
-        if not _valid_digest(anchors.get("policy_digest")):
-            errors.append(f"{receipt}: signed receipt policy digest is invalid")
-        if not _valid_digest(anchors.get("pack_signer_fingerprint")):
-            errors.append(f"{receipt}: signed receipt pack signer is invalid")
-        artifacts = anchors.get("artifact_digests")
-        if (
-            not isinstance(artifacts, dict)
-            or set(artifacts) != {"baseline", "subject"}
-            or any(not _valid_digest(digest) for digest in artifacts.values())
-        ):
-            errors.append(f"{receipt}: signed receipt artifact anchors are invalid")
-        if not _valid_digest(anchors.get("schedule_digest")):
-            errors.append(f"{receipt}: signed receipt schedule anchor is invalid")
-        runtimes = anchors.get("runtime_digests")
-        if (
-            not isinstance(runtimes, dict)
-            or set(runtimes) != {"baseline", "subject"}
-            or any(not _valid_digest(digest) for digest in runtimes.values())
-        ):
-            errors.append(f"{receipt}: signed receipt runtime anchors are invalid")
-
-    verifier = statement.get("verifier")
-    if not isinstance(verifier, dict) or set(verifier) != {
-        "identity",
-        "signing_key_fingerprint",
-        "trust_profile_digest",
-    }:
-        errors.append(f"{receipt}: signed receipt verifier fields are invalid")
-        recorded_fingerprint = None
-    else:
-        identity = verifier.get("identity")
-        if not isinstance(identity, str) or _IDENTITY.fullmatch(identity) is None:
-            errors.append(f"{receipt}: signed receipt verifier identity is invalid")
-        recorded_fingerprint = verifier.get("signing_key_fingerprint")
-        if not _valid_digest(recorded_fingerprint):
-            errors.append(f"{receipt}: signed receipt verifier fingerprint is invalid")
-        profile_digest = verifier.get("trust_profile_digest")
-        if profile_digest is not None and not _valid_digest(profile_digest):
-            errors.append(f"{receipt}: signed receipt trust profile digest is invalid")
-
-    verdict = statement.get("verdict")
-    if not isinstance(verdict, dict) or set(verdict) != {
-        "ok",
-        "integrity_ok",
-        "policy_verdict",
-        "verification_status",
-    }:
-        errors.append(f"{receipt}: signed receipt verdict fields are invalid")
-    else:
-        ok = verdict.get("ok")
-        integrity_ok = verdict.get("integrity_ok")
-        policy_verdict = verdict.get("policy_verdict")
-        status = verdict.get("verification_status")
-        if not isinstance(ok, bool) or not isinstance(integrity_ok, bool):
-            errors.append(f"{receipt}: signed receipt verdict booleans are invalid")
-        if policy_verdict not in {"pass", "fail", None}:
-            errors.append(f"{receipt}: signed receipt policy verdict is invalid")
-        if isinstance(status, bool) or not isinstance(status, int) or status < 0:
-            errors.append(f"{receipt}: signed receipt verification status is invalid")
-        if not (
-            ok is True
-            and integrity_ok is True
-            and policy_verdict == "pass"
-            and status == 0
-        ):
-            errors.append(
-                f"{receipt}: signed receipt must record successful strict acceptance"
-            )
-
-    if (
-        not isinstance(signature, dict)
-        or set(signature) != {"algorithm", "format", "public_key", "value"}
-        or signature.get("format") != _RECEIPT_SIGNATURE_FORMAT
-        or signature.get("algorithm") != "ed25519"
+    if require_request and (
+        not isinstance(anchors, dict) or anchors.get("request_digest") != request_digest
     ):
-        errors.append(f"{receipt}: signed verification receipt signature is required")
-        return
-
-    public_key_block = signature.get("public_key")
-    if (
-        not isinstance(public_key_block, dict)
-        or set(public_key_block)
-        != {
-            "encoding",
-            "value",
-        }
-        or public_key_block.get("encoding") != "pem"
-    ):
-        errors.append(f"{receipt}: signed receipt public key is invalid")
-        return
-    public_key_value = public_key_block.get("value")
-    public_key: ed25519.Ed25519PublicKey | None = None
-    if not isinstance(public_key_value, str):
-        errors.append(f"{receipt}: signed receipt public key is invalid")
-    else:
-        try:
-            loaded = serialization.load_pem_public_key(public_key_value.encode("ascii"))
-            if not isinstance(loaded, ed25519.Ed25519PublicKey):
-                raise TypeError("public key is not Ed25519")
-            public_key = loaded
-        except (TypeError, UnicodeEncodeError, ValueError) as exc:
-            errors.append(f"{receipt}: signed receipt public key is invalid: {exc}")
+        errors.append(
+            f"{receipt}: signed request anchor does not bind the pack request"
+        )
+    recorded_fingerprint = _check_receipt_verifier(
+        errors, receipt, statement.get("verifier")
+    )
+    _check_receipt_verdict(errors, receipt, statement.get("verdict"))
+    public_key = _receipt_public_key(errors, receipt, signature)
     if public_key is None:
         return
 
@@ -458,6 +547,68 @@ def _check_local_entry(errors: list[str], entry_root: Path) -> None:
                 )
 
 
+def _check_index_entry(errors: list[str], raw_entry: object, root: Path) -> None:
+    if not isinstance(raw_entry, dict):
+        errors.append("public evidence entry must be an object")
+        return
+    slug = raw_entry.get("slug")
+    if not isinstance(slug, str) or not slug or "/" in slug:
+        errors.append("public evidence entry slug is invalid")
+        return
+    if raw_entry.get("evidence_class") != "signed_evidence_pack":
+        errors.append(f"{slug}: evidence_class must be signed_evidence_pack")
+    expected_path = f"public_evidence/{EVIDENCE_DIRNAME}/{slug}"
+    if raw_entry.get("path") != expected_path:
+        errors.append(f"{slug}: entry path must be {expected_path}")
+    _check_artifact_summary(errors, raw_entry, "evidence_pack", root)
+    _check_artifact_summary(errors, raw_entry, "verification_receipt", root)
+
+
+def _artifact_totals(entries: list[object]) -> tuple[int, int]:
+    artifact_file_count = 0
+    artifact_size_bytes = 0
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            continue
+        artifacts = raw_entry.get("artifacts")
+        if not isinstance(artifacts, dict):
+            continue
+        for summary in artifacts.values():
+            if not isinstance(summary, dict):
+                continue
+            count = 1 if summary.get("kind") == "file" else summary.get("file_count")
+            size = summary.get("size_bytes")
+            if isinstance(count, int) and not isinstance(count, bool):
+                artifact_file_count += count
+            if isinstance(size, int) and not isinstance(size, bool):
+                artifact_size_bytes += size
+    return artifact_file_count, artifact_size_bytes
+
+
+def _check_local_evidence_tree(
+    errors: list[str], root: Path, entries: list[object]
+) -> None:
+    evidence_root = root / EVIDENCE_DIRNAME
+    if not evidence_root.is_dir():
+        return
+    local_entries = sorted(path for path in evidence_root.iterdir() if path.is_dir())
+    indexed = {entry.get("slug") for entry in entries if isinstance(entry, dict)}
+    if not {path.name for path in local_entries}.issubset(indexed):
+        errors.append("every local evidence directory must appear in the index")
+    for entry_root in local_entries:
+        _check_local_entry(errors, entry_root)
+    unexpected_children = sorted(
+        item.name
+        for item in evidence_root.iterdir()
+        if not item.is_dir() and not _is_ignored_local_metadata(item)
+    )
+    if unexpected_children:
+        errors.append(
+            "unexpected files in public evidence directory: "
+            + ", ".join(unexpected_children)
+        )
+
+
 def check_public_evidence(root: Path = SOURCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
@@ -487,64 +638,20 @@ def check_public_evidence(root: Path = SOURCE_ROOT) -> list[str]:
     entries = index.get("entries")
     assert isinstance(entries, list)
     for raw_entry in entries:
-        if not isinstance(raw_entry, dict):
-            errors.append("public evidence entry must be an object")
-            continue
-        slug = raw_entry.get("slug")
-        if not isinstance(slug, str) or not slug or "/" in slug:
-            errors.append("public evidence entry slug is invalid")
-            continue
-        if raw_entry.get("evidence_class") != "signed_evidence_pack":
-            errors.append(f"{slug}: evidence_class must be signed_evidence_pack")
-        expected_path = f"public_evidence/{EVIDENCE_DIRNAME}/{slug}"
-        if raw_entry.get("path") != expected_path:
-            errors.append(f"{slug}: entry path must be {expected_path}")
-        _check_artifact_summary(errors, raw_entry, "evidence_pack", root)
-        _check_artifact_summary(errors, raw_entry, "verification_receipt", root)
-    artifact_file_count = 0
-    artifact_size_bytes = 0
-    for raw_entry in entries:
-        if not isinstance(raw_entry, dict):
-            continue
-        artifacts = raw_entry.get("artifacts")
-        if not isinstance(artifacts, dict):
-            continue
-        for summary in artifacts.values():
-            if not isinstance(summary, dict):
-                continue
-            count = 1 if summary.get("kind") == "file" else summary.get("file_count")
-            size = summary.get("size_bytes")
-            if isinstance(count, int) and not isinstance(count, bool):
-                artifact_file_count += count
-            if isinstance(size, int) and not isinstance(size, bool):
-                artifact_size_bytes += size
+        _check_index_entry(errors, raw_entry, root)
+    artifact_file_count, artifact_size_bytes = _artifact_totals(entries)
     if index.get("evidence_file_count") != artifact_file_count:
         errors.append("evidence_file_count must match artifact summaries")
     if index.get("evidence_size_bytes") != artifact_size_bytes:
         errors.append("evidence_size_bytes must match artifact summaries")
-    evidence_root = root / EVIDENCE_DIRNAME
-    if evidence_root.is_dir():
-        local_entries = sorted(
-            path for path in evidence_root.iterdir() if path.is_dir()
-        )
-        indexed = {entry.get("slug") for entry in entries if isinstance(entry, dict)}
-        if not {path.name for path in local_entries}.issubset(indexed):
-            errors.append("every local evidence directory must appear in the index")
-        for entry_root in local_entries:
-            _check_local_entry(errors, entry_root)
-        unexpected_children = sorted(
-            item.name for item in evidence_root.iterdir() if not item.is_dir()
-        )
-        if unexpected_children:
-            errors.append(
-                "unexpected files in public evidence directory: "
-                + ", ".join(unexpected_children)
-            )
+    _check_local_evidence_tree(errors, root, entries)
     allowed_root_files = {"README.md", INDEX_FILENAME}
     unexpected = sorted(
         item.name
         for item in root.iterdir()
-        if item.name not in allowed_root_files and item.name != EVIDENCE_DIRNAME
+        if item.name not in allowed_root_files
+        and item.name != EVIDENCE_DIRNAME
+        and not _is_ignored_local_metadata(item)
     )
     if unexpected:
         errors.append("unexpected public evidence surfaces: " + ", ".join(unexpected))

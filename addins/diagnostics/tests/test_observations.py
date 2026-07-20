@@ -260,3 +260,30 @@ def test_rmt_decomposition_failures_are_reported(
     )
     with pytest.raises(DiagnosticInputError, match="did not converge"):
         rmt_observation([[0.0], [1.0]])
+
+
+def test_decompositions_reject_nonfinite_library_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        observations.np.linalg,
+        "svd",
+        lambda *_args, **_kwargs: np.asarray([math.nan]),
+    )
+    with pytest.raises(DiagnosticInputError, match="non-finite singular values"):
+        spectral_observation([[1.0]])
+
+    monkeypatch.setattr(
+        observations.np.linalg,
+        "eigvalsh",
+        lambda *_args, **_kwargs: np.asarray([math.nan]),
+    )
+    with pytest.raises(DiagnosticInputError, match="non-finite eigenvalues"):
+        rmt_observation([[0.0], [1.0]])
+
+
+def test_rmt_rejects_nonrepresentable_normalization() -> None:
+    with pytest.raises(
+        DiagnosticInputError, match="normalization is not representable"
+    ):
+        rmt_observation([[1e308], [-1e308]])

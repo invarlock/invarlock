@@ -31,9 +31,8 @@ revision, runtime image, tokenizer contract, schedule, and policy.
 
 Advanced users who already have qualified engines can run the lower-level
 transaction without rebuilding them. Install matching released wheels for
-`invarlock` and `invarlock-runtime-tensorrt-llm`, then prepare this layout:
-
-Prepare a new input directory with this fixed layout:
+`invarlock` and `invarlock-runtime-tensorrt-llm`, then prepare a new input
+directory with this fixed layout:
 
 ```text
 tensorrt-inputs/

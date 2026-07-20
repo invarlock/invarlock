@@ -37,6 +37,9 @@ from invarlock.core.runtime_provider import (
     artifact_identity_sha256,
     runtime_execution_settings_from_mapping,
 )
+from invarlock.core.runtime_provider.request_bindings import (
+    TENSORRT_LLM_REQUEST_SETTINGS as _ALLOWED_SETTINGS,
+)
 from invarlock.core.runtime_provider.types import JSONScalar
 from invarlock.runtime_providers.tensorrt_llm_identity import (
     read_tensorrt_llm_artifact_identity,
@@ -49,24 +52,6 @@ from invarlock.runtime_security_helpers import (
 
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
-_ALLOWED_SETTINGS = frozenset(
-    {
-        "backend_build_sha256",
-        "backend_version",
-        "batch_size",
-        "builder_config_sha256",
-        "context_length",
-        "engine_bundle_tree_sha256",
-        "engine_metadata_sha256",
-        "file_inventory_sha256",
-        "max_output_tokens",
-        "runner_binary_sha256",
-        "seed",
-        "target_compute_capability",
-        "timeout_seconds",
-        "tokenizer_metadata_sha256",
-    }
-)
 _REQUIRED_SETTINGS = _ALLOWED_SETTINGS
 _DIGEST_SETTINGS = frozenset(
     {

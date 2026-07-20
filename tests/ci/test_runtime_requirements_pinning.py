@@ -3,10 +3,36 @@ from __future__ import annotations
 import subprocess
 import tomllib
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_REQUIREMENTS = ROOT / "requirements" / "workflows"
 REFRESH_SCRIPT = ROOT / "scripts" / "security" / "refresh_pinned_requirements.sh"
+
+
+def _locked_package_version(lock: dict[str, Any], package_name: str) -> str:
+    packages = lock.get("package")
+    assert isinstance(packages, list)
+    matches = [
+        package.get("version")
+        for package in packages
+        if isinstance(package, dict) and package.get("name") == package_name
+    ]
+    assert len(matches) == 1
+    version = matches[0]
+    assert isinstance(version, str)
+    return version
+
+
+def _hashed_requirement_version(path: Path, package_name: str) -> str:
+    prefix = f"{package_name}=="
+    matches = [
+        line.removeprefix(prefix).removesuffix(" \\")
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.startswith(prefix)
+    ]
+    assert len(matches) == 1
+    return matches[0]
 
 
 def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None:
@@ -21,7 +47,7 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert (
-        '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
+        '"${WORKFLOW_DIR}/runtime-image-cu128.in" \\\n'
         '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
     ) in text
     assert text.count("--torch-backend cpu") == 3
@@ -36,6 +62,29 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
     ) in text
     assert "--constraints requirements/workflows/runtime-image.in" in text
     assert "--no-deps" in text
+
+
+def test_type_checker_version_is_identical_in_local_and_workflow_locks() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    optional = project["project"]["optional-dependencies"]
+    declared = {
+        requirement.removeprefix("mypy==")
+        for group in ("dev", "ci")
+        for requirement in optional[group]
+        if requirement.startswith("mypy==")
+    }
+    assert len(declared) == 1
+
+    uv_version = _locked_package_version(
+        tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8")), "mypy"
+    )
+    workflow_versions = {
+        _hashed_requirement_version(
+            WORKFLOW_REQUIREMENTS / f"ci-hf-py{python_tag}.txt", "mypy"
+        )
+        for python_tag in ("312", "313")
+    }
+    assert {uv_version, *workflow_versions} == declared
 
 
 def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
@@ -75,12 +124,18 @@ def test_runtime_image_locks_are_cpu_only() -> None:
 
     for filename in runtime_locks:
         text = (WORKFLOW_REQUIREMENTS / filename).read_text(encoding="utf-8")
-        assert "torch==2.11.0+cpu" in text
+        assert "torch==2.13.0+cpu" in text
         assert "+cu" not in text
         assert "cu13" not in text
 
 
 def test_cuda_runtime_image_lock_is_separate_and_backend_pinned() -> None:
+    cuda_input = WORKFLOW_REQUIREMENTS / "runtime-image-cu128.in"
+    assert cuda_input.is_file()
+    input_text = cuda_input.read_text(encoding="utf-8")
+    assert "torch==2.11.0" in input_text
+    assert "torch==2.13.0" not in input_text
+
     text = (WORKFLOW_REQUIREMENTS / "runtime-image-py312-cu128.txt").read_text(
         encoding="utf-8"
     )
@@ -116,7 +171,7 @@ def test_lm_evaluation_harness_lock_is_complete_and_cpu_aligned() -> None:
     )
 
     assert "lm-eval==0.4.12" in text
-    assert "torch==2.11.0+cpu" in text
+    assert "torch==2.13.0+cpu" in text
     assert "transformers==5.14.1" in text
     assert "+cu" not in text
     assert "--hash=sha256:" in text

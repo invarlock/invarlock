@@ -17,10 +17,13 @@ for the complete inventory and interpretation boundary.
 
 When evidence is added, the source repository may carry the complete pack or a
 hash-bound external release asset. Installed wheels contain only the compact
-index. Policies, expected artifact-identity and canonical-schedule digests,
-expected runtime digests, evidence-signer fingerprints, verifier fingerprints,
-and private keys are trust inputs; they must remain outside the signed bundle
-and arrive through independent channels.
+index. The signed bundle includes the policy snapshot used for its evaluation.
+The verifier's independently obtained copy of that policy, expected artifact-
+identity and canonical-schedule digests, expected runtime digests,
+evidence-signer and verifier fingerprints, and private signing key are trust
+inputs. Those verifier-owned inputs remain outside the submitted bundle and
+arrive through independent channels; verification compares them with the
+corresponding signed evidence.
 
 Verification requires an external policy, both expected artifact-identity
 digests, the expected canonical-schedule digest, both expected runtime digests,

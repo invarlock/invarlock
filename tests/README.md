@@ -83,13 +83,17 @@ make coverage-enforce
 make verify
 ```
 
-`make coverage-enforce` measures branches as well as statements. It requires
-at least 90% coverage across the core distribution and at least 80% within
-each maintained first-party add-in distribution; one well-covered add-in
-cannot mask a gap in another. The complete add-in gate is Linux-authoritative
-because GGUF executes its pinned backend through Linux descriptor paths. CI
-runs that exact gate on Linux; run it through a Linux checkout or container
-when developing on another host operating system.
+`make coverage-enforce` requires at least 90% branch coverage for every
+branch-bearing maintained module and for the repository-wide aggregate across
+the core, add-ins, examples, qualification/release helpers, and repository
+check/security scripts. It also requires at least 90% combined
+statement-and-branch coverage for each module and aggregate suite, so a
+well-covered distribution cannot mask a local gap. Each suite uses isolated
+coverage data to prevent concurrent or stale runs from inflating a result. The
+complete add-in gate is Linux-authoritative because GGUF executes its pinned
+backend through Linux descriptor paths. CI runs that exact gate on Linux; run
+it through a Linux checkout or container when developing on another host
+operating system.
 
 Set `PYTEST_WORKERS=0` for an explicit sequential diagnostic run.
 

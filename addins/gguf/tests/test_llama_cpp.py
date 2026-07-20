@@ -570,6 +570,79 @@ def test_llama_cpp_config_identity_capabilities_and_private_bindings(
     assert all("path" not in name for name in spec.settings)
 
 
+def test_llama_cpp_provider_rejects_invalid_inspection_and_preparation_bindings(
+    tmp_path: Path,
+) -> None:
+    provider = LlamaCppProvider()
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+
+    with pytest.raises(ValueError, match="native runtime bindings"):
+        provider.inspect_runtime_spec(  # type: ignore[arg-type]
+            object(),
+            seed=1,
+            context_length=32,
+            batch_size=1,
+            max_output_tokens=8,
+            timeout_seconds=2,
+        )
+
+    with pytest.raises(ValueError, match="CPU device"):
+        provider.prepare_execution(
+            spec,
+            _preflight_resources(tmp_path, bindings, device_kind="cuda"),
+        )
+
+
+def test_llama_cpp_open_rejects_inprocess_scorer_and_bound_artifact_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider = LlamaCppProvider()
+    spec, _bindings, context = _runtime_inputs(tmp_path)
+
+    with pytest.raises(ValueError, match="in-process scorer"):
+        provider.open(spec, replace(context, scorer=lambda *_args: None))
+
+    monkeypatch.setattr(
+        llama_cpp,
+        "read_gguf_artifact_identity",
+        lambda _path: replace(provider.identify_artifact(spec), byte_length=1),
+    )
+    with pytest.raises(ValueError, match="bound GGUF artifact identity"):
+        provider.open(spec, context)
+
+
+def test_llama_cpp_runtime_inspection_rechecks_artifact_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider = LlamaCppProvider()
+    spec, bindings, _context = _runtime_inputs(tmp_path)
+    identity = provider.identify_artifact(spec)
+    observations = iter((identity, replace(identity, byte_length=1)))
+    monkeypatch.setattr(
+        llama_cpp,
+        "read_gguf_artifact_identity",
+        lambda _path: next(observations),
+    )
+    monkeypatch.setattr(
+        llama_cpp,
+        "inspect_llama_cpp_backend",
+        lambda _bindings: SimpleNamespace(
+            binary_sha256=spec.settings["backend_binary_sha256"],
+            source_sha256=spec.settings["backend_source_sha256"],
+            version=spec.settings["backend_version"],
+        ),
+    )
+    with pytest.raises(ValueError, match="changed during runtime inspection"):
+        provider.inspect_runtime_spec(
+            bindings,
+            seed=7,
+            context_length=256,
+            batch_size=32,
+            max_output_tokens=16,
+            timeout_seconds=1,
+        )
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
@@ -695,6 +768,19 @@ def test_llama_cpp_strict_open_authenticates_runtime_image_reference(
 
     with pytest.raises(ValueError, match="INVARLOCK_RUNTIME_IMAGE"):
         LlamaCppProvider().open(spec, context)
+
+
+def test_llama_cpp_inspection_boundary_rejects_invalid_image_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", "")
+    with pytest.raises(ValueError, match="canonical INVARLOCK_RUNTIME_IMAGE_DIGEST"):
+        llama_cpp._require_inspection_container_boundary()  # noqa: SLF001
+
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _IMAGE_DIGEST)
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", "mutable:latest")
+    with pytest.raises(ValueError, match="INVARLOCK_RUNTIME_IMAGE"):
+        llama_cpp._require_inspection_container_boundary()  # noqa: SLF001
 
 
 def _write_route_tables(

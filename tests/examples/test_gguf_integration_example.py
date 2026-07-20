@@ -321,6 +321,8 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
     paths = example._paths(tmp_path / "transaction")
     report = paths.evidence / "reports" / "evaluation.report.json"
     report.parent.mkdir(parents=True)
+    paths.trusted_inputs.parent.mkdir(parents=True, exist_ok=True)
+    paths.trusted_inputs.write_text(json.dumps({"anchors": {}}), encoding="utf-8")
     report.write_text(
         json.dumps(
             {
@@ -350,6 +352,11 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             observed_binding["backend"] = environment[
                 "INVARLOCK_GGUF_BACKEND_EXECUTABLE"
             ]
+            if "--preflight" in command:
+                return _completed(
+                    command,
+                    json.dumps({"request_digest": "sha256:" + "1" * 64}),
+                )
         if "verify" in command:
             paths.receipt.parent.mkdir(parents=True, exist_ok=True)
             paths.receipt.write_text(
@@ -497,11 +504,18 @@ def test_execute_rejects_false_green_outputs(
     paths = example._paths(tmp_path / "transaction")
     report = paths.evidence / "reports" / "evaluation.report.json"
     report.parent.mkdir(parents=True)
+    paths.trusted_inputs.parent.mkdir(parents=True, exist_ok=True)
+    paths.trusted_inputs.write_text(json.dumps({"anchors": {}}), encoding="utf-8")
     report.write_text(json.dumps(report_payload), encoding="utf-8")
 
     def fake_run(
         command: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
+        if "evaluate" in command and "--preflight" in command:
+            return _completed(
+                command,
+                json.dumps({"request_digest": "sha256:" + "1" * 64}),
+            )
         if "verify" in command:
             paths.receipt.parent.mkdir(parents=True, exist_ok=True)
             paths.receipt.write_text(json.dumps(receipt_payload), encoding="utf-8")
@@ -609,3 +623,137 @@ def test_main_reports_runtime_failures(
     )
     assert example.main(["--workspace", str(tmp_path / "workspace")]) == 2
     assert "build failed" in capsys.readouterr().err
+
+
+def test_pinned_download_rejects_non_byte_streams(tmp_path: Path) -> None:
+    class TextStream:
+        def read(self, _size: int) -> str:
+            return "not bytes"
+
+    destination = tmp_path / "model.gguf"
+    with pytest.raises(RuntimeError, match="did not return bytes"):
+        example._copy_pinned_stream(TextStream(), destination, example._OFFICIAL_MODEL)
+    assert not destination.with_suffix(".gguf.partial").exists()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("count", "exactly 50 records"),
+        ("shape", "invalid shape"),
+        ("text", "must contain text"),
+        ("duplicate", "empty or duplicated"),
+    ],
+)
+def test_records_reject_malformed_or_duplicate_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+    message: str,
+) -> None:
+    records = json.loads(example._RECORDS.read_text(encoding="utf-8"))
+    if mutation == "count":
+        records.pop()
+    elif mutation == "shape":
+        records[0] = {"id": "missing-fields"}
+    elif mutation == "text":
+        records[0]["prompt"] = 1
+    else:
+        records[0]["id"] = records[1]["id"]
+    changed = tmp_path / f"records-{mutation}.json"
+    changed.write_text(json.dumps(records), encoding="utf-8")
+    monkeypatch.setattr(example, "_RECORDS", changed)
+
+    with pytest.raises(RuntimeError, match=message):
+        example._load_records()
+
+
+@pytest.mark.parametrize("artifact", ["missing", "identical"])
+def test_quantization_requires_a_distinct_created_subject(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact: str,
+) -> None:
+    payload = b"official"
+    official = example.ModelDownload(
+        role="baseline",
+        filename="official.gguf",
+        byte_length=len(payload),
+        sha256=example.hashlib.sha256(payload).hexdigest(),
+    )
+    monkeypatch.setattr(example, "_OFFICIAL_MODEL", official)
+    monkeypatch.setattr(
+        example,
+        "_download_model",
+        lambda destination, _spec: destination.write_bytes(payload),
+    )
+
+    def quantize(command: list[str], **_kwargs: object) -> object:
+        if artifact == "identical":
+            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(payload)
+        return _completed(command)
+
+    monkeypatch.setattr(example.launch, "_run", quantize)
+    message = "did not create" if artifact == "missing" else "identical"
+    with pytest.raises(RuntimeError, match=message):
+        example._stage_models(
+            tmp_path,
+            tmp_path / "models",
+            container_engine="docker",
+            image_id="sha256:" + "a" * 64,
+        )
+
+
+def test_runtime_build_requires_source_bundle_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
+    monkeypatch.setattr(
+        example.launch,
+        "_run",
+        lambda command, **_kwargs: _completed(command, "{}"),
+    )
+    with pytest.raises(RuntimeError, match="did not return its digest"):
+        example._build_runtime_image(
+            tmp_path, tmp_path / "build", container_engine="docker"
+        )
+
+
+def test_execute_rejects_non_object_transaction_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = example._paths(tmp_path / "transaction")
+    report = paths.evidence / "reports/evaluation.report.json"
+    report.parent.mkdir(parents=True)
+    report.write_text("[]", encoding="utf-8")
+    paths.receipt.parent.mkdir(parents=True)
+    paths.receipt.write_text("{}", encoding="utf-8")
+    paths.html_report.write_text("<html></html>", encoding="utf-8")
+    paths.trusted_inputs.write_text(json.dumps({"anchors": {}}), encoding="utf-8")
+
+    def complete(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if "evaluate" in command and "--preflight" in command:
+            return _completed(
+                command,
+                json.dumps({"request_digest": "sha256:" + "1" * 64}),
+            )
+        return _completed(command)
+
+    monkeypatch.setattr(
+        example.launch,
+        "_run",
+        complete,
+    )
+
+    with pytest.raises(RuntimeError, match="invalid transaction outputs"):
+        example._execute(
+            tmp_path,
+            paths,
+            runtime_root=tmp_path / "runtime",
+            container_engine="docker",
+            image_id="sha256:" + "a" * 64,
+        )

@@ -62,7 +62,7 @@ dev = [
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
   "ruff==0.15.21",
-  "mypy>=1.0",
+  "mypy==1.20.0",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
   "pre-commit>=3.0",
@@ -85,7 +85,7 @@ ci = [
   "pillow>=11.3,<13",
   "hypothesis>=6.98",
   "ruff==0.15.21",
-  "mypy>=1.0",
+  "mypy==1.20.0",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
   "wheel>=0.46.0",
@@ -162,14 +162,17 @@ select = [
     "F",  # pyflakes
     "I",  # isort
     "B",  # flake8-bugbear
+    "C90", # mccabe complexity
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
 ]
 ignore = [
     "E501", # line too long, handled by the Ruff formatter
     "B008", # do not perform function calls in argument defaults
-    "C901", # too complex
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 30
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # imported but unused

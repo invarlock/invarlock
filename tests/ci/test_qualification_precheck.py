@@ -18,9 +18,11 @@ def _digest(marker: str) -> str:
     return "sha256:" + marker * 64
 
 
-def _trust_profile(tmp_path: Path) -> tuple[Path, bytes]:
+def _trust_profile(
+    tmp_path: Path, *, request_digest: str | None = None
+) -> tuple[Path, bytes]:
     root = tmp_path / "trust"
-    root.mkdir()
+    root.mkdir(parents=True)
     policy = b'{"thresholds":{}}\n'
     (root / "policy.json").write_bytes(policy)
     key = ed25519.Ed25519PrivateKey.generate()
@@ -32,19 +34,22 @@ def _trust_profile(tmp_path: Path) -> tuple[Path, bytes]:
         )
     )
     profile = root / "profile.json"
+    anchors = {
+        "baseline_artifact_digest": _digest("a"),
+        "subject_artifact_digest": _digest("b"),
+        "schedule_digest": _digest("c"),
+        "baseline_runtime_digest": _digest("d"),
+        "subject_runtime_digest": _digest("e"),
+        "evidence_signer_fingerprint": _digest("f"),
+    }
+    if request_digest is not None:
+        anchors["request_digest"] = request_digest
     profile.write_text(
         json.dumps(
             {
                 "format": "invarlock/trust-inputs-v1",
                 "policy": {"path": "policy.json"},
-                "anchors": {
-                    "baseline_artifact_digest": _digest("a"),
-                    "subject_artifact_digest": _digest("b"),
-                    "schedule_digest": _digest("c"),
-                    "baseline_runtime_digest": _digest("d"),
-                    "subject_runtime_digest": _digest("e"),
-                    "evidence_signer_fingerprint": _digest("f"),
-                },
+                "anchors": anchors,
                 "verifier": {
                     "identity": "invarlock-verifier/qualification",
                     "signing_key_path": "verifier.pem",
@@ -74,6 +79,7 @@ def _preflight(policy: bytes) -> dict[str, object]:
             "baseline": _digest("d"),
             "subject": _digest("e"),
         },
+        "providers": {"baseline": "hf_transformers", "subject": "hf_transformers"},
     }
 
 
@@ -105,6 +111,31 @@ def test_qualification_precheck_loads_trust_and_reserves_fresh_receipt(
     assert str(result["trust_profile_digest"]).startswith("sha256:")
     assert str(result["verifier_fingerprint"]).startswith("sha256:")
     assert result["verifier_identity"] == "invarlock-verifier/qualification"
+
+
+def test_qualification_precheck_requires_and_matches_gguf_request_anchor(
+    tmp_path: Path,
+) -> None:
+    profile, policy = _trust_profile(tmp_path)
+    preflight = _preflight(policy)
+    preflight["providers"] = {"baseline": "llama_cpp", "subject": "llama_cpp"}
+    with pytest.raises(ValueError, match="required for llama_cpp"):
+        validate(
+            preflight=preflight,
+            trust_profile=profile,
+            receipt=tmp_path / "missing.json",
+        )
+
+    profile, policy = _trust_profile(tmp_path / "matched", request_digest=_digest("1"))
+    result = validate(
+        preflight={
+            **_preflight(policy),
+            "providers": {"baseline": "llama_cpp", "subject": "llama_cpp"},
+        },
+        trust_profile=profile,
+        receipt=tmp_path / "matched.json",
+    )
+    assert result["request_digest"] == _digest("1")
 
 
 @pytest.mark.parametrize(

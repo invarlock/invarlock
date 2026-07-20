@@ -104,10 +104,21 @@ def test_profile_resolves_files_and_has_formatting_independent_digest(
     }
     assert loaded.expected_schedule_digest == _digest("c")
     assert loaded.expected_signer_fingerprint == _digest("f")
+    assert loaded.expected_request_digest is None
     assert loaded.verifier_identity == "invarlock-verifier/release"
     assert loaded.allow_installed_scorers is False
     assert loaded.profile_digest == compact_loaded.profile_digest
     assert loaded.profile_digest.startswith("sha256:")
+
+
+def test_profile_loads_optional_independent_request_anchor(tmp_path: Path) -> None:
+    trust_root, payload = _material(tmp_path)
+    anchors = cast(dict[str, object], payload["anchors"])
+    anchors["request_digest"] = _digest("1")
+    profile = trust_root / "trust.json"
+    profile.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert load_trust_inputs(profile).expected_request_digest == _digest("1")
 
 
 def test_profile_can_replay_with_an_authenticated_public_key_override(
@@ -157,6 +168,10 @@ def test_profile_can_replay_with_an_authenticated_public_key_override(
         ),
         (
             lambda value: value["anchors"].update(schedule_digest="sha256:bad"),
+            "schema failed",
+        ),
+        (
+            lambda value: value["anchors"].update(request_digest="sha256:bad"),
             "schema failed",
         ),
     ],

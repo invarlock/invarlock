@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from invarlock import evidence_pack_publication as publication
-from invarlock.evidence_pack_contract import EvidencePackError, InputIdentity
+from invarlock.evidence_pack_contract import (
+    EvidenceObservation,
+    EvidencePackError,
+    InputIdentity,
+    canonical_json_bytes,
+    sha256_digest,
+)
 from tests.evidence_packs.test_evidence_pack import _digest, _publish
 
 
@@ -108,6 +115,79 @@ def test_publication_rejects_symlink_parent_and_invalid_external_digests(
     bad_policy["policy"] = InputIdentity(_digest("e"), locator="inputs/policy.json")
     with pytest.raises(EvidencePackError, match="policy identity"):
         publication.publish_comparison_evidence(tmp_path / "bad-policy", **bad_policy)
+
+
+def test_publication_rejects_destination_without_directory_name(tmp_path: Path) -> None:
+    _pack, _policy, _fingerprint, _runtimes, _key, arguments = _publish(tmp_path)
+    with pytest.raises(EvidencePackError, match="must name a directory"):
+        publication.publish_comparison_evidence(Path("/"), **arguments)
+
+
+def test_runtime_snapshot_rejects_verifier_errors_before_identity_use(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging = tmp_path / "staging"
+    manifest_path = staging / publication.EVIDENCE_PATHS["baseline_runtime_manifest"]
+    report_path = staging / publication.EVIDENCE_PATHS["baseline_run_report"]
+    manifest_path.parent.mkdir(parents=True)
+    report_path.parent.mkdir(parents=True)
+    manifest_path.write_text("{}", encoding="utf-8")
+    report_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        publication,
+        "verify_runtime_manifest_snapshot",
+        lambda *_args, **_kwargs: SimpleNamespace(errors=("digest mismatch",)),
+    )
+
+    with pytest.raises(EvidencePackError, match="runtime snapshot is invalid"):
+        publication._preflight_runtime_side(
+            staging,
+            side="baseline",
+            runtime_digest="sha256:" + "a" * 64,
+            provider_name="llama_cpp",
+            schedule_sha256="b" * 64,
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+
+def test_input_binding_requires_mapping_comparison() -> None:
+    with pytest.raises(EvidencePackError, match="comparison is invalid"):
+        publication._validate_input_bindings(
+            {"comparison": []},
+            schedule=object(),  # type: ignore[arg-type]
+            identities={},
+            baseline_evidence=object(),  # type: ignore[arg-type]
+            subject_evidence=object(),  # type: ignore[arg-type]
+        )
+
+
+def test_publication_enforces_observation_inventory_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _pack, _policy, _fingerprint, _runtimes, _key, arguments = _publish(tmp_path)
+    observation = EvidenceObservation(
+        observation_id="subject-variance",
+        scope="subject",
+        kind="variance",
+        payload=canonical_json_bytes({"population_variance": 0.5}),
+    )
+    normalized_request = dict(arguments["normalized_request"])  # type: ignore[arg-type]
+    normalized_request["observations"] = [
+        {
+            "id": observation.observation_id,
+            "kind": observation.kind,
+            "scope": observation.scope,
+            "payload_digest": sha256_digest(observation.payload),
+        }
+    ]
+    arguments["normalized_request"] = normalized_request
+    arguments["observations"] = (observation,)
+    monkeypatch.setattr(publication, "MAX_OBSERVATIONS", 0)
+
+    with pytest.raises(EvidencePackError, match="supports at most"):
+        publication.publish_comparison_evidence(
+            tmp_path / "too-many-observations", **arguments
+        )
 
 
 def test_publication_rejects_request_binding_drift(tmp_path: Path) -> None:

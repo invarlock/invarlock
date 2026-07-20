@@ -140,7 +140,7 @@ def test_runtime_platform_locks_are_cpu_only_and_hash_locked() -> None:
     )
     for path in locks:
         text = path.read_text(encoding="utf-8")
-        assert "torch==2.11.0+cpu" in text
+        assert "torch==2.13.0+cpu" in text
         assert "--hash=sha256:" in text
         assert "transformers==" in text
         assert "safetensors==" in text

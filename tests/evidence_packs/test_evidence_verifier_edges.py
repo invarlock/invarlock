@@ -449,6 +449,7 @@ def test_snapshot_failure_and_stability_results_preserve_anchors(
         expected_schedule_digest="sha256:" + "e" * 64,
         expected_runtime_digests=runtimes,
         expected_signer_fingerprint="sha256:" + "f" * 64,
+        expected_request_digest=None,
         manifest_digest="sha256:" + "0" * 64,
     )
     assert failure.status is EvidencePackStatus.INTEGRITY

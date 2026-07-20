@@ -212,3 +212,14 @@ def test_security_private_fallbacks_and_missing_path(
     guard.install()
     guard.install()
     guard.restore()
+
+
+def test_network_guard_restore_tolerates_partial_install_state() -> None:
+    guard = security.NetworkGuard()
+    guard._installed = True
+    guard._original_socket_cls = None
+    guard._original_create_connection = None
+
+    guard.restore()
+
+    assert not guard.installed

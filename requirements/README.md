@@ -9,6 +9,10 @@ documentation, release, security, and runtime-image builds.
 core and tooling locks stay independent of a model runtime. Hugging Face locks
 resolve the published Torch distribution for their target platform, while
 runtime-image locks select the container's Torch backend explicitly.
+The CPU and aarch64 locks share `runtime-image.in`. CUDA 12.8 uses
+`runtime-image-cu128.in` because that backend does not yet publish the patched
+Torch release used by the CPU images; the separate source file keeps the
+temporary exception from holding back unaffected runtimes.
 `lm-evaluation-harness-py312.txt` pins the complete Python 3.12 Linux x86_64
 dependency closure used only by the LM Evaluation Harness integration image;
 it is compiled from `lm-evaluation-harness.in` against the canonical CPU

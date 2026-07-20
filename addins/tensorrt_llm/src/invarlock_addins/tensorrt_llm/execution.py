@@ -11,17 +11,16 @@ from __future__ import annotations
 import hashlib
 import os
 import re
-import selectors
 import shutil
 import signal
 import stat
 import subprocess
 import tempfile
-import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import BinaryIO, cast
+
+from invarlock._bounded_subprocess import communicate_bounded
 
 _MAX_RUNNER_BYTES = 16 * 1024 * 1024
 _MAX_PROC_FACT_BYTES = 128 * 1024
@@ -634,14 +633,6 @@ def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=2)
 
 
-def _close_selector_stream(selector: selectors.BaseSelector, stream: BinaryIO) -> None:
-    try:
-        selector.unregister(stream)
-    except (KeyError, ValueError):
-        pass
-    stream.close()
-
-
 def _run_bounded_process(
     *,
     runner: _PinnedFile,
@@ -681,85 +672,18 @@ def _run_bounded_process(
             raise TensorRTLLMExecutionError(
                 "TensorRT-LLM runner execution is unavailable"
             ) from exc
-        selector: selectors.BaseSelector | None = None
-        try:
-            if (
-                (input_bytes and process.stdin is None)
-                or process.stdout is None
-                or process.stderr is None
-            ):
-                raise TensorRTLLMExecutionError(
-                    "TensorRT-LLM runner pipes are unavailable"
-                )
-
-            selector = selectors.DefaultSelector()
-            stdout = bytearray()
-            stderr = bytearray()
-            input_offset = 0
-            streams = tuple(
-                stream
-                for stream in (process.stdin, process.stdout, process.stderr)
-                if stream is not None
-            )
-            for stream in streams:
-                os.set_blocking(stream.fileno(), False)
-            if input_bytes:
-                assert process.stdin is not None
-                selector.register(process.stdin, selectors.EVENT_WRITE, "stdin")
-            selector.register(process.stdout, selectors.EVENT_READ, "stdout")
-            selector.register(process.stderr, selectors.EVENT_READ, "stderr")
-            deadline = time.monotonic() + timeout_seconds
-            while selector.get_map():
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TensorRTLLMExecutionError("TensorRT-LLM record timed out")
-                events = selector.select(remaining)
-                if not events:
-                    raise TensorRTLLMExecutionError("TensorRT-LLM record timed out")
-                for key, _mask in events:
-                    stream = cast(BinaryIO, key.fileobj)
-                    if key.data == "stdin":
-                        try:
-                            written = os.write(
-                                stream.fileno(),
-                                input_bytes[
-                                    input_offset : input_offset + _IO_CHUNK_BYTES
-                                ],
-                            )
-                        except BrokenPipeError:
-                            _close_selector_stream(selector, stream)
-                            continue
-                        input_offset += written
-                        if input_offset == len(input_bytes):
-                            _close_selector_stream(selector, stream)
-                        continue
-                    try:
-                        chunk = os.read(stream.fileno(), _IO_CHUNK_BYTES)
-                    except BlockingIOError:
-                        continue
-                    if not chunk:
-                        _close_selector_stream(selector, stream)
-                        continue
-                    target = stdout if key.data == "stdout" else stderr
-                    target.extend(chunk)
-                    limit = stdout_limit if key.data == "stdout" else stderr_limit
-                    if len(target) > limit:
-                        raise TensorRTLLMExecutionError(
-                            f"TensorRT-LLM runner {key.data} limit exceeded"
-                        )
-            try:
-                status = process.wait(timeout=max(0.1, deadline - time.monotonic()))
-            except subprocess.TimeoutExpired as exc:
-                raise TensorRTLLMExecutionError(
-                    "TensorRT-LLM record timed out"
-                ) from exc
-            return status, bytes(stdout), bytes(stderr)
-        finally:
-            if selector is not None:
-                selector.close()
-            for final_stream in (process.stdin, process.stdout, process.stderr):
-                if final_stream is not None and not final_stream.closed:
-                    final_stream.close()
-            _kill_process_group(process)
+        return communicate_bounded(
+            process,
+            input_bytes=input_bytes,
+            timeout_seconds=timeout_seconds,
+            stdout_limit=stdout_limit,
+            stderr_limit=stderr_limit,
+            error_type=TensorRTLLMExecutionError,
+            timeout_label="TensorRT-LLM record",
+            output_label="TensorRT-LLM runner",
+            pipes_message="TensorRT-LLM runner pipes are unavailable",
+            terminate=_kill_process_group,
+            terminate_after=True,
+        )
     finally:
         recheck_bindings()

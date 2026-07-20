@@ -243,3 +243,52 @@ def test_main_reports_creation_error_without_output(tmp_path: Path) -> None:
         )
 
     assert not output.exists()
+
+
+def test_generator_reports_descriptor_open_failure_and_leaves_no_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wheel = _wheel(tmp_path / "candidate.whl")
+    output = tmp_path / "candidate-wheels.json"
+    monkeypatch.setattr(
+        candidate_wheels.os,
+        "open",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+
+    with pytest.raises(
+        candidate_wheels.CandidateWheelManifestError,
+        match="candidate wheel could not be read",
+    ):
+        candidate_wheels.create_manifest([wheel], output=output)
+
+    assert not output.exists()
+
+
+def test_generator_closes_temporary_descriptor_when_permission_setup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wheel = _wheel(tmp_path / "candidate.whl")
+    output = tmp_path / "candidate-wheels.json"
+    real_close = candidate_wheels.os.close
+    closed: list[int] = []
+
+    def recording_close(descriptor: int) -> None:
+        closed.append(descriptor)
+        real_close(descriptor)
+
+    monkeypatch.setattr(candidate_wheels.os, "close", recording_close)
+    monkeypatch.setattr(
+        candidate_wheels.os,
+        "fchmod",
+        lambda *_args: (_ for _ in ()).throw(OSError("permission setup failed")),
+    )
+
+    with pytest.raises(OSError, match="permission setup failed"):
+        candidate_wheels.create_manifest([wheel], output=output)
+
+    assert closed
+    assert not output.exists()
+    assert not list(tmp_path.glob(".candidate-wheels.json.*.tmp"))

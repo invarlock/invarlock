@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -76,6 +77,39 @@ def test_receipt_no_clobber_race_never_removes_the_other_writer_file(
         receipt_module._write_no_clobber(receipt, b"ours")
 
     assert receipt.read_bytes() == b"other writer"
+
+
+def test_receipt_writer_removes_partial_file_after_durable_write_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "receipt.json"
+    monkeypatch.setattr(
+        receipt_module.os,
+        "fsync",
+        lambda _descriptor: (_ for _ in ()).throw(OSError("storage failure")),
+    )
+
+    with pytest.raises(EvidenceReceiptError, match="could not write"):
+        receipt_module._write_no_clobber(destination, b"partial")
+
+    assert not destination.exists()
+
+
+def test_receipt_writer_maps_destination_open_failure_without_cleanup_race(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "receipt.json"
+    real_open = Path.open
+
+    def denied_open(path: Path, mode: str = "r", *args, **kwargs):
+        if path == destination and mode == "xb":
+            raise OSError("permission denied")
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", denied_open)
+    with pytest.raises(EvidenceReceiptError, match="could not write"):
+        receipt_module._write_no_clobber(destination, b"receipt")
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize(
@@ -388,3 +422,96 @@ def test_receipt_writer_rejects_captured_non_ed25519_private_key(
             verifier_signing_key_path=key,
             verifier_signing_key_bytes=captured_key,
         )
+
+
+@pytest.mark.parametrize(
+    ("result_request", "expected_request", "message"),
+    [
+        (None, _digest("1"), "does not match caller request"),
+        (_digest("1"), None, "unexpected request anchor"),
+    ],
+)
+def test_receipt_writer_rejects_request_anchor_disagreement_with_result(
+    tmp_path: Path,
+    result_request: str | None,
+    expected_request: str | None,
+    message: str,
+) -> None:
+    pack, policy, runtimes, pack_signer = _inputs(tmp_path)
+    key, _verifier = _key(tmp_path, "verifier")
+
+    with pytest.raises(EvidenceReceiptError, match=message):
+        write_signed_verification_receipt(
+            pack,
+            _result(pack, policy, runtimes, pack_signer, result_request),
+            tmp_path / "receipt.json",
+            policy_path=policy,
+            **_input_anchor_kwargs(),
+            expected_runtime_digests=runtimes,
+            expected_pack_signer_fingerprint=pack_signer,
+            expected_request_digest=expected_request,
+            verifier_identity="invarlock-verifier/release",
+            verifier_signing_key_path=key,
+        )
+
+
+def test_v1_receipt_rejects_unexpected_independent_request_anchor(
+    tmp_path: Path,
+) -> None:
+    receipt, pack, policy, runtimes, pack_signer, verifier = _write(tmp_path)
+
+    result = _verify(
+        receipt,
+        pack,
+        policy,
+        runtimes,
+        pack_signer,
+        verifier,
+        expected_request_digest=_digest("1"),
+    )
+
+    assert result.ok is False
+    assert "request anchors require signed receipt format v2" in result.errors
+    assert "request anchor does not match the supplied pack request" in result.errors
+
+
+@pytest.mark.parametrize(
+    ("reference_path", "reference_digest", "request_payload", "message"),
+    [
+        ("other.json", _digest("0"), None, "reference path is invalid"),
+        ("request.json", _digest("0"), {}, "digest does not match manifest"),
+        ("request.json", None, {"not_comparison": {}}, "comparison is invalid"),
+    ],
+)
+def test_receipt_verifier_rejects_malformed_pack_request_binding(
+    tmp_path: Path,
+    reference_path: str,
+    reference_digest: str | None,
+    request_payload: dict[str, object] | None,
+    message: str,
+) -> None:
+    receipt, pack, policy, runtimes, pack_signer, verifier = _write(tmp_path)
+    request_bytes = b""
+    if request_payload is not None:
+        request_bytes = (
+            json.dumps(request_payload, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode("utf-8")
+        (pack / "request.json").write_bytes(request_bytes)
+    digest = reference_digest or ("sha256:" + hashlib.sha256(request_bytes).hexdigest())
+    (pack / "manifest.json").write_text(
+        json.dumps(
+            {
+                "format": "invarlock/evidence-pack-v1",
+                "evidence": {"request": {"path": reference_path, "digest": digest}},
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _verify(receipt, pack, policy, runtimes, pack_signer, verifier)
+
+    assert result.ok is False
+    assert message in " ".join(result.errors)

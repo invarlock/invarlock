@@ -34,6 +34,9 @@ from invarlock.core.runtime_provider import (
     artifact_identity_sha256,
     runtime_execution_settings_from_mapping,
 )
+from invarlock.core.runtime_provider.request_bindings import (
+    LLAMA_CPP_REQUEST_SETTINGS as _ALLOWED_SETTINGS,
+)
 from invarlock.core.runtime_provider.types import JSONScalar
 from invarlock.runtime_providers.gguf_identity import read_gguf_artifact_identity
 from invarlock.runtime_security_helpers import (
@@ -72,23 +75,6 @@ _CPU_IDENTITY_FIELDS = frozenset(
         "stepping",
         "uarch",
         "vendor_id",
-    }
-)
-_ALLOWED_SETTINGS = frozenset(
-    {
-        "artifact_byte_length",
-        "artifact_sha256",
-        "backend_binary_sha256",
-        "backend_source_sha256",
-        "backend_version",
-        "batch_size",
-        "context_length",
-        "gguf_metadata_sha256",
-        "max_output_tokens",
-        "seed",
-        "tensor_inventory_sha256",
-        "timeout_seconds",
-        "tokenizer_metadata_sha256",
     }
 )
 _REQUIRED_SETTINGS = _ALLOWED_SETTINGS

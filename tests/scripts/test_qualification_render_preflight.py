@@ -18,6 +18,7 @@ from invarlock.core.runtime_provider.behavioral_schedule import (
     build_runtime_behavioral_schedule_from_material,
     canonical_runtime_behavioral_schedule_json,
 )
+from invarlock.core.runtime_provider.types import evaluation_input_parts_sha256
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from scripts import qualification_render_preflight as preflight
 
@@ -1116,3 +1117,355 @@ def test_gguf_statement_shape_and_thresholds_fail_closed() -> None:
         preflight.QualificationRenderPreflightError, match="output is invalid"
     ):
         verify(invalid)
+
+
+class _BoundaryTokenizer(_CharacterTokenizer):
+    def __init__(self, mode: str) -> None:
+        self.mode = mode
+
+    def __call__(
+        self,
+        text: str,
+        *,
+        add_special_tokens: bool,
+        truncation: bool,
+        return_tensors: object,
+    ) -> Mapping[str, object]:
+        if self.mode == "empty_prompt" and add_special_tokens:
+            return {"input_ids": []}
+        if self.mode == "empty_expected" and not add_special_tokens:
+            return {"input_ids": []}
+        return super().__call__(
+            text,
+            add_special_tokens=add_special_tokens,
+            truncation=truncation,
+            return_tensors=return_tensors,
+        )
+
+    def encode(self, text: str, *, add_special_tokens: bool) -> list[int]:
+        if self.mode == "empty_prompt" and text == "Question?":
+            return []
+        return super().encode(text, add_special_tokens=add_special_tokens)
+
+    def decode(
+        self,
+        token_ids: list[int],
+        *,
+        skip_special_tokens: bool,
+        clean_up_tokenization_spaces: bool,
+    ) -> str:
+        if self.mode == "wrong_roundtrip" and skip_special_tokens:
+            return "substituted"
+        return super().decode(
+            token_ids,
+            skip_special_tokens=skip_special_tokens,
+            clean_up_tokenization_spaces=clean_up_tokenization_spaces,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mode", "message"),
+    [
+        ("empty_prompt", "prompt tokenization is empty"),
+        ("empty_expected", "expected output exceeds the token bound"),
+    ],
+)
+def test_hf_preflight_rejects_empty_provider_tokenization(
+    mode: str, message: str
+) -> None:
+    with pytest.raises(preflight.QualificationRenderPreflightError, match=message):
+        preflight.preflight_hf_text(
+            _text_schedule(),
+            schedule_file_sha256="sha256:" + "d" * 64,
+            tokenizer=_BoundaryTokenizer(mode),
+            expected_tokenizer_sha256="e" * 64,
+            context_length=64,
+            max_output_tokens=8,
+            metric="exact_match",
+            tokenizer_digest=lambda _tokenizer: "e" * 64,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mode", "message"),
+    [
+        ("empty_prompt", "prompt exceeds the TensorRT context"),
+        ("wrong_roundtrip", "does not round-trip"),
+    ],
+)
+def test_tensorrt_preflight_rejects_empty_or_non_replayable_tokenization(
+    mode: str, message: str
+) -> None:
+    with pytest.raises(preflight.QualificationRenderPreflightError, match=message):
+        preflight.preflight_tensorrt(
+            _text_schedule(expected="A"),
+            schedule_file_sha256="sha256:" + "d" * 64,
+            tokenizer=_BoundaryTokenizer(mode),
+            tokenizer_contract_sha256="e" * 64,
+            engine_config=_engine_config(),
+            engine_config_sha256="f" * 64,
+            context_length=64,
+            max_output_tokens=8,
+        )
+
+
+def _replace_multimodal_record(**changes: object):
+    schedule = _multimodal_schedule()
+    input_parts = changes.get("input_parts")
+    if isinstance(input_parts, tuple):
+        changes["input_sha256"] = evaluation_input_parts_sha256(input_parts)
+    record = replace(schedule.records[0], **changes)
+    return replace(schedule, records=(record,))
+
+
+def test_multimodal_preflight_rejects_malformed_record_contracts() -> None:
+    schedule = _multimodal_schedule()
+    image = schedule.records[0].input_parts[1]
+    malformed_parts = _replace_multimodal_record(
+        input_parts=(
+            *schedule.records[0].input_parts,
+            replace(image, role="secondary_image"),
+        )
+    )
+    empty_output = _replace_multimodal_record(expected_output="")
+    oversized_output = _replace_multimodal_record(expected_output="A" * 9)
+    common = {
+        "schedule_file_sha256": "sha256:" + "d" * 64,
+        "processor": _Processor(token_count=32),
+        "expected_processor_sha256": "e" * 64,
+        "context_length": 64,
+        "max_output_tokens": 8,
+        "processor_digest": lambda _processor: "e" * 64,
+        "image_resolver": lambda _record: _ClosableImage(),
+    }
+    for candidate, message in (
+        (malformed_parts, "exactly one prompt and one image"),
+        (empty_output, "requires prompt text and expected output"),
+        (oversized_output, "expected output exceeds the token bound"),
+    ):
+        with pytest.raises(preflight.QualificationRenderPreflightError, match=message):
+            preflight.preflight_multimodal(candidate, **common)
+
+
+def test_multimodal_preflight_accepts_non_closable_media_and_rejects_decode_drift() -> (
+    None
+):
+    result = preflight.preflight_multimodal(
+        _multimodal_schedule(),
+        schedule_file_sha256="sha256:" + "d" * 64,
+        processor=_Processor(token_count=32),
+        expected_processor_sha256="e" * 64,
+        context_length=64,
+        max_output_tokens=8,
+        processor_digest=lambda _processor: "e" * 64,
+        image_resolver=lambda _record: object(),
+    )
+    assert result["ok"] is True
+
+    processor = _Processor(token_count=32)
+    processor.tokenizer = _BoundaryTokenizer("wrong_roundtrip")
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError, match="does not round-trip"
+    ):
+        preflight.preflight_multimodal(
+            _multimodal_schedule(),
+            schedule_file_sha256="sha256:" + "d" * 64,
+            processor=processor,
+            expected_processor_sha256="e" * 64,
+            context_length=64,
+            max_output_tokens=8,
+            processor_digest=lambda _processor: "e" * 64,
+            image_resolver=lambda _record: _ClosableImage(),
+        )
+
+
+def _tensorrt_tokenizer_contract(**changes: object) -> dict[str, object]:
+    contract: dict[str, object] = {
+        "format_version": "invarlock/tensorrt-llm-tokenizer-contract-v1",
+        "add_special_tokens": False,
+        "skip_special_tokens": True,
+        "clean_up_tokenization_spaces": False,
+        "eos_token_id": 1,
+        "pad_token_id": 0,
+        "tokenizer_json": {},
+    }
+    contract.update(changes)
+    return contract
+
+
+def _install_fake_tokenizer_modules(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    raw: object,
+    built: object | None = None,
+) -> None:
+    tokenizers = SimpleNamespace(Tokenizer=SimpleNamespace(from_str=lambda _value: raw))
+    transformers = SimpleNamespace(
+        PreTrainedTokenizerFast=lambda **_kwargs: (
+            built
+            if built is not None
+            else SimpleNamespace(eos_token_id=1, pad_token_id=0)
+        )
+    )
+
+    def import_module(name: str) -> object:
+        return tokenizers if name == "tokenizers" else transformers
+
+    monkeypatch.setattr(preflight.importlib, "import_module", import_module)
+
+
+def test_tensorrt_contract_loader_rejects_open_or_unsupported_contracts(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "contract.json"
+    for contract, message in (
+        ({"format_version": "unexpected"}, "not closed"),
+        (
+            _tensorrt_tokenizer_contract(add_special_tokens=True),
+            "flags are unsupported",
+        ),
+    ):
+        path.write_bytes(preflight._canonical_json(contract) + b"\n")
+        with pytest.raises(preflight.QualificationRenderPreflightError, match=message):
+            preflight._load_tensorrt_contract(path)
+
+
+@pytest.mark.parametrize(
+    ("contract_changes", "raw_tokens", "built_ids", "message"),
+    [
+        ({"eos_token_id": True}, {0: "<pad>", 1: "<eos>"}, (1, 0), "IDs are invalid"),
+        ({}, {0: None, 1: "<eos>"}, (1, 0), "tokens are unavailable"),
+        ({}, {0: "<pad>", 1: "<eos>"}, (9, 0), "do not round-trip"),
+    ],
+)
+def test_tensorrt_contract_loader_rejects_special_token_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    contract_changes: dict[str, object],
+    raw_tokens: dict[int, object],
+    built_ids: tuple[int, int],
+    message: str,
+) -> None:
+    path = tmp_path / "contract.json"
+    path.write_bytes(
+        preflight._canonical_json(_tensorrt_tokenizer_contract(**contract_changes))
+        + b"\n"
+    )
+    raw = SimpleNamespace(id_to_token=lambda token_id: raw_tokens[token_id])
+    built = SimpleNamespace(eos_token_id=built_ids[0], pad_token_id=built_ids[1])
+    _install_fake_tokenizer_modules(monkeypatch, raw=raw, built=built)
+
+    with pytest.raises(preflight.QualificationRenderPreflightError, match=message):
+        preflight._load_tensorrt_contract(path)
+
+
+def test_multimodal_content_and_json_contract_readers_reject_substitution(
+    tmp_path: Path,
+) -> None:
+    content_store = tmp_path / "content"
+    content_store.mkdir()
+    (content_store / "image_001").write_bytes(b"substituted")
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError, match="identity does not match"
+    ):
+        preflight._image_resolver(content_store)(_multimodal_schedule().records[0])
+
+    value = tmp_path / "value.json"
+    value.write_text("[]", encoding="utf-8")
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError, match="must be a JSON object"
+    ):
+        preflight._read_json_object(value, label="fixture")
+
+
+def test_tensorrt_cli_rejects_contract_and_engine_digest_substitution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    schedule = _text_schedule(expected="A")
+    contract = tmp_path / "tokenizer.json"
+    contract.write_text("{}", encoding="utf-8")
+    engine = tmp_path / "config.json"
+    engine_payload = preflight._canonical_json(_engine_config())
+    engine.write_bytes(engine_payload)
+    arguments = [
+        "tensorrt-llm",
+        *_schedule_cli_args(tmp_path, schedule),
+        "--tokenizer-contract",
+        str(contract),
+        "--tokenizer-sha256",
+        "e" * 64,
+        "--engine-config",
+        str(engine),
+        "--engine-config-sha256",
+        hashlib.sha256(engine_payload).hexdigest(),
+        "--context-length",
+        "64",
+        "--max-output-tokens",
+        "8",
+    ]
+    monkeypatch.setattr(
+        preflight,
+        "_load_tensorrt_contract",
+        lambda _path: (_CharacterTokenizer(), "f" * 64),
+    )
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError,
+        match="tokenizer contract digest mismatch",
+    ):
+        preflight.main(arguments)
+
+    monkeypatch.setattr(
+        preflight,
+        "_load_tensorrt_contract",
+        lambda _path: (_CharacterTokenizer(), "e" * 64),
+    )
+    arguments[arguments.index("--engine-config-sha256") + 1] = "0" * 64
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError,
+        match="engine config digest mismatch",
+    ):
+        preflight.main(arguments)
+
+
+def test_gguf_cli_rejects_noncanonical_or_digest_substituted_statement(
+    tmp_path: Path,
+) -> None:
+    schedule = _text_schedule(expected="A")
+    statement = _gguf_statement(schedule)
+    statement_path = tmp_path / "statement.json"
+    signature = tmp_path / "signature"
+    public_key = tmp_path / "public.pem"
+    common = [
+        "gguf-prefix",
+        *_schedule_cli_args(tmp_path, schedule),
+        "--statement",
+        str(statement_path),
+        "--signature",
+        str(signature),
+        "--public-key",
+        str(public_key),
+        "--signer-fingerprint",
+        "sha256:" + "a" * 64,
+        "--minimum-exact-matches",
+        "1",
+    ]
+
+    pretty = json.dumps(statement, indent=2).encode() + b"\n"
+    statement_path.write_bytes(pretty)
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError, match="canonical JSON"
+    ):
+        preflight.main(
+            [
+                *common,
+                "--statement-sha256",
+                "sha256:" + hashlib.sha256(pretty).hexdigest(),
+            ]
+        )
+
+    canonical = preflight._canonical_json(statement) + b"\n"
+    statement_path.write_bytes(canonical)
+    with pytest.raises(
+        preflight.QualificationRenderPreflightError, match="file digest mismatch"
+    ):
+        preflight.main([*common, "--statement-sha256", "sha256:" + "0" * 64])

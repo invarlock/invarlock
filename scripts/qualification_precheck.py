@@ -73,6 +73,18 @@ def validate(
         or any(character not in "0123456789abcdef" for character in request_digest[7:])
     ):
         raise ValueError("preflight normalized request digest is invalid")
+    providers = preflight.get("providers")
+    if (
+        not isinstance(providers, dict)
+        or set(providers) != {"baseline", "subject"}
+        or any(not isinstance(value, str) or not value for value in providers.values())
+    ):
+        raise ValueError("preflight runtime providers are invalid")
+    if trust.expected_request_digest is not None:
+        if request_digest != trust.expected_request_digest:
+            raise ValueError("trust profile request digest does not match preflight")
+    elif "llama_cpp" in providers.values():
+        raise ValueError("trust profile request digest is required for llama_cpp")
     observed_runtimes = preflight.get("runtime_image_digests")
     if not isinstance(observed_runtimes, dict):
         raise ValueError("preflight runtime image digests are missing")

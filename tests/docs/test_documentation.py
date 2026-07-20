@@ -466,6 +466,9 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
     handoff = _read("examples/run_trust_boundary_demo.py")
     assert 'expected_policy_verdict="fail"' in handoff
     assert "tampered_report.write_bytes" in handoff
+    makefile = _read("Makefile")
+    handoff_recipe = makefile.split("trust-boundary-demo:", 1)[1].split("\n\n", 1)[0]
+    assert "rm -rf" not in handoff_recipe
 
 
 def test_model_change_guide_preserves_the_external_artifact_boundary() -> None:
@@ -587,9 +590,10 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
 def test_unreleased_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
     unreleased = changelog.split("## [0.12.1]", maxsplit=1)[0]
-    assert "paired model release-regression evaluation" in unreleased
-    assert "exact two-sided McNemar" in unreleased
-    assert "perplexity ratio as a verifier-derived likelihood" in unreleased
+    normalized = " ".join(unreleased.split())
+    assert "paired model release-regression evaluation" in normalized
+    assert "exact two-sided McNemar" in normalized
+    assert "perplexity ratio as a verifier-derived likelihood" in normalized
     assert "paired schedule-resampling interval" in unreleased
     assert "host-to-OCI" in unreleased
     assert "canonical evidence bundles" in unreleased

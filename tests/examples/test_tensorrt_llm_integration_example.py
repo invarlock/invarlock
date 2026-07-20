@@ -26,7 +26,7 @@ def _load(name: str, path: Path) -> Any:
 @pytest.fixture(scope="module")
 def example() -> Any:
     return _load(
-        "tensorrt_outreach_example",
+        "tensorrt_integration_example",
         Path(__file__).resolve().parents[2]
         / "examples/integrations/tensorrt-llm/run.py",
     )
@@ -35,7 +35,7 @@ def example() -> Any:
 @pytest.fixture(scope="module")
 def showcase() -> Any:
     return _load(
-        "tensorrt_outreach_showcase",
+        "tensorrt_integration_showcase",
         Path(__file__).resolve().parents[2]
         / "examples/integrations/tensorrt-llm/showcase.py",
     )
@@ -178,7 +178,7 @@ def prepare_helper(monkeypatch: pytest.MonkeyPatch) -> Any:
     for name, module in modules.items():
         monkeypatch.setitem(sys.modules, name, module)
     helper = _load(
-        "tensorrt_outreach_prepare",
+        "tensorrt_integration_prepare",
         Path(__file__).resolve().parents[2]
         / "examples/integrations/tensorrt-llm/prepare.py",
     )
@@ -379,6 +379,51 @@ def test_prepare_closes_request_keys_and_independent_trust(
     assert trust["anchors"]["schedule_digest"].startswith("sha256:")
     assert stat.S_IMODE(paths["signer"].stat().st_mode) == 0o600
     assert stat.S_IMODE(paths["verifier"].stat().st_mode) == 0o600
+
+
+def test_prepare_refuses_existing_output_and_non_object_policy(
+    example: Any, inputs: Path, tmp_path: Path
+) -> None:
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    with pytest.raises(FileExistsError, match="output already exists"):
+        example._prepare(
+            inputs,
+            existing,
+            _inspection(),
+            "sha256:" + "a" * 64,
+            ("baseline", "subject"),
+        )
+
+    (inputs / "policy.json").write_text("[]", encoding="utf-8")
+    with pytest.raises(ValueError, match="must contain a JSON object"):
+        example._prepare(
+            inputs,
+            tmp_path / "output",
+            _inspection(),
+            "sha256:" + "a" * 64,
+            ("baseline", "subject"),
+        )
+
+
+def test_run_main_rejects_non_cuda_devices(example: Any, tmp_path: Path) -> None:
+    assert (
+        example.main(
+            [
+                "--runtime-image",
+                "sha256:" + "a" * 64,
+                "--resource-root",
+                str(tmp_path / "unused"),
+                "--baseline-locator",
+                "baseline",
+                "--subject-locator",
+                "subject",
+                "--baseline-device",
+                "cpu",
+            ]
+        )
+        == 2
+    )
 
 
 def test_execute_runs_preflight_evaluate_verify_report_with_provider_resources(
@@ -598,7 +643,7 @@ def test_image_probe_uses_addin_provider_and_official_runner(
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", digest)
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", digest)
     helper = _load(
-        "tensorrt_outreach_inspect",
+        "tensorrt_integration_inspect",
         Path(__file__).resolve().parents[2]
         / "examples/integrations/tensorrt-llm/engine_inspect.py",
     )
@@ -704,6 +749,29 @@ def test_showcase_workspace_download_and_input_materialization(
         showcase._prepare_inputs(paths, tokenizer=tokenizer)
 
 
+def test_showcase_default_workspace_and_record_shape_fail_closed(
+    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    monkeypatch.setattr(showcase.tempfile, "mkdtemp", lambda **_kwargs: str(generated))
+    paths = showcase._create_workspace(None)
+    assert paths.workspace == generated
+
+    for role in showcase._VARIANTS:
+        directory = paths.work / role
+        directory.mkdir()
+        (directory / f"{role}.tokenizer-contract.json").write_bytes(b"same")
+
+    monkeypatch.setattr(showcase.json, "loads", lambda _payload: [])
+    with pytest.raises(RuntimeError, match="must contain 102 records"):
+        showcase._prepare_inputs(paths, tokenizer=object())
+
+    monkeypatch.setattr(showcase.json, "loads", lambda _payload: [{}] * 102)
+    with pytest.raises(RuntimeError, match="preserve its leading space"):
+        showcase._prepare_inputs(paths, tokenizer=object())
+
+
 def test_showcase_rejects_non_lossless_exact_match_targets(
     showcase: Any, tmp_path: Path
 ) -> None:
@@ -760,6 +828,8 @@ def test_showcase_container_build_and_transaction_commands(
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(showcase.subprocess, "run", run)
+    monkeypatch.setattr(showcase.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(showcase.os, "getegid", lambda: 1000)
     digest = "sha256:" + "a" * 64
     showcase._container_build(
         paths,
@@ -769,12 +839,26 @@ def test_showcase_container_build_and_transaction_commands(
         container_engine="docker",
     )
     command = calls[-1][0]
-    assert stat.S_IMODE((paths.work / "baseline").stat().st_mode) == 0o777
+    assert stat.S_IMODE((paths.work / "baseline").stat().st_mode) == 0o700
+    assert command[command.index("--user") + 1] == "1000:1000"
     assert command[command.index("--gpus") + 1] == "device=1"
     assert "--network" in command and "none" in command
     assert "LD_LIBRARY_PATH=/usr/local/tensorrt/lib" in command
     assert "/resources/baseline-engine" in command
     assert command[command.index("--quantization") + 1] == "none"
+
+    showcase._container_build(
+        paths,
+        role="subject",
+        device="2",
+        image=digest,
+        container_engine="docker",
+    )
+    subject = calls[-1][0]
+    assert subject[subject.index("--quantization") + 1] == "fp8"
+    assert subject[subject.index("--calibration-records") + 1] == (
+        "/example/records.json"
+    )
     with pytest.raises(ValueError, match="nonnegative"):
         showcase._container_build(
             paths,
@@ -795,6 +879,41 @@ def test_showcase_container_build_and_transaction_commands(
     assert transaction[transaction.index("--baseline-device") + 1] == "cuda:0"
     assert transaction[transaction.index("--subject-device") + 1] == "cuda:1"
     assert options["env"]["INVARLOCK_CONTAINER_ENGINE"] == "docker"
+
+
+def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
+    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "showcase-root")
+    (paths.models / "qwen3-0.6b").mkdir()
+    ownership: list[tuple[Path, int, int]] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(showcase.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(showcase.os, "getegid", lambda: 0)
+    monkeypatch.setattr(
+        showcase.os,
+        "chown",
+        lambda path, uid, gid: ownership.append((Path(path), uid, gid)),
+    )
+    monkeypatch.setattr(
+        showcase.subprocess,
+        "run",
+        lambda command, **_options: commands.append(command),
+    )
+
+    showcase._container_build(
+        paths,
+        role="baseline",
+        device="0",
+        image="sha256:" + "a" * 64,
+        container_engine="docker",
+    )
+
+    assert commands[0][commands[0].index("--user") + 1] == "65532:65532"
+    assert ownership == [
+        (paths.work, 65532, 65532),
+        (paths.work / "baseline", 65532, 65532),
+    ]
 
 
 def test_showcase_main_runs_two_downloads_and_builds(

@@ -26,8 +26,9 @@ from the same canonical JSON.
 - Added paired exact-match regression statistics covering regressions,
   improvements, an exact two-sided McNemar probability, and a paired Newcombe
   95% effect-size interval. Normalized negative log-likelihood per expected
-  UTF-8 byte uses a paired schedule-resampling interval, with the perplexity ratio as a verifier-derived likelihood
-  interpretation when tokenizer contracts are comparable.
+  UTF-8 byte uses a paired schedule-resampling interval, with the perplexity
+  ratio as a verifier-derived likelihood interpretation when tokenizer
+  contracts are comparable.
 - Added a bounded deterministic scorer extension whose per-record results remain
   subject to verifier-owned aggregation, confidence intervals, policy, and
   verdict calculation.
@@ -72,9 +73,13 @@ from the same canonical JSON.
   explicit **Evidence not yet created** state.
 - Bound source archives, core and add-in wheels, runtime images, signed
   canaries, published artifacts, and final receipts in one reproducible release
-  qualification flow, with branch measurement enabled and at least 90%
-  combined statement-and-branch coverage required for every maintained Python
-  module as well as each aggregate suite.
+  qualification flow, with isolated suite data, at least 90% aggregate branch
+  coverage across runtime, example, qualification, release, check, and security
+  Python code, together with the same branch floor and a combined-coverage
+  ratchet for every branch-bearing maintained module.
+- Consolidated bounded native-process communication across GGUF and
+  TensorRT-LLM and introduced a repository-wide complexity ceiling for core,
+  add-in, example, and maintenance Python code.
 
 ### Removed
 
@@ -103,6 +108,12 @@ from the same canonical JSON.
   static engine layouts, tokenizer contracts, immutable images, and configured
   resource bounds are checked before native execution. Runner protocol, engine
   loadability, and GPU behavior then fail closed inside the isolated runtime.
+  GGUF verification also requires an independently approved normalized-request
+  digest and reconciles its artifact, backend, and execution settings with the
+  authenticated provider receipt.
+- Made container and native-process cancellation terminate late-identified
+  containers and whole process groups, including descendants that retain pipe
+  descriptors after their launcher exits.
 - Fixed worker-unreadable artifact and support mounts to fail on the host with
   an actionable diagnostic before container launch instead of an opaque runtime
   authentication error.
@@ -111,6 +122,16 @@ from the same canonical JSON.
   and published artifact digests must remain bound to the same candidate. The
   clean-export safeguard prevents ignored local fixtures from producing a false
   green result.
+- Updated maintained dependency locks to use patched CPU packages while keeping
+  narrowly scoped, expiring exceptions for CUDA and harness dependencies that
+  do not yet have compatible fixed releases. Pull-request, tag, and release
+  workflows now audit the authoritative locks and retain their reports even
+  when a finding blocks the run. Full-history secret scanning correctly
+  recognizes only the intended digest and key-type metadata fields while still
+  detecting unrelated credentials in the same file.
+- Made trust-boundary and TensorRT-LLM examples use fresh private workspaces and
+  least-privilege runtime ownership instead of deleting fixed output paths or
+  granting world-writable permissions.
 
 ## [0.12.1] - 2026-07-05
 

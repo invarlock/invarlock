@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +51,11 @@ from invarlock.evidence_pack_json import (
 from invarlock.evidence_pack_snapshot import PackSnapshot
 from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
 from invarlock.public_contracts import load_evidence_pack_schema
-from invarlock.runtime_provider_evidence import decode_artifact_identity
+from invarlock.runtime_provider_evidence import (
+    decode_artifact_identity,
+    decode_runtime_provider_receipt,
+    runtime_request_binding_errors,
+)
 from invarlock.runtime_verify import verify_runtime_manifest_snapshot
 
 _DIGEST_RE = re.compile(r"sha256:[a-f0-9]{64}\Z")
@@ -68,6 +73,96 @@ def _load_json_object(
     if not isinstance(payload, dict):
         return None, f"{label} must decode to a JSON object", raw
     return payload, None, raw
+
+
+def _validate_manifest_inputs(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    inputs = payload.get("inputs")
+    if not isinstance(inputs, dict) or set(inputs) != set(INPUT_ROLES):
+        return [
+            "manifest inputs must contain baseline, subject, dataset, both "
+            "runtimes, and policy"
+        ]
+    for role in INPUT_ROLES:
+        reference = inputs.get(role)
+        if not isinstance(reference, dict) or set(reference) != {
+            "path",
+            "digest",
+            "material_digest",
+        }:
+            errors.append(f"manifest input {role} fields are invalid")
+            continue
+        if reference.get("path") != f"inputs/{role}.json":
+            errors.append(f"manifest input {role} path is invalid")
+        for field in ("digest", "material_digest"):
+            value = reference.get(field)
+            if not isinstance(value, str) or not _DIGEST_RE.fullmatch(value):
+                errors.append(f"manifest input {role} {field} is invalid")
+    return errors
+
+
+def _validate_manifest_evidence(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict) or set(evidence) != set(EVIDENCE_PATHS):
+        return ["manifest evidence roles are invalid"]
+    for role, relative in EVIDENCE_PATHS.items():
+        reference = evidence.get(role)
+        if not isinstance(reference, dict) or set(reference) != {"path", "digest"}:
+            errors.append(f"manifest evidence {role} fields are invalid")
+            continue
+        if reference.get("path") != relative:
+            errors.append(f"manifest evidence {role} path is invalid")
+        digest = reference.get("digest")
+        if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
+            errors.append(f"manifest evidence {role} digest is invalid")
+    return errors
+
+
+def _validate_manifest_paired_records(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    paired = payload.get("paired_records")
+    if not isinstance(paired, dict) or set(paired) != {"path", "digest", "count"}:
+        return ["manifest paired_records fields are invalid"]
+    if paired.get("path") != "records/paired-records.json":
+        errors.append("manifest paired_records path is invalid")
+    digest = paired.get("digest")
+    if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
+        errors.append("manifest paired_records digest is invalid")
+    count = paired.get("count")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        errors.append("manifest paired_records count is invalid")
+    return errors
+
+
+def _validate_manifest_observations(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    observations = payload.get("observations")
+    if observations is None:
+        return errors
+    if not isinstance(observations, dict) or not 1 <= len(observations) <= 64:
+        return ["manifest observations must contain between 1 and 64 entries"]
+    for observation_id, reference in observations.items():
+        if (
+            not isinstance(observation_id, str)
+            or _IDENTIFIER_RE.fullmatch(observation_id) is None
+        ):
+            errors.append("manifest observation identifier is invalid")
+            continue
+        if not isinstance(reference, dict) or set(reference) != {
+            "path",
+            "digest",
+            "kind",
+            "scope",
+        }:
+            errors.append(f"manifest observation {observation_id!r} fields are invalid")
+            continue
+        if reference.get("path") != f"observations/{observation_id}.json":
+            errors.append(f"manifest observation {observation_id!r} path is invalid")
+        digest = reference.get("digest")
+        if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
+            errors.append(f"manifest observation {observation_id!r} digest is invalid")
+    return errors
 
 
 def _validate_manifest(payload: object) -> list[str]:
@@ -120,90 +215,10 @@ def _validate_manifest(payload: object) -> list[str]:
     if not isinstance(fingerprint, str) or not _DIGEST_RE.fullmatch(fingerprint):
         errors.append("manifest signing_key_fingerprint is invalid")
 
-    inputs = payload.get("inputs")
-    if not isinstance(inputs, dict) or set(inputs) != set(INPUT_ROLES):
-        errors.append(
-            "manifest inputs must contain baseline, subject, dataset, both "
-            "runtimes, and policy"
-        )
-    else:
-        for role in INPUT_ROLES:
-            reference = inputs.get(role)
-            if not isinstance(reference, dict) or set(reference) != {
-                "path",
-                "digest",
-                "material_digest",
-            }:
-                errors.append(f"manifest input {role} fields are invalid")
-                continue
-            if reference.get("path") != f"inputs/{role}.json":
-                errors.append(f"manifest input {role} path is invalid")
-            for field in ("digest", "material_digest"):
-                value = reference.get(field)
-                if not isinstance(value, str) or not _DIGEST_RE.fullmatch(value):
-                    errors.append(f"manifest input {role} {field} is invalid")
-
-    evidence = payload.get("evidence")
-    if not isinstance(evidence, dict) or set(evidence) != set(EVIDENCE_PATHS):
-        errors.append("manifest evidence roles are invalid")
-    else:
-        for role, relative in EVIDENCE_PATHS.items():
-            reference = evidence.get(role)
-            if not isinstance(reference, dict) or set(reference) != {
-                "path",
-                "digest",
-            }:
-                errors.append(f"manifest evidence {role} fields are invalid")
-                continue
-            if reference.get("path") != relative:
-                errors.append(f"manifest evidence {role} path is invalid")
-            digest = reference.get("digest")
-            if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
-                errors.append(f"manifest evidence {role} digest is invalid")
-
-    paired = payload.get("paired_records")
-    if not isinstance(paired, dict) or set(paired) != {"path", "digest", "count"}:
-        errors.append("manifest paired_records fields are invalid")
-    else:
-        if paired.get("path") != "records/paired-records.json":
-            errors.append("manifest paired_records path is invalid")
-        digest = paired.get("digest")
-        if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
-            errors.append("manifest paired_records digest is invalid")
-        count = paired.get("count")
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            errors.append("manifest paired_records count is invalid")
-    observations = payload.get("observations")
-    if observations is not None:
-        if not isinstance(observations, dict) or not 1 <= len(observations) <= 64:
-            errors.append("manifest observations must contain between 1 and 64 entries")
-        else:
-            for observation_id, reference in observations.items():
-                if (
-                    not isinstance(observation_id, str)
-                    or _IDENTIFIER_RE.fullmatch(observation_id) is None
-                ):
-                    errors.append("manifest observation identifier is invalid")
-                    continue
-                if not isinstance(reference, dict) or set(reference) != {
-                    "path",
-                    "digest",
-                    "kind",
-                    "scope",
-                }:
-                    errors.append(
-                        f"manifest observation {observation_id!r} fields are invalid"
-                    )
-                    continue
-                if reference.get("path") != f"observations/{observation_id}.json":
-                    errors.append(
-                        f"manifest observation {observation_id!r} path is invalid"
-                    )
-                digest = reference.get("digest")
-                if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
-                    errors.append(
-                        f"manifest observation {observation_id!r} digest is invalid"
-                    )
+    errors.extend(_validate_manifest_inputs(payload))
+    errors.extend(_validate_manifest_evidence(payload))
+    errors.extend(_validate_manifest_paired_records(payload))
+    errors.extend(_validate_manifest_observations(payload))
     return errors
 
 
@@ -557,6 +572,7 @@ def _snapshot_failure_result(
     expected_schedule_digest: str | None,
     expected_runtime_digests: Mapping[str, str] | None,
     expected_signer_fingerprint: str | None,
+    expected_request_digest: str | None,
     manifest_digest: str | None = None,
 ) -> EvidencePackResult:
     """Return a closed failure when immutable snapshot handling fails."""
@@ -578,6 +594,8 @@ def _snapshot_failure_result(
             expected_signer_fingerprint
         ),
     }
+    if expected_request_digest is not None:
+        anchors["request_digest"] = expected_request_digest
     result = _result(
         pack_dir,
         errors=errors,
@@ -619,6 +637,172 @@ def _with_snapshot_errors(
     )
 
 
+@dataclass(frozen=True)
+class _IndependentAnchors:
+    policy_payload: dict[str, Any] | None
+    policy_digest: str | None
+    artifact_digests: dict[str, str]
+    schedule_digest: str | None
+    runtime_digests: dict[str, str]
+    signer_fingerprint: str | None
+    request_digest: str | None
+    errors: tuple[str, ...]
+
+    def payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "policy_digest": self.policy_digest,
+            "artifact_digests": self.artifact_digests,
+            "schedule_digest": self.schedule_digest,
+            "runtime_digests": self.runtime_digests,
+            "signer_fingerprint": self.signer_fingerprint,
+        }
+        if self.request_digest is not None:
+            payload["request_digest"] = self.request_digest
+        return payload
+
+
+def _load_independent_policy(
+    *, policy_path: Path | None, policy_bytes: bytes | None
+) -> tuple[dict[str, Any] | None, str | None, list[str]]:
+    if policy_bytes is not None:
+        if len(policy_bytes) > 4 * 1024 * 1024:
+            return (
+                None,
+                None,
+                ["independent policy anchor exceeds the 4194304-byte size limit"],
+            )
+        raw = policy_bytes
+    elif policy_path is None:
+        return None, None, ["independent policy_path anchor is required"]
+    else:
+        try:
+            raw = read_regular_file_bytes(
+                Path(policy_path),
+                label="independent policy anchor",
+                max_bytes=4 * 1024 * 1024,
+            )
+        except StrictJsonError as exc:
+            return None, None, [str(exc)]
+    try:
+        return (
+            parse_json_object(raw, label="independent policy anchor"),
+            sha256_digest(raw),
+            [],
+        )
+    except (EvidencePackError, StrictJsonError) as exc:
+        return None, None, [str(exc)]
+
+
+def _normalize_side_anchors(
+    values: Mapping[str, str] | None, *, kind: str
+) -> tuple[dict[str, str], list[str]]:
+    if not isinstance(values, Mapping) or set(values) != {"baseline", "subject"}:
+        return {}, [
+            f"independent {kind} anchors must contain exactly baseline and subject"
+        ]
+    normalized: dict[str, str] = {}
+    errors: list[str] = []
+    for side in ("baseline", "subject"):
+        try:
+            normalized[side] = normalize_digest(
+                values[side], label=f"independent {side} {kind} anchor"
+            )
+        except EvidencePackError as exc:
+            errors.append(str(exc))
+    return normalized, errors
+
+
+def _load_independent_anchors(
+    *,
+    policy_path: Path | None,
+    policy_bytes: bytes | None,
+    expected_artifact_digests: Mapping[str, str] | None,
+    expected_schedule_digest: str | None,
+    expected_runtime_digests: Mapping[str, str] | None,
+    expected_signer_fingerprint: str | None,
+    expected_request_digest: str | None,
+) -> _IndependentAnchors:
+    policy, policy_digest, errors = _load_independent_policy(
+        policy_path=policy_path, policy_bytes=policy_bytes
+    )
+    artifacts, artifact_errors = _normalize_side_anchors(
+        expected_artifact_digests, kind="artifact"
+    )
+    errors.extend(artifact_errors)
+    try:
+        schedule_digest = normalize_digest(
+            expected_schedule_digest or "", label="independent schedule anchor"
+        )
+    except EvidencePackError as exc:
+        errors.append(str(exc))
+        schedule_digest = None
+    runtimes, runtime_errors = _normalize_side_anchors(
+        expected_runtime_digests, kind="runtime"
+    )
+    errors.extend(runtime_errors)
+    signer = integrity.normalize_expected_fingerprint(expected_signer_fingerprint)
+    if signer is None:
+        errors.append("independent signer anchor must be a sha256:... fingerprint")
+    request_digest: str | None = None
+    if expected_request_digest is not None:
+        try:
+            request_digest = normalize_digest(
+                expected_request_digest, label="independent request anchor"
+            )
+        except EvidencePackError as exc:
+            errors.append(str(exc))
+    return _IndependentAnchors(
+        policy_payload=policy,
+        policy_digest=policy_digest,
+        artifact_digests=artifacts,
+        schedule_digest=schedule_digest,
+        runtime_digests=runtimes,
+        signer_fingerprint=signer,
+        request_digest=request_digest,
+        errors=tuple(errors),
+    )
+
+
+def _identity_anchor_errors(
+    identity_digests: Mapping[str, object],
+    *,
+    canonical_schedule_digest: str,
+    artifact_digests: Mapping[str, str],
+    schedule_digest: str | None,
+    policy_digest: str | None,
+    runtime_digests: Mapping[str, str],
+) -> list[str]:
+    errors: list[str] = []
+    for side in ("baseline", "subject"):
+        if (
+            artifact_digests.get(side) is not None
+            and identity_digests.get(side) != artifact_digests[side]
+        ):
+            errors.append(
+                f"embedded {side} artifact identity does not match caller artifact anchor"
+            )
+    if identity_digests.get("dataset") != canonical_schedule_digest:
+        errors.append("dataset identity does not match the canonical schedule")
+    if (
+        schedule_digest is not None
+        and identity_digests.get("dataset") != schedule_digest
+    ):
+        errors.append(
+            "embedded canonical schedule identity does not match caller schedule anchor"
+        )
+    if policy_digest is not None and identity_digests.get("policy") != policy_digest:
+        errors.append("embedded policy identity does not match caller policy anchor")
+    for side in ("baseline", "subject"):
+        if (
+            runtime_digests.get(side) is not None
+            and identity_digests.get(f"{side}_runtime") != runtime_digests[side]
+        ):
+            errors.append(
+                f"embedded {side} runtime identity does not match caller runtime anchor"
+            )
+    return errors
+
+
 def _verify_comparison_evidence_snapshot(
     pack_dir: Path,
     *,
@@ -628,94 +812,30 @@ def _verify_comparison_evidence_snapshot(
     expected_schedule_digest: str | None,
     expected_runtime_digests: Mapping[str, str] | None,
     expected_signer_fingerprint: str | None,
+    expected_request_digest: str | None,
     scorer_registry: ScorerExtensionRegistry | None,
 ) -> EvidencePackResult:
     """Verify one already materialized immutable bundle snapshot."""
 
     pack_dir = Path(pack_dir)
-    errors: list[str] = []
-    policy_payload: dict[str, Any] | None = None
-    policy_digest: str | None = None
-    if policy_bytes is not None:
-        if len(policy_bytes) > 4 * 1024 * 1024:
-            errors.append(
-                "independent policy anchor exceeds the 4194304-byte size limit"
-            )
-        else:
-            try:
-                policy_payload = parse_json_object(
-                    policy_bytes, label="independent policy anchor"
-                )
-                policy_digest = sha256_digest(policy_bytes)
-            except (EvidencePackError, StrictJsonError) as exc:
-                errors.append(str(exc))
-    elif policy_path is None:
-        errors.append("independent policy_path anchor is required")
-    else:
-        try:
-            loaded_policy_bytes = read_regular_file_bytes(
-                Path(policy_path),
-                label="independent policy anchor",
-                max_bytes=4 * 1024 * 1024,
-            )
-            policy_payload = parse_json_object(
-                loaded_policy_bytes, label="independent policy anchor"
-            )
-            policy_digest = sha256_digest(loaded_policy_bytes)
-        except (EvidencePackError, StrictJsonError) as exc:
-            errors.append(str(exc))
-    artifacts: dict[str, str] = {}
-    if not isinstance(expected_artifact_digests, Mapping) or set(
-        expected_artifact_digests
-    ) != {"baseline", "subject"}:
-        errors.append(
-            "independent artifact anchors must contain exactly baseline and subject"
-        )
-    else:
-        for side in ("baseline", "subject"):
-            try:
-                artifacts[side] = normalize_digest(
-                    expected_artifact_digests[side],
-                    label=f"independent {side} artifact anchor",
-                )
-            except EvidencePackError as exc:
-                errors.append(str(exc))
-    try:
-        schedule_digest = normalize_digest(
-            expected_schedule_digest or "",
-            label="independent schedule anchor",
-        )
-    except EvidencePackError as exc:
-        errors.append(str(exc))
-        schedule_digest = None
-    runtimes: dict[str, str] = {}
-    if not isinstance(expected_runtime_digests, Mapping) or set(
-        expected_runtime_digests
-    ) != {"baseline", "subject"}:
-        errors.append(
-            "independent runtime anchors must contain exactly baseline and subject"
-        )
-    else:
-        for side in ("baseline", "subject"):
-            try:
-                runtimes[side] = normalize_digest(
-                    expected_runtime_digests[side],
-                    label=f"independent {side} runtime anchor",
-                )
-            except EvidencePackError as exc:
-                errors.append(str(exc))
-    normalized_signer = integrity.normalize_expected_fingerprint(
-        expected_signer_fingerprint
+    independent = _load_independent_anchors(
+        policy_path=policy_path,
+        policy_bytes=policy_bytes,
+        expected_artifact_digests=expected_artifact_digests,
+        expected_schedule_digest=expected_schedule_digest,
+        expected_runtime_digests=expected_runtime_digests,
+        expected_signer_fingerprint=expected_signer_fingerprint,
+        expected_request_digest=expected_request_digest,
     )
-    if normalized_signer is None:
-        errors.append("independent signer anchor must be a sha256:... fingerprint")
-    anchors: dict[str, object] = {
-        "policy_digest": policy_digest,
-        "artifact_digests": artifacts,
-        "schedule_digest": schedule_digest,
-        "runtime_digests": runtimes,
-        "signer_fingerprint": normalized_signer,
-    }
+    errors = list(independent.errors)
+    policy_payload = independent.policy_payload
+    policy_digest = independent.policy_digest
+    artifacts = independent.artifact_digests
+    schedule_digest = independent.schedule_digest
+    runtimes = independent.runtime_digests
+    normalized_signer = independent.signer_fingerprint
+    expected_request = independent.request_digest
+    anchors = independent.payload()
 
     manifest, manifest_error, manifest_raw = _load_json_object(
         pack_dir / "manifest.json", label="manifest.json", max_bytes=256 * 1024
@@ -792,6 +912,10 @@ def _verify_comparison_evidence_snapshot(
                 if canonical_json_bytes(request) != loaded["request"]:
                     errors.append("normalized request is not canonical JSON")
                 request_digest = sha256_digest(loaded["request"])
+                if expected_request is not None and request_digest != expected_request:
+                    errors.append(
+                        "normalized request does not match independent request anchor"
+                    )
                 errors.extend(evaluation_request_errors(request))
                 metric = request_metric(request)
                 scorer_binding = request_scorer_binding(request)
@@ -832,50 +956,22 @@ def _verify_comparison_evidence_snapshot(
                         artifact_digests=embedded_artifacts,
                     )
                     errors.extend(observation_errors)
-                for side in ("baseline", "subject"):
-                    if (
-                        artifacts.get(side) is not None
-                        and identity_digests.get(side) != artifacts[side]
-                    ):
-                        errors.append(
-                            f"embedded {side} artifact identity does not match caller "
-                            "artifact anchor"
-                        )
-                if identity_digests.get("dataset") != (
-                    f"sha256:{schedule.schedule_sha256}"
-                ):
-                    errors.append(
-                        "dataset identity does not match the canonical schedule"
+                errors.extend(
+                    _identity_anchor_errors(
+                        identity_digests,
+                        canonical_schedule_digest=f"sha256:{schedule.schedule_sha256}",
+                        artifact_digests=artifacts,
+                        schedule_digest=schedule_digest,
+                        policy_digest=policy_digest,
+                        runtime_digests=runtimes,
                     )
-                if (
-                    schedule_digest is not None
-                    and identity_digests.get("dataset") != schedule_digest
-                ):
-                    errors.append(
-                        "embedded canonical schedule identity does not match caller "
-                        "schedule anchor"
-                    )
-                if (
-                    policy_digest is not None
-                    and identity_digests.get("policy") != policy_digest
-                ):
-                    errors.append(
-                        "embedded policy identity does not match caller policy anchor"
-                    )
-                for side in ("baseline", "subject"):
-                    if (
-                        runtimes.get(side) is not None
-                        and identity_digests.get(f"{side}_runtime") != runtimes[side]
-                    ):
-                        errors.append(
-                            f"embedded {side} runtime identity does not match caller "
-                            "runtime anchor"
-                        )
+                )
                 errors.extend(
                     _request_input_binding_errors(request, identities, loaded)
                 )
                 comparison = request.get("comparison")
                 if isinstance(comparison, Mapping) and policy_digest is not None:
+                    provider_names: list[str] = []
                     for side in ("baseline", "subject"):
                         side_request = comparison.get(side)
                         runtime_request = (
@@ -893,13 +989,28 @@ def _verify_comparison_evidence_snapshot(
                                 f"normalized request {side} provider is invalid"
                             )
                             continue
+                        assert isinstance(runtime_request, Mapping)
+                        provider_names.append(provider_name)
+                        settings = runtime_request.get("settings")
                         try:
                             artifact = decode_artifact_identity(
                                 loaded[f"{side}_provider_identity"]
                             )
+                            provider_receipt = decode_runtime_provider_receipt(
+                                loaded[f"{side}_provider_receipt"]
+                            )
                         except ValueError as exc:
                             errors.append(str(exc))
                             continue
+                        errors.extend(
+                            f"{side} {error}"
+                            for error in runtime_request_binding_errors(
+                                provider_name=provider_name,
+                                settings=settings,
+                                artifact_identity=artifact,
+                                receipt=provider_receipt,
+                            )
+                        )
                         errors.extend(
                             runtime_side_config_errors(
                                 loaded[f"{side}_runtime_config"],
@@ -911,6 +1022,10 @@ def _verify_comparison_evidence_snapshot(
                                 schedule_sha256=schedule.schedule_sha256,
                                 policy_digest=policy_digest,
                             )
+                        )
+                    if "llama_cpp" in provider_names and expected_request is None:
+                        errors.append(
+                            "independent request anchor is required for llama_cpp evidence"
                         )
                 if not errors:
                     baseline_side = _runtime_side_from_loaded("baseline", loaded)
@@ -1028,6 +1143,7 @@ def verify_comparison_evidence(
     expected_schedule_digest: str | None,
     expected_runtime_digests: Mapping[str, str] | None,
     expected_signer_fingerprint: str | None,
+    expected_request_digest: str | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
     policy_bytes: bytes | None = None,
 ) -> EvidencePackResult:
@@ -1051,6 +1167,7 @@ def verify_comparison_evidence(
             expected_schedule_digest=expected_schedule_digest,
             expected_runtime_digests=expected_runtime_digests,
             expected_signer_fingerprint=expected_signer_fingerprint,
+            expected_request_digest=expected_request_digest,
         )
 
     manifest_entry = snapshot.files.entry("manifest.json")
@@ -1068,6 +1185,7 @@ def verify_comparison_evidence(
                 expected_schedule_digest=expected_schedule_digest,
                 expected_runtime_digests=expected_runtime_digests,
                 expected_signer_fingerprint=expected_signer_fingerprint,
+                expected_request_digest=expected_request_digest,
                 scorer_registry=scorer_registry,
             )
             materialized_errors = snapshot.files.materialized_stability_errors(
@@ -1082,6 +1200,7 @@ def verify_comparison_evidence(
             expected_schedule_digest=expected_schedule_digest,
             expected_runtime_digests=expected_runtime_digests,
             expected_signer_fingerprint=expected_signer_fingerprint,
+            expected_request_digest=expected_request_digest,
             manifest_digest=manifest_digest,
         )
 

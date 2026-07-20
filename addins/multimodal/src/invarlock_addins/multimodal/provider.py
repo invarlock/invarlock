@@ -48,6 +48,12 @@ from invarlock.core.runtime_provider import (
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
 )
+from invarlock.core.runtime_provider.request_bindings import (
+    HF_VISION_TEXT_REQUEST_SETTINGS as _ALLOWED_SETTINGS,
+)
+from invarlock.core.runtime_provider.request_bindings import (
+    HF_VISION_TEXT_REQUIRED_REQUEST_SETTINGS as _REQUIRED_SETTINGS,
+)
 from invarlock.core.runtime_provider.types import JSONScalar
 from invarlock.runtime_provider_evidence import (
     encode_scoring_observation,
@@ -82,34 +88,6 @@ _MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
 # total work without excluding representative 400-record vision suites; the
 # per-image 50M-pixel and aggregate 512 MiB byte ceilings remain independent.
 _MAX_TOTAL_IMAGE_PIXELS = 2_000_000_000
-_ALLOWED_SETTINGS = frozenset(
-    {
-        "batch_size",
-        "checkpoint_tree_sha256",
-        "context_length",
-        "immutable_revision",
-        "max_output_tokens",
-        "offline",
-        "processor_metadata_sha256",
-        "seed",
-        "timeout_seconds",
-        "tokenizer_metadata_sha256",
-    }
-)
-_REQUIRED_SETTINGS = frozenset(
-    {
-        "batch_size",
-        "checkpoint_tree_sha256",
-        "context_length",
-        "max_output_tokens",
-        "offline",
-        "processor_metadata_sha256",
-        "seed",
-        "timeout_seconds",
-        "tokenizer_metadata_sha256",
-    }
-)
-
 _VISION_TEXT_MODEL_LOADERS = (
     "AutoModelForMultimodalLM",
     "AutoModelForImageTextToText",

@@ -7,6 +7,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from invarlock.evidence_pack_contract import sha256_digest
 from invarlock.evidence_pack_support import EvidencePackStatus
 from invarlock.evidence_verification import (
     EvidenceVerificationError,
@@ -48,6 +49,7 @@ def _verify_kwargs(
         "expected_baseline_runtime": runtimes["baseline"],
         "expected_subject_runtime": runtimes["subject"],
         "expected_signer": signer,
+        "expected_request_digest": sha256_digest((pack / "request.json").read_bytes()),
         "receipt_path": tmp_path / "verification.receipt.json",
         "verifier_signing_key_path": _verifier_key(tmp_path),
         "verifier_identity": "invarlock-verifier/release",

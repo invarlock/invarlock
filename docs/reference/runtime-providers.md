@@ -147,6 +147,9 @@ Every key is required: `artifact_byte_length`, `artifact_sha256`,
 `tokenizer_metadata_sha256`. Digest values are lowercase bare SHA-256 values.
 The provider authenticates the GGUF bytes, typed metadata and tensor inventory,
 tokenizer metadata, and the pinned `llama.cpp` executable and source tree.
+Independent verification also requires the normalized-request digest from the
+reviewed preflight result. It reconciles every GGUF identity, backend, and shared
+execution setting in that request with the authenticated provider receipt.
 
 ### `tensorrt_llm`
 

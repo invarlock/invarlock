@@ -133,6 +133,7 @@ def verify_evidence(
     expected_baseline_runtime: str | None,
     expected_subject_runtime: str | None,
     expected_signer: str | None,
+    expected_request_digest: str | None = None,
     receipt_path: Path | None = None,
     verifier_signing_key_path: Path | None = None,
     verifier_identity: str | None = None,
@@ -236,6 +237,7 @@ def verify_evidence(
         expected_schedule_digest=expected_schedule,
         expected_runtime_digests=runtimes,
         expected_signer_fingerprint=expected_signer,
+        expected_request_digest=expected_request_digest,
         scorer_registry=scorer_registry,
         policy_bytes=policy_bytes,
     )
@@ -250,6 +252,7 @@ def verify_evidence(
             expected_schedule_digest=expected_schedule,
             expected_runtime_digests=runtimes,
             expected_pack_signer_fingerprint=expected_signer,
+            expected_request_digest=expected_request_digest,
             verifier_identity=verifier_identity,
             verifier_signing_key_path=verifier_key,
             trust_profile_digest=trust_profile_digest,

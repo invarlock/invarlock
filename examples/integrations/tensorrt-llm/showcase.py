@@ -60,9 +60,9 @@ def _create_workspace(value: Path | None) -> Paths:
             raise FileExistsError(f"workspace already exists: {workspace}")
         workspace.mkdir()
     paths = _paths(workspace)
-    for directory in (paths.models, paths.work, paths.resources):
-        directory.mkdir()
-        directory.chmod(0o777)
+    paths.models.mkdir(mode=0o755)
+    paths.work.mkdir(mode=0o700)
+    paths.resources.mkdir(mode=0o755)
     return paths
 
 
@@ -95,8 +95,14 @@ def _container_build(
         raise ValueError("GPU device indices must be nonnegative integers")
     helper = Path(__file__).with_name("prepare.py").resolve(strict=True)
     role_work = paths.work / role
-    role_work.mkdir(mode=0o777)
-    role_work.chmod(0o777)
+    role_work.mkdir(mode=0o700)
+    runtime_uid = 65532 if os.geteuid() == 0 else os.geteuid()
+    runtime_gid = 65532 if os.geteuid() == 0 else os.getegid()
+    if os.geteuid() == 0:
+        os.chown(paths.work, runtime_uid, runtime_gid)
+        os.chown(role_work, runtime_uid, runtime_gid)
+    runtime_identity = str(runtime_uid)
+    runtime_user = f"{runtime_uid}:{runtime_gid}"
     command = [
         container_engine,
         "run",
@@ -112,15 +118,15 @@ def _container_build(
         "--pids-limit",
         "4096",
         "--user",
-        "65532:65532",
+        runtime_user,
         "--tmpfs",
         "/tmp:rw,nosuid,nodev,size=16g",
         "--env",
         "HOME=/tmp",
         "--env",
-        "USER=65532",
+        f"USER={runtime_identity}",
         "--env",
-        "LOGNAME=65532",
+        f"LOGNAME={runtime_identity}",
         "--env",
         "LD_LIBRARY_PATH=/usr/local/tensorrt/lib",
         "--mount",

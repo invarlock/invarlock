@@ -109,6 +109,58 @@ def test_candidate_manifest_and_file_identity_require_real_regular_files(
         qualification._file_identity(tmp_path / "missing", label="candidate")
 
 
+def test_candidate_manifest_rejects_linked_and_repeated_wheel_paths(
+    tmp_path: Path,
+) -> None:
+    wheel = tmp_path / "candidate.whl"
+    wheel.write_bytes(b"wheel")
+    linked_manifest = tmp_path / "linked.json"
+    real_manifest = tmp_path / "real.json"
+    linked_manifest.symlink_to(real_manifest)
+    real_manifest.write_text("{}", encoding="utf-8")
+    with pytest.raises(qualification.QualificationError, match="must not traverse"):
+        qualification._candidate_wheel_specs(linked_manifest)
+
+    digest = "sha256:" + "0" * 64
+    real_manifest.write_text(
+        json.dumps(
+            {
+                "format_version": qualification._CANDIDATE_MANIFEST_FORMAT,
+                "wheels": [
+                    {"path": str(wheel), "sha256": digest},
+                    {"path": str(wheel), "sha256": digest},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(qualification.QualificationError, match="invalid or repeated"):
+        qualification._candidate_wheel_specs(real_manifest)
+
+
+def test_file_identity_detects_mutation_during_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = tmp_path / "candidate"
+    payload.write_bytes(b"payload")
+    real_fstat = qualification.os.fstat
+    calls = 0
+
+    def changed(descriptor: int) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        facts = real_fstat(descriptor)
+        if calls == 2:
+            values = list(facts)
+            values[8] += 1
+            return os.stat_result(values)
+        return facts
+
+    monkeypatch.setattr(qualification.os, "fstat", changed)
+    with pytest.raises(qualification.QualificationError, match="changed while"):
+        qualification._file_identity(payload, label="candidate")
+
+
 def test_python_identity_rejects_missing_nonexecutable_and_changed_interpreters(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -161,6 +213,19 @@ def test_python_identity_rechecks_resolution_and_execution(
         qualification._python_identity(str(executable))
 
 
+def test_python_identity_checks_resolved_executable_permission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "python"
+    executable.write_text("#!/bin/sh\n", encoding="utf-8")
+    executable.chmod(0o600)
+    monkeypatch.setattr(
+        qualification, "qualification_python", lambda _value: executable
+    )
+    with pytest.raises(qualification.QualificationError, match="must be executable"):
+        qualification._python_identity(str(executable))
+
+
 def _wheel(metadata: bytes, *, second_metadata: bool = False) -> zipfile.ZipFile:
     output = io.BytesIO()
     with zipfile.ZipFile(output, mode="w") as archive:
@@ -198,6 +263,138 @@ def test_candidate_member_write_is_no_clobber(tmp_path: Path) -> None:
         qualification._write_candidate_member(destination, b"second")
 
 
+def test_candidate_member_write_closes_descriptor_after_fdopen_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "package/module.py"
+    real_fdopen = qualification.os.fdopen
+    descriptor: int | None = None
+
+    def fail_fdopen(value: int, *_args: object, **_kwargs: object) -> object:
+        nonlocal descriptor
+        descriptor = value
+        raise OSError("fdopen failed")
+
+    monkeypatch.setattr(qualification.os, "fdopen", fail_fdopen)
+    with pytest.raises(qualification.QualificationError, match="extraction failed"):
+        qualification._write_candidate_member(destination, b"payload")
+    assert descriptor is not None
+    with pytest.raises(OSError):
+        os.fstat(descriptor)
+    monkeypatch.setattr(qualification.os, "fdopen", real_fdopen)
+
+
+def _candidate_wheel_with_members(
+    tmp_path: Path,
+    members: tuple[tuple[zipfile.ZipInfo | str, bytes], ...],
+) -> qualification.CandidateWheelSpec:
+    wheel = tmp_path / "candidate.whl"
+    with zipfile.ZipFile(wheel, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "invarlock-1.dist-info/METADATA",
+            b"Name: invarlock\nVersion: 1\n",
+        )
+        for member, payload in members:
+            archive.writestr(member, payload)
+    return qualification.CandidateWheelSpec(
+        path=wheel,
+        sha256="sha256:" + qualification.hashlib.sha256(wheel.read_bytes()).hexdigest(),
+    )
+
+
+def _capture_candidate(
+    spec: qualification.CandidateWheelSpec, *, tmp_path: Path
+) -> qualification.CandidateWheelIdentity:
+    candidate_site = tmp_path / f"site-{len(tuple(tmp_path.glob('site-*')))}"
+    candidate_site.mkdir()
+    return qualification._capture_candidate_wheel(
+        spec,
+        archived={},
+        candidate_site=candidate_site,
+    )
+
+
+def test_candidate_wheel_rejects_bounded_and_empty_archives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = _candidate_wheel_with_members(tmp_path, ())
+    monkeypatch.setattr(qualification, "_MAX_CANDIDATE_WHEEL_BYTES", 1)
+    with pytest.raises(qualification.QualificationError, match="bounded regular file"):
+        _capture_candidate(spec, tmp_path=tmp_path)
+
+    monkeypatch.setattr(qualification, "_MAX_CANDIDATE_WHEEL_BYTES", 1024 * 1024)
+    spec.path.unlink()
+    with zipfile.ZipFile(spec.path, "w"):
+        pass
+    empty = qualification.CandidateWheelSpec(
+        path=spec.path,
+        sha256="sha256:"
+        + qualification.hashlib.sha256(spec.path.read_bytes()).hexdigest(),
+    )
+    with pytest.raises(qualification.QualificationError, match="inventory is invalid"):
+        _capture_candidate(empty, tmp_path=tmp_path)
+
+
+def test_candidate_wheel_rejects_duplicate_and_unsafe_members(
+    tmp_path: Path,
+) -> None:
+    with pytest.warns(UserWarning, match="Duplicate name"):
+        duplicate = _candidate_wheel_with_members(
+            tmp_path,
+            (("invarlock/repeated.py", b"one"), ("invarlock/repeated.py", b"two")),
+        )
+    with pytest.raises(qualification.QualificationError, match="repeats an archive"):
+        _capture_candidate(duplicate, tmp_path=tmp_path)
+
+    duplicate.path.unlink()
+    unsafe = _candidate_wheel_with_members(tmp_path, (("../escape.py", b"bad"),))
+    with pytest.raises(qualification.QualificationError, match="unsafe member"):
+        _capture_candidate(unsafe, tmp_path=tmp_path)
+
+
+def test_candidate_wheel_rejects_member_and_expansion_bounds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = _candidate_wheel_with_members(tmp_path, (("invarlock/large.py", b"x" * 80),))
+    monkeypatch.setattr(qualification, "_MAX_CANDIDATE_WHEEL_MEMBER_BYTES", 64)
+    with pytest.raises(qualification.QualificationError, match="member is too large"):
+        _capture_candidate(spec, tmp_path=tmp_path)
+
+    monkeypatch.setattr(qualification, "_MAX_CANDIDATE_WHEEL_MEMBER_BYTES", 4096)
+    spec.path.unlink()
+    spec = _candidate_wheel_with_members(
+        tmp_path, (("invarlock/compressed.py", b"x" * 4096),)
+    )
+    monkeypatch.setattr(
+        qualification,
+        "_MAX_CANDIDATE_WHEEL_BYTES",
+        max(spec.path.stat().st_size + 1, 1024),
+    )
+    with pytest.raises(qualification.QualificationError, match="expands beyond"):
+        _capture_candidate(spec, tmp_path=tmp_path)
+
+
+def test_candidate_wheel_handles_directories_and_rejects_hooks_and_unbound_payloads(
+    tmp_path: Path,
+) -> None:
+    directory = zipfile.ZipInfo("invarlock/")
+    directory.external_attr = 0o40775 << 16
+    valid = _candidate_wheel_with_members(tmp_path, ((directory, b""),))
+    assert _capture_candidate(valid, tmp_path=tmp_path).distribution == "invarlock"
+
+    valid.path.unlink()
+    hook = _candidate_wheel_with_members(
+        tmp_path, (("invarlock-1.dist-info/bootstrap.pth", b"import bad"),)
+    )
+    with pytest.raises(qualification.QualificationError, match="import hook"):
+        _capture_candidate(hook, tmp_path=tmp_path)
+
+    hook.path.unlink()
+    unbound = _candidate_wheel_with_members(tmp_path, (("foreign/data.txt", b"bad"),))
+    with pytest.raises(qualification.QualificationError, match="unbound payload"):
+        _capture_candidate(unbound, tmp_path=tmp_path)
+
+
 def test_source_archive_rejects_invalid_identity_inventory_and_entries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -227,6 +424,60 @@ def test_source_archive_rejects_invalid_identity_inventory_and_entries(
     with pytest.raises(qualification.QualificationError, match="inventory is empty"):
         qualification._source_archive_files(
             _tar(comment=commit, members=((ignored, ignored_payload),)),
+            source_commit=commit,
+        )
+
+
+def test_source_archive_rejects_unsafe_duplicate_unreadable_and_large_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commit = "a" * 40
+    unsafe, unsafe_payload = _regular_member("src/invarlock/../escape.py", b"unsafe")
+    with pytest.raises(qualification.QualificationError, match="path is unsafe"):
+        qualification._source_archive_files(
+            _tar(comment=commit, members=((unsafe, unsafe_payload),)),
+            source_commit=commit,
+        )
+
+    first, first_payload = _regular_member("scripts/runtime_qualification.py", b"one")
+    second, second_payload = _regular_member("scripts/runtime_qualification.py", b"two")
+    with pytest.raises(qualification.QualificationError, match="repeats"):
+        qualification._source_archive_files(
+            _tar(
+                comment=commit,
+                members=((first, first_payload), (second, second_payload)),
+            ),
+            source_commit=commit,
+        )
+
+    source, source_payload = _regular_member(
+        "scripts/runtime_qualification.py", b"source"
+    )
+    real_extractfile = tarfile.TarFile.extractfile
+    monkeypatch.setattr(tarfile.TarFile, "extractfile", lambda *_args: None)
+    with pytest.raises(qualification.QualificationError, match="unreadable"):
+        qualification._source_archive_files(
+            _tar(comment=commit, members=((source, source_payload),)),
+            source_commit=commit,
+        )
+
+    monkeypatch.setattr(tarfile.TarFile, "extractfile", real_extractfile)
+    monkeypatch.setattr(qualification, "_MAX_SOURCE_MEMBER_BYTES", 1)
+    with pytest.raises(qualification.QualificationError, match="entry is invalid"):
+        qualification._source_archive_files(
+            _tar(comment=commit, members=((source, source_payload),)),
+            source_commit=commit,
+        )
+
+    monkeypatch.setattr(qualification, "_MAX_SOURCE_MEMBER_BYTES", 10)
+    monkeypatch.setattr(
+        tarfile.TarFile,
+        "extractfile",
+        lambda *_args: io.BytesIO(b"x" * 11),
+    )
+    with pytest.raises(qualification.QualificationError, match="entry is too large"):
+        qualification._source_archive_files(
+            _tar(comment=commit, members=((source, source_payload),)),
             source_commit=commit,
         )
 

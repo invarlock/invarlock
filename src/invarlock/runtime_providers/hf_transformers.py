@@ -25,6 +25,7 @@ from invarlock.core.checkpoint_identity import (
 from invarlock.core.runtime_provider import (
     INVARLOCK_RUNTIME_PROVIDER_ABI,
     EvaluationBatch,
+    EvaluationRecord,
     HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
@@ -42,6 +43,12 @@ from invarlock.core.runtime_provider import (
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
+)
+from invarlock.core.runtime_provider.request_bindings import (
+    HF_TRANSFORMERS_REQUEST_SETTINGS as _ALLOWED_SETTINGS,
+)
+from invarlock.core.runtime_provider.request_bindings import (
+    HF_TRANSFORMERS_REQUIRED_REQUEST_SETTINGS as _REQUIRED_RECEIPT_SETTINGS,
 )
 from invarlock.core.runtime_provider.types import (
     JSONScalar,
@@ -68,31 +75,8 @@ from invarlock.runtime_security_helpers import (
     third_party_plugins_allowed,
 )
 
-_ALLOWED_SETTINGS = frozenset(
-    {
-        "batch_size",
-        "checkpoint_tree_sha256",
-        "context_length",
-        "immutable_revision",
-        "max_output_tokens",
-        "offline",
-        "seed",
-        "timeout_seconds",
-        "tokenizer_metadata_sha256",
-    }
-)
 _POSITIVE_INTEGER_SETTINGS = frozenset(
     {"batch_size", "context_length", "max_output_tokens", "timeout_seconds"}
-)
-_REQUIRED_RECEIPT_SETTINGS = frozenset(
-    {
-        "batch_size",
-        "context_length",
-        "max_output_tokens",
-        "offline",
-        "seed",
-        "timeout_seconds",
-    }
 )
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
@@ -1121,6 +1105,252 @@ def require_loaded_hf_checkpoint_binding(
         raise RuntimeError("strict HF checkpoint tree changed during model binding")
 
 
+def _hf_model_inputs(
+    *,
+    record: EvaluationRecord,
+    tokenizer_call: Callable[..., object],
+    settings: RuntimeExecutionSettings,
+    device: object,
+) -> Any:
+    if record.input_parts:
+        if len(record.input_parts) != 1 or (
+            record.input_parts[0].kind != "text"
+            or record.input_parts[0].role != "prompt"
+        ):
+            raise ValueError(
+                "built-in HF causal execution requires one prompt text input part"
+            )
+        expected_input_sha256 = evaluation_input_parts_sha256(record.input_parts)
+    else:
+        expected_input_sha256 = hashlib.sha256(
+            record.input_text.encode("utf-8")
+        ).hexdigest()
+    if expected_input_sha256 != record.input_sha256:
+        raise ValueError("runtime evaluation input does not match input_sha256")
+    encoded = tokenizer_call(
+        record.input_text,
+        add_special_tokens=True,
+        max_length=settings.context_length,
+        return_tensors="pt",
+        truncation=True,
+    )
+    if not isinstance(encoded, Mapping) or "input_ids" not in encoded:
+        raise RuntimeError("strict HF tokenizer did not return input_ids")
+    model_inputs = {
+        key: value.to(device) for key, value in encoded.items() if hasattr(value, "to")
+    }
+    input_ids = model_inputs.get("input_ids")
+    if input_ids is None or input_ids.ndim != 2 or input_ids.shape[0] != 1:
+        raise RuntimeError("strict HF tokenizer returned invalid input_ids")
+    if input_ids.shape[1] < 1:
+        raise RuntimeError("strict HF tokenizer returned empty input_ids")
+    return input_ids
+
+
+def _hf_causal_logits(model: object, torch: Any, window: Any) -> Any:
+    result = cast(Any, model)(
+        input_ids=window,
+        attention_mask=torch.ones_like(window),
+        return_dict=True,
+        use_cache=False,
+    )
+    logits = getattr(result, "logits", None)
+    if (
+        logits is None
+        or logits.ndim != 3
+        or logits.shape[0] != 1
+        or logits.shape[1] != window.shape[1]
+        or not bool(torch.isfinite(logits[:, -1, :]).all())
+    ):
+        raise RuntimeError("strict HF model returned invalid causal logits")
+    return logits
+
+
+def _hf_normalized_nll(
+    *,
+    record: EvaluationRecord,
+    tokenizer_call: Callable[..., object],
+    decode: Callable[..., object],
+    model: object,
+    torch: Any,
+    input_ids: Any,
+    device: object,
+    settings: RuntimeExecutionSettings,
+    deadline: float,
+) -> tuple[float, int, int]:
+    if record.expected_output is None:
+        raise ValueError("strict HF normalized NLL requires expected_output")
+    target = tokenizer_call(
+        record.expected_output,
+        add_special_tokens=False,
+        return_tensors="pt",
+        truncation=False,
+    )
+    if not isinstance(target, Mapping) or "input_ids" not in target:
+        raise RuntimeError("strict HF tokenizer did not return target input_ids")
+    target_ids = target["input_ids"]
+    if hasattr(target_ids, "to"):
+        target_ids = target_ids.to(device)
+    if (
+        not hasattr(target_ids, "ndim")
+        or target_ids.ndim != 2
+        or target_ids.shape[0] != 1
+        or target_ids.shape[1] < 1
+    ):
+        raise RuntimeError("strict HF tokenizer returned invalid target input_ids")
+    target_count = int(target_ids.shape[1])
+    if target_count > settings.max_output_tokens:
+        raise ValueError("strict HF normalized NLL target exceeds max_output_tokens")
+    prompt_ids = [
+        int(input_ids[0, index].item()) for index in range(input_ids.shape[1])
+    ]
+    continuation_ids = [
+        int(target_ids[0, index].item()) for index in range(target_count)
+    ]
+    decoded_prompt = decode(
+        prompt_ids,
+        clean_up_tokenization_spaces=False,
+        skip_special_tokens=False,
+    )
+    decoded_continuation = decode(
+        prompt_ids + continuation_ids,
+        clean_up_tokenization_spaces=False,
+        skip_special_tokens=False,
+    )
+    if (
+        not isinstance(decoded_prompt, str)
+        or not isinstance(decoded_continuation, str)
+        or decoded_continuation != decoded_prompt + record.expected_output
+    ):
+        raise ValueError(
+            "strict HF normalized NLL target is not an exact tokenizer continuation "
+            "of the prompt"
+        )
+    history = input_ids
+    target_logprobs: list[float] = []
+    for target_index in range(target_count):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("strict HF normalized NLL scoring timed out")
+        window = history[:, -settings.context_length :]
+        logits = _hf_causal_logits(model, torch, window)
+        target_token = target_ids[:, target_index : target_index + 1]
+        if int(target_token.item()) < 0 or int(target_token.item()) >= logits.shape[-1]:
+            raise RuntimeError("strict HF target token is outside the model vocabulary")
+        token_logprob = torch.log_softmax(logits[:, -1, :], dim=-1).gather(
+            1, target_token
+        )
+        value = float(token_logprob.item())
+        if not math.isfinite(value) or value > 0:
+            raise RuntimeError("strict HF model returned an invalid target logprob")
+        target_logprobs.append(value)
+        history = torch.cat((history, target_token), dim=1)
+    return (
+        math.fsum(target_logprobs),
+        target_count,
+        len(record.expected_output.encode("utf-8")),
+    )
+
+
+def _hf_exact_match_output(
+    *,
+    tokenizer: object,
+    decode: Callable[..., object],
+    model: object,
+    torch: Any,
+    input_ids: Any,
+    settings: RuntimeExecutionSettings,
+    deadline: float,
+) -> str:
+    generated = input_ids
+    new_tokens: list[int] = []
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    for _ in range(settings.max_output_tokens):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("strict HF causal scoring timed out")
+        window = generated[:, -settings.context_length :]
+        logits = _hf_causal_logits(model, torch, window)
+        next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
+        token_id = int(next_token.item())
+        new_tokens.append(token_id)
+        generated = torch.cat((generated, next_token), dim=1)
+        if (
+            isinstance(eos_token_id, int)
+            and not isinstance(eos_token_id, bool)
+            and token_id == eos_token_id
+        ):
+            break
+    output = decode(
+        new_tokens,
+        clean_up_tokenization_spaces=False,
+        skip_special_tokens=True,
+    )
+    try:
+        return exact_match_output_text(output)
+    except ValueError as exc:
+        raise RuntimeError(
+            "strict HF tokenizer returned invalid user-visible text"
+        ) from exc
+
+
+def _hf_score_record(
+    *,
+    record: EvaluationRecord,
+    metric: str,
+    tokenizer: object,
+    tokenizer_call: Callable[..., object],
+    decode: Callable[..., object],
+    model: object,
+    torch: Any,
+    device: object,
+    settings: RuntimeExecutionSettings,
+) -> RuntimeScoringRecord:
+    deadline = time.monotonic() + settings.timeout_seconds
+    input_ids = _hf_model_inputs(
+        record=record,
+        tokenizer_call=tokenizer_call,
+        settings=settings,
+        device=device,
+    )
+    nll_facts = None
+    output_text = None
+    if metric == "normalized_nll_per_utf8_byte":
+        nll_facts = _hf_normalized_nll(
+            record=record,
+            tokenizer_call=tokenizer_call,
+            decode=decode,
+            model=model,
+            torch=torch,
+            input_ids=input_ids,
+            device=device,
+            settings=settings,
+            deadline=deadline,
+        )
+    elif metric == "exact_match":
+        output_text = _hf_exact_match_output(
+            tokenizer=tokenizer,
+            decode=decode,
+            model=model,
+            torch=torch,
+            input_ids=input_ids,
+            settings=settings,
+            deadline=deadline,
+        )
+    else:
+        raise ValueError(f"unsupported built-in HF metric {metric!r}")
+    return RuntimeScoringRecord(
+        record_id=record.record_id,
+        input_sha256=record.input_sha256,
+        status="ok",
+        output_text=output_text,
+        output_sha256=(
+            _sha256(output_text.encode("utf-8")) if output_text is not None else None
+        ),
+        logprob_sum=(nll_facts[0] if nll_facts else None),
+        token_count=(nll_facts[1] if nll_facts else None),
+        utf8_byte_count=(nll_facts[2] if nll_facts else None),
+    )
+
+
 @dataclass(frozen=True)
 class HFTransformersCausalScorer:
     """Provider-owned deterministic scorer bound to one model and tokenizer."""
@@ -1181,237 +1411,20 @@ class HFTransformersCausalScorer:
                 torch.manual_seed(settings.seed)
                 if getattr(device, "type", None) == "cuda":
                     torch.cuda.manual_seed_all(settings.seed)
+                if batch.task != "text_causal":
+                    raise ValueError("built-in HF execution supports only text_causal")
                 for record in batch.records:
-                    deadline = time.monotonic() + settings.timeout_seconds
-                    if batch.task != "text_causal":
-                        raise ValueError(
-                            "built-in HF execution supports only text_causal"
-                        )
-                    if record.input_parts:
-                        if len(record.input_parts) != 1 or (
-                            record.input_parts[0].kind != "text"
-                            or record.input_parts[0].role != "prompt"
-                        ):
-                            raise ValueError(
-                                "built-in HF causal execution requires one prompt "
-                                "text input part"
-                            )
-                        expected_input_sha256 = evaluation_input_parts_sha256(
-                            record.input_parts
-                        )
-                    else:
-                        expected_input_sha256 = hashlib.sha256(
-                            record.input_text.encode("utf-8")
-                        ).hexdigest()
-                    if expected_input_sha256 != record.input_sha256:
-                        raise ValueError(
-                            "runtime evaluation input does not match input_sha256"
-                        )
-                    encoded = tokenizer_call(
-                        record.input_text,
-                        add_special_tokens=True,
-                        max_length=settings.context_length,
-                        return_tensors="pt",
-                        truncation=True,
-                    )
-                    if not isinstance(encoded, Mapping) or "input_ids" not in encoded:
-                        raise RuntimeError(
-                            "strict HF tokenizer did not return input_ids"
-                        )
-                    model_inputs = {
-                        key: value.to(device)
-                        for key, value in encoded.items()
-                        if hasattr(value, "to")
-                    }
-                    input_ids = model_inputs.get("input_ids")
-                    if (
-                        input_ids is None
-                        or input_ids.ndim != 2
-                        or input_ids.shape[0] != 1
-                    ):
-                        raise RuntimeError(
-                            "strict HF tokenizer returned invalid input_ids"
-                        )
-                    if input_ids.shape[1] < 1:
-                        raise RuntimeError(
-                            "strict HF tokenizer returned empty input_ids"
-                        )
-                    nll_facts: tuple[float, int, int] | None = None
-                    if batch.metric == "normalized_nll_per_utf8_byte":
-                        if record.expected_output is None:
-                            raise ValueError(
-                                "strict HF normalized NLL requires expected_output"
-                            )
-                        target = tokenizer_call(
-                            record.expected_output,
-                            add_special_tokens=False,
-                            return_tensors="pt",
-                            truncation=False,
-                        )
-                        if not isinstance(target, Mapping) or "input_ids" not in target:
-                            raise RuntimeError(
-                                "strict HF tokenizer did not return target input_ids"
-                            )
-                        target_ids = target["input_ids"]
-                        if hasattr(target_ids, "to"):
-                            target_ids = target_ids.to(device)
-                        if (
-                            not hasattr(target_ids, "ndim")
-                            or target_ids.ndim != 2
-                            or target_ids.shape[0] != 1
-                            or target_ids.shape[1] < 1
-                        ):
-                            raise RuntimeError(
-                                "strict HF tokenizer returned invalid target input_ids"
-                            )
-                        target_count = int(target_ids.shape[1])
-                        if target_count > settings.max_output_tokens:
-                            raise ValueError(
-                                "strict HF normalized NLL target exceeds "
-                                "max_output_tokens"
-                            )
-                        prompt_token_ids = [
-                            int(input_ids[0, index].item())
-                            for index in range(int(input_ids.shape[1]))
-                        ]
-                        target_token_ids = [
-                            int(target_ids[0, index].item())
-                            for index in range(target_count)
-                        ]
-                        decoded_prompt = decode(
-                            prompt_token_ids,
-                            clean_up_tokenization_spaces=False,
-                            skip_special_tokens=False,
-                        )
-                        decoded_continuation = decode(
-                            prompt_token_ids + target_token_ids,
-                            clean_up_tokenization_spaces=False,
-                            skip_special_tokens=False,
-                        )
-                        if (
-                            not isinstance(decoded_prompt, str)
-                            or not isinstance(decoded_continuation, str)
-                            or decoded_continuation
-                            != decoded_prompt + record.expected_output
-                        ):
-                            raise ValueError(
-                                "strict HF normalized NLL target is not an exact "
-                                "tokenizer continuation of the prompt"
-                            )
-                        history = input_ids
-                        target_logprobs: list[float] = []
-                        for target_index in range(target_count):
-                            if time.monotonic() >= deadline:
-                                raise TimeoutError(
-                                    "strict HF normalized NLL scoring timed out"
-                                )
-                            window = history[:, -settings.context_length :]
-                            attention_mask = torch.ones_like(window)
-                            result = self.model(
-                                input_ids=window,
-                                attention_mask=attention_mask,
-                                return_dict=True,
-                                use_cache=False,
-                            )
-                            logits = getattr(result, "logits", None)
-                            if (
-                                logits is None
-                                or logits.ndim != 3
-                                or logits.shape[0] != 1
-                                or logits.shape[1] != window.shape[1]
-                                or not bool(torch.isfinite(logits[:, -1, :]).all())
-                            ):
-                                raise RuntimeError(
-                                    "strict HF model returned invalid causal logits"
-                                )
-                            target_token = target_ids[
-                                :, target_index : target_index + 1
-                            ]
-                            if (
-                                int(target_token.item()) < 0
-                                or int(target_token.item()) >= logits.shape[-1]
-                            ):
-                                raise RuntimeError(
-                                    "strict HF target token is outside the model vocabulary"
-                                )
-                            token_logprob = torch.log_softmax(
-                                logits[:, -1, :], dim=-1
-                            ).gather(1, target_token)
-                            value = float(token_logprob.item())
-                            if not math.isfinite(value) or value > 0:
-                                raise RuntimeError(
-                                    "strict HF model returned an invalid target logprob"
-                                )
-                            target_logprobs.append(value)
-                            history = torch.cat((history, target_token), dim=1)
-                        nll_facts = (
-                            math.fsum(target_logprobs),
-                            target_count,
-                            len(record.expected_output.encode("utf-8")),
-                        )
-                    output_text: str | None = None
-                    if batch.metric == "exact_match":
-                        generated = input_ids
-                        new_tokens: list[int] = []
-                        eos_token_id = getattr(self.tokenizer, "eos_token_id", None)
-                        for _ in range(settings.max_output_tokens):
-                            if time.monotonic() >= deadline:
-                                raise TimeoutError("strict HF causal scoring timed out")
-                            window = generated[:, -settings.context_length :]
-                            attention_mask = torch.ones_like(window)
-                            result = self.model(
-                                input_ids=window,
-                                attention_mask=attention_mask,
-                                return_dict=True,
-                                use_cache=False,
-                            )
-                            logits = getattr(result, "logits", None)
-                            if (
-                                logits is None
-                                or logits.ndim != 3
-                                or logits.shape[0] != 1
-                                or logits.shape[1] != window.shape[1]
-                                or not bool(torch.isfinite(logits[:, -1, :]).all())
-                            ):
-                                raise RuntimeError(
-                                    "strict HF model returned invalid causal logits"
-                                )
-                            next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
-                            token_id = int(next_token.item())
-                            new_tokens.append(token_id)
-                            generated = torch.cat((generated, next_token), dim=1)
-                            if (
-                                isinstance(eos_token_id, int)
-                                and not isinstance(eos_token_id, bool)
-                                and token_id == eos_token_id
-                            ):
-                                break
-                        assert callable(decode)
-                        output_text = decode(
-                            new_tokens,
-                            clean_up_tokenization_spaces=False,
-                            skip_special_tokens=True,
-                        )
-                        try:
-                            output_text = exact_match_output_text(output_text)
-                        except ValueError as exc:
-                            raise RuntimeError(
-                                "strict HF tokenizer returned invalid user-visible text"
-                            ) from exc
                     records.append(
-                        RuntimeScoringRecord(
-                            record_id=record.record_id,
-                            input_sha256=record.input_sha256,
-                            status="ok",
-                            output_text=output_text,
-                            output_sha256=(
-                                _sha256(output_text.encode("utf-8"))
-                                if output_text is not None
-                                else None
-                            ),
-                            logprob_sum=(nll_facts[0] if nll_facts else None),
-                            token_count=(nll_facts[1] if nll_facts else None),
-                            utf8_byte_count=(nll_facts[2] if nll_facts else None),
+                        _hf_score_record(
+                            record=record,
+                            metric=batch.metric,
+                            tokenizer=self.tokenizer,
+                            tokenizer_call=tokenizer_call,
+                            decode=decode,
+                            model=self.model,
+                            torch=torch,
+                            device=device,
+                            settings=settings,
                         )
                     )
         finally:

@@ -507,6 +507,23 @@ def test_text_scorer_extension_fails_closed_without_authorized_registry(
         )
 
 
+def test_text_scorer_extension_fails_closed_when_authorized_scorer_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    registry, binding = _text_scorer_registry_and_binding()
+    material = _materialize_request(
+        tmp_path, scorer_binding=binding, scorer_registry=registry
+    )
+    evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+
+    with pytest.raises(EvaluationTransactionError, match="not installed or enabled"):
+        evaluate_request_file(
+            material["request"],  # type: ignore[arg-type]
+            signing_key_path=evidence_key,
+            scorer_registry=ScorerExtensionRegistry(),
+        )
+
+
 @pytest.mark.parametrize("pin", ["descriptor_sha256", "configuration_sha256"])
 def test_text_scorer_extension_rejects_policy_pin_mismatch(
     tmp_path: Path, pin: str

@@ -95,6 +95,37 @@ def test_request_file_detects_identity_change_during_read(
         transaction._read_request_file(tmp_path, source, label="fixture")
 
 
+def test_request_file_enforces_stream_bound_when_open_file_grows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source.json"
+    source.write_bytes(b"")
+    reads = iter((b"ab", b""))
+    monkeypatch.setattr(transaction.os, "read", lambda *_args: next(reads))
+
+    with pytest.raises(EvaluationTransactionError, match="size limit"):
+        transaction._read_request_file(
+            tmp_path,
+            source,
+            label="fixture",
+            max_bytes=1,
+        )
+
+
+def test_output_parent_closes_intermediate_directory_descriptors(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "one" / "two" / "evidence"
+
+    anchor = transaction._prepare_output_parent(tmp_path, destination)
+
+    try:
+        assert destination.parent.is_dir()
+        transaction._revalidate_output_parent(anchor, destination, published=False)
+    finally:
+        anchor.close()
+
+
 def test_output_parent_rejects_existing_and_unsafe_components(tmp_path: Path) -> None:
     existing = tmp_path / "artifacts" / "evidence"
     existing.mkdir(parents=True)
@@ -151,6 +182,27 @@ def test_output_anchor_revalidation_rejects_changed_published_path(
         monkeypatch.setattr(Path, "lstat", lambda _self: replacement_stat)
         with pytest.raises(EvaluationTransactionError, match="escaped"):
             transaction._revalidate_output_parent(anchor, destination, published=True)
+    finally:
+        anchor.close()
+
+
+def test_output_anchor_revalidation_rejects_parent_inode_drift(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "artifacts" / "evidence"
+    anchor = transaction._prepare_output_parent(tmp_path, destination)
+    real_fstat = transaction.os.fstat
+
+    def changed_parent(descriptor: int) -> os.stat_result:
+        file_stat = real_fstat(descriptor)
+        values = list(file_stat)
+        values[1] = file_stat.st_ino + 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(transaction.os, "fstat", changed_parent)
+    try:
+        with pytest.raises(EvaluationTransactionError, match="parent changed"):
+            transaction._revalidate_output_parent(anchor, destination, published=False)
     finally:
         anchor.close()
 
@@ -224,6 +276,27 @@ def test_output_destination_rejects_existing_escaped_and_unwritable_paths(
     monkeypatch.setattr(transaction.os, "access", lambda *_args: False)
     with pytest.raises(EvaluationTransactionError, match="not writable"):
         transaction._validate_output_destination(writable)
+
+
+def test_output_destination_rejects_when_no_ancestor_belongs_to_request_root(
+    tmp_path: Path,
+) -> None:
+    missing_root = tmp_path / "missing-request-root"
+    request = type(
+        "Request",
+        (),
+        {
+            "root": missing_root,
+            "output": type(
+                "Output",
+                (),
+                {"evidence": missing_root / "nested" / "evidence"},
+            )(),
+        },
+    )()
+
+    with pytest.raises(EvaluationTransactionError, match="not a real directory"):
+        transaction._validate_output_destination(request)
 
 
 def test_prepare_inputs_requires_signing_key() -> None:

@@ -44,6 +44,9 @@ def _case(tmp_path: Path) -> dict[str, object]:
     profile_policy = trust_root / "policy.json"
     profile_policy.write_bytes(policy.read_bytes())
     verifier_key, verifier_fingerprint = _verifier_key(trust_root / "verifier.pem")
+    request_digest = (
+        "sha256:" + hashlib.sha256((pack / "request.json").read_bytes()).hexdigest()
+    )
     profile = trust_root / "trust-inputs.json"
     profile.write_text(
         json.dumps(
@@ -57,6 +60,7 @@ def _case(tmp_path: Path) -> dict[str, object]:
                     "baseline_runtime_digest": runtimes["baseline"],
                     "subject_runtime_digest": runtimes["subject"],
                     "evidence_signer_fingerprint": signer,
+                    "request_digest": request_digest,
                 },
                 "verifier": {
                     "identity": "invarlock-verifier/release",
@@ -80,6 +84,7 @@ def _case(tmp_path: Path) -> dict[str, object]:
         "profile": profile,
         "verifier_key": verifier_key,
         "verifier_fingerprint": verifier_fingerprint,
+        "request_digest": request_digest,
     }
 
 
@@ -118,6 +123,8 @@ def test_profile_and_explicit_verification_have_the_same_decision_and_anchors(
             str(runtimes["subject"]),
             "--expected-signer",
             str(case["signer"]),
+            "--expected-request-digest",
+            str(case["request_digest"]),
             "--receipt",
             str(explicit_receipt),
             "--verifier-signing-key",
@@ -168,6 +175,7 @@ def test_profile_and_explicit_verification_have_the_same_decision_and_anchors(
             "subject": str(runtimes["subject"]),
         },
         expected_pack_signer_fingerprint=str(case["signer"]),
+        expected_request_digest=str(case["request_digest"]),
         expected_verifier_identity="invarlock-verifier/release",
         expected_verifier_fingerprint=str(case["verifier_fingerprint"]),
         expected_trust_profile_digest=loaded.profile_digest,
@@ -182,6 +190,7 @@ def test_profile_ignores_environment_anchors_and_rejects_cli_mixing(
     runner = CliRunner()
     monkeypatch.setenv("INVARLOCK_POLICY", "/missing/from/environment")
     monkeypatch.setenv("INVARLOCK_EXPECTED_BASELINE_ARTIFACT", "sha256:bad")
+    monkeypatch.setenv("INVARLOCK_EXPECTED_REQUEST_DIGEST", "sha256:bad")
     monkeypatch.setenv("INVARLOCK_ALLOW_INSTALLED_SCORERS", "1")
     receipt = tmp_path / "environment.receipt.json"
 

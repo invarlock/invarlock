@@ -48,6 +48,7 @@ def built_addins(tmp_path_factory: pytest.TempPathFactory) -> Path:
             isolated_source,
             ignore=shutil.ignore_patterns(
                 ".DS_Store",
+                ".venv*",
                 "__pycache__",
                 "*.egg-info",
                 "build",

@@ -210,6 +210,7 @@ The preferred form uses one closed `invarlock/trust-inputs-v1` object:
     "baseline_artifact_digest": "sha256:...",
     "baseline_runtime_digest": "sha256:...",
     "evidence_signer_fingerprint": "sha256:...",
+    "request_digest": "sha256:...",
     "schedule_digest": "sha256:...",
     "subject_artifact_digest": "sha256:...",
     "subject_runtime_digest": "sha256:..."
@@ -231,6 +232,10 @@ an error. The profile, its policy, and its verifier key must remain outside the
 submitted evidence directory. The canonical profile digest is included in the
 signed receipt.
 
+`request_digest` is optional for existing non-GGUF evidence and required when
+either request side selects `llama_cpp`. Record it from the execution-free
+`evaluate --preflight --json` result after reviewing the normalized request.
+
 For systems that already keep each anchor separately, the equivalent explicit
 form remains available:
 
@@ -243,6 +248,7 @@ invarlock verify EVIDENCE \
   --expected-baseline-runtime sha256:... \
   --expected-subject-runtime sha256:... \
   --expected-signer sha256:... \
+  [--expected-request-digest sha256:...] \
   --receipt verification.receipt.json \
   --verifier-signing-key verifier.pem \
   --verifier-identity release-verifier \
@@ -264,6 +270,7 @@ from the caller and writes a signed receipt outside the bundle.
 | `--expected-baseline-runtime DIGEST` | Yes | `INVARLOCK_EXPECTED_BASELINE_RUNTIME` | Expected baseline outer-image digest |
 | `--expected-subject-runtime DIGEST` | Yes | `INVARLOCK_EXPECTED_SUBJECT_RUNTIME` | Expected subject outer-image digest |
 | `--expected-signer FINGERPRINT` | Yes | `INVARLOCK_EXPECTED_SIGNER` | Expected Ed25519 evidence-signer fingerprint |
+| `--expected-request-digest DIGEST` | For `llama_cpp`; optional otherwise | `INVARLOCK_EXPECTED_REQUEST_DIGEST` | Approved normalized-request digest, including provider backend and execution settings |
 | `--receipt PATH` | Yes | None | New receipt path outside the pack |
 | `--verifier-signing-key PATH` | Yes | `INVARLOCK_VERIFIER_SIGNING_KEY` | Independent verifier Ed25519 private key |
 | `--verifier-identity TEXT` | Yes | `INVARLOCK_VERIFIER_IDENTITY` | Stable verifier name placed in the receipt |
@@ -277,7 +284,8 @@ the evidence directory and must not already exist.
 Verification checks the closed manifest, evidence signature, checksums and
 inventory; caller-approved artifact and schedule identities; all input and
 evidence references; the normalized request and schedule; runtime manifests
-and provider sidecars; record ordering and input digests; derived paired
+and provider sidecars; for GGUF, the caller-approved request digest and its
+artifact/backend/execution bindings; record ordering and input digests; derived paired
 scores; the canonical comparison report; and the policy verdict. A policy
 verdict includes any configured record-count and interval-width qualification.
 A verdict of `fail` is a valid, integrity-checked result but is not command

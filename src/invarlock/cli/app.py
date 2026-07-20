@@ -403,6 +403,15 @@ def verify(
         envvar="INVARLOCK_EXPECTED_SIGNER",
         help="Independent expected evidence-signing fingerprint.",
     ),
+    expected_request_digest: str | None = typer.Option(
+        None,
+        "--expected-request-digest",
+        envvar="INVARLOCK_EXPECTED_REQUEST_DIGEST",
+        help=(
+            "Independent expected normalized request digest; required when either "
+            "side uses llama_cpp."
+        ),
+    ),
     receipt: Path | None = typer.Option(
         None,
         "--receipt",
@@ -459,6 +468,7 @@ def verify(
                 "expected_baseline_runtime",
                 "expected_subject_runtime",
                 "expected_signer",
+                "expected_request_digest",
                 "verifier_signing_key",
                 "verifier_identity",
                 "allow_installed_scorers",
@@ -505,6 +515,7 @@ def verify(
             expected_baseline_runtime = loaded.expected_runtime_digests["baseline"]
             expected_subject_runtime = loaded.expected_runtime_digests["subject"]
             expected_signer = loaded.expected_signer_fingerprint
+            expected_request_digest = loaded.expected_request_digest
             verifier_signing_key = loaded.verifier_signing_key_path
             verifier_signing_key_bytes = loaded.verifier_signing_key_bytes
             verifier_identity = loaded.verifier_identity
@@ -519,6 +530,7 @@ def verify(
             expected_baseline_runtime=expected_baseline_runtime,
             expected_subject_runtime=expected_subject_runtime,
             expected_signer=expected_signer,
+            expected_request_digest=expected_request_digest,
             receipt_path=receipt,
             verifier_signing_key_path=verifier_signing_key,
             verifier_identity=verifier_identity,

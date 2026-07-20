@@ -363,6 +363,7 @@ separate JSON Schema file:
 | `invarlock/evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
 | `invarlock/evidence-pack-verify-v1` | Machine-readable independent verification result |
 | `invarlock/evidence-verification-receipt-v1` | Signed statement binding the pack, artifact/schedule/policy/runtime/signer anchors, verifier, optional trust-profile digest, and verdict |
+| `invarlock/evidence-verification-receipt-v2` | The v1 statement plus an independently supplied normalized-request digest; emitted when that anchor is present and required for GGUF evidence |
 | `invarlock/evidence-verification-receipt-signature-v1` | Ed25519 envelope for the receipt statement |
 
 These are documented for inspection and interchange, not as permission to
@@ -398,7 +399,7 @@ schedule + both observations -> paired records -> comparison report
 all payload bytes -> checksums.sha256
 payload references + checksum-file digest -> manifest.json
 canonical manifest bytes -> Ed25519 evidence signature
-manifest digest + independent anchors + verdict -> verifier-signed receipt
+manifest digest + independent anchors (+ GGUF request digest) + verdict -> verifier-signed receipt
 ```
 
 A later layer authenticates references to earlier layers; it does not replace
@@ -440,6 +441,12 @@ The v2 comparison report is the current writer format. Strict verification
 continues to reconstruct a v1 report with the v1 exact-match method when a
 signed legacy pack identifies that format; it never applies v2 arithmetic and
 then relabels the result as v1.
+
+Receipt v1 remains valid for existing evidence whose runtime does not require a
+request-level executable binding. A supplied request digest selects receipt v2.
+GGUF verification requires that external request anchor because the normalized
+request authorizes the exact llama.cpp binary, source, version, execution
+settings, and GGUF identity reconciled with provider evidence.
 
 Core and first-party add-ins are released at the same package version. Provider
 add-ins declare the exact coordinated core release, while the provider ABI remains

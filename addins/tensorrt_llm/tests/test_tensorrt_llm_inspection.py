@@ -263,6 +263,20 @@ def test_static_inspection_json_rejects_ambiguous_inputs(
         )
 
 
+def test_static_inspection_json_accepts_finite_floats() -> None:
+    assert tensorrt_llm_inspection._strict_json_object(  # noqa: SLF001
+        b'{"value":1.5}', label="static input"
+    ) == {"value": 1.5}
+
+
+def test_tokenizer_contract_enforces_authenticated_byte_bound(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tensorrt_llm_inspection, "_MAX_TOKENIZER_CONTRACT_BYTES", 1)
+    with pytest.raises(TensorRTLLMExecutionError, match="size bound"):
+        tensorrt_llm_inspection.authenticate_tensorrt_llm_tokenizer_contract(b"{}")
+
+
 def test_static_inspection_json_enforces_depth_and_item_budgets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

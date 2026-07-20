@@ -592,6 +592,31 @@ def test_complete_requires_immutable_runtime_identity(tmp_path: Path) -> None:
         module.complete(tmp_path / "transaction", tmp_path / "prepared", "latest")
 
 
+def test_complete_rejects_existing_workspace_and_mismatched_harness_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    image = "sha256:" + ("d" * 64)
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    with pytest.raises(module.BridgeError, match="workspace must be new"):
+        module.complete(existing, tmp_path / "prepared", image)
+
+    monkeypatch.setattr(
+        module,
+        "load_run",
+        lambda _path, role: (
+            {
+                "execution_config_sha256": "shared-execution",
+                "task_config_sha256": f"different-{role}",
+            },
+            tmp_path / f"{role}-samples.jsonl",
+        ),
+    )
+    with pytest.raises(module.BridgeError, match="different Harness configurations"):
+        module.complete(tmp_path / "new-transaction", tmp_path / "prepared", image)
+
+
 def test_bridge_main_dispatches_worker_complete_and_reports_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1270,6 +1295,21 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
         module.validate_completed_outputs(evidence, receipt, rendered)
 
 
+def test_completed_outputs_reject_non_object_json(tmp_path: Path) -> None:
+    module = _module()
+    evidence = tmp_path / "evidence"
+    reports = evidence / "reports"
+    reports.mkdir(parents=True)
+    (reports / "evaluation.report.json").write_text("[]", encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text("{}", encoding="utf-8")
+    rendered = tmp_path / "report.html"
+    rendered.write_text("<html></html>", encoding="utf-8")
+
+    with pytest.raises(module.BridgeError, match="returned invalid outputs"):
+        module.validate_completed_outputs(evidence, receipt, rendered)
+
+
 def test_launcher_rejects_unsafe_mount_paths() -> None:
     module = _launcher_module()
 
@@ -1330,6 +1370,55 @@ def test_launcher_canonicalizes_default_workspace_before_source_build(
     monkeypatch.setattr(shared_launch, "_runtime_image", stop)
     assert module.main([]) == 2
     assert observed == [real.resolve() / "build"]
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("after-build", "changed after source-bound build"),
+        ("during-build", "changed during Harness image build"),
+        ("mutable-image", "did not return an immutable ID"),
+        ("wrong-base-label", "does not bind the inspected base image ID"),
+    ],
+)
+def test_launcher_rejects_image_identity_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    message: str,
+) -> None:
+    module = _launcher_module()
+    from examples.integrations import launch as shared_launch
+
+    base_id = "sha256:" + "a" * 64
+    final_id = "sha256:" + "b" * 64
+    monkeypatch.setattr(
+        shared_launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
+    monkeypatch.setattr(
+        shared_launch, "_runtime_image", lambda **_kwargs: (base_id, base_id)
+    )
+    base_inspections = 0
+
+    def run(command: list[str], *, cwd: Path, stdin_path: Path | None = None) -> str:
+        nonlocal base_inspections
+        if command[:3] != ["docker", "image", "inspect"]:
+            return ""
+        if "org.invarlock.example.base-image-id" in " ".join(command):
+            return "sha256:" + "d" * 64 if failure == "wrong-base-label" else base_id
+        if command[-1].startswith("invarlock-example-runtime:"):
+            base_inspections += 1
+            if failure == "after-build" and base_inspections == 1:
+                return "sha256:" + "d" * 64
+            if failure == "during-build" and base_inspections == 2:
+                return "sha256:" + "d" * 64
+            return base_id
+        if failure == "mutable-image":
+            return "mutable-tag"
+        return final_id
+
+    monkeypatch.setattr(module, "run", run)
+    assert module.main(["--workspace", str(tmp_path / failure)]) == 2
 
 
 def test_container_recipe_pins_the_harness_and_real_worker() -> None:

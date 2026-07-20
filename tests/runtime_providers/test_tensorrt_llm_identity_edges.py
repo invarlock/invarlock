@@ -66,6 +66,9 @@ def test_json_budget_and_config_validation_edges(
 
     with _error("finite canonical JSON"):
         identity._canonical_json({"value": object()})
+    assert identity._finite_float("1.5") == 1.5
+    with _error("must be printable"):
+        identity._require_nonempty_text("bad\x00value", field="version")
 
     valid = {
         "version": "1",
@@ -114,6 +117,20 @@ def test_tree_budget_listing_and_entry_lookup_errors(
             identity.os, "listdir", lambda _fd: (_ for _ in ()).throw(OSError())
         )
         with _error("cannot be listed"):
+            identity._collect_files(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def test_tree_depth_limit_rejects_nested_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = tmp_path / "bundle"
+    (bundle / "nested").mkdir(parents=True)
+    descriptor = os.open(bundle, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        monkeypatch.setattr(identity, "_MAX_TREE_DEPTH", 0)
+        with _error("tree depth"):
             identity._collect_files(descriptor)
     finally:
         os.close(descriptor)

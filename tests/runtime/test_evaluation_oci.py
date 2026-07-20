@@ -869,11 +869,11 @@ def test_worker_diagnostics_are_drained_but_bounded() -> None:
     assert len(completed.stderr.encode("utf-8")) == 64 * 1024
 
 
-def test_worker_cleanup_is_exception_safe(
+def test_worker_cancellation_stops_late_identified_container(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     cidfile = tmp_path / "container.cid"
-    cidfile.write_text("a" * 64, encoding="ascii")
+    container_id = "a" * 64
 
     class Stream:
         closed = False
@@ -888,11 +888,27 @@ def test_worker_cleanup_is_exception_safe(
     class Process:
         stdout = Stream()
         stderr = Stream()
+        running = True
+        waits = 0
+
+        def wait(self, *, timeout: int) -> int:
+            self.waits += 1
+            if self.waits == 1:
+                assert timeout == 10
+                raise KeyboardInterrupt
+            assert timeout == evaluation_oci._CONTAINER_STOP_SECONDS  # noqa: SLF001
+            self.running = False
+            return -15
+
+        def poll(self) -> int | None:
+            return None if self.running else -15
+
+        def terminate(self) -> None:
+            cidfile.write_text(container_id, encoding="ascii")
 
         @staticmethod
-        def wait(*, timeout: int) -> int:
-            assert timeout == 10
-            raise RuntimeError("wait failed")
+        def kill() -> None:
+            raise AssertionError("graceful launcher termination should be enough")
 
     process = Process()
 
@@ -902,13 +918,23 @@ def test_worker_cleanup_is_exception_safe(
         return process
 
     monkeypatch.setattr(evaluation_oci.subprocess, "Popen", popen)
+    controls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        evaluation_oci,
+        "_container_control",
+        lambda engine, action, identity: controls.append((engine, action, identity)),
+    )
 
-    with pytest.raises(RuntimeError, match="wait failed"):
+    with pytest.raises(KeyboardInterrupt):
         evaluation_oci.run_side_worker(
             ["/usr/bin/docker", "run", "--cidfile", str(cidfile)],
             timeout_seconds=10,
         )
 
+    assert controls == [
+        ("/usr/bin/docker", "stop", container_id),
+        ("/usr/bin/docker", "kill", container_id),
+    ]
     assert process.stdout.closed is True
     assert process.stderr.closed is True
     assert not cidfile.exists()
@@ -977,7 +1003,7 @@ def test_timeout_cleanup_stops_then_kills_the_engine_issued_container(
     process = Process()
     monkeypatch.setattr(evaluation_oci.subprocess, "run", control)
 
-    evaluation_oci._terminate_timed_out_worker(  # type: ignore[arg-type]  # noqa: SLF001
+    evaluation_oci._terminate_worker(  # type: ignore[arg-type]  # noqa: SLF001
         process,
         ["/usr/bin/docker", "run", "--cidfile", str(cidfile)],
         cidfile,

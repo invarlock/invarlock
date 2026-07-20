@@ -58,6 +58,14 @@ def test_ci_runs_the_repository_gates() -> None:
     coverage = jobs["coverage"]
     assert _step(coverage, "Enforce coverage")["run"] == "make coverage-enforce"
 
+    supply_chain = jobs["supply-chain"]
+    audit = _step(supply_chain, "Audit maintained dependency locks")
+    assert "scripts/security/cve_audit.py" in audit["run"]
+    upload = _step(supply_chain, "Upload dependency audit report")
+    assert upload["if"] == "${{ always() }}"
+    assert "cve-audit.json" in upload["with"]["path"]
+    assert supply_chain["steps"].index(upload) == supply_chain["steps"].index(audit) + 1
+
 
 def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> None:
     workflow = _load(".github/workflows/ci.yml")

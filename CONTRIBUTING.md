@@ -30,8 +30,10 @@ Run the local gate before opening a pull request:
 make verify-fast
 ```
 
-`make verify`, `make verify-fast`, and `make coverage-enforce` use pytest-xdist
-automatically. Set `PYTEST_WORKERS=0` when diagnosing a failure sequentially.
+`make verify`, `make verify-fast`, and `make coverage-enforce` run independent
+suites concurrently and use bounded pytest-xdist workers. Set
+`VERIFY_TARGET_JOBS=1 COVERAGE_TARGET_JOBS=1 PYTEST_WORKERS=0` when diagnosing
+a failure sequentially.
 `make verify` adds the complete test and documentation build. The opt-in
 container journey builds the final runtime image and exercises all three
 commands:

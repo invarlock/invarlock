@@ -36,7 +36,8 @@
         "schedule_digest": {"$ref": "#/$defs/digest"},
         "baseline_runtime_digest": {"$ref": "#/$defs/digest"},
         "subject_runtime_digest": {"$ref": "#/$defs/digest"},
-        "evidence_signer_fingerprint": {"$ref": "#/$defs/digest"}
+        "evidence_signer_fingerprint": {"$ref": "#/$defs/digest"},
+        "request_digest": {"$ref": "#/$defs/digest"}
       },
       "additionalProperties": false
     },

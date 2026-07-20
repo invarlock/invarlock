@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import inspect
+import math
 import re
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from scripts.release import verify_hosted_distributions as hosted_verifier
 
 WORKFLOWS = Path(".github/workflows")
 PINNED_ACTION = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
@@ -121,6 +125,8 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
     names = [step.get("name") for step in steps]
 
     for required in (
+        "Audit maintained dependency locks",
+        "Test gitleaks allowlist boundary",
         "Run gitleaks PR git delta scan",
         "Build release wheel",
         "Run pip-audit",
@@ -130,10 +136,29 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
         assert required in names
     assert not any("advanced" in str(name).lower() for name in names)
 
+    allowlist_probe = _step(steps, "Test gitleaks allowlist boundary")["run"]
+    assert '"api_key":"%s"' in allowlist_probe
+    assert (
+        "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        in allowlist_probe
+    )
+    assert "gitleaks git ." in allowlist_probe
+    assert "exit_code" in allowlist_probe
+
     secret_scan = _step(steps, "Run gitleaks PR git delta scan")
     assert "--config .gitleaks.toml" in secret_scan["run"]
     assert "--log-opts" in secret_scan["run"]
     assert "--redact" in secret_scan["run"]
+    lock_audit = _step(steps, "Audit maintained dependency locks")["run"]
+    assert "scripts/security/cve_audit.py" in lock_audit
+    assert "artifacts/supply-chain/cve-audit.json" in lock_audit
+    lock_upload = _step(steps, "Upload dependency audit report")
+    assert lock_upload["if"] == "${{ always() }}"
+    assert "cve-audit.json" in lock_upload["with"]["path"]
+    assert (
+        steps.index(lock_upload)
+        == steps.index(_step(steps, "Audit maintained dependency locks")) + 1
+    )
 
 
 def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> None:
@@ -171,6 +196,20 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     assert _step(build["steps"], "Run complete repository gates")["run"] == (
         "make verify"
+    )
+    release_lock_audit = _step(build["steps"], "Audit maintained dependency locks")[
+        "run"
+    ]
+    assert "scripts/security/cve_audit.py" in release_lock_audit
+    release_lock_upload = _step(build["steps"], "Upload dependency audit report")
+    assert release_lock_upload["if"] == "${{ always() }}"
+    assert "cve-audit.json" in release_lock_upload["with"]["path"]
+    assert (
+        build["steps"].index(release_lock_upload)
+        == build["steps"].index(
+            _step(build["steps"], "Audit maintained dependency locks")
+        )
+        + 1
     )
     assert _step(build["steps"], "Enforce release coverage")["run"] == (
         "make coverage-enforce"
@@ -470,6 +509,27 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     assert promotion_upload["with"]["name"] == "testpypi-promotion"
     assert promotion_upload["with"]["if-no-files-found"] == "error"
+
+
+def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    jobs = workflow["jobs"]
+    signature = inspect.signature(hosted_verifier.verify_hosted_distributions)
+    attempts = signature.parameters["attempts"].default
+    retry_delay = signature.parameters["retry_delay"].default
+    request_timeout = signature.parameters["timeout"].default
+
+    assert isinstance(attempts, int)
+    assert isinstance(retry_delay, float)
+    assert isinstance(request_timeout, float)
+    requests_per_attempt = len(hosted_verifier.PROJECTS) * 3
+    verifier_worst_case_seconds = (
+        attempts * requests_per_attempt * request_timeout + (attempts - 1) * retry_delay
+    )
+    required_job_minutes = math.ceil(verifier_worst_case_seconds / 60) + 15
+
+    assert jobs["publish"]["timeout-minutes"] >= required_job_minutes
+    assert jobs["testpypi_smoke"]["timeout-minutes"] >= required_job_minutes
 
 
 def test_docs_publish_validates_dispatch_input_before_using_it_as_a_path() -> None:

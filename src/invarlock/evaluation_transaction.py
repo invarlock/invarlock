@@ -79,6 +79,7 @@ from invarlock.runtime_provider_evidence import (
     decode_artifact_identity,
     decode_runtime_provider_receipt,
     encode_artifact_identity,
+    runtime_request_binding_errors,
 )
 from invarlock.runtime_security_helpers import (
     network_allowed,
@@ -561,20 +562,14 @@ def _validate_import_side(
         raise EvaluationTransactionError(
             f"{side} provider receipt lacks a strict outer runtime image digest"
         )
-    execution = receipt.execution_settings
-    settings = comparison.runtime.settings
-    for field in (
-        "seed",
-        "context_length",
-        "batch_size",
-        "max_output_tokens",
-        "timeout_seconds",
-        "allow_network",
-    ):
-        if field in settings and settings[field] != getattr(execution, field):
-            raise EvaluationTransactionError(
-                f"{side} provider receipt does not match runtime setting {field!r}"
-            )
+    request_binding_errors = runtime_request_binding_errors(
+        provider_name=comparison.runtime.provider,
+        settings=comparison.runtime.settings,
+        artifact_identity=identity,
+        receipt=receipt,
+    )
+    if request_binding_errors:
+        raise EvaluationTransactionError(f"{side} {request_binding_errors[0]}")
     return receipt.outer_image_digest
 
 

@@ -305,6 +305,7 @@ def validate(
             expected_verifier_identity=trust.verifier_identity,
             expected_verifier_fingerprint=verifier_fingerprint,
             expected_trust_profile_digest=trust.profile_digest,
+            expected_request_digest=trust.expected_request_digest,
             require_signed=True,
         )
         if not result.ok or not result.signed or result.statement is None:

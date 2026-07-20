@@ -525,6 +525,7 @@ verification = verify_evidence(
     expected_baseline_runtime=trust.expected_runtime_digests["baseline"],
     expected_subject_runtime=trust.expected_runtime_digests["subject"],
     expected_signer=trust.expected_signer_fingerprint,
+    expected_request_digest=trust.expected_request_digest,
     receipt_path=Path("verification.receipt.json"),
     verifier_signing_key_path=trust.verifier_signing_key_path,
     verifier_signing_key_bytes=trust.verifier_signing_key_bytes,
@@ -542,7 +543,8 @@ verification = verify_evidence(
 It accepts the receipt and pack paths plus independently supplied policy,
 baseline and subject artifact-identity digests, canonical schedule digest,
 baseline and subject runtime digests, expected evidence signer, expected
-verifier identity, and expected verifier fingerprint. It verifies the receipt
+verifier identity, expected verifier fingerprint, and the optional normalized-
+request digest. The request digest is required for GGUF evidence. It verifies the receipt
 signature and embedded public-key fingerprint, then compares every statement
 binding with those caller-owned values and the supplied pack manifest.
 
@@ -564,6 +566,7 @@ verify_signed_verification_receipt(
     expected_verifier_identity: str,
     expected_verifier_fingerprint: str,
     expected_trust_profile_digest: str | None = None,
+    expected_request_digest: str | None = None,
     require_signed: bool = True,
 ) -> ReceiptVerification
 ```

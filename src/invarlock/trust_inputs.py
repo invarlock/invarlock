@@ -39,6 +39,7 @@ class TrustInputs:
     expected_schedule_digest: str
     expected_runtime_digests: Mapping[str, str]
     expected_signer_fingerprint: str
+    expected_request_digest: str | None
     verifier_identity: str
     verifier_signing_key_path: Path
     verifier_signing_key_bytes: bytes = field(repr=False)
@@ -267,6 +268,9 @@ def load_trust_inputs(
                 }
             ),
             expected_signer_fingerprint=str(anchors["evidence_signer_fingerprint"]),
+            expected_request_digest=(
+                str(anchors["request_digest"]) if "request_digest" in anchors else None
+            ),
             verifier_identity=str(verifier["identity"]),
             verifier_signing_key_path=profile.parent.joinpath(*signing_key_parts),
             verifier_signing_key_bytes=signing_key_bytes,

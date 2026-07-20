@@ -612,11 +612,29 @@ def _execute(
         "cpu",
         "--json",
     ]
-    launch._run(
+    preflight = launch._run(
         [*evaluation, "--preflight"],
         cwd=repository,
+        capture_output=True,
         environment=environment,
     )
+    try:
+        preflight_result = json.loads(preflight.stdout)
+        request_digest = preflight_result["request_digest"]
+        trust_profile = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
+        anchors = trust_profile["anchors"]
+    except (KeyError, TypeError, json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError("GGUF preflight did not return a request identity") from exc
+    if (
+        not isinstance(request_digest, str)
+        or not request_digest.startswith("sha256:")
+        or len(request_digest) != 71
+    ):
+        raise RuntimeError("GGUF preflight returned an invalid request identity")
+    if not isinstance(anchors, dict):
+        raise RuntimeError("GGUF trust profile anchors are invalid")
+    anchors["request_digest"] = request_digest
+    paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
     launch._run(evaluation, cwd=repository, environment=environment)
     launch._run(
         [

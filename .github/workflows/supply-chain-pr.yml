@@ -32,6 +32,22 @@ jobs:
       - name: Install supply-chain tools
         run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
 
+      - name: Audit maintained dependency locks
+        run: |
+          python scripts/security/cve_audit.py \
+            --out-json artifacts/supply-chain/cve-audit.json \
+            --out-md artifacts/supply-chain/cve-audit.md
+      - name: Upload dependency audit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: supply-chain-pr-cve-audit
+          path: |
+            artifacts/supply-chain/cve-audit.json
+            artifacts/supply-chain/cve-audit.md
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Cache gitleaks binary
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
@@ -46,6 +62,35 @@ jobs:
           fi
           "${gitleaks_bin}" version
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Test gitleaks allowlist boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe_root="$(mktemp -d)"
+          trap 'rm -rf "${probe_root}"' EXIT
+          git -C "${probe_root}" init --quiet
+          git -C "${probe_root}" config user.email security-probe@invarlock.dev
+          git -C "${probe_root}" config user.name InvarLock
+          probe_path="public_evidence/evidence/example/evidence"
+          mkdir -p "${probe_root}/${probe_path}"
+          digest="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          printf '{"tokenizer_metadata_sha256":"%s","api_key":"%s"}\n' \
+            "${digest}" "${digest}" > "${probe_root}/${probe_path}/request.json"
+          git -C "${probe_root}" add .
+          git -C "${probe_root}" commit --quiet -m "Add scanner boundary probe"
+          set +e
+          (
+            cd "${probe_root}"
+            gitleaks git . --config "${GITHUB_WORKSPACE}/.gitleaks.toml" \
+              --redact --no-banner
+          )
+          exit_code=$?
+          set -e
+          if [ "${exit_code}" -ne 1 ]; then
+            echo "gitleaks allowlist suppressed an unrelated credential or failed" >&2
+            exit 1
+          fi
 
       - name: Run gitleaks PR git delta scan
         id: gitleaks_scan

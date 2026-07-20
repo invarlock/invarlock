@@ -201,6 +201,65 @@ def test_descriptor_binding_and_result_match_shipped_schemas() -> None:
     )
 
 
+def test_public_scorer_helpers_reject_untyped_contract_values() -> None:
+    with pytest.raises(ScorerExtensionError, match="descriptor must be"):
+        scorer_descriptor_payload(cast(ScorerExtensionDescriptor, object()))
+    with pytest.raises(ScorerExtensionError, match="schema must be a JSON object"):
+        scorer_configuration_schema_sha256(cast(Mapping[str, object], object()))
+    with pytest.raises(
+        ScorerExtensionError, match="configuration must be a JSON object"
+    ):
+        build_scorer_binding(_descriptor(), cast(Mapping[str, object], []))
+    with pytest.raises(ScorerExtensionError, match="binding must be a JSON object"):
+        scorer_module.decode_scorer_binding(object())
+    with pytest.raises(ScorerExtensionError, match="binding must be"):
+        scorer_binding_payload(cast(ScorerExtensionBinding, object()))
+    with pytest.raises(ScorerExtensionError, match="result must be"):
+        scorer_result_payload(cast(ScorerExtensionResult, object()))
+    with pytest.raises(ScorerExtensionError, match="must not be empty"):
+        scorer_record_results_sha256(())
+
+
+def test_authenticated_scorer_records_reject_untyped_and_unbound_facts() -> None:
+    with pytest.raises(ScorerExtensionError, match="facts must be a JSON object"):
+        AuthenticatedScorerRecord(
+            record_id="row",
+            input_sha256=_DIGEST_A,
+            facts=cast(Mapping[str, object], object()),
+        )
+    with pytest.raises(ScorerExtensionError, match="must be strings"):
+        AuthenticatedScorerRecord(
+            record_id="row",
+            input_sha256=_DIGEST_A,
+            facts={
+                "expected_output": 1,
+                "output_text": "value",
+                "output_sha256": hashlib.sha256(b"value").hexdigest(),
+            },
+        )
+    with pytest.raises(ScorerExtensionError, match="does not match output_text"):
+        AuthenticatedScorerRecord(
+            record_id="row",
+            input_sha256=_DIGEST_A,
+            facts={
+                "expected_output": "target",
+                "output_text": "value",
+                "output_sha256": _DIGEST_B,
+            },
+        )
+
+
+def test_replay_and_record_results_require_typed_nonempty_identity() -> None:
+    request = _request()
+    with pytest.raises(ScorerExtensionError, match="binding must be"):
+        dataclasses.replace(
+            request,
+            binding=cast(ScorerExtensionBinding, object()),
+        )
+    with pytest.raises(ScorerExtensionError, match="ID must be non-empty"):
+        ScorerRecordResult(record_id="", input_sha256=_DIGEST_A, value=0.5)
+
+
 @pytest.mark.parametrize(
     "updates",
     [

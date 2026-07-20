@@ -23,12 +23,16 @@ def test_verify_composes_the_maintained_gates() -> None:
         "lint",
         "docs-check-build",
     ):
-        assert f"$(MAKE) {target}" in block
+        assert target in block
+
+    assert "$(MAKE) -j $(VERIFY_TARGET_JOBS)" in block
+    assert "$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)" in block
 
 
 def test_verify_fast_includes_the_example_contract() -> None:
     block = _block("verify-fast", "contracts-check")
-    assert "$(MAKE) examples-check" in block
+    assert "$(MAKE) -j $(VERIFY_TARGET_JOBS)" in block
+    assert "$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)" in block
 
 
 def test_docs_are_checked_by_established_tools() -> None:

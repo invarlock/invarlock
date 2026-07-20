@@ -6,12 +6,14 @@ import json
 import math
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+import invarlock.evidence_pack_contract as evidence_pack_contract
 import invarlock.evidence_pack_publication as evidence_pack_publication
 from invarlock.core.runtime_provider import (
     GGUFArtifactIdentity,
@@ -196,7 +198,7 @@ def _side_evidence(
             name="llama.cpp",
             version="test",
             source_sha256="4" * 64,
-            binary_sha256=None,
+            binary_sha256="5" * 64,
             build_sha256=None,
         ),
         capabilities=capabilities,
@@ -275,20 +277,37 @@ def _side_evidence(
 
 
 def _request(metric: str = "exact_match") -> dict[str, object]:
-    def side(model_id: str) -> dict[str, object]:
+    def side(model_id: str, artifact_marker: str) -> dict[str, object]:
         return {
             "artifact": {
                 "model_id": model_id,
                 "locator": f"artifact://{model_id}",
             },
-            "runtime": {"provider": "llama_cpp", "settings": {}},
+            "runtime": {
+                "provider": "llama_cpp",
+                "settings": {
+                    "artifact_byte_length": 123,
+                    "artifact_sha256": artifact_marker * 64,
+                    "backend_binary_sha256": "5" * 64,
+                    "backend_source_sha256": "4" * 64,
+                    "backend_version": "test",
+                    "batch_size": 1,
+                    "context_length": 512,
+                    "gguf_metadata_sha256": "1" * 64,
+                    "max_output_tokens": 16,
+                    "seed": 42,
+                    "tensor_inventory_sha256": "2" * 64,
+                    "timeout_seconds": 120,
+                    "tokenizer_metadata_sha256": "3" * 64,
+                },
+            },
         }
 
     return {
         "format_version": "invarlock/evaluation-request-v1",
         "comparison": {
-            "baseline": side("model-c.gguf"),
-            "subject": side("model-d.gguf"),
+            "baseline": side("model-c.gguf", "c"),
+            "subject": side("model-d.gguf", "d"),
             "dataset": {
                 "format_version": "invarlock/local-jsonl-preparation-v1",
                 "source_sha256": "e" * 64,
@@ -450,6 +469,9 @@ def _verification_anchors(arguments: dict[str, object]) -> dict[str, Any]:
             "subject": subject.digest,
         },
         "expected_schedule_digest": dataset.digest,
+        "expected_request_digest": sha256_digest(
+            canonical_json_bytes(arguments["normalized_request"])
+        ),
     }
 
 
@@ -545,6 +567,49 @@ def test_publish_and_verify_real_runtime_provider_snapshots(tmp_path: Path) -> N
     assert result.payload["authenticity"] == "pinned"
     assert result.payload["policy_verdict"] == "pass"
     assert result.payload["observations"] == []
+
+
+def test_gguf_verification_requires_exact_independent_request_anchor(
+    tmp_path: Path,
+) -> None:
+    pack, policy, fingerprint, runtimes, _key, arguments = _publish(tmp_path)
+    anchors = _verification_anchors(arguments)
+    expected_request = cast(str, anchors.pop("expected_request_digest"))
+
+    missing = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **anchors,
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+    assert missing.payload["ok"] is False
+    assert "request anchor is required for llama_cpp" in " ".join(
+        missing.payload["errors"]
+    )
+
+    mismatch = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **anchors,
+        expected_request_digest=_digest("0"),
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+    assert mismatch.payload["ok"] is False
+    assert "does not match independent request anchor" in " ".join(
+        mismatch.payload["errors"]
+    )
+
+    accepted = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **anchors,
+        expected_request_digest=expected_request,
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+    assert accepted.payload["ok"] is True
 
 
 def test_strict_verifier_replays_legacy_comparison_report(
@@ -714,6 +779,34 @@ def test_observation_envelope_requires_both_artifact_bindings() -> None:
             schedule_digest=_digest("a"),
             policy_digest=_digest("b"),
             artifact_digests={"baseline": _digest("c")},
+        )
+
+
+def test_observation_envelope_fails_closed_on_schema_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observation = EvidenceObservation(
+        observation_id="subject-variance",
+        scope="subject",
+        kind="variance",
+        payload=canonical_json_bytes({"population_variance": 0.5}),
+    )
+    monkeypatch.setattr(
+        evidence_pack_contract,
+        "_observation_schema_errors",
+        lambda _envelope: ["schema rejected the observation envelope"],
+    )
+
+    with pytest.raises(EvidencePackError, match="schema rejected"):
+        evidence_observation_bytes(
+            observation,
+            comparison_id="comparison",
+            schedule_digest=_digest("a"),
+            policy_digest=_digest("b"),
+            artifact_digests={
+                "baseline": _digest("c"),
+                "subject": _digest("d"),
+            },
         )
 
 
@@ -1281,6 +1374,7 @@ def test_normalized_nll_is_replayed_from_typed_observations(tmp_path: Path) -> N
             "subject": subject_runtime,
         },
         expected_signer_fingerprint=fingerprint,
+        expected_request_digest=sha256_digest(canonical_json_bytes(request)),
     )
     paired = json.loads(
         (destination / "records/paired-records.json").read_text(encoding="utf-8")
@@ -1407,6 +1501,45 @@ def test_normalized_nll_marks_derived_perplexity_unavailable_when_incomparable(
         "method": "target_token_weighted_perplexity_ratio_v1",
         "reason": reason,
     }
+
+
+def test_derived_perplexity_fails_closed_for_missing_and_nonfinite_facts() -> None:
+    unavailable = evidence_pack_contract._derived_perplexity_measurement(
+        baseline_records=(SimpleNamespace(token_count=None, logprob_sum=-1.0),),
+        subject_records=(SimpleNamespace(token_count=1, logprob_sum=-1.0),),
+        baseline_tokenizer_sha256="a" * 64,
+        subject_tokenizer_sha256="a" * 64,
+    )
+    assert unavailable["reason"] == "target_token_counts_unavailable"
+
+    overflow = evidence_pack_contract._derived_perplexity_measurement(
+        baseline_records=(SimpleNamespace(token_count=1, logprob_sum=-1000.0),),
+        subject_records=(SimpleNamespace(token_count=1, logprob_sum=-1000.0),),
+        baseline_tokenizer_sha256="a" * 64,
+        subject_tokenizer_sha256="a" * 64,
+    )
+    assert overflow["reason"] == "derived_value_non_finite"
+
+
+def test_comparison_math_and_derived_contract_reject_invalid_boundaries() -> None:
+    assert evidence_pack_contract._percentile([0.5], 0.95) == 0.5
+    with pytest.raises(EvidencePackError, match="schedule_sha256 is invalid"):
+        evidence_pack_contract._paired_resampling_interval(
+            metric="exact_match",
+            baseline_scores=(1.0, 0.0),
+            subject_scores=(1.0, 0.0),
+            schedule_sha256="invalid",
+        )
+    with pytest.raises(EvidencePackError, match="must be an object"):
+        evidence_pack_contract.validated_derived_measurements({"perplexity_ratio": []})
+    with pytest.raises(EvidencePackError, match="format is unsupported"):
+        build_comparison_report(
+            comparison_id="comparison",
+            paired_records={},
+            policy={},
+            policy_digest=_digest("f"),
+            report_format="unsupported",
+        )
 
 
 def test_resigned_runtime_config_role_swap_is_rejected(tmp_path: Path) -> None:

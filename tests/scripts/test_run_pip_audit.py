@@ -221,3 +221,86 @@ def test_load_allowlist_requires_a_compensating_control(tmp_path: Path) -> None:
 
     with pytest.raises(SystemExit, match="is incomplete"):
         module._load_allowlist(allowlist)
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ([], "must contain an object"),
+        ({"owner": "", "entries": []}, "owner missing"),
+        ({"owner": "security-maintainers", "entries": {}}, "must be a list"),
+        (
+            {"owner": "security-maintainers", "entries": ["unexpected"]},
+            "must be an object",
+        ),
+    ],
+)
+def test_load_allowlist_rejects_malformed_policy_shapes(
+    tmp_path: Path, payload: object, message: str
+) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    allowlist.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=message):
+        module._load_allowlist(allowlist)
+
+
+@pytest.mark.parametrize(
+    ("days", "message"),
+    [(-1, "expired"), (31, "exceeds 30 days")],
+)
+def test_load_allowlist_enforces_expiry_window(
+    tmp_path: Path, days: int, message: str
+) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    _write_allowlist(
+        allowlist,
+        tracking_issue="https://github.com/example/repo/issues/1",
+    )
+    payload = json.loads(allowlist.read_text(encoding="utf-8"))
+    payload["entries"][0]["expires"] = (date.today() + timedelta(days=days)).isoformat()
+    allowlist.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=message):
+        module._load_allowlist(allowlist)
+
+
+def test_requirement_scan_handles_external_paths_and_ignores_unpinned_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    _write_allowlist(
+        allowlist,
+        tracking_issue="https://github.com/example/repo/issues/1",
+    )
+    requirement = tmp_path / "external.txt"
+    requirement.write_text(
+        "# generated lock\nexample-package>=1.0.0\n", encoding="utf-8"
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    observed: list[str] = []
+
+    def run(command: list[str], *, check: bool):
+        assert check is False
+        observed.extend(command)
+        return SimpleNamespace(returncode=7)
+
+    monkeypatch.chdir(workspace)
+    monkeypatch.setattr(module.subprocess, "run", run)
+
+    assert (
+        module.main(
+            [
+                "--allowlist",
+                str(allowlist),
+                "--requirement",
+                str(requirement),
+            ]
+        )
+        == 7
+    )
+    assert observed == ["pip-audit", "-r", str(requirement)]

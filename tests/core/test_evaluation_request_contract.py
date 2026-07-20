@@ -582,6 +582,34 @@ def test_unknown_runtime_provider_fails_closed(tmp_path: Path) -> None:
         load_evaluation_request(_write_request(tmp_path / "request.yaml", payload))
 
 
+def test_provider_resolution_rejects_identity_abi_and_unexpected_loader_failures() -> (
+    None
+):
+    wrong_identity = _TaskContractProvider("other", tasks=("text_causal",))
+    with pytest.raises(EvaluationRequestError, match="identity mismatch"):
+        evaluation_request._resolve_provider(
+            "requested",
+            resolver=lambda _name: wrong_identity,  # type: ignore[arg-type]
+        )
+
+    wrong_abi = _TaskContractProvider("requested", tasks=("text_causal",))
+    wrong_abi.abi_version = "unsupported"
+    with pytest.raises(EvaluationRequestError, match="unsupported ABI"):
+        evaluation_request._resolve_provider(
+            "requested",
+            resolver=lambda _name: wrong_abi,  # type: ignore[arg-type]
+        )
+
+    def broken_resolver(_name: str) -> object:
+        raise RuntimeError("entry-point loader failed")
+
+    with pytest.raises(EvaluationRequestError, match="could not be resolved"):
+        evaluation_request._resolve_provider(
+            "requested",
+            resolver=broken_resolver,  # type: ignore[arg-type]
+        )
+
+
 @pytest.mark.parametrize(
     "reference",
     ["/tmp/model", "../outside", "file://outside", "C:\\outside", "./models/subject"],
@@ -740,6 +768,34 @@ def test_future_task_contract_accepts_matching_providers_and_names_mismatched_si
         ),
     ):
         load_evaluation_request(request_path, provider_resolver=mismatched)
+
+
+def test_request_rejects_metric_not_declared_by_resolved_provider(
+    tmp_path: Path,
+) -> None:
+    _materialize_run_inputs(tmp_path)
+    payload = _request_payload()
+    comparison = payload["comparison"]
+    assert isinstance(comparison, dict)
+    comparison["metric"] = "normalized_nll_per_utf8_byte"
+    for side_name in ("baseline", "subject"):
+        side = comparison[side_name]
+        assert isinstance(side, dict)
+        runtime = side["runtime"]
+        assert isinstance(runtime, dict)
+        runtime["provider"] = f"{side_name}_exact_only"
+    resolver = _task_provider_resolver(
+        {
+            "baseline_exact_only": ("text_causal",),
+            "subject_exact_only": ("text_causal",),
+        }
+    )
+
+    with pytest.raises(EvaluationRequestError, match="does not support metric"):
+        load_evaluation_request(
+            _write_request(tmp_path / "unsupported-metric.yaml", payload),
+            provider_resolver=resolver,
+        )
 
 
 def test_run_request_authenticates_content_role_with_all_content_mappings(

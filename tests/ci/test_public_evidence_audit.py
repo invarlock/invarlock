@@ -4,6 +4,7 @@ import base64
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -14,6 +15,8 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock.engine import evaluate_request_file, verify_evidence
 from invarlock.evidence_pack_integrity import public_key_fingerprint
+
+DIGEST = "sha256:" + "a" * 64
 
 
 def _load() -> ModuleType:
@@ -168,6 +171,48 @@ def _write_local_publication(
     return pack, receipt
 
 
+def _valid_receipt_anchors() -> dict[str, object]:
+    return {
+        "policy_digest": DIGEST,
+        "artifact_digests": {"baseline": DIGEST, "subject": DIGEST},
+        "schedule_digest": DIGEST,
+        "runtime_digests": {"baseline": DIGEST, "subject": DIGEST},
+        "pack_signer_fingerprint": DIGEST,
+    }
+
+
+def _valid_external_entry(slug: str = "external") -> dict[str, object]:
+    return {
+        "slug": slug,
+        "path": f"public_evidence/evidence/{slug}",
+        "evidence_class": "signed_evidence_pack",
+        "summary": "External evidence",
+        "artifacts": {
+            "evidence_pack": {
+                "kind": "directory",
+                "path": f"public_evidence/evidence/{slug}/evidence",
+                "file_count": 3,
+                "size_bytes": 30,
+                "control_hashes": {"manifest.json": DIGEST},
+                "external_asset": {
+                    "url": "https://example.com/evidence.tar.zst",
+                    "sha256": DIGEST,
+                },
+            },
+            "verification_receipt": {
+                "kind": "file",
+                "path": f"public_evidence/evidence/{slug}/verification.receipt.json",
+                "size_bytes": 10,
+                "sha256": DIGEST,
+                "external_asset": {
+                    "url": "https://example.com/verification.receipt.json",
+                    "sha256": DIGEST,
+                },
+            },
+        },
+    }
+
+
 def test_empty_public_evidence_is_an_explicit_valid_state(tmp_path: Path) -> None:
     module = _load()
     root = tmp_path / "public_evidence"
@@ -233,6 +278,41 @@ def test_public_evidence_rejects_unindexed_surfaces(tmp_path: Path) -> None:
     errors = module.check_public_evidence(root)
 
     assert errors == ["unexpected public evidence surfaces: historical_failures.json"]
+
+
+def test_public_evidence_ignores_untracked_macos_directory_metadata(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    _write_index(root)
+    (root / ".DS_Store").write_bytes(b"local Finder state")
+    evidence_root = root / "evidence"
+    evidence_root.mkdir()
+    (evidence_root / ".DS_Store").write_bytes(b"local Finder state")
+
+    assert module.check_public_evidence(root) == []
+
+
+@pytest.mark.parametrize("entry_kind", ["directory", "symlink"])
+def test_public_evidence_rejects_non_file_macos_metadata_surfaces(
+    tmp_path: Path, entry_kind: str
+) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    _write_index(root)
+    metadata = root / ".DS_Store"
+    if entry_kind == "directory":
+        metadata.mkdir()
+        (metadata / "unreviewed.txt").write_text("not evidence", encoding="utf-8")
+    else:
+        target = tmp_path / "unreviewed.txt"
+        target.write_text("not evidence", encoding="utf-8")
+        metadata.symlink_to(target)
+
+    assert module.check_public_evidence(root) == [
+        "unexpected public evidence surfaces: .DS_Store"
+    ]
 
 
 def test_external_entries_can_coexist_without_local_directories(tmp_path: Path) -> None:
@@ -475,3 +555,687 @@ def test_index_artifact_paths_must_remain_under_their_slug(tmp_path: Path) -> No
     errors = module.check_public_evidence(root)
 
     assert any("unsafe evidence_pack path" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ({"policy_digest": "bad"}, "policy digest is invalid"),
+        ({"pack_signer_fingerprint": "bad"}, "pack signer is invalid"),
+        ({"artifact_digests": []}, "artifact anchors are invalid"),
+        (
+            {"artifact_digests": {"baseline": DIGEST, "subject": "bad"}},
+            "artifact anchors are invalid",
+        ),
+        ({"schedule_digest": "bad"}, "schedule anchor is invalid"),
+        ({"runtime_digests": []}, "runtime anchors are invalid"),
+        (
+            {"runtime_digests": {"baseline": DIGEST, "subject": "bad"}},
+            "runtime anchors are invalid",
+        ),
+    ],
+)
+def test_receipt_anchor_validation_rejects_invalid_bound_materials(
+    tmp_path: Path,
+    mutation: dict[str, object],
+    message: str,
+) -> None:
+    module = _load()
+    anchors = _valid_receipt_anchors()
+    anchors.update(mutation)
+    errors: list[str] = []
+
+    module._check_receipt_anchors(errors, tmp_path / "receipt.json", anchors)
+
+    assert any(message in error for error in errors)
+
+
+def test_receipt_anchor_validation_rejects_open_shape(tmp_path: Path) -> None:
+    module = _load()
+    errors: list[str] = []
+
+    module._check_receipt_anchors(errors, tmp_path / "receipt.json", {"extra": True})
+
+    assert errors and "anchor fields are invalid" in errors[0]
+
+
+def test_v2_receipt_anchor_rejects_invalid_request_digest(tmp_path: Path) -> None:
+    module = _load()
+    anchors = _valid_receipt_anchors()
+    anchors["request_digest"] = "not-a-digest"
+    errors: list[str] = []
+
+    module._check_receipt_anchors(
+        errors,
+        tmp_path / "receipt.json",
+        anchors,
+        require_request=True,
+    )
+
+    assert errors == [
+        f"{tmp_path / 'receipt.json'}: signed receipt request digest is invalid"
+    ]
+
+
+def test_pack_request_context_rejects_mismatched_digest_and_malformed_request(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    pack = tmp_path / "evidence"
+    pack.mkdir()
+    request_path = pack / "request.json"
+    request_path.write_text("[]\n", encoding="utf-8")
+    manifest_path = pack / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {"evidence": {"request": {"path": "request.json", "digest": DIGEST}}}
+        ),
+        encoding="utf-8",
+    )
+    receipt = tmp_path / "receipt.json"
+    errors: list[str] = []
+
+    request_digest, uses_llama_cpp = module._public_pack_request_context(
+        errors,
+        receipt=receipt,
+        manifest_path=manifest_path,
+    )
+
+    assert request_digest == module._sha256_bytes(request_path.read_bytes())
+    assert uses_llama_cpp is False
+    assert errors == [f"{receipt}: pack request digest does not match manifest"]
+
+
+def test_pack_request_context_rejects_noncanonical_reference_path(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {"evidence": {"request": {"path": "../request.json", "digest": DIGEST}}}
+        ),
+        encoding="utf-8",
+    )
+    errors: list[str] = []
+
+    request_digest, uses_llama_cpp = module._public_pack_request_context(
+        errors,
+        receipt=tmp_path / "receipt.json",
+        manifest_path=manifest_path,
+    )
+
+    assert request_digest is None
+    assert uses_llama_cpp is False
+    assert errors == [f"{manifest_path}: request reference path is invalid"]
+
+
+@pytest.mark.parametrize(
+    ("receipt_format", "request_anchor", "message"),
+    [
+        (
+            "invarlock/evidence-verification-receipt-v1",
+            None,
+            "llama_cpp evidence requires signed receipt format v2",
+        ),
+        (
+            "invarlock/evidence-verification-receipt-v2",
+            DIGEST,
+            "signed request anchor does not bind the pack request",
+        ),
+    ],
+)
+def test_signed_receipt_fail_closes_gguf_request_binding(
+    tmp_path: Path,
+    receipt_format: str,
+    request_anchor: str | None,
+    message: str,
+) -> None:
+    module = _load()
+    pack = tmp_path / "evidence"
+    pack.mkdir()
+    request_path = pack / "request.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "comparison": {
+                    "baseline": {"runtime": {"provider": "llama_cpp"}},
+                    "subject": {"runtime": {"provider": "llama_cpp"}},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    request_digest = module._sha256_bytes(request_path.read_bytes())
+    manifest_path = pack / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "evidence": {
+                    "request": {"path": "request.json", "digest": request_digest}
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    anchors = _valid_receipt_anchors()
+    if request_anchor is not None:
+        anchors["request_digest"] = request_anchor
+    statement = {
+        "format": receipt_format,
+        "pack_manifest_digest": module._sha256_bytes(manifest_path.read_bytes()),
+        "anchors": anchors,
+        "verifier": {
+            "identity": "tests.verifier",
+            "signing_key_fingerprint": DIGEST,
+            "trust_profile_digest": None,
+        },
+        "verdict": {
+            "ok": True,
+            "integrity_ok": True,
+            "policy_verdict": "pass",
+            "verification_status": 0,
+        },
+    }
+    errors: list[str] = []
+
+    module._check_signed_receipt(
+        errors,
+        receipt=tmp_path / "receipt.json",
+        value={"statement": statement, "signature": {}},
+        manifest_path=manifest_path,
+    )
+
+    assert any(message in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("verifier", "message"),
+    [
+        ({"identity": "test"}, "verifier fields are invalid"),
+        (
+            {
+                "identity": "contains spaces",
+                "signing_key_fingerprint": DIGEST,
+                "trust_profile_digest": None,
+            },
+            "verifier identity is invalid",
+        ),
+        (
+            {
+                "identity": "tests.verifier",
+                "signing_key_fingerprint": "bad",
+                "trust_profile_digest": None,
+            },
+            "verifier fingerprint is invalid",
+        ),
+        (
+            {
+                "identity": "tests.verifier",
+                "signing_key_fingerprint": DIGEST,
+                "trust_profile_digest": "bad",
+            },
+            "trust profile digest is invalid",
+        ),
+    ],
+)
+def test_receipt_verifier_validation_rejects_ambiguous_identity(
+    tmp_path: Path,
+    verifier: dict[str, object],
+    message: str,
+) -> None:
+    module = _load()
+    errors: list[str] = []
+
+    module._check_receipt_verifier(errors, tmp_path / "receipt.json", verifier)
+
+    assert any(message in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("verdict", "message"),
+    [
+        ({"ok": True}, "verdict fields are invalid"),
+        (
+            {
+                "ok": 1,
+                "integrity_ok": True,
+                "policy_verdict": "pass",
+                "verification_status": 0,
+            },
+            "verdict booleans are invalid",
+        ),
+        (
+            {
+                "ok": True,
+                "integrity_ok": True,
+                "policy_verdict": "unknown",
+                "verification_status": 0,
+            },
+            "policy verdict is invalid",
+        ),
+        (
+            {
+                "ok": True,
+                "integrity_ok": True,
+                "policy_verdict": "pass",
+                "verification_status": True,
+            },
+            "verification status is invalid",
+        ),
+    ],
+)
+def test_receipt_verdict_validation_rejects_invalid_acceptance_claims(
+    tmp_path: Path,
+    verdict: dict[str, object],
+    message: str,
+) -> None:
+    module = _load()
+    errors: list[str] = []
+
+    module._check_receipt_verdict(errors, tmp_path / "receipt.json", verdict)
+
+    assert any(message in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("signature", "message"),
+    [
+        ({}, "signature is required"),
+        (
+            {
+                "algorithm": "ed25519",
+                "format": "invarlock/evidence-verification-receipt-signature-v1",
+                "public_key": [],
+                "value": "",
+            },
+            "public key is invalid",
+        ),
+        (
+            {
+                "algorithm": "ed25519",
+                "format": "invarlock/evidence-verification-receipt-signature-v1",
+                "public_key": {"encoding": "pem", "value": 7},
+                "value": "",
+            },
+            "public key is invalid",
+        ),
+        (
+            {
+                "algorithm": "ed25519",
+                "format": "invarlock/evidence-verification-receipt-signature-v1",
+                "public_key": {"encoding": "pem", "value": "not a pem"},
+                "value": "",
+            },
+            "public key is invalid",
+        ),
+    ],
+)
+def test_receipt_public_key_rejects_malformed_signature_blocks(
+    tmp_path: Path,
+    signature: dict[str, object],
+    message: str,
+) -> None:
+    module = _load()
+    errors: list[str] = []
+
+    public_key = module._receipt_public_key(
+        errors, tmp_path / "receipt.json", signature
+    )
+
+    assert public_key is None
+    assert any(message in error for error in errors)
+
+
+def test_signed_receipt_rejects_missing_statement(tmp_path: Path) -> None:
+    module = _load()
+    errors: list[str] = []
+
+    module._check_signed_receipt(
+        errors,
+        receipt=tmp_path / "receipt.json",
+        value={"signature": {}},
+        manifest_path=tmp_path / "manifest.json",
+    )
+
+    assert any("fields are not closed" in error for error in errors)
+    assert any("statement is required" in error for error in errors)
+
+
+def test_signed_receipt_rejects_invalid_manifest_claim_and_unsigned_shape(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    errors: list[str] = []
+    statement = {
+        "format": "future",
+        "pack_manifest_digest": "bad",
+        "anchors": _valid_receipt_anchors(),
+        "verifier": {
+            "identity": "tests.verifier",
+            "signing_key_fingerprint": DIGEST,
+            "trust_profile_digest": None,
+        },
+        "verdict": {
+            "ok": True,
+            "integrity_ok": True,
+            "policy_verdict": "pass",
+            "verification_status": 0,
+        },
+        "undeclared": True,
+    }
+
+    module._check_signed_receipt(
+        errors,
+        receipt=tmp_path / "receipt.json",
+        value={"statement": statement, "signature": {}},
+        manifest_path=tmp_path / "manifest.json",
+    )
+
+    assert any("statement fields are invalid" in error for error in errors)
+    assert any("receipt format is invalid" in error for error in errors)
+    assert any("manifest digest is invalid" in error for error in errors)
+
+
+def test_signed_receipt_rejects_unreadable_claimed_manifest(tmp_path: Path) -> None:
+    module = _load()
+    errors: list[str] = []
+    statement = {
+        "format": "invarlock/evidence-verification-receipt-v1",
+        "pack_manifest_digest": DIGEST,
+        "anchors": _valid_receipt_anchors(),
+        "verifier": {
+            "identity": "tests.verifier",
+            "signing_key_fingerprint": DIGEST,
+            "trust_profile_digest": None,
+        },
+        "verdict": {
+            "ok": True,
+            "integrity_ok": True,
+            "policy_verdict": "pass",
+            "verification_status": 0,
+        },
+    }
+
+    module._check_signed_receipt(
+        errors,
+        receipt=tmp_path / "receipt.json",
+        value={"statement": statement, "signature": {}},
+        manifest_path=tmp_path / "missing-manifest.json",
+    )
+
+    assert any("could not read pack manifest" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, "/absolute/path", "public_evidence/evidence/demo/../secret", "wrong/root"],
+)
+def test_safe_logical_path_rejects_noncanonical_or_escaping_values(
+    value: object,
+) -> None:
+    module = _load()
+
+    assert not module._safe_logical_path(value, prefix="public_evidence/evidence/demo/")
+
+
+def test_safe_external_url_rejects_non_text() -> None:
+    module = _load()
+
+    assert not module._safe_external_url(None)
+
+
+def test_index_entry_rejects_non_object_and_invalid_slug(tmp_path: Path) -> None:
+    module = _load()
+    errors: list[str] = []
+
+    module._check_index_entry(errors, [], tmp_path)
+    module._check_index_entry(errors, {"slug": "bad/slug"}, tmp_path)
+
+    assert "public evidence entry must be an object" in errors
+    assert "public evidence entry slug is invalid" in errors
+
+
+def test_index_entry_rejects_wrong_class_path_and_missing_artifacts(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    errors: list[str] = []
+    entry = {
+        "slug": "demo",
+        "path": "elsewhere",
+        "evidence_class": "historical",
+        "artifacts": {},
+    }
+
+    module._check_index_entry(errors, entry, tmp_path / "public_evidence")
+
+    assert any(
+        "evidence_class must be signed_evidence_pack" in error for error in errors
+    )
+    assert any("entry path must be" in error for error in errors)
+    assert any("missing evidence_pack" in error for error in errors)
+    assert any("missing verification_receipt" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("summary", "message"),
+    [
+        (
+            {
+                "kind": "archive",
+                "path": "public_evidence/evidence/demo/evidence",
+                "size_bytes": 1,
+            },
+            "kind must be file or directory",
+        ),
+        (
+            {
+                "kind": "file",
+                "path": "public_evidence/evidence/demo/receipt.json",
+                "size_bytes": True,
+                "sha256": DIGEST,
+            },
+            "artifact size is invalid",
+        ),
+        (
+            {
+                "kind": "file",
+                "path": "public_evidence/evidence/demo/receipt.json",
+                "size_bytes": 1,
+                "sha256": "bad",
+            },
+            "artifact digest is invalid",
+        ),
+        (
+            {
+                "kind": "directory",
+                "path": "public_evidence/evidence/demo/evidence",
+                "size_bytes": 1,
+                "file_count": -1,
+                "control_hashes": {},
+            },
+            "artifact file count is invalid",
+        ),
+        (
+            {
+                "kind": "directory",
+                "path": "public_evidence/evidence/demo/evidence",
+                "size_bytes": 1,
+                "file_count": 1,
+                "control_hashes": {"unexpected.json": DIGEST},
+            },
+            "artifact control hashes are invalid",
+        ),
+    ],
+)
+def test_artifact_summary_rejects_invalid_shape_and_totals(
+    tmp_path: Path,
+    summary: dict[str, object],
+    message: str,
+) -> None:
+    module = _load()
+    errors: list[str] = []
+    entry = {
+        "slug": "demo",
+        "artifacts": {"evidence_pack": summary},
+    }
+
+    module._check_artifact_summary(
+        errors, entry, "evidence_pack", tmp_path / "public_evidence"
+    )
+
+    assert any(message in error for error in errors)
+
+
+def test_artifact_summary_rejects_open_external_asset_and_carrier_conflict(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    local = root / "evidence" / "demo" / "receipt.json"
+    local.parent.mkdir(parents=True)
+    local.write_text("{}\n", encoding="utf-8")
+    summary = {
+        "kind": "file",
+        "path": "public_evidence/evidence/demo/receipt.json",
+        "size_bytes": local.stat().st_size,
+        "sha256": module._sha256_bytes(local.read_bytes()),
+        "external_asset": {
+            "url": "http://example.com/receipt.json",
+            "sha256": "bad",
+            "token": "secret",
+        },
+    }
+    errors: list[str] = []
+
+    module._check_artifact_summary(
+        errors,
+        {"slug": "demo", "artifacts": {"verification_receipt": summary}},
+        "verification_receipt",
+        root,
+    )
+
+    assert any("external asset fields are not closed" in error for error in errors)
+    assert any("credential-free HTTPS" in error for error in errors)
+    assert any("external asset digest is invalid" in error for error in errors)
+    assert any("one publication carrier" in error for error in errors)
+
+
+def test_artifact_summary_rejects_symlinked_local_carrier(tmp_path: Path) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    outside = tmp_path / "outside.json"
+    outside.write_text("{}\n", encoding="utf-8")
+    local = root / "evidence" / "demo" / "receipt.json"
+    local.parent.mkdir(parents=True)
+    local.symlink_to(outside)
+    errors: list[str] = []
+
+    module._check_artifact_summary(
+        errors,
+        {
+            "slug": "demo",
+            "artifacts": {
+                "verification_receipt": {
+                    "kind": "file",
+                    "path": "public_evidence/evidence/demo/receipt.json",
+                    "size_bytes": outside.stat().st_size,
+                    "sha256": module._sha256_bytes(outside.read_bytes()),
+                }
+            },
+        },
+        "verification_receipt",
+        root,
+    )
+
+    assert any("symlinks are not allowed" in error for error in errors)
+
+
+def test_local_tree_rejects_unindexed_directory_and_loose_file(tmp_path: Path) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    evidence_root = root / "evidence"
+    (evidence_root / "orphan").mkdir(parents=True)
+    (evidence_root / "loose.txt").write_text("unexpected\n", encoding="utf-8")
+    errors: list[str] = []
+
+    module._check_local_evidence_tree(errors, root, [])
+
+    assert "every local evidence directory must appear in the index" in errors
+    assert any("unexpected files" in error for error in errors)
+    assert any("missing safe evidence.meta.json" in error for error in errors)
+
+
+def test_public_evidence_reports_missing_root_readme_and_index(tmp_path: Path) -> None:
+    module = _load()
+    missing = tmp_path / "missing"
+
+    assert module.check_public_evidence(missing) == [
+        f"public evidence root not found: {missing.resolve()}"
+    ]
+
+    root = tmp_path / "public_evidence"
+    root.mkdir()
+    errors = module.check_public_evidence(root)
+    assert "public_evidence/README.md is required" in errors
+    assert "public_evidence/evidence_index.json is required" in errors
+
+
+def test_public_evidence_rejects_invalid_index_json(tmp_path: Path) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    root.mkdir()
+    (root / "README.md").write_text("# Evidence\n", encoding="utf-8")
+    (root / "evidence_index.json").write_text("{", encoding="utf-8")
+
+    errors = module.check_public_evidence(root)
+
+    assert errors and "Expecting property name" in errors[0]
+
+
+def test_public_evidence_checks_packaged_index_at_canonical_root(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    packaged = tmp_path / "packaged"
+    _write_index(root)
+    packaged.mkdir()
+    (packaged / "evidence_index.json").write_text("{}\n", encoding="utf-8")
+    module.SOURCE_ROOT = root
+    module.PACKAGED_ROOT = packaged
+
+    errors = module.check_public_evidence(root)
+
+    assert "source and packaged public evidence indexes differ" in errors
+
+
+def test_public_evidence_cli_reports_success_and_failure(tmp_path: Path) -> None:
+    script = (
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "checks"
+        / "check_public_evidence.py"
+    )
+    valid = tmp_path / "valid"
+    invalid = tmp_path / "invalid"
+    _write_index(valid)
+
+    passed = subprocess.run(
+        [sys.executable, str(script), "--root", str(valid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    failed = subprocess.run(
+        [sys.executable, str(script), "--root", str(invalid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert passed.returncode == 0
+    assert "audit passed" in passed.stdout
+    assert failed.returncode == 1
+    assert "public evidence root not found" in failed.stdout

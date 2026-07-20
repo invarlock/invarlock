@@ -1007,7 +1007,7 @@ def _container_control(
         return
 
 
-def _terminate_timed_out_worker(
+def _terminate_worker(
     process: subprocess.Popen[bytes],
     command: Sequence[str],
     cidfile: Path | None,
@@ -1015,8 +1015,6 @@ def _terminate_timed_out_worker(
     container_id = _read_worker_container_id(cidfile)
     if container_id is not None and command:
         _container_control(command[0], "stop", container_id)
-        if process.poll() is None:
-            _container_control(command[0], "kill", container_id)
     if process.poll() is None:
         process.terminate()
         try:
@@ -1024,6 +1022,14 @@ def _terminate_timed_out_worker(
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=_CONTAINER_STOP_SECONDS)
+    # The engine may create its cidfile immediately before it exits in response
+    # to termination. Re-read only after reaping the launcher so cancellation
+    # cannot discard the sole handle to a still-running container.
+    late_container_id = _read_worker_container_id(cidfile)
+    if late_container_id is not None and command:
+        if late_container_id != container_id:
+            _container_control(command[0], "stop", late_container_id)
+        _container_control(command[0], "kill", late_container_id)
 
 
 def run_side_worker(
@@ -1080,9 +1086,12 @@ def run_side_worker(
             returncode = process.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
             timed_out = True
-            _terminate_timed_out_worker(process, command, cidfile)
+            _terminate_worker(process, command, cidfile)
             returncode = 124
         _join_worker_drains(drains)
+    except BaseException:
+        _terminate_worker(process, command, cidfile)
+        raise
     finally:
         stop_drains.set()
         process.stdout.close()

@@ -139,6 +139,16 @@ def test_runtime_boundary_and_backend_version_fail_closed(
     with pytest.raises(runner.TensorRTLLMRunnerError, match="container boundary"):
         runner._require_runtime_boundary()  # noqa: SLF001
 
+    calls: list[bool] = []
+    monkeypatch.setattr(security, "strict_container_boundary_present", lambda: True)
+    monkeypatch.setattr(
+        runner,
+        "_require_isolated_network_namespace",
+        lambda: calls.append(True),
+    )
+    runner._require_runtime_boundary()  # noqa: SLF001
+    assert calls == [True]
+
     monkeypatch.setattr(
         runner.importlib.metadata,
         "version",

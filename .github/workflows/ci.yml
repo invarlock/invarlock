@@ -163,3 +163,18 @@ jobs:
         run: bash scripts/security/generate_sbom.sh --scope tool-environment
       - name: Audit dependencies
         run: python scripts/security/run_pip_audit.py
+      - name: Audit maintained dependency locks
+        run: |
+          python scripts/security/cve_audit.py \
+            --out-json artifacts/supply-chain/cve-audit.json \
+            --out-md artifacts/supply-chain/cve-audit.md
+      - name: Upload dependency audit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ci-cve-audit
+          path: |
+            artifacts/supply-chain/cve-audit.json
+            artifacts/supply-chain/cve-audit.md
+          if-no-files-found: error
+          retention-days: 14

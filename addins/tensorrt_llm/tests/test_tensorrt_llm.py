@@ -489,6 +489,38 @@ def test_tensorrt_llm_input_preflight_rejects_unsupported_schedule_task(
         )
 
 
+def test_tensorrt_llm_input_preflight_and_preparation_require_cuda(
+    tmp_path: Path,
+) -> None:
+    spec, resources = _tensorrt_llm_preflight_inputs(tmp_path)
+    cpu_resources = replace(resources, device_kind="cpu")
+    provider = TensorRTLLMProvider()
+
+    with pytest.raises(ValueError, match="input preflight requires a CUDA device"):
+        provider.validate_evaluation_inputs(
+            spec,
+            cpu_resources,
+            _tensorrt_llm_preflight_schedule(),
+        )
+    with pytest.raises(ValueError, match="preparation requires a CUDA device"):
+        provider.prepare_execution(spec, cpu_resources)
+
+
+def test_tensorrt_llm_open_rejects_bound_engine_identity_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, _bindings, context = _runtime_inputs(tmp_path)
+    provider = TensorRTLLMProvider()
+    identity = provider.identify_artifact(spec)
+    monkeypatch.setattr(
+        tensorrt_llm_provider,
+        "read_tensorrt_llm_artifact_identity",
+        lambda *_args, **_kwargs: replace(identity, engine_metadata_sha256="0" * 64),
+    )
+    with pytest.raises(ValueError, match="bound TensorRT-LLM artifact identity"):
+        provider.open(spec, context)
+
+
 @pytest.mark.parametrize(
     ("resource_name", "message"),
     [

@@ -5,11 +5,20 @@ import io
 import json
 import os
 import stat
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from invarlock_addins.tensorrt_llm import execution, inspection, runner, session
+
+from invarlock.core.runtime_provider import (
+    EvaluationBatch,
+    EvaluationInputPart,
+    EvaluationRecord,
+    RuntimeExecutionSettings,
+    evaluation_input_parts_sha256,
+)
 
 
 def test_runtime_resource_budgets_match_static_inspection_for_qwen3_contract() -> None:
@@ -481,17 +490,6 @@ def test_execution_boundary_create_and_recheck_report_filesystem_failures(
         boundary.close()
 
 
-def test_selector_stream_close_tolerates_unregistered_stream() -> None:
-    stream = io.BytesIO()
-
-    class Selector:
-        def unregister(self, _stream: object) -> None:
-            raise KeyError("not registered")
-
-    execution._close_selector_stream(Selector(), stream)  # type: ignore[arg-type]  # noqa: SLF001
-    assert stream.closed is True
-
-
 def test_runner_info_probe_rejects_exit_and_stderr(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -606,3 +604,152 @@ def test_tensorrt_network_namespace_requires_loopback_only(
     monkeypatch.setattr(Path, "read_text", routable)
     with pytest.raises(execution.TensorRTLLMExecutionError, match="network-disabled"):
         session._require_isolated_network_namespace()  # noqa: SLF001
+
+
+def _runtime_record(
+    *, role: str = "prompt", digest: str | None = None
+) -> EvaluationRecord:
+    text = "prompt"
+    part = EvaluationInputPart(
+        kind="text",
+        role=role,
+        text=text,
+        sha256=hashlib.sha256(text.encode()).hexdigest(),
+    )
+    return EvaluationRecord(
+        record_id="record",
+        input_text=text,
+        input_sha256=digest or evaluation_input_parts_sha256((part,)),
+        input_parts=(part,),
+    )
+
+
+def _bare_tensorrt_session() -> session.TensorRTLLMSession:
+    candidate = object.__new__(session.TensorRTLLMSession)
+    candidate._closed = False  # noqa: SLF001
+    candidate._runner = SimpleNamespace()  # noqa: SLF001
+    candidate._vendor_python = SimpleNamespace()  # noqa: SLF001
+    candidate._execution_boundary = SimpleNamespace()  # noqa: SLF001
+    candidate._run_directory = SimpleNamespace()  # noqa: SLF001
+    candidate._engine_snapshot = Path("/engine")  # noqa: SLF001
+    candidate._tokenizer_snapshot = Path("/tokenizer")  # noqa: SLF001
+    candidate._config = SimpleNamespace(  # noqa: SLF001
+        execution_settings=RuntimeExecutionSettings(
+            seed=1,
+            context_length=32,
+            batch_size=1,
+            max_output_tokens=8,
+            timeout_seconds=2,
+        )
+    )
+    return candidate
+
+
+def test_batch_request_and_score_reject_unbounded_or_malformed_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = _bare_tensorrt_session()
+    record = _runtime_record()
+    monkeypatch.setattr(session, "_MAX_INPUT_BYTES", 0)
+    with pytest.raises(ValueError, match="batch input exceeds"):
+        candidate._batch_request((record,))  # noqa: SLF001
+
+    monkeypatch.setattr(session, "_MAX_INPUT_BYTES", 1024 * 1024)
+    candidate._score_lock = threading.Lock()  # noqa: SLF001
+    candidate._latest_observation_sha256 = None  # noqa: SLF001
+    with pytest.raises(TypeError, match="EvaluationBatch"):
+        candidate.score(object())  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="text_causal"):
+        candidate.score(
+            EvaluationBatch(
+                schedule_sha256="a" * 64,
+                records=(record,),
+                task="vision_text_generation",
+            )
+        )
+    monkeypatch.setattr(session, "_MAX_BATCH_RECORDS", 0)
+    with pytest.raises(ValueError, match="record limit"):
+        candidate.score(EvaluationBatch("a" * 64, (record,)))
+    monkeypatch.setattr(session, "_MAX_BATCH_RECORDS", 1024)
+    with pytest.raises(ValueError, match="one prompt text input part"):
+        candidate.score(EvaluationBatch("a" * 64, (_runtime_record(role="context"),)))
+
+
+def test_runtime_receipt_requires_observed_device() -> None:
+    candidate = _bare_tensorrt_session()
+    candidate._score_lock = threading.Lock()  # noqa: SLF001
+    candidate._latest_observation_sha256 = "a" * 64  # noqa: SLF001
+    candidate._device = None  # noqa: SLF001
+    with pytest.raises(RuntimeError, match="device facts are unavailable"):
+        candidate.runtime_receipt()
+
+
+def test_snapshot_bundle_reports_listing_open_and_file_type_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    destination = tmp_path / "destination"
+    monkeypatch.setattr(
+        Path,
+        "iterdir",
+        lambda _self: (_ for _ in ()).throw(OSError("unavailable")),
+    )
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="cannot be listed"):
+        session._snapshot_bundle(source, destination)  # noqa: SLF001
+
+    monkeypatch.undo()
+    source.joinpath("config.json").write_bytes(b"{}")
+    source.joinpath("rank0.engine").mkdir()
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="non-regular"):
+        session._snapshot_bundle(source, tmp_path / "second")  # noqa: SLF001
+
+
+def test_inspection_rejects_engine_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    static = SimpleNamespace(
+        tokenizer_sha256="a" * 64,
+        engine_max_batch_size=1,
+        engine_max_input_len=8,
+        engine_max_seq_len=9,
+        recheck=lambda: None,
+        close=lambda: None,
+    )
+    first = SimpleNamespace(name="first")
+    second = SimpleNamespace(name="second")
+    identities = iter((first, second))
+    monkeypatch.setattr(
+        session, "_open_validated_tensorrt_llm_static_inputs", lambda **_kwargs: static
+    )
+    monkeypatch.setattr(
+        session,
+        "_authenticated_official_runner_info",
+        lambda _runner: (
+            {
+                "backend_build_sha256": "b" * 64,
+                "backend_name": "TensorRT-LLM",
+                "backend_version": "1.2.1",
+                "cuda_compute_capability": "9.0",
+                "cuda_device_name": "GPU",
+                "cuda_driver_version": "1",
+                "cuda_runtime_version": "12.8",
+                "device_kind": "cuda",
+                "format_version": "invarlock/tensorrt-llm-runner-info-v1",
+                "protocol_version": "invarlock/tensorrt-llm-runner-v1",
+            },
+            "c" * 64,
+        ),
+    )
+    monkeypatch.setattr(
+        session,
+        "read_tensorrt_llm_artifact_identity",
+        lambda *_args, **_kwargs: next(identities),
+    )
+    bindings = session.TensorRTLLMRuntimeBindings(
+        Path("/engine"), Path("/tokenizer"), Path("/runner")
+    )
+    with pytest.raises(
+        execution.TensorRTLLMExecutionError, match="changed during runtime inspection"
+    ):
+        session.inspect_tensorrt_llm_inputs(bindings)

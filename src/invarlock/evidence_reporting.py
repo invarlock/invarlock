@@ -682,7 +682,9 @@ def _validate_sample_qualification(
     return qualified
 
 
-def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
+def _comparison_report_shape(
+    report: dict[str, Any],
+) -> tuple[str, str, int, dict[str, float], dict[str, Any], str, float, float]:
     expected = {
         "format",
         "comparison_id",
@@ -774,6 +776,21 @@ def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
         )
     if report.get("verdict") not in {"pass", "fail"}:
         raise EvidenceReportError("canonical report verdict is invalid")
+    return (
+        report_format,
+        metric,
+        count,
+        side_means,
+        comparison,
+        kind,
+        comparison_value,
+        limit,
+    )
+
+
+def _comparison_uncertainty(
+    report: dict[str, Any], *, metric: str, report_format: str
+) -> tuple[dict[str, Any], float, float]:
     uncertainty = report.get("uncertainty")
     if not isinstance(uncertainty, dict):
         raise EvidenceReportError("canonical report uncertainty is invalid")
@@ -819,6 +836,22 @@ def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
     upper = _number(uncertainty.get("upper"), field="uncertainty.upper")
     if lower > upper:
         raise EvidenceReportError("canonical report uncertainty bounds are invalid")
+    return uncertainty, lower, upper
+
+
+def _comparison_acceptance(
+    report: dict[str, Any],
+    *,
+    metric: str,
+    count: int,
+    side_means: dict[str, float],
+    kind: str,
+    comparison_value: float,
+    limit: float,
+    uncertainty: dict[str, Any],
+    lower: float,
+    upper: float,
+) -> bool:
     baseline_mean = side_means["baseline"]
     subject_mean = side_means["subject"]
     if kind in {"exact_match_delta_pp", "scorer_extension_delta_pp"}:
@@ -882,6 +915,35 @@ def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
             interval_lower=lower,
             interval_upper=upper,
         )
+    return passed
+
+
+def _closed_comparison_report(report: dict[str, Any]) -> dict[str, Any]:
+    (
+        report_format,
+        metric,
+        count,
+        side_means,
+        comparison,
+        kind,
+        comparison_value,
+        limit,
+    ) = _comparison_report_shape(report)
+    uncertainty, lower, upper = _comparison_uncertainty(
+        report, metric=metric, report_format=report_format
+    )
+    passed = _comparison_acceptance(
+        report,
+        metric=metric,
+        count=count,
+        side_means=side_means,
+        kind=kind,
+        comparison_value=comparison_value,
+        limit=limit,
+        uncertainty=uncertainty,
+        lower=lower,
+        upper=upper,
+    )
     expected_verdict = "pass" if passed else "fail"
     if report["verdict"] != expected_verdict:
         raise EvidenceReportError(

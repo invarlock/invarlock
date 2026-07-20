@@ -21,6 +21,46 @@ def _pack(tmp_path: Path) -> Path:
     return root
 
 
+def test_snapshot_identity_rejects_nonregular_nodes(tmp_path: Path) -> None:
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    target = tmp_path / "target"
+    target.write_text("bytes", encoding="utf-8")
+    link = tmp_path / "link"
+    link.symlink_to(target)
+
+    assert snapshot_module._identity(directory) is None
+    assert snapshot_module._identity(link) is None
+
+
+def test_capture_entry_rejects_missing_and_replaced_source(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.json"
+    destination = tmp_path / "snapshot" / "missing.json"
+    expected = snapshot_module.FileIdentity(1, 2, 3, 4, 5, 6)
+
+    entry, error = snapshot_module._capture_entry(
+        missing,
+        relative_path="missing.json",
+        snapshot_path=destination,
+        expected_identity=expected,
+        max_bytes=100,
+    )
+    assert entry is None
+    assert error == "snapshot input is missing or not a regular file: missing.json"
+
+    source = tmp_path / "source.json"
+    source.write_text("{}\n", encoding="utf-8")
+    entry, error = snapshot_module._capture_entry(
+        source,
+        relative_path="source.json",
+        snapshot_path=tmp_path / "snapshot" / "source.json",
+        expected_identity=expected,
+        max_bytes=100,
+    )
+    assert entry is None
+    assert error == "snapshot input changed before capture: source.json"
+
+
 def test_pack_snapshot_materializes_authenticated_immutable_bytes(
     tmp_path: Path,
 ) -> None:

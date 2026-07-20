@@ -6,19 +6,17 @@ import hashlib
 import json
 import os
 import re
-import selectors
 import shutil
 import signal
 import stat
 import subprocess
 import tempfile
 import threading
-import time
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import BinaryIO, cast
 
+from invarlock._bounded_subprocess import communicate_bounded
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
     EvaluationRecord,
@@ -312,8 +310,6 @@ class _RunDirectory:
 
 
 def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
@@ -323,16 +319,6 @@ def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=2)
-
-
-def _close_selector_stream(selector: selectors.BaseSelector, stream: BinaryIO) -> None:
-    try:
-        selector.unregister(stream)
-    except (KeyError, ValueError):
-        pass
-    close = getattr(stream, "close", None)
-    if callable(close):
-        close()
 
 
 def _run_bounded_process(
@@ -369,82 +355,18 @@ def _run_bounded_process(
         raise LlamaCppExecutionError(
             "descriptor-backed llama.cpp execution is unavailable"
         ) from exc
-    if (
-        (input_bytes and process.stdin is None)
-        or process.stdout is None
-        or process.stderr is None
-    ):
-        _kill_process_group(process)
-        raise LlamaCppExecutionError("llama.cpp pipes could not be established")
-
-    selector = selectors.DefaultSelector()
-    stdout = bytearray()
-    stderr = bytearray()
-    input_offset = 0
-    try:
-        streams = tuple(
-            stream
-            for stream in (process.stdin, process.stdout, process.stderr)
-            if stream is not None
-        )
-        for stream in streams:
-            os.set_blocking(stream.fileno(), False)
-        if input_bytes:
-            assert process.stdin is not None
-            selector.register(process.stdin, selectors.EVENT_WRITE, "stdin")
-        selector.register(process.stdout, selectors.EVENT_READ, "stdout")
-        selector.register(process.stderr, selectors.EVENT_READ, "stderr")
-        deadline = time.monotonic() + timeout_seconds
-
-        while selector.get_map():
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise LlamaCppExecutionError("llama.cpp record timed out")
-            events = selector.select(remaining)
-            if not events:
-                raise LlamaCppExecutionError("llama.cpp record timed out")
-            for key, _mask in events:
-                selected_stream = cast(BinaryIO, key.fileobj)
-                if key.data == "stdin":
-                    try:
-                        written = os.write(
-                            selected_stream.fileno(),
-                            input_bytes[input_offset : input_offset + _IO_CHUNK_BYTES],
-                        )
-                    except BrokenPipeError:
-                        _close_selector_stream(selector, selected_stream)
-                        continue
-                    input_offset += written
-                    if input_offset == len(input_bytes):
-                        _close_selector_stream(selector, selected_stream)
-                    continue
-
-                try:
-                    chunk = os.read(selected_stream.fileno(), _IO_CHUNK_BYTES)
-                except BlockingIOError:
-                    continue
-                if not chunk:
-                    _close_selector_stream(selector, selected_stream)
-                    continue
-                target = stdout if key.data == "stdout" else stderr
-                target.extend(chunk)
-                limit = stdout_limit if key.data == "stdout" else stderr_limit
-                if len(target) > limit:
-                    raise LlamaCppExecutionError(f"llama.cpp {key.data} limit exceeded")
-
-        try:
-            return_code = process.wait(timeout=max(0.1, deadline - time.monotonic()))
-        except subprocess.TimeoutExpired as exc:
-            raise LlamaCppExecutionError("llama.cpp record timed out") from exc
-        return return_code, bytes(stdout), bytes(stderr)
-    except BaseException:
-        _kill_process_group(process)
-        raise
-    finally:
-        selector.close()
-        for final_stream in (process.stdin, process.stdout, process.stderr):
-            if final_stream is not None and not final_stream.closed:
-                final_stream.close()
+    return communicate_bounded(
+        process,
+        input_bytes=input_bytes,
+        timeout_seconds=timeout_seconds,
+        stdout_limit=stdout_limit,
+        stderr_limit=stderr_limit,
+        error_type=LlamaCppExecutionError,
+        timeout_label="llama.cpp record",
+        output_label="llama.cpp",
+        pipes_message="llama.cpp pipes could not be established",
+        terminate=_kill_process_group,
+    )
 
 
 def validate_llama_cpp_backend_version(value: object) -> str:

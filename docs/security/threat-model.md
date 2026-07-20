@@ -149,12 +149,15 @@ out or independently selected schedule where appropriate.
 ### Circular trust anchors
 
 A decision owner copies the expected evidence-signer fingerprint, policy,
-artifact identities, schedule digest, or runtime digest from the pack and
+artifact identities, schedule digest, runtime digest, or GGUF request digest from the pack and
 passes those values to `verify`. Verification can establish internal
 consistency but not independent acceptance.
 
 **Mitigation:** obtain all anchors from authorized configuration or another
 independent channel. Compare the signed receipt with that source before acting.
+For GGUF, approve the execution-free preflight request digest before evaluation;
+the verifier uses it to reject substituted llama.cpp backend, artifact, or
+execution settings even when the submitted bundle is internally consistent.
 
 ### Compromised verifier
 

@@ -169,8 +169,9 @@ transaction over the inspected model and backend:
    resource variables documented in the main runtime-provider guide;
 4. let the host validate both side results and sign the evidence bundle without
    mounting the signing key into either worker;
-5. verify the resulting pack with independently recorded artifact, schedule,
-   runtime-image, and evidence-signer anchors; and
+5. retain the reviewed preflight `request_digest`, then verify the resulting pack
+   with that digest and independently recorded artifact, schedule, runtime-image,
+   and evidence-signer anchors; and
 6. require both the evaluation and strict verification to finish successfully.
 
 With those pinned request and expected-anchor files in place, the qualification
@@ -179,12 +180,16 @@ uses the same public transactions as the core package:
 ```bash
 invarlock evaluate request.yaml \
   --signing-key evidence-signer.pem \
-  --preflight
+  --preflight --json
 invarlock evaluate request.yaml --signing-key evidence-signer.pem
 invarlock verify evidence/ \
   --trust-profile trust/trust-inputs.json \
   --receipt verification.receipt.json
 ```
+
+Place the reviewed preflight `request_digest` in the trust profile's `anchors`
+object. GGUF verification fails closed without it and emits a v2 signed receipt
+that binds the same request identity.
 
 Bootstrap that transaction once for the exact image with
 `make -C addins/gguf qualify-canary`. Retain its `EVIDENCE`, strictly verified

@@ -10,6 +10,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from invarlock.engine import verify_signed_verification_receipt
@@ -339,11 +340,18 @@ def main() -> None:
     parser.add_argument(
         "--workspace",
         type=Path,
-        required=True,
-        help="new destination for evaluation and verifier workspaces",
+        help=(
+            "new destination for evaluation and verifier workspaces; "
+            "defaults to a fresh temporary directory"
+        ),
     )
     args = parser.parse_args()
-    run_demo(Path(__file__).resolve().parent, args.workspace.resolve())
+    if args.workspace is None:
+        parent = Path(tempfile.mkdtemp(prefix="invarlock-evidence-handoff-"))
+        workspace = parent / "workspace"
+    else:
+        workspace = args.workspace.resolve()
+    run_demo(Path(__file__).resolve().parent, workspace)
 
 
 if __name__ == "__main__":

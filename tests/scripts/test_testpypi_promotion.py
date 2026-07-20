@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from pathlib import Path
 from urllib.request import Request
 
@@ -351,3 +352,99 @@ def test_main_records_manifest_and_reports_invalid_current_candidate(
     )
     assert "workflow run ID is malformed" in capsys.readouterr().err
     assert not github_output.exists()
+
+
+def test_promotion_reader_rejects_missing_nonregular_and_oversized_inputs(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing.json"
+    with pytest.raises(promotion.PromotionError, match="unavailable"):
+        promotion.load_promotion(missing)
+
+    directory = tmp_path / "directory.json"
+    directory.mkdir()
+    with pytest.raises(promotion.PromotionError, match="bounded regular file"):
+        promotion.load_promotion(directory)
+
+    oversized = tmp_path / "oversized.json"
+    with oversized.open("wb") as handle:
+        handle.truncate(promotion._MAX_JSON_BYTES + 1)  # noqa: SLF001
+    with pytest.raises(promotion.PromotionError, match="bounded regular file"):
+        promotion.load_promotion(oversized)
+
+
+def test_promotion_reader_rejects_short_and_identity_changing_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = _write_manifest(tmp_path / "promotion.json")
+    real_read = promotion.os.read
+    monkeypatch.setattr(promotion.os, "read", lambda *_args: b"")
+    with pytest.raises(promotion.PromotionError, match="changed or exceeded"):
+        promotion.load_promotion(manifest)
+
+    monkeypatch.setattr(promotion.os, "read", real_read)
+    real_fstat = promotion.os.fstat
+    calls = 0
+
+    def changed_fstat(descriptor: int) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        file_stat = real_fstat(descriptor)
+        if calls >= 2:
+            values = list(file_stat)
+            values[9] = file_stat.st_mtime + 1
+            return os.stat_result(values)
+        return file_stat
+
+    monkeypatch.setattr(promotion.os, "fstat", changed_fstat)
+    with pytest.raises(promotion.PromotionError, match="changed while it was read"):
+        promotion.load_promotion(manifest)
+
+
+def test_promotion_writer_closes_descriptor_when_stream_open_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "promotion.json"
+    closed: list[int] = []
+    real_close = promotion.os.close
+    monkeypatch.setattr(
+        promotion.os,
+        "fdopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+
+    def tracked_close(descriptor: int) -> None:
+        closed.append(descriptor)
+        real_close(descriptor)
+
+    monkeypatch.setattr(promotion.os, "close", tracked_close)
+
+    with pytest.raises(promotion.PromotionError, match="created safely"):
+        promotion.record_promotion(
+            output=output,
+            release_sha=SHA,
+            release_tag=TAG,
+            dist_ledger_sha256=DIGEST,
+            source_run_id=RUN_ID,
+        )
+
+    assert len(closed) == 1
+
+
+def test_authorize_rejects_nontext_ledger_and_oversized_run_metadata(
+    tmp_path: Path,
+) -> None:
+    malformed = _write_manifest(tmp_path / "malformed.json", dist_ledger_sha256=7)
+    with pytest.raises(promotion.PromotionError, match="ledger digest is malformed"):
+        _authorize(malformed)
+
+    manifest = _write_manifest(tmp_path / "promotion.json")
+
+    def oversized_api(_request: Request, *, timeout: int) -> FakeResponse:
+        assert timeout == 30
+        return FakeResponse(b"x" * (promotion._MAX_JSON_BYTES + 1))  # noqa: SLF001
+
+    with pytest.raises(promotion.PromotionError, match="metadata is too large"):
+        _authorize(manifest, opener=oversized_api)

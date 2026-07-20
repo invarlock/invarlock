@@ -189,6 +189,7 @@ def test_candidate_qualification_uses_real_provider_session_contract(
 
     class Session:
         observation: ScoringObservation | None = None
+        status = "ok"
 
         def __init__(self) -> None:
             self.distribution_version = (
@@ -197,13 +198,21 @@ def test_candidate_qualification_uses_real_provider_session_contract(
 
         def score(self, batch):  # noqa: ANN001, ANN201
             calls.append("score")
-            record = RuntimeScoringRecord(
-                record_id=batch.records[0].record_id,
-                input_sha256=batch.records[0].input_sha256,
-                status="ok",
-                output_text="qualified",
-                output_sha256=hashlib.sha256(b"qualified").hexdigest(),
-            )
+            if self.status == "ok":
+                record = RuntimeScoringRecord(
+                    record_id=batch.records[0].record_id,
+                    input_sha256=batch.records[0].input_sha256,
+                    status="ok",
+                    output_text="qualified",
+                    output_sha256=hashlib.sha256(b"qualified").hexdigest(),
+                )
+            else:
+                record = RuntimeScoringRecord(
+                    record_id=batch.records[0].record_id,
+                    input_sha256=batch.records[0].input_sha256,
+                    status="error",
+                    error_code="candidate_failed",
+                )
             self.observation = ScoringObservation(
                 provider_name="tensorrt_llm",
                 artifact_identity_sha256=artifact_identity_sha256(identity),
@@ -260,6 +269,8 @@ def test_candidate_qualification_uses_real_provider_session_contract(
             calls.append("close")
 
     class Provider:
+        fail_open = False
+
         def validate_config(self, spec):  # noqa: ANN001, ANN201
             calls.append("validate")
             assert spec.model_id == identity.bundle_name
@@ -267,6 +278,8 @@ def test_candidate_qualification_uses_real_provider_session_contract(
 
         def open(self, spec, context):  # noqa: ANN001, ANN201
             calls.append("open")
+            if self.fail_open:
+                raise RuntimeError("provider open failed")
             assert spec.settings["backend_build_sha256"] == "a" * 64
             assert context.strict is True
             assert context.container_image_digest == _IMAGE_DIGEST
@@ -285,6 +298,37 @@ def test_candidate_qualification_uses_real_provider_session_contract(
         "expected_engine_tree_sha256": identity.engine_bundle_tree_sha256,
         "expected_tokenizer_sha256": tokenizer_sha256,
     }
+    Provider.fail_open = True
+    with pytest.raises(RuntimeError, match="provider open failed"):
+        canary.qualify_candidate(
+            **qualification_args,
+            expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
+        )
+    Provider.fail_open = False
+
+    Session.status = "error"
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="did not complete"):
+        canary.qualify_candidate(
+            **qualification_args,
+            expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
+        )
+    Session.status = "ok"
+
+    with monkeypatch.context() as evidence_context:
+        evidence_context.setattr(
+            canary,
+            "runtime_provider_evidence_errors",
+            lambda **_kwargs: ("authenticated receipt mismatch",),
+        )
+        with pytest.raises(
+            canary.TensorRTLLMCanaryError,
+            match="evidence is inconsistent: authenticated receipt mismatch",
+        ):
+            canary.qualify_candidate(
+                **qualification_args,
+                expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
+            )
+
     with pytest.raises(canary.TensorRTLLMCanaryError, match="expected digest"):
         canary.qualify_candidate(
             **qualification_args,
