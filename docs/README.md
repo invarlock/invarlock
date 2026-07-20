@@ -141,8 +141,9 @@ authority.
 A request selects exactly one built-in `metric` or one complete
 `scorer_extension` binding. Extension scorers receive only authenticated
 expected-output and output-text facts, run only when explicitly authorized, and
-cannot redefine aggregation or direction. The core ships the contract, not a
-catalog of F1, extraction, or VQA scorer packages. Network, external-model,
+cannot redefine aggregation or direction. Deterministic F1, extraction, and VQA
+scorers can be supplied as separately installed packages and run only when
+explicitly authorized through the extension contract. Network, external-model,
 human, executable SQL/code, semantic-model, and judge scoring remain outside
 acceptance; judges fit the authenticated-observation path.
 

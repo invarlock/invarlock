@@ -50,5 +50,6 @@ invarlock evaluate request.yaml --signing-key evidence-signer.pem
 ```
 
 Complete the independent `verify` and `report` handoff described in the
-[scenario catalog](../../README.md#common-transaction). A maintained bridge
-should add golden fixtures proving stable-ID mapping and verifier score replay.
+[scenario catalog](../../README.md#common-transaction). A bridge implementation
+should include golden fixtures proving stable-ID mapping and verifier score
+replay.

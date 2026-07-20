@@ -3,9 +3,9 @@
 ## When to use this example
 
 Use this recipe when releasing or replacing a vision-language checkpoint. The
-optional vision-text add-in keeps image decoding, processor behavior, model
-loading, and generation outside the core while using the same evidence and
-verification transaction as text evaluation.
+optional vision-text add-in supplies image decoding, processor behavior, model
+loading, and generation through the same evidence and verification transaction
+used for text evaluation.
 
 ## Inputs you bring
 

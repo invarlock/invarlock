@@ -152,8 +152,9 @@ interval, threshold comparison, and verdict.
 
 This boundary can support deterministic text scorers such as token F1,
 structured-field extraction, or VQA answer normalization when separately
-implemented and authorized. InvarLock does not ship those scorer packages.
-SQL or code execution, model-based semantic similarity, network services,
+implemented and authorized. Those scorer packages are separately installed and
+require explicit authorization. SQL or code execution, model-based semantic
+similarity, network services,
 human review, and LLM judges require different trust contracts; judge outputs
 can be attached as authenticated observations without acceptance authority.
 

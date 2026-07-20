@@ -80,11 +80,12 @@ fully bound `scorer_extension` instead of a built-in `metric`. The runtime still
 collects authenticated expected output, output text, and output digest facts.
 An explicitly authorized scorer replays those facts into one `[0,1]`
 higher-is-better value per record; core owns the arithmetic means, paired
-percentage-point delta, deterministic interval, and policy decision. This
-boundary can support separately supplied deterministic F1, structured
-extraction, or VQA answer normalization. No such scorer package ships here.
-The public CLI loads the exact installed scorer bound by the request only when
-`--allow-installed-scorers` is supplied to both `evaluate` and `verify`.
+percentage-point delta, deterministic interval, and policy decision. Separately
+installed scorer packages can implement deterministic F1, structured
+extraction, or VQA answer normalization and require explicit authorization
+through this extension contract. The public CLI loads the exact installed
+scorer bound by the request only when `--allow-installed-scorers` is supplied to
+both `evaluate` and `verify`.
 
 Executable SQL or code scoring, model-based semantic similarity, network or
 human scoring, external models, and LLM judges are outside this acceptance
@@ -268,19 +269,19 @@ comparison before publication.
 
 For recognizable release situations, the
 [`examples/scenarios/`](https://github.com/invarlock/invarlock/tree/main/examples/scenarios)
-catalog covers fine-tuned, pruned, quantized, GGUF, TensorRT-LLM, model-upgrade,
-multimodal, external-harness, serving-endpoint, and independent-verification
-workflows. Candidate creation stays in the tool that owns it; every recipe
-converges on the same `evaluate`, `verify`, and `report` transaction.
+catalog provides adoption recipes for fine-tuned, pruned, quantized, GGUF,
+TensorRT-LLM, model-upgrade, multimodal, external-harness, serving-endpoint, and
+independent-verification cases. Candidate creation stays in the tool that owns
+it; every recipe converges on the same `evaluate`, `verify`, and `report`
+transaction.
 
 ## Providers and diagnostics
 
 Hugging Face Transformers is the built-in reference provider and supports both
 built-in metrics. First-party optional GGUF/llama.cpp, TensorRT-LLM, and Hugging
-Face vision-text packages add bounded runtime integrations without expanding
-the core dependency set. The vision-text add-in is the first structured-content
-integration and supports exact-match comparisons over authenticated prompt and
-image parts.
+Face vision-text packages are independently installable runtime integrations
+with their own dependency sets. The vision-text add-in supports exact-match
+comparisons over authenticated prompt and image parts.
 See [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md).
 
 Spectral, random-matrix, and variance summaries live in the optional

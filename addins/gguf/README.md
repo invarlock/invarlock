@@ -70,8 +70,8 @@ make -C addins/gguf build \
   BUILD_STATEMENT=/absolute/path/to/gguf-build.json
 ```
 
-The maintained add-in targets keep the build, import smoke, and full
-evaluate-to-verify qualification together without expanding the core Makefile:
+The add-in Makefile groups its build, import smoke, and complete
+evaluate-to-verify qualification targets:
 
 ```bash
 make -C addins/gguf build \
@@ -244,10 +244,10 @@ directories.
 Use a model and prompt whose expected output is fixed before qualification.
 Changing the GGUF file, `llama.cpp` executable, source archive, image digest,
 CPU identity, prompt, or decoding settings invalidates the qualification and
-requires a new transaction. InvarLock does not ship a model fixture because a
-fixture would not qualify the operator's actual artifact/backend combination.
-The signed canary catches image-level failure before fan-out; it does not prove
-that a different GGUF artifact loads, fits memory, or completes successfully.
+requires a new transaction. Qualification therefore binds the caller's actual
+model, prompt, artifact, backend, and CPU combination. The signed canary catches
+image-level failure before fan-out; it does not prove that a different GGUF
+artifact loads, fits memory, or completes successfully.
 
 ## Public Python surface
 

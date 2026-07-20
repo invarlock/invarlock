@@ -177,9 +177,9 @@ the job after artifact collection. Automation must require job success and
 validate the signed receipt; it must not infer acceptance from HTML or artifact
 upload success.
 
-The verification action writes the signed receipt and selected review artifacts. It does not create MLflow tags, model-card fragments, or
-release-review Markdown. Downstream systems should consume the verified JSON
-and validate the signed receipt through the
+The verification action writes the signed receipt and selected review
+artifacts. Downstream systems consume the verified JSON and validate the signed
+receipt through the
 [Python API](../reference/api-guide.md#verify-a-signed-receipt).
 
 ## Trust and secret handling

@@ -20,9 +20,9 @@ checkpoint.
   Face stack.
 - Evidence and verifier signing identities managed independently.
 
-Use a small schedule only to smoke-test integration. A release qualification
-should generally select at least 400 eligible paired records and should encode
-both its minimum count and precision requirement in policy.
+Use a small schedule only to smoke-test the evaluation path. A release
+qualification should generally select at least 400 eligible paired records and
+should encode both its minimum count and precision requirement in policy.
 
 ## InvarLock transaction
 

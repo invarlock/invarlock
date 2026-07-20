@@ -50,7 +50,8 @@ make container-front-door-smoke
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
-  utilities. It is not a second user interface.
+  utilities used by maintainers; user-facing operations remain in the installed
+  CLI.
 
 Hugging Face Transformers is the built-in reference provider. New runtime
 integrations implement the provider ABI in an optional package. Keep runtime-

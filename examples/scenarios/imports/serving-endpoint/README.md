@@ -4,8 +4,8 @@
 
 Use this recipe when a hosted inference service, model server, or gateway
 changes model artifacts, runtime versions, generation settings, routing, or
-deployment configuration. The endpoint client captures paired records; the
-public core receives only authenticated, bounded results.
+deployment configuration. The endpoint client captures paired records for an
+authenticated, bounded import transaction.
 
 ## Inputs you bring
 

@@ -1,32 +1,31 @@
 # Change and deployment scenarios
 
 These examples connect common model-development and deployment changes to the
-distilled InvarLock transaction. The external tool or team creates the
+InvarLock evidence transaction. The external tool or team creates the
 candidate artifact or evaluation records. InvarLock authenticates the inputs,
 compares the baseline and subject on one paired schedule, produces a canonical
 evidence pack, verifies that pack against independently supplied trust inputs,
 and renders the result.
 
-The scenario catalog deliberately contains no fine-tuning, pruning,
-quantization, conversion, or serving implementation. Each directory contains
-only a closed scenario manifest and a runbook. That keeps integrations useful
-to their respective ecosystems without moving artifact creation back into the
-core package.
+Each directory contains a closed scenario manifest and a runbook. The selected
+training, pruning, quantization, conversion, evaluation, or serving system
+creates the artifact or per-record results; InvarLock authenticates that output
+and applies its evaluation, verification, and reporting transaction.
 
 ## Choose a scenario
 
-| Scenario | Relevant users | Execution path | Availability |
+| Scenario | Relevant users | Execution path | Provided material |
 | --- | --- | --- | --- |
-| [`fine-tuned-checkpoint`](changes/fine-tuned-checkpoint/) | PEFT, TRL, and training-pipeline users | Built-in Hugging Face run mode | Operator recipe |
-| [`pruned-checkpoint`](changes/pruned-checkpoint/) | Structured and unstructured pruning users | Hugging Face run mode or authenticated import | Operator recipe |
-| [`hf-quantized-checkpoint`](changes/hf-quantized-checkpoint/) | AWQ, GPTQModel, HQQ, bitsandbytes, Quanto, and TorchAO users | Compatible provider or authenticated import | Operator recipe |
-| [`gguf-conversion`](changes/gguf-conversion/) | llama.cpp and GGUF publishing users | Optional GGUF add-in | Operator recipe |
-| [`tensorrt-deployment`](changes/tensorrt-deployment/) | TensorRT-LLM deployment users | Optional TensorRT-LLM add-in | Operator recipe |
-| [`model-upgrade`](changes/model-upgrade/) | Model and application release teams | Built-in Hugging Face run mode | Operator recipe |
-| [`multimodal-upgrade`](changes/multimodal-upgrade/) | Vision-language model teams | Optional vision-text add-in | Operator recipe |
-| [`external-harness`](imports/external-harness/) | Evaluation-harness maintainers and users | Authenticated import | Operator recipe |
-| [`serving-endpoint`](imports/serving-endpoint/) | Hosted inference and serving teams | Provider ABI plus authenticated import | Operator recipe |
-| [`evidence-handoff`](journeys/evidence-handoff/) | Release reviewers and independent verifiers | Verify and report | Runnable |
+| [`fine-tuned-checkpoint`](changes/fine-tuned-checkpoint/) | PEFT, TRL, and training-pipeline users | Built-in Hugging Face run mode | Adoption recipe |
+| [`pruned-checkpoint`](changes/pruned-checkpoint/) | Structured and unstructured pruning users | Hugging Face run mode or authenticated import | Adoption recipe |
+| [`hf-quantized-checkpoint`](changes/hf-quantized-checkpoint/) | AWQ, GPTQModel, HQQ, bitsandbytes, Quanto, and TorchAO users | Compatible provider or authenticated import | Adoption recipe |
+| [`gguf-conversion`](changes/gguf-conversion/) | llama.cpp and GGUF publishing users | Optional GGUF add-in | Adoption recipe |
+| [`tensorrt-deployment`](changes/tensorrt-deployment/) | TensorRT-LLM deployment users | Optional TensorRT-LLM add-in | Adoption recipe |
+| [`model-upgrade`](changes/model-upgrade/) | Model and application release teams | Built-in Hugging Face run mode | Adoption recipe |
+| [`multimodal-upgrade`](changes/multimodal-upgrade/) | Vision-language model teams | Optional vision-text add-in | Adoption recipe |
+| [`external-harness`](imports/external-harness/) | Evaluation-harness maintainers and users | Authenticated import | Adoption recipe |
+| [`serving-endpoint`](imports/serving-endpoint/) | Hosted inference and serving teams | Provider ABI plus authenticated import | Adoption recipe |
+| [`evidence-handoff`](journeys/evidence-handoff/) | Independent verifiers and release teams | Verify and report | Runnable journey |
 
 ## Common transaction
 

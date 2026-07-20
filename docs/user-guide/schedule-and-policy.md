@@ -350,11 +350,11 @@ aggregation, direction, interval, or verdict semantics.
 As with exact match, scorer count and percentage-point width controls are
 optional but coupled and use the same ranges.
 
-Potential implementations include deterministic token F1, structured-field
-extraction, and VQA answer normalization. No such package ships with InvarLock.
-Executable SQL/code tests, model-based semantic similarity, network or human
-scoring, external-model calls, and LLM judges require separate authenticated
-contracts. Judge results remain observations.
+Separately installed scorer packages may implement deterministic token F1,
+structured-field extraction, and VQA answer normalization and require explicit
+authorization. Executable SQL/code tests, model-based semantic similarity,
+network or human scoring, external-model calls, and LLM judges require separate
+authenticated contracts. Judge results remain observations.
 
 ## Derived perplexity interpretation
 

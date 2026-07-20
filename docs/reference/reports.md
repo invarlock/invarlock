@@ -264,12 +264,13 @@ replay results. Verification requires the caller to authorize the same scorer
 in a `ScorerExtensionRegistry`, runs it twice, and reconstructs the complete
 report. A stored scorer result is never accepted as an aggregate assertion.
 
-The scorer-extension v1 contract is suitable for separately supplied deterministic text scorers
-such as token F1, structured-field extraction, or VQA answer normalization.
-No such packages are claimed as built in. SQL or code execution, model-based
-semantic similarity, network or human services, and LLM judges are outside
-acceptance replay. Judge results may be authenticated as observations, where
-they have no verdict authority.
+The scorer-extension v1 contract is suitable for separately supplied
+deterministic text scorers such as token F1, structured-field extraction, or VQA
+answer normalization. Those scorers are separately installed and require
+explicit authorization. SQL or code execution, model-based semantic similarity,
+network or human services, and LLM judges are outside acceptance replay. Judge
+results may be authenticated as observations, where they have no verdict
+authority.
 
 ## Verification result
 

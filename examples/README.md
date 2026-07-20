@@ -1,4 +1,4 @@
-# Runnable examples
+# Examples and change scenarios
 
 The primary [`run/`](run/) example creates two distinct tiny Hugging Face
 checkpoints and executes a meaningful CPU release-regression decision through
@@ -14,9 +14,9 @@ they are not measurements of real models.
 The [`scenarios/`](scenarios/) catalog maps fine-tuning, pruning, quantization,
 GGUF conversion, TensorRT-LLM deployment, model upgrades, multimodal changes,
 external harnesses, serving endpoints, and independent evidence handoff to the
-same distilled transaction. These are neutral operator recipes: external tools
-create candidate artifacts or per-record results, while InvarLock evaluates or
-imports, verifies, and reports them.
+same InvarLock evidence transaction. Each adoption recipe begins with candidate
+artifacts or per-record results created by the selected external system, then
+shows how InvarLock evaluates or imports, verifies, and reports them.
 
 ## Run the primary Hugging Face journey
 

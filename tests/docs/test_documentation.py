@@ -490,7 +490,11 @@ def test_change_scenario_guide_preserves_the_external_artifact_boundary() -> Non
         assert phrase in catalog
     assert re.search(r"at least 400\s+eligible paired records", guide)
     assert "make example-scenarios-check" in guide
-    assert "does not install a training or compression framework" in guide
+    assert re.search(
+        r"selected training or compression framework creates the candidate\s+artifact",
+        guide,
+    )
+    assert "InvarLock evaluates its authenticated output" in guide
 
 
 def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:

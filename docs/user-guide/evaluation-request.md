@@ -307,12 +307,11 @@ The scorer ID, version, descriptor digest, configuration digest, task, input
 kinds, output kind, pairing, source facts, and replay result must all agree.
 Replay runs twice and must produce byte-identical canonical results.
 
-This boundary can support separately implemented deterministic token F1,
-structured extraction, or VQA answer normalization. InvarLock does not ship
-those scorer packages. SQL or code execution, model-based semantic similarity,
-network and human scoring, external models, and LLM judges are excluded until
-separate authenticated contracts exist. Judge outputs remain optional
-authenticated observations.
+Separately installed and explicitly authorized scorer packages may implement
+deterministic token F1, structured extraction, or VQA answer normalization. SQL
+or code execution, model-based semantic similarity, network and human scoring,
+external models, and LLM judges are excluded until separate authenticated
+contracts exist. Judge outputs remain optional authenticated observations.
 
 ## Authenticated optional observations
 

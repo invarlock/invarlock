@@ -477,9 +477,9 @@ class ExampleProvider:
         ...
 ```
 
-Use the exported typed value classes rather than free-form dictionaries. Core
-does not ship a generic third-party conformance executable: an author owns the
-provider test harness and can use the first-party add-in suites as examples.
+Use the exported typed value classes rather than free-form dictionaries.
+Provider authors own their conformance harnesses and can use the first-party
+add-in suites as examples.
 Tests should cover unknown settings, byte-authentication and each identity mismatch,
 no-follow resource access, record order and failure shapes, receipt-to-observation
 binding, deterministic canonical bytes, session cleanup, and discovery without

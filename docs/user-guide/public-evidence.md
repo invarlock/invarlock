@@ -211,8 +211,8 @@ When no evidence entries exist, retain the checked-in index:
 }
 ```
 
-Do not replace the empty state with historical failures, batch-run notes, or
-unverified placeholders. Entries appear only when publishable evidence exists.
+Keep the **Evidence not yet created** state until a strictly verified,
+disclosure-reviewed pack and receipt are publishable.
 
 ## Final publication checklist
 

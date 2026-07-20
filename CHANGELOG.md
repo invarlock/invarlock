@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This release refocuses InvarLock on one paired model release-regression evaluation.
-A closed request authenticates the baseline and subject artifacts,
+This release provides one paired model release-regression evaluation. A closed
+request authenticates the baseline and subject artifacts,
 dataset, providers, runtimes, policy, metric or deterministic scorer, execution
 mode, and evidence destination. `invarlock evaluate request.yaml` executes or
 imports both sides over one deterministic schedule, publishes a canonical
@@ -42,42 +42,41 @@ from the same canonical JSON.
 
 ### Changed
 
-- Consolidated the public workflow around `invarlock evaluate`, `invarlock
-  verify`, and `invarlock report`, with executed and imported records entering
-  the same canonical publication and independent-verification transaction.
-- Kept Hugging Face Transformers as the built-in text-causal provider while
-  moving GGUF/llama.cpp, TensorRT-LLM, and Hugging Face vision-text execution
-  into coordinated first-party optional distributions using the same request,
-  schedule, evidence, verification, and reporting contracts.
+- Unified executed and imported comparisons under `invarlock evaluate`,
+  `invarlock verify`, and `invarlock report`, with one canonical publication and
+  independent-verification transaction.
+- GGUF/llama.cpp, TensorRT-LLM, and Hugging Face vision-text ship as coordinated
+  first-party optional distributions; Hugging Face Transformers remains the
+  built-in text-causal provider. All use the same request, schedule, evidence,
+  verification, and reporting contracts.
 - Moved spectral, random-matrix, and variance calculations to the optional
   `invarlock-diagnostics` package. Their canonical outputs can be authenticated
   as observations but do not participate in acceptance.
-- Rebuilt documentation, diagrams, packaged contracts, workflows, examples,
-  and public evidence around the closed transaction. The public index now
-  retains only `invarlock/evidence-pack-v1` comparisons qualified on balanced,
+- Documentation, diagrams, packaged contracts, workflows, examples, and public
+  evidence use the closed transaction. The public index contains only
+  `invarlock/evidence-pack-v1` comparisons qualified on balanced,
   pinned 400-record MMLU-Pro or MMMU-Pro schedules, with independent signed
-  receipts and a checked-in, hash-pinned suite manifest. The refreshed set spans
-  Hugging Face text and vision-text execution plus TensorRT-LLM runtime
+  receipts and a checked-in, hash-pinned suite manifest. The indexed entries
+  span Hugging Face text and vision-text execution plus TensorRT-LLM runtime
   qualification; comparisons without current large-sample evidence use the
   explicit **Evidence not yet created** state.
-- Reframed the former transformation-specific examples as a closed scenario
-  catalog for fine-tuned, pruned, quantized, converted, deployed, upgraded,
-  multimodal, imported, and independently reviewed candidates. Each recipe
-  starts at the external artifact or result boundary and uses the same
-  evaluation, verification, and reporting path.
-- Coordinated source archives, core and add-in wheels, runtime images, signed
-  canaries, artifact promotion, and final receipts under one reproducible
-  release qualification flow, with at least 80% branch coverage required for
-  every maintained Python module as well as the aggregate suite.
+- Added a closed scenario catalog for fine-tuned, pruned, quantized, converted,
+  deployed, upgraded, multimodal, imported, and evidence-handoff workflows.
+  Each recipe starts at the external artifact or result boundary and uses the
+  same evaluation, verification, and reporting path.
+- Bound source archives, core and add-in wheels, runtime images, signed
+  canaries, published artifacts, and final receipts in one reproducible release
+  qualification flow, with at least 80% branch coverage required for every
+  maintained Python module as well as the aggregate suite.
 
 ### Removed
 
-- Removed multi-command catalog and calibration orchestration, built-in editing,
-  training and quantization producers, the custom observability stack, and
-  duplicate report formats from the core.
-- Removed broad masked-LM and sequence-to-sequence adapter surfaces from built-in
-  execution. Transformation systems now provide authenticated artifacts and
-  receipts, while bounded vision-text execution remains an optional package.
+- Removed catalog and calibration command families, built-in model editing,
+  training and quantization commands, the custom observability stack, and
+  duplicate report formats.
+- Removed built-in masked-LM and sequence-to-sequence execution support.
+  External transformation systems provide authenticated artifacts and receipts;
+  bounded vision-text execution remains an optional package.
 
 ### Fixed
 
@@ -101,7 +100,7 @@ from the same canonical JSON.
   authentication error.
 - Fixed release qualification so deterministic source archives, matching wheel
   bytes, image labels, signed canaries, rendered packs, verification receipts,
-  and promoted artifact digests must remain bound to the same candidate. The
+  and published artifact digests must remain bound to the same candidate. The
   clean-export safeguard prevents ignored local fixtures from producing a false
   green result.
 
@@ -577,8 +576,8 @@ from the same canonical JSON.
 - Generated reports now distinguish declared runtime provenance from verifier
   confirmation, preserve a separate report-local verdict, and record the actual
   runtime-provenance verification result in `verify` output.
-- Consolidated open dependency/security PR content into this branch: CodeQL
-  action SHA refresh, Ruff 0.15.14, `idna>=3.15`, and
+- Updated dependency and security tooling with a CodeQL action SHA refresh,
+  Ruff 0.15.14, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
 - Durable assurance and reference docs now describe the current strict contract
   without patch-release dating, and assurance documentation filenames now use

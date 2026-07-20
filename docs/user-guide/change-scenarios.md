@@ -1,11 +1,10 @@
 # Change scenarios
 
-The distilled architecture applies one evidence transaction to several model
-and runtime changes without taking ownership of those changes. A training,
-compression, conversion, deployment, evaluation, or serving system creates the
-candidate artifact or per-record results. InvarLock starts at that boundary and
-authenticates what is compared, how it is evaluated, which policy applies, and
-what an independent verifier accepted.
+InvarLock applies one evidence transaction to several model and runtime
+changes. A training, compression, conversion, deployment, evaluation, or
+serving system creates the candidate artifact or per-record results. InvarLock
+starts at that boundary and authenticates what is compared, how it is
+evaluated, which policy applies, and what an independent verifier accepted.
 
 !!! tip "User guide"
 
@@ -18,8 +17,8 @@ what an independent verifier accepted.
     release decision.
 
     **Audience:** Model adaptation teams, runtime and inference engineers,
-    evaluation-platform maintainers, application release teams, and independent
-    reviewers.
+    evaluation-system maintainers, application release teams, and independent
+    verifiers.
 
     **Prerequisites:** A materialized candidate or closed per-record result set,
     stable evaluation IDs, an appropriate policy, and independently managed
@@ -69,8 +68,8 @@ training · pruning · quantization · conversion · compilation · serving job
 
 This separation has practical consequences:
 
-1. InvarLock does not install a training or compression framework merely to
-   evaluate its output.
+1. The selected training or compression framework creates the candidate
+   artifact; InvarLock evaluates its authenticated output.
 2. The external system records configuration and lineage needed to identify the
    candidate; InvarLock authenticates those facts as artifact, runtime, receipt,
    or observation inputs.
@@ -89,13 +88,13 @@ actual task distribution, record the source revision and selection method, and
 exclude records that cannot be scored deterministically under the chosen
 metric.
 
-A tiny schedule can prove that the integration works. It cannot support a
-meaningful release conclusion. The maintained public qualification suites use
-400 balanced records. A scenario should normally start with at least 400
-eligible paired records, then increase that count when the observed interval is
-too wide or the represented task has important subgroups. Encode both a minimum
-record count and maximum interval width in policy; record count alone does not
-guarantee precision or representativeness.
+A tiny schedule can prove that the execution or import path works. It cannot
+support a meaningful release conclusion. The maintained public qualification
+suites use 400 balanced records. A scenario should normally start with
+at least 400 eligible paired records, then increase that count when the
+observed interval is too wide or the represented task has important subgroups.
+Encode both a minimum record count and maximum interval width in policy; record
+count alone does not guarantee precision or representativeness.
 
 ## Choose execution and scoring
 
@@ -172,7 +171,6 @@ transformation scripts from growing inside the scenario directories:
 make example-scenarios-check
 ```
 
-The scenario catalog is an adoption and operator surface, not evidence that
-every external ecosystem has been qualified. Runtime conformance, real model
-execution, strictly verified packs, and public evidence publication remain
-separate claims.
+The scenario catalog provides adoption guidance. Runtime conformance,
+real-model execution, strict pack verification, and public evidence publication
+are reported independently for each named ecosystem.

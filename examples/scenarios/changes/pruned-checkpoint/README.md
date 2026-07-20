@@ -24,9 +24,8 @@ the paired acceptance metric.
 
 For portable Hugging Face `safetensors`, use `hf_transformers`,
 `text_causal`, `normalized_nll_per_utf8_byte`, and run mode. If the sparse
-layout needs a specialized loader, implement the runtime-provider ABI or
-import its closed per-record side results; do not make the core reinterpret an
-unsupported checkpoint.
+layout needs a specialized loader, use the runtime-provider ABI or import
+closed per-record side results from a controlled external execution.
 
 ## What the result establishes
 

@@ -1,6 +1,6 @@
 # Maintainer scripts
 
-The core user journey is implemented by the installed CLI:
+The installed CLI provides InvarLock's user workflow:
 
 ```bash
 invarlock evaluate request.yaml
@@ -8,8 +8,8 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-Scripts in this directory support repository maintenance. They are not a
-second product workflow.
+Scripts in this directory provide repository maintenance, release validation,
+and security checks.
 
 ## Maintained families
 

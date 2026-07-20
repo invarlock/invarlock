@@ -3,7 +3,7 @@
 ## When to use this example
 
 Use this runnable journey when an evaluation system sends an immutable evidence
-pack to a separate release reviewer. It demonstrates the essential trust
+pack to an independent verifier. It demonstrates the essential trust
 boundary: evidence carries signed facts, while expected artifact, schedule,
 runtime, policy, and signer identities arrive independently.
 
