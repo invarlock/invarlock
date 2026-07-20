@@ -39,6 +39,11 @@ from the same canonical JSON.
   `invarlock.engine` embedding facade. The accepted, rejected, and tamper
   examples now execute from a clean Git export with every required fixture
   tracked.
+- Added maintained one-command Hugging Face and PEFT journeys that create real
+  checkpoint artifacts, build an exact-source runtime, evaluate both sides,
+  independently verify the evidence, and render the comparison. The offline
+  handoff journey covers accepted evidence, a valid policy failure, and byte
+  tampering without model downloads.
 
 ### Changed
 
@@ -60,10 +65,6 @@ from the same canonical JSON.
   span Hugging Face text and vision-text execution plus TensorRT-LLM runtime
   qualification; comparisons without current large-sample evidence use the
   explicit **Evidence not yet created** state.
-- Added a closed scenario catalog for fine-tuned, pruned, quantized, converted,
-  deployed, upgraded, multimodal, imported, and evidence-handoff workflows.
-  Each recipe starts at the external artifact or result boundary and uses the
-  same evaluation, verification, and reporting path.
 - Bound source archives, core and add-in wheels, runtime images, signed
   canaries, published artifacts, and final receipts in one reproducible release
   qualification flow, with at least 80% branch coverage required for every

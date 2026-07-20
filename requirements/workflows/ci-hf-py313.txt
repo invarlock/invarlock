@@ -3,7 +3,9 @@
 accelerate==1.14.0 \
     --hash=sha256:41b9c4377a54e0b460a959b0defa1b736e4ca0a2373252d9a539964c2afe3c8d \
     --hash=sha256:e94390c2863b873be18f623f9df48a0d8fe5eff13ea7f1a00092b0a7904888c6
-    # via invarlock (pyproject.toml)
+    # via
+    #   invarlock (pyproject.toml)
+    #   peft
 annotated-doc==0.0.4 \
     --hash=sha256:571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320 \
     --hash=sha256:fbcda96e87e9c92ad167c2e53839e57503ecfda18804ea28102353485033faa4
@@ -500,6 +502,7 @@ huggingface-hub==1.7.1 \
     --hash=sha256:be38fe66e9b03c027ad755cb9e4b87ff0303c98acf515b5d579690beb0bf3048
     # via
     #   accelerate
+    #   peft
     #   tokenizers
     #   transformers
 hypothesis==6.151.13 \
@@ -914,6 +917,7 @@ numpy==2.4.3 \
     --hash=sha256:eb610595dd91560905c132c709412b512135a60f1851ccbd2c959e136431ff67
     # via
     #   accelerate
+    #   peft
     #   transformers
 nvidia-cublas==13.1.1.3 \
     --hash=sha256:37936a16db8fe4ac1f065c2139360608a543a09275cb1a1af612e08cfa065436 \
@@ -1005,6 +1009,7 @@ packaging==26.0 \
     #   accelerate
     #   build
     #   huggingface-hub
+    #   peft
     #   pytest
     #   transformers
     #   twine
@@ -1013,6 +1018,10 @@ pathspec==1.0.4 \
     --hash=sha256:0210e2ae8a21a9137c0d470578cb0e595af87edaa6ebf12ff176f14a02e0e645 \
     --hash=sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723
     # via mypy
+peft==0.19.1 \
+    --hash=sha256:0d97542fe96dcdaa20d3b81c06f26f988618f416a73544ab23c3618ccb674a40 \
+    --hash=sha256:2113f72a81621b5913ef28f9022204c742df111890c5f49d812716a4a301e356
+    # via invarlock (pyproject.toml)
 pillow==12.3.0 \
     --hash=sha256:00808c5e14ef63ac5161091d242999076604ff74b883423a11e5d7bbb38bf756 \
     --hash=sha256:04f01d28a6aaff387bf842a13be313df23ba0597a44f1a976c9feb3c6ff4711a \
@@ -1140,7 +1149,9 @@ psutil==7.2.2 \
     --hash=sha256:ed0cace939114f62738d808fdcecd4c869222507e266e574799e9c0faa17d486 \
     --hash=sha256:eed63d3b4d62449571547b60578c5b2c4bcccc5387148db46e0c2313dad0ee00 \
     --hash=sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8
-    # via accelerate
+    # via
+    #   accelerate
+    #   peft
 pycparser==3.0 \
     --hash=sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29 \
     --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
@@ -1249,6 +1260,7 @@ pyyaml==6.0.3 \
     #   invarlock (pyproject.toml)
     #   accelerate
     #   huggingface-hub
+    #   peft
     #   transformers
 readme-renderer==45.0 \
     --hash=sha256:030a8fac74904f8fba11ad1bb6964e3f76e896dc7e5e71f16af190c9056696d1 \
@@ -1561,6 +1573,7 @@ safetensors==0.8.0 \
     # via
     #   invarlock (pyproject.toml)
     #   accelerate
+    #   peft
     #   transformers
 secretstorage==3.5.0 \
     --hash=sha256:0ce65888c0725fcb2c5bc0fdb8e5438eece02c523557ea40ce0703c266248137 \
@@ -1764,16 +1777,20 @@ torch==2.13.0 \
     # via
     #   invarlock (pyproject.toml)
     #   accelerate
+    #   peft
 tqdm==4.67.3 \
     --hash=sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb \
     --hash=sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf
     # via
     #   huggingface-hub
+    #   peft
     #   transformers
 transformers==5.14.1 \
     --hash=sha256:60d196c27781eacf8637e2b533f517582907ad6f9ae142046d6b69431a5b2173 \
     --hash=sha256:9db974c4079ede2d1a3ea7ca5a240df33f2cc26fc2b36ba64c5f2a4f43b6e725
-    # via invarlock (pyproject.toml)
+    # via
+    #   invarlock (pyproject.toml)
+    #   peft
 triton==3.7.1 \
     --hash=sha256:10ba85fa2cca4a2fbdeb36bf1cb082f2c252bda55bf9fccd74f65ec5bc647e68 \
     --hash=sha256:2020153b08280415ec0da6607834e79166442147e78e144df06b508c75b186d2 \

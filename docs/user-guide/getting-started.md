@@ -66,7 +66,7 @@ add CUDA libraries to the CPU image.
 
 For a complete CPU journey that generates two distinct tiny checkpoints and
 derives all verifier inputs independently, run the checked-in
-[Hugging Face example](https://github.com/invarlock/invarlock/tree/main/examples/run).
+[Hugging Face example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/hf-transformers).
 The remaining sections
 explain the same transaction field by field for a real release workspace.
 
@@ -366,13 +366,12 @@ that a runtime-backed model comparison works.
 
 ## Apply the transaction to a release change
 
-The [change-scenario guide](change-scenarios.md) and repository
-[`examples/scenarios/`](https://github.com/invarlock/invarlock/tree/main/examples/scenarios)
-catalog map common inputs to the same transaction. Recipes cover fine-tuned,
-pruned, quantized, GGUF, TensorRT-LLM, model-upgrade, multimodal,
-external-harness, serving-endpoint, and evidence-handoff workflows. They begin
-with an immutable candidate or authenticated per-record results; artifact
-creation remains in the external tool that owns it.
+The [model-change workflow guide](change-scenarios.md) maps fine-tuned, pruned,
+quantized, GGUF, TensorRT-LLM, multimodal, harness, endpoint, and evidence
+handoff inputs to the same transaction. The
+[runnable examples](https://github.com/invarlock/invarlock/tree/main/examples)
+execute the maintained Hugging Face, PEFT, and evidence-handoff paths. Artifact
+creation remains in the system that owns it.
 
 ## Recovery and next steps
 

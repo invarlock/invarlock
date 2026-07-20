@@ -16,7 +16,7 @@ def test_verify_composes_the_maintained_gates() -> None:
     for target in (
         "repo-cruft-check",
         "public-evidence-audit",
-        "example-scenarios-check",
+        "examples-check",
         "contracts-check",
         "test",
         "cli-smoke-core",
@@ -26,9 +26,9 @@ def test_verify_composes_the_maintained_gates() -> None:
         assert f"$(MAKE) {target}" in block
 
 
-def test_verify_fast_includes_the_scenario_contract() -> None:
+def test_verify_fast_includes_the_example_contract() -> None:
     block = _block("verify-fast", "contracts-check")
-    assert "$(MAKE) example-scenarios-check" in block
+    assert "$(MAKE) examples-check" in block
 
 
 def test_docs_are_checked_by_established_tools() -> None:

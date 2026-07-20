@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import stat
 import subprocess
 import sys
@@ -146,6 +147,35 @@ def test_example_export_uses_committed_head_not_staged_index(tmp_path: Path) -> 
     assert exported.joinpath("fixture.txt").read_text(encoding="utf-8") == "committed\n"
 
 
+def test_hf_integration_prepares_from_committed_export(tmp_path: Path) -> None:
+    exported = _export_committed_paths(tmp_path / "exported-repository")
+    workspace = tmp_path / "hf-integration"
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(exported / "src")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(exported / "examples/integrations/run.py"),
+            "hf-transformers",
+            "--workspace",
+            str(workspace),
+            "--runtime-image-digest",
+            "sha256:" + ("0" * 64),
+            "--prepare-only",
+        ],
+        cwd=exported,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    assert (workspace / "evaluation/request.yaml").is_file()
+    assert (workspace / "verifier/trusted-inputs.json").is_file()
+
+
 @pytest.mark.parametrize(
     ("request_name", "expected_inputs"), _EXPECTED_REQUEST_INPUTS.items()
 )
@@ -199,69 +229,6 @@ def test_only_fixed_runtime_receipts_are_unignored() -> None:
         ).returncode
         == 0
     )
-
-
-def test_scenario_catalog_is_complete_in_committed_head() -> None:
-    tracked = _git("ls-tree", "-r", "--name-only", "HEAD", "--", "examples/scenarios")
-    assert tracked.returncode == 0, tracked.stderr.decode("utf-8", errors="replace")
-    tracked_paths = set(tracked.stdout.decode("utf-8").splitlines())
-    working_paths = {
-        path.relative_to(REPO_ROOT).as_posix()
-        for path in (REPO_ROOT / "examples/scenarios").glob("**/*")
-        if path.is_file()
-        and path.name in {"README.md", "scenario.schema.json", "scenario.yaml"}
-    }
-
-    assert working_paths
-    assert working_paths <= tracked_paths
-    assert "examples/scenarios/scenario.schema.json" in tracked_paths
-    assert (
-        len({path for path in tracked_paths if path.endswith("/scenario.yaml")}) == 10
-    )
-
-
-def test_scenario_catalog_passes_from_committed_export(tmp_path: Path) -> None:
-    tracked = _git("ls-tree", "-r", "--name-only", "HEAD")
-    assert tracked.returncode == 0, tracked.stderr.decode("utf-8", errors="replace")
-    tracked_paths = set(tracked.stdout.decode("utf-8").splitlines())
-    manifests = sorted(
-        path
-        for path in tracked_paths
-        if path.startswith("examples/scenarios/") and path.endswith("/scenario.yaml")
-    )
-    related_paths: set[str] = set()
-    for manifest in manifests:
-        shown = _git("show", f"HEAD:{manifest}")
-        assert shown.returncode == 0, shown.stderr.decode("utf-8", errors="replace")
-        value = yaml.safe_load(shown.stdout.decode("utf-8"))
-        related_paths.update(value.get("workflow", {}).get("related_paths", []))
-
-    assert related_paths
-    assert related_paths <= tracked_paths
-    exported = _export_committed_paths(
-        tmp_path / "exported-scenarios",
-        "examples/scenarios",
-        "scripts/checks/check_example_scenarios.py",
-        *sorted(related_paths),
-    )
-    checked = subprocess.run(
-        [
-            sys.executable,
-            str(exported / "scripts/checks/check_example_scenarios.py"),
-            "--root",
-            str(exported),
-            "--json",
-        ],
-        cwd=exported,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert checked.returncode == 0, checked.stderr
-    payload = json.loads(checked.stdout)
-    assert payload["ok"] is True
-    assert payload["scenario_count"] == 10
 
 
 def test_checked_in_example_completes_the_public_signed_journey(
@@ -420,8 +387,12 @@ def test_trust_boundary_demo_accepts_rejects_and_detects_tampering(
 
     assert completed.returncode == 0, completed.stderr or completed.stdout
     assert "PASS accepted evidence and receipt" in completed.stdout
+    assert "PASS human-readable report" in completed.stdout
     assert "PASS authentic policy rejection" in completed.stdout
     assert "PASS byte-tamper rejection" in completed.stdout
+    report = workspace / "verifier/reports/accepted.html"
+    assert report.is_file()
+    assert "PASS" in report.read_text(encoding="utf-8")
 
     receipts = workspace / "verifier/receipts"
     accepted = json.loads(

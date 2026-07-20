@@ -442,19 +442,14 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
 
     example = _read("examples/README.md")
     for fragment in (
-        "--signing-key",
-        "--policy",
-        "--expected-baseline-artifact",
-        "--expected-subject-artifact",
-        "--expected-schedule",
-        "--expected-baseline-runtime",
-        "--expected-subject-runtime",
-        "--expected-signer",
-        "--receipt",
-        "--verifier-signing-key",
-        "--verifier-identity",
+        "make example-hf-transformers",
+        "make example-peft-lora",
+        "make example-evidence-handoff",
+        "independently supplied trust inputs",
+        "human-readable report",
     ):
         assert fragment in example
+    assert re.search(r"signed evidence\s+pack", example)
 
     policy = json.loads(_read("examples/policy/acceptance.json"))
     assert policy == {
@@ -468,33 +463,28 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
             }
         }
     }
-    assert "one-record (`-2` percentage-point)" in example
-    assert "`-50` percentage-point regression" not in example
+    handoff = _read("examples/run_trust_boundary_demo.py")
+    assert 'expected_policy_verdict="fail"' in handoff
+    assert "tampered_report.write_bytes" in handoff
 
 
-def test_change_scenario_guide_preserves_the_external_artifact_boundary() -> None:
+def test_model_change_guide_preserves_the_external_artifact_boundary() -> None:
     guide = _read("docs/user-guide/change-scenarios.md")
-    catalog = _read("examples/scenarios/README.md")
     for phrase in (
-        "fine-tuned",
+        "trained",
         "pruned",
-        "quantized",
+        "quantization",
         "GGUF",
         "TensorRT-LLM",
-        "multimodal",
-        "external-harness",
-        "serving-endpoint",
-        "evidence-handoff",
+        "Vision-text",
+        "harness",
+        "endpoint",
     ):
         assert phrase in guide
-        assert phrase in catalog
-    assert re.search(r"at least 400\s+eligible paired records", guide)
-    assert "make example-scenarios-check" in guide
-    assert re.search(
-        r"selected training or compression framework creates the candidate\s+artifact",
-        guide,
-    )
-    assert "InvarLock evaluates its authenticated output" in guide
+    assert "use 400" in guide
+    assert "make example-peft-lora" in guide
+    assert re.search(r"remains responsible for creating that\s+artifact", guide)
+    assert "InvarLock does not rebuild it" in guide
 
 
 def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:

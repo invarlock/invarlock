@@ -73,6 +73,7 @@ dev = [
   "build>=0.10.0",
   "wheel>=0.46.0",
   "twine>=4.0.0",
+  "peft==0.19.1",
 ]
 
 ci = [
@@ -88,6 +89,7 @@ ci = [
   "build>=0.10.0",
   "wheel>=0.46.0",
   "twine>=4.0.0",
+  "peft==0.19.1",
 ]
 
 docs-ci = [
@@ -114,6 +116,11 @@ security-ci = [
   "pip-audit>=2.8",
   "msgpack>=1.2.1",
   "cyclonedx-bom>=4.1",
+]
+
+[dependency-groups]
+example-peft = [
+  "peft==0.19.1",
 ]
 
 [project.entry-points."invarlock.runtime_providers"]

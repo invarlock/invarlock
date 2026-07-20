@@ -24,6 +24,7 @@ SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 DIST_RUN ?= uv run --isolated --locked --extra release-ci
 RELEASE_PREFLIGHT_ARGS ?=
+EXAMPLE_ARGS ?=
 ADDINS_SMOKE_PYTHON_TAG := $(shell $(PYTHON) -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')
 ADDINS_SMOKE_RELEASE_LOCK ?= requirements/workflows/release-install-py$(ADDINS_SMOKE_PYTHON_TAG).txt
 
@@ -41,8 +42,8 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/evidence_verification.py
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
-.PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-scenarios coverage-enforce coverage-enforce-parallel
-.PHONY: trust-smoke mutation-smoke trust-boundary-demo
+.PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-enforce coverage-enforce-parallel
+.PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-peft-lora
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
@@ -51,7 +52,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
-.PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync example-scenarios-check
+.PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
 .PHONY: clean docsclean deepclean pre-commit pre-commit-install ensure-python ensure-ruff ensure-mypy
 
 help:  ## Show maintained targets
@@ -199,15 +200,13 @@ coverage-release:  ## Enforce branch coverage for maintained release helpers
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/verify_hosted_distributions.py' --fail-under=80
 
-coverage-scenarios:  ## Enforce branch coverage for the example-scenario checker
-	PYTHONPATH=. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		tests/scripts/test_check_example_scenarios.py \
-		--cov=scripts.checks.check_example_scenarios --cov-branch \
+coverage-examples:  ## Enforce branch coverage for maintained example launchers
+	PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		tests/examples \
+		--cov=examples.integrations.launch --cov=examples.integrations.run --cov-branch \
 		--cov-report=term-missing \
-		--cov-report=xml:reports/scenarios-cov.xml \
+		--cov-report=xml:reports/examples-cov.xml \
 		--cov-fail-under=80
-	$(PYTHON) -m coverage report \
-		--include='scripts/checks/check_example_scenarios.py' --fail-under=80
 
 coverage-enforce: PYTEST_WORKERS = auto
 coverage-enforce: coverage-linux-check  ## Enforce branch coverage in parallel by default
@@ -215,7 +214,7 @@ coverage-enforce: coverage-linux-check  ## Enforce branch coverage in parallel b
 	$(MAKE) coverage-addins PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-qualification PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-release PYTEST_WORKERS=$(PYTEST_WORKERS)
-	$(MAKE) coverage-scenarios PYTEST_WORKERS=$(PYTEST_WORKERS)
+	$(MAKE) coverage-examples PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 coverage-enforce-parallel: PYTEST_WORKERS = auto
 coverage-enforce-parallel:  ## Enforce coverage with pytest-xdist
@@ -234,13 +233,23 @@ trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example tran
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py \
 		--workspace examples/artifacts/trust-boundary-demo
 
+example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
+
+example-hf-transformers:  ## Run a real one-command Hugging Face comparison
+	PYTHONPATH=src uv run --isolated --locked --extra hf python \
+		examples/integrations/launch.py hf-transformers $(EXAMPLE_ARGS)
+
+example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
+	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
+		examples/integrations/launch.py peft-lora $(EXAMPLE_ARGS)
+
 ##@ Static analysis
 lint: verify-ruff typecheck  ## Run Ruff and mypy
 
 verify-ruff:  ## Check Python lint and formatting
 	$(MAKE) ensure-ruff
-	$(RUFF) check src tests scripts addins
-	$(RUFF) format --check src tests scripts addins
+	$(RUFF) check src tests scripts addins examples
+	$(RUFF) format --check src tests scripts addins examples
 
 typecheck:  ## Type-check the core package
 	$(MAKE) ensure-mypy
@@ -256,8 +265,8 @@ mypy-typed-surface:  ## Type-check the public transaction and evidence surface
 
 format:  ## Format Python sources and tests
 	$(MAKE) ensure-ruff
-	$(RUFF) format src tests scripts addins
-	$(RUFF) check --fix src tests scripts addins
+	$(RUFF) format src tests scripts addins examples
+	$(RUFF) check --fix src tests scripts addins examples
 
 ##@ Product smoke
 cli-smoke-core:  ## Check the evaluate, verify, and report command surface
@@ -368,7 +377,7 @@ verify: PYTEST_WORKERS = auto
 verify:  ## Run repository, product, docs, and contract gates in parallel by default
 	$(MAKE) repo-cruft-check
 	$(MAKE) public-evidence-audit
-	$(MAKE) example-scenarios-check
+	$(MAKE) examples-check
 	$(MAKE) contracts-check
 	$(MAKE) test PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) addins-test PYTEST_WORKERS=$(PYTEST_WORKERS)
@@ -380,7 +389,7 @@ verify-fast: PYTEST_WORKERS = auto
 verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) repo-cruft-check
 	$(MAKE) public-evidence-audit
-	$(MAKE) example-scenarios-check
+	$(MAKE) examples-check
 	$(MAKE) contracts-check
 	$(MAKE) test-fast PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) addins-test PYTEST_WORKERS=$(PYTEST_WORKERS)
@@ -403,8 +412,8 @@ public-evidence-audit:  ## Validate the canonical public evidence index
 public-evidence-sync:  ## Refresh the packaged public evidence index
 	PYTHONPATH=src $(PYTHON) scripts/checks/sync_packaged_public_evidence.py --write
 
-example-scenarios-check:  ## Validate the neutral change and deployment recipes
-	$(PYTHON) scripts/checks/check_example_scenarios.py
+examples-check:  ## Test the maintained one-command integration journeys
+	PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q tests/examples
 
 ##@ Documentation
 docs:  ## Build documentation strictly

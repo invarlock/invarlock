@@ -1,115 +1,91 @@
-# Change scenarios
+# Model-change workflows
 
-InvarLock applies one evidence transaction to several model and runtime
-changes. A training, compression, conversion, deployment, evaluation, or
-serving system creates the candidate artifact or per-record results. InvarLock
-starts at that boundary and authenticates what is compared, how it is
-evaluated, which policy applies, and what an independent verifier accepted.
+InvarLock compares an authenticated baseline with an authenticated subject on
+the same paired schedule, applies a named policy, and creates evidence another
+party can verify independently. The system that trained, pruned, quantized,
+converted, or compiled the subject remains responsible for creating that
+artifact.
 
 !!! tip "User guide"
 
-    **In plain language:** Keep using the tool that fine-tunes, prunes,
-    quantizes, converts, or serves the model. Give InvarLock the immutable
-    before-and-after artifacts or their replayable paired results.
+    **In plain language:** Create the candidate with the tool you already use,
+    then give InvarLock the immutable before-and-after artifacts or complete
+    per-record results.
 
-    **Outcome:** Select a scenario, prepare its baseline, subject, schedule,
-    provider, metric, and policy, then produce one independently verifiable
-    release decision.
+    **Outcome:** A signed comparison bundle, an independently signed
+    verification receipt, and a human-readable report.
 
-    **Audience:** Model adaptation teams, runtime and inference engineers,
-    evaluation-system maintainers, application release teams, and independent
-    verifiers.
+    **Audience:** Model adaptation, runtime, evaluation, and release teams.
 
-    **Prerequisites:** A materialized candidate or closed per-record result set,
-    stable evaluation IDs, an appropriate policy, and independently managed
-    trust inputs and signing identities.
+    **Prerequisites:** Stable record IDs, a representative paired schedule, a
+    policy, and independently managed artifact, runtime, signer, and policy
+    identities.
 
-## Select the release question
+## Choose the execution boundary
 
-Choose the scenario from the decision being made, not from a tool name alone:
+| Candidate form | InvarLock path | Maintained implementation |
+| --- | --- | --- |
+| Hugging Face causal checkpoint | Run mode | Built-in `hf_transformers` provider |
+| PEFT adapter merged into a checkpoint | Run mode | Built-in provider; [runnable PEFT journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/peft-lora) |
+| GGUF artifact | Run mode | Optional [`invarlock-runtime-gguf`](https://github.com/invarlock/invarlock/tree/main/addins/gguf) package |
+| Vision-text checkpoint | Run mode | Optional [`invarlock-runtime-hf-vision-text`](https://github.com/invarlock/invarlock/tree/main/addins/multimodal) package |
+| TensorRT-LLM engine | Run mode | Optional [`invarlock-runtime-tensorrt-llm`](https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm) package |
+| Complete per-record results from a harness or endpoint | Import mode | Runtime-import authoring API and closed request contract |
 
-| Release question | Scenario | Typical path | Built-in metric |
-| --- | --- | --- | --- |
-| Did adaptation preserve expected-continuation likelihood? | [Fine-tuned checkpoint](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/fine-tuned-checkpoint) | Hugging Face run mode | Normalized NLL |
-| Did removing weights remain within the likelihood policy? | [Pruned checkpoint](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/pruned-checkpoint) | Hugging Face run mode or import | Normalized NLL |
-| Did a lower-precision artifact preserve paired task outcomes? | [Quantized checkpoint](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/hf-quantized-checkpoint) | Compatible provider or import | Exact match |
-| Did GGUF conversion preserve closed-answer behavior? | [GGUF conversion](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/gguf-conversion) | Optional GGUF add-in | Exact match |
-| Did a compiled engine preserve closed-answer behavior? | [TensorRT-LLM deployment](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/tensorrt-deployment) | Optional TensorRT-LLM add-in | Exact match |
-| Is a replacement checkpoint acceptable relative to production? | [Model upgrade](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/model-upgrade) | Per-side providers | Exact match or normalized NLL |
-| Did a vision-language change meet the VQA-style policy? | [Multimodal upgrade](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/changes/multimodal-upgrade) | Optional vision-text add-in | Exact match |
-| Can existing harness records support a replayed decision? | [External harness](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/imports/external-harness) | Authenticated import | Built-in or scorer extension |
-| Did an endpoint configuration preserve recorded outcomes? | [Serving endpoint](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/imports/serving-endpoint) | Provider bridge plus import | Exact match or scorer extension |
-| Does submitted evidence match independently maintained anchors? | [Evidence handoff](https://github.com/invarlock/invarlock/tree/main/examples/scenarios/journeys/evidence-handoff) | Verify and report | Recorded evidence metric |
+The runtime must match the artifact that will be released. A quantized model
+loaded by llama.cpp should be evaluated through the GGUF provider rather than a
+different Hugging Face representation. A compiled TensorRT-LLM engine remains
+the subject; InvarLock does not rebuild it from its source checkpoint.
 
-The same ecosystem may use more than one scenario. For example, an AWQ or GPTQ
-workflow may produce a Hugging Face checkpoint, a GGUF file, or a runtime-bound
-engine. Select the scenario matching the artifact and loader that will actually
-be released.
-
-## Keep the external boundary explicit
-
-The scenario begins after the external change has completed:
+## Keep the change boundary explicit
 
 ```text
-training · pruning · quantization · conversion · compilation · serving job
-                                  |
-                                  v
-                immutable candidate or paired records
-                                  |
-                                  v
-                    invarlock evaluate request.yaml
-                                  |
-                                  v
-                  canonical signed evidence bundle
-                                  |
-                                  v
-               independent verify → human-readable report
+training · pruning · quantization · conversion · compilation
+                             |
+                             v
+              immutable candidate or paired records
+                             |
+                             v
+                invarlock evaluate request.yaml
+                             |
+                             v
+                 signed canonical evidence bundle
+                             |
+                             v
+                independent verify → report
 ```
 
-This separation has practical consequences:
+Configuration, lineage, throughput, memory, sparsity, and similar facts can be
+attached as authenticated observations. They do not influence acceptance
+unless a versioned policy and replayable scorer explicitly authorize them.
 
-1. The selected training or compression framework creates the candidate
-   artifact; InvarLock evaluates its authenticated output.
-2. The external system records configuration and lineage needed to identify the
-   candidate; InvarLock authenticates those facts as artifact, runtime, receipt,
-   or observation inputs.
-3. An artifact requiring a special loader uses the runtime-provider ABI or an
-   authenticated import bridge rather than an implicit fallback.
-4. Acceptance depends only on the selected paired metric or scorer and policy.
-   Size, throughput, memory, sparsity, latency, and similar properties remain
-   separately authenticated observations unless a future policy contract gives
-   them explicit authority.
+## Select a metric that matches the task
+
+- Use exact match for closed-answer tasks. InvarLock reports paired regressions,
+  paired improvements, effect size, an interval, and McNemar's exact test.
+- Use normalized NLL for expected-continuation likelihood. It does not measure
+  general model quality. When tokenizers and target-token accounting are
+  comparable, the report renders perplexity ratio as a derived interpretation,
+  not a second acceptance metric.
+- Use a verifier-replayable scorer extension for task-specific F1, structured
+  extraction, code execution, SQL execution, semantic similarity, VQA
+  normalization, or another deterministic score.
+- Keep model-judge results as authenticated observations until the judge,
+  prompt, references, and calibration have an independently verifiable
+  acceptance contract.
 
 ## Prepare a meaningful paired schedule
 
-Every release conclusion is limited by its schedule. Stable IDs and identical
-ordering across baseline and subject are mandatory. Select records from the
-actual task distribution, record the source revision and selection method, and
-exclude records that cannot be scored deterministically under the chosen
-metric.
+Every conclusion is limited by its schedule. Baseline and subject must use the
+same stable IDs in the same order. Select records from the real task
+distribution, record the source revision and selection method, and include
+important subgroups.
 
-A tiny schedule can prove that the execution or import path works. It cannot
-support a meaningful release conclusion. The maintained public qualification
-suites use 400 balanced records. A scenario should normally start with
-at least 400 eligible paired records, then increase that count when the
-observed interval is too wide or the represented task has important subgroups.
-Encode both a minimum record count and maximum interval width in policy; record
-count alone does not guarantee precision or representativeness.
-
-## Choose execution and scoring
-
-Use run mode when an installed provider can authenticate and execute both
-artifacts now. Use import mode when a controlled external job already produced
-complete provider side files and canonical paired records. Import mode is not
-an aggregate-score upload.
-
-Use exact match for closed-answer tasks and unlike tokenizer/runtime paths. Use
-normalized NLL for expected-continuation likelihood when both sides expose the
-required authenticated likelihood facts. Use a scorer extension only when the
-verifier can replay the exact descriptor, configuration, per-record inputs, and
-results. Keep model judges and network-dependent scoring in authenticated
-observations until their acceptance contract and calibration are independently
-established.
+A small tutorial can prove that integration code works; it cannot support a
+release conclusion. The maintained public qualification suites use 400
+balanced records. Production policies should set both a minimum record count
+and a maximum interval width, then increase the sample when the observed
+precision or subgroup coverage is inadequate.
 
 ## Execute, verify, and report
 
@@ -121,56 +97,48 @@ invarlock evaluate request.yaml --signing-key evidence-signer.pem \
   --preflight
 ```
 
-Resolve every reported error at the artifact, provider, schedule, policy,
-runtime, or output boundary. A successful preflight checks deterministic
-inputs; it does not predict model behavior or replace execution.
+Resolve each artifact, provider, schedule, policy, runtime, and destination
+error. Preflight validates deterministic prerequisites; it cannot predict model
+behavior.
 
-Run the same request without `--preflight`, deliver only the immutable evidence
-pack to the verifier, and keep expected identities on an independent channel:
+Run the same request without `--preflight`, deliver the immutable evidence pack
+to the verifier, and provide expected identities through a separate channel:
 
 ```console
 invarlock evaluate request.yaml --signing-key evidence-signer.pem \
   --runtime-image "$RUNTIME_IMAGE" --runtime-image-digest "$RUNTIME_DIGEST"
 invarlock verify evidence/ --trust-profile verifier/trust-inputs.json \
-  --receipt verifier/verification.receipt.json \
-  --verifier-signing-key verifier/verifier.pem \
-  --verifier-identity release-verifier
+  --receipt verifier/verification.receipt.json
 invarlock report evidence/ --html verifier/report.html --explain
 ```
 
-Import scenarios use the same commands without runtime-image options. Optional
-providers may add qualification steps before the public transaction; their
-runbooks link to the package-owned commands.
+Import mode uses the same public transaction without runtime-image arguments.
+It accepts complete per-record results with stable IDs, not aggregate scores.
+The verifier recomputes the named built-in or extension score from those
+records.
 
-## Read the outcome at the correct level
+## Interpret the outcome
 
-A passing receipt establishes one bounded statement: the named subject met the
-named policy relative to the named baseline on the authenticated paired
-schedule under the recorded runtime identities. A policy failure can still be
-intact, useful evidence. An integrity or trust mismatch means the verifier
-cannot rely on the submitted comparison.
+A passing receipt says that the named subject met the named policy relative to
+the named baseline on the authenticated paired schedule under the recorded
+runtime identities. A policy failure can still be intact evidence. An integrity
+or trust mismatch means the submitted comparison is not independently
+acceptable.
 
-Interpret every result together with:
+Read every result together with the schedule composition, paired effect and
+interval, metric semantics, artifact and runtime identities, policy thresholds,
+and separately authenticated operational observations.
 
-- schedule composition and selected record identities;
-- point effect, paired regressions and improvements, and interval width;
-- metric semantics and any scorer-extension boundary;
-- artifact and runtime identities;
-- policy thresholds and sample-qualification controls; and
-- separately authenticated operational observations.
+## Run the maintained journeys
 
-## Maintainer contract
-
-Each repository scenario contains one `scenario.yaml` and one `README.md`.
-[`scenario.schema.json`](https://github.com/invarlock/invarlock/blob/main/examples/scenarios/scenario.schema.json)
-closes the metadata. The repository checker requires consistent runbook
-sections, validates related paths, rejects duplicate IDs, and prevents
-transformation scripts from growing inside the scenario directories:
+The repository examples exercise real public commands:
 
 ```console
-make example-scenarios-check
+make example-hf-transformers
+make example-peft-lora
+make example-evidence-handoff
 ```
 
-The scenario catalog provides adoption guidance. Runtime conformance,
-real-model execution, strict pack verification, and public evidence publication
-are reported independently for each named ecosystem.
+The optional runtime packages expose conformance, image smoke, canary,
+readiness, and evidence-qualification targets in their package-owned
+Makefile. Their runbooks document the required real model or engine fixtures.

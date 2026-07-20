@@ -29,7 +29,7 @@ from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 from invarlock.trust_inputs import load_trust_inputs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXAMPLE = REPO_ROOT / "examples" / "run" / "hf_cpu_decision.py"
+EXAMPLE = REPO_ROOT / "examples" / "integrations" / "run.py"
 IMAGE_DIGEST = "sha256:" + "7" * 64
 
 
@@ -40,6 +40,7 @@ def _prepare(workspace: Path) -> subprocess.CompletedProcess[str]:
         [
             sys.executable,
             str(EXAMPLE),
+            "hf-transformers",
             "--workspace",
             str(workspace),
             "--runtime-image-digest",
@@ -90,6 +91,7 @@ def test_checked_in_hf_run_executes_verification_through_the_trust_profile(
         container_engine="docker",
         runtime_image="invarlock-runtime:local",
         runtime_image_digest=IMAGE_DIGEST,
+        runtime_device="cpu",
     )
 
     assert commands[1] == [
@@ -148,7 +150,7 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
     assert trust_profile["format"] == "invarlock/trust-inputs-v1"
     assert trust_profile["policy"] == {"path": "policy/acceptance.json"}
     assert trust_profile["verifier"] == {
-        "identity": "local-hf-cpu-example",
+        "identity": "invarlock-example/hf-transformers-verifier",
         "signing_key_path": "keys/verifier.pem",
     }
     assert trust_profile["allow_installed_scorers"] is False

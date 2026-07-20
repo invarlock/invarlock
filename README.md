@@ -259,21 +259,19 @@ the closed profile and the equivalent explicit options.
 ## Import existing measurements
 
 The repository's
-[`examples/run/`](https://github.com/invarlock/invarlock/tree/main/examples/run)
-journey creates two distinct tiny Hugging Face checkpoints and executes a real
-CPU comparison through the pinned OCI path. The repository also includes an
-offline import fixture for complete sidecars produced elsewhere. Import mode
-requires the canonical schedule, both typed observations and runtime bindings,
-and canonical paired records; InvarLock re-derives and checks the full
-comparison before publication.
+[`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
+directory contains maintained one-command Hugging Face and PEFT journeys. They
+create real checkpoint artifacts and complete the source-bound `evaluate`,
+`verify`, and `report` transaction. The repository also includes an offline
+import and evidence-handoff journey for complete per-record results produced
+elsewhere. Import mode requires the canonical schedule, typed observations,
+runtime bindings, and paired records; InvarLock re-derives the comparison
+before publication.
 
-For recognizable release situations, the
-[`examples/scenarios/`](https://github.com/invarlock/invarlock/tree/main/examples/scenarios)
-catalog provides adoption recipes for fine-tuned, pruned, quantized, GGUF,
-TensorRT-LLM, model-upgrade, multimodal, external-harness, serving-endpoint, and
-independent-verification cases. Candidate creation stays in the tool that owns
-it; every recipe converges on the same `evaluate`, `verify`, and `report`
-transaction.
+The [model-change workflow guide](docs/user-guide/change-scenarios.md) maps
+fine-tuning, pruning, quantization, GGUF, TensorRT-LLM, multimodal, harness, and
+endpoint outputs to the appropriate built-in, optional-runtime, or import
+boundary.
 
 ## Providers and diagnostics
 

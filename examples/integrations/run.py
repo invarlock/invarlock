@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Prepare and optionally execute a real Hugging Face CPU comparison.
+"""Run one maintained Hugging Face ecosystem integration journey.
 
-The example creates two tiny, distinct GPT-2 checkpoints.  The baseline
-suppresses the fixed expected token while the subject favors it.  A successful
-decision therefore depends on real Transformers scoring rather than identical
-fixtures or a prewritten report.
+The built-in journey creates two tiny, distinct GPT-2 checkpoints. The PEFT
+journey trains, saves, reloads, and merges a real LoRA adapter before comparing
+the resulting checkpoint. Both finish through the public evaluate, verify, and
+report commands.
 """
 
 from __future__ import annotations
@@ -40,10 +40,7 @@ from invarlock.runtime_providers.hf_transformers import (
 )
 
 _SEED = 20_260_716
-_MODEL_IDS = {
-    "baseline": "invarlock-example/tiny-suppressed-target",
-    "subject": "invarlock-example/tiny-favored-target",
-}
+_INTEGRATIONS = ("hf-transformers", "peft-lora")
 
 
 @dataclass(frozen=True)
@@ -120,7 +117,34 @@ def _tokenizer(checkpoint: Path, transformers: Any, tokenizers: Any) -> Any:
     return tokenizer
 
 
-def _create_distinct_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
+def _seed_model(transformers: Any) -> Any:
+    return transformers.GPT2LMHeadModel(
+        transformers.GPT2Config(
+            vocab_size=8,
+            n_positions=8,
+            n_embd=8,
+            n_layer=1,
+            n_head=1,
+            bos_token_id=1,
+            eos_token_id=2,
+            pad_token_id=0,
+            use_cache=False,
+            loss_type="ForCausalLM",
+        )
+    )
+
+
+def _save_model_and_tokenizer(
+    model: Any, checkpoint: Path, transformers: Any, tokenizers: Any
+) -> str:
+    checkpoint.mkdir(parents=True)
+    model.eval()
+    model.save_pretrained(checkpoint, safe_serialization=True)
+    tokenizer = _tokenizer(checkpoint, transformers, tokenizers)
+    return hf_tokenizer_contract_sha256(tokenizer)
+
+
+def _create_hf_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
     try:
         import safetensors  # noqa: F401
         import tokenizers  # type: ignore[import-untyped]
@@ -132,18 +156,7 @@ def _create_distinct_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], 
         ) from exc
 
     torch.manual_seed(_SEED)
-    seed_model = transformers.GPT2LMHeadModel(
-        transformers.GPT2Config(
-            vocab_size=8,
-            n_positions=8,
-            n_embd=8,
-            n_layer=1,
-            n_head=1,
-            bos_token_id=1,
-            eos_token_id=2,
-            pad_token_id=0,
-        )
-    )
+    seed_model = _seed_model(transformers)
     seed_model.eval()
     prompt_ids = torch.tensor([[4, 5]], dtype=torch.long)
     with torch.inference_mode():
@@ -169,11 +182,9 @@ def _create_distinct_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], 
     tokenizer_digest: str | None = None
     for role in ("baseline", "subject"):
         checkpoint = paths.evaluation / "models" / role
-        checkpoint.mkdir(parents=True)
-        models[role].eval()
-        models[role].save_pretrained(checkpoint, safe_serialization=True)
-        tokenizer = _tokenizer(checkpoint, transformers, tokenizers)
-        observed_digest = hf_tokenizer_contract_sha256(tokenizer)
+        observed_digest = _save_model_and_tokenizer(
+            models[role], checkpoint, transformers, tokenizers
+        )
         if tokenizer_digest is None:
             tokenizer_digest = observed_digest
         elif observed_digest != tokenizer_digest:
@@ -186,6 +197,109 @@ def _create_distinct_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], 
         raise RuntimeError("the generated checkpoints are not distinct")
     assert tokenizer_digest is not None
     return checkpoints, tokenizer_digest
+
+
+def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
+    try:
+        import peft
+        import safetensors  # noqa: F401
+        import tokenizers  # type: ignore[import-untyped]
+        import torch
+        import transformers
+    except ImportError as exc:
+        raise RuntimeError(
+            "the PEFT example requires the dependencies installed by "
+            "`make example-peft-lora`"
+        ) from exc
+
+    torch.manual_seed(_SEED)
+    baseline_model = _seed_model(transformers)
+    baseline = paths.evaluation / "models" / "baseline"
+    tokenizer_digest = _save_model_and_tokenizer(
+        baseline_model, baseline, transformers, tokenizers
+    )
+
+    training_model = peft.get_peft_model(
+        copy.deepcopy(baseline_model),
+        peft.LoraConfig(
+            task_type=peft.TaskType.CAUSAL_LM,
+            r=2,
+            lora_alpha=8,
+            lora_dropout=0.0,
+            target_modules=["c_attn"],
+            bias="none",
+            fan_in_fan_out=True,
+        ),
+    )
+    training_model.train()
+    trainable = [
+        parameter
+        for parameter in training_model.parameters()
+        if parameter.requires_grad
+    ]
+    if not trainable:
+        raise RuntimeError("PEFT did not expose trainable LoRA parameters")
+    optimizer = torch.optim.AdamW(trainable, lr=0.05)
+    input_ids = torch.tensor([[4, 5, 6]], dtype=torch.long)
+    labels = torch.tensor([[-100, -100, 6]], dtype=torch.long)
+    initial_loss: float | None = None
+    final_loss = float("inf")
+    for _step in range(80):
+        optimizer.zero_grad(set_to_none=True)
+        loss = training_model(input_ids=input_ids, labels=labels).loss
+        if loss is None or not torch.isfinite(loss):
+            raise RuntimeError("PEFT training produced a non-finite loss")
+        if initial_loss is None:
+            initial_loss = float(loss.detach())
+        loss.backward()
+        optimizer.step()
+        final_loss = float(loss.detach())
+    if initial_loss is None or final_loss >= initial_loss:
+        raise RuntimeError("PEFT training did not improve the target-token loss")
+
+    adapter = paths.root / "upstream" / "peft-adapter"
+    adapter.parent.mkdir(parents=True)
+    training_model.peft_config["default"].base_model_name_or_path = str(baseline)
+    training_model.save_pretrained(adapter, safe_serialization=True)
+    reloaded_base = transformers.GPT2LMHeadModel.from_pretrained(
+        baseline, local_files_only=True
+    )
+    reloaded = peft.PeftModel.from_pretrained(
+        reloaded_base, adapter, is_trainable=False
+    )
+    subject_model = reloaded.merge_and_unload()
+    subject = paths.evaluation / "models" / "subject"
+    observed_digest = _save_model_and_tokenizer(
+        subject_model, subject, transformers, tokenizers
+    )
+    if observed_digest != tokenizer_digest:
+        raise RuntimeError("the PEFT baseline and subject tokenizers do not match")
+    if checkpoint_tree_sha256(baseline) == checkpoint_tree_sha256(subject):
+        raise RuntimeError("the merged PEFT subject is identical to its baseline")
+    (paths.root / "upstream" / "peft-summary.json").write_bytes(
+        canonical_json_bytes(
+            {
+                "format": "invarlock/example-peft-summary-v1",
+                "library": "peft",
+                "library_version": str(peft.__version__),
+                "initial_loss": initial_loss,
+                "final_loss": final_loss,
+                "merged_subject_sha256": checkpoint_tree_sha256(subject),
+                "saved_adapter": "peft-adapter",
+            }
+        )
+    )
+    return {"baseline": baseline, "subject": subject}, tokenizer_digest
+
+
+def _create_checkpoints(
+    paths: ExamplePaths, integration: str
+) -> tuple[dict[str, Path], str]:
+    if integration == "hf-transformers":
+        return _create_hf_checkpoints(paths)
+    if integration == "peft-lora":
+        return _create_peft_checkpoints(paths)
+    raise RuntimeError(f"unsupported integration: {integration}")
 
 
 def _settings(checkpoint: Path, tokenizer_digest: str) -> dict[str, JSONScalar]:
@@ -202,7 +316,7 @@ def _settings(checkpoint: Path, tokenizer_digest: str) -> dict[str, JSONScalar]:
 
 
 def _prepare_workspace(
-    root: Path, *, runtime_image_digest: str
+    root: Path, *, integration: str, runtime_image_digest: str
 ) -> tuple[ExamplePaths, dict[str, str]]:
     root = root.expanduser().resolve()
     if root.exists():
@@ -218,14 +332,21 @@ def _prepare_workspace(
         paths.evidence_key.parent.mkdir(parents=True)
         paths.verifier_key.parent.mkdir(parents=True)
 
-        checkpoints, tokenizer_digest = _create_distinct_checkpoints(paths)
+        checkpoints, tokenizer_digest = _create_checkpoints(paths, integration)
         settings = {
             role: _settings(checkpoints[role], tokenizer_digest)
             for role in ("baseline", "subject")
         }
 
-        dataset_bytes = (
-            b'{"id":"expected-token","prompt":"alpha beta","expected":" target"}\n'
+        dataset_bytes = b"".join(
+            canonical_json_bytes(
+                {
+                    "expected": " target",
+                    "id": f"expected-token-{index:02d}",
+                    "prompt": "alpha beta",
+                }
+            )
+            for index in range(50)
         )
         dataset = paths.evaluation / "inputs" / "records.jsonl"
         dataset.write_bytes(dataset_bytes)
@@ -235,7 +356,7 @@ def _prepare_workspace(
             LocalDatasetRequest(
                 path=dataset,
                 sha256=dataset_sha256,
-                name="tiny-hf-release-decision",
+                name=f"{integration}-smoke",
                 split="validation",
                 input_field="prompt",
                 expected_output_field="expected",
@@ -256,11 +377,12 @@ def _prepare_workspace(
         paths.independent_policy.write_bytes(policy_bytes)
 
         def side(role: str) -> dict[str, object]:
+            model_id = f"invarlock-example/{integration}-{role}"
             return {
                 "artifact": {
                     "path": f"models/{role}",
-                    "model_id": _MODEL_IDS[role],
-                    "locator": f"hf://{_MODEL_IDS[role]}@{'a' * 40}",
+                    "model_id": model_id,
+                    "locator": f"hf://{model_id}@{'a' * 40}",
                 },
                 "runtime": {
                     "provider": "hf_transformers",
@@ -277,7 +399,7 @@ def _prepare_workspace(
                     "path": "inputs/records.jsonl",
                     "sha256": dataset_sha256,
                     "format": "jsonl",
-                    "name": "tiny-hf-release-decision",
+                    "name": f"{integration}-smoke",
                     "split": "validation",
                     "input_field": "prompt",
                     "expected_output_field": "expected",
@@ -301,7 +423,7 @@ def _prepare_workspace(
                 provider.identify_artifact(
                     ModelRuntimeSpec(
                         provider_name="hf_transformers",
-                        model_id=_MODEL_IDS[role],
+                        model_id=f"invarlock-example/{integration}-{role}",
                         settings=settings[role],
                     )
                 )
@@ -333,7 +455,7 @@ def _prepare_workspace(
             "policy": {"path": "policy/acceptance.json"},
             "anchors": anchors,
             "verifier": {
-                "identity": "local-hf-cpu-example",
+                "identity": f"invarlock-example/{integration}-verifier",
                 "signing_key_path": "keys/verifier.pem",
             },
             "allow_installed_scorers": False,
@@ -365,6 +487,7 @@ def _execute(
     container_engine: str,
     runtime_image: str,
     runtime_image_digest: str,
+    runtime_device: str,
 ) -> None:
     base = [sys.executable, "-m", "invarlock"]
     _run(
@@ -381,7 +504,7 @@ def _execute(
             "--runtime-image-digest",
             runtime_image_digest,
             "--runtime-device",
-            "cpu",
+            runtime_device,
             "--json",
         ]
     )
@@ -422,6 +545,7 @@ def _execute(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("integration", choices=_INTEGRATIONS)
     parser.add_argument(
         "--workspace",
         type=Path,
@@ -448,6 +572,7 @@ def _parser() -> argparse.ArgumentParser:
             "close the generated verifier trust profile."
         ),
     )
+    parser.add_argument("--runtime-device", default="cpu")
     return parser
 
 
@@ -458,6 +583,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         paths, _anchors = _prepare_workspace(
             arguments.workspace,
+            integration=arguments.integration,
             runtime_image_digest=arguments.runtime_image_digest,
         )
         print(f"Prepared: {paths.root}")
@@ -475,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
             container_engine=arguments.container_engine,
             runtime_image=arguments.runtime_image,
             runtime_image_digest=arguments.runtime_image_digest,
+            runtime_device=arguments.runtime_device,
         )
     except (FileExistsError, RuntimeError, OSError, ValueError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)

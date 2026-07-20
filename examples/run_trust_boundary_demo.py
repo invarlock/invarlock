@@ -264,6 +264,17 @@ def run_demo(example_root: Path, workspace: Path) -> None:
         expected_acceptance=True,
         expected_policy_verdict="pass",
     )
+    reports = verifier / "reports"
+    reports.mkdir()
+    accepted_report = reports / "accepted.html"
+    _run(
+        "report",
+        str(accepted_evidence),
+        "--html",
+        str(accepted_report),
+        "--explain",
+        expect_success=True,
+    )
 
     rejected_receipt = receipts / "policy-rejected.receipt.json"
     _verify_command(
@@ -315,6 +326,7 @@ def run_demo(example_root: Path, workspace: Path) -> None:
     )
 
     print(f"PASS accepted evidence and receipt: {accepted_receipt}")
+    print(f"PASS human-readable report: {accepted_report}")
     print(f"PASS authentic policy rejection: {rejected_receipt}")
     print(f"PASS byte-tamper rejection: {tampered_receipt}")
     print(f"Inspect the isolated workspaces under {workspace}")
