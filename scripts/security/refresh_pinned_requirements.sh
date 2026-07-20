@@ -148,7 +148,6 @@ run_workflow_locks() {
 
   compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
     --python-version 3.13 \
-    --extra ci \
     --extra docs-ci
 
   compile_pyproject "${WORKFLOW_DIR}/hf-py313.txt" \

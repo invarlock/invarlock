@@ -52,6 +52,21 @@ def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
         assert marker not in text
 
 
+def test_docs_lock_excludes_the_model_runtime_test_stack() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
+    docs_compile = text.split(
+        'compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt"', 1
+    )[1].split("\n\n", 1)[0]
+
+    assert "--extra docs-ci" in docs_compile
+    assert "--extra ci" not in docs_compile
+
+    lock = (WORKFLOW_REQUIREMENTS / "docs-ci-py313.txt").read_text(encoding="utf-8")
+    assert "linkchecker==" in lock
+    for package in ("peft==", "torch==", "torchao==", "transformers=="):
+        assert package not in lock
+
+
 def test_runtime_image_locks_are_cpu_only() -> None:
     runtime_locks = (
         "runtime-image-py312.txt",

@@ -17,6 +17,7 @@ from typing import Any, Literal, cast
 
 import yaml
 
+from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
     ModelRuntimeSpec,
@@ -492,7 +493,7 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
                 records_path, schedule=schedule
             ),
             plugin=RuntimeProviderPluginIdentity(
-                "hf_transformers", "invarlock", importlib.metadata.version("invarlock")
+                "hf_transformers", "invarlock", INVARLOCK_VERSION
             ),
             backend=RuntimeBackendIdentity(
                 "lm-evaluation-harness-hf",

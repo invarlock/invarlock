@@ -592,8 +592,19 @@ def test_complete_requires_immutable_runtime_identity(tmp_path: Path) -> None:
         module.complete(tmp_path / "transaction", tmp_path / "prepared", "latest")
 
 
-def test_complete_replays_real_import_transaction(tmp_path: Path) -> None:
+def test_complete_replays_real_import_transaction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _module()
+
+    def missing_distribution_version(package: str) -> str:
+        raise module.importlib.metadata.PackageNotFoundError(package)
+
+    monkeypatch.setattr(
+        module.importlib.metadata,
+        "version",
+        missing_distribution_version,
+    )
     prepared = tmp_path / "prepared"
     image = "sha256:" + ("d" * 64)
     records = _prepare_test_transaction(prepared, module, image)
@@ -639,6 +650,12 @@ def test_complete_replays_real_import_transaction(tmp_path: Path) -> None:
             "timeout_seconds": 300,
         }
         assert provider_receipt["device"]["device_kind"] == "cpu"
+        assert provider_receipt["plugin"] == {
+            "distribution": "invarlock",
+            "distribution_version": module.INVARLOCK_VERSION,
+            "name": "hf_transformers",
+            "provider_abi": "1",
+        }
         assert provider_receipt["backend"]["source_sha256"] == module.digest(
             module.canonical_json_bytes(provenance)
         )
