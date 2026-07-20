@@ -213,3 +213,24 @@ def test_pack_snapshot_bounds_a_file_that_grows_after_enumeration(
 
     assert snapshot is None
     assert errors == ["unable to snapshot input safely: manifest.json"]
+
+
+def test_capture_and_stability_fail_if_the_snapshot_or_root_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _pack(tmp_path)
+    monkeypatch.setattr(
+        snapshot_module.ImmutableFileSnapshot,
+        "stability_errors",
+        lambda _self: ["pack snapshot changed after capture"],
+    )
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is None
+    assert errors == ["pack snapshot changed after capture"]
+
+    monkeypatch.undo()
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is not None and errors == []
+    root.rename(tmp_path / "moved-pack")
+    assert "root changed after capture" in " ".join(snapshot.stability_errors())
+    snapshot.files.cleanup()

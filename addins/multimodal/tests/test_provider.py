@@ -226,6 +226,67 @@ def test_content_store_rechecks_length_and_digest(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("content_id", "digest", "byte_length", "message"),
+    [
+        (".", _DIGEST, 1, "safe basename"),
+        ("image", "BAD", 1, "lowercase sha256"),
+        ("image", _DIGEST, True, "outside the supported range"),
+        ("image", _DIGEST, 0, "outside the supported range"),
+    ],
+)
+def test_content_store_rejects_invalid_bindings_before_open(
+    tmp_path: Path,
+    content_id: str,
+    digest: str,
+    byte_length: object,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        _read_content_bytes(
+            tmp_path,
+            content_id=content_id,
+            expected_sha256=digest,
+            expected_byte_length=byte_length,  # type: ignore[arg-type]
+        )
+
+
+def test_content_store_reports_missing_store_and_object(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="content store is unavailable"):
+        _read_content_bytes(
+            tmp_path / "missing",
+            content_id="image",
+            expected_sha256=_DIGEST,
+            expected_byte_length=1,
+        )
+
+    with pytest.raises(ValueError, match="content object is unavailable"):
+        _read_content_bytes(
+            tmp_path,
+            content_id="missing",
+            expected_sha256=_DIGEST,
+            expected_byte_length=1,
+        )
+
+
+def test_optional_text_rejects_untrimmed_or_empty_values() -> None:
+    for value in ("", " untrimmed"):
+        with pytest.raises(ValueError, match="non-empty trimmed text"):
+            provider_module._optional_text({"revision": value}, "revision")
+    assert provider_module._optional_text({"revision": "stable"}, "revision") == (
+        "stable"
+    )
+
+
+def test_schedule_content_rejects_wrong_task(tmp_path: Path) -> None:
+    schedule = SimpleNamespace(task="text_causal", records=())
+    with pytest.raises(ValueError, match="requires vision_text_generation"):
+        provider_module._validate_schedule_content(  # type: ignore[arg-type]
+            schedule,
+            content_store=tmp_path,
+        )
+
+
 def test_input_preflight_authenticates_schedule_content_without_loading_model(
     tmp_path: Path,
 ) -> None:

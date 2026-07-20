@@ -592,6 +592,84 @@ def test_complete_requires_immutable_runtime_identity(tmp_path: Path) -> None:
         module.complete(tmp_path / "transaction", tmp_path / "prepared", "latest")
 
 
+def test_bridge_main_dispatches_worker_complete_and_reports_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _module()
+    observed: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "worker",
+        lambda *_args: observed.append("worker"),
+    )
+    assert (
+        module.main(
+            [
+                "worker",
+                "--role",
+                "baseline",
+                "--model",
+                str(tmp_path / "model"),
+                "--dataset",
+                str(tmp_path / "records.jsonl"),
+                "--output",
+                str(tmp_path / "output"),
+            ]
+        )
+        == 0
+    )
+    monkeypatch.setattr(
+        module,
+        "complete",
+        lambda *_args: (
+            tmp_path / "evidence",
+            tmp_path / "receipt.json",
+            tmp_path / "report.html",
+        ),
+    )
+    assert (
+        module.main(
+            [
+                "complete",
+                "--workspace",
+                str(tmp_path / "transaction"),
+                "--prepared",
+                str(tmp_path / "prepared"),
+                "--runtime-image",
+                "sha256:" + "a" * 64,
+            ]
+        )
+        == 0
+    )
+    assert observed == ["worker"]
+    assert "Evidence:" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        module,
+        "worker",
+        lambda *_args: (_ for _ in ()).throw(module.BridgeError("bad run")),
+    )
+    assert (
+        module.main(
+            [
+                "worker",
+                "--role",
+                "subject",
+                "--model",
+                str(tmp_path / "model"),
+                "--dataset",
+                str(tmp_path / "records.jsonl"),
+                "--output",
+                str(tmp_path / "output"),
+            ]
+        )
+        == 2
+    )
+    assert "FAIL bad run" in capsys.readouterr().err
+
+
 def test_complete_replays_real_import_transaction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

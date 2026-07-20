@@ -54,8 +54,6 @@ from invarlock.runtime_providers.tensorrt_llm_identity import (
 
 _RUNNER_PROTOCOL = "invarlock/tensorrt-llm-runner-v1"
 _RUNNER_INFO_FORMAT = "invarlock/tensorrt-llm-runner-info-v1"
-_RUNNER_REQUEST_FORMAT = "invarlock/tensorrt-llm-runner-request-v1"
-_RUNNER_RESPONSE_FORMAT = "invarlock/tensorrt-llm-runner-response-v1"
 _RUNNER_BATCH_REQUEST_FORMAT = "invarlock/tensorrt-llm-runner-batch-request-v1"
 _RUNNER_BATCH_RESPONSE_FORMAT = "invarlock/tensorrt-llm-runner-batch-response-v1"
 _MAX_INPUT_BYTES = 1024 * 1024
@@ -677,62 +675,6 @@ class TensorRTLLMSession:
             != self._config.artifact_identity.tokenizer_metadata_sha256
         ):
             raise TensorRTLLMExecutionError("snapshotted tokenizer contract changed")
-
-    def _request(self, record: EvaluationRecord) -> bytes:
-        request = {
-            "engine_bundle": str(self._engine_snapshot),
-            "format_version": _RUNNER_REQUEST_FORMAT,
-            "input_text": record.input_text,
-            "protocol_version": _RUNNER_PROTOCOL,
-            "settings": asdict(self._config.execution_settings),
-            "tokenizer_contract": str(self._tokenizer_snapshot),
-        }
-        encoded = json.dumps(
-            request,
-            ensure_ascii=False,
-            allow_nan=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        if len(encoded) > _MAX_INPUT_BYTES:
-            raise ValueError("TensorRT-LLM record input exceeds the byte limit")
-        return encoded
-
-    def _execute_record(self, record: EvaluationRecord) -> str:
-        runner, vendor_python, execution_boundary = self._require_open()
-        status, stdout, stderr = _run_bounded_process(
-            runner=runner,
-            vendor_python=vendor_python,
-            execution_boundary=execution_boundary,
-            arguments=("--invarlock-score-v1",),
-            input_bytes=self._request(record),
-            run_directory=self._run_directory,
-            timeout_seconds=self._config.execution_settings.timeout_seconds,
-            stdout_limit=_MAX_STDOUT_BYTES,
-            stderr_limit=_MAX_STDERR_BYTES,
-        )
-        if status != 0:
-            raise TensorRTLLMExecutionError(
-                f"TensorRT-LLM runner exited with status {status}"
-            )
-        if stderr:
-            raise TensorRTLLMExecutionError("TensorRT-LLM runner emitted stderr")
-        response = _strict_json_object(stdout, label="TensorRT-LLM runner response")
-        if set(response) != {"format_version", "output_text"}:
-            raise TensorRTLLMExecutionError(
-                "TensorRT-LLM runner response has unexpected fields"
-            )
-        if response.get("format_version") != _RUNNER_RESPONSE_FORMAT:
-            raise TensorRTLLMExecutionError(
-                "TensorRT-LLM runner response format is unsupported"
-            )
-        output_text = response.get("output_text")
-        try:
-            return exact_match_output_text(output_text)
-        except ValueError as exc:
-            raise TensorRTLLMExecutionError(
-                "TensorRT-LLM runner output_text must be valid user-visible text"
-            ) from exc
 
     def _batch_request(self, records: tuple[EvaluationRecord, ...]) -> bytes:
         request = {

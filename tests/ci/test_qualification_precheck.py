@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 
 from scripts import qualification_precheck
 from scripts.qualification_precheck import validate
@@ -245,3 +245,61 @@ def test_qualification_precheck_main_emits_validated_json(
 
     assert result == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
+
+
+def test_receipt_destination_requires_a_new_file_in_an_existing_directory(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="must name a file"):
+        qualification_precheck._receipt_destination(Path("."))
+    with pytest.raises(ValueError, match="existing directory"):
+        qualification_precheck._receipt_destination(tmp_path / "missing/receipt.json")
+    parent_file = tmp_path / "parent-file"
+    parent_file.write_text("file", encoding="utf-8")
+    with pytest.raises(ValueError, match="existing directory"):
+        qualification_precheck._receipt_destination(parent_file / "receipt.json")
+
+
+@pytest.mark.parametrize("key_kind", ("invalid", "rsa"))
+def test_qualification_precheck_requires_an_ed25519_verifier_key(
+    tmp_path: Path, key_kind: str
+) -> None:
+    profile, policy = _trust_profile(tmp_path)
+    if key_kind == "invalid":
+        key_bytes = b"not a private key"
+        message = "signing key is invalid"
+    else:
+        key_bytes = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048
+        ).private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+        message = "must be Ed25519"
+    profile.parent.joinpath("verifier.pem").write_bytes(key_bytes)
+    with pytest.raises(ValueError, match=message):
+        validate(
+            preflight=_preflight(policy),
+            trust_profile=profile,
+            receipt=tmp_path / "receipt.json",
+        )
+
+
+@pytest.mark.parametrize("payload", (b"not-json", b"x" * (256 * 1024 + 1)))
+def test_qualification_precheck_main_rejects_invalid_stdin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: bytes,
+) -> None:
+    profile, _policy = _trust_profile(tmp_path)
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(payload)))
+    with pytest.raises(SystemExit):
+        qualification_precheck.main(
+            [
+                "--trust-profile",
+                str(profile),
+                "--receipt",
+                str(tmp_path / "receipt.json"),
+            ]
+        )

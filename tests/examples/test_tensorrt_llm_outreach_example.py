@@ -251,6 +251,22 @@ def test_resource_root_rejects_symlinked_artifacts(example: Any, inputs: Path) -
         example._root(inputs)
 
 
+def test_resource_root_rejects_oversized_and_unmountable_inputs(
+    example: Any, inputs: Path, tmp_path: Path
+) -> None:
+    records = inputs / "records.jsonl"
+    with records.open("r+b") as handle:
+        handle.truncate(64 * 1024 * 1024 + 1)
+    with pytest.raises(ValueError, match="exceeds 64 MiB"):
+        example._root(inputs)
+
+    records.write_text("{}\n", encoding="utf-8")
+    comma_root = tmp_path / "comma,root"
+    inputs.rename(comma_root)
+    with pytest.raises(ValueError, match="Docker mount"):
+        example._root(comma_root)
+
+
 def test_inspect_runs_real_offline_gpu_probe_and_validates_output(
     example: Any,
     inputs: Path,
@@ -315,6 +331,30 @@ def test_inspect_rejects_same_engine_identity(
     )
     digest = "sha256:" + "a" * 64
     with pytest.raises(ValueError, match="must be distinct"):
+        example._inspect(inputs, digest, digest, "cuda:0")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        "not-json",
+        "[]",
+        '{"baseline":{},"subject":{}}',
+    ),
+)
+def test_inspect_rejects_malformed_probe_output(
+    example: Any,
+    inputs: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: str,
+) -> None:
+    monkeypatch.setattr(
+        example.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, payload, ""),
+    )
+    digest = "sha256:" + "a" * 64
+    with pytest.raises(ValueError, match="inspection"):
         example._inspect(inputs, digest, digest, "cuda:0")
 
 
@@ -401,6 +441,78 @@ def test_execute_runs_preflight_evaluate_verify_report_with_provider_resources(
     paths["receipt"].write_text("{}\n", encoding="utf-8")
     report.write_text("[]\n", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid outputs"):
+        example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
+
+
+@pytest.mark.parametrize(
+    ("report", "receipt", "message"),
+    (
+        (
+            {
+                "baseline": {"mean_score": 0.5},
+                "subject": {"mean_score": 0.5},
+                "verdict": "fail",
+            },
+            {
+                "statement": {
+                    "verdict": {
+                        "ok": True,
+                        "integrity_ok": True,
+                        "policy_verdict": "pass",
+                    }
+                }
+            },
+            "policy verdict",
+        ),
+        (
+            {
+                "baseline": {"mean_score": 0.5},
+                "subject": {"mean_score": 0.5},
+                "verdict": "pass",
+            },
+            {"statement": {"verdict": {"ok": False}}},
+            "did not verify",
+        ),
+        (
+            {
+                "baseline": {"mean_score": 0.5},
+                "subject": {"mean_score": 0.1},
+                "verdict": "pass",
+            },
+            {
+                "statement": {
+                    "verdict": {
+                        "ok": True,
+                        "integrity_ok": True,
+                        "policy_verdict": "pass",
+                    }
+                }
+            },
+            "subject engine solved fewer",
+        ),
+    ),
+)
+def test_execute_rejects_false_green_transaction_outputs(
+    example: Any,
+    inputs: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    report: dict[str, object],
+    receipt: dict[str, object],
+    message: str,
+) -> None:
+    paths = {
+        name: tmp_path / name
+        for name in ("request", "evidence", "signer", "trust", "receipt", "report")
+    }
+    report_path = paths["evidence"] / "reports/evaluation.report.json"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    paths["receipt"].write_text(json.dumps(receipt), encoding="utf-8")
+    paths["report"].write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(example.subprocess, "run", lambda *args, **kwargs: None)
+    digest = "sha256:" + "a" * 64
+    with pytest.raises(ValueError, match=message):
         example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
 
 
@@ -509,6 +621,14 @@ def test_image_probe_uses_addin_provider_and_official_runner(
     output = json.loads(capsys.readouterr().out)
     assert output["baseline"]["model_id"] == "baseline"
     assert output["subject"]["model_id"] == "subject"
+
+    monkeypatch.setattr(helper, "strict_container_boundary_present", lambda: False)
+    with pytest.raises(SystemExit, match="container boundary"):
+        helper.main()
+    monkeypatch.setattr(helper, "strict_container_boundary_present", lambda: True)
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE", "runtime:mutable")
+    with pytest.raises(SystemExit, match="authenticated digest"):
+        helper.main()
 
 
 def test_showcase_workspace_download_and_input_materialization(
@@ -831,6 +951,45 @@ def test_prepare_helper_contract_conversion_and_build(
     monkeypatch.setattr(prepare.shutil, "which", lambda _name: None)
     with pytest.raises(RuntimeError, match="unavailable"):
         prepare._build(checkpoint, tmp_path / "unused", quantization="none")
+
+
+def test_prepare_helper_rejects_invalid_contract_calibration_and_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prepare_helper: Any
+) -> None:
+    prepare = prepare_helper
+    tokenizer = prepare.AutoTokenizer.from_pretrained(tmp_path)
+    tokenizer.is_fast = False
+    with pytest.raises(RuntimeError, match="usable fast tokenizer"):
+        prepare._canonical_tokenizer_contract(tmp_path)
+    tokenizer.is_fast = True
+
+    records = tmp_path / "records.json"
+    records.write_text("[]", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="non-empty JSON array"):
+        list(prepare._calibration_batches(tokenizer, records))
+    records.write_text('[{"id":"missing-prompt"}]', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="contain a prompt"):
+        list(prepare._calibration_batches(tokenizer, records))
+
+    with pytest.raises(RuntimeError, match="unsupported TensorRT quantization"):
+        prepare._convert(
+            tmp_path,
+            tmp_path / "unsupported",
+            quantization="int4",
+            calibration_records=None,
+        )
+
+    monkeypatch.setattr(prepare.shutil, "which", lambda _name: "/trtllm-build")
+    engine = tmp_path / "bad-engine"
+
+    def build_bad(_command: list[str], *, check: bool) -> None:
+        assert check
+        engine.mkdir()
+        (engine / "config.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(prepare.subprocess, "run", build_bad)
+    with pytest.raises(RuntimeError, match="unexpected engine layout"):
+        prepare._build(tmp_path, engine, quantization="none")
 
 
 def test_prepare_helper_main_and_failure_paths(

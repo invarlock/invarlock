@@ -22,9 +22,10 @@ def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
     assert "--cov-fail-under=90" in block
     assert "git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=80' in block
+    assert '--include="$$source" --fail-under=90' in block
     assert "check_coverage_thresholds.py" not in MAKEFILE
     assert "scripts/evidence_packs" not in MAKEFILE
+    assert "--fail-under=80" not in MAKEFILE
 
 
 def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
@@ -33,11 +34,11 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
         assert f"--cov=addins/{package}/src/invarlock_addins/{package}" in block
         assert f"--include='addins/{package}/src/*'" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=80" in block
-    assert block.count("--fail-under=80") == 5
+    assert "--cov-fail-under=90" in block
+    assert block.count("--fail-under=90") == 5
     assert "git ls-files 'addins/*/src/**/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=80' in block
+    assert '--include="$$source" --fail-under=90' in block
     assert "ADDIN_COVERAGE_MIN" not in MAKEFILE
     assert "coverage-addins: coverage-linux-check" in MAKEFILE
     assert 'test "$$(uname -s)" = Linux' in MAKEFILE
@@ -50,16 +51,18 @@ def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> N
         "qualification_candidate_wheels.py",
         "qualification_precheck.py",
         "qualification_receipt_check.py",
+        "qualification_render_preflight.py",
         "qualification_source.py",
         "runtime_qualification.py",
         "tensorrt_llm_canary_preflight.py",
     ):
-        assert f"--include='scripts/{script}' --fail-under=80" in block
+        assert f"--include='scripts/{script}' --fail-under=90" in block
         assert f"scripts/{script}" in QUALIFICATION_COVERAGE_CONFIG
     assert "addins/tensorrt_llm/tests/test_tensorrt_llm_canary_preflight.py" in block
     assert "PYTHONPATH=src:addins/tensorrt_llm/src" in block
     assert "--cov-config=scripts/qualification.coveragerc" in block
     assert "--cov-branch" in block
+    assert "--cov-fail-under=90" in block
     assert "$(PYTEST_WORKER_ARGS)" in block
 
 
@@ -72,9 +75,10 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
         "testpypi_promotion.py",
         "verify_hosted_distributions.py",
     ):
-        assert f"--include='scripts/release/{script}' --fail-under=80" in block
+        assert f"--include='scripts/release/{script}' --fail-under=90" in block
     assert "--cov-config=scripts/release.coveragerc" in block
     assert "--cov-branch" in block
+    assert "--cov-fail-under=90" in block
     assert "$(PYTEST_WORKER_ARGS)" in block
 
 
@@ -88,9 +92,9 @@ def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
     assert "--cov=examples/integrations/lm-evaluation-harness" in block
     assert "--cov=examples/integrations/tensorrt-llm" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=80" in block
+    assert "--cov-fail-under=90" in block
     assert "find examples/integrations -type f -name '*.py'" in block
-    assert '--include="$$source" --fail-under=80' in block
+    assert '--include="$$source" --fail-under=90' in block
     assert "$(PYTEST_WORKER_ARGS)" in block
 
 

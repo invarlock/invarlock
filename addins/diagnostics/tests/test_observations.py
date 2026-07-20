@@ -4,6 +4,7 @@ import json
 import math
 from collections.abc import Mapping
 
+import invarlock_addins.diagnostics.observations as observations
 import numpy as np
 import numpy.typing as npt
 import pytest
@@ -191,3 +192,71 @@ def test_canonical_observation_bytes_are_ready_for_evidence_input() -> None:
 def test_unrepresentable_variance_fails_instead_of_emitting_infinity() -> None:
     with pytest.raises(DiagnosticInputError, match="not representable"):
         variance_observation([1e308, -1e308])
+
+
+@pytest.mark.parametrize("method_name", ["detach", "cpu", "numpy"])
+def test_tensor_protocol_failures_are_reported(method_name: str) -> None:
+    class BrokenTensor:
+        def detach(self) -> BrokenTensor:
+            if method_name == "detach":
+                raise RuntimeError("broken")
+            return self
+
+        def cpu(self) -> BrokenTensor:
+            if method_name == "cpu":
+                raise RuntimeError("broken")
+            return self
+
+        def numpy(self) -> object:
+            if method_name == "numpy":
+                raise RuntimeError("broken")
+            return [[1.0]]
+
+    with pytest.raises(DiagnosticInputError, match=rf"{method_name}\(\) failed"):
+        variance_observation(BrokenTensor())
+
+
+def test_numeric_conversion_and_size_limits_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class InvalidArray:
+        def __array__(self) -> object:
+            raise TypeError("invalid")
+
+    with pytest.raises(DiagnosticInputError, match="numeric array"):
+        variance_observation(InvalidArray())
+
+    monkeypatch.setattr(observations, "_MAX_ELEMENTS", 1)
+    with pytest.raises(DiagnosticInputError, match="diagnostic limit"):
+        variance_observation([1.0, 2.0])
+
+
+def test_canonical_and_decomposition_failures_are_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(DiagnosticInputError, match="canonical JSON"):
+        canonical_observation_bytes({"invalid": {1, 2}})
+
+    monkeypatch.setattr(
+        observations.np.linalg,
+        "svd",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            np.linalg.LinAlgError("no convergence")
+        ),
+    )
+    with pytest.raises(DiagnosticInputError, match="SVD did not converge"):
+        spectral_observation([[1.0]])
+
+
+def test_rmt_decomposition_failures_are_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        observations.np.linalg,
+        "eigvalsh",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            np.linalg.LinAlgError("no convergence")
+        ),
+    )
+    with pytest.raises(DiagnosticInputError, match="did not converge"):
+        rmt_observation([[0.0], [1.0]])

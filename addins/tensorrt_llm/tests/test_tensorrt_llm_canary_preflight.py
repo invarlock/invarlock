@@ -266,3 +266,34 @@ def test_main_prints_only_the_authenticated_canonical_root(
 
     assert preflight.main(argv) == 0
     assert capsys.readouterr().out == f"{Path(arguments['input_root']).absolute()}\n"
+
+
+def test_secure_directory_authentication_requires_platform_nofollow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delattr(preflight.os, "O_NOFOLLOW")
+    with pytest.raises(preflight.CanaryPreflightError, match="nofollow"):
+        preflight._directory_flags()
+
+
+def test_input_root_rejects_explicit_traversal(tmp_path: Path) -> None:
+    value = str(tmp_path / "child" / ".." / "inputs")
+    with pytest.raises(preflight.CanaryPreflightError, match="traversal"):
+        preflight._canonical_input_root(value)
+
+
+def test_tokenizer_contract_size_bound_and_main_failure_are_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    arguments = _valid_inputs(tmp_path)
+    monkeypatch.setattr(preflight, "_MAX_TOKENIZER_CONTRACT_BYTES", 0)
+    with pytest.raises(preflight.CanaryPreflightError, match="size bound"):
+        preflight.validate(**arguments)
+
+    argv: list[str] = []
+    arguments["image"] = "mutable:latest"
+    for name, value in arguments.items():
+        argv.extend(("--" + name.replace("_", "-"), value))
+    with pytest.raises(SystemExit):
+        preflight.main(argv)

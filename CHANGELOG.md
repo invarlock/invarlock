@@ -72,8 +72,9 @@ from the same canonical JSON.
   explicit **Evidence not yet created** state.
 - Bound source archives, core and add-in wheels, runtime images, signed
   canaries, published artifacts, and final receipts in one reproducible release
-  qualification flow, with at least 80% branch coverage required for every
-  maintained Python module as well as the aggregate suite.
+  qualification flow, with branch measurement enabled and at least 90%
+  combined statement-and-branch coverage required for every maintained Python
+  module as well as each aggregate suite.
 
 ### Removed
 

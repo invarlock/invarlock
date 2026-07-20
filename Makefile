@@ -99,7 +99,7 @@ test-%:  ## Run one tests/<name> directory
 	@test -d tests/$* || { echo "tests/$* does not exist" >&2; exit 2; }
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q tests/$*
 
-coverage:  ## Run the fast suite with branch coverage
+coverage:  ## Run the fast suite with statement-and-branch coverage
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		-m "not integration and not slow and not manual and not gpu" tests \
@@ -108,7 +108,7 @@ coverage:  ## Run the fast suite with branch coverage
 	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			$(PYTHON) -m coverage report --include="$$source" --fail-under=80 || exit $$?; \
+			$(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
 
 coverage-linux-check:
@@ -117,7 +117,7 @@ coverage-linux-check:
 		exit 2; \
 	}
 
-coverage-addins: coverage-linux-check  ## Enforce the branch-coverage ratchet for optional packages
+coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
 	PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests \
@@ -127,28 +127,29 @@ coverage-addins: coverage-linux-check  ## Enforce the branch-coverage ratchet fo
 		--cov=addins/tensorrt_llm/src/invarlock_addins/tensorrt_llm \
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
-		--cov-fail-under=80
+		--cov-fail-under=90
 	$(PYTHON) -m coverage report \
 		--include='addins/diagnostics/src/*' \
-		--fail-under=80
+		--fail-under=90
 	$(PYTHON) -m coverage report \
 		--include='addins/gguf/src/*' \
-		--fail-under=80
+		--fail-under=90
 	$(PYTHON) -m coverage report \
 		--include='addins/multimodal/src/*' \
-		--fail-under=80
+		--fail-under=90
 	$(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
-		--fail-under=80
+		--fail-under=90
 	@git ls-files 'addins/*/src/**/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			$(PYTHON) -m coverage report --include="$$source" --fail-under=80 || exit $$?; \
+			$(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
 
-coverage-qualification:  ## Enforce branch coverage for the maintained qualification transaction
+coverage-qualification:  ## Enforce branch-aware coverage for qualification tooling
 	PYTHONPATH=src:addins/tensorrt_llm/src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/scripts/test_runtime_qualification.py \
+		tests/scripts/test_runtime_qualification_edges.py \
 		tests/scripts/test_runtime_qualification_security.py \
 		tests/ci/test_qualification_precheck.py \
 		tests/scripts/test_qualification_candidate_wheels.py \
@@ -160,48 +161,50 @@ coverage-qualification:  ## Enforce branch coverage for the maintained qualifica
 		--cov --cov-config=scripts/qualification.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
-		--cov-fail-under=80
+		--cov-fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/authenticated_runtime_build.py' --fail-under=80
+		--include='scripts/authenticated_runtime_build.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_precheck.py' --fail-under=80
+		--include='scripts/qualification_precheck.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_candidate_wheels.py' --fail-under=80
+		--include='scripts/qualification_candidate_wheels.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_receipt_check.py' --fail-under=80
+		--include='scripts/qualification_receipt_check.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_render_preflight.py' --fail-under=80
+		--include='scripts/qualification_render_preflight.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_source.py' --fail-under=80
+		--include='scripts/qualification_source.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/runtime_qualification.py' --fail-under=80
+		--include='scripts/runtime_qualification.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=80
+		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=90
 
-coverage-release:  ## Enforce branch coverage for maintained release helpers
+coverage-release:  ## Enforce branch-aware coverage for release helpers
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/scripts/test_first_party_distribution_validation.py \
+		tests/scripts/test_release_distribution_validation_edges.py \
 		tests/scripts/test_release_preflight.py \
 		tests/scripts/test_release_preflight_adversarial.py \
 		tests/scripts/test_release_preflight_edges.py \
 		tests/scripts/test_verify_hosted_distributions.py \
+		tests/scripts/test_verify_hosted_distributions_edges.py \
 		tests/scripts/test_testpypi_promotion.py \
 		--cov --cov-config=scripts/release.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
-		--cov-fail-under=80
+		--cov-fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/first_party_distribution_validation.py' --fail-under=80
+		--include='scripts/release/first_party_distribution_validation.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_distribution_validation.py' --fail-under=80
+		--include='scripts/release/release_distribution_validation.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_preflight.py' --fail-under=80
+		--include='scripts/release/release_preflight.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/testpypi_promotion.py' --fail-under=80
+		--include='scripts/release/testpypi_promotion.py' --fail-under=90
 	$(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/verify_hosted_distributions.py' --fail-under=80
+		--include='scripts/release/verify_hosted_distributions.py' --fail-under=90
 
-coverage-examples:  ## Enforce branch coverage for maintained example launchers
+coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/examples \
 		--cov=examples.integrations.launch \
@@ -213,15 +216,15 @@ coverage-examples:  ## Enforce branch coverage for maintained example launchers
 		--cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/examples-cov.xml \
-		--cov-fail-under=80
+		--cov-fail-under=90
 	@find examples/integrations -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
-			$(PYTHON) -m coverage report --include="$$source" --fail-under=80 || exit $$?; \
+			$(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
 
 coverage-enforce: PYTEST_WORKERS = auto
-coverage-enforce: coverage-linux-check  ## Enforce branch coverage in parallel by default
+coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in parallel by default
 	$(MAKE) coverage PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-addins PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-qualification PYTEST_WORKERS=$(PYTEST_WORKERS)

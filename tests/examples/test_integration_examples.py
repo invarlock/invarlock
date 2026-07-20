@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import hashlib
 import json
 import math
@@ -353,6 +354,58 @@ def test_preparation_rejects_existing_and_unknown_workspace(tmp_path: Path) -> N
     paths = integration._paths(tmp_path / "unused")
     with pytest.raises(RuntimeError, match="unsupported integration"):
         integration._create_checkpoints(paths, "unknown")
+    with pytest.raises(ValueError, match="unsupported comparison metric"):
+        integration._prepare_workspace(
+            tmp_path / "invalid-metric",
+            integration="hf-transformers",
+            runtime_image_digest=ZERO_DIGEST,
+            metric="accuracy",
+        )
+
+
+@pytest.mark.parametrize(
+    ("creator", "missing", "message"),
+    (
+        (
+            integration._create_hf_checkpoints,
+            "safetensors",
+            "Hugging Face dependencies",
+        ),
+        (integration._create_peft_checkpoints, "peft", "PEFT example requires"),
+        (
+            integration._create_torchao_checkpoints,
+            "torchao",
+            "TorchAO example requires",
+        ),
+    ),
+)
+def test_checkpoint_authors_report_missing_optional_dependencies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    creator: object,
+    missing: str,
+    message: str,
+) -> None:
+    real_import = builtins.__import__
+
+    def import_without_optional(
+        name: str,
+        globals: object = None,
+        locals: object = None,
+        fromlist: object = (),
+        level: int = 0,
+    ) -> object:
+        if name == missing:
+            raise ImportError(f"missing {missing}")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_optional)
+    paths = integration._paths(tmp_path / missing)
+    with pytest.raises(RuntimeError, match=message):
+        if creator is integration._create_hf_checkpoints:
+            creator(paths, expected_output=" target")  # type: ignore[operator]
+        else:
+            creator(paths)  # type: ignore[operator]
 
 
 def test_execute_invokes_public_commands_and_checks_report(
@@ -406,6 +459,30 @@ def test_command_runner_surfaces_failure(monkeypatch: pytest.MonkeyPatch) -> Non
         integration._run(["false"])
 
 
+def test_command_runner_accepts_success_and_handles_empty_diagnostic(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        integration.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, stdout="done\n", stderr=""
+        ),
+    )
+    integration._run(["true"])
+    assert "done" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        integration.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 3, stdout="", stderr=""
+        ),
+    )
+    with pytest.raises(RuntimeError, match="status 3"):
+        integration._run(["false"])
+
+
 def test_run_main_prepare_only_and_input_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -445,6 +522,88 @@ def test_run_main_prepare_only_and_input_errors(
                 "--runtime-image-digest",
                 ZERO_DIGEST,
             ]
+        )
+
+
+def test_run_main_executes_the_prepared_transaction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed: list[Path] = []
+    monkeypatch.setattr(
+        integration,
+        "_execute",
+        lambda paths, **_kwargs: observed.append(paths.root),
+    )
+    workspace = tmp_path / "executed"
+    assert (
+        integration.main(
+            [
+                "hf-transformers",
+                "--workspace",
+                str(workspace),
+                "--runtime-image",
+                "runtime@" + ZERO_DIGEST,
+                "--runtime-image-digest",
+                ZERO_DIGEST,
+            ]
+        )
+        == 0
+    )
+    assert observed == [workspace]
+
+
+def test_integration_helpers_fail_closed_on_malformed_model_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class BadTargetTokenizer:
+        def __call__(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+            return {"input_ids": [1, 2]}
+
+    with pytest.raises(RuntimeError, match="one-token expected continuation"):
+        integration._single_target_id(BadTargetTokenizer(), " target")
+
+    class NonTensorTokenizer:
+        def __call__(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+            return {"attention_mask": [], "input_ids": []}
+
+    with pytest.raises(RuntimeError, match="did not return tensors"):
+        integration._prompt_batch(
+            NonTensorTokenizer(), object(), expected_output=" target"
+        )
+
+    class EmptyPromptTokenizer:
+        pad_token_id = 0
+
+        def __call__(self, value: object, **_kwargs: object) -> dict[str, object]:
+            return {"input_ids": [7] if value == " target" else []}
+
+    with pytest.raises(RuntimeError, match="empty prompt"):
+        integration._continuation_training_batch(
+            EmptyPromptTokenizer(), object(), expected_output=" target"
+        )
+
+    monkeypatch.setattr(
+        integration,
+        "_prompt_batch",
+        lambda *_args, **_kwargs: {
+            "input_ids": object(),
+            "attention_mask": object(),
+        },
+    )
+    model = type(
+        "Model", (), {"base_model_prefix": "missing", "eval": lambda self: None}
+    )()
+    with pytest.raises(RuntimeError, match="does not expose its causal backbone"):
+        integration._target_row_derivative(
+            model, object(), object(), expected_output=" target"
+        )
+
+    with pytest.raises(ValueError, match="exact-match preparation"):
+        integration._prepare_workspace(
+            tmp_path / "invalid-metric-integration",
+            integration="peft-lora",
+            runtime_image_digest=ZERO_DIGEST,
+            metric="exact_match",
         )
 
 
@@ -640,3 +799,42 @@ def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
     assert all(call[2]["trust_remote_code"] is False for call in calls)
     assert calls[1][2]["use_safetensors"] is True
     assert calls[1][2]["dtype"] == "auto"
+
+
+def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
+    class Config:
+        use_cache = True
+
+    class Model:
+        config = Config()
+
+    class AutoModel:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> Model:
+            return Model()
+
+    class Tokenizer:
+        pad_token_id = None
+        eos_token_id: int | None = 2
+        pad_token: object = None
+        eos_token = "</s>"
+
+    tokenizer = Tokenizer()
+    transformers = type(
+        "Transformers",
+        (),
+        {
+            "AutoTokenizer": type(
+                "AutoTokenizer",
+                (),
+                {"from_pretrained": staticmethod(lambda *_args, **_kwargs: tokenizer)},
+            ),
+            "AutoModelForCausalLM": AutoModel,
+        },
+    )
+    _model, observed = REAL_QWEN3_LOADER(torch=object(), transformers=transformers)
+    assert observed.pad_token == "</s>"
+
+    tokenizer.eos_token_id = None
+    with pytest.raises(RuntimeError, match="no padding token"):
+        REAL_QWEN3_LOADER(torch=object(), transformers=transformers)

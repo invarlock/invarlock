@@ -9,8 +9,11 @@ import sys
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from scripts import authenticated_runtime_build
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = ROOT / "scripts" / "authenticated_runtime_build.py"
@@ -731,6 +734,136 @@ def test_build_propagates_engine_failure_without_inspecting_a_candidate(
 
     assert completed.returncode == 23
     assert (tmp_path / "arguments.json").exists()
+
+
+@pytest.mark.parametrize("value", ("", " docker", "docker\n"))
+def test_engine_rejects_noncanonical_names(
+    value: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        authenticated_runtime_build.shutil, "which", lambda _value: None
+    )
+    with pytest.raises(SystemExit, match="container engine is invalid"):
+        authenticated_runtime_build._engine(value)
+
+
+def test_engine_requires_an_available_executable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        authenticated_runtime_build.shutil, "which", lambda _value: None
+    )
+    with pytest.raises(SystemExit, match="container engine is unavailable"):
+        authenticated_runtime_build._engine("missing-engine")
+
+
+@pytest.mark.parametrize("value", ("", "/Dockerfile", "../Dockerfile", "a//Dockerfile"))
+def test_dockerfile_path_must_be_canonical_and_archive_relative(value: str) -> None:
+    with pytest.raises(SystemExit, match="canonical archive-relative"):
+        authenticated_runtime_build._relative_dockerfile(value)
+
+
+def test_build_arguments_reject_invalid_and_repeated_names() -> None:
+    with pytest.raises(SystemExit, match="build argument is invalid"):
+        authenticated_runtime_build._build_arguments(["lowercase=value"])
+    with pytest.raises(SystemExit, match="is repeated"):
+        authenticated_runtime_build._build_arguments(["VALUE=one", "VALUE=two"])
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    (
+        (b"x" * (1024 * 1024 + 1), "size limit"),
+        (b'{"Id":"one","Id":"two"}', "duplicate key"),
+        (b"not-json", "strict JSON"),
+        (b"[]", "identify one image"),
+        (b"[{},{}]", "identify one image"),
+        (b"1", "identify one image"),
+    ),
+)
+def test_image_inspection_parser_rejects_ambiguous_payloads(
+    raw: bytes, message: str
+) -> None:
+    with pytest.raises(SystemExit, match=message):
+        authenticated_runtime_build._inspect_payload(raw)
+
+
+def _inspect_payload(**updates: object) -> dict[str, object]:
+    digest = "sha256:" + "a" * 64
+    payload: dict[str, object] = {
+        "Id": digest,
+        "Config": {"Labels": {"label": "value"}},
+        "RootFS": {"Layers": [digest]},
+    }
+    payload.update(updates)
+    return payload
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    (
+        (_inspect_payload(Descriptor="bad"), "invalid descriptor"),
+        (
+            _inspect_payload(Descriptor={"digest": "sha256:" + "b" * 64}),
+            "descriptor does not match",
+        ),
+        (
+            _inspect_payload(
+                Descriptor={
+                    "digest": "sha256:" + "a" * 64,
+                    "annotations": "bad",
+                }
+            ),
+            "annotations are invalid",
+        ),
+        (
+            _inspect_payload(
+                Descriptor={
+                    "digest": "sha256:" + "a" * 64,
+                    "annotations": {"config.digest": "bad"},
+                }
+            ),
+            "config digest is invalid",
+        ),
+        (_inspect_payload(Config=None), "missing Config"),
+        (_inspect_payload(Config={"Labels": {"label": 1}}), "missing source labels"),
+        (_inspect_payload(RootFS="bad"), "invalid RootFS"),
+        (_inspect_payload(RootFS={"Layers": ["bad"]}), "missing filesystem layers"),
+    ),
+)
+def test_image_metadata_rejects_malformed_engine_inventory(
+    payload: dict[str, object],
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        authenticated_runtime_build.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0, stdout=json.dumps([payload]).encode(), stderr=b""
+        ),
+    )
+    with pytest.raises(SystemExit, match=message):
+        authenticated_runtime_build._image_metadata("engine", "image")
+
+
+@pytest.mark.parametrize("payload", (b"", b"not-a-digest", b"\xff", b"x" * 129))
+def test_built_image_identity_requires_a_small_ascii_digest(
+    tmp_path: Path, payload: bytes
+) -> None:
+    path = tmp_path / "identity"
+    path.write_bytes(payload)
+    with pytest.raises(SystemExit, match="invalid image identity"):
+        authenticated_runtime_build._built_image_identity(path)
+    with pytest.raises(SystemExit, match="did not record"):
+        authenticated_runtime_build._built_image_identity(tmp_path / "missing")
+
+
+def test_deterministic_build_options_apply_only_to_docker() -> None:
+    assert authenticated_runtime_build._deterministic_build_options("/bin/docker") == (
+        "--provenance=false",
+    )
+    assert authenticated_runtime_build._deterministic_build_options("/bin/podman") == ()
 
 
 @pytest.mark.integration

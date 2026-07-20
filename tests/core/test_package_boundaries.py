@@ -9,6 +9,10 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
+from invarlock.core.builtin_plugin_catalog import builtin_plugin_specs
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 OBSERVABILITY_ROOT = REPO_ROOT / "src/invarlock/observability"
@@ -97,6 +101,11 @@ def test_core_distribution_registers_only_canonical_hf_provider() -> None:
         )
     }
     assert "invarlock-tensorrt-llm-runner" not in scripts
+
+
+def test_builtin_provider_catalog_rejects_unknown_catalog_types() -> None:
+    with pytest.raises(ValueError, match="Unknown plugin catalog type"):
+        builtin_plugin_specs("scorers")
 
 
 def test_core_distribution_declares_its_supported_posix_platforms() -> None:

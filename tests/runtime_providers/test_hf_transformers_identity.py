@@ -225,3 +225,145 @@ def test_distribution_identity_requires_complete_installed_metadata(
     monkeypatch.setattr(identity.importlib.metadata, "distribution", missing)
     with pytest.raises(RuntimeError, match="is not installed"):
         identity._distribution_identity("example")
+
+
+def test_installed_backend_identity_rejects_mismatched_and_incomplete_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transformers = SimpleNamespace(__version__="1.0", __file__=__file__)
+    torch_c = SimpleNamespace(__file__=__file__)
+    torch = SimpleNamespace(
+        __version__="1.0",
+        __file__=__file__,
+        _C=torch_c,
+        __config__=SimpleNamespace(show=lambda: "build"),
+    )
+
+    def import_module(name: str) -> object:
+        return {
+            "transformers": transformers,
+            "torch": torch,
+            "torch._C": torch_c,
+            __name__: SimpleNamespace(__file__=__file__),
+        }[name]
+
+    monkeypatch.setattr(identity.importlib, "import_module", import_module)
+    versions = {"transformers": "2.0", "torch": "1.0"}
+    monkeypatch.setattr(
+        identity,
+        "_distribution_identity",
+        lambda name: {
+            "metadata_sha256": "a" * 64,
+            "name": name,
+            "record_sha256": "b" * 64,
+            "version": versions[name],
+        },
+    )
+
+    class Model:
+        pass
+
+    with pytest.raises(RuntimeError, match="transformers version"):
+        identity._installed_backend_identity(Model())
+
+    versions["transformers"] = "1.0"
+    versions["torch"] = "2.0"
+    with pytest.raises(RuntimeError, match="torch version"):
+        identity._installed_backend_identity(Model())
+
+    versions["torch"] = "1.0"
+    with pytest.raises(RuntimeError, match="implementation identity"):
+        identity._installed_backend_identity(object())
+
+    torch.__config__ = SimpleNamespace(show=None)
+    with pytest.raises(RuntimeError, match="build configuration"):
+        identity._installed_backend_identity(Model())
+
+    torch.__config__ = SimpleNamespace(show=lambda: "")
+    with pytest.raises(RuntimeError, match="build configuration"):
+        identity._installed_backend_identity(Model())
+
+
+def test_observed_device_facts_cover_cpu_accelerator_and_error_contracts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Module:
+        pass
+
+    class Tensor:
+        def __init__(self, kind: str, index: int | None = None) -> None:
+            self.device = SimpleNamespace(type=kind, index=index)
+
+    class Model(Module):
+        def __init__(
+            self,
+            parameters: tuple[Tensor, ...] = (),
+            buffers: tuple[Tensor, ...] = (),
+        ) -> None:
+            self._parameters = parameters
+            self._buffers = buffers
+
+        def parameters(self) -> tuple[Tensor, ...]:
+            return self._parameters
+
+        def buffers(self) -> tuple[Tensor, ...]:
+            return self._buffers
+
+    cuda = SimpleNamespace(
+        is_available=lambda: True,
+        current_device=lambda: 2,
+        get_device_properties=lambda index: SimpleNamespace(
+            name=f"GPU {index}", major=9, minor=0
+        ),
+    )
+    fake_torch = SimpleNamespace(
+        nn=SimpleNamespace(Module=Module),
+        cuda=cuda,
+        _C=SimpleNamespace(_cuda_getDriverVersion=lambda: 12080),
+    )
+    monkeypatch.setattr(identity.importlib, "import_module", lambda _name: fake_torch)
+
+    with pytest.raises(RuntimeError, match="must be a torch module"):
+        identity._observed_device_facts(object(), expected_device_kind="cpu")
+    with pytest.raises(RuntimeError, match="no tensors"):
+        identity._observed_device_facts(Model(), expected_device_kind="cpu")
+    with pytest.raises(RuntimeError, match="one model execution device"):
+        identity._observed_device_facts(
+            Model((Tensor("cpu"), Tensor("cuda", 0))),
+            expected_device_kind="cpu",
+        )
+    with pytest.raises(ValueError, match="does not match"):
+        identity._observed_device_facts(
+            Model((Tensor("cpu"),)), expected_device_kind="cuda"
+        )
+
+    monkeypatch.setattr(identity.platform, "processor", lambda: "test-cpu")
+    cpu = identity._observed_device_facts(
+        Model(buffers=(Tensor("cpu"),)), expected_device_kind="cpu"
+    )
+    assert cpu.device_name == "CPU test-cpu"
+    assert (
+        identity._observed_device_facts(
+            Model((Tensor("mps"),)), expected_device_kind="mps"
+        ).device_name
+        == "Apple Metal Performance Shaders"
+    )
+    assert (
+        identity._observed_device_facts(
+            Model((Tensor("xpu"),)), expected_device_kind="xpu"
+        ).device_name
+        == "xpu"
+    )
+
+    observed_cuda = identity._observed_device_facts(
+        Model((Tensor("cuda"),)), expected_device_kind="cuda"
+    )
+    assert observed_cuda.device_name == "GPU 2"
+    assert observed_cuda.compute_capability == "9.0"
+    assert observed_cuda.driver_version == "12080"
+
+    cuda.is_available = lambda: False
+    with pytest.raises(RuntimeError, match="CUDA model device is unavailable"):
+        identity._observed_device_facts(
+            Model((Tensor("cuda", 0),)), expected_device_kind="cuda"
+        )

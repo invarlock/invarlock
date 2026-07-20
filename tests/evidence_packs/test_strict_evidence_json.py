@@ -228,3 +228,66 @@ def test_snapshot_copy_removes_partial_destination_when_source_changes(
         copy_regular_file_snapshot(source, destination, label="observation")
 
     assert not destination.exists()
+
+
+def test_regular_reader_rejects_open_and_initial_identity_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "input.json"
+    source.write_bytes(b"{}")
+    real_open = strict_json.os.open
+    monkeypatch.setattr(
+        strict_json.os,
+        "open",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+    with pytest.raises(StrictJsonError, match="could not be opened safely"):
+        read_regular_file_bytes(source, label="input")
+
+    monkeypatch.setattr(strict_json.os, "open", real_open)
+    real_fstat = strict_json.os.fstat
+
+    def changed_fstat(descriptor: int) -> os.stat_result:
+        file_stat = real_fstat(descriptor)
+        values = list(file_stat)
+        values[1] = file_stat.st_ino + 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(strict_json.os, "fstat", changed_fstat)
+    with pytest.raises(StrictJsonError, match="changed while being opened"):
+        read_regular_file_bytes(source, label="input")
+
+
+def test_snapshot_copy_rejects_invalid_limit_open_failure_and_mode_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"bytes")
+    destination = tmp_path / "destination.bin"
+    for invalid_limit in (-1, True, 1.5):
+        with pytest.raises(StrictJsonError, match="non-negative integer"):
+            copy_regular_file_snapshot(
+                source,
+                destination,
+                label="artifact",
+                max_bytes=invalid_limit,  # type: ignore[arg-type]
+            )
+
+    real_open = strict_json.os.open
+    monkeypatch.setattr(
+        strict_json.os,
+        "open",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+    with pytest.raises(StrictJsonError, match="could not be opened safely"):
+        copy_regular_file_snapshot(source, destination, label="artifact")
+
+    monkeypatch.setattr(strict_json.os, "open", real_open)
+    monkeypatch.setattr(
+        Path,
+        "chmod",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+    with pytest.raises(StrictJsonError, match="mode could not be preserved"):
+        copy_regular_file_snapshot(source, destination, label="artifact", mode=0o440)
+    assert not destination.exists()

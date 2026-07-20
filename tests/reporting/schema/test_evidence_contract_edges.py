@@ -11,6 +11,7 @@ from invarlock.evidence_pack_contract import (
     COMPARISON_REPORT_FORMAT,
     EVIDENCE_INPUT_IDENTITY_FORMAT,
     PAIRED_RECORDS_FORMAT,
+    EvidenceObservation,
     EvidencePackError,
     InputIdentity,
     build_comparison_report,
@@ -552,3 +553,174 @@ def test_record_scoring_requires_metric_specific_authenticated_facts() -> None:
             metric="normalized_nll_per_utf8_byte",
             side="baseline",
         )
+
+
+def _unchecked_observation(**values: object) -> EvidenceObservation:
+    observation = object.__new__(EvidenceObservation)
+    for key, value in values.items():
+        object.__setattr__(observation, key, value)
+    return observation
+
+
+@pytest.mark.parametrize(
+    ("values", "message"),
+    [
+        (
+            {
+                "observation_id": "bad id",
+                "kind": "diagnostic",
+                "scope": "comparison",
+                "payload": b"{}\n",
+            },
+            "observation_id is invalid",
+        ),
+        (
+            {
+                "observation_id": "valid",
+                "kind": "bad kind",
+                "scope": "comparison",
+                "payload": b"{}\n",
+            },
+            "kind is invalid",
+        ),
+        (
+            {
+                "observation_id": "valid",
+                "kind": "diagnostic",
+                "scope": "invalid",
+                "payload": b"{}\n",
+            },
+            "scope is invalid",
+        ),
+        (
+            {
+                "observation_id": "valid",
+                "kind": "diagnostic",
+                "scope": "comparison",
+                "payload": b"[",
+            },
+            "not valid JSON",
+        ),
+        (
+            {
+                "observation_id": "valid",
+                "kind": "diagnostic",
+                "scope": "comparison",
+                "payload": b"[]\n",
+            },
+            "JSON object",
+        ),
+        (
+            {
+                "observation_id": "valid",
+                "kind": "diagnostic",
+                "scope": "comparison",
+                "payload": b'{"value": 1}\n',
+            },
+            "canonical JSON",
+        ),
+    ],
+)
+def test_observation_envelope_revalidates_untrusted_instances(
+    values: dict[str, object], message: str
+) -> None:
+    observation = _unchecked_observation(**values)
+    with pytest.raises(EvidencePackError, match=message):
+        contract.evidence_observation_bytes(
+            observation,
+            comparison_id="comparison-1",
+            schedule_digest=_digest(),
+            policy_digest=_digest("b"),
+            artifact_digests={"baseline": _digest("c"), "subject": _digest("d")},
+        )
+
+
+def test_observation_envelope_requires_both_artifact_bindings() -> None:
+    observation = EvidenceObservation(
+        observation_id="valid",
+        kind="diagnostic",
+        scope="comparison",
+        payload=b"{}\n",
+    )
+    with pytest.raises(EvidencePackError, match="baseline and subject"):
+        contract.evidence_observation_bytes(
+            observation,
+            comparison_id="comparison-1",
+            schedule_digest=_digest(),
+            policy_digest=_digest("b"),
+            artifact_digests={"baseline": _digest("c")},
+        )
+
+
+def test_observation_binding_errors_cover_manifest_and_envelope_drift() -> None:
+    observation = EvidenceObservation(
+        observation_id="valid",
+        kind="diagnostic",
+        scope="comparison",
+        payload=b"{}\n",
+    )
+    encoded = contract.evidence_observation_bytes(
+        observation,
+        comparison_id="comparison-1",
+        schedule_digest=_digest(),
+        policy_digest=_digest("b"),
+        artifact_digests={"baseline": _digest("c"), "subject": _digest("d")},
+    )
+    payload = contract.parse_json_object(encoded, label="observation")
+    reference = {
+        "path": "wrong",
+        "digest": _digest("e"),
+        "kind": "other",
+        "scope": "subject",
+    }
+    payload.update(
+        observation_id="other",
+        kind="diagnostic",
+        scope="comparison",
+        authority="acceptance",
+        bindings={},
+    )
+    errors = contract.evidence_observation_errors(
+        payload,
+        observation_id="valid",
+        reference=reference,
+        comparison_id="comparison-1",
+        schedule_digest=_digest(),
+        policy_digest=_digest("b"),
+        artifact_digests={"baseline": _digest("c"), "subject": _digest("d")},
+    )
+    for fragment in (
+        "manifest reference",
+        "identifier binding",
+        "kind binding",
+        "scope binding",
+        "does not bind",
+        "authority is invalid",
+    ):
+        assert any(fragment in error for error in errors), (fragment, errors)
+
+
+def test_runtime_side_config_rejects_parse_shape_binding_and_encoding() -> None:
+    arguments = {
+        "role": "baseline",
+        "provider_name": "fixture",
+        "artifact_identity_sha256": "a" * 64,
+        "schedule_sha256": "b" * 64,
+        "policy_digest": _digest("c"),
+    }
+    assert "valid JSON" in contract.runtime_side_config_errors(b"{", **arguments)[0]
+    assert "JSON object" in contract.runtime_side_config_errors(b"[]", **arguments)[0]
+    assert "does not bind" in contract.runtime_side_config_errors(b"{}", **arguments)[0]
+    expected = {
+        "format": contract.RUNTIME_SIDE_CONFIG_FORMAT,
+        "role": "baseline",
+        "provider": "fixture",
+        "artifact_identity_sha256": "a" * 64,
+        "schedule_sha256": "b" * 64,
+        "policy_digest": _digest("c"),
+    }
+    noncanonical = contract.canonical_json_bytes(expected).replace(b'":', b'": ')
+    assert (
+        "canonical JSON"
+        in contract.runtime_side_config_errors(noncanonical, **arguments)[0]
+    )

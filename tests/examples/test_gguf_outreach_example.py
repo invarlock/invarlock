@@ -543,3 +543,69 @@ def test_default_workspace_is_canonical_before_source_build(
     monkeypatch.setattr(example, "_build_runtime_image", stop)
     assert example.main([]) == 2
     assert observed == [real.resolve() / "build"]
+
+
+def test_main_reuses_an_immutable_image_and_completes_transaction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    digest = "sha256:" + "a" * 64
+    observed: list[str] = []
+    monkeypatch.setattr(
+        example,
+        "_inspect_image_id",
+        lambda *_args, **_kwargs: observed.append("image") or digest,
+    )
+
+    def stage_models(
+        _repository: Path,
+        model_root: Path,
+        **_kwargs: object,
+    ) -> dict[str, Path]:
+        model_root.mkdir(parents=True)
+        paths = {role: model_root / f"{role}.gguf" for role in ("baseline", "subject")}
+        for role, path in paths.items():
+            path.write_bytes(role.encode())
+        observed.append("models")
+        return paths
+
+    monkeypatch.setattr(example, "_stage_models", stage_models)
+    monkeypatch.setattr(
+        example,
+        "_stage_backend",
+        lambda *_args, **_kwargs: observed.append("backend"),
+    )
+    monkeypatch.setattr(
+        example,
+        "_inspect_spec",
+        lambda _repository, model, **_kwargs: {
+            "model_id": model.stem,
+            "settings": {},
+        },
+    )
+    paths = object()
+    monkeypatch.setattr(
+        example,
+        "_prepare_transaction",
+        lambda *_args, **_kwargs: observed.append("prepare") or paths,
+    )
+    monkeypatch.setattr(
+        example,
+        "_execute",
+        lambda *_args, **_kwargs: observed.append("execute"),
+    )
+
+    assert example.main(["--workspace", str(workspace), "--runtime-image", digest]) == 0
+    assert observed == ["image", "models", "backend", "prepare", "execute"]
+
+
+def test_main_reports_runtime_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        example,
+        "_build_runtime_image",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("build failed")),
+    )
+    assert example.main(["--workspace", str(tmp_path / "workspace")]) == 2
+    assert "build failed" in capsys.readouterr().err

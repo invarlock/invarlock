@@ -183,6 +183,58 @@ def test_tensorrt_llm_config_identity_capabilities_and_private_bindings(
 
 
 @pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("provider", "provider_name"),
+        ("unknown", "unsupported tensorrt_llm setting"),
+        ("missing", "missing tensorrt_llm setting"),
+        ("digest", "lowercase sha256 digest"),
+        ("boolean_integer", "positive integer"),
+        ("negative_seed", "non-negative integer"),
+        ("spacing", "canonical single spacing"),
+        ("compute", "major.minor notation"),
+        ("model_id", "privacy-safe full engine digest name"),
+    ],
+)
+def test_tensorrt_llm_config_rejects_noncanonical_settings(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    spec, _bindings, _context = _runtime_inputs(tmp_path)
+    settings = dict(spec.settings)
+    provider_name = spec.provider_name
+    model_id = spec.model_id
+    if mutation == "provider":
+        provider_name = "other"
+    elif mutation == "unknown":
+        settings["unknown"] = "value"
+    elif mutation == "missing":
+        settings.pop("backend_version")
+    elif mutation == "digest":
+        settings["backend_build_sha256"] = "BAD"
+    elif mutation == "boolean_integer":
+        settings["batch_size"] = True
+    elif mutation == "negative_seed":
+        settings["seed"] = -1
+    elif mutation == "spacing":
+        settings["backend_version"] = "TensorRT  LLM"
+    elif mutation == "compute":
+        settings["target_compute_capability"] = "sm90"
+    else:
+        model_id = "local-engine"
+
+    invalid = replace(
+        spec,
+        provider_name=provider_name,
+        model_id=model_id,
+        settings=settings,
+    )
+    with pytest.raises(ValueError, match=message):
+        TensorRTLLMProvider().validate_config(invalid)
+
+
+@pytest.mark.parametrize(
     ("replacement", "message"),
     [
         ({"strict": False}, "strict mode"),
@@ -192,6 +244,7 @@ def test_tensorrt_llm_config_identity_capabilities_and_private_bindings(
         ({"artifact_identity_sha256": "0" * 64}, "does not match"),
         ({"device_kind": "cpu"}, "CUDA device"),
         ({"provider_state": None}, "runtime bindings"),
+        ({"scorer": lambda *_args: None}, "in-process scorer"),
     ],
 )
 def test_tensorrt_llm_open_rejects_missing_security_bindings(

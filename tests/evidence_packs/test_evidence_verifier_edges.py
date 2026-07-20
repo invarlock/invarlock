@@ -353,3 +353,123 @@ def test_runtime_side_parser_rejects_nonobject_manifest() -> None:
     )
 
     assert errors == ["baseline runtime manifest must be a JSON object"]
+
+
+def test_manifest_observation_references_fail_closed() -> None:
+    manifest = _manifest()
+    invalid_sets = [
+        ([], "between 1 and 64"),
+        ({}, "between 1 and 64"),
+        ({"bad id": {}}, "identifier is invalid"),
+        ({"valid": []}, "fields are invalid"),
+        (
+            {
+                "valid": {
+                    "path": "wrong",
+                    "digest": "bad",
+                    "kind": "diagnostic",
+                    "scope": "comparison",
+                }
+            },
+            "path is invalid",
+        ),
+    ]
+    for observations, message in invalid_sets:
+        candidate = copy.deepcopy(manifest)
+        candidate["observations"] = observations
+        assert message in " ".join(verification._validate_manifest(candidate))
+
+
+def test_observation_loader_rejects_invalid_request_and_manifest_entries(
+    tmp_path: Path,
+) -> None:
+    arguments = {
+        "pack_dir": tmp_path,
+        "comparison_id": "comparison-1",
+        "schedule_digest": "sha256:" + "a" * 64,
+        "policy_digest": "sha256:" + "b" * 64,
+        "artifact_digests": {
+            "baseline": "sha256:" + "c" * 64,
+            "subject": "sha256:" + "d" * 64,
+        },
+    }
+    assert verification._verify_observations(
+        references=None, requested={}, **arguments
+    )[1] == ["normalized request observations are invalid"]
+    assert verification._verify_observations(
+        references=None, requested=[{}], **arguments
+    )[1] == ["normalized request observation entry is invalid"]
+    assert verification._verify_observations(
+        references=None,
+        requested=[{"id": "one"}, {"id": "one"}],
+        **arguments,
+    )[1] == ["normalized request observation entry is invalid"]
+    assert verification._verify_observations(
+        references=None, requested=[{"id": "one"}], **arguments
+    )[1] == ["normalized request observations are missing from manifest"]
+    assert verification._verify_observations(references=[], requested=[], **arguments)[
+        1
+    ] == ["manifest observations are invalid"]
+    assert verification._verify_observations(
+        references={"other": {}}, requested=[{"id": "one"}], **arguments
+    )[1] == ["manifest observations do not match normalized request"]
+
+    _verified, errors = verification._verify_observations(
+        references={"one": []}, requested=[{"id": "one"}], **arguments
+    )
+    assert errors == ["manifest observation entry is invalid"]
+    _verified, errors = verification._verify_observations(
+        references={"one": {}}, requested=[{"id": "one"}], **arguments
+    )
+    assert errors == ["observation 'one' path is invalid"]
+    _verified, errors = verification._verify_observations(
+        references={"one": {"path": "../outside"}},
+        requested=[{"id": "one"}],
+        **arguments,
+    )
+    assert "path is unsafe" in errors[0]
+
+
+def test_snapshot_failure_and_stability_results_preserve_anchors(
+    tmp_path: Path,
+) -> None:
+    artifacts = {
+        "baseline": "sha256:" + "a" * 64,
+        "subject": "sha256:" + "b" * 64,
+    }
+    runtimes = {
+        "baseline": "sha256:" + "c" * 64,
+        "subject": "sha256:" + "d" * 64,
+    }
+    failure = verification._snapshot_failure_result(
+        tmp_path / "pack",
+        errors=["capture failed"],
+        policy_path=None,
+        expected_artifact_digests=artifacts,
+        expected_schedule_digest="sha256:" + "e" * 64,
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint="sha256:" + "f" * 64,
+        manifest_digest="sha256:" + "0" * 64,
+    )
+    assert failure.status is EvidencePackStatus.INTEGRITY
+    assert failure.manifest_digest == "sha256:" + "0" * 64
+    assert failure.payload["anchors"]["artifact_digests"] == artifacts  # type: ignore[index]
+
+    augmented = verification._with_snapshot_errors(
+        verification._result(
+            tmp_path / "materialized",
+            errors=[],
+            signer_fingerprint=None,
+            comparison_id="comparison",
+            request_digest=None,
+            anchors={},
+            status=EvidencePackStatus.OK,
+        ),
+        pack_dir=tmp_path / "source-pack",
+        errors=["changed", "changed"],
+        manifest_digest="sha256:" + "1" * 64,
+    )
+    assert augmented.status is EvidencePackStatus.INTEGRITY
+    assert augmented.payload["pack"] == "source-pack"
+    assert augmented.payload["errors"] == ["changed"]
+    assert augmented.payload["integrity_ok"] is False

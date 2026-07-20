@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
 import tarfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from scripts import qualification_source
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "qualification_source.py"
@@ -207,3 +211,110 @@ def test_verify_rejects_unbound_source_identity(
 
     assert completed.returncode != 0
     assert message in completed.stderr
+
+
+def _tar_payload(
+    *, comment: str | None, member: tarfile.TarInfo | None = None
+) -> bytes:
+    output = io.BytesIO()
+    with tarfile.open(
+        fileobj=output, mode="w", pax_headers={"comment": comment} if comment else None
+    ) as archive:
+        if member is not None:
+            archive.addfile(member, io.BytesIO(b"x") if member.isfile() else None)
+    return output.getvalue()
+
+
+def test_source_helpers_fail_closed_on_missing_tools_and_unsafe_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[object] = []
+
+    def which(name: str, path: str | None = None) -> str | None:
+        calls.append(path)
+        return None if path is not None else "/usr/bin/git"
+
+    monkeypatch.setattr(qualification_source.shutil, "which", which)
+    assert qualification_source._git().endswith("/git")
+    assert calls == [qualification_source.os.defpath, None]
+    monkeypatch.setattr(
+        qualification_source.shutil, "which", lambda *_args, **_kwargs: None
+    )
+    with pytest.raises(SystemExit, match="git is required"):
+        qualification_source._git()
+
+    with pytest.raises(SystemExit, match="unavailable"):
+        qualification_source._regular_file_bytes(tmp_path / "missing.tar")
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    with pytest.raises(SystemExit, match="regular file"):
+        qualification_source._regular_file_bytes(directory)
+    oversized = tmp_path / "oversized.tar"
+    oversized.write_bytes(b"x")
+    monkeypatch.setattr(qualification_source, "_MAX_BUNDLE_BYTES", 0)
+    with pytest.raises(SystemExit, match="size limit"):
+        qualification_source._regular_file_bytes(oversized)
+
+
+def test_archive_validation_rejects_unbound_invalid_and_unsafe_payloads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commit = "a" * 40
+    with pytest.raises(SystemExit, match="exact Git tar archive"):
+        qualification_source._validate_archive(b"not a tar", commit=commit)
+    with pytest.raises(SystemExit, match="does not bind"):
+        qualification_source._validate_archive(
+            _tar_payload(comment=None), commit=commit
+        )
+
+    monkeypatch.setattr(qualification_source, "_MAX_ARCHIVE_MEMBERS", 0)
+    member = tarfile.TarInfo("file.txt")
+    member.size = 1
+    with pytest.raises(SystemExit, match="too many entries"):
+        qualification_source._validate_archive(
+            _tar_payload(comment=commit, member=member), commit=commit
+        )
+    monkeypatch.setattr(qualification_source, "_MAX_ARCHIVE_MEMBERS", 10)
+    unsafe = tarfile.TarInfo("link")
+    unsafe.type = tarfile.SYMTYPE
+    unsafe.linkname = "target"
+    with pytest.raises(SystemExit, match="unsafe entry"):
+        qualification_source._validate_archive(
+            _tar_payload(comment=commit, member=unsafe), commit=commit
+        )
+
+
+def test_authenticate_and_create_reject_identity_and_archive_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    commit = "a" * 40
+    bundle = tmp_path / "bundle.tar"
+    bundle.write_bytes(b"bundle")
+    monkeypatch.setattr(
+        qualification_source, "_commit_identity", lambda *_args: "b" * 40
+    )
+    with pytest.raises(SystemExit, match="selected Git object"):
+        qualification_source.authenticate_bundle(
+            repository=repository,
+            commit=commit,
+            bundle=bundle,
+            bundle_sha256="sha256:" + "c" * 64,
+        )
+
+    monkeypatch.setattr(qualification_source, "_commit_identity", lambda *_args: commit)
+    monkeypatch.setattr(
+        qualification_source.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1),
+    )
+    with pytest.raises(SystemExit, match="archive creation failed"):
+        qualification_source._create(repository, commit, tmp_path / "created.tar")
+
+    existing_parent = tmp_path / "parent-file"
+    existing_parent.write_text("not a directory", encoding="utf-8")
+    with pytest.raises((SystemExit, NotADirectoryError), match="parent"):
+        qualification_source._create(
+            repository, commit, existing_parent / "created.tar"
+        )

@@ -99,6 +99,8 @@ def _tensor_to_array_candidate(values: object) -> object:
 def _numeric_array(values: object, *, label: str) -> npt.NDArray[np.float64]:
     try:
         source = np.asarray(_tensor_to_array_candidate(values))
+    except DiagnosticInputError:
+        raise
     except (TypeError, ValueError) as exc:
         raise DiagnosticInputError(
             f"{label} must be a numeric array or tensor"

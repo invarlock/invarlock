@@ -472,6 +472,83 @@ def test_llama_cpp_rejects_unobservable_cpu_identity(
         _OBSERVE_LINUX_CPU()
 
 
+def test_llama_cpp_rejects_non_linux_cpu_observation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(llama_cpp.platform, "system", lambda: "Darwin")
+    with pytest.raises(ValueError, match="requires Linux"):
+        _OBSERVE_LINUX_CPU()
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (b"", "is empty"),
+        (b"\xff", "not UTF-8"),
+    ],
+)
+def test_llama_cpp_rejects_invalid_cpuinfo_payloads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: bytes,
+    message: str,
+) -> None:
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_bytes(payload)
+    monkeypatch.setattr(llama_cpp.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(llama_cpp, "_CPU_INFO_PATH", cpuinfo)
+
+    with pytest.raises(ValueError, match=message):
+        _OBSERVE_LINUX_CPU()
+
+
+def test_llama_cpp_rejects_invalid_machine_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("processor: 0\n", encoding="utf-8")
+    monkeypatch.setattr(llama_cpp.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(llama_cpp, "_CPU_INFO_PATH", cpuinfo)
+    monkeypatch.setattr(
+        llama_cpp.os,
+        "uname",
+        lambda: type("U", (), {"machine": ""})(),
+    )
+
+    with pytest.raises(ValueError, match="machine identity is invalid"):
+        _OBSERVE_LINUX_CPU()
+
+
+@pytest.mark.parametrize(
+    ("ipv4", "ipv6", "message"),
+    [
+        ("", "", "IPv4 route table"),
+        ("Iface Destination\neth0 short\n", "", "IPv4 route table"),
+        (
+            "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n",
+            "short ipv6 row\n",
+            "IPv6 route table",
+        ),
+    ],
+)
+def test_llama_cpp_rejects_malformed_route_tables(
+    tmp_path: Path,
+    ipv4: str,
+    ipv6: str,
+    message: str,
+) -> None:
+    ipv4_path = tmp_path / "route"
+    ipv6_path = tmp_path / "ipv6_route"
+    ipv4_path.write_text(ipv4, encoding="ascii")
+    ipv6_path.write_text(ipv6, encoding="ascii")
+
+    with pytest.raises(ValueError, match=message):
+        _REQUIRE_ISOLATED_NETWORK_NAMESPACE(
+            ipv4_route_path=ipv4_path,
+            ipv6_route_path=ipv6_path,
+        )
+
+
 def test_llama_cpp_config_identity_capabilities_and_private_bindings(
     tmp_path: Path,
 ) -> None:

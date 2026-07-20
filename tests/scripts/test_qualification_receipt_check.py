@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
@@ -875,3 +875,128 @@ def test_qualification_receipt_check_rejects_missing_manifest_identity(
 
     with pytest.raises(ValueError, match="manifest identity is missing"):
         validate(receipt=receipt, evidence=evidence, trust_profile=profile)
+
+
+@pytest.mark.parametrize(
+    ("metric", "scorer", "message"),
+    (
+        (None, None, "exactly one"),
+        ("exact_match", _scorer_binding(), "exactly one"),
+        ("accuracy", None, "built-in acceptance metric"),
+        (None, {"format_version": "bad"}, "scorer acceptance binding"),
+    ),
+)
+def test_acceptance_compatibility_rejects_ambiguous_or_invalid_selection(
+    metric: object, scorer: object, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        qualification_receipt_check._acceptance_compatibility(
+            metric=metric, scorer_extension=scorer
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    (
+        ([], "JSON object"),
+        ({}, "comparison is missing"),
+        (
+            {"comparison": {"task": "text_causal", "metric": "exact_match"}},
+            "baseline provider",
+        ),
+        (
+            {
+                "comparison": {
+                    "baseline": {"runtime": {"provider": "hf_transformers"}},
+                    "subject": {"runtime": {"provider": "hf_transformers"}},
+                    "metric": "exact_match",
+                }
+            },
+            "task identity",
+        ),
+    ),
+)
+def test_request_compatibility_rejects_missing_authenticated_identity(
+    payload: object, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        qualification_receipt_check._request_compatibility(payload, label="canary")
+
+
+def test_runtime_device_class_accepts_device_indices_and_rejects_other_devices() -> (
+    None
+):
+    assert qualification_receipt_check._runtime_device_class("cpu") == "cpu"
+    assert qualification_receipt_check._runtime_device_class("cuda:7") == "cuda"
+    with pytest.raises(ValueError, match="must be cpu"):
+        qualification_receipt_check._runtime_device_class("mps")
+
+
+def test_authenticated_canary_rejects_missing_pack_and_manifest_substitution(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="snapshot failed"):
+        qualification_receipt_check._authenticated_canary_compatibility(
+            tmp_path / "missing", expected_manifest_digest=_digest("a")
+        )
+
+    case = tmp_path / "case"
+    case.mkdir()
+    _receipt, evidence, _profile, _manifest = _case(case)
+    with pytest.raises(ValueError, match="manifest changed"):
+        qualification_receipt_check._authenticated_canary_compatibility(
+            evidence, expected_manifest_digest=_digest("a")
+        )
+
+
+@pytest.mark.parametrize("kind", ("private-rsa", "public-rsa"))
+def test_receipt_check_requires_ed25519_verifier_material(
+    tmp_path: Path, kind: str
+) -> None:
+    receipt, evidence, profile, _manifest = _case(tmp_path)
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    if kind == "private-rsa":
+        profile.parent.joinpath("verifier.pem").write_bytes(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+        with pytest.raises(ValueError, match="signing key must be Ed25519"):
+            validate(receipt=receipt, evidence=evidence, trust_profile=profile)
+    else:
+        public = tmp_path / "verifier.pub.pem"
+        public.write_bytes(
+            key.public_key().public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        )
+        with pytest.raises(ValueError, match="public key must be Ed25519"):
+            validate(
+                receipt=receipt,
+                evidence=evidence,
+                trust_profile=profile,
+                verifier_public_key=public,
+            )
+
+
+def test_receipt_check_requires_complete_compatibility_inputs_and_digest(
+    tmp_path: Path,
+) -> None:
+    receipt, evidence, profile, _manifest = _case(tmp_path)
+    with pytest.raises(ValueError, match="must be supplied together"):
+        validate(
+            receipt=receipt,
+            evidence=evidence,
+            trust_profile=profile,
+            expected_request=tmp_path / "request.json",
+        )
+    with pytest.raises(ValueError, match="lowercase sha256"):
+        validate(
+            receipt=receipt,
+            evidence=evidence,
+            trust_profile=profile,
+            expected_runtime_image_digest="latest",
+        )
