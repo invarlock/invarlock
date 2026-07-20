@@ -506,3 +506,125 @@ def test_run_side_closes_prepared_context_when_provider_open_fails(
             output_directory=tmp_path / "evidence",
         )
     assert closed == [True]
+
+
+@pytest.mark.parametrize("failure_phase", ["score", "receipt"])
+def test_run_side_preserves_primary_failure_when_session_cleanup_also_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_phase: str,
+) -> None:
+    _execution_prerequisites(monkeypatch)
+    primary = RuntimeError(f"primary {failure_phase} failure")
+
+    class FailingSession(_Session):
+        def score(self, _batch: object) -> object:
+            if failure_phase == "score":
+                raise primary
+            return self.observation
+
+        def runtime_receipt(self) -> object:
+            if failure_phase == "receipt":
+                raise primary
+            return self.receipt
+
+        def close(self) -> None:
+            self.closed = True
+            raise OSError("private cleanup detail /must/not/escape")
+
+    session = FailingSession(object(), object())
+    provider = _Provider(session=session)
+
+    with pytest.raises(
+        RuntimeError, match=f"primary {failure_phase} failure"
+    ) as caught:
+        transaction.run_evidence_side(
+            role="baseline",
+            provider=cast(RuntimeProvider, provider),
+            spec=ModelRuntimeSpec("fixture", "model", {"batch_size": 1}),
+            context=_context(),
+            schedule_path=tmp_path / "schedule.json",
+            policy_digest="sha256:" + "1" * 64,
+            output_directory=tmp_path / "evidence",
+        )
+
+    assert session.closed is True
+    assert caught.value is primary
+    assert caught.value.__notes__ == [
+        transaction._RUNTIME_CLEANUP_FAILURE_NOTE  # noqa: SLF001
+    ]
+    assert "/must/not/escape" not in "\n".join(caught.value.__notes__)
+
+
+def test_run_side_preserves_open_failure_when_context_cleanup_also_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _execution_prerequisites(monkeypatch)
+    primary = RuntimeError("primary open failure")
+    cleanup_calls: list[bool] = []
+
+    class FailingProvider(_Provider):
+        def open(
+            self, _spec: ModelRuntimeSpec, _context: RuntimeExecutionContext
+        ) -> object:
+            raise primary
+
+    def fail_cleanup() -> None:
+        cleanup_calls.append(True)
+        raise OSError("private context cleanup /must/not/escape")
+
+    context = RuntimeExecutionContext(
+        strict=True,
+        allow_network=False,
+        container_image_digest=_DIGEST,
+        device_kind="cpu",
+        artifact_identity_sha256="b" * 64,
+        close_callback=fail_cleanup,
+    )
+
+    with pytest.raises(RuntimeError, match="primary open failure") as caught:
+        transaction.run_evidence_side(
+            role="baseline",
+            provider=cast(RuntimeProvider, FailingProvider()),
+            spec=ModelRuntimeSpec("fixture", "model", {"batch_size": 1}),
+            context=context,
+            schedule_path=tmp_path / "schedule.json",
+            policy_digest="sha256:" + "1" * 64,
+            output_directory=tmp_path / "evidence",
+        )
+
+    assert caught.value is primary
+    assert cleanup_calls == [True]
+    assert caught.value.__notes__ == [
+        transaction._RUNTIME_CLEANUP_FAILURE_NOTE  # noqa: SLF001
+    ]
+
+
+def test_run_side_raises_cleanup_failure_when_execution_succeeded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _execution_prerequisites(monkeypatch)
+    cleanup = OSError("cleanup-only failure")
+
+    class CleanupFailingSession(_Session):
+        def close(self) -> None:
+            self.closed = True
+            raise cleanup
+
+    session = CleanupFailingSession(object(), object())
+
+    with pytest.raises(OSError, match="cleanup-only failure") as caught:
+        transaction.run_evidence_side(
+            role="baseline",
+            provider=cast(RuntimeProvider, _Provider(session=session)),
+            spec=ModelRuntimeSpec("fixture", "model", {"batch_size": 1}),
+            context=_context(),
+            schedule_path=tmp_path / "schedule.json",
+            policy_digest="sha256:" + "1" * 64,
+            output_directory=tmp_path / "evidence",
+        )
+
+    assert caught.value is cleanup
+    assert session.closed is True

@@ -44,6 +44,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-enforce coverage-enforce-parallel
 .PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-peft-lora
+.PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
@@ -203,10 +204,21 @@ coverage-release:  ## Enforce branch coverage for maintained release helpers
 coverage-examples:  ## Enforce branch coverage for maintained example launchers
 	PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/examples \
-		--cov=examples.integrations.launch --cov=examples.integrations.run --cov-branch \
+		--cov=examples.integrations.launch \
+		--cov=examples.integrations.run \
+		--cov=examples.integrations.gguf_llama_cpp \
+		--cov=examples.integrations.qwen3_profile \
+		--cov=examples/integrations/lm-evaluation-harness \
+		--cov=examples/integrations/tensorrt-llm \
+		--cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/examples-cov.xml \
 		--cov-fail-under=80
+	@find examples/integrations -type f -name '*.py' \
+		! -name '__init__.py' | sort | \
+		while IFS= read -r source; do \
+			$(PYTHON) -m coverage report --include="$$source" --fail-under=80 || exit $$?; \
+		done
 
 coverage-enforce: PYTEST_WORKERS = auto
 coverage-enforce: coverage-linux-check  ## Enforce branch coverage in parallel by default
@@ -242,6 +254,32 @@ example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
 	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
 		examples/integrations/launch.py peft-lora $(EXAMPLE_ARGS)
+
+example-torchao-int8:  ## Quantize with TorchAO, then evaluate, verify, and report
+	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-torchao python \
+		examples/integrations/launch.py torchao-int8 $(EXAMPLE_ARGS)
+
+example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
+	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
+		--with ./addins/gguf python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
+
+example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/lm-evaluation-harness/launch.py $(EXAMPLE_ARGS)
+
+example-tensorrt-llm:  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
+	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --extra hf \
+		--with . --with ./addins/tensorrt_llm python \
+		examples/integrations/tensorrt-llm/showcase.py $(EXAMPLE_ARGS)
+
+example-tensorrt-llm-prepared:  ## Compare caller-prepared TensorRT-LLM engines
+	@test -n "$(EXAMPLE_ARGS)" || { \
+		echo 'set EXAMPLE_ARGS to the immutable image, prepared inputs, and locators' >&2; \
+		exit 2; \
+	}
+	PYTHONPATH=src:addins/tensorrt_llm/src uv run --isolated --locked --with . \
+		--with ./addins/tensorrt_llm python \
+		examples/integrations/tensorrt-llm/run.py $(EXAMPLE_ARGS)
 
 ##@ Static analysis
 lint: verify-ruff typecheck  ## Run Ruff and mypy

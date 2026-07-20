@@ -445,7 +445,7 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
         "make example-hf-transformers",
         "make example-peft-lora",
         "make example-evidence-handoff",
-        "independently supplied trust inputs",
+        "separately generated trust inputs",
         "human-readable report",
     ):
         assert fragment in example

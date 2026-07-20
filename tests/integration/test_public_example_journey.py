@@ -69,6 +69,27 @@ _EXPECTED_REQUEST_INPUTS = {
     },
 }
 
+_MAINTAINED_INTEGRATION_PATHS = {
+    "examples/integrations/gguf-llama-cpp/README.md",
+    "examples/integrations/gguf-llama-cpp/records.json",
+    "examples/integrations/gguf_llama_cpp.py",
+    "examples/integrations/hf-transformers/README.md",
+    "examples/integrations/launch.py",
+    "examples/integrations/lm-evaluation-harness/Dockerfile",
+    "examples/integrations/lm-evaluation-harness/README.md",
+    "examples/integrations/lm-evaluation-harness/example.py",
+    "examples/integrations/lm-evaluation-harness/launch.py",
+    "examples/integrations/peft-lora/README.md",
+    "examples/integrations/run.py",
+    "examples/integrations/tensorrt-llm/README.md",
+    "examples/integrations/tensorrt-llm/engine_inspect.py",
+    "examples/integrations/tensorrt-llm/prepare.py",
+    "examples/integrations/tensorrt-llm/records.json",
+    "examples/integrations/tensorrt-llm/run.py",
+    "examples/integrations/tensorrt-llm/showcase.py",
+    "examples/integrations/torchao-int8/README.md",
+}
+
 
 def _git(
     *arguments: str, repository: Path = REPO_ROOT
@@ -174,6 +195,28 @@ def test_hf_integration_prepares_from_committed_export(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stderr or completed.stdout
     assert (workspace / "evaluation/request.yaml").is_file()
     assert (workspace / "verifier/trusted-inputs.json").is_file()
+
+
+def test_maintained_integration_commands_are_complete_in_committed_head() -> None:
+    tracked = _git("ls-tree", "-r", "--name-only", "HEAD", "--", "examples")
+    assert tracked.returncode == 0, tracked.stderr.decode("utf-8", errors="replace")
+    tracked_paths = set(tracked.stdout.decode("utf-8").splitlines())
+    assert _MAINTAINED_INTEGRATION_PATHS <= tracked_paths
+    for path in _MAINTAINED_INTEGRATION_PATHS:
+        assert (REPO_ROOT / path).is_file()
+
+    makefile = _git("show", "HEAD:Makefile")
+    assert makefile.returncode == 0, makefile.stderr.decode("utf-8", errors="replace")
+    text = makefile.stdout.decode("utf-8")
+    for target in (
+        "example-hf-transformers",
+        "example-peft-lora",
+        "example-torchao-int8",
+        "example-gguf-llama-cpp",
+        "example-lm-evaluation-harness",
+        "example-tensorrt-llm",
+    ):
+        assert f"{target}:" in text
 
 
 @pytest.mark.parametrize(

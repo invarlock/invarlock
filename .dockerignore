@@ -14,6 +14,7 @@
 !requirements/workflows/runtime-wheel-build-py312.txt
 !requirements/workflows/core-py312.txt
 !requirements/workflows/multimodal-runtime-py312.txt
+!requirements/workflows/lm-evaluation-harness-py312.txt
 !runtime/
 !runtime/Dockerfile
 !runtime/Dockerfile.cuda

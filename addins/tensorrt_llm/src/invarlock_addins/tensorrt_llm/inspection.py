@@ -14,10 +14,13 @@ from invarlock_addins.tensorrt_llm.execution import (
     _PinnedFile,
 )
 
-_MAX_ENGINE_CONFIG_BYTES = 16 * 1024 * 1024
+_MAX_ENGINE_CONFIG_BYTES = 1024 * 1024
 _MAX_TOKENIZER_CONTRACT_BYTES = 128 * 1024 * 1024
 _MAX_JSON_DEPTH = 64
-_MAX_JSON_ITEMS = 1_000_000
+# Qwen3's canonical 151k-token fast-tokenizer JSON expands to 1,060,694
+# bounded JSON nodes. Keep a narrow margin above that real contract while the
+# independent byte and depth limits continue to bound parser work.
+_MAX_JSON_ITEMS = 1_250_000
 _IO_CHUNK_BYTES = 64 * 1024
 _TOKENIZER_CONTRACT_FORMAT = "invarlock/tensorrt-llm-tokenizer-contract-v1"
 

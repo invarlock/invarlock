@@ -58,6 +58,9 @@ class RuntimeEvidenceError(ValueError):
     """Raised when strict runtime side evidence cannot be produced."""
 
 
+_RUNTIME_CLEANUP_FAILURE_NOTE = "runtime provider session cleanup also failed"
+
+
 def _canonical_json_bytes(value: object) -> bytes:
     return (
         json.dumps(
@@ -261,15 +264,24 @@ def run_evidence_side(
     assert image_digest is not None
 
     session: RuntimeSession | None = None
+    primary_error: BaseException | None = None
     try:
         session = provider.open(spec, context)
         observation = session.score(schedule.evaluation_batch(metric))
         receipt = session.runtime_receipt()
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
-        if session is not None:
-            session.close()
-        elif context.close_callback is not None:
-            context.close_callback()
+        try:
+            if session is not None:
+                session.close()
+            elif context.close_callback is not None:
+                context.close_callback()
+        except Exception:
+            if primary_error is None:
+                raise
+            primary_error.add_note(_RUNTIME_CLEANUP_FAILURE_NOTE)
     _validate_observation_bindings(
         schedule=schedule,
         provider_name=provider.name,

@@ -355,3 +355,13 @@ def test_worker_main_closes_argument_and_execution_failures(
 
     monkeypatch.setattr(worker, "execute_job", lambda _path: tmp_path / "output")
     assert worker.main([str(tmp_path / "job.json")]) == 0
+
+
+def test_worker_renders_only_the_bounded_cleanup_note() -> None:
+    error = RuntimeError("primary scoring failure")
+    error.add_note("private provider detail /must/not/escape")
+    error.add_note(worker._RUNTIME_CLEANUP_FAILURE_NOTE)  # noqa: SLF001
+
+    assert worker._closed_error_message(error) == (  # noqa: SLF001
+        "primary scoring failure\nruntime provider session cleanup also failed"
+    )

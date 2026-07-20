@@ -142,7 +142,9 @@ def _inspect_payload(raw: bytes) -> dict[str, object]:
     return payload
 
 
-def _image_metadata(engine: str, image: str) -> tuple[dict[str, str], tuple[str, ...]]:
+def _image_metadata(
+    engine: str, image: str
+) -> tuple[str, frozenset[str], dict[str, str], tuple[str, ...]]:
     completed = subprocess.run(
         [engine, "image", "inspect", image],
         check=False,
@@ -156,6 +158,37 @@ def _image_metadata(engine: str, image: str) -> tuple[dict[str, str], tuple[str,
             + (f": {diagnostic}" if diagnostic else "")
         )
     payload = _inspect_payload(completed.stdout)
+    identity = payload.get("Id", payload.get("id"))
+    if not isinstance(identity, str) or _DIGEST.fullmatch(identity) is None:
+        raise SystemExit("container image inspection is missing its image identity")
+    build_identities = {identity}
+    descriptor = payload.get("Descriptor", payload.get("descriptor"))
+    if descriptor is not None:
+        if not isinstance(descriptor, dict):
+            raise SystemExit("container image inspection has an invalid descriptor")
+        descriptor_digest = descriptor.get("digest")
+        if (
+            not isinstance(descriptor_digest, str)
+            or _DIGEST.fullmatch(descriptor_digest) is None
+            or descriptor_digest != identity
+        ):
+            raise SystemExit(
+                "container image descriptor does not match its image identity"
+            )
+        annotations = descriptor.get("annotations")
+        if annotations is not None:
+            if not isinstance(annotations, dict):
+                raise SystemExit("container image descriptor annotations are invalid")
+            config_digest = annotations.get("config.digest")
+            if config_digest is not None:
+                if (
+                    not isinstance(config_digest, str)
+                    or _DIGEST.fullmatch(config_digest) is None
+                ):
+                    raise SystemExit(
+                        "container image descriptor config digest is invalid"
+                    )
+                build_identities.add(config_digest)
     config = payload.get("Config", payload.get("config"))
     if not isinstance(config, dict):
         raise SystemExit("container image inspection is missing Config")
@@ -166,21 +199,35 @@ def _image_metadata(engine: str, image: str) -> tuple[dict[str, str], tuple[str,
     ):
         raise SystemExit("container image inspection is missing source labels")
     rootfs = payload.get("RootFS", payload.get("rootfs"))
-    layers = (
-        rootfs.get("Layers", rootfs.get("layers")) if isinstance(rootfs, dict) else None
-    )
+    layers = []
+    if rootfs is not None:
+        if not isinstance(rootfs, dict):
+            raise SystemExit("container image inspection has an invalid RootFS")
+        layers = rootfs.get("Layers", rootfs.get("layers", []))
     if not isinstance(layers, list) or any(
         not isinstance(layer, str) or _DIGEST.fullmatch(layer) is None
         for layer in layers
     ):
         raise SystemExit("container image inspection is missing filesystem layers")
-    return labels, tuple(layers)
+    return identity, frozenset(build_identities), labels, tuple(layers)
 
 
 def _require_source_labels(
-    *, engine: str, image: str, source_commit: str, source_bundle_sha256: str
-) -> tuple[str, ...]:
-    labels, layers = _image_metadata(engine, image)
+    *,
+    engine: str,
+    image: str,
+    source_commit: str,
+    source_bundle_sha256: str,
+    expected_build_identity: str | None = None,
+) -> tuple[str, tuple[str, ...]]:
+    identity, build_identities, labels, layers = _image_metadata(engine, image)
+    if (
+        expected_build_identity is not None
+        and expected_build_identity not in build_identities
+    ):
+        raise SystemExit(
+            f"container image tag {image!r} does not identify the recorded build result"
+        )
     expected = {
         _SOURCE_LABELS["commit"]: source_commit,
         _SOURCE_LABELS["bundle"]: source_bundle_sha256,
@@ -190,7 +237,7 @@ def _require_source_labels(
             raise SystemExit(
                 f"container image {image!r} source label {name!r} does not match"
             )
-    return layers
+    return identity, layers
 
 
 def _built_image_identity(path: Path) -> str:
@@ -207,6 +254,14 @@ def _built_image_identity(path: Path) -> str:
     if _DIGEST.fullmatch(image) is None:
         raise SystemExit("container build recorded an invalid image identity")
     return image
+
+
+def _deterministic_build_options(engine: str) -> tuple[str, ...]:
+    """Disable BuildKit metadata whose timestamp changes the image identity."""
+
+    if Path(engine).name == "docker":
+        return ("--provenance=false",)
+    return ()
 
 
 def _write_build_statement(path: Path, payload: dict[str, object]) -> None:
@@ -320,7 +375,7 @@ def build(argv: list[str] | None = None) -> int:
     engine = _engine(arguments.container_engine)
     base_layers: tuple[str, ...] | None = None
     if base_image is not None:
-        base_layers = _require_source_labels(
+        _, base_layers = _require_source_labels(
             engine=engine,
             image=base_image,
             source_commit=arguments.source_commit,
@@ -329,7 +384,13 @@ def build(argv: list[str] | None = None) -> int:
 
     with tempfile.TemporaryDirectory(prefix="invarlock-runtime-build-") as temporary:
         image_identity = Path(temporary) / "image-id"
-        command = [engine, "build", "--iidfile", str(image_identity)]
+        command = [
+            engine,
+            "build",
+            *_deterministic_build_options(engine),
+            "--iidfile",
+            str(image_identity),
+        ]
         if arguments.platform is not None:
             command.extend(("--platform", arguments.platform))
         for value in build_arguments:
@@ -351,11 +412,12 @@ def build(argv: list[str] | None = None) -> int:
         if completed.returncode != 0:
             return completed.returncode
         built_image = _built_image_identity(image_identity)
-        built_layers = _require_source_labels(
+        runtime_image_identity, built_layers = _require_source_labels(
             engine=engine,
-            image=built_image,
+            image=image,
             source_commit=arguments.source_commit,
             source_bundle_sha256=arguments.source_bundle_sha256,
+            expected_build_identity=built_image,
         )
         if base_layers is not None and (
             not base_layers or built_layers[: len(base_layers)] != base_layers
@@ -379,7 +441,7 @@ def build(argv: list[str] | None = None) -> int:
                     "image": image,
                     "ok": True,
                     "platform": arguments.platform,
-                    "runtime_image_id": built_image,
+                    "runtime_image_id": runtime_image_identity,
                     "source_bundle_sha256": arguments.source_bundle_sha256,
                     "source_commit": arguments.source_commit,
                 },

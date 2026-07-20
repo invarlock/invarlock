@@ -36,8 +36,9 @@ smoke:
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--env USER=65532 --env LOGNAME=65532 \
+		--env LD_LIBRARY_PATH=/usr/local/tensorrt/lib \
 		--entrypoint /opt/invarlock/bin/vendor-python "$(IMAGE)" \
-		-c "import torch; assert torch.cuda.is_available(); from invarlock_addins.tensorrt_llm.conformance import main; raise SystemExit(main())"
+		-c "import ctypes; ctypes.CDLL('libnvonnxparser.so.10'); import tensorrt_llm; import torch; assert torch.cuda.is_available(); from invarlock_addins.tensorrt_llm.conformance import main; raise SystemExit(main())"
 
 qualification-host-check:
 	@PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$(PYTHON)" -c "from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; provider = CoreRegistry().get_runtime_provider('tensorrt_llm'); assert provider.name == 'tensorrt_llm' and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI" || { \

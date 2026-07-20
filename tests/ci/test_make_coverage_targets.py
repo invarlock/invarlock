@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -82,9 +83,36 @@ def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
     assert "tests/examples" in block
     assert "--cov=examples.integrations.launch" in block
     assert "--cov=examples.integrations.run" in block
+    assert "--cov=examples.integrations.gguf_llama_cpp" in block
+    assert "--cov=examples.integrations.qwen3_profile" in block
+    assert "--cov=examples/integrations/lm-evaluation-harness" in block
+    assert "--cov=examples/integrations/tensorrt-llm" in block
     assert "--cov-branch" in block
     assert "--cov-fail-under=80" in block
+    assert "find examples/integrations -type f -name '*.py'" in block
+    assert '--include="$$source" --fail-under=80' in block
     assert "$(PYTEST_WORKER_ARGS)" in block
+
+
+def test_every_ratchet_example_module_is_collected_for_coverage() -> None:
+    block = _target("coverage-examples", "coverage-enforce")
+    selectors = set(re.findall(r"--cov=([^ \\\n]+)", block))
+    maintained = sorted((ROOT / "examples" / "integrations").rglob("*.py"))
+
+    missing: list[str] = []
+    for source in maintained:
+        if source.name == "__init__.py":
+            continue
+        relative = source.relative_to(ROOT).as_posix()
+        module = relative.removesuffix(".py").replace("/", ".")
+        covered = module in selectors or any(
+            "/" in selector and relative.startswith(f"{selector.rstrip('/')}/")
+            for selector in selectors
+        )
+        if not covered:
+            missing.append(relative)
+
+    assert missing == [], f"example modules omitted from coverage collection: {missing}"
 
 
 def test_coverage_configuration_is_the_core_surface() -> None:

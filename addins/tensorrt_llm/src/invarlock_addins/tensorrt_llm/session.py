@@ -886,25 +886,27 @@ class TensorRTLLMSession:
             if self._closed:
                 return
             self._closed = True
-            cleanup_errors: list[Exception] = []
+            cleanup_errors: list[tuple[str, Exception]] = []
             resources = (
-                self._tokenizer_source,
-                self._execution_boundary,
-                self._runner,
-                self._vendor_python,
-                self._run_directory,
+                ("tokenizer", self._tokenizer_source),
+                ("execution-boundary", self._execution_boundary),
+                ("runner", self._runner),
+                ("interpreter", self._vendor_python),
+                ("run-directory", self._run_directory),
             )
-            for resource in resources:
+            for label, resource in resources:
                 if resource is None:
                     continue
                 try:
                     resource.close()
                 except Exception as exc:  # cleanup must continue across resources
-                    cleanup_errors.append(exc)
+                    cleanup_errors.append((label, exc))
             if cleanup_errors:
+                details = ", ".join(label for label, _error in cleanup_errors)
                 raise TensorRTLLMExecutionError(
-                    "TensorRT-LLM session cleanup did not complete"
-                ) from cleanup_errors[0]
+                    "TensorRT-LLM session cleanup did not complete "
+                    f"(resources: {details})"
+                ) from cleanup_errors[0][1]
 
 
 __all__ = [

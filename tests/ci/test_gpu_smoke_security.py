@@ -65,4 +65,6 @@ def test_tensorrt_smoke_is_local_only_and_unprivileged() -> None:
     _assert_hardened_container_smoke(recipe)
     assert "--gpus all" in recipe
     assert '--entrypoint /opt/invarlock/bin/vendor-python "$(IMAGE)"' in recipe
+    assert "--env LD_LIBRARY_PATH=/usr/local/tensorrt/lib" in recipe
+    assert "ctypes.CDLL('libnvonnxparser.so.10')" in recipe
     assert "torch.cuda.is_available()" in recipe

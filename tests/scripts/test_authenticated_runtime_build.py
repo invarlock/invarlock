@@ -74,8 +74,8 @@ def _bundle(
     return bundle, json.loads(completed.stdout)["source_bundle_sha256"]
 
 
-def _fake_engine(tmp_path: Path) -> Path:
-    engine = tmp_path / "fake-container-engine"
+def _fake_engine(tmp_path: Path, name: str = "fake-container-engine") -> Path:
+    engine = tmp_path / name
     engine.write_text(
         """#!/usr/bin/env python3
 import json
@@ -89,24 +89,39 @@ if calls:
     with pathlib.Path(calls).open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(arguments) + "\\n")
 if arguments[:2] == ["image", "inspect"]:
-    if os.environ.get("FAKE_INSPECT_EXIT"):
-        print("inspection failed", file=sys.stderr)
-        raise SystemExit(int(os.environ["FAKE_INSPECT_EXIT"]))
     image = arguments[2]
+    if os.environ.get("FAKE_INSPECT_EXIT") or image == os.environ.get(
+        "FAKE_INSPECT_EXIT_IMAGE"
+    ):
+        print("inspection failed", file=sys.stderr)
+        raise SystemExit(int(os.environ.get("FAKE_INSPECT_EXIT", "17")))
+    output_image = os.environ.get("FAKE_OUTPUT_IMAGE", "candidate:local")
     commit = os.environ["FAKE_SOURCE_COMMIT"]
     digest = os.environ["FAKE_SOURCE_DIGEST"]
     base_layer = "sha256:" + "a" * 64
     layers = [base_layer]
-    if image == os.environ.get("FAKE_IMAGE_ID"):
+    identity = "sha256:" + "a" * 64
+    if image == output_image:
+        identity = os.environ.get("FAKE_INSPECT_IMAGE_ID", os.environ["FAKE_IMAGE_ID"])
         layers.append("sha256:" + "c" * 64)
         if os.environ.get("FAKE_FINAL_BASE_MISMATCH"):
             layers[0] = "sha256:" + "b" * 64
     if image == os.environ.get("FAKE_MISMATCH_IMAGE"):
         commit = "0" * 40
-    print(json.dumps([{"Config": {"Labels": {
+    payload = {"Config": {"Labels": {
         "org.opencontainers.image.revision": commit,
         "dev.invarlock.source-bundle-sha256": digest,
-    }}, "RootFS": {"Layers": layers}}]))
+    }}, "RootFS": {"Layers": layers}}
+    if not os.environ.get("FAKE_OMIT_INSPECT_IMAGE_ID"):
+        payload["Id"] = identity
+    if image == output_image and os.environ.get("FAKE_CONTAINERD_IMAGE_ID"):
+        manifest = os.environ["FAKE_CONTAINERD_IMAGE_ID"]
+        payload["Id"] = manifest
+        payload["Descriptor"] = {
+            "digest": manifest,
+            "annotations": {"config.digest": os.environ["FAKE_IMAGE_ID"]},
+        }
+    print(json.dumps([payload]))
     raise SystemExit(0)
 if arguments and arguments[0] == "build":
     pathlib.Path(os.environ["FAKE_CONTEXT"]).write_bytes(sys.stdin.buffer.read())
@@ -274,6 +289,51 @@ def test_build_consumes_the_authenticated_archive_not_the_dirty_checkout(
     }
 
 
+def test_docker_build_disables_nondeterministic_default_provenance(
+    tmp_path: Path,
+) -> None:
+    repository, commit = _repository(tmp_path)
+    bundle, digest = _bundle(tmp_path, repository, commit, "source.tar")
+    engine = _fake_engine(tmp_path, "docker")
+
+    completed = subprocess.run(
+        _command(
+            repository=repository,
+            commit=commit,
+            bundle=bundle,
+            digest=digest,
+            engine=engine,
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+        env=_environment(tmp_path, commit=commit, digest=digest),
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    arguments = json.loads((tmp_path / "arguments.json").read_text(encoding="utf-8"))
+    assert arguments[:3] == ["build", "--provenance=false", "--iidfile"]
+
+
+def test_containerd_manifest_identity_is_bound_to_the_recorded_config_digest(
+    harness: BuildHarness,
+) -> None:
+    statement = harness.root / "build-statement.json"
+    manifest = "sha256:" + "d" * 64
+
+    completed = harness.run(
+        [*harness.command(), "--statement", str(statement)],
+        environment=harness.environment(
+            overrides={"FAKE_CONTAINERD_IMAGE_ID": manifest}
+        ),
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(statement.read_text(encoding="utf-8"))["runtime_image_id"] == (
+        manifest
+    )
+
+
 def test_build_statement_is_no_clobber(harness: BuildHarness) -> None:
     statement = harness.root / "build-statement.json"
     statement.write_text("caller-owned\n", encoding="utf-8")
@@ -417,6 +477,26 @@ def test_build_rejects_a_bundle_from_a_different_commit(tmp_path: Path) -> None:
             "container build recorded an invalid image identity",
             True,
         ),
+        (
+            "different_tag_identity",
+            "does not identify the recorded build result",
+            True,
+        ),
+        (
+            "malformed_tag_identity",
+            "inspection is missing its image identity",
+            True,
+        ),
+        (
+            "missing_tag_identity",
+            "inspection is missing its image identity",
+            True,
+        ),
+        (
+            "final_inspection_failure",
+            "is unavailable for source-label verification: inspection failed",
+            True,
+        ),
         ("invalid_platform", "runtime build platform is invalid", False),
         (
             "mutable_base",
@@ -459,7 +539,7 @@ def test_build_rejects_source_and_engine_boundary_attacks(
     elif attack == "missing_dockerfile":
         command[command.index("runtime/Dockerfile")] = "runtime/missing.Dockerfile"
     elif attack == "final_label_mismatch":
-        overrides["FAKE_MISMATCH_IMAGE"] = "sha256:" + "c" * 64
+        overrides["FAKE_MISMATCH_IMAGE"] = "candidate:local"
     elif attack == "final_base_mismatch":
         command.extend(
             (
@@ -472,6 +552,14 @@ def test_build_rejects_source_and_engine_boundary_attacks(
         overrides["FAKE_FINAL_BASE_MISMATCH"] = "1"
     elif attack == "invalid_image_identity":
         overrides["FAKE_IMAGE_ID"] = "candidate:local"
+    elif attack == "different_tag_identity":
+        overrides["FAKE_INSPECT_IMAGE_ID"] = "sha256:" + "d" * 64
+    elif attack == "malformed_tag_identity":
+        overrides["FAKE_INSPECT_IMAGE_ID"] = "candidate:local"
+    elif attack == "missing_tag_identity":
+        overrides["FAKE_OMIT_INSPECT_IMAGE_ID"] = "1"
+    elif attack == "final_inspection_failure":
+        overrides["FAKE_INSPECT_EXIT_IMAGE"] = "candidate:local"
     elif attack == "invalid_platform":
         command.extend(("--platform", "darwin/arm64"))
     elif attack == "mutable_base":
@@ -665,7 +753,10 @@ def test_real_container_engine_builds_from_the_authenticated_tar_context(
         )
     repository, commit = _repository(tmp_path)
     bundle, digest = _bundle(tmp_path, repository, commit, "source.tar")
-    image = f"invarlock-authenticated-runtime-build:{os.getpid()}"
+    images = (
+        f"invarlock-authenticated-runtime-build-a:{os.getpid()}",
+        f"invarlock-authenticated-runtime-build-b:{os.getpid()}",
+    )
     command = _command(
         repository=repository,
         commit=commit,
@@ -673,19 +764,40 @@ def test_real_container_engine_builds_from_the_authenticated_tar_context(
         digest=digest,
         engine=Path(engine),
     )
-    command[command.index("candidate:local")] = image
+    command[command.index("candidate:local")] = images[0]
 
     try:
-        completed = subprocess.run(
+        first = subprocess.run(
             command,
             check=False,
             capture_output=True,
             text=True,
             timeout=120,
         )
-        assert completed.returncode == 0, completed.stderr
+        assert first.returncode == 0, first.stderr
+        second_command = list(command)
+        second_command[second_command.index(images[0])] = images[1]
+        second = subprocess.run(
+            second_command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert second.returncode == 0, second.stderr
+        image_ids = [
+            subprocess.run(
+                [engine, "image", "inspect", "--format", "{{.Id}}", image],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            ).stdout.strip()
+            for image in images
+        ]
+        assert image_ids[0] == image_ids[1]
         inspected = subprocess.run(
-            [engine, "image", "inspect", image],
+            [engine, "image", "inspect", images[0]],
             check=True,
             capture_output=True,
             text=True,
@@ -696,7 +808,7 @@ def test_real_container_engine_builds_from_the_authenticated_tar_context(
         assert labels["dev.invarlock.source-bundle-sha256"] == digest
     finally:
         subprocess.run(
-            [engine, "image", "rm", "--force", image],
+            [engine, "image", "rm", "--force", *images],
             check=False,
             capture_output=True,
             timeout=30,

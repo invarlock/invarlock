@@ -27,10 +27,11 @@ artifact.
 | --- | --- | --- |
 | Hugging Face causal checkpoint | Run mode | Built-in `hf_transformers` provider |
 | PEFT adapter merged into a checkpoint | Run mode | Built-in provider; [runnable PEFT journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/peft-lora) |
-| GGUF artifact | Run mode | Optional [`invarlock-runtime-gguf`](https://github.com/invarlock/invarlock/tree/main/addins/gguf) package |
+| TorchAO weight-only quantization materialized as a checkpoint | Run mode | Built-in provider; [runnable TorchAO journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/torchao-int8) |
+| GGUF artifact | Run mode | Optional [`invarlock-runtime-gguf`](https://github.com/invarlock/invarlock/tree/main/addins/gguf) package; [runnable llama.cpp journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp) |
 | Vision-text checkpoint | Run mode | Optional [`invarlock-runtime-hf-vision-text`](https://github.com/invarlock/invarlock/tree/main/addins/multimodal) package |
 | TensorRT-LLM engine | Run mode | Optional [`invarlock-runtime-tensorrt-llm`](https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm) package |
-| Complete per-record results from a harness or endpoint | Import mode | Runtime-import authoring API and closed request contract |
+| Complete per-record results from a harness or endpoint | Import mode | Runtime-import authoring API and closed request contract; [runnable LM Evaluation Harness journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness) |
 
 The runtime must match the artifact that will be released. A quantized model
 loaded by llama.cpp should be evaluated through the GGUF provider rather than a
@@ -68,8 +69,8 @@ unless a versioned policy and replayable scorer explicitly authorize them.
   comparable, the report renders perplexity ratio as a derived interpretation,
   not a second acceptance metric.
 - Use a verifier-replayable scorer extension for task-specific F1, structured
-  extraction, code execution, SQL execution, semantic similarity, VQA
-  normalization, or another deterministic score.
+  extraction, VQA normalization, or another deterministic text score computed
+  only from authenticated record facts.
 - Keep model-judge results as authenticated observations until the judge,
   prompt, references, and calibration have an independently verifiable
   acceptance contract.
@@ -136,9 +137,18 @@ The repository examples exercise real public commands:
 ```console
 make example-hf-transformers
 make example-peft-lora
+make example-torchao-int8
+make example-gguf-llama-cpp
+make example-lm-evaluation-harness
+make example-tensorrt-llm
 make example-evidence-handoff
 ```
 
-The optional runtime packages expose conformance, image smoke, canary,
-readiness, and evidence-qualification targets in their package-owned
-Makefile. Their runbooks document the required real model or engine fixtures.
+The TensorRT-LLM showcase downloads one pinned Qwen3-0.6B revision and builds
+BF16 and ModelOpt-calibrated FP8 engines on separate H100 GPUs before
+completing the signed transaction.
+Its README also documents the lower-level command for qualified,
+caller-prepared engines. Both paths bind the observed engine identities rather
+than assuming independently compiled engine bytes will be identical. Optional
+runtime packages also expose conformance and evidence-qualification targets
+beside their implementations.

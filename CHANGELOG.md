@@ -39,9 +39,14 @@ from the same canonical JSON.
   `invarlock.engine` embedding facade. The accepted, rejected, and tamper
   examples now execute from a clean Git export with every required fixture
   tracked.
-- Added maintained one-command Hugging Face and PEFT journeys that create real
-  checkpoint artifacts, build an exact-source runtime, evaluate both sides,
-  independently verify the evidence, and render the comparison. The offline
+- Added maintained ecosystem journeys for Hugging Face checkpoints, PEFT LoRA,
+  TorchAO INT8 materialization, GGUF/llama.cpp, LM Evaluation Harness, and
+  TensorRT-LLM. Each journey obtains or creates its real artifacts and preserves
+  the upstream operation or runtime boundary while completing the same
+  exact-source evaluation, independent verification, and report transaction.
+  The model-based journeys use pinned Qwen3-0.6B-family artifacts across direct
+  checkpoint scoring, adapter merge, weight-only quantization, GGUF execution,
+  harness import, and BF16-to-FP8 TensorRT engine conversion. The offline
   handoff journey covers accepted evidence, a valid policy failure, and byte
   tampering without model downloads.
 
@@ -94,8 +99,9 @@ from the same canonical JSON.
   inventory; partial or additional casts and quantized runtime state fail
   closed.
 - Hardened GGUF and TensorRT-LLM readiness so authenticated models, executables,
-  engine layouts, tokenizer contracts, runner protocols, immutable images, and
-  resource limits are checked before native execution or GPU allocation.
+  static engine layouts, tokenizer contracts, immutable images, and configured
+  resource bounds are checked before native execution. Runner protocol, engine
+  loadability, and GPU behavior then fail closed inside the isolated runtime.
 - Fixed worker-unreadable artifact and support mounts to fail on the host with
   an actionable diagnostic before container launch instead of an opaque runtime
   authentication error.

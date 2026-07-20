@@ -7,7 +7,18 @@ import os
 from pathlib import Path
 
 import pytest
-from invarlock_addins.tensorrt_llm import execution, runner
+from invarlock_addins.tensorrt_llm import execution, inspection, runner
+
+
+def test_runtime_resource_budgets_match_static_inspection_for_qwen3_contract() -> None:
+    assert runner._MAX_CONFIG_BYTES == inspection._MAX_ENGINE_CONFIG_BYTES  # noqa: SLF001
+    assert (  # noqa: SLF001
+        runner._MAX_TOKENIZER_BYTES == inspection._MAX_TOKENIZER_CONTRACT_BYTES
+    )
+    assert runner._MAX_JSON_DEPTH == inspection._MAX_JSON_DEPTH  # noqa: SLF001
+    assert runner._MAX_JSON_ITEMS == inspection._MAX_JSON_ITEMS  # noqa: SLF001
+    assert runner._MAX_JSON_ITEMS >= 1_060_694  # noqa: SLF001
+    assert runner._MAX_JSON_ITEMS <= 1_250_000  # noqa: SLF001
 
 
 def test_strict_json_rejects_ambiguous_or_unbounded_payloads(

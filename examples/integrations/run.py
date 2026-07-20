@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Run one maintained Hugging Face ecosystem integration journey.
+"""Run one maintained Qwen3 Hugging Face ecosystem integration journey.
 
-The built-in journey creates two tiny, distinct GPT-2 checkpoints. The PEFT
-journey trains, saves, reloads, and merges a real LoRA adapter before comparing
-the resulting checkpoint. Both finish through the public evaluate, verify, and
-report commands.
+Every journey starts from one official revision-pinned Qwen3 checkpoint. The
+Transformers journey creates an explicit behavioral derivative, the PEFT
+journey trains, saves, reloads, and merges a LoRA adapter, and the TorchAO
+journey applies INT8 weight-only quantization before materializing a portable
+checkpoint. All three finish through evaluate, verify, and report.
 """
 
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
 import shutil
@@ -25,6 +25,15 @@ import yaml
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+try:
+    from examples.integrations import qwen3_profile
+except ModuleNotFoundError as exc:
+    if exc.name != "examples":
+        raise
+    # Direct script execution places this directory, rather than the repository
+    # root, on sys.path. Keep the maintained one-command entry point usable with
+    # the same PYTHONPATH=src boundary as an installed core package.
+    import qwen3_profile  # type: ignore[no-redef]
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import ModelRuntimeSpec, artifact_identity_sha256
 from invarlock.core.runtime_provider.types import JSONScalar
@@ -34,13 +43,11 @@ from invarlock.core.schedule_preparation import (
 )
 from invarlock.evidence_pack_contract import canonical_json_bytes, normalize_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
-from invarlock.runtime_providers.hf_transformers import (
-    HFTransformersProvider,
-    hf_tokenizer_contract_sha256,
-)
+from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
 _SEED = 20_260_716
-_INTEGRATIONS = ("hf-transformers", "peft-lora")
+_INTEGRATIONS = ("hf-transformers", "peft-lora", "torchao-int8")
+_METRICS = ("normalized_nll_per_utf8_byte", "exact_match")
 
 
 @dataclass(frozen=True)
@@ -91,66 +98,147 @@ def _write_private_key(path: Path) -> str:
     return public_key_fingerprint(key.public_key())
 
 
-def _tokenizer(checkpoint: Path, transformers: Any, tokenizers: Any) -> Any:
-    vocabulary = {
-        "<pad>": 0,
-        "<bos>": 1,
-        "<eos>": 2,
-        "<unk>": 3,
-        "alpha": 4,
-        "beta": 5,
-        "target": 6,
-        "other": 7,
-    }
-    backend = tokenizers.Tokenizer(
-        tokenizers.models.WordLevel(vocabulary, unk_token="<unk>")
-    )
-    backend.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
-    tokenizer = transformers.PreTrainedTokenizerFast(
-        tokenizer_object=backend,
-        bos_token="<bos>",
-        eos_token="<eos>",
-        pad_token="<pad>",
-        unk_token="<unk>",
-    )
-    tokenizer.save_pretrained(checkpoint)
-    return tokenizer
+def _example_records(*, expected_output: str = " target") -> tuple[dict[str, str], ...]:
+    """Return 50 distinct contexts for one expected continuation."""
 
-
-def _seed_model(transformers: Any) -> Any:
-    return transformers.GPT2LMHeadModel(
-        transformers.GPT2Config(
-            vocab_size=8,
-            n_positions=8,
-            n_embd=8,
-            n_layer=1,
-            n_head=1,
-            bos_token_id=1,
-            eos_token_id=2,
-            pad_token_id=0,
-            use_cache=False,
-            loss_type="ForCausalLM",
+    tokens = ("alpha", "beta", "other")
+    records: list[dict[str, str]] = []
+    for index in range(50):
+        value = index
+        prompt_tokens: list[str] = []
+        for _position in range(4):
+            prompt_tokens.append(tokens[value % len(tokens)])
+            value //= len(tokens)
+        records.append(
+            {
+                "expected": expected_output,
+                "id": f"expected-token-{index:02d}",
+                "prompt": " ".join(reversed(prompt_tokens)),
+            }
         )
+    return tuple(records)
+
+
+def _single_target_id(tokenizer: Any, expected_output: str) -> int:
+    encoded = tokenizer(expected_output, add_special_tokens=False)
+    token_ids = encoded["input_ids"]
+    if not isinstance(token_ids, list) or len(token_ids) != 1:
+        raise RuntimeError(
+            "the pinned Qwen3 profile requires a one-token expected continuation"
+        )
+    return int(token_ids[0])
+
+
+def _prompt_batch(
+    tokenizer: Any, torch: Any, *, expected_output: str
+) -> dict[str, Any]:
+    records = _example_records(expected_output=expected_output)
+    encoded = tokenizer(
+        [record["prompt"] for record in records],
+        add_special_tokens=True,
+        padding=True,
+        return_tensors="pt",
     )
+    if not hasattr(encoded["input_ids"], "shape"):
+        raise RuntimeError("the pinned Qwen3 tokenizer did not return tensors")
+    target_id = _single_target_id(tokenizer, expected_output)
+    targets = torch.full((len(records), 1), target_id, dtype=encoded["input_ids"].dtype)
+    return {
+        "input_ids": encoded["input_ids"],
+        "attention_mask": encoded["attention_mask"],
+        "target_ids": targets,
+    }
 
 
-def _save_model_and_tokenizer(
-    model: Any, checkpoint: Path, transformers: Any, tokenizers: Any
-) -> str:
-    checkpoint.mkdir(parents=True)
+def _continuation_training_batch(
+    tokenizer: Any,
+    torch: Any,
+    *,
+    expected_output: str,
+) -> dict[str, Any]:
+    target_id = _single_target_id(tokenizer, expected_output)
+    sequences: list[list[int]] = []
+    prompt_lengths: list[int] = []
+    for record in _example_records(expected_output=expected_output):
+        prompt_ids = tokenizer(record["prompt"], add_special_tokens=True)["input_ids"]
+        if not isinstance(prompt_ids, list) or not prompt_ids:
+            raise RuntimeError("the pinned Qwen3 tokenizer returned an empty prompt")
+        prompt_lengths.append(len(prompt_ids))
+        sequences.append([int(value) for value in prompt_ids] + [target_id])
+    width = max(len(sequence) for sequence in sequences)
+    input_ids = torch.full(
+        (len(sequences), width),
+        int(tokenizer.pad_token_id),
+        dtype=torch.long,
+    )
+    attention_mask = torch.zeros_like(input_ids)
+    labels = torch.full_like(input_ids, -100)
+    for index, sequence in enumerate(sequences):
+        length = len(sequence)
+        input_ids[index, :length] = torch.tensor(sequence, dtype=torch.long)
+        attention_mask[index, :length] = 1
+        labels[index, prompt_lengths[index]] = target_id
+    return {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "labels": labels,
+    }
+
+
+def _target_row_derivative(
+    model: Any,
+    tokenizer: Any,
+    torch: Any,
+    *,
+    expected_output: str,
+) -> tuple[int, float]:
+    """Fit one output row so every maintained prompt favors the target token."""
+
+    batch = _prompt_batch(tokenizer, torch, expected_output=expected_output)
     model.eval()
-    model.save_pretrained(checkpoint, safe_serialization=True)
-    tokenizer = _tokenizer(checkpoint, transformers, tokenizers)
-    checkpoint.chmod(0o755)
-    for path in checkpoint.rglob("*"):
-        path.chmod(0o755 if path.is_dir() else 0o644)
-    return hf_tokenizer_contract_sha256(tokenizer)
+    backbone = getattr(model, str(model.base_model_prefix), None)
+    if backbone is None:
+        raise RuntimeError("the Qwen3 model does not expose its causal backbone")
+    with torch.inference_mode():
+        hidden_states = backbone(
+            input_ids=batch["input_ids"],
+            attention_mask=batch["attention_mask"],
+            return_dict=True,
+            use_cache=False,
+        ).last_hidden_state
+        positions = torch.stack(
+            [
+                torch.nonzero(mask, as_tuple=False)[-1, 0]
+                for mask in batch["attention_mask"]
+            ]
+        )
+        rows = hidden_states[torch.arange(hidden_states.shape[0]), positions].float()
+        logits = model.lm_head(rows.to(model.lm_head.weight.dtype)).float()
+        target_id = int(batch["target_ids"][0, 0])
+        logits[:, target_id] = -torch.inf
+        desired = logits.max(dim=1).values + 12.0
+        solution = torch.linalg.lstsq(rows, desired[:, None]).solution[:, 0]
+        model.lm_head.weight[target_id].copy_(solution.to(model.lm_head.weight.dtype))
+        revised = model.lm_head(rows.to(model.lm_head.weight.dtype)).float()
+        revised[:, target_id] = -torch.inf
+        margin = float(
+            (
+                model.lm_head(rows.to(model.lm_head.weight.dtype)).float()[:, target_id]
+                - revised.max(dim=1).values
+            )
+            .min()
+            .item()
+        )
+    if margin <= 0.0:
+        raise RuntimeError("the Qwen3 subject transformation missed a prompt")
+    return target_id, margin
 
 
-def _create_hf_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
+def _create_hf_checkpoints(
+    paths: ExamplePaths, *, expected_output: str
+) -> tuple[dict[str, Path], str]:
     try:
         import safetensors  # noqa: F401
-        import tokenizers  # type: ignore[import-untyped]
         import torch
         import transformers
     except ImportError as exc:
@@ -159,54 +247,47 @@ def _create_hf_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
         ) from exc
 
     torch.manual_seed(_SEED)
-    seed_model = _seed_model(transformers)
-    seed_model.eval()
-    prompt_ids = torch.tensor([[4, 5]], dtype=torch.long)
-    with torch.inference_mode():
-        hidden = seed_model.transformer(
-            input_ids=prompt_ids,
-            return_dict=True,
-            use_cache=False,
-        ).last_hidden_state[0, -1]
-        direction = hidden / hidden.norm()
-
-    models = {
-        "baseline": copy.deepcopy(seed_model),
-        "subject": copy.deepcopy(seed_model),
-    }
-    with torch.no_grad():
-        # Token 6 does not occur in the prompt.  Changing only its tied output
-        # embedding changes the expected-token likelihood without changing the
-        # prompt hidden state used to construct this comparison.
-        models["baseline"].transformer.wte.weight[6].copy_(-4.0 * direction)
-        models["subject"].transformer.wte.weight[6].copy_(4.0 * direction)
-
-    checkpoints: dict[str, Path] = {}
-    tokenizer_digest: str | None = None
-    for role in ("baseline", "subject"):
-        checkpoint = paths.evaluation / "models" / role
-        observed_digest = _save_model_and_tokenizer(
-            models[role], checkpoint, transformers, tokenizers
+    model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+        torch=torch, transformers=transformers
+    )
+    baseline = paths.evaluation / "models" / "baseline"
+    tokenizer_digest = qwen3_profile.save_checkpoint(model, tokenizer, baseline)
+    baseline_digest = checkpoint_tree_sha256(baseline)
+    target_id, margin = _target_row_derivative(
+        model,
+        tokenizer,
+        torch,
+        expected_output=expected_output,
+    )
+    subject = paths.evaluation / "models" / "subject"
+    observed_digest = qwen3_profile.save_checkpoint(model, tokenizer, subject)
+    if observed_digest != tokenizer_digest:
+        raise RuntimeError("the Qwen3 baseline and subject tokenizers do not match")
+    subject_digest = checkpoint_tree_sha256(subject)
+    if baseline_digest == subject_digest:
+        raise RuntimeError("the transformed Qwen3 subject is identical to its baseline")
+    (paths.evaluation / "inputs" / "subject-transformation.json").write_bytes(
+        canonical_json_bytes(
+            {
+                "format": "invarlock/example-hf-transformers-summary-v1",
+                "library": "transformers",
+                "library_version": str(transformers.__version__),
+                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                "method": "causal-output-row-fit",
+                "expected_output": expected_output,
+                "target_token_id": target_id,
+                "minimum_logit_margin": margin,
+                "subject_checkpoint_tree_sha256": subject_digest,
+            }
         )
-        if tokenizer_digest is None:
-            tokenizer_digest = observed_digest
-        elif observed_digest != tokenizer_digest:
-            raise RuntimeError("the generated tokenizer contracts do not match")
-        checkpoints[role] = checkpoint
-
-    if checkpoint_tree_sha256(checkpoints["baseline"]) == checkpoint_tree_sha256(
-        checkpoints["subject"]
-    ):
-        raise RuntimeError("the generated checkpoints are not distinct")
-    assert tokenizer_digest is not None
-    return checkpoints, tokenizer_digest
+    )
+    return {"baseline": baseline, "subject": subject}, tokenizer_digest
 
 
 def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
     try:
         import peft
         import safetensors  # noqa: F401
-        import tokenizers  # type: ignore[import-untyped]
         import torch
         import transformers
     except ImportError as exc:
@@ -216,22 +297,27 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
         ) from exc
 
     torch.manual_seed(_SEED)
-    baseline_model = _seed_model(transformers)
-    baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = _save_model_and_tokenizer(
-        baseline_model, baseline, transformers, tokenizers
+    torch.cuda.manual_seed_all(_SEED)
+    baseline_model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+        torch=torch, transformers=transformers
     )
+    baseline = paths.evaluation / "models" / "baseline"
+    tokenizer_digest = qwen3_profile.save_checkpoint(
+        baseline_model, tokenizer, baseline
+    )
+    baseline_digest = checkpoint_tree_sha256(baseline)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_dtype = next(baseline_model.parameters()).dtype
 
     training_model = peft.get_peft_model(
-        copy.deepcopy(baseline_model),
+        baseline_model.to(device),
         peft.LoraConfig(
             task_type=peft.TaskType.CAUSAL_LM,
-            r=2,
+            r=4,
             lora_alpha=8,
             lora_dropout=0.0,
-            target_modules=["c_attn"],
+            target_modules=list(qwen3_profile.PEFT_TARGET_MODULES),
             bias="none",
-            fan_in_fan_out=True,
         ),
     )
     training_model.train()
@@ -242,52 +328,81 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
     ]
     if not trainable:
         raise RuntimeError("PEFT did not expose trainable LoRA parameters")
-    optimizer = torch.optim.AdamW(trainable, lr=0.05)
-    input_ids = torch.tensor([[4, 5, 6]], dtype=torch.long)
-    labels = torch.tensor([[-100, -100, 6]], dtype=torch.long)
-    initial_loss: float | None = None
-    final_loss = float("inf")
-    for _step in range(80):
+    batch = {
+        name: value.to(device)
+        for name, value in _continuation_training_batch(
+            tokenizer, torch, expected_output=" target"
+        ).items()
+    }
+    optimizer = torch.optim.AdamW(trainable, lr=0.002)
+
+    training_model.eval()
+    with torch.no_grad():
+        initial = training_model(
+            **batch,
+        ).loss
+    if initial is None or not torch.isfinite(initial):
+        raise RuntimeError("PEFT training produced a non-finite initial loss")
+    initial_loss = float(initial.detach())
+    training_model.train()
+    for _step in range(12):
         optimizer.zero_grad(set_to_none=True)
-        loss = training_model(input_ids=input_ids, labels=labels).loss
+        loss = training_model(
+            **batch,
+        ).loss
         if loss is None or not torch.isfinite(loss):
             raise RuntimeError("PEFT training produced a non-finite loss")
-        if initial_loss is None:
-            initial_loss = float(loss.detach())
         loss.backward()
         optimizer.step()
-        final_loss = float(loss.detach())
-    if initial_loss is None or final_loss >= initial_loss:
+    training_model.eval()
+    with torch.no_grad():
+        final = training_model(
+            **batch,
+        ).loss
+    if final is None or not torch.isfinite(final):
+        raise RuntimeError("PEFT training produced a non-finite final loss")
+    final_loss = float(final.detach())
+    if final_loss >= initial_loss:
         raise RuntimeError("PEFT training did not improve the target-token loss")
 
     adapter = paths.root / "upstream" / "peft-adapter"
     adapter.parent.mkdir(parents=True)
     training_model.peft_config["default"].base_model_name_or_path = str(baseline)
     training_model.save_pretrained(adapter, safe_serialization=True)
-    reloaded_base = transformers.GPT2LMHeadModel.from_pretrained(
-        baseline, local_files_only=True
-    )
+    del training_model, baseline_model
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    reloaded_base = transformers.AutoModelForCausalLM.from_pretrained(
+        baseline,
+        local_files_only=True,
+        dtype=model_dtype,
+        trust_remote_code=False,
+    ).to(device)
     reloaded = peft.PeftModel.from_pretrained(
         reloaded_base, adapter, is_trainable=False
     )
-    subject_model = reloaded.merge_and_unload()
+    subject_model = reloaded.merge_and_unload().to("cpu")
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = _save_model_and_tokenizer(
-        subject_model, subject, transformers, tokenizers
-    )
+    observed_digest = qwen3_profile.save_checkpoint(subject_model, tokenizer, subject)
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the PEFT baseline and subject tokenizers do not match")
-    if checkpoint_tree_sha256(baseline) == checkpoint_tree_sha256(subject):
+    subject_digest = checkpoint_tree_sha256(subject)
+    if baseline_digest == subject_digest:
         raise RuntimeError("the merged PEFT subject is identical to its baseline")
-    (paths.root / "upstream" / "peft-summary.json").write_bytes(
+    (paths.evaluation / "inputs" / "subject-transformation.json").write_bytes(
         canonical_json_bytes(
             {
                 "format": "invarlock/example-peft-summary-v1",
                 "library": "peft",
                 "library_version": str(peft.__version__),
+                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                "target_modules": list(qwen3_profile.PEFT_TARGET_MODULES),
+                "training_record_count": len(_example_records()),
+                "training_steps": 12,
+                "training_device": device.type,
                 "initial_loss": initial_loss,
                 "final_loss": final_loss,
-                "merged_subject_sha256": checkpoint_tree_sha256(subject),
+                "merged_subject_sha256": subject_digest,
                 "saved_adapter": "peft-adapter",
             }
         )
@@ -295,13 +410,221 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
     return {"baseline": baseline, "subject": subject}, tokenizer_digest
 
 
+def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]:
+    try:
+        import safetensors  # noqa: F401
+        import torch
+        import torchao
+        import transformers
+        from torchao.quantization import Int8WeightOnlyConfig, quantize_
+    except ImportError as exc:
+        raise RuntimeError(
+            "the TorchAO example requires the dependencies installed by "
+            "`make example-torchao-int8`"
+        ) from exc
+
+    torch.manual_seed(_SEED)
+    baseline_model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+        torch=torch, transformers=transformers
+    )
+    baseline = paths.evaluation / "models" / "baseline"
+    tokenizer_digest = qwen3_profile.save_checkpoint(
+        baseline_model, tokenizer, baseline
+    )
+    baseline_digest = checkpoint_tree_sha256(baseline)
+    model_dtype = next(baseline_model.parameters()).dtype
+
+    quantized_model = baseline_model.eval()
+
+    def quantization_target(module: Any, fully_qualified_name: str) -> bool:
+        # Qwen ties lm_head.weight to the token embedding. Quantizing only the
+        # output projection would break that alias, and a dense HF checkpoint
+        # cannot represent the two different values. Keep the tied output
+        # unmodified so every transformed tensor can be materialized exactly.
+        return isinstance(module, torch.nn.Linear) and fully_qualified_name != "lm_head"
+
+    quantization_config = Int8WeightOnlyConfig(version=2)
+    quantize_(
+        quantized_model,
+        quantization_config,
+        filter_fn=quantization_target,
+    )
+    quantized_names = sorted(
+        name
+        for name, value in quantized_model.state_dict().items()
+        if type(value).__module__.startswith("torchao.")
+    )
+    if not quantized_names:
+        raise RuntimeError("TorchAO did not create any quantized tensors")
+    if "lm_head.weight" in quantized_names:
+        raise RuntimeError("TorchAO quantized the tied output projection")
+
+    materialized_state = {
+        name: (
+            value.dequantize().detach().cpu().clone()
+            if hasattr(value, "dequantize")
+            else value.detach().cpu().clone()
+        )
+        for name, value in quantized_model.state_dict().items()
+    }
+    if any(
+        value.is_floating_point() and not bool(torch.isfinite(value).all())
+        for value in materialized_state.values()
+    ):
+        raise RuntimeError("TorchAO materialization produced a non-finite tensor")
+    subject_model = transformers.AutoModelForCausalLM.from_pretrained(
+        baseline,
+        local_files_only=True,
+        dtype=model_dtype,
+        trust_remote_code=False,
+    ).eval()
+    loading = subject_model.load_state_dict(materialized_state, strict=True)
+    if loading.missing_keys or loading.unexpected_keys:
+        raise RuntimeError("the materialized TorchAO state is incomplete")
+    loaded_state = subject_model.state_dict()
+    loaded_mismatches = [
+        name
+        for name in quantized_names
+        if name not in loaded_state
+        or loaded_state[name].shape != materialized_state[name].shape
+        or loaded_state[name].dtype != materialized_state[name].dtype
+        or not torch.equal(loaded_state[name], materialized_state[name])
+    ]
+    if loaded_mismatches:
+        raise RuntimeError(
+            "the dense model does not preserve TorchAO materialization: "
+            + ", ".join(loaded_mismatches[:5])
+        )
+
+    records = _example_records()
+    probe = tokenizer(
+        [record["prompt"] for record in records],
+        add_special_tokens=True,
+        padding=True,
+        return_tensors="pt",
+    )
+    with torch.inference_mode():
+        live_logits = quantized_model(**probe, use_cache=False).logits
+        materialized_logits = subject_model(**probe, use_cache=False).logits
+    if not bool(torch.isfinite(live_logits).all()) or not bool(
+        torch.isfinite(materialized_logits).all()
+    ):
+        raise RuntimeError("TorchAO materialization probe produced non-finite logits")
+    record_indices = torch.arange(len(records))
+    final_positions = probe["attention_mask"].sum(dim=1) - 1
+    live_next_token_logits = live_logits[record_indices, final_positions].float()
+    materialized_next_token_logits = materialized_logits[
+        record_indices, final_positions
+    ].float()
+    logit_delta = (live_next_token_logits - materialized_next_token_logits).abs()
+    if not bool(torch.isfinite(logit_delta).all()):
+        raise RuntimeError(
+            "TorchAO materialization probe produced a non-finite difference"
+        )
+    max_abs_logit_delta = float(logit_delta.max())
+    mean_abs_logit_delta = float(logit_delta.mean())
+    top1_agreement_count = int(
+        (
+            live_next_token_logits.argmax(dim=-1)
+            == materialized_next_token_logits.argmax(dim=-1)
+        )
+        .sum()
+        .item()
+    )
+
+    materialized_digest = hashlib.sha256()
+    for name in quantized_names:
+        tensor = materialized_state[name].contiguous()
+        descriptor = canonical_json_bytes(
+            {
+                "dtype": str(tensor.dtype),
+                "name": name,
+                "shape": list(tensor.shape),
+            }
+        )
+        payload = tensor.view(torch.uint8).numpy().tobytes(order="C")
+        materialized_digest.update(len(descriptor).to_bytes(8, "big"))
+        materialized_digest.update(descriptor)
+        materialized_digest.update(len(payload).to_bytes(8, "big"))
+        materialized_digest.update(payload)
+
+    subject = paths.evaluation / "models" / "subject"
+    observed_digest = qwen3_profile.save_checkpoint(subject_model, tokenizer, subject)
+    if observed_digest != tokenizer_digest:
+        raise RuntimeError("the TorchAO baseline and subject tokenizers do not match")
+    subject_digest = checkpoint_tree_sha256(subject)
+    if baseline_digest == subject_digest:
+        raise RuntimeError("the materialized TorchAO subject is identical to baseline")
+    persisted_model = transformers.AutoModelForCausalLM.from_pretrained(
+        subject,
+        local_files_only=True,
+        dtype=model_dtype,
+        trust_remote_code=False,
+    ).eval()
+    persisted_state = persisted_model.state_dict()
+    persisted_mismatches = [
+        name
+        for name in quantized_names
+        if name not in persisted_state
+        or persisted_state[name].shape != materialized_state[name].shape
+        or persisted_state[name].dtype != materialized_state[name].dtype
+        or not torch.equal(persisted_state[name], materialized_state[name])
+    ]
+    if persisted_mismatches:
+        raise RuntimeError(
+            "the saved checkpoint does not preserve TorchAO materialization: "
+            + ", ".join(persisted_mismatches[:5])
+        )
+    (paths.evaluation / "inputs" / "subject-transformation.json").write_bytes(
+        canonical_json_bytes(
+            {
+                "format": "invarlock/example-torchao-summary-v1",
+                "library": "torchao",
+                "library_version": str(torchao.__version__),
+                "torch_version": str(torch.__version__),
+                "transformers_version": str(transformers.__version__),
+                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                "quantization": {
+                    "configuration": "Int8WeightOnlyConfig(version=2)",
+                    "excluded_modules": ["lm_head"],
+                    "materialization": "dequantize-dense-state-v1",
+                    "selected_module_type": "torch.nn.Linear",
+                },
+                "quantized_tensors": quantized_names,
+                "quantized_tensor_count": len(quantized_names),
+                "dequantized_tensor_state_sha256": (
+                    "sha256:" + materialized_digest.hexdigest()
+                ),
+                "dequantized_tensor_state_loaded_exact": True,
+                "dequantized_tensor_state_save_reload_exact": True,
+                "live_kernel_observation": {
+                    "authority": "observation",
+                    "device": "cpu",
+                    "input_records_sha256": "sha256:"
+                    + hashlib.sha256(
+                        canonical_json_bytes({"records": list(records)})
+                    ).hexdigest(),
+                    "max_abs_next_token_logit_delta": max_abs_logit_delta,
+                    "mean_abs_next_token_logit_delta": mean_abs_logit_delta,
+                    "record_count": len(records),
+                    "top1_agreement_count": top1_agreement_count,
+                },
+                "materialized_subject_sha256": subject_digest,
+            }
+        )
+    )
+    return {"baseline": baseline, "subject": subject}, tokenizer_digest
+
+
 def _create_checkpoints(
-    paths: ExamplePaths, integration: str
+    paths: ExamplePaths, integration: str, *, expected_output: str = " target"
 ) -> tuple[dict[str, Path], str]:
     if integration == "hf-transformers":
-        return _create_hf_checkpoints(paths)
+        return _create_hf_checkpoints(paths, expected_output=expected_output)
     if integration == "peft-lora":
         return _create_peft_checkpoints(paths)
+    if integration == "torchao-int8":
+        return _create_torchao_checkpoints(paths)
     raise RuntimeError(f"unsupported integration: {integration}")
 
 
@@ -309,18 +632,26 @@ def _settings(checkpoint: Path, tokenizer_digest: str) -> dict[str, JSONScalar]:
     return {
         "batch_size": 1,
         "checkpoint_tree_sha256": checkpoint_tree_sha256(checkpoint),
-        "context_length": 8,
+        "context_length": 32,
         "max_output_tokens": 1,
         "offline": True,
         "seed": _SEED,
-        "timeout_seconds": 30,
+        "timeout_seconds": 300,
         "tokenizer_metadata_sha256": tokenizer_digest,
     }
 
 
 def _prepare_workspace(
-    root: Path, *, integration: str, runtime_image_digest: str
+    root: Path,
+    *,
+    integration: str,
+    runtime_image_digest: str,
+    metric: str = "normalized_nll_per_utf8_byte",
 ) -> tuple[ExamplePaths, dict[str, str]]:
+    if metric not in _METRICS:
+        raise ValueError(f"unsupported comparison metric: {metric}")
+    if metric == "exact_match" and integration != "hf-transformers":
+        raise ValueError("exact-match preparation requires hf-transformers")
     root = root.expanduser().resolve()
     if root.exists():
         raise FileExistsError(
@@ -335,31 +666,35 @@ def _prepare_workspace(
         paths.evidence_key.parent.mkdir(parents=True)
         paths.verifier_key.parent.mkdir(parents=True)
 
-        checkpoints, tokenizer_digest = _create_checkpoints(paths, integration)
+        expected_output = "target" if metric == "exact_match" else " target"
+        checkpoints, tokenizer_digest = _create_checkpoints(
+            paths,
+            integration,
+            expected_output=expected_output,
+        )
         settings = {
             role: _settings(checkpoints[role], tokenizer_digest)
             for role in ("baseline", "subject")
         }
 
         dataset_bytes = b"".join(
-            canonical_json_bytes(
-                {
-                    "expected": " target",
-                    "id": f"expected-token-{index:02d}",
-                    "prompt": "alpha beta",
-                }
-            )
-            for index in range(50)
+            canonical_json_bytes(record)
+            for record in _example_records(expected_output=expected_output)
         )
         dataset = paths.evaluation / "inputs" / "records.jsonl"
         dataset.write_bytes(dataset_bytes)
         dataset_sha256 = hashlib.sha256(dataset_bytes).hexdigest()
+        dataset_name = (
+            f"{integration}-exact-match-smoke"
+            if metric == "exact_match"
+            else f"{integration}-smoke"
+        )
 
         schedule = prepare_local_evaluation_schedule_bytes(
             LocalDatasetRequest(
                 path=dataset,
                 sha256=dataset_sha256,
-                name=f"{integration}-smoke",
+                name=dataset_name,
                 split="validation",
                 input_field="prompt",
                 expected_output_field="expected",
@@ -368,24 +703,46 @@ def _prepare_workspace(
             dataset_bytes,
         )
 
-        policy_bytes = canonical_json_bytes(
-            {
+        if metric == "exact_match":
+            policy = {
                 "resolved_policy": {
-                    "metrics": {"normalized_nll_per_utf8_byte": {"ratio_max": 1.0}}
+                    "metrics": {
+                        "exact_match": {
+                            "delta_min_pp": 0.0,
+                            "maximum_interval_width_pp": 20.0,
+                            "minimum_record_count": 50,
+                        }
+                    }
                 }
             }
-        )
+        else:
+            ratio_max = 1.01 if integration == "torchao-int8" else 1.0
+            policy = {
+                "resolved_policy": {
+                    "metrics": {
+                        "normalized_nll_per_utf8_byte": {"ratio_max": ratio_max}
+                    }
+                }
+            }
+        policy_bytes = canonical_json_bytes(policy)
         request_policy = paths.evaluation / "inputs" / "acceptance.json"
         request_policy.write_bytes(policy_bytes)
         paths.independent_policy.write_bytes(policy_bytes)
 
         def side(role: str) -> dict[str, object]:
             model_id = f"invarlock-example/{integration}-{role}"
+            artifact_digest = settings[role]["checkpoint_tree_sha256"]
+            locator = (
+                f"hf://{qwen3_profile.MODEL_ID}@{qwen3_profile.MODEL_REVISION}"
+                f"#checkpoint-tree-sha256:{artifact_digest}"
+                if role == "baseline"
+                else f"generated://{model_id}@sha256:{artifact_digest}"
+            )
             return {
                 "artifact": {
                     "path": f"models/{role}",
                     "model_id": model_id,
-                    "locator": f"hf://{model_id}@{'a' * 40}",
+                    "locator": locator,
                 },
                 "runtime": {
                     "provider": "hf_transformers",
@@ -402,7 +759,7 @@ def _prepare_workspace(
                     "path": "inputs/records.jsonl",
                     "sha256": dataset_sha256,
                     "format": "jsonl",
-                    "name": f"{integration}-smoke",
+                    "name": dataset_name,
                     "split": "validation",
                     "input_field": "prompt",
                     "expected_output_field": "expected",
@@ -410,11 +767,21 @@ def _prepare_workspace(
                 },
                 "policy": "inputs/acceptance.json",
                 "task": "text_causal",
-                "metric": "normalized_nll_per_utf8_byte",
+                "metric": metric,
             },
             "execution": {"mode": "run"},
             "output": {"evidence": "evidence"},
         }
+        transformation = paths.evaluation / "inputs" / "subject-transformation.json"
+        if transformation.is_file():
+            request["observations"] = [
+                {
+                    "id": f"{integration}-subject-transformation",
+                    "kind": "artifact_transformation",
+                    "scope": "subject",
+                    "path": "inputs/subject-transformation.json",
+                }
+            ]
         paths.request.write_text(
             yaml.safe_dump(request, sort_keys=False), encoding="utf-8"
         )
@@ -576,6 +943,12 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--runtime-device", default="cpu")
+    parser.add_argument(
+        "--metric",
+        choices=_METRICS,
+        default="normalized_nll_per_utf8_byte",
+        help="Metric used to author the fixed example dataset and policy.",
+    )
     return parser
 
 
@@ -588,6 +961,7 @@ def main(argv: list[str] | None = None) -> int:
             arguments.workspace,
             integration=arguments.integration,
             runtime_image_digest=arguments.runtime_image_digest,
+            metric=arguments.metric,
         )
         print(f"Prepared: {paths.root}")
         print(f"Request: {paths.request}")
@@ -595,8 +969,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Keys outside request tree: {paths.evidence_key.parent}")
         if arguments.prepare_only:
             print(
-                "Use the generated request and trust profile with evaluate, verify, "
-                "and report; the checked-in README contains the complete commands."
+                "Preparation stops before execution. Run the maintained example "
+                "command without --prepare-only to complete evaluate, verify, and "
+                "report."
             )
             return 0
         _execute(

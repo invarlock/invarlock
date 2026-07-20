@@ -469,20 +469,37 @@ def test_close_continues_cleanup_after_resource_close_failure(
     session = TensorRTLLMProvider().open(spec, context)
     run_root = session._run_directory.path  # noqa: SLF001
     runner = session._runner  # noqa: SLF001
+    run_directory = session._run_directory  # noqa: SLF001
     real_runner_close = runner.close
+    real_run_directory_close = run_directory.close
 
     def fail_runner_close() -> None:
-        raise OSError("injected runner close failure")
+        raise OSError("private runner detail /must/not/escape")
+
+    def fail_run_directory_close() -> None:
+        raise OSError("private directory detail /also/must/not/escape")
 
     monkeypatch.setattr(runner, "close", fail_runner_close)
-    with pytest.raises(TensorRTLLMExecutionError, match="cleanup did not complete"):
+    monkeypatch.setattr(run_directory, "close", fail_run_directory_close)
+    with pytest.raises(
+        TensorRTLLMExecutionError,
+        match=(
+            r"^TensorRT-LLM session cleanup did not complete "
+            r"\(resources: runner, run-directory\)$"
+        ),
+    ) as captured:
         session.close()
 
-    assert not run_root.exists()
+    assert captured.value.__cause__ is not None
+    assert str(captured.value.__cause__) == "private runner detail /must/not/escape"
+    assert "/must/not/escape" not in str(captured.value)
+    assert run_root.exists()
     assert session._execution_boundary._closed is True  # noqa: SLF001
     assert session._vendor_python._closed is True  # noqa: SLF001
     assert session._tokenizer_source._closed is True  # noqa: SLF001
     real_runner_close()
+    real_run_directory_close()
+    assert not run_root.exists()
 
 
 def test_run_directory_removal_is_attempted_after_preparation_failure(

@@ -184,6 +184,14 @@ run_workflow_locks() {
     --torch-backend cu128 \
     --no-deps
 
+  compile_req_platform \
+    "${WORKFLOW_DIR}/lm-evaluation-harness.in" \
+    "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints requirements/workflows/runtime-image.in \
+    --torch-backend cpu
+
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \
     --extra precommit-ci

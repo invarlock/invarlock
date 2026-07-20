@@ -104,14 +104,16 @@ RUN tar -xzf /tmp/llama.cpp.tar.gz -C /tmp \
       -DLLAMA_BUILD_TOOLS=ON \
       -DLLAMA_BUILD_UI=OFF \
       -DLLAMA_USE_PREBUILT_UI=OFF \
-    && cmake --build /tmp/llama.cpp-build --config Release --target llama-completion --parallel "${LLAMA_CPP_BUILD_JOBS}" \
+    && cmake --build /tmp/llama.cpp-build --config Release --target llama-completion llama-quantize --parallel "${LLAMA_CPP_BUILD_JOBS}" \
     && install -D -m 0755 /tmp/llama.cpp-build/bin/llama-completion /opt/llama.cpp/llama-completion \
+    && install -D -m 0755 /tmp/llama.cpp-build/bin/llama-quantize /opt/llama.cpp/llama-quantize \
     && install -D -m 0444 /tmp/llama.cpp.tar.gz /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
     && install -D -m 0444 /runtime/llama-completion-user-output.patch /opt/llama.cpp/source/llama-completion-user-output.patch \
     && strip /opt/llama.cpp/llama-completion \
     && touch -h -d "@${SOURCE_DATE_EPOCH}" \
       /opt/llama.cpp \
       /opt/llama.cpp/llama-completion \
+      /opt/llama.cpp/llama-quantize \
       /opt/llama.cpp/source \
       /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
       /opt/llama.cpp/source/llama-completion-user-output.patch
@@ -144,6 +146,7 @@ LABEL dev.invarlock.runtime-provider="llama_cpp" \
 COPY --from=runtime-inputs /requirements/workflows/core-py312.txt /opt/invarlock/requirements/core-py312.txt
 COPY --from=public-wheel /wheelhouse /opt/invarlock/artifacts
 COPY --from=llama-cpp-build /opt/llama.cpp/llama-completion /opt/llama.cpp/llama-completion
+COPY --from=llama-cpp-build /opt/llama.cpp/llama-quantize /opt/llama.cpp/llama-quantize
 COPY --from=llama-cpp-build /opt/llama.cpp/source /opt/llama.cpp/source
 
 RUN python -m pip install \

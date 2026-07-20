@@ -33,19 +33,14 @@ EXAMPLE = REPO_ROOT / "examples" / "integrations" / "run.py"
 IMAGE_DIGEST = "sha256:" + "7" * 64
 
 
-def _prepare(workspace: Path) -> subprocess.CompletedProcess[str]:
+def test_checked_in_hf_script_entry_resolves_the_shared_profile() -> None:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(REPO_ROOT / "src")
-    return subprocess.run(
+    completed = subprocess.run(
         [
             sys.executable,
             str(EXAMPLE),
-            "hf-transformers",
-            "--workspace",
-            str(workspace),
-            "--runtime-image-digest",
-            IMAGE_DIGEST,
-            "--prepare-only",
+            "--help",
         ],
         cwd=REPO_ROOT,
         env=environment,
@@ -53,6 +48,8 @@ def _prepare(workspace: Path) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
     )
+    assert completed.returncode == 0, completed.stderr
+    assert "hf-transformers" in completed.stdout
 
 
 def _payload(path: Path) -> dict[str, Any]:
@@ -70,6 +67,56 @@ def _example_module() -> Any:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _install_tiny_qwen3_profile(example: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercise the real Qwen3 code path with a small offline test fixture."""
+
+    def load_model_and_tokenizer(*, torch: Any, transformers: Any) -> tuple[Any, Any]:
+        import tokenizers
+
+        torch.manual_seed(example._SEED)
+        vocabulary = {
+            "<pad>": 0,
+            "<bos>": 1,
+            "<eos>": 2,
+            "<unk>": 3,
+            "alpha": 4,
+            "beta": 5,
+            "target": 6,
+            "other": 7,
+        }
+        backend = tokenizers.Tokenizer(
+            tokenizers.models.WordLevel(vocabulary, unk_token="<unk>")
+        )
+        backend.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
+        tokenizer = transformers.PreTrainedTokenizerFast(
+            tokenizer_object=backend,
+            bos_token="<bos>",
+            eos_token="<eos>",
+            pad_token="<pad>",
+            unk_token="<unk>",
+        )
+        config = transformers.Qwen3Config(
+            vocab_size=8,
+            hidden_size=64,
+            intermediate_size=128,
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=16,
+            max_position_embeddings=64,
+            bos_token_id=1,
+            eos_token_id=2,
+            pad_token_id=0,
+            use_cache=False,
+            tie_word_embeddings=False,
+        )
+        return transformers.Qwen3ForCausalLM(config), tokenizer
+
+    monkeypatch.setattr(
+        example.qwen3_profile, "load_model_and_tokenizer", load_model_and_tokenizer
+    )
 
 
 def test_checked_in_hf_run_executes_verification_through_the_trust_profile(
@@ -109,23 +156,33 @@ def test_checked_in_hf_run_executes_verification_through_the_trust_profile(
 
 
 def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     pytest.importorskip("torch")
     pytest.importorskip("transformers")
     pytest.importorskip("tokenizers")
     pytest.importorskip("safetensors")
 
+    example = _example_module()
+    _install_tiny_qwen3_profile(example, monkeypatch)
     workspace = tmp_path / "hf-run"
-    prepared = _prepare(workspace)
-    assert prepared.returncode == 0, prepared.stderr
-    assert "Keys outside request tree" in prepared.stdout
+    arguments = [
+        "hf-transformers",
+        "--workspace",
+        str(workspace),
+        "--runtime-image-digest",
+        IMAGE_DIGEST,
+        "--prepare-only",
+    ]
+    assert example.main(arguments) == 0
+    assert "Keys outside request tree" in capsys.readouterr().out
 
     request_path = workspace / "evaluation" / "request.yaml"
     before = hashlib.sha256(request_path.read_bytes()).hexdigest()
-    refused = _prepare(workspace)
-    assert refused.returncode == 2
-    assert "workspace already exists" in refused.stderr
+    assert example.main(arguments) == 2
+    assert "workspace already exists" in capsys.readouterr().err
     assert hashlib.sha256(request_path.read_bytes()).hexdigest() == before
 
     request = _payload(request_path)
@@ -255,7 +312,7 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
     assert report["baseline"]["mean_score"] > report["subject"]["mean_score"]
     assert report["derived_measurements"]["perplexity_ratio"]["status"] == "available"
     perplexity = report["derived_measurements"]["perplexity_ratio"]
-    assert 0.0 < perplexity["ratio"] < 0.1
+    assert 0.0 < perplexity["ratio"] < 1.0
     assert perplexity["ratio"] == pytest.approx(
         perplexity["subject_perplexity"] / perplexity["baseline_perplexity"]
     )

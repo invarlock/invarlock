@@ -64,8 +64,9 @@ Pass its commit, path, and digest to the build target shown below.
 The CUDA device flag only exposes a GPU to a CUDA-capable image. It does not
 add CUDA libraries to the CPU image.
 
-For a complete CPU journey that generates two distinct tiny checkpoints and
-derives all verifier inputs independently, run the checked-in
+For a complete journey that compares a pinned Qwen3-0.6B checkpoint with an
+explicit behavioral derivative and derives all verifier inputs independently,
+run the checked-in
 [Hugging Face example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/hf-transformers).
 The remaining sections
 explain the same transaction field by field for a real release workspace.
@@ -370,8 +371,10 @@ The [model-change workflow guide](change-scenarios.md) maps fine-tuned, pruned,
 quantized, GGUF, TensorRT-LLM, multimodal, harness, endpoint, and evidence
 handoff inputs to the same transaction. The
 [runnable examples](https://github.com/invarlock/invarlock/tree/main/examples)
-execute the maintained Hugging Face, PEFT, and evidence-handoff paths. Artifact
-creation remains in the system that owns it.
+execute the maintained Hugging Face, PEFT, TorchAO, GGUF/llama.cpp, LM
+Evaluation Harness, and TensorRT-LLM journeys. A separate evidence-handoff
+fixture exercises acceptance, policy rejection, and tamper rejection without a
+model runtime. Artifact creation remains in the system that owns it.
 
 ## Recovery and next steps
 

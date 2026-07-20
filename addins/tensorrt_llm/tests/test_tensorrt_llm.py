@@ -765,6 +765,9 @@ def test_tensorrt_llm_rejects_input_digest_and_runner_path_swap(
     _write_fake_runner(bindings.runner_executable_path)
     with pytest.raises(TensorRTLLMExecutionError, match="identity changed"):
         session.score(_batch(_record("a", "alpha")))
+    run_root = session._run_directory.path  # noqa: SLF001
+    session.close()
+    assert not run_root.exists()
 
 
 @_REQUIRES_POSIX_PINNING
@@ -847,6 +850,8 @@ def test_tensorrt_llm_uses_closed_request_and_sanitized_environment(
         assert keywords["close_fds"] is True
         assert keywords["pass_fds"] == ()
         assert keywords["start_new_session"] is True
+    session.close()
+    assert not run_path.exists()
 
 
 @pytest.mark.parametrize(
@@ -867,8 +872,13 @@ def test_tensorrt_llm_fails_closed_on_runner_errors(
 ) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
     session = TensorRTLLMProvider().open(spec, context)
-    with pytest.raises(TensorRTLLMExecutionError, match=message):
-        session.score(_batch(_record("bad", prompt)))
+    run_root = session._run_directory.path  # noqa: SLF001
+    try:
+        with pytest.raises(TensorRTLLMExecutionError, match=message):
+            session.score(_batch(_record("bad", prompt)))
+    finally:
+        session.close()
+    assert not run_root.exists()
 
 
 @_REQUIRES_POSIX_PINNING
@@ -885,9 +895,14 @@ def test_tensorrt_llm_timeout_kills_the_child_process_group(
 
     monkeypatch.setattr(tensorrt_llm_execution, "_kill_process_group", recording_kill)
     session = TensorRTLLMProvider().open(spec, context)
-    with pytest.raises(TensorRTLLMExecutionError, match="timed out"):
-        session.score(_batch(_record("sleep", "__sleep__")))
-    assert killed
+    run_root = session._run_directory.path  # noqa: SLF001
+    try:
+        with pytest.raises(TensorRTLLMExecutionError, match="timed out"):
+            session.score(_batch(_record("sleep", "__sleep__")))
+        assert killed
+    finally:
+        session.close()
+    assert not run_root.exists()
 
 
 def test_tensorrt_llm_kills_process_group_after_leader_exit(
@@ -1101,6 +1116,9 @@ def test_tensorrt_llm_uses_private_engine_and_tokenizer_snapshots(
     session._tokenizer_snapshot.write_bytes(b"snapshot changed")  # noqa: SLF001
     with pytest.raises(TensorRTLLMExecutionError, match="tokenizer contract changed"):
         session.score(_batch(_record("b", "beta")))
+    run_root = session._run_directory.path  # noqa: SLF001
+    session.close()
+    assert not run_root.exists()
 
 
 def test_tensorrt_llm_modules_remain_torch_free() -> None:

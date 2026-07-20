@@ -25,7 +25,10 @@ from invarlock.core.runtime_provider import (
 )
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
-from invarlock.runtime_behavior.transaction import run_evidence_side
+from invarlock.runtime_behavior.transaction import (
+    _RUNTIME_CLEANUP_FAILURE_NOTE,
+    run_evidence_side,
+)
 from invarlock.runtime_provider_evidence import RuntimeProviderEvidencePaths
 
 _JOB_FORMAT = "invarlock/runtime-side-job-v1"
@@ -50,6 +53,14 @@ _JOB_KEYS = {
 
 class RuntimeSideWorkerError(ValueError):
     """Raised when an internal worker job is unsafe or malformed."""
+
+
+def _closed_error_message(error: Exception) -> str:
+    lines = [str(error)]
+    notes = getattr(error, "__notes__", ())
+    if _RUNTIME_CLEANUP_FAILURE_NOTE in notes:
+        lines.append(_RUNTIME_CLEANUP_FAILURE_NOTE)
+    return "\n".join(lines)
 
 
 def _closed_absolute_path(value: object, *, expected: str, label: str) -> Path:
@@ -253,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         execute_job(Path(arguments[0]))
     except Exception as exc:  # closed process boundary converts all failures
-        print(str(exc), file=sys.stderr)
+        print(_closed_error_message(exc), file=sys.stderr)
         return 2
     return 0
 

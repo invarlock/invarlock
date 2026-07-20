@@ -6,20 +6,23 @@ named upstream operation or runtime call and completes InvarLock's
 
 | Integration | Command | Execution |
 | --- | --- | --- |
-| [Hugging Face Transformers](hf-transformers/) | `make example-hf-transformers` | CPU, local deterministic checkpoints |
-| [Hugging Face PEFT](peft-lora/) | `make example-peft-lora` | CPU, real LoRA save/reload/merge |
+| [Hugging Face Transformers](hf-transformers/) | `make example-hf-transformers` | Qwen3-0.6B checkpoint and an explicit behavioral derivative |
+| [Hugging Face PEFT](peft-lora/) | `make example-peft-lora` | Qwen3-0.6B LoRA training, save/reload, and merge |
+| [TorchAO](torchao-int8/) | `make example-torchao-int8` | Qwen3-0.6B INT8 weight-only quantization and a materialized checkpoint |
+| [GGUF with llama.cpp](gguf-llama-cpp/) | `make example-gguf-llama-cpp` | Official Qwen3-0.6B Q8 GGUF and an authenticated Q5 derivative |
+| [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | CPU, real upstream per-record output imported into the evidence transaction |
+| [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two H100 GPUs, and Qwen3-0.6B BF16-to-FP8 conversion |
 
-Optional runtime distributions keep their executable journeys beside the code
-they exercise:
+All six commands obtain or create their artifacts and complete the transaction
+from a clean committed checkout. The TensorRT-LLM showcase builds its engines
+on the target H100s and authenticates the resulting engine identities; it does
+not assume that independently compiled engine bytes will be identical. The
+first-party runtime packages also expose conformance and real-model
+qualification commands beside their implementations under `addins/`.
 
-- GGUF and llama.cpp: `addins/gguf`
-- Hugging Face vision-text: `addins/multimodal`
-- TensorRT-LLM: `addins/tensorrt_llm`
-
-Those packages expose conformance, image smoke, canary, readiness, and
-evidence-qualification targets for real model or engine fixtures. Their
-runbooks define the exact environment and preflight contract; they are not
-presented as zero-input tutorials.
+The GPU-backed checkpoint examples accept an explicit device when several
+accelerators are available, for example
+`EXAMPLE_ARGS="--runtime-device cuda:1"`.
 
 The root `make example-evidence-handoff` command runs accepted, policy-rejected,
-and tampered evidence through independently signed verification.
+and tampered evidence through separately signed verification.

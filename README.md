@@ -260,13 +260,15 @@ the closed profile and the equivalent explicit options.
 
 The repository's
 [`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
-directory contains maintained one-command Hugging Face and PEFT journeys. They
-create real checkpoint artifacts and complete the source-bound `evaluate`,
-`verify`, and `report` transaction. The repository also includes an offline
-import and evidence-handoff journey for complete per-record results produced
-elsewhere. Import mode requires the canonical schedule, typed observations,
-runtime bindings, and paired records; InvarLock re-derives the comparison
-before publication.
+directory contains maintained Hugging Face, PEFT, TorchAO, GGUF/llama.cpp,
+TensorRT-LLM, and LM Evaluation Harness journeys. They create or obtain real
+artifacts and complete the source-bound `evaluate`, `verify`, and `report`
+transaction. The TensorRT-LLM journey builds BF16 and calibrated FP8
+Qwen3-0.6B engines concurrently on the target H100 GPUs before authenticating
+their resulting identities. The repository also includes an offline evidence-handoff journey
+for complete per-record results produced elsewhere. Import mode requires the
+canonical schedule, typed observations, runtime bindings, and paired records;
+InvarLock re-derives the comparison before publication.
 
 The [model-change workflow guide](docs/user-guide/change-scenarios.md) maps
 fine-tuning, pruning, quantization, GGUF, TensorRT-LLM, multimodal, harness, and

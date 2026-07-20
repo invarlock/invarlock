@@ -281,6 +281,11 @@ def test_static_inspection_json_enforces_depth_and_item_budgets(
         )
 
 
+def test_static_inspection_item_budget_accommodates_qwen3_contract() -> None:
+    assert tensorrt_llm_inspection._MAX_JSON_ITEMS >= 1_060_694  # noqa: SLF001
+    assert tensorrt_llm_inspection._MAX_JSON_ITEMS <= 1_250_000  # noqa: SLF001
+
+
 @pytest.mark.parametrize("value", [True, -1, 2**31, "1"])
 def test_static_inspection_integer_bounds_are_closed(value: object) -> None:
     with pytest.raises(TensorRTLLMExecutionError, match="supported bound"):

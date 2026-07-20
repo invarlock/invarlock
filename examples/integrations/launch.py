@@ -5,17 +5,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-_INTEGRATIONS = ("hf-transformers", "peft-lora")
+_INTEGRATIONS = ("hf-transformers", "peft-lora", "torchao-int8")
 _ZERO_DIGEST = "sha256:" + ("0" * 64)
 
 
 def _run(
-    command: list[str], *, cwd: Path, capture_output: bool = False
+    command: list[str],
+    *,
+    cwd: Path,
+    capture_output: bool = False,
+    environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     completed = subprocess.run(
         command,
@@ -23,6 +28,7 @@ def _run(
         check=False,
         capture_output=capture_output,
         text=True,
+        env=environment if environment is not None else os.environ.copy(),
     )
     if completed.returncode != 0:
         diagnostic = (completed.stderr or completed.stdout or "").strip()
@@ -53,7 +59,12 @@ def _require_committed_checkout(repository: Path) -> str:
 
 
 def _runtime_image(
-    *, repository: Path, build_root: Path, container_engine: str
+    *,
+    repository: Path,
+    build_root: Path,
+    container_engine: str,
+    dockerfile: str = "runtime/Dockerfile",
+    image_prefix: str = "invarlock-example-runtime",
 ) -> tuple[str, str]:
     commit = _require_committed_checkout(repository)
     source_bundle = build_root / "source.tar"
@@ -77,7 +88,7 @@ def _runtime_image(
     if not isinstance(bundle_digest, str):
         raise RuntimeError("source-bundle creation did not return its digest")
     epoch = _git(repository, "show", "-s", "--format=%ct", commit)
-    image = f"invarlock-example-runtime:{commit[:12]}"
+    image = f"{image_prefix}:{commit[:12]}"
     _run(
         [
             sys.executable,
@@ -93,9 +104,11 @@ def _runtime_image(
             "--container-engine",
             container_engine,
             "--dockerfile",
-            "runtime/Dockerfile",
+            dockerfile,
             "--image",
             image,
+            "--statement",
+            str(build_root / "runtime-build.json"),
             "--build-arg",
             f"SOURCE_DATE_EPOCH={epoch}",
         ],
@@ -108,10 +121,9 @@ def _runtime_image(
     ).stdout.strip()
     if not inspected.startswith("sha256:") or len(inspected) != 71:
         raise RuntimeError("container inspection did not return a sha256 image ID")
-    # A local image config ID is an immutable execution coordinate but not a
-    # registry manifest digest.  The runtime boundary requires that coordinate
-    # as both the reference and digest; combining a mutable tag with the config
-    # ID must fail closed.
+    # The engine-reported local image ID is an immutable execution coordinate.
+    # The runtime boundary requires that coordinate as both the reference and
+    # digest; combining a mutable tag with a separate identity must fail closed.
     return inspected, inspected
 
 
@@ -122,8 +134,43 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--container-engine", choices=("docker", "podman"), default="docker"
     )
+    parser.add_argument(
+        "--runtime-device",
+        type=_runtime_device_argument,
+        default="auto",
+        help=(
+            "Use CUDA when available, or select CPU, CUDA, or a concrete "
+            "CUDA device such as cuda:1 explicitly."
+        ),
+    )
     parser.add_argument("--prepare-only", action="store_true")
     return parser
+
+
+def _resolve_runtime_device(requested: str) -> str:
+    if requested != "auto":
+        return requested
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def _runtime_device_argument(value: str) -> str:
+    if value in {"auto", "cpu", "cuda"}:
+        return value
+    prefix, separator, index = value.partition(":")
+    if (
+        prefix == "cuda"
+        and separator
+        and index
+        and all("0" <= character <= "9" for character in index)
+    ):
+        return value
+    raise argparse.ArgumentTypeError(
+        "runtime device must be auto, cpu, cuda, or cuda:<non-negative-index>"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -146,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
         workspace.mkdir()
     transaction = workspace / "transaction"
     try:
+        runtime_device = _resolve_runtime_device(arguments.runtime_device)
         if arguments.prepare_only:
             image = None
             image_digest = _ZERO_DIGEST
@@ -156,6 +204,16 @@ def main(argv: list[str] | None = None) -> int:
                 repository=repository,
                 build_root=build_root,
                 container_engine=arguments.container_engine,
+                dockerfile=(
+                    "runtime/Dockerfile.cuda"
+                    if runtime_device.startswith("cuda")
+                    else "runtime/Dockerfile"
+                ),
+                image_prefix=(
+                    "invarlock-example-runtime-cuda"
+                    if runtime_device.startswith("cuda")
+                    else "invarlock-example-runtime"
+                ),
             )
         command = [
             sys.executable,
@@ -167,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
             image_digest,
             "--container-engine",
             arguments.container_engine,
+            "--runtime-device",
+            runtime_device,
         ]
         if arguments.prepare_only:
             command.append("--prepare-only")

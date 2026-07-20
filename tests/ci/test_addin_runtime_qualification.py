@@ -168,6 +168,8 @@ def test_tensorrt_runtime_has_gpu_build_smoke_canary_and_shared_qualification() 
     assert "src=$$canonical_input_root,dst=/inputs,readonly" in makefile
     _assert_frozen_source_labels(dockerfile)
     _assert_shared_qualification_wrapper(makefile, "tensorrt_llm")
+    assert "--env LD_LIBRARY_PATH=/usr/local/tensorrt/lib" in makefile
+    assert "ctypes.CDLL('libnvonnxparser.so.10')" in makefile
     assert "INVARLOCK_TENSORRT_LLM_RUNNER" not in dockerfile
     assert 'IMAGE="$IMAGE"' in readme
     assert 'IMAGE_DIGEST="$DIGEST"' in readme

@@ -24,12 +24,17 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
         '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
         '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
     ) in text
-    assert text.count("--torch-backend cpu") == 2
+    assert text.count("--torch-backend cpu") == 3
     assert text.count("--torch-backend cu128") == 2
     assert (
         '"${WORKFLOW_DIR}/multimodal-runtime.in" \\\n'
         '    "${WORKFLOW_DIR}/multimodal-runtime-py312.txt"'
     ) in text
+    assert (
+        '"${WORKFLOW_DIR}/lm-evaluation-harness.in" \\\n'
+        '    "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt"'
+    ) in text
+    assert "--constraints requirements/workflows/runtime-image.in" in text
     assert "--no-deps" in text
 
 
@@ -87,6 +92,18 @@ def test_multimodal_runtime_lock_pins_cuda_matched_torchvision() -> None:
     assert "torchvision==0.26.0+cu128" in text
     assert "pillow==12.3.0" in text
     assert "torch==" not in text
+    assert "--hash=sha256:" in text
+
+
+def test_lm_evaluation_harness_lock_is_complete_and_cpu_aligned() -> None:
+    text = (WORKFLOW_REQUIREMENTS / "lm-evaluation-harness-py312.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "lm-eval==0.4.12" in text
+    assert "torch==2.11.0+cpu" in text
+    assert "transformers==5.14.1" in text
+    assert "+cu" not in text
     assert "--hash=sha256:" in text
 
 

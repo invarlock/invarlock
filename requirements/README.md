@@ -9,6 +9,11 @@ documentation, release, security, and runtime-image builds.
 core and tooling locks stay independent of a model runtime. Hugging Face locks
 resolve the published Torch distribution for their target platform, while
 runtime-image locks select the container's Torch backend explicitly.
+`lm-evaluation-harness-py312.txt` pins the complete Python 3.12 Linux x86_64
+dependency closure used only by the LM Evaluation Harness integration image;
+it is compiled from `lm-evaluation-harness.in` against the canonical CPU
+runtime input so the derived image cannot resolve a second inference stack at
+build time.
 `release-install-py312.txt` and `release-install-py313.txt` are the
 Python-version-specific, hash-pinned dependency closures installed before the
 coordinated local release wheels. Both are compiled from
