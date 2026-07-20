@@ -141,6 +141,9 @@ def _save_model_and_tokenizer(
     model.eval()
     model.save_pretrained(checkpoint, safe_serialization=True)
     tokenizer = _tokenizer(checkpoint, transformers, tokenizers)
+    checkpoint.chmod(0o755)
+    for path in checkpoint.rglob("*"):
+        path.chmod(0o755 if path.is_dir() else 0o644)
     return hf_tokenizer_contract_sha256(tokenizer)
 
 

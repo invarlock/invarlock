@@ -34,6 +34,13 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
     assert anchors["baseline_runtime_digest"] == ZERO_DIGEST
     assert paths.evidence_key.stat().st_mode & 0o777 == 0o600
     assert paths.verifier_key.stat().st_mode & 0o777 == 0o600
+    for checkpoint in ("baseline", "subject"):
+        model_root = paths.evaluation / "models" / checkpoint
+        assert model_root.stat().st_mode & 0o005 == 0o005
+        assert all(
+            path.stat().st_mode & (0o005 if path.is_dir() else 0o004)
+            for path in model_root.rglob("*")
+        )
 
 
 def test_peft_preparation_trains_serializes_reloads_and_merges(tmp_path: Path) -> None:
@@ -202,7 +209,7 @@ def test_runtime_image_builds_from_authenticated_source(
         build_root=build,
         container_engine="docker",
     )
-    assert image == "invarlock-example-runtime:" + ("c" * 12)
+    assert image == "sha256:" + ("d" * 64)
     assert digest == "sha256:" + ("d" * 64)
     assert any("authenticated_runtime_build.py" in " ".join(item) for item in commands)
 

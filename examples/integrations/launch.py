@@ -108,7 +108,11 @@ def _runtime_image(
     ).stdout.strip()
     if not inspected.startswith("sha256:") or len(inspected) != 71:
         raise RuntimeError("container inspection did not return a sha256 image ID")
-    return image, inspected
+    # A local image config ID is an immutable execution coordinate but not a
+    # registry manifest digest.  The runtime boundary requires that coordinate
+    # as both the reference and digest; combining a mutable tag with the config
+    # ID must fail closed.
+    return inspected, inspected
 
 
 def _parser() -> argparse.ArgumentParser:
