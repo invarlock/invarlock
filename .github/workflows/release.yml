@@ -16,11 +16,11 @@ on:
         options: [ testpypi, pypi ]
         default: testpypi
       release_tag:
-        description: "Existing release tag to rebuild/publish (for example v0.5.0)"
+        description: "Existing release tag to validate/publish (for example v0.5.0)"
         type: string
         default: ""
-      promotion_run_id:
-        description: "Successful TestPyPI release run ID required for PyPI"
+      candidate_run_id:
+        description: "Successful tagged release workflow run ID required for publication"
         type: string
         default: ""
 
@@ -108,6 +108,7 @@ jobs:
 
   build_check:
     needs: resolve_release_ref
+    if: ${{ github.event_name == 'push' || inputs.publish != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -115,7 +116,9 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: default
     permissions:
+      attestations: write
       contents: read
+      id-token: write
     outputs:
       dist_ledger_sha256: ${{ steps.dist_digests.outputs.ledger_sha256 }}
     steps:
@@ -408,6 +411,12 @@ jobs:
           cd dist
           printf '%s  %s\n' "${EXPECTED_DIST_LEDGER_SHA256}" SHA256SUMS | sha256sum --check -
           sha256sum --check SHA256SUMS
+      - name: Attest tagged release candidate
+        id: attest_candidate
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-checksums: dist/SHA256SUMS
       - name: Upload dist artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -420,6 +429,14 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
+      - name: Upload tagged candidate provenance
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-candidate-provenance
+          path: ${{ steps.attest_candidate.outputs.bundle-path }}
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload SBOM artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -429,7 +446,7 @@ jobs:
           if-no-files-found: error
           retention-days: 3
   authorize_candidate:
-    needs: [build_check, resolve_release_ref]
+    needs: resolve_release_ref
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
@@ -442,14 +459,14 @@ jobs:
       actions: read
       contents: read
     outputs:
-      artifact_run_id: ${{ steps.authorize.outputs.artifact_run_id }}
-      dist_ledger_sha256: ${{ steps.authorize.outputs.dist_ledger_sha256 }}
+      artifact_run_id: ${{ steps.authenticate.outputs.artifact_run_id }}
+      dist_ledger_sha256: ${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}
     steps:
       - name: Checkout release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
-      - name: Set up promotion Python
+      - name: Set up candidate verification Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
@@ -457,65 +474,54 @@ jobs:
         id: validate_publication
         shell: bash
         env:
-          INVARLOCK_PROMOTION_RUN_ID: ${{ inputs.promotion_run_id }}
+          INVARLOCK_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
           INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
-          if [ "${INVARLOCK_PUBLISH_TARGET}" = "testpypi" ]; then
-            if [ -n "${INVARLOCK_PROMOTION_RUN_ID}" ]; then
-              echo "promotion_run_id must be empty for TestPyPI" >&2
-              exit 1
-            fi
-            echo "candidate_run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
-          elif [ "${INVARLOCK_PUBLISH_TARGET}" = "pypi" ]; then
-            if [[ ! "${INVARLOCK_PROMOTION_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
-              echo "promotion_run_id must identify a successful TestPyPI run" >&2
-              exit 1
-            fi
-            if [ "${INVARLOCK_PROMOTION_RUN_ID}" = "${GITHUB_RUN_ID}" ]; then
-              echo "production promotion must use an earlier TestPyPI run" >&2
-              exit 1
-            fi
-            echo "candidate_run_id=${INVARLOCK_PROMOTION_RUN_ID}" >> "$GITHUB_OUTPUT"
-          else
+          if [ "${INVARLOCK_PUBLISH_TARGET}" != "testpypi" ] && [ "${INVARLOCK_PUBLISH_TARGET}" != "pypi" ]; then
             echo "unsupported publication target" >&2
             exit 1
           fi
-      - name: Download promoted candidate authorization
-        if: ${{ inputs.target == 'pypi' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: testpypi-promotion
-          path: _promotion
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.validate_publication.outputs.candidate_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Authorize exact publication candidate
-        id: authorize
+          if [[ ! "${INVARLOCK_CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "candidate_run_id must identify a successful tagged release run" >&2
+            exit 1
+          fi
+          if [ "${INVARLOCK_CANDIDATE_RUN_ID}" = "${GITHUB_RUN_ID}" ]; then
+            echo "publication must use an earlier tagged release run" >&2
+            exit 1
+          fi
+      - name: Authenticate tagged candidate run
+        id: authenticate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INVARLOCK_BUILD_LEDGER_SHA256: ${{ needs.build_check.outputs.dist_ledger_sha256 }}
-          INVARLOCK_CANDIDATE_RUN_ID: ${{ steps.validate_publication.outputs.candidate_run_id }}
-          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
+          INVARLOCK_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
           INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
           INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
-          set -euo pipefail
-          if [ "${INVARLOCK_PUBLISH_TARGET}" = "testpypi" ]; then
-            python scripts/release/testpypi_promotion.py current \
-              --candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}" \
-              --dist-ledger-sha256 "${INVARLOCK_BUILD_LEDGER_SHA256}" \
-              --github-output "${GITHUB_OUTPUT}"
-          else
-            python scripts/release/testpypi_promotion.py authorize \
-              --manifest _promotion/promotion.json \
-              --release-sha "${INVARLOCK_RELEASE_SHA}" \
-              --release-tag "${INVARLOCK_RELEASE_TAG}" \
-              --candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}" \
-              --repository "${GITHUB_REPOSITORY}" \
-              --api-url "${GITHUB_API_URL}" \
-              --github-output "${GITHUB_OUTPUT}"
-          fi
+          python scripts/release/tagged_release_candidate.py authenticate \
+            --release-sha "${INVARLOCK_RELEASE_SHA}" \
+            --release-tag "${INVARLOCK_RELEASE_TAG}" \
+            --candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --api-url "${GITHUB_API_URL}" \
+            --github-output "${GITHUB_OUTPUT}"
+      - name: Download tagged candidate distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dist
+          path: _release_dist
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.authenticate.outputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify tagged candidate ledger
+        id: verify_candidate
+        env:
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          python scripts/release/tagged_release_candidate.py verify-ledger \
+            --dist-dir _release_dist \
+            --release-tag "${INVARLOCK_RELEASE_TAG}" \
+            --github-output "${GITHUB_OUTPUT}"
 
   publish:
     needs: [authorize_candidate, resolve_release_ref]
@@ -540,7 +546,6 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      attestations: write
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
@@ -677,18 +682,6 @@ jobs:
                   raise SystemExit(f"distribution digest mismatch: {name}")
               print(f"{name}: OK")
           PY
-      - name: Attest release artifacts
-        id: attest_release
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
-        with:
-          subject-path: publish-dist/*
-      - name: Upload provenance bundle
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-provenance-${{ matrix.package }}
-          path: ${{ steps.attest_release.outputs.bundle-path }}
-          if-no-files-found: error
-          retention-days: 3
       - name: Reconfirm immutable release tag
         env:
           INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -707,7 +700,7 @@ jobs:
         with:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
-          skip-existing: true
+          skip-existing: ${{ inputs.target == 'testpypi' }}
 
   verify_hosted_release:
     needs: [authorize_candidate, publish, resolve_release_ref]
@@ -745,10 +738,10 @@ jobs:
             --target "${INVARLOCK_PUBLISH_TARGET}" \
             --version "${INVARLOCK_RELEASE_VERSION}"
 
-  testpypi_smoke:
+  published_install_smoke:
     needs: [authorize_candidate, resolve_release_ref, verify_hosted_release]
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
+      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
     runs-on: ubuntu-latest
     # Leave the same bounded verification budget plus installation headroom.
     timeout-minutes: 120
@@ -770,19 +763,20 @@ jobs:
           path: _release_dist
           run-id: ${{ needs.authorize_candidate.outputs.artifact_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download ledger-selected TestPyPI wheels
+      - name: Download ledger-selected hosted wheels
         env:
           EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
+          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
           INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           set -euo pipefail
           python scripts/release/verify_hosted_distributions.py \
             --ledger _release_dist/SHA256SUMS \
             --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
-            --target testpypi \
+            --target "${INVARLOCK_PUBLISH_TARGET}" \
             --version "${INVARLOCK_RELEASE_VERSION}" \
             --wheelhouse wheelhouse
-      - name: Install published wheel and smoke test
+      - name: Install published wheels and smoke test
         env:
           INVARLOCK_LIGHT_IMPORT: "1"
         run: |
@@ -817,47 +811,3 @@ jobs:
           if any(candidate != expected for candidate in observed.values()):
               raise SystemExit(f"first-party version mismatch: {observed}")
           PY
-
-  record_testpypi_promotion:
-    needs: [authorize_candidate, resolve_release_ref, testpypi_smoke]
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' &&
-        inputs.publish == true &&
-        inputs.target == 'testpypi' &&
-        needs.testpypi_smoke.result == 'success'
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout release source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
-      - name: Set up promotion Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with:
-          python-version: '3.13'
-      - name: Record exact TestPyPI promotion candidate
-        env:
-          INVARLOCK_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
-          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
-          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-          mkdir -p promotion
-          python scripts/release/testpypi_promotion.py record \
-            --output promotion/promotion.json \
-            --release-sha "${INVARLOCK_RELEASE_SHA}" \
-            --release-tag "${INVARLOCK_RELEASE_TAG}" \
-            --dist-ledger-sha256 "${INVARLOCK_DIST_LEDGER_SHA256}" \
-            --source-run-id "${GITHUB_RUN_ID}"
-      - name: Upload TestPyPI promotion authorization
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: testpypi-promotion
-          path: promotion/promotion.json
-          if-no-files-found: error
-          retention-days: 14

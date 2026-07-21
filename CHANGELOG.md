@@ -135,14 +135,17 @@ from the same canonical JSON.
 - Fixed worker-unreadable artifact and support mounts to fail on the host with
   an actionable diagnostic before container launch instead of an opaque runtime
   authentication error.
-- Fixed release qualification so deterministic source archives, matching wheel
-  bytes, image labels, signed canaries, rendered packs, verification receipts,
-  and published artifact digests must remain bound to the same candidate. The
-  clean-export safeguard prevents ignored local fixtures from producing a false
-  green result, while artifact-install smokes clear source and user import paths
-  before force-installing the exact release wheels. Coordinated core and add-in
+- Fixed release qualification so source, runtime images, signed canaries,
+  rendered packs, verification receipts, and published archive digests remain
+  bound to the same candidate. The protected tag run now builds and attests one
+  authoritative ten-archive distribution set recorded in a single digest
+  ledger. Manual TestPyPI or PyPI publication authenticates and reuses that
+  exact tag-run artifact instead of rebuilding it; TestPyPI remains an optional
+  smoke rather than a production prerequisite. Coordinated core and add-in
   distributions publish through separate project-scoped trusted identities,
-  then pass one ledger-wide hosted-artifact verification and install smoke.
+  then pass ledger-wide hosted-artifact verification and a clean hosted-wheel
+  install smoke. Clean-export and isolated-install safeguards prevent ignored
+  local fixtures or source-path imports from producing a false green result.
 - Updated maintained dependency locks to use patched CPU and CUDA packages.
   The LM Evaluation Harness image now derives a deterministic cache-free wheel
   from an authenticated upstream wheel, rejects response-cache use explicitly,

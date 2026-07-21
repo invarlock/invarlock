@@ -183,10 +183,17 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "${{ inputs.release_tag }}"
     )
     inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-    assert inputs["promotion_run_id"]["default"] == ""
+    assert inputs["candidate_run_id"]["default"] == ""
 
     build = jobs["build_check"]
+    assert "github.event_name == 'push'" in build["if"]
+    assert "inputs.publish != true" in build["if"]
     assert build["timeout-minutes"] >= 120
+    assert build["permissions"] == {
+        "attestations": "write",
+        "contents": "read",
+        "id-token": "write",
+    }
     checkout = build["steps"][0]
     assert checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -319,7 +326,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         for index, step in enumerate(build["steps"])
         if step.get("name") == "Upload dist artifacts"
     )
-    assert upload_verify_index + 1 == upload_index
+    candidate_attestation = _step(build["steps"], "Attest tagged release candidate")
+    assert candidate_attestation["if"] == "${{ github.event_name == 'push' }}"
+    assert candidate_attestation["with"]["subject-checksums"] == ("dist/SHA256SUMS")
+    assert upload_verify_index + 1 == build["steps"].index(candidate_attestation)
+    assert build["steps"].index(candidate_attestation) + 1 == upload_index
 
     gitleaks_range = _step(build["steps"], "Resolve gitleaks release range")
     assert "previous release tag is not a valid version tag" in gitleaks_range["run"]
@@ -349,40 +360,24 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert secret_failure_index < distribution_build_index
 
     authorization = jobs["authorize_candidate"]
+    assert authorization["needs"] == "resolve_release_ref"
     assert authorization["permissions"] == {"actions": "read", "contents": "read"}
     authorization_checkout = _step(authorization["steps"], "Checkout release source")
     assert authorization_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
     validate_publication = _step(authorization["steps"], "Validate publication inputs")
-    assert validate_publication["env"]["INVARLOCK_PROMOTION_RUN_ID"] == (
-        "${{ inputs.promotion_run_id }}"
+    assert validate_publication["env"]["INVARLOCK_CANDIDATE_RUN_ID"] == (
+        "${{ inputs.candidate_run_id }}"
     )
     assert (
-        "promotion_run_id must identify a successful TestPyPI run"
+        "candidate_run_id must identify a successful tagged release run"
         in (validate_publication["run"])
     )
-    promotion_download = _step(
-        authorization["steps"], "Download promoted candidate authorization"
-    )
-    assert promotion_download["if"] == "${{ inputs.target == 'pypi' }}"
-    assert promotion_download["with"]["name"] == "testpypi-promotion"
-    assert promotion_download["with"]["run-id"] == (
-        "${{ steps.validate_publication.outputs.candidate_run_id }}"
-    )
-    assert promotion_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
-    authorize = _step(authorization["steps"], "Authorize exact publication candidate")[
-        "run"
-    ]
-    assert authorization["steps"].index(authorization_checkout) < next(
-        index
-        for index, step in enumerate(authorization["steps"])
-        if step.get("name") == "Authorize exact publication candidate"
-    )
+    authenticate = _step(authorization["steps"], "Authenticate tagged candidate run")
+    authenticate_run = authenticate["run"]
     for required in (
-        "scripts/release/testpypi_promotion.py current",
-        "scripts/release/testpypi_promotion.py authorize",
-        "--manifest _promotion/promotion.json",
+        "scripts/release/tagged_release_candidate.py authenticate",
         '--release-sha "${INVARLOCK_RELEASE_SHA}"',
         '--release-tag "${INVARLOCK_RELEASE_TAG}"',
         '--candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}"',
@@ -390,14 +385,38 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         '--api-url "${GITHUB_API_URL}"',
         '--github-output "${GITHUB_OUTPUT}"',
     ):
-        assert required in authorize
+        assert required in authenticate_run
+    candidate_download = _step(
+        authorization["steps"], "Download tagged candidate distributions"
+    )
+    assert candidate_download["with"]["name"] == "dist"
+    assert candidate_download["with"]["run-id"] == (
+        "${{ steps.authenticate.outputs.artifact_run_id }}"
+    )
+    assert candidate_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
+    verify_candidate = _step(authorization["steps"], "Verify tagged candidate ledger")
+    assert (
+        "scripts/release/tagged_release_candidate.py verify-ledger"
+        in (verify_candidate["run"])
+    )
+    assert "--dist-dir _release_dist" in verify_candidate["run"]
+    assert authorization["outputs"] == {
+        "artifact_run_id": "${{ steps.authenticate.outputs.artifact_run_id }}",
+        "dist_ledger_sha256": (
+            "${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}"
+        ),
+    }
+    assert (
+        authorization["steps"].index(authenticate)
+        < authorization["steps"].index(candidate_download)
+        < authorization["steps"].index(verify_candidate)
+    )
 
     publish = jobs["publish"]
     assert publish["permissions"] == {
         "actions": "read",
         "contents": "read",
         "id-token": "write",
-        "attestations": "write",
     }
     assert "github.event_name == 'push'" not in publish["if"]
     assert "github.event_name == 'workflow_dispatch'" in publish["if"]
@@ -430,7 +449,9 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     assert "user" not in publish_step.get("with", {})
     assert "password" not in publish_step.get("with", {})
-    assert publish_step["with"]["skip-existing"] is True
+    assert publish_step["with"]["skip-existing"] == (
+        "${{ inputs.target == 'testpypi' }}"
+    )
     stage_publish = _step(publish["steps"], "Stage publish distributions")
     assert stage_publish["env"]["INVARLOCK_PACKAGE"] == "${{ matrix.package }}"
     for package in (
@@ -474,12 +495,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         for index, step in enumerate(publish["steps"])
         if step.get("name") == "Verify distribution digests before publish"
     )
-    attest_index = next(
-        index
-        for index, step in enumerate(publish["steps"])
-        if step.get("name") == "Attest release artifacts"
-    )
-    assert verify_index + 1 == attest_index
+    tag_index = publish["steps"].index(tag_recheck)
+    assert verify_index < tag_index
 
     hosted_job = jobs["verify_hosted_release"]
     assert set(hosted_job["needs"]) == {
@@ -512,28 +529,29 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "--ledger _release_dist/SHA256SUMS" in hosted_verify["run"]
     assert "if" not in hosted_verify
 
-    testpypi = jobs["testpypi_smoke"]
-    assert set(testpypi["needs"]) == {
+    published_smoke = jobs["published_install_smoke"]
+    assert set(published_smoke["needs"]) == {
         "authorize_candidate",
         "resolve_release_ref",
         "verify_hosted_release",
     }
-    assert testpypi["permissions"] == {"actions": "read", "contents": "read"}
-    testpypi_checkout = testpypi["steps"][0]
-    assert testpypi_checkout["with"]["ref"] == (
+    assert published_smoke["permissions"] == {"actions": "read", "contents": "read"}
+    published_checkout = published_smoke["steps"][0]
+    assert published_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
     hosted_download = _step(
-        testpypi["steps"], "Download ledger-selected TestPyPI wheels"
+        published_smoke["steps"], "Download ledger-selected hosted wheels"
     )
     assert hosted_download["env"]["EXPECTED_DIST_LEDGER_SHA256"] == (
         "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
     )
     assert "scripts/release/verify_hosted_distributions.py" in hosted_download["run"]
     assert "--ledger _release_dist/SHA256SUMS" in hosted_download["run"]
+    assert '--target "${INVARLOCK_PUBLISH_TARGET}"' in hosted_download["run"]
     assert "--wheelhouse wheelhouse" in hosted_download["run"]
     assert "urllib.request" not in hosted_download["run"]
-    smoke = _step(testpypi["steps"], "Install published wheel and smoke test")
+    smoke = _step(published_smoke["steps"], "Install published wheels and smoke test")
     assert "requirements/workflows/pip-bootstrap.txt" in smoke["run"]
     assert smoke["run"].index("release-install-py313.txt") < smoke["run"].index(
         "--no-deps --force-reinstall wheelhouse/*.whl"
@@ -553,34 +571,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "is_relative_to(site)" in smoke["run"]
     assert "first-party version mismatch" in smoke["run"]
 
-    promotion = jobs["record_testpypi_promotion"]
-    assert set(promotion["needs"]) == {
-        "authorize_candidate",
-        "resolve_release_ref",
-        "testpypi_smoke",
-    }
-    assert "needs.testpypi_smoke.result == 'success'" in promotion["if"]
-    promotion_checkout = _step(promotion["steps"], "Checkout release source")
-    assert promotion_checkout["with"]["ref"] == (
-        "${{ needs.resolve_release_ref.outputs.release_sha }}"
-    )
-    promotion_record = _step(
-        promotion["steps"], "Record exact TestPyPI promotion candidate"
-    )["run"]
-    assert promotion["steps"].index(promotion_checkout) < next(
-        index
-        for index, step in enumerate(promotion["steps"])
-        if step.get("name") == "Record exact TestPyPI promotion candidate"
-    )
-    assert "scripts/release/testpypi_promotion.py record" in promotion_record
-    assert '--release-sha "${INVARLOCK_RELEASE_SHA}"' in promotion_record
-    assert '--release-tag "${INVARLOCK_RELEASE_TAG}"' in promotion_record
-    assert '--source-run-id "${GITHUB_RUN_ID}"' in promotion_record
-    promotion_upload = _step(
-        promotion["steps"], "Upload TestPyPI promotion authorization"
-    )
-    assert promotion_upload["with"]["name"] == "testpypi-promotion"
-    assert promotion_upload["with"]["if-no-files-found"] == "error"
+    assert "record_testpypi_promotion" not in jobs
 
 
 def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
@@ -601,7 +592,7 @@ def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
     required_job_minutes = math.ceil(verifier_worst_case_seconds / 60) + 15
 
     assert jobs["verify_hosted_release"]["timeout-minutes"] >= required_job_minutes
-    assert jobs["testpypi_smoke"]["timeout-minutes"] >= required_job_minutes
+    assert jobs["published_install_smoke"]["timeout-minutes"] >= required_job_minutes
 
 
 def test_release_stages_each_distribution_in_its_own_publish_job(

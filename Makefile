@@ -197,7 +197,7 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		tests/scripts/test_release_preflight_edges.py \
 		tests/scripts/test_verify_hosted_distributions.py \
 		tests/scripts/test_verify_hosted_distributions_edges.py \
-		tests/scripts/test_testpypi_promotion.py \
+		tests/scripts/test_tagged_release_candidate.py \
 		--cov --cov-config=scripts/release.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
@@ -209,7 +209,7 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/release_preflight.py' --fail-under=90
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/testpypi_promotion.py' --fail-under=90
+		--include='scripts/release/tagged_release_candidate.py' --fail-under=90
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/verify_hosted_distributions.py' --fail-under=90
 
