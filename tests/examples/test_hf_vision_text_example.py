@@ -413,6 +413,7 @@ def test_makefile_and_docs_expose_one_command_vision_example() -> None:
     guide = root.joinpath("examples/integrations/hf-vision-text/README.md")
 
     assert "example-hf-vision-text:" in makefile
+    assert "-m examples.integrations.launch hf-vision-text" in makefile
     assert "make example-hf-vision-text" in overview
     assert "make example-hf-vision-text" in integrations
     assert guide.is_file()

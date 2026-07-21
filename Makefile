@@ -278,20 +278,20 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \
-		examples/integrations/launch.py hf-transformers $(EXAMPLE_ARGS)
+		-m examples.integrations.launch hf-transformers $(EXAMPLE_ARGS)
 
 example-hf-vision-text:  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
 	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --extra hf \
 		--with ./addins/multimodal python \
-		examples/integrations/launch.py hf-vision-text $(EXAMPLE_ARGS)
+		-m examples.integrations.launch hf-vision-text $(EXAMPLE_ARGS)
 
 example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
 	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
-		examples/integrations/launch.py peft-lora $(EXAMPLE_ARGS)
+		-m examples.integrations.launch peft-lora $(EXAMPLE_ARGS)
 
 example-torchao-int8:  ## Quantize with TorchAO, then evaluate, verify, and report
 	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-torchao python \
-		examples/integrations/launch.py torchao-int8 $(EXAMPLE_ARGS)
+		-m examples.integrations.launch torchao-int8 $(EXAMPLE_ARGS)
 
 example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
