@@ -57,9 +57,11 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
         '    "${WORKFLOW_DIR}/multimodal-runtime-py312.txt"'
     ) in text
     assert (
-        '"${WORKFLOW_DIR}/lm-evaluation-harness.in" \\\n'
-        '    "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt"'
+        '"${WORKFLOW_DIR}/lm-evaluation-harness.in" \\\n    "${harness_full_lock}"'
     ) in text
+    assert "build_cache_free_lm_eval_wheel.py" in text
+    assert "filter-lock" in text
+    assert '--output "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt"' in text
     assert "--constraints requirements/workflows/runtime-image.in" in text
     assert "--no-deps" in text
 
@@ -170,11 +172,20 @@ def test_lm_evaluation_harness_lock_is_complete_and_cpu_aligned() -> None:
         encoding="utf-8"
     )
 
-    assert "lm-eval==0.4.12" in text
+    assert "lm-eval==" not in text
+    assert "sqlitedict==" not in text
     assert "torch==2.13.0+cpu" in text
     assert "transformers==5.14.1" in text
     assert "+cu" not in text
     assert "--hash=sha256:" in text
+
+    upstream = (
+        WORKFLOW_REQUIREMENTS / "lm-evaluation-harness-upstream-wheel.txt"
+    ).read_text(encoding="utf-8")
+    assert "lm-eval==0.4.12" in upstream
+    assert (
+        "02971ff68284dd14cfa7fce9310a58452c4162e8d413ba96aa7988a0ff9352ef" in upstream
+    )
 
 
 def test_declared_typer_floor_matches_the_maintained_runtime_version() -> None:

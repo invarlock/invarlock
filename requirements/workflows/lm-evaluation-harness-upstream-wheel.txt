@@ -1,0 +1,3 @@
+# Exact upstream wheel used to derive the cache-free integration package.
+lm-eval==0.4.12 \
+    --hash=sha256:02971ff68284dd14cfa7fce9310a58452c4162e8d413ba96aa7988a0ff9352ef

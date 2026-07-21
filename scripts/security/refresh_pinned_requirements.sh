@@ -183,13 +183,23 @@ run_workflow_locks() {
     --torch-backend cu126 \
     --no-deps
 
+  local harness_full_lock="${WORKFLOW_DIR}/.lm-evaluation-harness-full-py312.txt"
   compile_req_platform \
     "${WORKFLOW_DIR}/lm-evaluation-harness.in" \
-    "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt" \
+    "${harness_full_lock}" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
     --constraints requirements/workflows/runtime-image.in \
-    --torch-backend cpu
+    --torch-backend cpu \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_cache_free_lm_eval_wheel.py" \
+    filter-lock \
+    --input "${harness_full_lock}" \
+    --output "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt"; then
+    rm -f "${harness_full_lock}"
+    return 1
+  fi
+  rm -f "${harness_full_lock}"
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \
