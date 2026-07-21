@@ -1015,6 +1015,57 @@ def test_local_image_publication_is_digest_bound_and_disposable(
     ]
 
 
+def test_local_registry_command_runner_reports_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_subprocess_run(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command == ["success"]:
+            return subprocess.CompletedProcess(command, 0, stdout="ready", stderr="")
+        if command == ["stderr"]:
+            return subprocess.CompletedProcess(command, 9, stdout="", stderr="denied")
+        return subprocess.CompletedProcess(command, 7, stdout="", stderr="")
+
+    monkeypatch.setattr(local_registry.subprocess, "run", fake_subprocess_run)
+    assert (
+        local_registry._run(["success"], cwd=tmp_path, capture_output=True).stdout
+        == "ready"
+    )
+    with pytest.raises(RuntimeError, match=r"status 9: stderr\ndenied"):
+        local_registry._run(["stderr"], cwd=tmp_path)
+    with pytest.raises(RuntimeError, match=r"status 7: silent$"):
+        local_registry._run(["silent"], cwd=tmp_path)
+
+
+def test_local_image_publication_cleans_nothing_when_volume_creation_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+    digest = "sha256:" + ("a" * 64)
+    monkeypatch.setattr(local_registry.secrets, "token_hex", lambda _length: "fixed")
+
+    def fail_first_command(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        raise OSError("volume creation failed")
+
+    monkeypatch.setattr(local_registry, "_run", fail_first_command)
+    with pytest.raises(OSError, match="volume creation failed"):
+        with local_registry.published_local_image(
+            repository=tmp_path,
+            container_engine="docker",
+            image=digest,
+            image_digest=digest,
+            repository_name="example-runtime",
+        ):
+            raise AssertionError("publication must fail before yielding")
+    assert commands == [
+        ["docker", "volume", "create", "invarlock-example-registry-fixed"]
+    ]
+
+
 @pytest.mark.parametrize(
     ("failure", "message"),
     (
