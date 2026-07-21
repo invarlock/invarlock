@@ -81,6 +81,23 @@ def _source_wheel(path: Path, *, metadata: bytes | None = None) -> bytes:
     return path.read_bytes()
 
 
+def _write_wheel(
+    path: Path,
+    files: dict[str, bytes],
+    *,
+    record_name: str = "package-1.0.dist-info/RECORD",
+    record: bytes | None = None,
+) -> Path:
+    contents = dict(files)
+    contents[record_name] = (
+        record if record is not None else _record(files, record_name)
+    )
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, payload in contents.items():
+            archive.writestr(name, payload)
+    return path
+
+
 def test_builds_deterministic_cache_free_wheel(tmp_path: Path, monkeypatch) -> None:
     module = _load_module()
     source = tmp_path / "lm_eval-0.4.12-py3-none-any.whl"
@@ -130,6 +147,119 @@ def test_rejects_changed_upstream_patch_surface(tmp_path: Path, monkeypatch) -> 
         module.build_wheel(source, tmp_path / "output")
 
 
+def test_record_validation_rejects_unsafe_and_malformed_wheels(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    unsafe = _write_wheel(tmp_path / "unsafe.whl", {"../escape": b"x"})
+    missing = tmp_path / "missing.whl"
+    with zipfile.ZipFile(missing, "w") as archive:
+        archive.writestr("package.py", b"x")
+    unreadable = _write_wheel(
+        tmp_path / "unreadable.whl", {"package.py": b"x"}, record=b"\xff"
+    )
+    bad_row = _write_wheel(
+        tmp_path / "bad-row.whl", {"package.py": b"x"}, record=b"only,two\n"
+    )
+    incomplete = _write_wheel(
+        tmp_path / "incomplete.whl",
+        {"package.py": b"x"},
+        record=b"package-1.0.dist-info/RECORD,,\n",
+    )
+    file_digest = base64.urlsafe_b64encode(hashlib.sha256(b"x").digest()).decode()
+    self_hashed = _write_wheel(
+        tmp_path / "self-hashed.whl",
+        {"package.py": b"x"},
+        record=(
+            f"package.py,sha256={file_digest.rstrip('=')},1\n"
+            "package-1.0.dist-info/RECORD,sha256=invalid,1\n"
+        ).encode(),
+    )
+    mismatched = _write_wheel(
+        tmp_path / "mismatched.whl",
+        {"package.py": b"x"},
+        record=(b"package.py,sha256=invalid,99\npackage-1.0.dist-info/RECORD,,\n"),
+    )
+
+    cases = (
+        (unsafe, "duplicated or unsafe"),
+        (missing, "exactly one RECORD"),
+        (unreadable, "RECORD is unreadable"),
+        (bad_row, "invalid row"),
+        (incomplete, "does not cover"),
+        (self_hashed, "must not hash itself"),
+        (mismatched, "does not match"),
+    )
+    for wheel, message in cases:
+        with zipfile.ZipFile(wheel) as archive:
+            with pytest.raises(module.DerivationError, match=message):
+                module.validate_wheel_record(archive)
+
+
+def test_patch_surfaces_fail_closed_on_upstream_drift() -> None:
+    module = _load_module()
+    metadata = b"Version: 9.9.9\nRequires-Dist: sqlitedict\n"
+    with pytest.raises(module.DerivationError, match="metadata version"):
+        module._patch_metadata(metadata)
+
+    model = (
+        b"if TYPE_CHECKING:\n"
+        b"    from sqlitedict import SqliteDict\n\n"
+        b"    from lm_eval.api.instance import Instance\n"
+        b"class CachingLM:\n"
+        b"    def __init__(self, lm: LM, cache_db: str) -> None:\n"
+        b"        self.dbdict: SqliteDict | None = None\n"
+        b"        lm.set_cache_hook(self.get_cache_hook())\n"
+    )
+    with pytest.raises(module.DerivationError, match="type surface"):
+        module._patch_model(model.replace(b"SqliteDict | None", b"object"))
+    with pytest.raises(module.DerivationError, match="implementation changed"):
+        module._patch_model(model.replace(b"lm.set_cache_hook", b"lm.other_hook"))
+    with pytest.raises(module.DerivationError, match="dependency remained"):
+        module._patch_model(model + b"# sqlitedict must not remain\n")
+
+
+def test_build_rejects_unreadable_invalid_incomplete_and_existing_outputs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _load_module()
+    with pytest.raises(module.DerivationError, match="unreadable"):
+        module.build_wheel(tmp_path / "missing.whl", tmp_path / "output")
+
+    bad_zip = tmp_path / "bad.whl"
+    bad_zip.write_bytes(b"not a zip")
+    monkeypatch.setattr(
+        module,
+        "UPSTREAM_WHEEL_SHA256",
+        hashlib.sha256(bad_zip.read_bytes()).hexdigest(),
+    )
+    with pytest.raises(module.DerivationError, match="readable ZIP"):
+        module.build_wheel(bad_zip, tmp_path / "bad-output")
+
+    incomplete = _write_wheel(
+        tmp_path / "incomplete-source.whl", {"lm_eval/__init__.py": b""}
+    )
+    monkeypatch.setattr(
+        module,
+        "UPSTREAM_WHEEL_SHA256",
+        hashlib.sha256(incomplete.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setattr(module, "UPSTREAM_DIST_INFO", "package-1.0.dist-info")
+    with pytest.raises(module.DerivationError, match="patch surface"):
+        module.build_wheel(incomplete, tmp_path / "incomplete-output")
+
+    source = tmp_path / "source.whl"
+    payload = _source_wheel(source)
+    monkeypatch.setattr(module, "UPSTREAM_DIST_INFO", "lm_eval-0.4.12.dist-info")
+    monkeypatch.setattr(
+        module, "UPSTREAM_WHEEL_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+    destination = module.build_wheel(source, tmp_path / "complete-output")
+    assert destination.is_file()
+    with pytest.raises(module.DerivationError, match="already exists"):
+        module.build_wheel(source, tmp_path / "complete-output")
+
+
 def test_filter_lock_removes_only_upstream_and_sqlitedict(tmp_path: Path) -> None:
     module = _load_module()
     source = tmp_path / "compiled.txt"
@@ -174,3 +304,90 @@ def test_filter_lock_requires_exact_expected_packages(
 
     with pytest.raises(module.DerivationError, match=message):
         module.filter_lock(source, tmp_path / "filtered.txt")
+
+
+def test_filter_lock_rejects_residual_and_unsafe_outputs(tmp_path: Path) -> None:
+    module = _load_module()
+    source = tmp_path / "compiled.txt"
+    source.write_text(
+        "# sqlitedict must not survive\nlm-eval==0.4.12\nsqlitedict==2.1.0\nalpha==1\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(module.DerivationError, match="remained"):
+        module.filter_lock(source, tmp_path / "residual.txt")
+
+    source.write_text(
+        "lm-eval==0.4.12\nsqlitedict==2.1.0\nalpha==1\n", encoding="utf-8"
+    )
+    directory_output = tmp_path / "directory-output"
+    directory_output.mkdir()
+    with pytest.raises(module.DerivationError, match="regular file"):
+        module.filter_lock(source, directory_output)
+
+    temporary_output = tmp_path / "filtered.txt"
+    temporary_output.with_name(".filtered.txt.tmp").write_text("occupied")
+    with pytest.raises(module.DerivationError, match="temporary output"):
+        module.filter_lock(source, temporary_output)
+
+
+def test_main_dispatches_both_commands_and_reports_failures(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    module = _load_module()
+    built = tmp_path / "derived.whl"
+    built.write_bytes(b"wheel")
+    calls: list[tuple[str, Path, Path]] = []
+
+    def fake_build(source: Path, output: Path) -> Path:
+        calls.append(("build", source, output))
+        return built
+
+    def fake_filter(source: Path, output: Path) -> None:
+        calls.append(("filter", source, output))
+
+    monkeypatch.setattr(module, "build_wheel", fake_build)
+    monkeypatch.setattr(module, "filter_lock", fake_filter)
+    assert (
+        module.main(
+            [
+                "build-wheel",
+                "--input",
+                str(tmp_path / "upstream.whl"),
+                "--output-directory",
+                str(tmp_path / "wheelhouse"),
+            ]
+        )
+        == 0
+    )
+    assert str(built) in capsys.readouterr().out
+    assert (
+        module.main(
+            [
+                "filter-lock",
+                "--input",
+                str(tmp_path / "compiled.txt"),
+                "--output",
+                str(tmp_path / "filtered.txt"),
+            ]
+        )
+        == 0
+    )
+    assert [call[0] for call in calls] == ["build", "filter"]
+
+    def fail_build(_source: Path, _output: Path) -> Path:
+        raise module.DerivationError("rejected")
+
+    monkeypatch.setattr(module, "build_wheel", fail_build)
+    assert (
+        module.main(
+            [
+                "build-wheel",
+                "--input",
+                str(tmp_path / "upstream.whl"),
+                "--output-directory",
+                str(tmp_path / "wheelhouse"),
+            ]
+        )
+        == 2
+    )
+    assert "ERROR: rejected" in capsys.readouterr().err
