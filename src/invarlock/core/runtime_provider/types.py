@@ -5,9 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
+import stat
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, TypeAliasType
 
@@ -20,17 +23,19 @@ RUNTIME_SCORING_OBSERVATION_FORMAT = "invarlock/runtime-scoring-observation-v1"
 ArtifactFormat = TypeAliasType(  # noqa: UP040
     "ArtifactFormat", Literal["hf_snapshot", "gguf", "tensorrt_llm_engine"]
 )
-RuntimeTask = TypeAliasType("RuntimeTask", Literal["text_causal"])  # noqa: UP040
+RuntimeTask = TypeAliasType("RuntimeTask", str)  # noqa: UP040
+EvaluationInputPartKind = TypeAliasType(  # noqa: UP040
+    "EvaluationInputPartKind", Literal["text", "content"]
+)
 RuntimeMetric = TypeAliasType(  # noqa: UP040
     "RuntimeMetric",
-    Literal["exact_match", "multiple_choice_accuracy", "normalized_nll_per_utf8_byte"],
+    Literal[
+        "exact_match",
+        "normalized_nll_per_utf8_byte",
+    ],
 )
 RuntimeExecutionMode = TypeAliasType(  # noqa: UP040
     "RuntimeExecutionMode", Literal["in_process", "local_process", "container"]
-)
-EvidenceSurface = TypeAliasType(  # noqa: UP040
-    "EvidenceSurface",
-    Literal["behavior", "tokenizer", "weights", "modules", "activations", "build"],
 )
 ScoringStatus = TypeAliasType(  # noqa: UP040
     "ScoringStatus", Literal["ok", "error"]
@@ -45,16 +50,23 @@ _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
 _IMMUTABLE_REMOTE_REVISION = re.compile(r"^[0-9a-f]{40,64}$")
+_RESOURCE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_TASK_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_MEDIA_TYPE = re.compile(
+    r"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$"
+)
 
 _ARTIFACT_FORMATS = frozenset({"hf_snapshot", "gguf", "tensorrt_llm_engine"})
-_TASKS = frozenset({"text_causal"})
-_METRICS = frozenset(
-    {"exact_match", "multiple_choice_accuracy", "normalized_nll_per_utf8_byte"}
+STANDARD_RUNTIME_TASKS = frozenset(
+    {
+        "text_causal",
+        "text_seq2seq",
+        "masked_language",
+        "vision_text_generation",
+    }
 )
+_METRICS = frozenset({"exact_match", "normalized_nll_per_utf8_byte"})
 _EXECUTION_MODES = frozenset({"in_process", "local_process", "container"})
-_EVIDENCE_SURFACES = frozenset(
-    {"behavior", "tokenizer", "weights", "modules", "activations", "build"}
-)
 
 
 def _require_nonempty_string(value: object, *, field_name: str) -> str:
@@ -69,6 +81,20 @@ def _require_provider_name(value: object, *, field_name: str) -> str:
     text = _require_nonempty_string(value, field_name=field_name)
     if _PROVIDER_NAME.fullmatch(text) is None:
         raise ValueError(f"{field_name} must be a canonical provider name")
+    return text
+
+
+def require_runtime_task(value: object, *, field_name: str = "task") -> RuntimeTask:
+    """Return one canonical task identifier or fail closed.
+
+    The ABI reserves the identifiers in ``STANDARD_RUNTIME_TASKS`` but
+    intentionally accepts any canonical snake-case identifier. Optional add-ins
+    can therefore declare later modalities without an ABI or schema revision.
+    """
+
+    text = _require_nonempty_string(value, field_name=field_name)
+    if _TASK_NAME.fullmatch(text) is None:
+        raise ValueError(f"{field_name} must be a canonical task identifier")
     return text
 
 
@@ -140,20 +166,9 @@ def _require_unique_allowed(
         raise ValueError(f"unsupported {item_label}: {invalid[0]}")
 
 
-def _require_unique_strings(
-    values: tuple[str, ...], *, field_name: str, allow_empty: bool = True
-) -> None:
-    if not isinstance(values, tuple) or (not values and not allow_empty):
-        raise ValueError(f"{field_name} must be a tuple")
-    if len(values) != len(set(values)):
-        raise ValueError(f"{field_name} must not contain duplicate values")
-    for value in values:
-        _require_nonempty_string(value, field_name=field_name)
-
-
 @dataclass(frozen=True)
 class RuntimeProviderCapabilities:
-    """Exact, claim-relevant capabilities declared by one provider."""
+    """Closed execution capabilities declared by one provider."""
 
     provider_name: str
     artifact_formats: tuple[ArtifactFormat, ...]
@@ -162,11 +177,6 @@ class RuntimeProviderCapabilities:
     execution_modes: tuple[RuntimeExecutionMode, ...]
     required_extra: str | None
     required_image: str | None
-    platform_constraints: tuple[str, ...]
-    evidence_surfaces: tuple[EvidenceSurface, ...]
-    supported_claim_sets: tuple[str, ...]
-    degraded_modes: tuple[str, ...] = ()
-    unavailable_modes: tuple[str, ...] = ()
     format_version: str = field(
         default=RUNTIME_PROVIDER_CAPABILITIES_FORMAT, init=False
     )
@@ -183,9 +193,11 @@ class RuntimeProviderCapabilities:
         _require_unique_allowed(
             self.tasks,
             field_name="tasks",
-            allowed=_TASKS,
+            allowed=frozenset(self.tasks),
             item_label="runtime task",
         )
+        for task in self.tasks:
+            require_runtime_task(task, field_name="tasks entry")
         _require_unique_allowed(
             self.metrics,
             field_name="metrics",
@@ -198,28 +210,12 @@ class RuntimeProviderCapabilities:
             allowed=_EXECUTION_MODES,
             item_label="execution mode",
         )
-        _require_unique_allowed(
-            self.evidence_surfaces,
-            field_name="evidence_surfaces",
-            allowed=_EVIDENCE_SURFACES,
-            item_label="evidence surface",
-        )
         if self.required_extra is not None:
             _require_provider_name(self.required_extra, field_name="required_extra")
         if self.required_image is not None:
             _require_nonempty_string(self.required_image, field_name="required_image")
             if any(character.isspace() for character in self.required_image):
                 raise ValueError("required_image must not contain whitespace")
-        _require_unique_strings(
-            self.platform_constraints, field_name="platform_constraints"
-        )
-        _require_unique_strings(
-            self.supported_claim_sets,
-            field_name="supported_claim_sets",
-            allow_empty=False,
-        )
-        _require_unique_strings(self.degraded_modes, field_name="degraded_modes")
-        _require_unique_strings(self.unavailable_modes, field_name="unavailable_modes")
 
 
 @dataclass(frozen=True)
@@ -351,13 +347,10 @@ class ModelRuntimeSpec:
     provider_name: str
     model_id: str
     settings: Mapping[str, JSONScalar] = field(default_factory=dict)
-    adapter_name: str | None = None
 
     def __post_init__(self) -> None:
         _require_provider_name(self.provider_name, field_name="provider_name")
         _require_nonempty_string(self.model_id, field_name="model_id")
-        if self.adapter_name is not None:
-            _require_provider_name(self.adapter_name, field_name="adapter_name")
         if not isinstance(self.settings, Mapping):
             raise ValueError("settings must be a mapping of JSON scalar values")
         copied: dict[str, JSONScalar] = {}
@@ -373,6 +366,96 @@ class ModelRuntimeSpec:
 
 
 @dataclass(frozen=True)
+class EvaluationInputPart:
+    """One ordered, portable input component for a future-capable provider.
+
+    Text is carried inline and authenticated directly. Binary or media content is
+    represented only by a canonical caller-owned content identifier, media type,
+    byte length, and digest. A schedule never carries a host path or URI.
+    """
+
+    kind: EvaluationInputPartKind
+    role: str
+    sha256: str
+    text: str | None = None
+    content_id: str | None = None
+    media_type: str | None = None
+    byte_length: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"text", "content"}:
+            raise ValueError("input part kind must be text or content")
+        _require_provider_name(self.role, field_name="input part role")
+        _require_sha256(self.sha256, field_name="input part sha256")
+        if self.kind == "text":
+            if not isinstance(self.text, str) or not self.text.strip():
+                raise ValueError("text input part must contain non-empty text")
+            if hashlib.sha256(self.text.encode("utf-8")).hexdigest() != self.sha256:
+                raise ValueError("text input part sha256 does not match text")
+            if any(
+                value is not None
+                for value in (self.content_id, self.media_type, self.byte_length)
+            ):
+                raise ValueError("text input part must not contain content fields")
+            return
+
+        if self.text is not None:
+            raise ValueError("content input part must not contain inline text")
+        _require_provider_name(
+            self.content_id, field_name="content input part content_id"
+        )
+        media_type = _require_nonempty_string(
+            self.media_type, field_name="content input part media_type"
+        )
+        if _MEDIA_TYPE.fullmatch(media_type) is None:
+            raise ValueError("content input part media_type must be canonical")
+        _require_positive_int(
+            self.byte_length, field_name="content input part byte_length"
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        """Return the closed public representation for canonical serialization."""
+
+        if self.kind == "text":
+            return {
+                "kind": self.kind,
+                "role": self.role,
+                "text": self.text,
+                "sha256": self.sha256,
+            }
+        return {
+            "kind": self.kind,
+            "role": self.role,
+            "content_id": self.content_id,
+            "media_type": self.media_type,
+            "byte_length": self.byte_length,
+            "sha256": self.sha256,
+        }
+
+
+def canonical_evaluation_input_parts_json(
+    parts: tuple[EvaluationInputPart, ...],
+) -> bytes:
+    """Serialize ordered structured inputs using the sole schedule convention."""
+
+    if not isinstance(parts, tuple) or not parts:
+        raise ValueError("input_parts must be a non-empty tuple")
+    return json.dumps(
+        [part.to_payload() for part in parts],
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def evaluation_input_parts_sha256(parts: tuple[EvaluationInputPart, ...]) -> str:
+    """Authenticate the exact ordered structured input material."""
+
+    return hashlib.sha256(canonical_evaluation_input_parts_json(parts)).hexdigest()
+
+
+@dataclass(frozen=True)
 class EvaluationRecord:
     """One canonically identified evaluation input."""
 
@@ -380,6 +463,7 @@ class EvaluationRecord:
     input_text: str
     input_sha256: str
     expected_output: str | None = None
+    input_parts: tuple[EvaluationInputPart, ...] = ()
 
     def __post_init__(self) -> None:
         _require_nonempty_string(self.record_id, field_name="record_id")
@@ -390,6 +474,20 @@ class EvaluationRecord:
             self.expected_output, str
         ):
             raise ValueError("expected_output must be a string or null")
+        if not isinstance(self.input_parts, tuple):
+            raise ValueError("input_parts must be a tuple")
+        if not self.input_parts:
+            return
+        roles = [part.role for part in self.input_parts]
+        if len(roles) != len(set(roles)):
+            raise ValueError("input part roles must be unique within a record")
+        text_parts = [part for part in self.input_parts if part.kind == "text"]
+        if not text_parts:
+            raise ValueError("structured input requires at least one text part")
+        if text_parts[0].text != self.input_text:
+            raise ValueError("input_text must match the first structured text part")
+        if evaluation_input_parts_sha256(self.input_parts) != self.input_sha256:
+            raise ValueError("input_sha256 does not match ordered input_parts")
 
 
 @dataclass(frozen=True)
@@ -398,9 +496,14 @@ class EvaluationBatch:
 
     schedule_sha256: str
     records: tuple[EvaluationRecord, ...]
+    metric: RuntimeMetric = "exact_match"
+    task: RuntimeTask = "text_causal"
 
     def __post_init__(self) -> None:
         _require_sha256(self.schedule_sha256, field_name="schedule_sha256")
+        if self.metric not in _METRICS:
+            raise ValueError(f"unsupported runtime metric: {self.metric}")
+        require_runtime_task(self.task, field_name="task")
         if not isinstance(self.records, tuple) or not self.records:
             raise ValueError("records must be a non-empty tuple")
         record_ids = [record.record_id for record in self.records]
@@ -558,17 +661,160 @@ RuntimeScorer = TypeAliasType(  # noqa: UP040
 )
 
 
+def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Path:
+    """Revalidate one root-confined resource without following symbolic links."""
+
+    if not isinstance(relative_path, str) or "\\" in relative_path:
+        raise ValueError(f"{label} must be a portable relative path")
+    _require_safe_logical_name(relative_path, field_name=label)
+    parts = tuple(relative_path.split("/"))
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    leaf_flags = (
+        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    )
+    root_descriptor: int | None = None
+    current_descriptor: int | None = None
+    leaf_descriptor: int | None = None
+    try:
+        root_descriptor = os.open(root, directory_flags)
+        current_descriptor = root_descriptor
+        for component in parts[:-1]:
+            child_descriptor = os.open(
+                component, directory_flags, dir_fd=current_descriptor
+            )
+            if current_descriptor != root_descriptor:
+                os.close(current_descriptor)
+            current_descriptor = child_descriptor
+        leaf_descriptor = os.open(parts[-1], leaf_flags, dir_fd=current_descriptor)
+        mode = os.fstat(leaf_descriptor).st_mode
+        if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+            raise ValueError(f"{label} must name a regular file or directory")
+    except OSError as exc:
+        raise ValueError(
+            f"{label} must exist beneath root without symbolic links"
+        ) from exc
+    finally:
+        if leaf_descriptor is not None:
+            os.close(leaf_descriptor)
+        if current_descriptor is not None and current_descriptor != root_descriptor:
+            os.close(current_descriptor)
+        if root_descriptor is not None:
+            os.close(root_descriptor)
+    return root.joinpath(*parts)
+
+
+@dataclass(frozen=True)
+class RuntimeArtifactResources:
+    """Closed, offline resources supplied by the caller to one provider.
+
+    Paths are portable names beneath an absolute caller-owned root. Construction
+    and every lookup authenticate the path component-by-component without
+    following symbolic links. The object deliberately has no network, remote-code,
+    plugin, or arbitrary host-capability switches: evaluation cannot
+    acquire those permissions from request data.
+    """
+
+    root: Path = field(repr=False)
+    primary_artifact: str = field(repr=False)
+    support_resources: Mapping[str, str] = field(repr=False, compare=False)
+    device_kind: str
+    container_image_digest: str
+
+    def __post_init__(self) -> None:
+        root = Path(self.root)
+        if not root.is_absolute():
+            raise ValueError("runtime artifact resource root must be absolute")
+        root_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            descriptor = os.open(root, root_flags)
+        except OSError as exc:
+            raise ValueError(
+                "runtime artifact resource root must be a non-symlink directory"
+            ) from exc
+        else:
+            os.close(descriptor)
+        if self.device_kind not in {"cpu", "cuda"}:
+            raise ValueError("device_kind must be cpu or cuda")
+        if (
+            _require_image_digest(
+                self.container_image_digest,
+                field_name="container_image_digest",
+            )
+            is None
+        ):
+            raise ValueError("container_image_digest is required")
+
+        support = dict(self.support_resources)
+        for name, relative_path in support.items():
+            if not isinstance(name, str) or _RESOURCE_NAME.fullmatch(name) is None:
+                raise ValueError("support resource names must be canonical identifiers")
+            _validate_resource_path(
+                root,
+                relative_path,
+                label=f"support resource {name!r}",
+            )
+        _validate_resource_path(root, self.primary_artifact, label="primary_artifact")
+        object.__setattr__(self, "root", root)
+        object.__setattr__(self, "support_resources", MappingProxyType(support))
+
+    def primary_path(self) -> Path:
+        """Return the primary resource after repeating no-follow validation."""
+
+        return _validate_resource_path(
+            self.root, self.primary_artifact, label="primary_artifact"
+        )
+
+    def support_path(self, name: str) -> Path:
+        """Return one named support resource after repeating validation."""
+
+        try:
+            relative_path = self.support_resources[name]
+        except KeyError as exc:
+            raise ValueError(f"missing required support resource {name!r}") from exc
+        return _validate_resource_path(
+            self.root,
+            relative_path,
+            label=f"support resource {name!r}",
+        )
+
+    def require_support_names(self, expected: frozenset[str]) -> None:
+        """Reject missing and undeclared provider support resources."""
+
+        observed = set(self.support_resources)
+        missing = expected - observed
+        if missing:
+            raise ValueError(
+                f"missing required support resource {sorted(missing)[0]!r}"
+            )
+        unexpected = observed - expected
+        if unexpected:
+            raise ValueError(f"unexpected support resource {sorted(unexpected)[0]!r}")
+
+
 @dataclass(frozen=True)
 class RuntimeExecutionContext:
-    """Ephemeral execution bindings, including already-loaded HF objects."""
+    """Ephemeral execution bindings owned by one runtime provider.
+
+    ``provider_state`` is opaque outside the provider implementation. The public
+    ABI exposes scoring and receipts, not mutable backend or model objects.
+    """
 
     strict: bool
     allow_network: bool
     container_image_digest: str | None
     device_kind: str
     artifact_identity_sha256: str | None = None
-    model_adapter: object | None = field(default=None, repr=False, compare=False)
-    native_model: object | None = field(default=None, repr=False, compare=False)
+    provider_state: object | None = field(default=None, repr=False, compare=False)
     scorer: RuntimeScorer | None = field(default=None, repr=False, compare=False)
     close_callback: Callable[[], None] | None = field(
         default=None, repr=False, compare=False
@@ -678,10 +924,14 @@ class RuntimeProviderReceipt:
 __all__ = [
     "ArtifactFormat",
     "artifact_identity_sha256",
+    "STANDARD_RUNTIME_TASKS",
     "canonical_artifact_identity_json",
+    "canonical_evaluation_input_parts_json",
     "EvaluationBatch",
+    "EvaluationInputPart",
+    "EvaluationInputPartKind",
     "EvaluationRecord",
-    "EvidenceSurface",
+    "evaluation_input_parts_sha256",
     "GGUFArtifactIdentity",
     "HFSnapshotArtifactIdentity",
     "JSONScalar",
@@ -693,6 +943,7 @@ __all__ = [
     "RUNTIME_PROVIDER_RECEIPT_FORMAT",
     "RUNTIME_SCORING_OBSERVATION_FORMAT",
     "RuntimeBackendIdentity",
+    "RuntimeArtifactResources",
     "RuntimeDeviceFacts",
     "RuntimeExecutionContext",
     "RuntimeExecutionMode",
@@ -705,6 +956,7 @@ __all__ = [
     "RuntimeScorer",
     "RuntimeScoringRecord",
     "RuntimeTask",
+    "require_runtime_task",
     "ScoringObservation",
     "ScoringStatus",
     "TensorRTLLMArtifactIdentity",

@@ -1,2 +1,0 @@
--r ../../../../requirements/workflows/runtime-image.in
-hqq>=0.2.8

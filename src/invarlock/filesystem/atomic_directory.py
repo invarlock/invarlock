@@ -28,7 +28,15 @@ def _directory_open_flags() -> int:
         raise AtomicDirectoryPublicationError(
             "secure descriptor-relative directory opening is unavailable"
         )
-    return os.O_RDONLY | directory | nofollow | getattr(os, "O_CLOEXEC", 0)
+    access_mode = os.O_RDONLY
+    if platform.system() == "Linux":
+        path_only = getattr(os, "O_PATH", None)
+        if not isinstance(path_only, int):
+            raise AtomicDirectoryPublicationError(
+                "secure path-only directory opening is unavailable on Linux"
+            )
+        access_mode = path_only
+    return access_mode | directory | nofollow | getattr(os, "O_CLOEXEC", 0)
 
 
 def _open_directory(path: Path, *, label: str) -> int:

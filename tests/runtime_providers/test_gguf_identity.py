@@ -451,13 +451,21 @@ def test_gguf_identity_rejects_file_mutation_during_read(
 ) -> None:
     path = tmp_path / "model.gguf"
     path.write_bytes(_fixture())
+    # Coarse-grained filesystem timestamps can leave a same-tick in-place
+    # write with an unchanged st_mtime_ns; pinning the fixture into the past
+    # guarantees the mutation below always moves the stat identity.
+    os.utime(path, ns=(946_684_800_000_000_000, 946_684_800_000_000_000))
     original = gguf_identity._stream_file_sha256
 
     def mutate_after_hash(descriptor: int, expected_size: int) -> str:
         digest = original(descriptor, expected_size)
         with path.open("r+b") as handle:
             handle.seek(-1, os.SEEK_END)
-            handle.write(b"X")
+            original_byte = handle.read(1)
+            handle.seek(-1, os.SEEK_END)
+            handle.write(bytes([original_byte[0] ^ 0xFF]))
+            handle.flush()
+            os.fsync(handle.fileno())
         return digest
 
     monkeypatch.setattr(gguf_identity, "_stream_file_sha256", mutate_after_hash)

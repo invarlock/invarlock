@@ -1,0 +1,11 @@
+# Base runtime dependency closure for the coordinated first-party release set.
+# Keep this list equal to the external [project].dependencies declared by the
+# core and every add-in; tests/ci/test_release_dependency_closure.py enforces it.
+typer>=0.24.1
+click>=8.3.3
+cryptography>=48.0.1
+rich>=13.0
+pyyaml>=6.0
+jsonschema>=4.0
+numpy>=1.24
+pillow>=11.3,<13

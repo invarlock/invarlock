@@ -35,12 +35,22 @@ from invarlock.core.runtime_provider import (
     TensorRTLLMArtifactIdentity,
     artifact_identity_sha256,
 )
+from invarlock.core.runtime_provider.request_bindings import (
+    HF_TRANSFORMERS_ARTIFACT_REQUEST_BINDINGS,
+    HF_TRANSFORMERS_REQUEST_SETTINGS,
+    HF_TRANSFORMERS_REQUIRED_REQUEST_SETTINGS,
+    HF_VISION_TEXT_REQUEST_SETTINGS,
+    HF_VISION_TEXT_REQUIRED_REQUEST_SETTINGS,
+    LLAMA_CPP_REQUEST_SETTINGS,
+    RUNTIME_EXECUTION_REQUEST_SETTINGS,
+    TENSORRT_LLM_ARTIFACT_REQUEST_BINDINGS,
+    TENSORRT_LLM_BACKEND_REQUEST_BINDINGS,
+    TENSORRT_LLM_REQUEST_SETTINGS,
+)
 from invarlock.core.runtime_provider.types import (
     ArtifactFormat,
-    EvidenceSurface,
     RuntimeExecutionMode,
     RuntimeMetric,
-    RuntimeTask,
 )
 from invarlock.evidence_pack_json import (
     StrictJsonError,
@@ -67,6 +77,7 @@ type RuntimeProviderEvidenceValue = (
 )
 
 _IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
+_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 
 class RuntimeProviderEvidenceError(ValueError):
@@ -75,7 +86,7 @@ class RuntimeProviderEvidenceError(ValueError):
 
 @dataclass(frozen=True)
 class RuntimeProviderEvidencePaths:
-    """The three sibling files required by runtime manifest v2."""
+    """The three sibling files required by the runtime manifest."""
 
     artifact_identity: Path
     scoring_observation: Path
@@ -225,7 +236,7 @@ def _capabilities_from_payload(
         artifact_formats=cast(
             tuple[ArtifactFormat, ...], _string_tuple(payload["artifact_formats"])
         ),
-        tasks=cast(tuple[RuntimeTask, ...], _string_tuple(payload["tasks"])),
+        tasks=_string_tuple(payload["tasks"]),
         metrics=cast(tuple[RuntimeMetric, ...], _string_tuple(payload["metrics"])),
         execution_modes=cast(
             tuple[RuntimeExecutionMode, ...],
@@ -233,14 +244,6 @@ def _capabilities_from_payload(
         ),
         required_extra=_optional_text(payload["required_extra"]),
         required_image=_optional_text(payload["required_image"]),
-        platform_constraints=_string_tuple(payload["platform_constraints"]),
-        evidence_surfaces=cast(
-            tuple[EvidenceSurface, ...],
-            _string_tuple(payload["evidence_surfaces"]),
-        ),
-        supported_claim_sets=_string_tuple(payload["supported_claim_sets"]),
-        degraded_modes=_string_tuple(payload["degraded_modes"]),
-        unavailable_modes=_string_tuple(payload["unavailable_modes"]),
     )
 
 
@@ -421,6 +424,208 @@ def runtime_provider_evidence_errors(
             errors.append(
                 "receipt outer_image_digest does not match expected runtime image"
             )
+    return tuple(errors)
+
+
+def _hf_request_binding_errors(
+    provider_name: str,
+    settings: Mapping[str, object],
+    artifact_identity: ModelArtifactIdentity,
+    receipt: RuntimeProviderReceipt,
+    *,
+    allowed_settings: frozenset[str],
+    required_request_settings: frozenset[str],
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    if not isinstance(artifact_identity, HFSnapshotArtifactIdentity):
+        return (f"{provider_name} request and HF artifact identity do not agree",)
+    required_settings = set(required_request_settings)
+    required_settings.update(
+        request_field
+        for request_field, identity_field in HF_TRANSFORMERS_ARTIFACT_REQUEST_BINDINGS
+        if getattr(artifact_identity, identity_field) is not None
+    )
+    if not required_settings.issubset(settings) or not set(settings).issubset(
+        allowed_settings
+    ):
+        return (f"{provider_name} request settings are not the closed supported set",)
+    for request_field, identity_field in HF_TRANSFORMERS_ARTIFACT_REQUEST_BINDINGS:
+        if request_field not in settings:
+            continue
+        observed = settings[request_field]
+        expected = getattr(artifact_identity, identity_field)
+        if request_field.endswith("_sha256") and isinstance(observed, str):
+            observed = observed.removeprefix("sha256:")
+        if observed != expected:
+            errors.append(
+                f"{provider_name} provider receipt does not match request "
+                f"setting {request_field!r}"
+            )
+    if settings.get("offline") is not True:
+        errors.append(f"{provider_name} request must require offline execution")
+    if provider_name == "hf_vision_text":
+        processor_digest = settings["processor_metadata_sha256"]
+        # The v1 receipt does not carry a separate processor identity. The
+        # provider authenticates this request digest before and during execution;
+        # the independent verifier can enforce only its canonical representation.
+        if (
+            not isinstance(processor_digest, str)
+            or _SHA256.fullmatch(processor_digest.removeprefix("sha256:")) is None
+        ):
+            errors.append("hf_vision_text request processor metadata digest is invalid")
+    if receipt.execution_settings.allow_network:
+        errors.append(f"{provider_name} provider receipt must disable network access")
+    return tuple(errors)
+
+
+def _tensorrt_request_binding_errors(
+    settings: Mapping[str, object],
+    artifact_identity: ModelArtifactIdentity,
+    receipt: RuntimeProviderReceipt,
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    if not isinstance(artifact_identity, TensorRTLLMArtifactIdentity):
+        return ("tensorrt_llm request and TensorRT-LLM artifact identity do not agree",)
+    if frozenset(settings) != TENSORRT_LLM_REQUEST_SETTINGS:
+        return ("tensorrt_llm request settings are not the closed supported set",)
+    expected_settings = {
+        request_field: getattr(artifact_identity, identity_field)
+        for request_field, identity_field in TENSORRT_LLM_ARTIFACT_REQUEST_BINDINGS
+    }
+    expected_settings.update(
+        {
+            request_field: getattr(receipt.backend, backend_field)
+            for request_field, backend_field in TENSORRT_LLM_BACKEND_REQUEST_BINDINGS
+        }
+    )
+    for field, expected in expected_settings.items():
+        if settings[field] != expected:
+            errors.append(
+                "tensorrt_llm provider receipt does not match request "
+                f"setting {field!r}"
+            )
+    if receipt.backend.name != "TensorRT-LLM":
+        errors.append("tensorrt_llm provider receipt backend name is invalid")
+    if receipt.backend.source_sha256 is not None:
+        errors.append(
+            "tensorrt_llm provider receipt backend source digest must be null"
+        )
+    if receipt.execution_settings.allow_network:
+        errors.append("tensorrt_llm provider receipt must disable network access")
+    if receipt.device.compute_capability != artifact_identity.target_compute_capability:
+        errors.append(
+            "tensorrt_llm provider receipt device compute capability does not "
+            "match the artifact target"
+        )
+    return tuple(errors)
+
+
+def runtime_request_binding_errors(
+    *,
+    provider_name: object,
+    settings: object,
+    artifact_identity: ModelArtifactIdentity,
+    receipt: RuntimeProviderReceipt,
+) -> tuple[str, ...]:
+    """Bind authenticated provider evidence to one normalized request side.
+
+    The generic provider identity and shared execution settings are checked for
+    every provider. First-party providers additionally require their complete
+    closed request configuration and bind it to artifact and backend facts in the
+    provider receipt. This keeps the independent verifier free of provider or
+    add-in imports while still rejecting substituted runtime provenance.
+    """
+
+    errors: list[str] = []
+    if not isinstance(provider_name, str) or not provider_name:
+        return ("normalized request provider is invalid",)
+    if not isinstance(settings, Mapping):
+        return ("normalized request runtime settings are invalid",)
+    provider_matches = provider_name == receipt.plugin.name
+    if not provider_matches:
+        errors.append("request provider does not match provider receipt")
+
+    execution = receipt.execution_settings
+    for field in sorted(RUNTIME_EXECUTION_REQUEST_SETTINGS):
+        if field in settings and settings[field] != getattr(execution, field):
+            errors.append(
+                f"provider receipt does not match request runtime setting {field!r}"
+            )
+
+    if not provider_matches:
+        return tuple(errors)
+
+    if provider_name == "hf_transformers":
+        return (
+            *errors,
+            *_hf_request_binding_errors(
+                provider_name,
+                cast(Mapping[str, object], settings),
+                artifact_identity,
+                receipt,
+                allowed_settings=HF_TRANSFORMERS_REQUEST_SETTINGS,
+                required_request_settings=HF_TRANSFORMERS_REQUIRED_REQUEST_SETTINGS,
+            ),
+        )
+
+    if provider_name == "hf_vision_text":
+        return (
+            *errors,
+            *_hf_request_binding_errors(
+                provider_name,
+                cast(Mapping[str, object], settings),
+                artifact_identity,
+                receipt,
+                allowed_settings=HF_VISION_TEXT_REQUEST_SETTINGS,
+                required_request_settings=HF_VISION_TEXT_REQUIRED_REQUEST_SETTINGS,
+            ),
+        )
+
+    if provider_name == "tensorrt_llm":
+        return (
+            *errors,
+            *_tensorrt_request_binding_errors(
+                cast(Mapping[str, object], settings), artifact_identity, receipt
+            ),
+        )
+
+    if provider_name != "llama_cpp":
+        if isinstance(artifact_identity, GGUFArtifactIdentity):
+            errors.append("llama_cpp request and GGUF artifact identity do not agree")
+        return tuple(errors)
+    if not isinstance(artifact_identity, GGUFArtifactIdentity):
+        errors.append("llama_cpp request and GGUF artifact identity do not agree")
+        return tuple(errors)
+
+    if frozenset(settings) != LLAMA_CPP_REQUEST_SETTINGS:
+        errors.append("llama_cpp request settings are not the closed supported set")
+        return tuple(errors)
+    expected_settings: dict[str, object] = {
+        "artifact_byte_length": artifact_identity.byte_length,
+        "artifact_sha256": artifact_identity.sha256,
+        "backend_binary_sha256": receipt.backend.binary_sha256,
+        "backend_source_sha256": receipt.backend.source_sha256,
+        "backend_version": receipt.backend.version,
+        "batch_size": execution.batch_size,
+        "context_length": execution.context_length,
+        "gguf_metadata_sha256": artifact_identity.gguf_metadata_sha256,
+        "max_output_tokens": execution.max_output_tokens,
+        "seed": execution.seed,
+        "tensor_inventory_sha256": artifact_identity.tensor_inventory_sha256,
+        "timeout_seconds": execution.timeout_seconds,
+        "tokenizer_metadata_sha256": artifact_identity.tokenizer_metadata_sha256,
+    }
+    for field, expected in expected_settings.items():
+        if settings.get(field) != expected:
+            errors.append(
+                f"llama_cpp provider receipt does not match request setting {field!r}"
+            )
+    if receipt.backend.name != "llama.cpp":
+        errors.append("llama_cpp provider receipt backend name is invalid")
+    if receipt.backend.build_sha256 is not None:
+        errors.append("llama_cpp provider receipt backend build digest must be null")
+    if receipt.execution_settings.allow_network:
+        errors.append("llama_cpp provider receipt must disable network access")
     return tuple(errors)
 
 
@@ -654,5 +859,6 @@ __all__ = [
     "encode_scoring_observation",
     "load_runtime_provider_evidence",
     "runtime_provider_evidence_errors",
+    "runtime_request_binding_errors",
     "write_runtime_provider_evidence",
 ]

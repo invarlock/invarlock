@@ -1,0 +1,12 @@
+[run]
+branch = True
+parallel = True
+patch = subprocess
+include =
+    scripts/checks/*.py
+    scripts/prepare_qualification_suites.py
+    scripts/security/*.py
+
+[report]
+show_missing = True
+precision = 2

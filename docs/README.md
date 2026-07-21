@@ -1,384 +1,216 @@
-# InvarLock Documentation
+<div class="invarlock-hero" markdown>
 
-InvarLock is a standalone verification layer for baseline-versus-subject
-checkpoint comparisons. Production subjects come from your quantization, pruning, adapter,
-fine-tuning, or other external edit workflow; the main path is
-bring-your-own-edited-checkpoint (BYOE).
+<img
+  class="invarlock-hero__mark"
+  src="assets/invarlock-logo-dark.svg"
+  alt="InvarLock"
+/>
 
-In these docs, a **strict pass** means the verifier received the complete raw
-baseline report, an independently maintained acceptance policy pack, and an
-independently pinned runtime-image digest, then accepted the report schema,
-pairing, recomputed
-metric, required guard evidence, and runtime-manifest binding. It is not
-execution attestation, artifact provenance, or a general model-safety
-certification. See the [Trust Model](assurance/14-trust-model.md).
+<p class="invarlock-hero__kicker">Paired release-regression assurance</p>
 
-A generated strict report is not yet a strict pass: its report-local gates may
-show `PASS`, but `assurance.verdict` remains `pending_verifier` until
-`invarlock verify` exits `0` with those independent inputs. A policy pack or
-digest copied from the submitted bundle is not an independent trust anchor. See
-[policy-pack build and
-verification](reference/contracts.md#policy-packs) and the
-[runtime provenance guide](security/runtime-provenance-guide.md).
+# Evaluate once. Verify independently. Report clearly
 
----
+<p class="invarlock-hero__lead">
+InvarLock runs a pinned baseline and subject over one deterministic paired
+schedule, applies an explicit interval-based regression policy, publishes
+signed evidence, and lets another party replay the decision against
+independently supplied trust anchors.
+</p>
 
-## Start Here
+</div>
 
-1. **[Getting Started](user-guide/getting-started.md)** – the first `evaluate → verify → report html` loop.
-2. **[Compare & Evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – use a checkpoint produced by an external edit workflow.
-3. **[Reading a Report](user-guide/reading-report.md)** – interpret PASS/FAIL, evidence maturity, warnings, and provenance.
-4. **[Alternatives Comparison](reference/alternatives-comparison.md)** – decide when NeMo Evaluator, MLflow, lm-evaluation-harness, or another tool is the better fit.
-
-### Choose Your Path
-
-- **Report reader**: start with [Reading a Report](user-guide/reading-report.md).
-- **Checkpoint evaluator**: start with [Getting Started](user-guide/getting-started.md).
-- **Native runtime operator**: use [Native Runtime Providers](user-guide/native-runtime-providers.md) for GGUF or TensorRT-LLM artifacts.
-- **CI owner**: continue from [Quickstart](user-guide/quickstart.md) to the [CLI Reference](reference/cli.md).
-- **Toolchain designer**: use [Alternatives Comparison](reference/alternatives-comparison.md) before choosing workflow components.
-
-### Quick Example
-
-Strict evaluation requires a running Docker or Podman engine. Confirm the
-engine separately (`docker info` or `podman info`) and run `invarlock doctor`
-for Python, dependency, and accelerator diagnostics.
+[Run a paired comparison](user-guide/getting-started.md) ·
+[Read the assurance case](assurance/assurance-case.md)
 
 ```bash
-pip install "invarlock[hf]"
-invarlock doctor
-
-BASELINE_CHECKPOINT=/path/to/original-checkpoint
-EDITED_SUBJECT_CHECKPOINT=/path/to/checkpoint-produced-by-your-edit-pipeline
-
-# The subject must be the actual output of an external edit pipeline.
-INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
-  --baseline "$BASELINE_CHECKPOINT" \
-  --subject "$EDITED_SUBJECT_CHECKPOINT" \
-  --baseline-adapter auto \
-  --subject-adapter  auto \
-  --profile ci \
-  --assurance strict \
-  --verbose \
-  --report-out reports/eval
+invarlock evaluate request.yaml
+invarlock verify evidence/
+invarlock report evidence/
 ```
 
-Continue with the strict verifier command in [Getting
-Started](user-guide/getting-started.md#verify-and-render). `evaluate` uses the
-runtime container by default; network access is explicit with `--allow-network`.
-`--verbose` prints the retained `Baseline report: ...` path, also recorded at
-`provenance.baseline.report_path`. The template above is not a claim that a
-strict black-box run has passed.
+![A pinned request runs a paired baseline and subject comparison, publishes signed evidence, is independently verified, and is rendered as a report](assets/evaluation-verification-flow.svg)
 
----
+## The primary path
 
-## Documentation Map
+Run mode is the normal release-regression path:
 
-### User Guide
+1. Pin local baseline and subject artifacts, a local JSONL source, provider
+   settings, one built-in metric or scorer binding, one policy, and a fresh
+   output path in `request.yaml`.
+2. Invoke `invarlock evaluate` from the host with digest-addressed baseline and
+   subject runtime images, Docker or Podman, CPU/CUDA selections, and an
+   evidence-signing key held by the host.
+3. The host authenticates the JSONL bytes, prepares the ordered schedule, and
+   launches one constrained worker per side. Each worker sees only its artifact
+   and support resources read-only plus an isolated writable output directory.
+   The host validates both outputs, derives built-in scores or replays the
+   authorized scorer, derives the paired interval, publishes one bundle, and
+   signs it without exposing the private key to either worker.
+4. A verifier supplies its own policy copy, expected artifact identities,
+   canonical schedule digest, runtime digests, evidence signer, identity, and
+   signing key. `verify` replays the pack and writes a separately signed receipt.
+5. `report` renders the signature-authenticated comparison as console text and,
+   optionally, standalone HTML.
 
-- [Getting Started](user-guide/getting-started.md)
-- [Quickstart](user-guide/quickstart.md)
-- [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
-- [Reading a report](user-guide/reading-report.md) — PASS meaning, evidence maturity, warnings, and provenance
-- [Failure Examples](user-guide/failure-examples.md)
-- [Evidence Packs](user-guide/evidence-packs.md) — Portable validation bundles
-- [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
-- [Knowledge & self-edit workflows](user-guide/knowledge-and-self-edit-workflows.md)
-- [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
-- [Live Examples](user-guide/live-examples.md)
-- [Integration Examples](user-guide/integrations.md)
-- [Native Runtime Providers](user-guide/native-runtime-providers.md) — authenticated GGUF and TensorRT-LLM side production
-- [Public Evidence Walkthrough](user-guide/public-evidence-walkthrough.md)
-- [Configuration Gallery](user-guide/config-gallery.md)
-- [Example Reports](user-guide/example-reports.md)
-- [Plugins](user-guide/plugins.md) — Extending adapters and guards
-- [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
+Shared image, device, and entrypoint options act as defaults when both sides use
+the same runtime. Workers sharing a generic or identical CUDA device run
+sequentially; explicitly different CUDA indexes can run in parallel. The host
+owns the no-clobber evidence destination and evidence-signing key.
 
-### Reference
+Import mode is the secondary path for complete provider sidecars created by
+another controlled execution. It publishes the same bundle format and faces
+the same verifier. Its inputs must include authenticated record-level material;
+aggregate scores alone are insufficient.
 
-- [Reference Index](reference/index.md)
-- [CLI Reference](reference/cli.md)
-- [Public Contracts](reference/contracts.md)
-- [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock advanced calibrate` for tier policy sweeps
-- [Configuration Schema](reference/config-schema.md)
-- [Guards](reference/guards.md)
-- [Model Adapters](reference/model-adapters.md)
-- [Model Family Catalog](reference/model-family-catalog.md)
-- [reports](reference/reports.md) — Schema, telemetry, and HTML export
-- [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
-- [Datasets](reference/datasets.md)
-- [Artifact Layout](reference/artifacts.md)
-- [Observability](reference/observability.md)
-- [API Guide](reference/api-guide.md)
-- [Programmatic Quickstart](reference/programmatic-quickstart.md)
-- [Environment Variables](reference/env-vars.md)
-- [Alternatives and Workflow Fit](reference/alternatives-comparison.md)
+## The three transactions
 
-### Assurance
+<div class="invarlock-transaction" markdown>
 
-- [Assurance Case](assurance/00-assurance-case.md)
-- [Trust Model](assurance/14-trust-model.md)
-- [Strict Assurance Checklist](assurance/15-strict-assurance-checklist.md)
-- [Evaluation Math Derivation](assurance/01-eval-math-derivation.md)
-- [Coverage & Pairing Plan](assurance/02-coverage-and-pairing.md)
-- [BCa Bootstrap (Paired Δlog)](assurance/03-bca-bootstrap.md)
-- [Guard Contracts & Primer](assurance/04-guard-contracts.md)
-- [Spectral Selection Arithmetic and Assumptions](assurance/05-spectral-fpr-derivation.md)
-- [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
-- [VE Predictive Gate](assurance/07-ve-gate-power.md)
-- [Determinism Contracts](assurance/08-determinism-contracts.md)
-- [Tier Policy v1 Calibration](assurance/09-tier-v1-calibration.md)
-- [Guard Metric Impact Method](assurance/10-guard-metric-impact-method.md)
-- [Policy Provenance & Digest](assurance/11-policy-provenance.md)
-- [Device Drift Bands](assurance/12-device-drift-bands.md)
-- [GPU/MPS-First Guard Measurement Contracts](assurance/13-gpu-mps-first-guards.md)
-- [Guard Validation Smoke](assurance/16-guard-validation-smoke.md)
-- [Diagnostic Empirical Guard Artifact Inventory](assurance/17-empirical-guard-evidence.md)
+<div class="invarlock-transaction__step" markdown>
 
-Automated tests cover the implementation contracts cross-referenced from the
-assurance notes. Empirical performance and calibration claims are backed by
-separately reviewed run artifacts and independently supplied trust anchors.
+<span class="invarlock-transaction__number">Transaction 01</span>
 
-Calibration CSVs and evidence reports are produced by evaluation runs,
-typically under `runs/null_sweeps/**` and `reports/calibration/**`. Publish the
-supporting artifacts with any release that changes policy defaults. Current
-public artifacts are listed by `public_evidence/catalog_evidence_index.json`.
+### `evaluate`
 
-### Security
+Validate one closed baseline-versus-subject request. In run mode, prepare the
+canonical schedule from digest-pinned local JSONL and execute the selected
+providers in the delegated OCI environment. In import mode, authenticate
+complete provider materials. Pair records by schedule identity, compute the
+selected built-in metric or replay the authorized scorer, derive its paired
+interval, apply the policy to the
+conservative interval bound, and atomically publish signed evidence.
 
-- [Threat Model](security/threat-model.md) — Assets and adversaries
-- [Security Architecture](security/architecture.md) — Components and defaults
-- [Best Practices](security/best-practices.md) — Operational recommendations
-- [Release Verification](security/release-verification.md) — Verification of published package artifacts and source tags
-- [Runtime Provenance Guide](security/runtime-provenance-guide.md) — Manifest requirements for strict assurance
-- [pip-audit Allowlist](security/pip-audit-allowlist.md)
+</div>
 
-### Governance
+<div class="invarlock-transaction__step" markdown>
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.12.1/CONTRIBUTING.md)
+<span class="invarlock-transaction__number">Transaction 02</span>
 
----
+### `verify`
 
-## Core Concepts
+Treat the bundle as untrusted. Verify inventory, checksums, signatures,
+cross-bindings, schedule order, record-level scores, interval arithmetic, and
+the canonical report. Compare the artifact identities, schedule, policy,
+runtime identities, and evidence signer with caller-owned anchors, then record
+the result in a separately signed receipt.
 
-1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
-2. **Execute** – run `invarlock evaluate` under a CI or release profile;
-   model-loading commands use the runtime container by default unless you pass
-   `--execution-mode host`.
-3. **Validate** – run `invarlock verify` with the complete raw baseline, a
-   independently maintained policy pack, and an independently maintained
-   `--expected-runtime-image-digest` for strict assurance, then render HTML via
-   `invarlock report html`;
-   container-backed outputs include `runtime.manifest.json` next to
-   `evaluation.report.json`.
-   Directory inputs to `invarlock report` are only accepted when they contain
-   canonical `report.json` or `evaluation.report.json`.
-4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
+</div>
 
-The guard suite (invariants, spectral, variance, and RMT) evaluates available
-evidence against configured acceptance envelopes. A pass is scoped to those
-measurements and policies; it is not a general safety or downstream-quality guarantee.
+<div class="invarlock-transaction__step" markdown>
 
----
+<span class="invarlock-transaction__number">Transaction 03</span>
 
-## Live Example Verification
+### `report`
 
-- Curated CI-safe live examples are gated by `make docs-live-fast` and cover
-  `README.md`, `docs/user-guide/getting-started.md`,
-  `docs/user-guide/quickstart.md`,
-  `notebooks/invarlock_python_api.ipynb`, and
-  `notebooks/invarlock_policy_tiers.ipynb`.
-- Runnable documentation surfaces can be verified locally with
-  `make docs-live-fast`, `python scripts/docs/verify_live_examples.py`, or
-  `make docs-live`.
-- The curated fast lane replays concrete Markdown CLI snippets in host
-  mode with seeded demo evidence, then smoke-runs the curated notebook subset.
-- For heavyweight notebook cells that would otherwise trigger model downloads or
-  full evaluations, the curated lane reuses seeded demo reports and keeps the
-  later contract-reading and verification steps live.
-- `make docs-live` remains the broader local lane that replays runnable
-  Markdown examples and smoke-runs notebooks under `notebooks/`, using the same
-  host seeded-demo approach for heavyweight model-loading steps.
-- Artifacts land under `tmp/live_examples/`, including per-command JSONL
-  results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
-- Placeholder/template snippets must remain parseable, but only concrete
-  runnable examples should be treated as copy-paste-ready.
-- GitHub Actions enforce the curated deterministic subset; the full verifier
-  remains a local or long-gate lane.
+Authenticate the bundle's embedded evidence signature and integrity, then
+render its canonical report. The view includes the point comparison,
+selected paired interval, threshold, and scoped verdict. Evidence
+remains the source of truth and the signed verification receipt remains the
+independent acceptance record.
 
----
+</div>
 
-## Building Docs Offline vs Online
+</div>
 
-- Offline (default): mkdocs builds without contacting the Internet. Mermaid
-  diagrams are disabled by default to keep builds fully local. The generated
-  HTML references MathJax so formulas render in browsers with network access;
-  MathJax is not fetched during the build.
-  - Command: `make docs` or `mkdocs build --strict`.
-- Online (enable networked assets explicitly): enable Mermaid diagrams (via CDN)
-  and keep strict checks.
-  - Command: `INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict`
+## Metrics and verdicts
 
-Notes
+| Metric | What is compared | Passing rule |
+| --- | --- | --- |
+| `exact_match` | Difference between subject and baseline literal accuracy, with paired regression/improvement counts and exact McNemar probability | Paired Newcombe interval lower bound is at least `metrics.exact_match.delta_min_pp` |
+| `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of teacher-forced expected-continuation NLL per UTF-8 byte | Paired schedule-resampling interval upper bound is at most `metrics.normalized_nll_per_utf8_byte.ratio_max` |
+| Authorized deterministic text scorer | Difference between subject and baseline arithmetic-mean `[0,1]` scores, in percentage points | Paired schedule-resampling interval lower bound is at least `metrics.scorer_extension.delta_min_pp` |
 
-- The configuration references MathJax via `extra_javascript` in the generated
-  HTML. This is required for Arithmatex formulas to render on the published
-  docs site.
-- The mermaid2 plugin pings the CDN; we gate it behind the
-  `INVARLOCK_DOCS_MERMAID` environment variable to avoid network dependencies by
-  default.
+Exact match uses the continuity-corrected paired Newcombe 95% effect-size
+interval emitted by `invarlock/comparison-report-v2`. Normalized NLL
+uses the deterministic `paired_percentile_bootstrap_sha256_v1` method with
+2,048 replicates over the authenticated finite schedule. The selected policy
+reads the conservative bound of the corresponding interval.
 
----
+A metric policy may additionally bind `minimum_record_count` and the matching
+maximum interval-width field. The two fields are supplied together. When they
+are present, the metric bound, record count, and precision width must all pass;
+the canonical report records each result. Preflight can qualify record count
+but leaves interval width pending until execution produces paired outcomes.
 
-## Support Matrix
+Normalized NLL measures expected-continuation likelihood under teacher forcing,
+not general model quality. If tokenizer contracts and paired token counts are
+comparable, the report also includes a verifier-derived token-weighted
+perplexity ratio as interpretation only; it has no policy, interval, or verdict
+authority.
 
-InvarLock maintains 39 evaluation lanes across causal, masked-language, seq2seq, and image-text workflows. Each lane has a checked adapter, preset, input definition, execution policy, and required artifact set.
+A request selects exactly one built-in `metric` or one complete
+`scorer_extension` binding. Extension scorers receive only authenticated
+expected-output and output-text facts, run only when explicitly authorized, and
+cannot redefine aggregation or direction. Deterministic F1, extraction, and VQA
+scorers can be supplied as separately installed packages and run only when
+explicitly authorized through the extension contract. Network, external-model,
+human, executable SQL/code, semantic-model, and judge scoring remain outside
+acceptance; judges fit the authenticated-observation path.
 
-The evidence column reports published artifacts only. Every catalog lane is a
-`noop` same-checkpoint compatibility run: it exercises model loading, paired
-evaluation, evidence generation, strict verification, and packaging, but it
-does not establish transformed-subject detection or guard effectiveness. A
-lane changes to **Available** after its run and verification artifacts are
-published. The 31 available packs use the frozen v1 claim set and are accepted
-through the current verifier's compatibility path; they do not exercise v2
-guard authority.
+## Choose a reading path
 
-| Surface | Lane ID | Adapter | Evidence |
+| Responsibility | Start here | Continue with |
+| --- | --- | --- |
+| Run a first comparison | [Getting started](user-guide/getting-started.md) | [Evaluation request](user-guide/evaluation-request.md) and [schedule and policy](user-guide/schedule-and-policy.md) |
+| Run a model-backed example | [Runnable integrations](https://github.com/invarlock/invarlock/tree/main/examples/integrations) | [Runtime providers](user-guide/runtime-providers.md) and [evidence and verification](user-guide/evidence-and-verification.md) |
+| Apply InvarLock to a model or runtime change | [Model-change workflows](user-guide/change-scenarios.md) | [Runnable examples](https://github.com/invarlock/invarlock/tree/main/examples) and [runtime providers](user-guide/runtime-providers.md) |
+| Review or accept evidence | [Evidence and verification](user-guide/evidence-and-verification.md) | [Acceptance checklist](assurance/acceptance-checklist.md) and [decision semantics](assurance/decision-semantics.md) |
+| Automate a gate | [CI integration](user-guide/ci-integration.md) | [Key management](user-guide/key-management.md) and [CLI reference](reference/cli.md) |
+| Integrate a runtime | [Runtime providers](user-guide/runtime-providers.md) | [Provider reference](reference/runtime-providers.md) and [contracts](reference/contracts.md) |
+| Import existing provider evidence | [Evaluation request](user-guide/evaluation-request.md#import-mode) | [Evidence artifacts](reference/artifacts.md) and [reports and receipts](reference/reports.md) |
+| Embed the engine | [Python API](reference/api-guide.md) | [Architecture](reference/architecture.md) and [runtime-security API](reference/runtime-security.md) |
+| Assess claims and risk | [Assurance case](assurance/assurance-case.md) | [Pairing and replay](assurance/pairing-and-replay.md), [trust model](security/trust-model.md), and [threat model](security/threat-model.md) |
+| Maintain the project | [Documentation development](reference/documentation.md) | [Release verification](reference/release-verification.md) |
+
+## What the evidence establishes
+
+| Bound material | Why it is present | Verification consequence |
+| --- | --- | --- |
+| Baseline and subject identities | Name the exact artifacts being compared | Artifact substitution changes the authenticated comparison |
+| Local JSONL identity and canonical schedule | Fix the source bytes, field mapping, selected ordered records, inputs, and targets | Changed source bytes, mapping, order, or schedule fail closed |
+| Provider observations | Preserve record-level outputs or log-likelihood facts and runtime bindings | The verifier independently re-derives every paired score |
+| Policy digest and content | Record the threshold applied at evaluation time | Verification requires the caller-supplied policy to match exactly |
+| Point comparison and paired interval | Show the estimate and deterministic finite-schedule resampling bounds | The conservative interval bound, not the point value alone, controls the verdict |
+| Runtime identities | Bind each side to a declared OCI execution environment | The verifier compares them with independent expected identities |
+| Checksums and evidence signature | Authenticate the fixed bundle inventory and bytes | Integrity or signer mismatch rejects the bundle |
+
+These bindings support a precise claim: an authorized evidence signer signed a
+complete comparison for named inputs, and a named verifier accepted or rejected
+that evidence under explicit anchors. Runtime digests identify declared bytes;
+execution attestation requires separate evidence. The schedule fixes the
+evaluated sample; population representativeness, safety, and broad quality
+remain separate assessments.
+
+![The evidence signer authenticates canonical evidence while a verifier applies external anchors and signs a separate receipt](assets/evidence-signer-verifier-trust.svg)
+
+## Runtime and integration choices
+
+| Path | Package | Metrics | Intended use |
 | --- | --- | --- | --- |
-| BERT / RoBERTa MLM | `bert-mlm-hf` | `hf_mlm` | **Available** |
-| DeepSeek-R1-0528-Qwen3 8B causal LM | `deepseek-r1-0528-qwen3-8b-causal-hf` | `hf_causal` | **Available** |
-| DeepSeek-R1-Distill-Qwen 14B causal LM | `deepseek-r1-distill-qwen-14b-causal-hf` | `hf_causal` | **Available** |
-| DeepSeek-R1-Distill-Qwen causal LM | `deepseek-r1-distill-qwen-causal-hf` | `hf_causal` | **Available** |
-| Falcon 7B causal LM | `falcon-7b-causal-hf` | `hf_causal` | **Available** |
-| FLAN-T5 base seq2seq LM | `flan-t5-base-seq2seq-hf` | `hf_seq2seq` | **Available** |
-| Gemma 4 12B any-to-any LM | `gemma4-12b-any-to-any-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Gemma 4 26B-A4B MoE image-text LM | `gemma4-26b-a4b-moe-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Gemma 4 31B image-text LM | `gemma4-31b-image-text-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Gemma 4 E2B image-text LM | `gemma4-e2b-image-text-hf` | `hf_multimodal` | **Available** |
-| Gemma 4 E2B causal LM (text-only eval) | `gemma4-e2b-text-causal-hf` | `hf_causal` | **Available** |
-| Gemma 4 E4B image-text LM | `gemma4-e4b-image-text-hf` | `hf_multimodal` | **Available** |
-| GPT-OSS 20B causal LM | `gpt-oss-20b-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| GPT-2 causal LM | `gpt2-causal-hf` | `hf_causal` | **Available** |
-| Granite 4.1 3B causal LM | `granite-4-1-3b-causal-hf` | `hf_causal` | **Available** |
-| Granite 4.1 8B causal LM | `granite-4-1-8b-causal-hf` | `hf_causal` | **Available** |
-| Ministral 3 14B causal LM (text-only eval) | `ministral-3-14b-text-causal-hf` | `hf_causal` | **Available** |
-| Ministral 3 3B causal LM (text-only eval) | `ministral-3-3b-text-causal-hf` | `hf_causal` | **Available** |
-| Ministral 3 8B causal LM (text-only eval) | `ministral-3-8b-text-causal-hf` | `hf_causal` | **Available** |
-| Mistral 7B causal LM | `mistral-7b-causal-hf` | `hf_causal` | **Available** |
-| Mixtral 8x7B MoE causal LM | `mixtral-8x7b-moe-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| OLMo 2 13B causal LM | `olmo-2-13b-causal-hf` | `hf_causal` | **Available** |
-| OLMo 2 7B causal LM | `olmo-2-7b-causal-hf` | `hf_causal` | **Available** |
-| OLMoE 1B-active/7B-total causal LM | `olmoe-1b-7b-0924-causal-hf` | `hf_causal` | **Available** |
-| OpenLLaMA 7B causal LM | `open-llama-7b-causal-hf` | `hf_causal` | **Available** |
-| Phi-4 mini causal LM | `phi-4-mini-causal-hf` | `hf_causal` | **Available** |
-| Phi-4 causal LM (text-only eval) | `phi-4-text-causal-hf` | `hf_causal` | **Available** |
-| Qwen2.5 14B causal LM | `qwen2-5-14b-causal-hf` | `hf_causal` | **Available** |
-| Qwen2.5 7B causal LM | `qwen2-5-7b-causal-hf` | `hf_causal` | **Available** |
-| Qwen2 7B causal LM | `qwen2-7b-causal-hf` | `hf_causal` | **Available** |
-| Qwen3 30B-A3B MoE causal LM | `qwen3-30b-a3b-moe-causal-hf` | `hf_causal` | **Evidence not yet created** |
-| Qwen3.5 27B image-text LM (scoped) | `qwen3-5-27b-image-text-scoped-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Qwen3.5 2B image-text LM | `qwen3-5-2b-image-text-hf` | `hf_multimodal` | **Available** |
-| Qwen3.5 4B image-text LM | `qwen3-5-4b-image-text-hf` | `hf_multimodal` | **Available** |
-| Qwen3.5 causal LM | `qwen3-5-causal-hf` | `hf_causal` | **Available** |
-| Qwen3.6 27B image-text LM (scoped) | `qwen3-6-27b-image-text-scoped-hf` | `hf_multimodal` | **Evidence not yet created** |
-| Qwen3 causal LM | `qwen3-causal-hf` | `hf_causal` | **Available** |
-| SmolLM3 3B causal LM | `smollm3-3b-causal-hf` | `hf_causal` | **Available** |
-| TinyLlama 1.1B causal LM | `tinyllama-1-1b-causal-hf` | `hf_causal` | **Available** |
+| Hugging Face Transformers | `invarlock[hf]` | Exact match and byte-normalized expected-continuation NLL | Built-in reference provider for local PyTorch/SafeTensors snapshots |
+| GGUF / llama.cpp | `invarlock-runtime-gguf` | Exact match | Optional first-party provider for authenticated GGUF artifacts |
+| TensorRT-LLM | `invarlock-runtime-tensorrt-llm` | Exact match | Optional first-party provider for authenticated engine bundles |
+| Hugging Face vision-text | `invarlock-runtime-hf-vision-text` | Exact match | Optional first-party provider for authenticated prompt-and-image schedules |
+| Imported provider material | Core plus the provider package needed to validate identities | Provider-declared metric | Secondary/offline integration when complete sidecars already exist |
+| Custom runtime | Provider package | Declared by provider | ABI integration; strict evidence still requires explicit authorization |
 
-Machine-readable definitions live in `contracts/evidence_catalog_v1.json` and `contracts/support_matrix.json`. Model and adapter implementation details live in the [Model Family Catalog](reference/model-family-catalog.md).
+Optional spectral, random-matrix, and variance diagnostics live in
+`invarlock-diagnostics`. They remain observation-only; the paired metric and
+policy exclusively determine the verdict. Authenticated attachments appear in
+the report's separate authenticated-observations section.
 
----
+## How the documentation is organized
 
-## Common Workflows
+| Type | Reader question | What the page provides | Start here |
+| --- | --- | --- | --- |
+| User guide | How do I complete this task safely? | Outcome, prerequisites, procedure, validation, and recovery | [Getting started](user-guide/getting-started.md) |
+| Assurance note | Why is this scoped decision justified, and what could defeat it? | Plain-language interpretation, evidence, assumptions, arithmetic, and limits | [Assurance case](assurance/assurance-case.md) |
+| Reference | What exactly does this interface accept, produce, or guarantee? | Current syntax, fields, outputs, and failure behavior | [CLI reference](reference/cli.md) |
+| Security guidance | What must be protected and what risk remains? | Plain-language boundaries, adversaries, controls, and residual risk | [Trust model](security/trust-model.md) |
 
-### Research
+User guides explain complete tasks. Assurance pages state claims and replay
+semantics. Reference pages define exact interfaces. Security pages describe
+assets, threats, controls, and residual risk.
 
-```bash
-pip install "invarlock[adapters,guards,eval]"
-invarlock doctor
-INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
-  --baseline gpt2 \
-  --subject /path/to/edited \
-  --baseline-adapter auto --subject-adapter auto \
-  --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml
-```
-
-### Development
-
-```bash
-invarlock advanced plugins adapters
-invarlock advanced calibrate --help
-make ci-matrix
-```
-
-### Production Evaluation
-
-```bash
-INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
-  --baseline /path/to/baseline \
-  --subject  /path/to/edited \
-  --baseline-adapter auto --subject-adapter auto \
-  --profile release \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml
-invarlock verify \
-  --profile release \
-  --assurance strict \
-  --baseline /path/to/retained/baseline/report.json \
-  --policy-pack /path/to/acceptance/policy-pack.json \
-  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST" \
-  reports/eval/evaluation.report.json
-# expects reports/eval/runtime.manifest.json next to the report
-```
-
----
-
-## Configuration Snapshot
-
-```yaml
-model:
-  id: gpt2
-  adapter: hf_causal
-  device: auto
-dataset:
-  provider: wikitext2
-  seq_len: 768
-  stride: 768
-  preview_n: 240
-  final_n: 240
-  seed: 42
-edit:
-  # No edit by default (Compare & evaluate/BYOE recommended), or use built-in quant demo:
-  # edit:
-  #   name: quant_rtn
-  #   plan:
-  #     bitwidth: 8
-  #     per_channel: true
-guards:
-  spectral:
-    kappa: 3.2
-  variance:
-    tier: balanced
-eval:
-  pairing:
-    enforce: true
-output:
-  dir: runs/
-```
-
----
-
-```bash
-bash scripts/smoke/run_tiny_all_matrix.sh
-```
-
-Run with `RUN=1 NET=1` to execute the matrix and allow downloads.
-
----
-
-**Quick Links**
-[Getting Started](user-guide/getting-started.md) ·
-[CLI Reference](reference/cli.md) ·
-[Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
-[Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/v0.12.1/CONTRIBUTING.md)
+InvarLock is pre-1.0. Canonical artifact formats carry explicit versions;
+non-contract embedding APIs may evolve between minor releases.

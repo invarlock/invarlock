@@ -3,7 +3,7 @@
 Evidence packs are adversarial inputs at verification time.  Python's default
 ``json`` decoder silently accepts duplicate object members and non-standard
 numeric constants, which makes a signed byte stream ambiguous to different
-consumers.  This module provides the small, dependency-free reader shared by
+readers.  This module provides the small, dependency-free reader shared by
 the package verifier and its immutable snapshot boundary.
 """
 
@@ -58,11 +58,11 @@ def _regular_file_stat(path: Path, *, label: str) -> os.stat_result:
     try:
         file_stat = path.lstat()
     except OSError as exc:
-        raise StrictJsonError(f"{label} is unavailable: {path}") from exc
+        raise StrictJsonError(f"{label} is unavailable") from exc
     if stat.S_ISLNK(file_stat.st_mode):
-        raise StrictJsonError(f"{label} must not be a symlink: {path}")
+        raise StrictJsonError(f"{label} must not be a symlink")
     if not stat.S_ISREG(file_stat.st_mode):
-        raise StrictJsonError(f"{label} must be a regular file: {path}")
+        raise StrictJsonError(f"{label} must be a regular file")
     return file_stat
 
 
@@ -90,25 +90,25 @@ def read_regular_file_bytes(
     try:
         descriptor = os.open(path, flags)
     except OSError as exc:
-        raise StrictJsonError(f"{label} could not be opened safely: {path}") from exc
+        raise StrictJsonError(f"{label} could not be opened safely") from exc
     try:
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode):
-            raise StrictJsonError(f"{label} must be a regular file: {path}")
+            raise StrictJsonError(f"{label} must be a regular file")
         if _file_identity(before) != _file_identity(opened):
-            raise StrictJsonError(f"{label} changed while being opened: {path}")
+            raise StrictJsonError(f"{label} changed while being opened")
         with os.fdopen(descriptor, "rb", closefd=False) as handle:
             payload = handle.read() if max_bytes is None else handle.read(max_bytes + 1)
         if max_bytes is not None and len(payload) > max_bytes:
             raise StrictJsonError(f"{label} exceeds the {max_bytes}-byte size limit")
         after_read = os.fstat(descriptor)
         if _file_identity(opened) != _file_identity(after_read):
-            raise StrictJsonError(f"{label} changed while being read: {path}")
+            raise StrictJsonError(f"{label} changed while being read")
     finally:
         os.close(descriptor)
     after = _regular_file_stat(path, label=label)
     if _file_identity(before) != _file_identity(after):
-        raise StrictJsonError(f"{label} changed while being read: {path}")
+        raise StrictJsonError(f"{label} changed while being read")
     return payload
 
 
@@ -118,6 +118,7 @@ def copy_regular_file_snapshot(
     *,
     label: str,
     mode: int | None = None,
+    max_bytes: int | None = None,
 ) -> None:
     """Stream one immutable regular-file snapshot to a new destination.
 
@@ -127,12 +128,18 @@ def copy_regular_file_snapshot(
     :func:`read_regular_file_bytes` without retaining a shard-sized byte string.
     """
 
+    if max_bytes is not None and (
+        isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0
+    ):
+        raise StrictJsonError("max_bytes must be a non-negative integer")
     before = _regular_file_stat(source, label=label)
+    if max_bytes is not None and before.st_size > max_bytes:
+        raise StrictJsonError(f"{label} exceeds the {max_bytes}-byte size limit")
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         descriptor = os.open(source, flags)
     except OSError as exc:
-        raise StrictJsonError(f"{label} could not be opened safely: {source}") from exc
+        raise StrictJsonError(f"{label} could not be opened safely") from exc
     created = False
     try:
         try:
@@ -140,37 +147,48 @@ def copy_regular_file_snapshot(
             if not stat.S_ISREG(opened.st_mode) or _file_identity(
                 before
             ) != _file_identity(opened):
-                raise StrictJsonError(f"{label} changed while being opened: {source}")
+                raise StrictJsonError(f"{label} changed while being opened")
             try:
                 with destination.open("xb") as output:
                     created = True
-                    while chunk := os.read(descriptor, 1024 * 1024):
+                    copied = 0
+                    while chunk := os.read(
+                        descriptor,
+                        (
+                            1024 * 1024
+                            if max_bytes is None
+                            else min(1024 * 1024, max_bytes - copied + 1)
+                        ),
+                    ):
+                        copied += len(chunk)
+                        if max_bytes is not None and copied > max_bytes:
+                            raise StrictJsonError(
+                                f"{label} exceeds the {max_bytes}-byte size limit"
+                            )
                         output.write(chunk)
                     output.flush()
                     os.fsync(output.fileno())
             except OSError as exc:
-                raise StrictJsonError(
-                    f"{label} could not be copied safely: {source}"
-                ) from exc
+                raise StrictJsonError(f"{label} could not be copied safely") from exc
             after_read = os.fstat(descriptor)
             if _file_identity(opened) != _file_identity(after_read):
-                raise StrictJsonError(f"{label} changed while being copied: {source}")
+                raise StrictJsonError(f"{label} changed while being copied")
         finally:
             os.close(descriptor)
         after = _regular_file_stat(source, label=label)
         if _file_identity(before) != _file_identity(after):
-            raise StrictJsonError(f"{label} changed while being copied: {source}")
+            raise StrictJsonError(f"{label} changed while being copied")
         if mode is not None:
             try:
                 destination.chmod(mode)
             except OSError as exc:
                 raise StrictJsonError(
-                    f"{label} destination mode could not be preserved: {destination}"
+                    f"{label} destination mode could not be preserved"
                 ) from exc
     except OSError as exc:
         if created:
             destination.unlink(missing_ok=True)
-        raise StrictJsonError(f"{label} could not be copied safely: {source}") from exc
+        raise StrictJsonError(f"{label} could not be copied safely") from exc
     except Exception:
         if created:
             destination.unlink(missing_ok=True)
@@ -193,7 +211,7 @@ def parse_json_bytes(payload: bytes, *, label: str) -> Any:
         )
     except StrictJsonError:
         raise
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (RecursionError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise StrictJsonError(f"{label} is not valid JSON") from exc
 
 
@@ -226,7 +244,7 @@ def read_json_object_snapshot(
 ) -> tuple[bytes, dict[str, Any]]:
     """Read and parse one strict JSON object from exactly one file snapshot.
 
-    The returned bytes are the authenticated regular-file read.  Consumers can
+    The returned bytes are the authenticated regular-file read.  Callers can
     safely derive a digest with :func:`sha256_prefixed` and use the returned
     object without a second path-based read, closing the hash/parse TOCTOU gap
     for direct evidence staging helpers.

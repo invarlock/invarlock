@@ -1,12 +1,42 @@
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW_REQUIREMENTS = ROOT / "requirements" / "workflows"
+REFRESH_SCRIPT = ROOT / "scripts" / "security" / "refresh_pinned_requirements.sh"
 
 
-def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
-    script = Path.cwd() / "scripts" / "security" / "refresh_pinned_requirements.sh"
-    text = script.read_text(encoding="utf-8")
+def _locked_package_version(lock: dict[str, Any], package_name: str) -> str:
+    packages = lock.get("package")
+    assert isinstance(packages, list)
+    matches = [
+        package.get("version")
+        for package in packages
+        if isinstance(package, dict) and package.get("name") == package_name
+    ]
+    assert len(matches) == 1
+    version = matches[0]
+    assert isinstance(version, str)
+    return version
+
+
+def _hashed_requirement_version(path: Path, package_name: str) -> str:
+    prefix = f"{package_name}=="
+    matches = [
+        line.removeprefix(prefix).removesuffix(" \\")
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.startswith(prefix)
+    ]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
 
     assert (
         '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
@@ -14,89 +44,163 @@ def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
     ) in text
     assert (
         '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
-        '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
-    ) in text
-    assert (
-        '"${WORKFLOW_DIR}/runtime-image-quant.in" \\\n'
-        '    "${WORKFLOW_DIR}/runtime-image-quant-py312-cu128.txt"'
-    ) in text
-    assert (
-        '"${WORKFLOW_DIR}/runtime-image.in" \\\n'
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert (
-        '"${WORKFLOW_DIR}/training-profile.in" \\\n'
-        '    "${WORKFLOW_DIR}/training-profile-py312.txt"'
-    ) in text
-    assert (
-        '"${EVIDENCE_PACK_DIR}/accelerate.in" \\\n'
-        '    "${EVIDENCE_PACK_DIR}/accelerate.txt" \\\n'
-        "    --no-deps"
-    ) in text
-    assert (
-        '"${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \\\n'
-        '    "${EVIDENCE_PACK_DIR}/cuda-nvcc.txt" \\\n'
-        "    --no-deps"
-    ) in text
-    assert (
-        '"${EVIDENCE_PACK_DIR}/flash-attn.in" \\\n'
-        '    "${EVIDENCE_PACK_DIR}/flash-attn.txt" \\\n'
-        "    --no-deps"
+        '"${WORKFLOW_DIR}/runtime-image-cu128.in" \\\n'
+        '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
     ) in text
     assert text.count("--torch-backend cpu") == 3
     assert text.count("--torch-backend cu128") == 2
+    assert (
+        '"${WORKFLOW_DIR}/multimodal-runtime.in" \\\n'
+        '    "${WORKFLOW_DIR}/multimodal-runtime-py312.txt"'
+    ) in text
+    assert (
+        '"${WORKFLOW_DIR}/lm-evaluation-harness.in" \\\n'
+        '    "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt"'
+    ) in text
+    assert "--constraints requirements/workflows/runtime-image.in" in text
+    assert "--no-deps" in text
 
 
-def test_evidence_pack_helper_locks_do_not_select_torch_cuda_backend() -> None:
-    req_dir = Path.cwd() / "requirements" / "evidence-packs"
-    forbidden = (
-        "torch==",
-        "torchvision==",
-        "torchao==",
-        "triton==",
-        "bitsandbytes==",
-        "optimum-quanto==",
-        "cuda-toolkit",
-        "cuda-bindings",
-        "nvidia-",
-        "cu13",
-    )
-    allowed_backend_specific = {"cuda-nvcc.txt"}
-
-    for path in sorted(req_dir.glob("*.txt")):
-        text = path.read_text(encoding="utf-8")
-        assert str(Path.cwd()) not in text, f"{path.name} must use repo-relative paths"
-        if path.name in allowed_backend_specific:
-            continue
-        for token in forbidden:
-            assert token not in text, f"{path.name} must not pin {token!r}"
-
-
-def test_runtime_image_locks_are_the_explicit_torch_backend_surface() -> None:
-    workflow_dir = Path.cwd() / "requirements" / "workflows"
-    runtime_locks = {
-        "runtime-image-py312.txt": ("2.13.0+cpu", "0.28.0+cpu"),
-        "runtime-image-py312-aarch64.txt": ("2.11.0+cpu", "0.26.0+cpu"),
-        "runtime-image-py312-cu128.txt": ("2.11.0+cu128", "0.26.0+cu128"),
-        "runtime-image-quant-py312-cu128.txt": (
-            "2.11.0+cu128",
-            "0.26.0+cu128",
-        ),
-        "training-profile-py312.txt": ("2.11.0+cpu", "0.26.0+cpu"),
+def test_type_checker_version_is_identical_in_local_and_workflow_locks() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    optional = project["project"]["optional-dependencies"]
+    declared = {
+        requirement.removeprefix("mypy==")
+        for group in ("dev", "ci")
+        for requirement in optional[group]
+        if requirement.startswith("mypy==")
     }
+    assert len(declared) == 1
 
-    for filename, (torch_version, torchvision_version) in runtime_locks.items():
-        text = (workflow_dir / filename).read_text(encoding="utf-8")
-        assert f"torch=={torch_version}" in text
-        assert f"torchvision=={torchvision_version}" in text
+    uv_version = _locked_package_version(
+        tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8")), "mypy"
+    )
+    workflow_versions = {
+        _hashed_requirement_version(
+            WORKFLOW_REQUIREMENTS / f"ci-hf-py{python_tag}.txt", "mypy"
+        )
+        for python_tag in ("312", "313")
+    }
+    assert {uv_version, *workflow_versions} == declared
+
+
+def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
+    retired = (
+        "advanced-py313",
+        "assurance-ci",
+        "evidence-packs",
+        "runtime-image-quant",
+        "training-profile",
+    )
+
+    for marker in retired:
+        assert marker not in text
+
+
+def test_docs_lock_excludes_the_model_runtime_test_stack() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
+    docs_compile = text.split(
+        'compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt"', 1
+    )[1].split("\n\n", 1)[0]
+
+    assert "--extra docs-ci" in docs_compile
+    assert "--extra ci" not in docs_compile
+
+    lock = (WORKFLOW_REQUIREMENTS / "docs-ci-py313.txt").read_text(encoding="utf-8")
+    assert "linkchecker==" in lock
+    for package in ("peft==", "torch==", "torchao==", "transformers=="):
+        assert package not in lock
+
+
+def test_runtime_image_locks_are_cpu_only() -> None:
+    runtime_locks = (
+        "runtime-image-py312.txt",
+        "runtime-image-py312-aarch64.txt",
+    )
+
+    for filename in runtime_locks:
+        text = (WORKFLOW_REQUIREMENTS / filename).read_text(encoding="utf-8")
+        assert "torch==2.13.0+cpu" in text
+        assert "+cu" not in text
         assert "cu13" not in text
 
 
-def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
-    script = Path.cwd() / "scripts" / "security" / "refresh_pinned_requirements.sh"
+def test_cuda_runtime_image_lock_is_separate_and_backend_pinned() -> None:
+    cuda_input = WORKFLOW_REQUIREMENTS / "runtime-image-cu128.in"
+    assert cuda_input.is_file()
+    input_text = cuda_input.read_text(encoding="utf-8")
+    assert "torch==2.11.0" in input_text
+    assert "torch==2.13.0" not in input_text
 
+    text = (WORKFLOW_REQUIREMENTS / "runtime-image-py312-cu128.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "torch==2.11.0+cu128" in text
+    assert "nvidia-cuda-runtime-cu12==" in text
+    assert "--hash=sha256:" in text
+    assert "bitsandbytes==" not in text
+    assert "gptqmodel==" not in text
+
+
+def test_runtime_wheel_build_lock_is_retained() -> None:
+    lock = WORKFLOW_REQUIREMENTS / "runtime-wheel-build-py312.txt"
+
+    assert lock.is_file()
+    assert "--hash=sha256:" in lock.read_text(encoding="utf-8")
+
+
+def test_multimodal_runtime_lock_pins_cuda_matched_torchvision() -> None:
+    text = (WORKFLOW_REQUIREMENTS / "multimodal-runtime-py312.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "torchvision==0.26.0+cu128" in text
+    assert "pillow==12.3.0" in text
+    assert "torch==" not in text
+    assert "--hash=sha256:" in text
+
+
+def test_lm_evaluation_harness_lock_is_complete_and_cpu_aligned() -> None:
+    text = (WORKFLOW_REQUIREMENTS / "lm-evaluation-harness-py312.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "lm-eval==0.4.12" in text
+    assert "torch==2.13.0+cpu" in text
+    assert "transformers==5.14.1" in text
+    assert "+cu" not in text
+    assert "--hash=sha256:" in text
+
+
+def test_declared_typer_floor_matches_the_maintained_runtime_version() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    dependencies = project["dependencies"]
+    assert isinstance(dependencies, list)
+    typer_requirement = next(
+        dependency for dependency in dependencies if dependency.startswith("typer")
+    )
+    runtime_input = (WORKFLOW_REQUIREMENTS / "runtime-image.in").read_text(
+        encoding="utf-8"
+    )
+    locked_typer = next(
+        line.removeprefix("typer==")
+        for line in runtime_input.splitlines()
+        if line.startswith("typer==")
+    )
+
+    assert typer_requirement == f"typer>={locked_typer}"
+
+
+def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
     result = subprocess.run(
-        ["bash", str(script), "--help"],
+        ["bash", str(REFRESH_SCRIPT), "--help"],
         capture_output=True,
         text=True,
         check=False,
@@ -104,4 +208,5 @@ def test_refresh_pinned_requirements_help_is_side_effect_free() -> None:
 
     assert result.returncode == 0
     assert "--check" in result.stdout
+    assert "all or workflows" in result.stdout
     assert "uv pip compile" not in result.stderr

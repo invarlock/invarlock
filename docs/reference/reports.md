@@ -1,692 +1,427 @@
-# reports
+# Reports and receipts
 
-This document consolidates all report-related reference material: schema,
-telemetry fields, and HTML export.
+InvarLock separates provider facts, a canonical comparison report, independent
+verification output, a signed verification receipt, and a human rendering.
+They have different trust meanings.
 
-## Overview
+!!! info "Reference"
 
-| Aspect | Details |
-| --- | --- |
-| **Purpose** | Define the v1 report contract, telemetry fields, and export formats. |
-| **Audience** | Operators verifying reports and tool authors parsing them. |
-| **Schema version** | `schema_version = "v1"` (minimal schema core; CI, release, and strict assurance add profile-specific requirements). |
-| **Source of truth** | `invarlock.reporting.report_schema.REPORT_JSON_SCHEMA`. |
+    - **Surface:** Runtime-side reports, canonical comparison reports,
+      verification results, signed receipts, and human renderings
+    - **Stability:** Versioned machine contracts are stable by format; console
+      and HTML output are presentation surfaces
+    - **Use this page when:** Parsing a decision, validating a receipt, or
+      distinguishing signed evidence from independently accepted evidence
 
-## Table of Contents
+## Runtime-side report
 
-- [Quick Start](#quick-start)
-- [report Layout](#report-layout)
-  - [Executive Summary Interpretation](#executive-summary-interpretation)
-- [Report Outline](report-outline.md)
-- [Schema](#schema)
-  - [Minimal v1 report Example](#minimal-v1-report-example)
-  - [Schema Summary](#schema-summary-validator-view)
-  - [Required vs Optional Blocks](#required-vs-optional-blocks)
-  - [Primary Metric Tail Gate](#primary-metric-tail-gate-optional)
-- [Telemetry Fields](#telemetry-fields)
-- [HTML Export](#html-export)
-- [CI and Registry Exports](#ci-and-registry-exports)
-- [Troubleshooting](#troubleshooting)
-- [Related Documentation](#related-documentation)
-
----
-
-## Quick Start
-
-```bash
-# Generate a report from a run report
-invarlock report generate \
-  --run runs/subject/report.json \
-  --baseline-run-report runs/baseline/report.json \
-  --format report
-
-# Validate a strict container-backed report using independent acceptance inputs
-invarlock verify \
-  --profile ci \
-  --assurance strict \
-  --baseline runs/baseline/report.json \
-  --policy-pack acceptance-policy-pack.json \
-  --expected-runtime-image-digest "$EXPECTED_RUNTIME_IMAGE_DIGEST" \
-  reports/eval/evaluation.report.json
-# expects reports/eval/runtime.manifest.json next to the report
-
-# Explain a bundle directly from the evaluation report
-invarlock report explain --evaluation-report reports/eval/evaluation.report.json
-
-# Inspect telemetry fields
-jq '.telemetry' reports/eval/evaluation.report.json
-
-# Export to HTML
-invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-
-# Export CI/model-registry handoff artifacts
-invarlock report export -i reports/eval/evaluation.report.json --format mlflow-tags
-invarlock report export -i reports/eval/evaluation.report.json --format model-card-md
-invarlock report export -i reports/eval/evaluation.report.json --format release-review-md
-```
-
-Artifact model:
-
-| Artifact | Produced by | Primary consumers |
-| --- | --- | --- |
-| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report export`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
-| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
-
-`report explain --evaluation-report` reads `evaluation.report.json` directly.
-Raw subject and baseline `report.json` files are still useful when you need to
-regenerate the paired evaluation bundle or inspect low-level run telemetry, but
-portable fixtures that ship only `evaluation.report.json`,
-`runtime.manifest.json`, and evidence metadata can still be rendered, schema
-validated, and explained. Strict verification additionally requires the
-complete raw baseline and independently maintained policy pack.
-
-Strict reports bind each model through one typed `model_identity` object in
-`meta`, `subject_ref`, and `baseline_ref`. A remote identity contains its
-immutable revision; a local identity contains its checkpoint-tree `sha256`.
-The verifier requires exact object equality between metadata and references.
-
-## report Layout
-
-The markdown report is structured to highlight evaluation outcomes first:
-
-Renderers use the shared renderer-neutral [Report Outline](report-outline.md).
-The outline groups report evidence as Decision, Primary Metric, Policy Gates,
-Guard Signals, optional
-Benchmark Comparison, Evidence And Provenance, and Technical Appendix.
-
-Container-backed evaluations emit `runtime.manifest.json` next to
-`evaluation.report.json`. Archive and verify them together.
-
-The sibling manifest and its report hash establish bundle consistency, not
-evidence-source authenticity or execution attestation. Strict verification also
-requires a complete raw baseline, an independently maintained policy pack, and
-`--expected-runtime-image-digest` from independent policy channels. The digest
-comparison checks the manifest's image claim, but a compromised evaluation environment can
-still fabricate a consistent bundle naming that digest.
-
-The HTML export renders that shared outline directly. It adds:
-
-- a summary ledger row for **report-local gates**, subject model, baseline
-  model/run, metric, and guard warnings
-- an unconditional `REPORT-LOCAL / UNVERIFIED RENDER` notice: rendering a JSON
-  report does not independently verify its bytes, provenance, policy inputs, or
-  report-authored assurance fields
-- a sticky brand/theme row with a light/dark toggle
-- quick links for the outline sections, with hash anchors and the active
-  section highlight aligned to the sticky row while scrolling
-- task-aware primary-metric wording, including ratio output for ppl-like tasks
-  and percentage-point deltas for accuracy tasks
-- guard-warning detail tables when baseline-relative warning data is present
-- an optional Benchmark Comparison section when benchmark/scenario data is
-  embedded in the report
-- capped appendix previews for raw policy/plugin/artifact blocks, with
-  `evaluation.report.json` remaining the complete audit artifact
-
-The embedded stylesheet follows the current InvarLock site Ledger ink token
-map: warm paper/ink in light mode, warm-black/cream in dark mode, blue as the
-brand accent, oxblood as the editorial signal, and green/red/yellow reserved
-for verdict states.
-
-- **Decision**: PASS/FAIL, evidence mode, subject model, baseline model/run, edit, primary metric, and warning count.
-- **Quality Gates**: table of canonical gating checks with measured values.
-- **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
-- **Primary Metric**: task-specific metric summary with CI + baseline comparison.
-- **Guard Observability**: compact summaries with expandable guard details.
-- **Policy Configuration**: tier + digest summary with resolved policy details in `<details>`.
-- **Appendix**: environment, inference diagnostics, and variance guard details.
-
-### Executive Summary Interpretation
-
-| Row | Meaning | Action |
-| --- | --- | --- |
-| Overall | Aggregate PASS/FAIL of canonical gates | If FAIL, inspect the matching gate row |
-| Primary Metric | Ratio/Δpp vs baseline | Confirm within tier threshold |
-| Drift | Final/preview ratio | Check device stability, dataset drift |
-| Invariants/Spectral/RMT | Guard status | Expand guard details for failures |
-| Guard Metric Impact | Direction-aware degradation of the guarded metric vs a paired bare control | Only present when the paired comparison was evaluated |
-
-## Evidence Flow
-
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        EVIDENCE FLOW                                    │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   baseline/report.json + subject/report.json                            │
-│                         │                                               │
-│                         ▼                                               │
-│   report builder: pair windows, recompute metrics, apply local policy   │
-│                         │                                               │
-│                         ▼                                               │
-│   evaluation.report.json + runtime.manifest.json                        │
-│                         │                                               │
-│                         ├──────────────▶ invarlock report html           │
-│                         │                 (review rendering)            │
-│                         ▼                                               │
-│   invarlock verify  ◀── independent verifier inputs                     │
-│                         retained raw baseline report                    │
-│                         acceptance policy pack                          │
-│                         expected runtime-image digest                   │
-│                         │                                               │
-│                         ▼                                               │
-│   exit 0 + JSON verification result, or nonzero + diagnostics           │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Schema
-
-### Concepts
-
-- **Schema stability**: v1 has a stable core around primary metric,
-  dataset/window metadata, artifacts, plugins, and report identity. Optional
-  policy, guard, provenance, telemetry, and confidence blocks are additive
-  unless moved into the required core, which requires a schema-version bump.
-- **Validation allow-list**: only specific `validation.*` flags are accepted by
-  the schema validator.
-- **Baseline pairing**: baseline and subject final windows use identical IDs;
-  verification enforces that pairing in CI/Release profiles. Preview and final
-  are disjoint slices and their drift interval uses independent resampling.
-
-### Recorded Metadata Map
-
-| report block | Sourced from report | Verify checks |
-| --- | --- | --- |
-| `meta` | `report.meta` | Schema only. |
-| `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks; `dataset.hash.source` records whether hashes came from explicit preview/final hashes, explicit token IDs, or config fallback. |
-| `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
-| `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release); `rmt.mode` surfaces the active RMT measurement path. |
-| `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
-
-These fields are report-recorded evidence. Schema, digest, and consistency
-checks can detect malformed or internally inconsistent artifacts; they do not
-authenticate the evidence source. Evidence-pack signatures require an independently
-trusted signer fingerprint, and runtime image matching is not execution
-attestation.
-
-### Minimal v1 report Example
-
-The example below shows a realistic, PM‑only report envelope. It follows
-the validator in `invarlock.reporting.report_schema` and the
-fields produced by `invarlock.reporting.make_report`.
+Each side has an `invarlock/runtime-side-report-v1` object:
 
 ```json
 {
-  "schema_version": "v1",
-  "run_id": "20251013T012233Z-quant8-balanced",
-  "meta": {
-    "model_id": "gpt2",
-    "adapter": "hf_causal",
-    "device": "cpu",
-    "seeds": {
-      "python": 1337,
-      "numpy": 1337,
-      "torch": 1337
+  "format": "invarlock/runtime-side-report-v1",
+  "provider": "hf_transformers",
+  "artifact_identity_sha256": "...",
+  "scoring_observation_sha256": "...",
+  "schedule_sha256": "...",
+  "record_count": 20
+}
+```
+
+It binds one side to its artifact identity, scoring observation, provider, and
+schedule. Detailed settings and runtime identity remain in the provider
+receipt, observation, artifact identity, and runtime manifest. The verifier
+reconstructs the runtime-side object exactly.
+
+## Canonical comparison report
+
+New evaluations write `reports/evaluation.report.json` as an
+`invarlock/comparison-report-v2` object. Strict verification also accepts a
+signed `invarlock/comparison-report-v1` object and reconstructs it with the
+legacy v1 exact-match interval method. A verifier never silently upgrades the
+arithmetic of an existing pack.
+
+The current report contains:
+
+- `comparison_id`, `metric`, and `record_count`;
+- baseline and subject `mean_score`;
+- one metric-specific `comparison` object;
+- one metric-specific `uncertainty` object;
+- `paired_binary` for exact match, `derived_measurements` for normalized NLL,
+  or `scorer_extension` and `scorer_replay` for an authorized extension;
+- `policy_digest`;
+- optional `sample_qualification` when the policy binds count and precision
+  requirements; and
+- `verdict`, either `pass` or `fail`.
+
+A complete exact-match report has this shape:
+
+```json
+{
+  "baseline": {"mean_score": 0.75},
+  "comparison": {
+    "kind": "exact_match_delta_pp",
+    "minimum": -15.0,
+    "value": 5.0
+  },
+  "comparison_id": "cmp-example",
+  "format": "invarlock/comparison-report-v2",
+  "metric": "exact_match",
+  "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "record_count": 20,
+  "subject": {"mean_score": 0.8},
+  "paired_binary": {
+    "baseline_pass_subject_fail": 1,
+    "baseline_fail_subject_pass": 2,
+    "both_pass": 14,
+    "both_fail": 3,
+    "discordant_pairs": 3,
+    "mcnemar_exact_two_sided_p_value": 1.0,
+    "effect_size_pp": 5.0,
+    "effect_size_confidence_interval": {
+      "method": "newcombe_hybrid_score_paired_v2",
+      "confidence_level": 0.95,
+      "lower_pp": -14.975805254302834,
+      "upper_pp": 24.866848542801065
     }
   },
-  "dataset": {
-    "provider": "wikitext2",
-    "seq_len": 512,
-    "windows": {
-      "preview": 200,
-      "final": 200,
-      "seed": 42,
-      "stats": {
-        "window_match_fraction": 1.0,
-        "window_overlap_fraction": 0.0,
-        "paired_windows": 200,
-        "bootstrap": {
-          "replicates": 2000,
-          "seed": 1337,
-          "method": "bca_paired_delta_log",
-          "preview_final_delta_basis": "independent_disjoint_slices",
-          "preview_final_delta_method": "independent_percentile_delta_log",
-          "preview_final_delta_seed": 1434
-        },
-        "preview_final_slice_delta_summary": {
-          "mean": 0.0216,
-          "ci": [-0.01, 0.05],
-          "basis": "independent_disjoint_slices",
-          "paired": false,
-          "ci_method": "independent_percentile_delta_log",
-          "ci_reason": null,
-          "preview_windows": 200,
-          "final_windows": 200,
-          "degenerate": false,
-          "degenerate_reason": null
-        },
-        "coverage": {
-          "preview": { "used": 200 },
-          "final": { "used": 200 }
-        }
-      }
-    }
-  },
-  "primary_metric": {
-    "kind": "ppl_causal",
-    "unit": "ppl",
-    "direction": "lower",
-    "preview": 42.18,
-    "final": 43.10,
-    "ratio_vs_baseline": 1.02,
-    "display_ci": [1.00, 1.05]
-  },
-  "primary_metric_tail": {
-    "mode": "warn",
-    "evaluated": true,
-    "passed": true,
-    "warned": false,
-    "violations": [],
-    "policy": {
-      "mode": "warn",
-      "min_windows": 50,
-      "quantile": 0.95,
-      "quantile_max": 0.20,
-      "epsilon": 0.0001,
-      "mass_max": 1.0
+  "sample_qualification": {
+    "record_count": {"minimum": 20, "observed": 20, "passed": true},
+    "interval_width": {
+      "maximum": 50.0,
+      "observed": 39.8426537971039,
+      "unit": "percentage_points",
+      "passed": true
     },
-    "stats": {
-      "n": 200,
-      "epsilon": 0.0001,
-      "q95": 0.02,
-      "q99": 0.04,
-      "max": 0.06,
-      "tail_mass": 0.03
-    },
-    "source": "paired_baseline.final"
-  },
-  "guard_metric_impact": {
-    "metric_kind": "ppl_causal",
-    "direction": "lower",
-    "degradation_basis": "relative_increase",
-    "bare_value": 43.00,
-    "guarded_value": 43.10,
-    "bare_facts": {
-      "weighted_logloss_sum": 376.1200115693562,
-      "token_count": 100,
-      "example_ids_digest": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
-    },
-    "guarded_facts": {
-      "weighted_logloss_sum": 376.3522997109702,
-      "token_count": 100,
-      "example_ids_digest": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
-    },
-    "bare_report": {
-      "primary_metric": {"kind": "ppl_causal", "final": 43.0},
-      "final": {
-        "logloss": [3.7612001156935624],
-        "token_counts": [100],
-        "window_ids": [0]
-      }
-    },
-    "degradation": 0.0023255814,
-    "degradation_limit": 0.01,
-    "display_value": 0.23255814,
-    "display_unit": "percent",
-    "source": "paired_control",
-    "schedule_digest": "d566dfb39f20d549d1c0684e94949c71",
-    "checks": {
-      "metric_kind_matches": true,
-      "measurements_valid": true,
-      "guard_metric_impact": true,
-      "arm_facts_replay": true
-    },
-    "diagnostics": [],
-    "evaluated": true,
     "passed": true
   },
-  "validation": {
-    "primary_metric_acceptable": true,
-    "primary_metric_tail_acceptable": true,
-    "preview_final_drift_acceptable": true,
-    "guard_metric_impact_acceptable": true
+  "uncertainty": {
+    "interval_mass": 0.95,
+    "lower": -14.975805254302834,
+    "method": "newcombe_hybrid_score_paired_v2",
+    "scope": "paired_binary_outcomes",
+    "upper": 24.866848542801065
   },
-  "policy_digest": {
-    "policy_version": "v1",
-    "tier_policy_name": "balanced",
-    "thresholds_hash": "d49f15ade7d54beb",
-    "hysteresis": {
-      "ppl": 0.002
-    },
-    "min_effective": 0.0,
-    "changed": false
-  },
-  "artifacts": {
-    "events_path": "runs/quant8/20251013_012233/events.jsonl",
-    "report_path": "runs/quant8/20251013_012233/report.json"
-  },
-  "plugins": {
-    "adapters": [],
-    "edits": [],
-    "guards": []
+  "verdict": "pass"
+}
+```
+
+Values are illustrative. Verification reconstructs the whole object and
+requires canonical equality. It does not independently trust stored means,
+point comparison, interval bounds, threshold, or verdict.
+
+### Exact match
+
+```json
+{
+  "kind": "exact_match_delta_pp",
+  "value": 1.5,
+  "minimum": -2.0
+}
+```
+
+`value = 100 * (subject_mean - baseline_mean)`. The metric-bound check passes when
+`uncertainty.lower >= comparison.minimum`, where `minimum` comes from
+`resolved_policy.metrics.exact_match.delta_min_pp`. If sample qualification is
+present, the final report passes only when its count and width checks also pass.
+
+For this metric, baseline and subject `mean_score` are literal exact-match
+accuracies between `0` and `1`. Comparison and interval bounds are percentage
+points between `-100` and `100`.
+
+`paired_binary` reports baseline-pass to subject-fail regressions,
+baseline-fail to subject-pass improvements, both-pass and both-fail counts, the
+number of discordant pairs, and the exact two-sided McNemar probability. Its
+effect size is the same subject-minus-baseline percentage-point delta. The
+continuity-corrected paired Newcombe hybrid-score 95% interval is repeated as
+the canonical `uncertainty` object in a v2 report. The policy uses its lower
+bound; the McNemar probability does not control the verdict. A v1 report keeps
+method `newcombe_hybrid_score_paired_v1` and is replayed only with that original
+method.
+
+### Sample and precision qualification
+
+A metric policy may omit sample qualification. If it enables qualification,
+the two fields must be supplied together:
+
+- `minimum_record_count` plus `maximum_interval_width_pp` for exact match or an
+  authorized scorer extension; or
+- `minimum_record_count` plus `maximum_interval_width_ratio` for normalized
+  NLL.
+
+`minimum_record_count` is an integer from 1 through 10,000. Percentage-point
+width must be positive and at most 200; ratio width must be positive. The
+report records the observed width as `uncertainty.upper - uncertainty.lower`.
+Its final verdict is:
+
+```text
+metric bound passes
+and observed record count >= minimum record count
+and observed interval width <= maximum interval width
+```
+
+The report therefore distinguishes a metric rejection from insufficient count
+or precision without allowing a favorable point value to bypass either gate.
+
+### Normalized NLL per UTF-8 byte
+
+```json
+{
+  "kind": "normalized_nll_ratio",
+  "value": 0.98,
+  "maximum": 1.05
+}
+```
+
+Each side's `mean_score` is the arithmetic mean of verifier-derived per-record
+teacher-forced expected-continuation
+`-logprob_sum / utf8_byte_count`. The baseline mean must be positive and
+`value = subject_mean / baseline_mean`. The metric-bound check passes when
+`uncertainty.upper <= comparison.maximum`, where `maximum` comes from
+`resolved_policy.metrics.normalized_nll_per_utf8_byte.ratio_max`.
+
+This is a ratio of equally weighted record means, not pooled NLL, byte-weighted
+loss, or perplexity. It measures expected-continuation likelihood regression
+under authenticated inputs and runtime, not general model quality.
+
+### Derived perplexity interpretation
+
+```json
+{
+  "perplexity_ratio": {
+    "status": "available",
+    "basis": "authenticated_target_likelihood",
+    "method": "target_token_weighted_perplexity_ratio_v1",
+    "tokenizer_metadata_sha256": "...",
+    "target_token_count": 4096,
+    "baseline_perplexity": 12.3,
+    "subject_perplexity": 12.6,
+    "ratio": 1.0243902439
   }
 }
 ```
 
-Here `paired_windows` counts baseline/subject final pairs.
-`window_match_fraction` summarizes matching against the supplied baseline
-pairing context (both slices when that context contains both), while
-`window_overlap_fraction` records token-window overlap implied by sequence
-length and stride. It is not an ID-pairing measure. Raw
-`evaluation_windows.preview.window_ids` and
-`evaluation_windows.final.window_ids` provide the separate evidence that the
-preview/final ID sets are disjoint. The configured `bootstrap.method` names the
-paired baseline/subject method; the explicit `preview_final_delta_*` metadata
-and `preview_final_slice_delta_summary` identify the separate independent-slice
-drift interval.
+For normalized NLL, `derived_measurements.perplexity_ratio` is available when
+both artifacts bind matching authenticated tokenizer metadata and every pair
+has the same positive target-token count. The verifier derives both side
+perplexities and their ratio from authenticated target log probabilities. When
+the facts are not comparable, the object carries `status: unavailable` and a
+closed reason instead.
 
-**Notes:**
+This object is interpretation only. It is not a metric or policy input and has
+no threshold, confidence interval, or verdict authority.
 
-- `schema_version` is a string and must be `"v1"` for the v1 format.
-- `run_id` is a short, opaque identifier; reports treat it as a stable
-  string key.
-- `primary_metric` is the **canonical** place for PM values.
-- The `validation` object holds boolean flags; only a small allow‑list of
-  keys is recognized by the validator.
+### Normalized-NLL paired resampling interval
 
-### Schema Summary (Validator View)
+Every normalized-NLL comparison report contains:
 
-The v1 validator uses a JSON Schema (draft 2020‑12) embedded in
-`REPORT_JSON_SCHEMA`. The schema is intentionally permissive around new
-fields while enforcing a small, stable core:
-
-**Required top‑level fields:**
-
-- `schema_version` — must equal `"v1"`.
-- `run_id` — non‑empty string (minimum length 1).
-- `meta` — object (model/device/seeds; validator does not fix sub‑shape).
-- `dataset` — object with at least:
-  - `provider`: string
-  - `seq_len`: integer ≥ 0
-  - `windows.preview`: integer ≥ 0
-  - `windows.final`: integer ≥ 0
-  - `windows.stats`: object (paired-window stats and coverage)
-- `artifacts` — object (paths to `report.json`, `events.jsonl`, etc.).
-- `plugins` — object listing discovered adapters/edits/guards.
-- `primary_metric` — object (canonical primary metric snapshot).
-
-**Primary metric block (object required, only `kind` required by schema):**
-
-- `primary_metric.kind`: string (e.g., `"ppl_causal"`, `"accuracy"`).
-- `primary_metric.preview` / `primary_metric.final`: numbers when available.
-- `primary_metric.n_preview` / `primary_metric.n_final`: evaluated example
-  counts for both accuracy arms; strict verification requires positive explicit
-  integers reconciled with the classification and coverage blocks.
-- `primary_metric.counts_source`: identifies measured vs synthetic count provenance.
-- `primary_metric.estimated`: marks whether the metric/count surface is estimated;
-  strict accuracy requires measured, non-estimated evidence.
-- `primary_metric.ratio_vs_baseline`: multiplicative ratio for PPL-like metrics;
-  it is invalid for accuracy reports.
-- `primary_metric.delta_vs_baseline_pp`: canonical accuracy change in percentage
-  points, computed as `100 × (final - baseline_final)`.
-- `primary_metric.display_ci`: two‑element numeric array `[lo, hi]` when available.
-- Additional optional fields: `unit`, `direction`, `ci`, `gating_basis`,
-  `aggregation_scope`, `estimated`, etc.
-
-**Guard metric impact block (required for Release and strict assurance):**
-
-- `metric_kind`, `direction`, and `degradation_basis` identify the registered
-  metric semantics. PPL-like metrics are lower-is-better with
-  `relative_increase`; accuracy is higher-is-better with `absolute_drop`.
-- `bare_value` and `guarded_value` are the paired arm measurements.
-- `degradation` is `guarded_value / bare_value - 1` for PPL-like metrics and
-  `bare_value - guarded_value` for accuracy. Positive is worse; negative is an
-  improvement.
-- `degradation_limit` is the maximum allowed degradation in the selected basis.
-- `display_value` and `display_unit` are presentation-only: percent for relative
-  PPL change and percentage points for accuracy change. Verification recomputes
-  both the canonical and display values.
-- `source` records how the comparison was obtained, while `schedule_digest`
-  binds it to the paired example/window schedule. `checks` and `diagnostics`
-  expose the gate result and any failure reason.
-- `evaluated` and `passed` must both be true. Strict verification also requires
-  valid bound arm evidence and rejects a skip, non-finite value, registry
-  mismatch, or inconsistent derived field.
-
-**Validation flags:**
-
-- `validation` is an object of booleans; allowed keys come from
-  `contracts/validation_keys.json`, and report validation fails closed when that
-  contract is missing or malformed.
-- Common flags:
-  - `primary_metric_acceptable`
-  - `primary_metric_tail_acceptable`
-  - `preview_final_drift_acceptable`
-  - `guard_metric_impact_acceptable`
-  - `guard_warnings_present`
-  - `guard_warning_policy_acceptable`
-  - `invariants_pass`
-  - `spectral_stable`
-  - `rmt_stable`
-  - `hysteresis_applied`
-  - `moe_observed`
-  - `moe_identity_ok`
-- The validator rejects reports that contain non‑boolean values under
-  any of these keys.
-
-**Guard warnings (optional):**
-
-- `guard_warnings.present`: `true` when the subject has guard-signal movement
-  relative to the baseline while the hard policy may still pass.
-- `guard_warnings.warning_count`: number of warning records.
-- `guard_warnings.warnings[]`: structured warnings with `guard`, `kind`,
-  optional `family`/`module`, `baseline`, `subject`, `policy_gate`, and
-  `message`.
-- Warnings are advisory by default. `invarlock verify --warning-policy fail`
-  treats any warning as a verification failure.
-
-**Guard measurement evidence:**
-
-- `rmt.measurement_contract` records the RMT measurement mode/configuration
-  used for the report and is cross-checked against resolved policy evidence.
-- `spectral.families[*].max`, `spectral.families[*].mean`,
-  `spectral.families[*].count`, `spectral.families[*].violations`, and
-  `spectral.families[*].kappa` are the per-family summary fields when spectral
-  measurements are present.
-
-**Policy and structure:**
-
-- `policy_digest` — small summary of tier policy thresholds and whether they
-  changed relative to the baseline.
-- `resolved_policy` — snapshot of effective guard policies (spectral, rmt,
-  variance, metrics).
-- `policy_provenance` — tier label, overrides, and digest.
-- `structure` — structural deltas and compression diagnostics (optional).
-
-**Confidence (optional):**
-
-- `confidence` — object with:
-  - `label`: `"High" | "Medium" | "Low"`.
-  - `basis`: string description of the confidence basis.
-  - Optional numeric fields: `width`, `threshold`, `unstable` flag, etc.
-
-The full machine‑readable schema is available at runtime via
-`invarlock.reporting.report_schema.REPORT_JSON_SCHEMA`.
-
-### report → Verify Matrix
-
-| report block | Derived from | Verify checks |
-| --- | --- | --- |
-| `meta` | `report.meta` | Schema only. |
-| `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
-| `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
-| `validation` | `report.metrics` + policy thresholds | Schema allow-list, release-required values, and primary-metric policy recomputation. |
-| `guard_warnings` | Baseline/subject guard evidence | Advisory by default; fail only under strict warning policy. |
-| `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
-| `guard_metric_impact` | `report.guard_metric_impact` | Recomputes the registered metric-specific degradation and display value; Release requires evaluated, passing, paired evidence and skips fail. |
-| `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
-
-### Required vs Optional Blocks
-
-| Key | Required | Source | Stability |
-| --- | --- | --- | --- |
-| `schema_version` | Yes | `REPORT_SCHEMA_VERSION` | PM-only v1 |
-| `run_id` | Yes | Run metadata | Stable |
-| `meta` | Yes | `report.meta` | Stable |
-| `dataset` | Yes | `report.dataset` + windows stats | Stable |
-| `primary_metric` | Yes | `report.metrics.primary_metric` | Stable |
-| `artifacts` | Yes | Run artifact paths | Stable |
-| `plugins` | Yes | Plugin discovery snapshot | Stable |
-| `validation` | Optional | Gate outcomes | Allow-list evolves |
-| `policy_digest` / `resolved_policy` | Optional | Tier policies | Policy changes |
-| `guard_metric_impact` | Release/strict | Paired bare/guarded primary-metric evidence | Direction-aware degradation contract |
-| `primary_metric_tail` | Optional | Paired ΔlogNLL tail gate | ppl-like only |
-| `structure` / `confidence` / `system_overhead` / `provenance` | Optional | Best-effort evidence | May evolve |
-
-### Primary Metric Tail Gate (optional)
-
-For ppl-like metrics with paired per-window logloss, reports may include
-`primary_metric_tail`, which records tail summaries of per-window ΔlogNLL vs the
-baseline and the tail-gate evaluation outcome:
-
-- `primary_metric_tail.stats` — deterministic quantiles (`q50/q90/q95/q99`),
-  `max`, and `tail_mass = Pr[ΔlogNLL > ε]`.
-- `primary_metric_tail.policy` — resolved `metrics.pm_tail` policy (mode,
-  quantile, thresholds, floors).
-- `primary_metric_tail.violations` — structured reasons when thresholds are exceeded.
-- `validation.primary_metric_tail_acceptable` — remains `true` in `warn` mode;
-  flips `false` only when `mode=fail` and a violation is evaluated.
-
----
-
-## Telemetry Fields
-
-Telemetry values are copied from `report.json` into reports and always
-include the execution device. CPU telemetry sweeps are collected via
-`scripts/smoke/run_cpu_telemetry.sh`.
-
-| JSON Pointer | Meaning | Notes |
-| --- | --- | --- |
-| `/telemetry/device` | Execution device (`cpu`, `mps`, `cuda`). | Mirrors `meta.device`. |
-| `/telemetry/latency_ms_per_tok` | Mean latency per token. | ms/token. |
-| `/telemetry/memory_mb_peak` | Peak resident memory. | MiB. |
-| `/telemetry/preview_total_tokens` | Tokens processed in preview. | Derived from windows. |
-| `/telemetry/final_total_tokens` | Tokens processed in final. | Derived from windows. |
-| `/telemetry/throughput_tok_per_s` | Average throughput. | Present when available. |
-
-**Observability:**
-
-- `report.json` contains `metrics.latency_ms_per_tok` and `metrics.memory_mb_peak`.
-- `telemetry.summary_line` is emitted when `INVARLOCK_TELEMETRY=1`.
-- `dataset.hash.source` distinguishes content-derived, provider-derived, and config-derived dataset hashes.
-- `rmt.mode` and `rmt.measurement_contract_hash` show which RMT measurement contract produced the report evidence.
-
----
-
-## HTML Export
-
-The HTML renderer builds a browser-readable report from the shared
-renderer-neutral [Report Outline](report-outline.md). It does not depend on the
-Markdown renderer or the optional `markdown` Python package. Use `--embed-css`
-(default) to inline the standalone stylesheet; use `--no-embed-css` only when
-an external publishing system supplies its own styles.
-
-### CLI
-
-```bash
-invarlock report html -i <evaluation.report.json> -o <out.html>
+```json
+{
+  "method": "paired_percentile_bootstrap_sha256_v1",
+  "scope": "authenticated_schedule",
+  "interval_mass": 0.95,
+  "replicates": 2048,
+  "lower": 0.98,
+  "upper": 1.04
+}
 ```
 
-**Flags:**
+Index draws are derived from SHA-256 of the authenticated schedule digest,
+replicate number, and draw number. Baseline and subject scores at each selected
+schedule position are resampled together. The complete comparison is recomputed
+2,048 times; `lower` and `upper` are linearly interpolated 2.5th and 97.5th
+percentiles. A one-record schedule yields a point interval.
 
-- `--embed-css/--no-embed-css` — inline stylesheet (default: embed)
-- `--force` — overwrite existing output
+The interval and verdict are deterministic verifier-replay outputs. The scope
+`authenticated_schedule` is literal: this is a finite-schedule stability
+interval, not a population confidence interval or representativeness claim.
 
-### Python API
+### Authorized deterministic scorer extension
 
-```python
-from invarlock.reporting.html import render_report_html
+An extension report uses:
 
-html = render_report_html(report)
+```json
+{
+  "kind": "scorer_extension_delta_pp",
+  "value": 2.5,
+  "minimum": -1.0
+}
 ```
 
----
+For each side, an explicitly authorized deterministic scorer replays exactly
+the authenticated expected output, output text, and output digest for every
+record and returns one higher-is-better value in `[0, 1]`. The engine owns the
+arithmetic mean and computes
+`value = 100 * (subject_mean - baseline_mean)`. It then applies the same fixed
+2,048-replicate paired schedule-resampling method to the paired record values.
+The metric-bound check passes only when
+`uncertainty.lower >= comparison.minimum`, where
+`minimum` comes from `resolved_policy.metrics.scorer_extension.delta_min_pp`.
 
-## CI and Registry Exports
+`scorer_extension` records the bound scorer ID, version, descriptor digest,
+and configuration digest. `scorer_replay` binds the per-side deterministic
+replay results. Verification requires the caller to authorize the same scorer
+in a `ScorerExtensionRegistry`, runs it twice, and reconstructs the complete
+report. A stored scorer result is never accepted as an aggregate assertion.
 
-`invarlock report export` converts an existing `evaluation.report.json` into
-small handoff artifacts for systems that already own CI, registry, model-card,
-or release-review workflows.
+The scorer-extension v1 contract is suitable for separately supplied
+deterministic text scorers such as token F1, structured-field extraction, or VQA
+answer normalization. Those scorers are separately installed and require
+explicit authorization. SQL or code execution, model-based semantic similarity,
+network or human services, and LLM judges are outside acceptance replay. Judge
+results may be authenticated as observations, where they have no verdict
+authority.
 
-```bash
-invarlock report export \
-  --evaluation-report reports/eval/evaluation.report.json \
-  --format mlflow-tags \
-  --policy-profile ci \
-  --verify-result reports/eval/invarlock-verify.json \
-  --output reports/eval/mlflow-tags.json
+## Verification result
+
+`invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
+fields include:
+
+| Field | Meaning |
+| --- | --- |
+| `ok` | Integrity passed and the replayed policy verdict is not `fail` |
+| `integrity_ok` | Structural, signature, digest, cross-binding, and semantic replay passed |
+| `reports_verified` | The canonical report, including interval and verdict, matched verifier replay |
+| `verification_scope` | `paired_comparison` only after successful complete replay |
+| `assurance_status` | `verified` or `not_verified` |
+| `policy_verdict` | `pass`, `fail`, or unavailable when replay could not complete |
+| `observations` | Authenticated observation IDs, kinds, scopes, and content digests; never verdict inputs |
+| `authenticity` | Whether the evidence signer matched the independent signer anchor |
+| `anchors` | Policy path/digest, artifact and schedule digests, runtime digests, and signer fingerprint supplied by the caller |
+| `warnings`, `errors` | Closed diagnostic arrays |
+
+The high-level transaction adds `signed_receipt`, `verifier_identity`, and
+`verifier_fingerprint`. Profile-based verification also adds
+`trust_profile_digest`. Stdout is useful process output; the separately signed
+receipt is the portable verifier assertion.
+
+Do not infer acceptance from `integrity_ok` alone. Require status `0`,
+`ok: true`, the expected `assurance_status`, exact anchors, and a valid receipt
+when the result crosses a process boundary.
+
+## Signed verification receipt
+
+The receipt contains a `statement` and `signature`. The statement format is
+`invarlock/evidence-verification-receipt-v1`:
+
+```json
+{
+  "format": "invarlock/evidence-verification-receipt-v1",
+  "pack_manifest_digest": "sha256:...",
+  "anchors": {
+    "policy_digest": "sha256:...",
+    "artifact_digests": {
+      "baseline": "sha256:...",
+      "subject": "sha256:..."
+    },
+    "schedule_digest": "sha256:...",
+    "runtime_digests": {
+      "baseline": "sha256:...",
+      "subject": "sha256:..."
+    },
+    "pack_signer_fingerprint": "sha256:..."
+  },
+  "verifier": {
+    "identity": "release-verifier",
+    "signing_key_fingerprint": "sha256:...",
+    "trust_profile_digest": "sha256:..."
+  },
+  "verdict": {
+    "ok": true,
+    "integrity_ok": true,
+    "policy_verdict": "pass",
+    "verification_status": 0
+  }
+}
 ```
 
-| Format | Output | Purpose |
-| --- | --- | --- |
-| `mlflow-tags` | JSON with `tags` and report artifact path | Set registry tags and log the report as an MLflow artifact from an MLflow-enabled environment. |
-| `model-card-md` | Markdown block | Paste InvarLock evidence into a Hugging Face model card or equivalent model README. |
-| `release-review-md` | Markdown packet | Attach pass/fail, baseline/subject identity, report hash, policy profile, and acceptance checklist to release review. |
+The signature envelope is
+`invarlock/evidence-verification-receipt-signature-v1`. It uses Ed25519, embeds
+the verifier public key in PEM form, and signs canonical statement bytes. The
+embedded key is verification material, not a trust source. A receipt reader
+must still supply the expected verifier identity and fingerprint, pack, policy,
+artifact digests, schedule digest, runtime digests, and expected evidence
+signer. For profile-based verification, it must also supply the expected
+canonical trust-profile digest. Explicit-option receipts record `null` for that
+field.
 
-These exports summarize regression evidence only. They do not change verifier
-semantics, replace `invarlock verify`, or provide deployment approval.
+A receipt is written for a completed policy or integrity rejection when the
+transaction can form a safe statement, then the command exits nonzero. A
+successful receipt is internally consistent only when `ok` and `integrity_ok`
+are true, `policy_verdict` is not `fail`, and `verification_status` is zero.
 
-Without `--verify-result`, an export labels its status `report_local_pass` or
-`report_local_fail`. That is a rendering of the submitted report's gate fields,
-not an independent verifier result.
+Downstream readers use
+`invarlock.engine.verify_signed_verification_receipt`. The stable API returns a
+`ReceiptVerification`; acceptance requires its `ok` field to be true.
 
-Common options:
+| Caller-supplied receipt anchor | Compared with |
+| --- | --- |
+| Evidence pack directory | Receipt manifest digest and pack's canonical manifest |
+| Policy file | Receipt policy digest and pack-bound policy identity |
+| Baseline and subject artifact digests | Receipt anchors and both pack-bound artifact identities |
+| Canonical schedule digest | Receipt anchor and pack-bound dataset identity |
+| Baseline and subject runtime digests | Receipt anchors and both runtime manifests |
+| Expected evidence-signer fingerprint | Receipt anchor and authenticated evidence signature |
+| Expected verifier identity | Receipt statement identity |
+| Expected verifier fingerprint | Embedded receipt public key and receipt signature |
+| Expected trust-profile digest or `null` | Receipt verifier profile binding |
 
-- `--policy-profile`: profile label to use when the report does not record one.
-- `--report-url`: public report URL for Markdown exports.
-- `--evidence-url`: public evidence-pack URL for Markdown exports.
-- `--verify-result`: path to `invarlock verify --json` output. When supplied,
-  the exporter strictly parses `verify-v1`, requires exactly one result item
-  whose `id` resolves to the report, and requires the item's receipt
-  `subject_report_sha256` to match the exact report bytes being exported.
-  Duplicate keys, non-finite values, string booleans, malformed items, stale
-  report paths, and stale receipt digests are rejected. Current receipts are
-  explicitly unsigned, so a valid receipt is labelled
-  `receipt_bound_untrusted` with a separate claimed verifier outcome; it never
-  creates an independently verified pass badge.
-- `--force`: overwrite an existing output file.
+## Human report
 
----
+`invarlock report` authenticates the closed inventory, checksums, canonical JSON,
+and embedded evidence signature before rendering the comparison as console text
+or standalone HTML. Rendering never changes bundle bytes.
 
-## Troubleshooting
+A shortened text view is:
 
-### Schema Issues
+```text
+# InvarLock comparison report
 
-- **Schema validation fails**: check `schema_version` and required top-level
-  fields (`run_id`, `meta`, `dataset`, `artifacts`, `primary_metric`).
-- **Unexpected validation keys**: ensure `validation.*` keys match the allow-list
-  in `contracts/validation_keys.json`.
+- **Comparison:** `cmp-example`
+- **Metric:** `exact_match`
+- **Records:** 20
+- **Verdict:** **PASS**
+- **Bundle integrity:** embedded evidence signature verified
+- **Acceptance path:** `invarlock verify` records the expected signer and independent anchors in a signed receipt
+- **Evidence signer:** `sha256:...`
 
-### Telemetry Issues
+| Measure | Value |
+| --- | ---: |
+| Baseline mean | 0.75 |
+| Subject mean | 0.8 |
+| Exact-match delta (pp) | 5 |
+| Paired Newcombe 95% interval | [-14.975805, 24.866849] |
+| Minimum allowed (pp) | -15 |
+| Paired record count | 20 (minimum 20) |
+| Confidence-interval width (pp) | 39.842654 (maximum 50) |
+```
 
-- **Telemetry missing**: ensure the run completed successfully and check
-  `report.metrics` for latency/memory values.
+The exact-match rendering also lists regression and improvement counts, the
+discordant-pair count, and the exact two-sided McNemar probability. When the
+policy includes sample qualification, console and HTML render the observed and
+required record count, interval width, and combined qualification result.
 
-### HTML Export Issues
+The human view states what it is: a rendering of signature-authenticated
+evidence. Independent acceptance comes from `invarlock verify` and its signed
+receipt. Automation should parse verified JSON or validate a receipt, never
+scrape console or HTML.
 
-- **Missing report**: generate one first via
-  `invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
-- **HTML missing styles**: omit `--no-embed-css` or apply custom CSS later in your publishing layer.
+## Failure-state interpretation
 
----
+| State | Integrity | Policy | Portable receipt | Interpretation |
+| --- | --- | --- | --- | --- |
+| Accepted | True | `pass` | Signed success receipt | Conservative interval bound and any configured sample/precision requirements met the policy under all supplied anchors |
+| Policy rejection | True | `fail` | Signed rejection receipt when completion reached | Authentic evidence did not meet the policy |
+| Integrity rejection | False | Unavailable or untrusted | Signed rejection receipt when safe completion reached | Pack must not be used |
+| Precondition failure | Not completed | Unavailable | May be absent | Caller input or structure prevented completed verification |
+| Render success only | Embedded signature authenticated | Stored verdict only | None | Human inspection of evidence, not independent acceptance |
 
-## Observability
+## Related documentation
 
-- `validation.*`, `resolved_policy.*`, and `policy_digest.*` capture policy state.
-- `primary_metric_tail` appears only for ppl-like metrics with paired windows.
-- HTML and Markdown are both rendered views of the shared report outline. If
-  values look wrong, inspect the underlying `evaluation.report.json`.
-- The JSON report is the canonical evidence artifact, but it remains
-  report-supplied unless authenticated and collected inside a trusted
-  evaluation boundary.
-
----
-
-## Related Documentation
-
-- [CLI Reference](cli.md)
-- [Artifact Layout](artifacts.md)
-- [Assurance Case](../assurance/00-assurance-case.md) — What the report covers
-- [Reading a report](../user-guide/reading-report.md) — User-oriented guide
+- [Decision semantics](../assurance/decision-semantics.md) defines the exact
+  score, interval, and threshold arithmetic.
+- [Evidence artifacts](artifacts.md) maps reports to fixed bundle paths.
+- [Public contracts](contracts.md) specifies canonical bytes and signature
+  dependency order.
+- [Command-line interface](cli.md) documents JSON modes and exit status.
+- [Python API](api-guide.md) defines result and signed-receipt types.

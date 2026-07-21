@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import errno
+import os
+import platform
 from pathlib import Path
 
 import pytest
@@ -27,6 +29,27 @@ def test_atomic_directory_publication_moves_complete_tree(tmp_path: Path) -> Non
     publish_directory_no_replace(staging, destination)
 
     assert not staging.exists()
+    assert (destination / "payload.txt").read_text(encoding="utf-8") == "complete"
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux O_PATH contract")
+def test_atomic_directory_publication_supports_non_listable_writable_parent(
+    tmp_path: Path,
+) -> None:
+    parent = tmp_path / "worker-output"
+    parent.mkdir()
+    staging = parent / "staging"
+    staging.mkdir()
+    (staging / "payload.txt").write_text("complete", encoding="utf-8")
+    destination = parent / "published"
+    parent.chmod(0o300)
+    try:
+        publish_directory_no_replace(staging, destination)
+    finally:
+        parent.chmod(0o700)
+
+    assert not staging.exists()
+    assert os.lstat(destination).st_ino > 0
     assert (destination / "payload.txt").read_text(encoding="utf-8") == "complete"
 
 

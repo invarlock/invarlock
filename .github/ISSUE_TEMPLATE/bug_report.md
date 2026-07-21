@@ -10,7 +10,7 @@ labels: bug
 
 ### Environment
 
-- InvarLock version: `invarlock version`
+- InvarLock version: `invarlock --version`
 - Python version: `python --version`
 - OS/Arch/Device (CPU/CUDA/MPS):
 
@@ -23,8 +23,10 @@ labels: bug
 
 ### Actual Behavior / Logs
 
-<!-- Include relevant logs: `events.jsonl`, stack traces, or container-backed report snippets. -->
+<!-- Include the full error and traceback. For evidence defects, identify the
+request, evidence bundle, or signed receipt involved, but remove secrets,
+signing keys, private artifacts, and sensitive data. -->
 
 ### Additional Context
 
-<!-- Config files, minimal repro configs, or links to failing CI run. -->
+<!-- Minimal redacted request/policy, provider, exact command, or failing CI run. -->

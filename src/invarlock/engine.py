@@ -1,0 +1,183 @@
+"""Stable embedding facade for the InvarLock evaluation engine.
+
+Embedding applications should import this module rather than package internals.
+The surface is intentionally limited to the evaluate/verify/report transactions,
+their value types, and the runtime-provider ABI.
+"""
+
+from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
+from invarlock.core.evaluation_request import (
+    EvaluationRequest,
+    EvaluationRequestError,
+    ProviderResolver,
+    load_evaluation_request,
+)
+from invarlock.core.runtime_provider import (
+    INVARLOCK_RUNTIME_PROVIDER_ABI,
+    EvaluationBatch,
+    EvaluationInputPart,
+    EvaluationRecord,
+    GGUFArtifactIdentity,
+    HFSnapshotArtifactIdentity,
+    ModelArtifactIdentity,
+    ModelRuntimeSpec,
+    RuntimeArtifactResources,
+    RuntimeBackendIdentity,
+    RuntimeBehavioralSchedule,
+    RuntimeDeviceFacts,
+    RuntimeExecutionContext,
+    RuntimeExecutionSettings,
+    RuntimeProvider,
+    RuntimeProviderCapabilities,
+    RuntimeProviderPluginIdentity,
+    RuntimeProviderReceipt,
+    RuntimeScoringRecord,
+    RuntimeSession,
+    RuntimeTask,
+    ScoringObservation,
+    TensorRTLLMArtifactIdentity,
+    load_runtime_behavioral_schedule,
+)
+from invarlock.core.schedule_preparation import (
+    LocalDatasetRequest,
+    prepare_local_evaluation_schedule,
+)
+from invarlock.core.scorer_extension import (
+    SCORER_EXTENSION_ABI_VERSION,
+    ScorerExtensionBinding,
+    ScorerExtensionDescriptor,
+    ScorerExtensionError,
+    ScorerExtensionRegistry,
+    ScorerExtensionResult,
+    ScorerReplayRequest,
+    VerifierReplayScorer,
+    build_scorer_binding,
+    build_scorer_result,
+)
+from invarlock.evaluation_oci import (
+    OciEvaluationLaunch,
+    OciRuntimeExecutor,
+    OciSideLaunch,
+    OciWorkerLimits,
+    launch_from_environment,
+)
+from invarlock.evaluation_runtime import RuntimeResourceResolver
+from invarlock.evaluation_transaction import (
+    EvaluationPreflightError,
+    EvaluationPreflightResult,
+    EvaluationTransactionError,
+    EvaluationTransactionResult,
+    evaluate_request_file,
+    preflight_evaluation_request,
+)
+from invarlock.evidence_pack_contract import EvidenceObservation
+from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
+from invarlock.evidence_receipt import (
+    EvidenceReceiptError,
+    ReceiptVerification,
+    verify_signed_verification_receipt,
+)
+from invarlock.evidence_reporting import (
+    EvidenceReport,
+    EvidenceReportError,
+    render_evidence,
+)
+from invarlock.evidence_verification import (
+    EvidenceVerification,
+    EvidenceVerificationError,
+    verify_evidence,
+)
+from invarlock.runtime_import_authoring import (
+    RuntimeImportAuthoringError,
+    RuntimeImportPairedRecords,
+    RuntimeImportSideEvidence,
+    build_runtime_import_observation,
+    build_runtime_import_receipt,
+    load_external_scoring_records_jsonl,
+    load_runtime_import_side,
+    write_runtime_import_paired_records,
+    write_runtime_import_side,
+)
+from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sha256
+from invarlock.trust_inputs import TrustInputs, TrustInputsError, load_trust_inputs
+
+__all__ = [
+    "INVARLOCK_RUNTIME_PROVIDER_ABI",
+    "EvaluationBatch",
+    "EvaluationInputPart",
+    "EvaluationRecord",
+    "EvaluationRequest",
+    "EvaluationRequestError",
+    "EvaluationPreflightError",
+    "EvaluationPreflightResult",
+    "EvaluationTransactionError",
+    "EvaluationTransactionResult",
+    "EvidencePackResult",
+    "EvidencePackStatus",
+    "EvidenceObservation",
+    "EvidenceReceiptError",
+    "EvidenceReport",
+    "EvidenceReportError",
+    "EvidenceVerification",
+    "EvidenceVerificationError",
+    "GGUFArtifactIdentity",
+    "HFSnapshotArtifactIdentity",
+    "LocalDatasetRequest",
+    "ReceiptVerification",
+    "ModelArtifactIdentity",
+    "ModelRuntimeSpec",
+    "OciEvaluationLaunch",
+    "OciRuntimeExecutor",
+    "OciSideLaunch",
+    "OciWorkerLimits",
+    "ProviderResolver",
+    "RuntimeArtifactResources",
+    "RuntimeBackendIdentity",
+    "RuntimeBehavioralSchedule",
+    "RuntimeDeviceFacts",
+    "RuntimeExecutionContext",
+    "RuntimeExecutionSettings",
+    "RuntimeImportAuthoringError",
+    "RuntimeImportPairedRecords",
+    "RuntimeImportSideEvidence",
+    "RuntimeProvider",
+    "RuntimeProviderCapabilities",
+    "RuntimeProviderPluginIdentity",
+    "RuntimeProviderReceipt",
+    "RuntimeResourceResolver",
+    "RuntimeScoringRecord",
+    "RuntimeSession",
+    "RuntimeTask",
+    "SCORER_EXTENSION_ABI_VERSION",
+    "ScorerExtensionBinding",
+    "ScorerExtensionDescriptor",
+    "ScorerExtensionError",
+    "ScorerExtensionRegistry",
+    "ScorerExtensionResult",
+    "ScorerReplayRequest",
+    "VerifierReplayScorer",
+    "build_scorer_binding",
+    "build_scorer_result",
+    "ScoringObservation",
+    "TensorRTLLMArtifactIdentity",
+    "TrustInputs",
+    "TrustInputsError",
+    "build_runtime_import_observation",
+    "build_runtime_import_receipt",
+    "checkpoint_tree_sha256",
+    "evaluate_request_file",
+    "hf_tokenizer_contract_sha256",
+    "load_external_scoring_records_jsonl",
+    "load_evaluation_request",
+    "load_runtime_behavioral_schedule",
+    "load_runtime_import_side",
+    "load_trust_inputs",
+    "launch_from_environment",
+    "prepare_local_evaluation_schedule",
+    "preflight_evaluation_request",
+    "render_evidence",
+    "verify_evidence",
+    "verify_signed_verification_receipt",
+    "write_runtime_import_paired_records",
+    "write_runtime_import_side",
+]

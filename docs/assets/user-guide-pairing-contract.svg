@@ -1,0 +1,153 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1600"
+  height="780"
+  viewBox="0 0 1600 780"
+  role="img"
+  aria-labelledby="pairing-title pairing-desc"
+>
+  <title id="pairing-title">InvarLock schedule pairing and decision contract</title>
+  <desc id="pairing-desc">
+    One fixed schedule flows to baseline and subject runtime observations.
+    InvarLock requires identical ordered record IDs and input digests, derives
+    paired records and built-in scores or replays an authorized text scorer,
+    derives the paired interval, then applies the fixed policy threshold and
+    any configured record-count and interval-width requirements.
+  </desc>
+  <defs>
+    <marker
+      id="pairing-arrow"
+      viewBox="0 0 10 10"
+      refX="8.25"
+      refY="5"
+      markerWidth="6.7"
+      markerHeight="6.7"
+      orient="auto-start-reverse"
+    >
+      <path d="M 0.75 1 L 9.5 5 L 0.75 9 z" fill="#1b2b25" />
+    </marker>
+    <style>
+      .section-label {
+        font: 700 25px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .box-title {
+        fill: #1b2b25;
+        font: 700 24px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .box-text {
+        fill: #1b2b25;
+        font: 18px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+      .small-text {
+        fill: #5a675f;
+        font: 17px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .band-input {
+        fill: #fff8ea;
+        stroke: #0f7669;
+        stroke-width: 3;
+        stroke-dasharray: 13 10;
+      }
+      .band-output {
+        fill: #fff8ea;
+        stroke: #2d7a5f;
+        stroke-width: 3;
+        stroke-dasharray: 13 10;
+      }
+      .band-decision {
+        fill: #fff8ea;
+        stroke: #b56a3d;
+        stroke-width: 3;
+        stroke-dasharray: 13 10;
+      }
+      .box-input {
+        fill: #f3ecde;
+        stroke: #0f7669;
+        stroke-width: 3;
+      }
+      .box-output {
+        fill: #f3ecde;
+        stroke: #2d7a5f;
+        stroke-width: 3;
+      }
+      .box-decision {
+        fill: #f3ecde;
+        stroke: #b56a3d;
+        stroke-width: 3;
+      }
+      .arrow {
+        fill: none;
+        stroke: #1b2b25;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        marker-end: url(#pairing-arrow);
+      }
+    </style>
+  </defs>
+
+  <rect width="1600" height="780" fill="#f3ecde" />
+
+  <rect x="70" y="45" width="1460" height="165" rx="22" class="band-input" />
+  <text x="105" y="113" class="section-label" fill="#0f7669">1. Fixed</text>
+  <text x="105" y="147" class="section-label" fill="#0f7669">schedule</text>
+
+  <rect x="405" y="72" width="790" height="110" rx="12" class="box-input" />
+  <text x="800" y="110" text-anchor="middle" class="box-title">
+    runtime-behavioral-schedule-v1
+  </text>
+  <text x="800" y="143" text-anchor="middle" class="box-text">
+    ordered record_id + input_sha256 + expected_output
+  </text>
+  <text x="800" y="169" text-anchor="middle" class="small-text">
+    canonical bytes and schedule digest are shared by both sides
+  </text>
+
+  <rect x="70" y="230" width="1460" height="315" rx="22" class="band-output" />
+  <text x="105" y="350" class="section-label" fill="#2d7a5f">2. Pair and</text>
+  <text x="105" y="384" class="section-label" fill="#2d7a5f">derive</text>
+
+  <rect x="245" y="260" width="410" height="92" rx="12" class="box-output" />
+  <text x="450" y="298" text-anchor="middle" class="box-title">Baseline observation</text>
+  <text x="450" y="328" text-anchor="middle" class="small-text">provider measurements in schedule order</text>
+
+  <rect x="945" y="260" width="410" height="92" rx="12" class="box-output" />
+  <text x="1150" y="298" text-anchor="middle" class="box-title">Subject observation</text>
+  <text x="1150" y="328" text-anchor="middle" class="small-text">provider measurements in schedule order</text>
+
+  <rect x="540" y="382" width="520" height="66" rx="12" class="box-input" />
+  <text x="800" y="409" text-anchor="middle" class="box-title">Exact pairing invariant</text>
+  <text x="800" y="435" text-anchor="middle" class="box-text">same ordered IDs + same input digests</text>
+
+  <rect x="495" y="472" width="610" height="50" rx="10" class="box-output" />
+  <text x="800" y="505" text-anchor="middle" class="box-title">paired-records-v1 · replayable scores</text>
+
+  <path d="M 690 182 C 630 215 520 220 475 260" class="arrow" />
+  <path d="M 910 182 C 970 215 1080 220 1125 260" class="arrow" />
+  <path d="M 655 306 C 700 325 700 350 700 382" class="arrow" />
+  <path d="M 945 306 C 900 325 900 350 900 382" class="arrow" />
+  <path d="M 800 448 L 800 472" class="arrow" />
+
+  <rect x="70" y="565" width="1460" height="170" rx="22" class="band-decision" />
+  <text x="105" y="640" class="section-label" fill="#b56a3d">3. Deterministic</text>
+  <text x="105" y="674" class="section-label" fill="#b56a3d">decision</text>
+
+  <rect x="245" y="595" width="330" height="100" rx="12" class="box-decision" />
+  <text x="410" y="632" text-anchor="middle" class="box-title">Core arithmetic</text>
+  <text x="410" y="659" text-anchor="middle" class="small-text">built-ins · authorized scorer</text>
+  <text x="410" y="682" text-anchor="middle" class="small-text">paired outcomes · ratio or point delta</text>
+
+  <rect x="635" y="595" width="330" height="100" rx="12" class="box-decision" />
+  <text x="800" y="626" text-anchor="middle" class="box-title">Paired interval</text>
+  <text x="800" y="653" text-anchor="middle" class="small-text">Newcombe v2 · paired resampling</text>
+  <text x="800" y="678" text-anchor="middle" class="small-text">legacy v1 replay by report format</text>
+
+  <rect x="1025" y="595" width="330" height="100" rx="12" class="box-decision" />
+  <text x="1190" y="626" text-anchor="middle" class="box-title">Policy verdict</text>
+  <text x="1190" y="653" text-anchor="middle" class="small-text">metric bound · record count</text>
+  <text x="1190" y="678" text-anchor="middle" class="small-text">interval-width precision</text>
+
+  <path d="M 800 522 C 700 550 520 560 410 595" class="arrow" />
+  <path d="M 575 645 L 635 645" class="arrow" />
+  <path d="M 965 645 L 1025 645" class="arrow" />
+</svg>

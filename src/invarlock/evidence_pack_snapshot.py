@@ -3,23 +3,26 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
+import os
 import stat
 import tempfile
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any
 
-from invarlock.evidence_pack_contracts.probes import (
-    PROBE_FILENAMES,
-    ProbeValidationError,
-    validate_probe_payload,
+from invarlock.evidence_pack_json import (
+    StrictJsonError,
+    copy_regular_file_snapshot,
+    load_json_object,
 )
-from invarlock.evidence_pack_json import StrictJsonError, load_json_object
-from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
+
+MAX_PACK_SNAPSHOT_ENTRIES = 256
+MAX_PACK_SNAPSHOT_FILES = 128
+MAX_PACK_SNAPSHOT_FILE_BYTES = 64 * 1024 * 1024
+MAX_PACK_SNAPSHOT_TOTAL_BYTES = 512 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,10 @@ def _identity(path: Path) -> FileIdentity | None:
         return None
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
         return None
+    return _identity_from_stat(info)
+
+
+def _identity_from_stat(info: os.stat_result) -> FileIdentity:
     return FileIdentity(
         device=info.st_dev,
         inode=info.st_ino,
@@ -83,21 +90,31 @@ def _capture_entry(
     *,
     relative_path: str,
     snapshot_path: Path,
+    expected_identity: FileIdentity,
+    max_bytes: int,
     parse_json: bool = False,
 ) -> tuple[SnapshotEntry | None, str | None]:
     before = _identity(source_path)
     if before is None:
-        return None, f"snapshot input is missing or not a regular file: {source_path}"
+        return None, (
+            "snapshot input is missing or not a regular file: " + relative_path
+        )
+    if before != expected_identity:
+        return None, f"snapshot input changed before capture: {relative_path}"
     try:
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        snapshot_path.touch(exist_ok=False)
-        shutil.copyfile(source_path, snapshot_path)
+        copy_regular_file_snapshot(
+            source_path,
+            snapshot_path,
+            label=f"evidence-pack file {relative_path}",
+            max_bytes=max_bytes,
+        )
         digest = _sha256_path(snapshot_path)
-    except OSError as exc:
-        return None, f"unable to snapshot input {source_path}: {exc}"
+    except (OSError, StrictJsonError):
+        return None, f"unable to snapshot input safely: {relative_path}"
     after = _identity(source_path)
-    if after != before:
-        return None, f"snapshot input changed while being captured: {source_path}"
+    if after != expected_identity:
+        return None, f"snapshot input changed while being captured: {relative_path}"
     parsed_json, json_error = (
         _parse_json_once(snapshot_path, label=relative_path)
         if parse_json
@@ -119,114 +136,6 @@ def _capture_entry(
         ),
         None,
     )
-
-
-def _manifest_reference_paths(payload: dict[str, Any]) -> set[str]:
-    """Return manifest-declared JSON inputs that influence verification."""
-
-    paths: set[str] = set()
-
-    def add_reference(value: Any) -> None:
-        if not isinstance(value, dict):
-            return
-        relative_path = value.get("path")
-        if (
-            isinstance(relative_path, str)
-            and relative_path
-            and relative_path.lower().endswith(".json")
-        ):
-            paths.add(relative_path)
-
-    add_reference(payload.get("subject"))
-    add_reference(payload.get("environment"))
-    add_reference(payload.get("verification_policy_pack"))
-    invocation = payload.get("invocation")
-    if isinstance(invocation, dict):
-        add_reference(invocation.get("config_source"))
-    for field in ("materials", "verification_baselines"):
-        values = payload.get(field)
-        if isinstance(values, list):
-            for value in values:
-                add_reference(value)
-    return paths
-
-
-def _structural_json_paths(entries: list[SnapshotEntry]) -> set[str]:
-    """Identify pack files whose JSON semantics drive package verification."""
-
-    paths = {
-        "metadata/manifest.json",
-        "manifest.signature.json",
-        "metadata/manifest.signature.json",
-        "metadata/scenarios.json",
-    }
-    for entry in entries:
-        relative = entry.relative_path
-        filename = PurePosixPath(relative).name
-        if relative.startswith("results/") and filename == "final_verdict.json":
-            paths.add(relative)
-        if relative.startswith("reports/") and filename in {
-            "evaluation.report.json",
-            RUNTIME_MANIFEST_FILENAME,
-            *PROBE_FILENAMES,
-        }:
-            paths.add(relative)
-        if relative.startswith("baselines/") and filename in {
-            "evaluation.report.json",
-            RUNTIME_MANIFEST_FILENAME,
-        }:
-            paths.add(relative)
-    return paths
-
-
-def _validate_pack_json_inputs(
-    entries: list[SnapshotEntry],
-) -> tuple[list[SnapshotEntry], dict[str, Any], list[str]]:
-    """Strictly parse all JSON that can affect package verification decisions."""
-
-    by_relative = {entry.relative_path: entry for entry in entries}
-    manifest = by_relative.get("manifest.json")
-    required = _structural_json_paths(entries)
-    if manifest is not None and isinstance(manifest.parsed_json, dict):
-        required.update(_manifest_reference_paths(manifest.parsed_json))
-
-    parsed: dict[str, Any] = {
-        entry.relative_path: entry.parsed_json
-        for entry in entries
-        if entry.json_error is None
-    }
-    replacements: dict[str, SnapshotEntry] = {}
-    errors: list[str] = []
-    for relative in sorted(required):
-        # ``manifest.json`` is parsed during capture so its existing format
-        # diagnostics are returned by the verifier's format phase.
-        if relative == "manifest.json":
-            continue
-        entry = by_relative.get(relative)
-        if entry is None:
-            continue
-        payload, error = _parse_json_once(
-            entry.snapshot_path,
-            label=f"evidence-pack JSON input {relative}",
-        )
-        if error is not None:
-            errors.append(f"unsafe evidence-pack JSON input {relative}: {error}")
-            continue
-        parsed[relative] = payload
-        if PurePosixPath(relative).name in PROBE_FILENAMES:
-            try:
-                validate_probe_payload(PurePosixPath(relative).name, payload)
-            except ProbeValidationError as exc:
-                errors.append(f"unsafe evidence-pack JSON input {relative}: {exc}")
-                continue
-        replacements[relative] = replace(
-            entry,
-            parsed_json=payload,
-            json_error=None,
-        )
-    if replacements:
-        entries = [replacements.get(entry.relative_path, entry) for entry in entries]
-    return entries, parsed, errors
 
 
 @dataclass(frozen=True)
@@ -260,13 +169,16 @@ class ImmutableFileSnapshot:
 
     def stability_errors(self) -> list[str]:
         errors: list[str] = []
+        labels = {entry.source_path: entry.relative_path for entry in self.entries}
         for source, expected in self.tracked_sources.items():
             current = _identity(source)
             unsafe_new_entry = expected is None and (
                 source.is_symlink() or source.exists()
             )
             if current != expected or unsafe_new_entry:
-                errors.append(f"{self.label} changed after capture: {source}")
+                errors.append(
+                    f"{self.label} changed after capture: {labels.get(source, source.name)}"
+                )
         return errors
 
     def materialized_stability_errors(self, root: Path) -> list[str]:
@@ -347,12 +259,22 @@ class PackSnapshot:
         validate_structural_json: bool = True,
     ) -> tuple[PackSnapshot | None, list[str]]:
         if pack_dir.is_symlink() or not pack_dir.is_dir():
-            return None, [f"Pack directory not found or unsafe: {pack_dir}"]
-        paths: list[Path] = []
+            return None, [f"Pack directory not found or unsafe: {pack_dir.name}"]
+        paths: list[tuple[Path, FileIdentity]] = []
         errors: list[str] = []
+        entry_count = 0
+        total_bytes = 0
         for path in pack_dir.rglob("*"):
+            entry_count += 1
+            if entry_count > MAX_PACK_SNAPSHOT_ENTRIES:
+                errors.append(
+                    "evidence pack exceeds the "
+                    f"{MAX_PACK_SNAPSHOT_ENTRIES}-entry snapshot limit"
+                )
+                break
             try:
-                mode = path.lstat().st_mode
+                info = path.lstat()
+                mode = info.st_mode
             except OSError as exc:
                 errors.append(
                     "unable to inspect evidence-pack entry: "
@@ -366,7 +288,26 @@ class PackSnapshot:
                 )
                 continue
             if stat.S_ISREG(mode):
-                paths.append(path)
+                if len(paths) >= MAX_PACK_SNAPSHOT_FILES:
+                    errors.append(
+                        "evidence pack exceeds the "
+                        f"{MAX_PACK_SNAPSHOT_FILES}-file snapshot limit"
+                    )
+                    break
+                if info.st_size > MAX_PACK_SNAPSHOT_FILE_BYTES:
+                    errors.append(
+                        f"evidence-pack file {path.relative_to(pack_dir)} exceeds "
+                        f"the {MAX_PACK_SNAPSHOT_FILE_BYTES}-byte snapshot limit"
+                    )
+                    break
+                total_bytes += info.st_size
+                if total_bytes > MAX_PACK_SNAPSHOT_TOTAL_BYTES:
+                    errors.append(
+                        "evidence pack exceeds the "
+                        f"{MAX_PACK_SNAPSHOT_TOTAL_BYTES}-byte total snapshot limit"
+                    )
+                    break
+                paths.append((path, _identity_from_stat(info)))
                 continue
             if not stat.S_ISDIR(mode):
                 errors.append(
@@ -379,15 +320,21 @@ class PackSnapshot:
         tracked: dict[Path, FileIdentity | None] = {}
         storage = tempfile.TemporaryDirectory(prefix="invarlock-pack-snapshot-")
         snapshot_root = Path(storage.name)
-        for path in sorted(
-            paths, key=lambda item: item.relative_to(pack_dir).as_posix()
+        captured_bytes = 0
+        for path, expected_identity in sorted(
+            paths, key=lambda item: item[0].relative_to(pack_dir).as_posix()
         ):
             relative = path.relative_to(pack_dir).as_posix()
-            tracked[path] = _identity(path)
+            tracked[path] = expected_identity
             entry, error = _capture_entry(
                 path,
                 relative_path=relative,
                 snapshot_path=snapshot_root.joinpath(*PurePosixPath(relative).parts),
+                expected_identity=expected_identity,
+                max_bytes=min(
+                    MAX_PACK_SNAPSHOT_FILE_BYTES,
+                    MAX_PACK_SNAPSHOT_TOTAL_BYTES - captured_bytes,
+                ),
                 parse_json=validate_structural_json and relative == "manifest.json",
             )
             if error is not None:
@@ -395,16 +342,15 @@ class PackSnapshot:
             else:
                 assert entry is not None
                 entries.append(entry)
+                captured_bytes += entry.identity.size
         if errors:
             storage.cleanup()
             return None, errors
-        if validate_structural_json:
-            entries, parsed, json_errors = _validate_pack_json_inputs(entries)
-            if json_errors:
-                storage.cleanup()
-                return None, json_errors
-        else:
-            parsed = {}
+        parsed = {
+            entry.relative_path: entry.parsed_json
+            for entry in entries
+            if entry.json_error is None
+        }
         snapshot = cls(
             source_root=pack_dir,
             files=ImmutableFileSnapshot(

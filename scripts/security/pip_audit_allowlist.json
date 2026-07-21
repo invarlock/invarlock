@@ -3,17 +3,47 @@
   "entries": [
     {
       "advisory": "CVE-2025-3000",
+      "packages": ["torch"],
+      "versions": ["2.11.0+cu128"],
+      "allowed_sources": ["requirements/workflows/runtime-image-py312-cu128.txt"],
+      "compensating_control": "The affected wheel is confined to local model execution inside a digest-pinned, network-disabled CUDA runtime image; remote code loading is disabled for strict evidence production.",
       "owner": "security-maintainers",
       "expires": "2026-08-13",
       "tracking_issue": "https://github.com/invarlock/invarlock/issues/72",
-      "reason": "pip-audit reports the advisory against torch 2.11.0 in optional HF and advanced install surfaces and currently lists no fixed torch release; remove when upstream publishes a fixed version."
+      "reason": "Torch 2.13 fixes the advisory and is used by the CPU and aarch64 runtimes, but PyTorch has not published a 2.13 CUDA 12.8 wheel; remove after the CUDA image moves to a tested backend with a fixed wheel."
     },
     {
       "advisory": "PYSEC-2026-3447",
+      "packages": ["setuptools"],
+      "versions": ["81.0.0"],
+      "allowed_sources": ["requirements/workflows/runtime-image-py312-cu128.txt"],
+      "compensating_control": "The CUDA image installs hash-pinned wheels only and never builds or distributes setuptools sdists; CPU, aarch64, build, CI, documentation, and release environments use setuptools 83 or newer.",
       "owner": "security-maintainers",
       "expires": "2026-08-13",
       "tracking_issue": "https://github.com/invarlock/invarlock/issues/142",
-      "reason": "The pinned torch 2.11.0+cu128 wheel requires setuptools below 82; retain the runtime-only lock until a validated Torch/CUDA pairing permits setuptools 83 or later."
+      "reason": "The CUDA 12.8 Torch 2.11 wheel requires setuptools below 82; retain only this CUDA-runtime exception until an upstream-compatible pairing permits setuptools 83 or later."
+    },
+    {
+      "advisory": "PYSEC-2026-1939",
+      "packages": ["sqlitedict"],
+      "versions": ["2.1.0"],
+      "allowed_sources": ["requirements/workflows/lm-evaluation-harness-py312.txt"],
+      "compensating_control": "The maintained integration does not enable the LM Evaluation Harness response cache or consume SQLite cache files; it runs with network access disabled and repository-controlled arguments and inputs.",
+      "owner": "security-maintainers",
+      "expires": "2026-08-13",
+      "tracking_issue": "https://github.com/invarlock/invarlock/issues/151",
+      "reason": "LM Evaluation Harness 0.4.12 still requires sqlitedict even when its optional response cache is unused; remove this exception when the dependency can be omitted or replaced."
+    },
+    {
+      "advisory": "GHSA-g4r7-86gm-pgqc",
+      "packages": ["sqlitedict"],
+      "versions": ["2.1.0"],
+      "allowed_sources": ["requirements/workflows/lm-evaluation-harness-py312.txt"],
+      "compensating_control": "The maintained integration does not enable the LM Evaluation Harness response cache or consume SQLite cache files; it runs with network access disabled and repository-controlled arguments and inputs.",
+      "owner": "security-maintainers",
+      "expires": "2026-08-13",
+      "tracking_issue": "https://github.com/invarlock/invarlock/issues/151",
+      "reason": "LM Evaluation Harness 0.4.12 still requires sqlitedict even when its optional response cache is unused; remove this exception when the dependency can be omitted or replaced."
     }
   ]
 }

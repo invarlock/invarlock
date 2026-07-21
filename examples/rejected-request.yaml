@@ -1,0 +1,58 @@
+format_version: invarlock/evaluation-request-v1
+comparison:
+  baseline:
+    artifact:
+      model_id: org/baseline
+      locator: hf://org/baseline@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    runtime:
+      provider: hf_transformers
+      settings:
+        batch_size: 1
+        checkpoint_tree_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        context_length: 128
+        immutable_revision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        max_output_tokens: 16
+        offline: true
+        seed: 0
+        timeout_seconds: 30
+        tokenizer_metadata_sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  subject:
+    artifact:
+      model_id: org/subject
+      locator: hf://org/subject@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    runtime:
+      provider: hf_transformers
+      settings:
+        batch_size: 1
+        checkpoint_tree_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        context_length: 128
+        immutable_revision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        max_output_tokens: 16
+        offline: true
+        seed: 0
+        timeout_seconds: 30
+        tokenizer_metadata_sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  dataset: inputs/schedule.json
+  policy: policy/acceptance.json
+  task: text_causal
+  metric: exact_match
+execution:
+  mode: import
+  records: import/rejected-paired-records.json
+  schedule: inputs/schedule.json
+  baseline:
+    identity: import/baseline/model-artifact.identity.json
+    receipt: import/baseline/runtime-provider.receipt.json
+    observation: import/baseline/runtime-scoring.observation.json
+    run_report: import/baseline/report.json
+    runtime_manifest: import/baseline/runtime.manifest.json
+    runtime_config: import/baseline/run.yaml
+  subject:
+    identity: import/rejected-subject/model-artifact.identity.json
+    receipt: import/rejected-subject/runtime-provider.receipt.json
+    observation: import/rejected-subject/runtime-scoring.observation.json
+    run_report: import/rejected-subject/report.json
+    runtime_manifest: import/rejected-subject/runtime.manifest.json
+    runtime_config: import/rejected-subject/run.yaml
+output:
+  evidence: artifacts/rejected-evidence

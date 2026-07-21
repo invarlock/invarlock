@@ -117,6 +117,19 @@ def test_checkpoint_tree_digest_rejects_symlinks_and_no_checkpoint_files(
         checkpoint_tree_sha256(checkpoint)
 
 
+def test_checkpoint_tree_digest_rejects_intermediate_parent_symlink(
+    tmp_path: Path,
+) -> None:
+    actual_parent = tmp_path / "actual"
+    checkpoint = actual_parent / "checkpoint"
+    _write_checkpoint(checkpoint)
+    linked_parent = tmp_path / "linked"
+    linked_parent.symlink_to(actual_parent, target_is_directory=True)
+
+    with pytest.raises(CheckpointIdentityError, match="symbolic links"):
+        checkpoint_tree_sha256(linked_parent / checkpoint.name)
+
+
 def test_checkpoint_tree_digest_rejects_final_component_symlink_swap(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

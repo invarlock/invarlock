@@ -1,0 +1,172 @@
+# Runtime image for the optional GGUF provider distribution.
+ARG RUNTIME_BASE_IMAGE=python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
+ARG LLAMA_CPP_BUILD_BASE=python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
+ARG SOURCE_DATE_EPOCH=0
+
+FROM scratch AS runtime-inputs
+COPY requirements/workflows/core-py312.txt /requirements/workflows/core-py312.txt
+COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/workflows/runtime-wheel-build-py312.txt
+COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
+COPY src /project/src
+COPY addins/gguf/pyproject.toml addins/gguf/README.md /addin/
+COPY addins/gguf/src /addin/src
+COPY addins/gguf/runtime/llama-completion-user-output.patch /runtime/
+
+FROM ${RUNTIME_BASE_IMAGE} AS public-wheel
+ARG SOURCE_DATE_EPOCH
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+COPY --from=runtime-inputs /requirements/workflows/runtime-wheel-build-py312.txt /tmp/runtime-wheel-build.txt
+COPY --from=runtime-inputs /project /project
+COPY --from=runtime-inputs /addin /addin
+RUN python -m pip install \
+      --require-hashes \
+      --no-deps \
+      -r /tmp/runtime-wheel-build.txt \
+    && python -m pip wheel \
+      --no-build-isolation \
+      --no-deps \
+      --wheel-dir /wheelhouse \
+      /project \
+    && python -m pip wheel \
+      --no-build-isolation \
+      --no-deps \
+      --wheel-dir /wheelhouse \
+      /addin \
+    && set -- /wheelhouse/invarlock-*.whl \
+    && test "$#" -eq 1 \
+    && set -- /wheelhouse/invarlock_runtime_gguf-*.whl \
+    && test "$#" -eq 1 \
+    && touch -h -d "@${SOURCE_DATE_EPOCH}" /wheelhouse/*.whl
+
+FROM ${LLAMA_CPP_BUILD_BASE} AS llama-cpp-build
+
+ARG LLAMA_CPP_APT_SNAPSHOT
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN install -d \
+      /tmp/llama-apt-cache/archives/partial \
+      /tmp/llama-apt-log \
+      /tmp/llama-apt-state/lists/partial \
+    && printf '%s\n' "${LLAMA_CPP_APT_SNAPSHOT}" | grep -Eq '^[0-9]{8}T[0-9]{6}Z$' \
+    && apt_get() { \
+      set -- \
+        -o "APT::Snapshot=${LLAMA_CPP_APT_SNAPSHOT}" \
+        -o "Acquire::Check-Valid-Until=false" \
+        -o "Dir::Cache::archives=/tmp/llama-apt-cache/archives" \
+        -o "Dir::Log=/tmp/llama-apt-log" \
+        -o "Dir::State::lists=/tmp/llama-apt-state/lists" \
+        "$@"; \
+      apt-get "$@"; \
+    } \
+    && apt_get update \
+    && apt_get install -y --no-install-recommends build-essential cmake patch
+
+ARG SOURCE_DATE_EPOCH
+ARG LLAMA_CPP_BUILD_JOBS=2
+ARG LLAMA_CPP_SOURCE_URL=https://github.com/ggml-org/llama.cpp/archive/refs/tags/b10015.tar.gz
+ARG LLAMA_CPP_SOURCE_SHA256=5ab75e394f4c71425ecce64a213dab3b8e3e9cfe0f19d0dcda4d5a4f7733da83
+ARG LLAMA_CPP_SOURCE_COMMIT=12127defda4f41b7679cb2477a4b0d65ee6a0c8f
+
+# BuildKit verifies the archive against the pinned digest before exposing it
+# to the build. The source digest and commit are also recorded in image labels.
+ADD --checksum=sha256:${LLAMA_CPP_SOURCE_SHA256} ${LLAMA_CPP_SOURCE_URL} /tmp/llama.cpp.tar.gz
+COPY --from=runtime-inputs /runtime/llama-completion-user-output.patch /runtime/llama-completion-user-output.patch
+
+RUN tar -xzf /tmp/llama.cpp.tar.gz -C /tmp \
+    && test -f /tmp/llama.cpp-b10015/CMakeLists.txt \
+    && patch \
+      --directory /tmp/llama.cpp-b10015 \
+      --strip 1 \
+      --input /runtime/llama-completion-user-output.patch \
+    && ! grep -F 'LOG(" [end of text]\n");' /tmp/llama.cpp-b10015/tools/completion/completion.cpp \
+    && case "${LLAMA_CPP_BUILD_JOBS}" in *[!0-9]*|'') exit 2 ;; esac \
+    && test "${LLAMA_CPP_BUILD_JOBS}" -ge 1 \
+    && test "${LLAMA_CPP_BUILD_JOBS}" -le 8 \
+    && cmake \
+      -S /tmp/llama.cpp-b10015 \
+      -B /tmp/llama.cpp-build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DGGML_BACKEND_DL=OFF \
+      -DGGML_CCACHE=OFF \
+      -DGGML_NATIVE=OFF \
+      -DGGML_OPENMP=OFF \
+      -DLLAMA_BUILD_COMMIT=${LLAMA_CPP_SOURCE_COMMIT} \
+      -DLLAMA_BUILD_APP=OFF \
+      -DLLAMA_BUILD_EXAMPLES=OFF \
+      -DLLAMA_BUILD_NUMBER=10015 \
+      -DLLAMA_BUILD_SERVER=ON \
+      -DLLAMA_BUILD_TESTS=OFF \
+      -DLLAMA_BUILD_TOOLS=ON \
+      -DLLAMA_BUILD_UI=OFF \
+      -DLLAMA_USE_PREBUILT_UI=OFF \
+    && cmake --build /tmp/llama.cpp-build --config Release --target llama-completion llama-quantize --parallel "${LLAMA_CPP_BUILD_JOBS}" \
+    && install -D -m 0755 /tmp/llama.cpp-build/bin/llama-completion /opt/llama.cpp/llama-completion \
+    && install -D -m 0755 /tmp/llama.cpp-build/bin/llama-quantize /opt/llama.cpp/llama-quantize \
+    && install -D -m 0444 /tmp/llama.cpp.tar.gz /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
+    && install -D -m 0444 /runtime/llama-completion-user-output.patch /opt/llama.cpp/source/llama-completion-user-output.patch \
+    && strip /opt/llama.cpp/llama-completion \
+    && touch -h -d "@${SOURCE_DATE_EPOCH}" \
+      /opt/llama.cpp \
+      /opt/llama.cpp/llama-completion \
+      /opt/llama.cpp/llama-quantize \
+      /opt/llama.cpp/source \
+      /opt/llama.cpp/source/llama.cpp-b10015.tar.gz \
+      /opt/llama.cpp/source/llama-completion-user-output.patch
+
+FROM ${RUNTIME_BASE_IMAGE}
+
+ARG INVARLOCK_SOURCE_BUNDLE_SHA256
+ARG INVARLOCK_SOURCE_COMMIT
+ARG SOURCE_DATE_EPOCH
+ARG LLAMA_CPP_SOURCE_SHA256=5ab75e394f4c71425ecce64a213dab3b8e3e9cfe0f19d0dcda4d5a4f7733da83
+ARG LLAMA_CPP_SOURCE_COMMIT=12127defda4f41b7679cb2477a4b0d65ee6a0c8f
+
+RUN python -c 'import re,sys; commit,digest=sys.argv[1:]; re.fullmatch(r"[0-9a-f]{40,64}", commit) or sys.exit("invalid INVARLOCK_SOURCE_COMMIT"); re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or sys.exit("invalid INVARLOCK_SOURCE_BUNDLE_SHA256")' \
+      "${INVARLOCK_SOURCE_COMMIT}" "${INVARLOCK_SOURCE_BUNDLE_SHA256}"
+
+ENV PATH="/opt/llama.cpp:${PATH}" \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONNOUSERSITE=1 \
+    PYTHONUNBUFFERED=1 \
+    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+
+LABEL dev.invarlock.runtime-provider="llama_cpp" \
+      dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}" \
+      dev.invarlock.llama-cpp.source-commit="${LLAMA_CPP_SOURCE_COMMIT}" \
+      dev.invarlock.llama-cpp.source-sha256="${LLAMA_CPP_SOURCE_SHA256}" \
+      org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"
+
+COPY --from=runtime-inputs /requirements/workflows/core-py312.txt /opt/invarlock/requirements/core-py312.txt
+COPY --from=public-wheel /wheelhouse /opt/invarlock/artifacts
+COPY --from=llama-cpp-build /opt/llama.cpp/llama-completion /opt/llama.cpp/llama-completion
+COPY --from=llama-cpp-build /opt/llama.cpp/llama-quantize /opt/llama.cpp/llama-quantize
+COPY --from=llama-cpp-build /opt/llama.cpp/source /opt/llama.cpp/source
+
+RUN python -m pip install \
+      --require-hashes \
+      -r /opt/invarlock/requirements/core-py312.txt \
+    && set -- /opt/invarlock/artifacts/invarlock-*.whl \
+    && test "$#" -eq 1 \
+    && core_wheel="$1" \
+    && set -- /opt/invarlock/artifacts/invarlock_runtime_gguf-*.whl \
+    && test "$#" -eq 1 \
+    && addin_wheel="$1" \
+    && python -m pip install \
+      --no-compile \
+      --no-deps \
+      --no-index \
+      "${core_wheel}" "${addin_wheel}" \
+    && python -m invarlock_addins.gguf.conformance \
+    && find /opt/invarlock /opt/llama.cpp /usr/local/lib/python3.12 /usr/local/bin \
+      -xdev -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+
+WORKDIR /opt/invarlock
+
+ENTRYPOINT ["python", "-m", "invarlock"]

@@ -1,261 +1,678 @@
 #!/usr/bin/env python3
-"""Audit public evidence classification and verifier metadata."""
+"""Audit the canonical public evidence index and any local evidence packs."""
 
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
+import hashlib
+import json
+import re
 import sys
-from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlsplit
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from invarlock.reporting.report_schema import validate_report  # noqa: E402
-from scripts.checks.public_evidence_checks.artifacts import (  # noqa: E402
-    _check_catalog_evidence_multimodal_quality,
-    _check_guard_value_demo,
-    _check_signed_pack,
-    _is_direct_catalog_evidence_artifact,
-    _require_path,
+from invarlock.evidence_pack_integrity import (  # noqa: E402
+    public_key_fingerprint,
 )
-from scripts.checks.public_evidence_checks.common import (  # noqa: E402
-    META_FILENAME,
-    PUBLIC_EVIDENCE_ROOT,
-    SCHEMA,
-    _artifact_dirs,
-    _check_duplicate_root_evaluation_reports,
-    _check_public_evidence_privacy,
-    _load_json,
-    _relative,
+from invarlock.evidence_reporting import (  # noqa: E402
+    EvidenceReportError,
+    render_evidence,
 )
-from scripts.checks.public_evidence_checks.guard_scenarios import (  # noqa: E402
-    check_historical_guard_scenario_observations,
-)
-from scripts.checks.public_evidence_checks.index import (  # noqa: E402
-    _check_packaged_public_evidence_index,
-)
-from scripts.checks.public_evidence_checks.summaries import (  # noqa: E402
-    _check_attention_backend_compatibility,
-    _check_runtime_backend_compatibility,
+from scripts.checks.sync_packaged_public_evidence import (  # noqa: E402
+    EVIDENCE_DIRNAME,
+    INDEX_FILENAME,
+    INDEX_FORMAT_VERSION,
+    PACKAGED_ROOT,
+    SOURCE_ROOT,
+    _artifact_summary,
+    _read_object,
+    _validate_index,
+    _validate_metadata,
 )
 
-EVIDENCE_CLASS_REGISTRY: dict[str, dict[str, str | None]] = {
-    "contract_fixture": {"kind": "fixture", "specialized_checker": None},
-    "strict_pass_fixture": {"kind": "fixture", "specialized_checker": None},
-    "historical_archived_fixture": {
-        "kind": "historical",
-        "specialized_checker": None,
-    },
-    "historical_archived_run": {
-        "kind": "historical",
-        "specialized_checker": None,
-    },
-    "caught_regression_fixture": {"kind": "fixture", "specialized_checker": None},
-    "policy_failure_fixture": {"kind": "fixture", "specialized_checker": None},
-    "byoe_subject_fixture": {"kind": "fixture", "specialized_checker": None},
-    "real_model_run": {"kind": "real", "specialized_checker": None},
-    "real_guard_value_demo": {
-        "kind": "real",
-        "specialized_checker": "guard_value_demo",
-    },
-    "signed_real_model_pack": {"kind": "real", "specialized_checker": None},
-    "runtime_backend_compatibility": {
-        "kind": "summary",
-        "specialized_checker": "runtime_backend_compatibility",
-    },
-    "attention_backend_compatibility": {
-        "kind": "summary",
-        "specialized_checker": "attention_backend_compatibility",
-    },
-}
-
-EvidenceChecker = Callable[[list[str], Path, dict[str, Any]], None]
-
-SPECIALIZED_EVIDENCE_CHECKERS: dict[str, EvidenceChecker] = {
-    "guard_value_demo": _check_guard_value_demo,
-    "runtime_backend_compatibility": _check_runtime_backend_compatibility,
-    "attention_backend_compatibility": _check_attention_backend_compatibility,
-}
+_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
+_IDENTITY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+_RECEIPT_FORMAT_V1 = "invarlock/evidence-verification-receipt-v1"
+_RECEIPT_FORMAT_V2 = "invarlock/evidence-verification-receipt-v2"
+_RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
+_PRIVATE_MARKERS = (
+    "/Users/",
+    "/home/",
+    "/root/",
+    "ssh root@",
+    "INVARLOCK_SIGNING_KEY",
+    "PRIVATE KEY",
+)
+_OBSOLETE_MARKERS = (
+    "published_basis",
+    "frozen-v1",
+    "catalog_evidence_index",
+    "catalog_evidence/",
+)
+_IGNORED_LOCAL_METADATA = frozenset({".DS_Store"})
 
 
-def check_public_evidence(
-    root: Path = PUBLIC_EVIDENCE_ROOT,
+def _is_ignored_local_metadata(path: Path) -> bool:
+    return (
+        path.name in _IGNORED_LOCAL_METADATA
+        and path.is_file()
+        and not path.is_symlink()
+    )
+
+
+def _canonical_json_bytes(value: object) -> bytes:
+    return (
+        json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return f"sha256:{hashlib.sha256(value).hexdigest()}"
+
+
+def _valid_digest(value: object) -> bool:
+    return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
+
+
+def _check_receipt_anchors(
+    errors: list[str],
+    receipt: Path,
+    anchors: object,
     *,
-    fetch_external_assets: bool = False,
-) -> list[str]:
+    require_request: bool = False,
+) -> None:
+    expected_fields = {
+        "policy_digest",
+        "artifact_digests",
+        "schedule_digest",
+        "runtime_digests",
+        "pack_signer_fingerprint",
+    }
+    if require_request:
+        expected_fields.add("request_digest")
+    if not isinstance(anchors, dict) or set(anchors) != expected_fields:
+        errors.append(f"{receipt}: signed receipt anchor fields are invalid")
+        return
+    if not _valid_digest(anchors.get("policy_digest")):
+        errors.append(f"{receipt}: signed receipt policy digest is invalid")
+    if not _valid_digest(anchors.get("pack_signer_fingerprint")):
+        errors.append(f"{receipt}: signed receipt pack signer is invalid")
+    artifacts = anchors.get("artifact_digests")
+    if (
+        not isinstance(artifacts, dict)
+        or set(artifacts) != {"baseline", "subject"}
+        or any(not _valid_digest(digest) for digest in artifacts.values())
+    ):
+        errors.append(f"{receipt}: signed receipt artifact anchors are invalid")
+    if not _valid_digest(anchors.get("schedule_digest")):
+        errors.append(f"{receipt}: signed receipt schedule anchor is invalid")
+    runtimes = anchors.get("runtime_digests")
+    if (
+        not isinstance(runtimes, dict)
+        or set(runtimes) != {"baseline", "subject"}
+        or any(not _valid_digest(digest) for digest in runtimes.values())
+    ):
+        errors.append(f"{receipt}: signed receipt runtime anchors are invalid")
+    if require_request and not _valid_digest(anchors.get("request_digest")):
+        errors.append(f"{receipt}: signed receipt request digest is invalid")
+
+
+def _public_pack_request_context(
+    errors: list[str], *, receipt: Path, manifest_path: Path
+) -> tuple[str | None, bool]:
+    try:
+        manifest = _read_object(manifest_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"{manifest_path}: could not read pack request binding: {exc}")
+        return None, False
+    evidence = manifest.get("evidence")
+    reference = evidence.get("request") if isinstance(evidence, dict) else None
+    if not isinstance(reference, dict):
+        return None, False
+    if reference.get("path") != "request.json":
+        errors.append(f"{manifest_path}: request reference path is invalid")
+        return None, False
+    request_path = manifest_path.parent / "request.json"
+    try:
+        raw = request_path.read_bytes()
+        request = json.loads(raw)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"{request_path}: could not read pack request: {exc}")
+        return None, False
+    digest = _sha256_bytes(raw)
+    if reference.get("digest") != digest:
+        errors.append(f"{receipt}: pack request digest does not match manifest")
+    comparison = request.get("comparison") if isinstance(request, dict) else None
+    providers: list[object] = []
+    if isinstance(comparison, dict):
+        for side in ("baseline", "subject"):
+            side_value = comparison.get(side)
+            runtime = (
+                side_value.get("runtime") if isinstance(side_value, dict) else None
+            )
+            providers.append(
+                runtime.get("provider") if isinstance(runtime, dict) else None
+            )
+    return digest, "llama_cpp" in providers
+
+
+def _check_receipt_verifier(
+    errors: list[str], receipt: Path, verifier: object
+) -> object:
+    if not isinstance(verifier, dict) or set(verifier) != {
+        "identity",
+        "signing_key_fingerprint",
+        "trust_profile_digest",
+    }:
+        errors.append(f"{receipt}: signed receipt verifier fields are invalid")
+        return None
+    identity = verifier.get("identity")
+    if not isinstance(identity, str) or _IDENTITY.fullmatch(identity) is None:
+        errors.append(f"{receipt}: signed receipt verifier identity is invalid")
+    fingerprint = verifier.get("signing_key_fingerprint")
+    if not _valid_digest(fingerprint):
+        errors.append(f"{receipt}: signed receipt verifier fingerprint is invalid")
+    profile_digest = verifier.get("trust_profile_digest")
+    if profile_digest is not None and not _valid_digest(profile_digest):
+        errors.append(f"{receipt}: signed receipt trust profile digest is invalid")
+    return fingerprint
+
+
+def _check_receipt_verdict(errors: list[str], receipt: Path, verdict: object) -> None:
+    if not isinstance(verdict, dict) or set(verdict) != {
+        "ok",
+        "integrity_ok",
+        "policy_verdict",
+        "verification_status",
+    }:
+        errors.append(f"{receipt}: signed receipt verdict fields are invalid")
+        return
+    ok = verdict.get("ok")
+    integrity_ok = verdict.get("integrity_ok")
+    policy_verdict = verdict.get("policy_verdict")
+    status = verdict.get("verification_status")
+    if not isinstance(ok, bool) or not isinstance(integrity_ok, bool):
+        errors.append(f"{receipt}: signed receipt verdict booleans are invalid")
+    if policy_verdict not in {"pass", "fail", None}:
+        errors.append(f"{receipt}: signed receipt policy verdict is invalid")
+    if isinstance(status, bool) or not isinstance(status, int) or status < 0:
+        errors.append(f"{receipt}: signed receipt verification status is invalid")
+    if not (
+        ok is True and integrity_ok is True and policy_verdict == "pass" and status == 0
+    ):
+        errors.append(
+            f"{receipt}: signed receipt must record successful strict acceptance"
+        )
+
+
+def _receipt_public_key(
+    errors: list[str], receipt: Path, signature: object
+) -> ed25519.Ed25519PublicKey | None:
+    if (
+        not isinstance(signature, dict)
+        or set(signature) != {"algorithm", "format", "public_key", "value"}
+        or signature.get("format") != _RECEIPT_SIGNATURE_FORMAT
+        or signature.get("algorithm") != "ed25519"
+    ):
+        errors.append(f"{receipt}: signed verification receipt signature is required")
+        return None
+    public_key_block = signature.get("public_key")
+    if (
+        not isinstance(public_key_block, dict)
+        or set(public_key_block) != {"encoding", "value"}
+        or public_key_block.get("encoding") != "pem"
+    ):
+        errors.append(f"{receipt}: signed receipt public key is invalid")
+        return None
+    public_key_value = public_key_block.get("value")
+    if not isinstance(public_key_value, str):
+        errors.append(f"{receipt}: signed receipt public key is invalid")
+        return None
+    try:
+        loaded = serialization.load_pem_public_key(public_key_value.encode("ascii"))
+        if not isinstance(loaded, ed25519.Ed25519PublicKey):
+            raise TypeError("public key is not Ed25519")
+        return loaded
+    except (TypeError, UnicodeEncodeError, ValueError) as exc:
+        errors.append(f"{receipt}: signed receipt public key is invalid: {exc}")
+        return None
+
+
+def _check_signed_receipt(
+    errors: list[str],
+    *,
+    receipt: Path,
+    value: dict[str, Any],
+    manifest_path: Path,
+) -> None:
+    if set(value) != {"statement", "signature"}:
+        errors.append(f"{receipt}: signed receipt fields are not closed")
+
+    statement = value.get("statement")
+    signature = value.get("signature")
+    if not isinstance(statement, dict):
+        errors.append(f"{receipt}: signed verification receipt statement is required")
+        return
+    expected_statement_fields = {
+        "format",
+        "pack_manifest_digest",
+        "anchors",
+        "verifier",
+        "verdict",
+    }
+    if set(statement) != expected_statement_fields:
+        errors.append(f"{receipt}: signed receipt statement fields are invalid")
+    receipt_format = statement.get("format")
+    if receipt_format not in {_RECEIPT_FORMAT_V1, _RECEIPT_FORMAT_V2}:
+        errors.append(f"{receipt}: signed receipt format is invalid")
+
+    manifest_claim = statement.get("pack_manifest_digest")
+    if not _valid_digest(manifest_claim):
+        errors.append(f"{receipt}: signed receipt manifest digest is invalid")
+    else:
+        try:
+            manifest_digest = _sha256_bytes(manifest_path.read_bytes())
+        except OSError as exc:
+            errors.append(f"{manifest_path}: could not read pack manifest: {exc}")
+        else:
+            if manifest_claim != manifest_digest:
+                errors.append(
+                    f"{receipt}: signed receipt does not bind the pack manifest"
+                )
+
+    request_digest, llama_cpp = _public_pack_request_context(
+        errors, receipt=receipt, manifest_path=manifest_path
+    )
+    require_request = receipt_format == _RECEIPT_FORMAT_V2
+    if llama_cpp and not require_request:
+        errors.append(
+            f"{receipt}: llama_cpp evidence requires signed receipt format v2"
+        )
+    _check_receipt_anchors(
+        errors,
+        receipt,
+        statement.get("anchors"),
+        require_request=require_request,
+    )
+    anchors = statement.get("anchors")
+    if require_request and (
+        not isinstance(anchors, dict) or anchors.get("request_digest") != request_digest
+    ):
+        errors.append(
+            f"{receipt}: signed request anchor does not bind the pack request"
+        )
+    recorded_fingerprint = _check_receipt_verifier(
+        errors, receipt, statement.get("verifier")
+    )
+    _check_receipt_verdict(errors, receipt, statement.get("verdict"))
+    public_key = _receipt_public_key(errors, receipt, signature)
+    if public_key is None:
+        return
+
+    if recorded_fingerprint != public_key_fingerprint(public_key):
+        errors.append(
+            f"{receipt}: signed receipt verifier fingerprint does not match its key"
+        )
+    try:
+        encoded_signature = signature.get("value")
+        if not isinstance(encoded_signature, str):
+            raise ValueError("signature value is not text")
+        signature_bytes = base64.b64decode(encoded_signature, validate=True)
+        public_key.verify(signature_bytes, _canonical_json_bytes(statement))
+    except (
+        InvalidSignature,
+        TypeError,
+        ValueError,
+        binascii.Error,
+    ):
+        errors.append(f"{receipt}: signed receipt signature verification failed")
+
+
+def _safe_logical_path(value: object, *, prefix: str) -> bool:
+    if not isinstance(value, str):
+        return False
+    path = PurePosixPath(value)
+    return (
+        value == path.as_posix()
+        and not path.is_absolute()
+        and ".." not in path.parts
+        and value.startswith(prefix)
+    )
+
+
+def _safe_external_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and bool(parsed.hostname)
+        and parsed.username is None
+        and parsed.password is None
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def _check_artifact_summary(
+    errors: list[str], entry: dict[str, Any], role: str, root: Path
+) -> None:
+    artifacts = entry.get("artifacts")
+    summary = artifacts.get(role) if isinstance(artifacts, dict) else None
+    if not isinstance(summary, dict):
+        errors.append(f"{entry.get('slug', '<entry>')}: missing {role}")
+        return
+    logical = summary.get("path")
+    slug = entry.get("slug")
+    prefix = f"public_evidence/evidence/{slug}/"
+    if not isinstance(slug, str) or not _safe_logical_path(logical, prefix=prefix):
+        errors.append(f"{entry.get('slug', '<entry>')}: unsafe {role} path")
+        return
+    local = root.parent / str(logical)
+    external = summary.get("external_asset")
+    kind = summary.get("kind")
+    common_fields = {"kind", "path", "size_bytes"}
+    if kind == "file":
+        required_fields = common_fields | {"sha256"}
+    elif kind == "directory":
+        required_fields = common_fields | {"file_count", "control_hashes"}
+    else:
+        errors.append(f"{logical}: artifact kind must be file or directory")
+        return
+    if set(summary) != required_fields | ({"external_asset"} if external else set()):
+        errors.append(f"{logical}: artifact summary fields are not closed")
+    size = summary.get("size_bytes")
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+        errors.append(f"{logical}: artifact size is invalid")
+    if kind == "file" and _DIGEST.fullmatch(str(summary.get("sha256") or "")) is None:
+        errors.append(f"{logical}: artifact digest is invalid")
+    if kind == "directory":
+        count = summary.get("file_count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            errors.append(f"{logical}: artifact file count is invalid")
+        controls = summary.get("control_hashes")
+        if not isinstance(controls, dict) or any(
+            name not in {"manifest.json", "manifest.signature.json", "checksums.sha256"}
+            or _DIGEST.fullmatch(str(digest)) is None
+            for name, digest in (controls.items() if isinstance(controls, dict) else ())
+        ):
+            errors.append(f"{logical}: artifact control hashes are invalid")
+    if not local.exists() and not isinstance(external, dict):
+        errors.append(f"{logical}: missing local artifact and external_asset")
+    if isinstance(external, dict):
+        if set(external) != {"sha256", "url"}:
+            errors.append(f"{logical}: external asset fields are not closed")
+        if not _safe_external_url(external.get("url")):
+            errors.append(
+                f"{logical}: external asset URL must be credential-free HTTPS "
+                "without query or fragment"
+            )
+        if _DIGEST.fullmatch(str(external.get("sha256") or "")) is None:
+            errors.append(f"{logical}: external asset digest is invalid")
+        if local.exists():
+            errors.append(f"{logical}: artifact must use one publication carrier")
+    if local.is_symlink():
+        errors.append(f"{logical}: symlinks are not allowed")
+    elif local.exists():
+        try:
+            observed = _artifact_summary(local, source_root=root)
+        except (OSError, ValueError) as exc:
+            errors.append(str(exc))
+        else:
+            expected = {
+                key: value for key, value in summary.items() if key != "external_asset"
+            }
+            if observed != expected:
+                errors.append(f"{logical}: artifact summary does not match its bytes")
+
+
+def _check_local_entry(errors: list[str], entry_root: Path) -> None:
+    metadata_path = entry_root / "evidence.meta.json"
+    if not metadata_path.is_file() or metadata_path.is_symlink():
+        errors.append(f"{entry_root}: missing safe evidence.meta.json")
+        return
+    try:
+        metadata = _read_object(metadata_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return
+    try:
+        artifact_paths, _summary = _validate_metadata(metadata_path, metadata)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    pack_name = artifact_paths.get("evidence_pack")
+    receipt_name = artifact_paths.get("verification_receipt")
+    assert isinstance(pack_name, str) and isinstance(receipt_name, str)
+    pack = entry_root / pack_name
+    receipt = entry_root / receipt_name
+    if not pack.is_dir() or pack.is_symlink():
+        errors.append(f"{pack}: evidence pack is missing or unsafe")
+        return
+    manifest_path = pack / "manifest.json"
+    try:
+        manifest = _read_object(manifest_path)
+        receipt_value = _read_object(receipt)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return
+    if manifest.get("format") != "invarlock/evidence-pack-v1":
+        errors.append(
+            f"{pack}: only the canonical invarlock/evidence-pack-v1 is publishable"
+        )
+    _check_signed_receipt(
+        errors,
+        receipt=receipt,
+        value=receipt_value,
+        manifest_path=manifest_path,
+    )
+    statement = receipt_value.get("statement")
+    anchors = statement.get("anchors") if isinstance(statement, dict) else None
+    artifacts = anchors.get("artifact_digests") if isinstance(anchors, dict) else None
+    schedule = anchors.get("schedule_digest") if isinstance(anchors, dict) else None
+    runtimes = anchors.get("runtime_digests") if isinstance(anchors, dict) else None
+    policy_digest = anchors.get("policy_digest") if isinstance(anchors, dict) else None
+    signer = (
+        anchors.get("pack_signer_fingerprint") if isinstance(anchors, dict) else None
+    )
+    if (
+        isinstance(artifacts, dict)
+        and set(artifacts) == {"baseline", "subject"}
+        and all(_valid_digest(value) for value in artifacts.values())
+        and _valid_digest(schedule)
+        and isinstance(runtimes, dict)
+        and set(runtimes) == {"baseline", "subject"}
+        and all(_valid_digest(value) for value in runtimes.values())
+        and _valid_digest(policy_digest)
+        and _valid_digest(signer)
+    ):
+        inputs = manifest.get("inputs")
+        expected_materials = {
+            "baseline": artifacts["baseline"],
+            "subject": artifacts["subject"],
+            "dataset": schedule,
+            "policy": policy_digest,
+            "baseline_runtime": runtimes["baseline"],
+            "subject_runtime": runtimes["subject"],
+        }
+        if not isinstance(inputs, dict):
+            errors.append(f"{manifest_path}: manifest inputs are invalid")
+        else:
+            for role, expected_digest in expected_materials.items():
+                reference = inputs.get(role)
+                observed_digest = (
+                    reference.get("material_digest")
+                    if isinstance(reference, dict)
+                    else None
+                )
+                if observed_digest != expected_digest:
+                    errors.append(
+                        f"{receipt}: signed receipt {role} anchor does not bind "
+                        "the pack manifest"
+                    )
+        if manifest.get("signing_key_fingerprint") != signer:
+            errors.append(
+                f"{receipt}: signed receipt signer anchor does not bind the pack"
+            )
+        try:
+            rendered = render_evidence(pack)
+        except EvidenceReportError as exc:
+            errors.append(f"{pack}: signed pack validation failed: {exc}")
+        else:
+            if rendered.evidence_signer != signer:
+                errors.append(
+                    f"{receipt}: signed receipt signer anchor does not match "
+                    "the verified pack signer"
+                )
+
+
+def _check_index_entry(errors: list[str], raw_entry: object, root: Path) -> None:
+    if not isinstance(raw_entry, dict):
+        errors.append("public evidence entry must be an object")
+        return
+    slug = raw_entry.get("slug")
+    if not isinstance(slug, str) or not slug or "/" in slug:
+        errors.append("public evidence entry slug is invalid")
+        return
+    if raw_entry.get("evidence_class") != "signed_evidence_pack":
+        errors.append(f"{slug}: evidence_class must be signed_evidence_pack")
+    expected_path = f"public_evidence/{EVIDENCE_DIRNAME}/{slug}"
+    if raw_entry.get("path") != expected_path:
+        errors.append(f"{slug}: entry path must be {expected_path}")
+    _check_artifact_summary(errors, raw_entry, "evidence_pack", root)
+    _check_artifact_summary(errors, raw_entry, "verification_receipt", root)
+
+
+def _artifact_totals(entries: list[object]) -> tuple[int, int]:
+    artifact_file_count = 0
+    artifact_size_bytes = 0
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            continue
+        artifacts = raw_entry.get("artifacts")
+        if not isinstance(artifacts, dict):
+            continue
+        for summary in artifacts.values():
+            if not isinstance(summary, dict):
+                continue
+            count = 1 if summary.get("kind") == "file" else summary.get("file_count")
+            size = summary.get("size_bytes")
+            if isinstance(count, int) and not isinstance(count, bool):
+                artifact_file_count += count
+            if isinstance(size, int) and not isinstance(size, bool):
+                artifact_size_bytes += size
+    return artifact_file_count, artifact_size_bytes
+
+
+def _check_local_evidence_tree(
+    errors: list[str], root: Path, entries: list[object]
+) -> None:
+    evidence_root = root / EVIDENCE_DIRNAME
+    if not evidence_root.is_dir():
+        return
+    local_entries = sorted(path for path in evidence_root.iterdir() if path.is_dir())
+    indexed = {entry.get("slug") for entry in entries if isinstance(entry, dict)}
+    if not {path.name for path in local_entries}.issubset(indexed):
+        errors.append("every local evidence directory must appear in the index")
+    for entry_root in local_entries:
+        _check_local_entry(errors, entry_root)
+    unexpected_children = sorted(
+        item.name
+        for item in evidence_root.iterdir()
+        if not item.is_dir() and not _is_ignored_local_metadata(item)
+    )
+    if unexpected_children:
+        errors.append(
+            "unexpected files in public evidence directory: "
+            + ", ".join(unexpected_children)
+        )
+
+
+def check_public_evidence(root: Path = SOURCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
-    if not (root / "README.md").is_file():
-        errors.append(f"{_relative(root)}: README.md is required")
     if not root.is_dir():
         return [f"public evidence root not found: {root}"]
-    _check_public_evidence_privacy(errors, root)
-    _check_duplicate_root_evaluation_reports(errors, root)
-    if root == PUBLIC_EVIDENCE_ROOT.resolve():
-        _check_packaged_public_evidence_index(
-            errors,
-            root,
-            fetch_external_assets=fetch_external_assets,
-        )
-        check_historical_guard_scenario_observations(
-            errors,
-            root,
-            fetch_external_assets=fetch_external_assets,
-        )
-
-    for artifact_dir in sorted(_artifact_dirs(root)):
-        meta_path = artifact_dir / META_FILENAME
-        if not meta_path.is_file():
-            errors.append(f"{_relative(artifact_dir)}: missing {META_FILENAME}")
-            continue
-
-        metadata, error = _load_json(meta_path)
-        if error:
-            errors.append(error)
-            continue
-        assert metadata is not None
-
-        if metadata.get("schema") != SCHEMA:
-            errors.append(f"{_relative(meta_path)}: schema must be {SCHEMA}")
-
-        evidence_class = metadata.get("evidence_class")
-        if not isinstance(evidence_class, str):
-            errors.append(f"{_relative(meta_path)}: invalid evidence_class")
-            continue
-        class_spec = EVIDENCE_CLASS_REGISTRY.get(evidence_class)
-        if class_spec is None:
-            errors.append(f"{_relative(meta_path)}: invalid evidence_class")
-            continue
-
-        summary = str(metadata.get("summary") or "").lower()
-        class_kind = class_spec["kind"]
-        specialized_checker = class_spec["specialized_checker"]
-
-        if class_kind == "fixture" and "fixture" not in summary:
-            errors.append(f"{_relative(meta_path)}: fixture evidence must say fixture")
-        if class_kind == "historical":
-            allowed_historical_kinds = (
-                {
-                    "caught_regression_fixture",
-                    "policy_failure_fixture",
-                    "byoe_subject_fixture",
-                }
-                if evidence_class == "historical_archived_fixture"
-                else {"real_model_run"}
-            )
-            if metadata.get("historical_evidence_kind") not in allowed_historical_kinds:
-                errors.append(
-                    f"{_relative(meta_path)}: historical evidence must retain "
-                    "its prior evidence classification"
-                )
-            historical_status = metadata.get("current_verifier_status")
-            if (
-                not isinstance(historical_status, str)
-                or not historical_status.startswith("historical artifact;")
-                or "current verifier rejects" not in historical_status
-            ):
-                errors.append(
-                    f"{_relative(meta_path)}: historical evidence must state its "
-                    "non-current verifier status"
-                )
-            if metadata.get("verifier_command_expectation") != (
-                "expected_nonzero_current_contract_rejection"
-            ):
-                errors.append(
-                    f"{_relative(meta_path)}: historical evidence must expect "
-                    "current-contract rejection"
-                )
-
-        artifact_paths = metadata.get("artifact_paths")
-        if not isinstance(artifact_paths, dict):
-            errors.append(f"{_relative(meta_path)}: artifact_paths must be an object")
-            continue
-
-        report_path: Path | None = None
-        if "evaluation_report" in artifact_paths:
-            report_path = _require_path(
-                errors, artifact_dir, artifact_paths, "evaluation_report"
-            )
-            _require_path(errors, artifact_dir, artifact_paths, "runtime_manifest")
-        elif (artifact_dir / "evaluation.report.json").is_file():
-            report_path = _require_path(
-                errors, artifact_dir, artifact_paths, "evaluation_report"
-            )
-            _require_path(errors, artifact_dir, artifact_paths, "runtime_manifest")
-        if report_path is not None and _is_direct_catalog_evidence_artifact(
-            artifact_dir, root
-        ):
-            _check_catalog_evidence_multimodal_quality(
-                errors, artifact_dir, report_path
-            )
+    if not (root / "README.md").is_file():
+        errors.append("public_evidence/README.md is required")
+    index_path = root / INDEX_FILENAME
+    if not index_path.is_file():
+        errors.append(f"public_evidence/{INDEX_FILENAME} is required")
+        return errors
+    try:
+        index = _read_object(index_path)
+        _validate_index(index_path, index)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return errors
+    if index.get("format_version") != INDEX_FORMAT_VERSION:
+        errors.append("public evidence index format is invalid")
+    encoded = index_path.read_text(encoding="utf-8")
+    for marker in _PRIVATE_MARKERS:
+        if marker in encoded:
+            errors.append(f"public evidence index contains private marker {marker!r}")
+    for marker in _OBSOLETE_MARKERS:
+        if marker in encoded:
+            errors.append(f"public evidence index contains obsolete marker {marker!r}")
+    entries = index.get("entries")
+    assert isinstance(entries, list)
+    for raw_entry in entries:
+        _check_index_entry(errors, raw_entry, root)
+    artifact_file_count, artifact_size_bytes = _artifact_totals(entries)
+    if index.get("evidence_file_count") != artifact_file_count:
+        errors.append("evidence_file_count must match artifact summaries")
+    if index.get("evidence_size_bytes") != artifact_size_bytes:
+        errors.append("evidence_size_bytes must match artifact summaries")
+    _check_local_evidence_tree(errors, root, entries)
+    allowed_root_files = {"README.md", INDEX_FILENAME}
+    unexpected = sorted(
+        item.name
+        for item in root.iterdir()
+        if item.name not in allowed_root_files
+        and item.name != EVIDENCE_DIRNAME
+        and not _is_ignored_local_metadata(item)
+    )
+    if unexpected:
+        errors.append("unexpected public evidence surfaces: " + ", ".join(unexpected))
+    if root == SOURCE_ROOT.resolve():
+        packaged_index = PACKAGED_ROOT / INDEX_FILENAME
         if (
-            report_path is not None
-            and root == PUBLIC_EVIDENCE_ROOT.resolve()
-            and class_kind != "historical"
+            not packaged_index.is_file()
+            or packaged_index.read_bytes() != index_path.read_bytes()
         ):
-            report_payload, report_error = _load_json(report_path)
-            if report_error:
-                errors.append(report_error)
-            elif report_payload is None or not validate_report(report_payload):
-                errors.append(
-                    f"{_relative(report_path)}: evaluation report is not valid under the current schema"
-                )
-
-        if class_kind == "real":
-            _require_path(errors, artifact_dir, artifact_paths, "run_command")
-            if "invarlock evaluate" not in str(metadata.get("generated_by") or ""):
-                errors.append(
-                    f"{_relative(meta_path)}: real runs must record invarlock evaluate"
-                )
-            if "fixture" in summary:
-                errors.append(
-                    f"{_relative(meta_path)}: real-run summary must not say fixture"
-                )
-
-        if "evidence_pack" in artifact_paths:
-            _check_signed_pack(errors, artifact_dir, metadata, artifact_paths)
-
-        if specialized_checker is not None:
-            checker = SPECIALIZED_EVIDENCE_CHECKERS[specialized_checker]
-            checker(errors, artifact_dir, artifact_paths)
-
-        commands = metadata.get("verifier_commands")
-        if not isinstance(commands, list) or not commands:
-            errors.append(
-                f"{_relative(meta_path)}: verifier_commands must be a non-empty list"
-            )
-
+            errors.append("source and packaged public evidence indexes differ")
     return errors
 
 
-def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--root",
-        type=Path,
-        default=PUBLIC_EVIDENCE_ROOT,
-        help="Public evidence root to audit.",
-    )
-    parser.add_argument(
-        "--fetch-external-assets",
-        action="store_true",
-        help="Download external public-evidence assets and verify size/SHA256.",
-    )
-    return parser.parse_args(argv)
-
-
 def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(argv)
-    errors = check_public_evidence(
-        args.root,
-        fetch_external_assets=args.fetch_external_assets,
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=SOURCE_ROOT)
+    args = parser.parse_args(argv)
+    errors = check_public_evidence(args.root)
     if errors:
         for error in errors:
-            print(error, file=sys.stderr)
+            print(error)
         return 1
     print("Public evidence audit passed.")
     return 0

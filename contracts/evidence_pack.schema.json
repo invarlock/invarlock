@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evidence_pack.schema.json",
+  "title": "InvarLock Evidence Pack v1 Manifest",
+  "type": "object",
+  "required": [
+    "format",
+    "comparison_id",
+    "inputs",
+    "evidence",
+    "paired_records",
+    "checksums_sha256",
+    "checksums_sha256_digest",
+    "signing_key_fingerprint"
+  ],
+  "properties": {
+    "format": {"const": "invarlock/evidence-pack-v1"},
+    "comparison_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "inputs": {
+      "type": "object",
+      "required": [
+        "baseline",
+        "subject",
+        "dataset",
+        "baseline_runtime",
+        "subject_runtime",
+        "policy"
+      ],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/baselineInput"},
+        "subject": {"$ref": "#/$defs/subjectInput"},
+        "dataset": {"$ref": "#/$defs/datasetInput"},
+        "baseline_runtime": {"$ref": "#/$defs/baselineRuntimeInput"},
+        "subject_runtime": {"$ref": "#/$defs/subjectRuntimeInput"},
+        "policy": {"$ref": "#/$defs/policyInput"}
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "request",
+        "schedule",
+        "evaluation_report",
+        "baseline_run_report",
+        "subject_run_report",
+        "baseline_runtime_manifest",
+        "subject_runtime_manifest",
+        "baseline_runtime_config",
+        "subject_runtime_config",
+        "baseline_provider_identity",
+        "subject_provider_identity",
+        "baseline_provider_receipt",
+        "subject_provider_receipt",
+        "baseline_scoring_observation",
+        "subject_scoring_observation"
+      ],
+      "properties": {
+        "request": {"$ref": "#/$defs/requestEvidence"},
+        "schedule": {"$ref": "#/$defs/scheduleEvidence"},
+        "evaluation_report": {"$ref": "#/$defs/evaluationReportEvidence"},
+        "baseline_run_report": {"$ref": "#/$defs/baselineRunReportEvidence"},
+        "subject_run_report": {"$ref": "#/$defs/subjectRunReportEvidence"},
+        "baseline_runtime_manifest": {"$ref": "#/$defs/baselineRuntimeManifestEvidence"},
+        "subject_runtime_manifest": {"$ref": "#/$defs/subjectRuntimeManifestEvidence"},
+        "baseline_runtime_config": {"$ref": "#/$defs/baselineRuntimeConfigEvidence"},
+        "subject_runtime_config": {"$ref": "#/$defs/subjectRuntimeConfigEvidence"},
+        "baseline_provider_identity": {"$ref": "#/$defs/baselineProviderIdentityEvidence"},
+        "subject_provider_identity": {"$ref": "#/$defs/subjectProviderIdentityEvidence"},
+        "baseline_provider_receipt": {"$ref": "#/$defs/baselineProviderReceiptEvidence"},
+        "subject_provider_receipt": {"$ref": "#/$defs/subjectProviderReceiptEvidence"},
+        "baseline_scoring_observation": {"$ref": "#/$defs/baselineScoringObservationEvidence"},
+        "subject_scoring_observation": {"$ref": "#/$defs/subjectScoringObservationEvidence"}
+      },
+      "additionalProperties": false
+    },
+    "paired_records": {
+      "type": "object",
+      "required": ["path", "digest", "count"],
+      "properties": {
+        "path": {"const": "records/paired-records.json"},
+        "digest": {"$ref": "#/$defs/digest"},
+        "count": {"type": "integer", "minimum": 1, "maximum": 10000}
+      },
+      "additionalProperties": false
+    },
+    "observations": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+      },
+      "additionalProperties": {"$ref": "#/$defs/observationReference"}
+    },
+    "checksums_sha256": {"const": "checksums.sha256"},
+    "checksums_sha256_digest": {"$ref": "#/$defs/rawSha256"},
+    "signing_key_fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "rawSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "inputReference": {
+      "type": "object",
+      "required": ["path", "digest", "material_digest"],
+      "properties": {
+        "path": {"type": "string"},
+        "digest": {"$ref": "#/$defs/digest"},
+        "material_digest": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "baselineInput": {
+      "allOf": [
+        {"$ref": "#/$defs/inputReference"},
+        {"properties": {"path": {"const": "inputs/baseline.json"}}}
+      ]
+    },
+    "subjectInput": {
+      "allOf": [
+        {"$ref": "#/$defs/inputReference"},
+        {"properties": {"path": {"const": "inputs/subject.json"}}}
+      ]
+    },
+    "datasetInput": {
+      "allOf": [
+        {"$ref": "#/$defs/inputReference"},
+        {"properties": {"path": {"const": "inputs/dataset.json"}}}
+      ]
+    },
+    "baselineRuntimeInput": {
+      "allOf": [
+        {"$ref": "#/$defs/inputReference"},
+        {"properties": {"path": {"const": "inputs/baseline_runtime.json"}}}
+      ]
+    },
+    "subjectRuntimeInput": {
+      "allOf": [
+        {"$ref": "#/$defs/inputReference"},
+        {"properties": {"path": {"const": "inputs/subject_runtime.json"}}}
+      ]
+    },
+    "policyInput": {
+      "allOf": [
+        {"$ref": "#/$defs/inputReference"},
+        {"properties": {"path": {"const": "inputs/policy.json"}}}
+      ]
+    },
+    "evidenceReference": {
+      "type": "object",
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string"},
+        "digest": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "observationReference": {
+      "type": "object",
+      "required": ["path", "digest", "kind", "scope"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^observations/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.json$"
+        },
+        "digest": {"$ref": "#/$defs/digest"},
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "maxLength": 128
+        },
+        "scope": {"enum": ["baseline", "subject", "comparison"]}
+      },
+      "additionalProperties": false
+    },
+    "requestEvidence": {"$ref": "#/$defs/evidenceReferenceWithRequestPath"},
+    "evidenceReferenceWithRequestPath": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "request.json"}}}
+      ]
+    },
+    "scheduleEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "schedule/runtime-behavioral-schedule.json"}}}
+      ]
+    },
+    "evaluationReportEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "reports/evaluation.report.json"}}}
+      ]
+    },
+    "baselineRunReportEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "runs/baseline/report.json"}}}
+      ]
+    },
+    "subjectRunReportEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "runs/subject/report.json"}}}
+      ]
+    },
+    "baselineRuntimeManifestEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/baseline/runtime.manifest.json"}}}
+      ]
+    },
+    "subjectRuntimeManifestEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/subject/runtime.manifest.json"}}}
+      ]
+    },
+    "baselineRuntimeConfigEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/baseline/run.yaml"}}}
+      ]
+    },
+    "subjectRuntimeConfigEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/subject/run.yaml"}}}
+      ]
+    },
+    "baselineProviderIdentityEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/baseline/model-artifact.identity.json"}}}
+      ]
+    },
+    "subjectProviderIdentityEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/subject/model-artifact.identity.json"}}}
+      ]
+    },
+    "baselineProviderReceiptEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/baseline/runtime-provider.receipt.json"}}}
+      ]
+    },
+    "subjectProviderReceiptEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/subject/runtime-provider.receipt.json"}}}
+      ]
+    },
+    "baselineScoringObservationEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/baseline/runtime-scoring.observation.json"}}}
+      ]
+    },
+    "subjectScoringObservationEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceReference"},
+        {"properties": {"path": {"const": "providers/subject/runtime-scoring.observation.json"}}}
+      ]
+    }
+  }
+}

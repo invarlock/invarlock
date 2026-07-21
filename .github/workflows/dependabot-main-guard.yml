@@ -24,7 +24,7 @@ jobs:
             echo "Direct Dependabot PRs to main are blocked."
             echo "PR: ${PR_URL}"
             echo "Land the equivalent dependency fix on staging/next first, validate it there,"
-            echo "and promote it through the normal release flow."
+            echo "and carry it through the normal release flow."
             echo "Close this PR after the staging/next fix lands."
             exit 1
           fi

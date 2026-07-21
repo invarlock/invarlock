@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/scorer_extension_descriptor.schema.json",
+  "title": "InvarLock verifier-replayable scorer descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "scorer_abi",
+    "scorer_id",
+    "scorer_version",
+    "supported_tasks",
+    "supported_input_kinds",
+    "supported_output_kinds",
+    "required_facts",
+    "configuration_schema_sha256",
+    "replay_mode",
+    "record_value_semantics",
+    "aggregation",
+    "direction",
+    "uses_network",
+    "uses_external_model",
+    "uses_human_judgment"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "invarlock/scorer-extension-descriptor-v1"
+    },
+    "scorer_abi": {"const": "1"},
+    "scorer_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+$"
+    },
+    "scorer_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "supported_tasks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      }
+    },
+    "supported_input_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["text", "content"]}
+    },
+    "supported_output_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      }
+    },
+    "required_facts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["expected_output", "output_text", "output_sha256"]
+      },
+      "allOf": [
+        {"contains": {"const": "expected_output"}},
+        {"contains": {"const": "output_text"}},
+        {"contains": {"const": "output_sha256"}}
+      ]
+    },
+    "configuration_schema_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "replay_mode": {"const": "authenticated_record_facts"},
+    "record_value_semantics": {"const": "unit_interval_score"},
+    "aggregation": {"const": "arithmetic_mean"},
+    "direction": {"const": "higher_is_better"},
+    "uses_network": {"const": false},
+    "uses_external_model": {"const": false},
+    "uses_human_judgment": {"const": false}
+  }
+}

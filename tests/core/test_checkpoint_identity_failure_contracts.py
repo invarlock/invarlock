@@ -233,7 +233,7 @@ def test_root_match_and_observation_fail_closed_boundaries(
         "open",
         lambda path, flags, *args, **kwargs: (
             (_ for _ in ()).throw(OSError("blocked"))
-            if Path(path) == checkpoint
+            if path == checkpoint.name and kwargs.get("dir_fd") is not None
             else original_open(path, flags, *args, **kwargs)
         ),
     )
@@ -244,6 +244,52 @@ def test_root_match_and_observation_fail_closed_boundaries(
     monkeypatch.setattr(identity, "_root_path_matches_fd", lambda *_args: False)
     with pytest.raises(identity.CheckpointIdentityError, match="root changed"):
         identity.checkpoint_tree_observation(checkpoint)
+
+
+def test_checkpoint_root_open_rejects_unsafe_paths_and_io_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    for unsafe in (Path("relative"), tmp_path / "child" / ".." / "checkpoint"):
+        with pytest.raises(identity.CheckpointIdentityError, match="parent traversal"):
+            identity._open_checkpoint_root(unsafe)
+
+    original_open = os.open
+    with monkeypatch.context() as context:
+        context.setattr(
+            identity.os,
+            "open",
+            lambda path, flags, *args, **kwargs: (
+                (_ for _ in ()).throw(OSError("root unavailable"))
+                if path == tmp_path.anchor
+                else original_open(path, flags, *args, **kwargs)
+            ),
+        )
+        with pytest.raises(identity.CheckpointIdentityError, match="root could not"):
+            identity._open_checkpoint_root(tmp_path)
+
+    with monkeypatch.context() as context:
+        context.setattr(
+            identity.os,
+            "fstat",
+            lambda _descriptor: _stat_value(mode=stat.S_IFREG),
+        )
+        with pytest.raises(identity.CheckpointIdentityError, match="regular directory"):
+            identity._open_checkpoint_root(tmp_path)
+
+    root_fd = os.open(tmp_path, identity._directory_open_flags())
+    try:
+        with monkeypatch.context() as context:
+            context.setattr(
+                identity, "_open_checkpoint_root", lambda _root: os.dup(root_fd)
+            )
+            context.setattr(
+                identity.os,
+                "fstat",
+                lambda _descriptor: (_ for _ in ()).throw(OSError("stat failed")),
+            )
+            assert identity._root_path_matches_fd(tmp_path, root_fd) is False
+    finally:
+        os.close(root_fd)
 
 
 def test_observation_rejects_snapshot_and_root_changes(

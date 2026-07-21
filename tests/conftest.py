@@ -8,29 +8,15 @@ import pytest
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 _PATCH_TARGET_MODULES = (
-    "invarlock.cli.bench",
-    "invarlock.core.auto_tuning",
     "invarlock.core.bootstrap",
-    "invarlock.core.config_loader",
     "invarlock.core.determinism_policy",
     "invarlock.core.metric_provider_resolution",
     "invarlock.core.registry",
-    "invarlock.core.orchestration.execute",
-    "invarlock.core.runner",
     "invarlock.runtime_verify",
-    "invarlock.eval.bench_runner",
-    "invarlock.eval.data",
-    "invarlock.eval.metrics_activation",
-    "invarlock.eval.metrics_support",
     "invarlock.eval.primary_metric",
     "invarlock.model_profile",
-    "invarlock.observability.core",
-    "invarlock.observability.health",
     "invarlock.plugins.bitsandbytes",
     "invarlock.evidence_pack",
-    "invarlock.reporting.report_summary",
-    "invarlock.reporting.report_make",
-    "invarlock.reporting.report_builder_support",
 )
 
 
@@ -52,8 +38,6 @@ def _reattach_parent_package_attrs(module_name: str) -> None:
 def _restore_invarlock_env():
     # Snapshot environment variables that some tests may mutate without cleanup
     keys = [
-        "INVARLOCK_ALLOW_HOST_EXECUTION",
-        "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE",
         "INVARLOCK_ALLOW_NETWORK",
         "INVARLOCK_ALLOW_REMOTE_CODE",
         "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",

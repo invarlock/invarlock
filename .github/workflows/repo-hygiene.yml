@@ -36,21 +36,10 @@ jobs:
           head="${{ github.sha }}"
           files="$(git diff --name-only --diff-filter=ACMR "$base" "$head")"
           if echo "$files" | grep -E '^(site/|node_modules/|dist/|build/|reports_report/|reports_.*/|runs/)' ; then
-            echo "❌ Generated artifacts detected in the PR diff."; exit 1;
+            echo "Generated artifacts detected in the pull request."; exit 1;
           else
-            echo "✅ No generated artifacts in the PR diff.";
+            echo "No generated artifacts detected."
           fi
-      - name: Ensure no duplicate test basenames
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t dups < <(find tests -type f -name 'test_*.py' -exec basename {} \; | sort | uniq -d)
-          if [ ${#dups[@]} -gt 0 ]; then
-            echo "❌ Duplicate test filenames detected:";
-            printf '  - %s\n' "${dups[@]}";
-            exit 1;
-          fi
-          echo "✅ No duplicate test basenames in tests/."
 
   large-files:
     runs-on: ubuntu-latest
@@ -70,7 +59,7 @@ jobs:
             [ -f "$f" ] || continue
             sz=$(wc -c <"$f")
             if [ "$sz" -gt "$threshold" ]; then
-              echo "❌ $f is ${sz} bytes (>10MB)"; rc=1
+              echo "$f is ${sz} bytes (>10MB)"; rc=1
             fi
           done < <(git diff --name-only --diff-filter=ACMR "$base" "$head")
           exit $rc

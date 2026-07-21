@@ -30,12 +30,6 @@ def test_runtime_provider_protocol_accepts_complete_structural_implementations()
         def runtime_receipt(self):
             return None
 
-        def model_adapter(self):
-            return None
-
-        def native_model(self):
-            return None
-
         def close(self):
             return None
 
@@ -52,6 +46,12 @@ def test_runtime_provider_protocol_accepts_complete_structural_implementations()
         def identify_artifact(self, spec):
             return None
 
+        def authenticate_artifact(self, spec, artifact_path):
+            return None
+
+        def prepare_execution(self, spec, resources):
+            return resources
+
         def open(self, spec, context):
             return Session()
 
@@ -59,11 +59,84 @@ def test_runtime_provider_protocol_accepts_complete_structural_implementations()
     assert isinstance(Provider(), RuntimeProvider)
 
 
-def test_runtime_execution_context_binds_existing_hf_objects_and_callbacks() -> None:
+def test_input_preflight_is_optional_and_noncallable_hooks_fail_closed() -> None:
+    from invarlock.core.runtime_provider import (
+        RuntimeProvider,
+        RuntimeProviderInputPreflight,
+        validate_runtime_evaluation_inputs,
+    )
+
+    class LegacyProvider:
+        name = "legacy"
+        abi_version = "1"
+
+        def validate_config(self, spec):
+            return None
+
+        def capabilities(self):
+            return None
+
+        def identify_artifact(self, spec):
+            return None
+
+        def authenticate_artifact(self, spec, artifact_path):
+            return None
+
+        def prepare_execution(self, spec, resources):
+            return resources
+
+        def open(self, spec, context):
+            return None
+
+    provider = LegacyProvider()
+    assert isinstance(provider, RuntimeProvider)
+    assert not isinstance(provider, RuntimeProviderInputPreflight)
+    assert (
+        validate_runtime_evaluation_inputs(
+            provider,
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+        is False
+    )
+
+    provider.validate_evaluation_inputs = "not callable"  # type: ignore[attr-defined]
+    with pytest.raises(TypeError, match="must be callable"):
+        validate_runtime_evaluation_inputs(
+            provider,
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+
+
+def test_input_preflight_requires_exact_none_result() -> None:
+    from invarlock.core.runtime_provider import validate_runtime_evaluation_inputs
+
+    class Provider:
+        lookups = 0
+
+        @property
+        def validate_evaluation_inputs(self):  # noqa: ANN201
+            self.lookups += 1
+            return lambda *_args: False
+
+    provider = Provider()
+    with pytest.raises(TypeError, match="must return None"):
+        validate_runtime_evaluation_inputs(
+            provider,  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+    assert provider.lookups == 1
+
+
+def test_runtime_execution_context_binds_opaque_provider_state_and_callbacks() -> None:
     from invarlock.core.runtime_provider.types import RuntimeExecutionContext
 
-    adapter = object()
-    native_model = object()
+    provider_state = object()
     scorer = lambda batch, settings: (batch, settings)  # noqa: E731
     close_callback = lambda: None  # noqa: E731
 
@@ -73,14 +146,12 @@ def test_runtime_execution_context_binds_existing_hf_objects_and_callbacks() -> 
         container_image_digest="sha256:" + "a" * 64,
         device_kind="cuda",
         artifact_identity_sha256="b" * 64,
-        model_adapter=adapter,
-        native_model=native_model,
+        provider_state=provider_state,
         scorer=scorer,
         close_callback=close_callback,
     )
 
-    assert context.model_adapter is adapter
-    assert context.native_model is native_model
+    assert context.provider_state is provider_state
     assert context.scorer is scorer
     assert context.close_callback is close_callback
     assert context.artifact_identity_sha256 == "b" * 64
@@ -137,30 +208,41 @@ def test_runtime_provider_capabilities_are_closed_and_canonical() -> None:
         execution_modes=("in_process",),
         required_extra="hf",
         required_image=None,
-        platform_constraints=("python",),
-        evidence_surfaces=(
-            "behavior",
-            "tokenizer",
-            "weights",
-            "modules",
-            "activations",
-            "build",
-        ),
-        supported_claim_sets=("invarlock-weight-edit-regression-v2",),
     )
 
     assert capabilities.format_version == "runtime-provider-capabilities-v1"
     assert capabilities.provider_abi == "1"
 
     with pytest.raises(ValueError, match="duplicate"):
-        dataclasses.replace(
-            capabilities,
-            evidence_surfaces=("behavior", "behavior"),
-        )
+        dataclasses.replace(capabilities, metrics=("exact_match", "exact_match"))
     with pytest.raises(ValueError, match="unsupported artifact format"):
         dataclasses.replace(capabilities, artifact_formats=("pickle",))
     with pytest.raises(ValueError, match="provider_name"):
         dataclasses.replace(capabilities, provider_name="../provider")
+
+
+def test_runtime_provider_capabilities_accept_future_canonical_tasks() -> None:
+    from invarlock.core.runtime_provider.types import RuntimeProviderCapabilities
+
+    capabilities = RuntimeProviderCapabilities(
+        provider_name="future_runtime",
+        artifact_formats=("hf_snapshot",),
+        tasks=(
+            "text_causal",
+            "text_seq2seq",
+            "masked_language",
+            "vision_text_generation",
+            "audio_text_generation",
+        ),
+        metrics=("exact_match",),
+        execution_modes=("container",),
+        required_extra=None,
+        required_image=None,
+    )
+
+    assert capabilities.tasks[-1] == "audio_text_generation"
+    with pytest.raises(ValueError, match="canonical task identifier"):
+        dataclasses.replace(capabilities, tasks=("audio/text",))
 
 
 def test_model_artifact_identity_variants_reject_paths_and_bad_digests() -> None:
@@ -298,7 +380,6 @@ def test_model_runtime_spec_freezes_provider_settings() -> None:
         provider_name="hf_transformers",
         model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         settings=source,
-        adapter_name="hf_causal",
     )
     source["seed"] = 99
 

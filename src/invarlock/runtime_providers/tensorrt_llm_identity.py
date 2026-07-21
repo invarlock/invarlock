@@ -72,6 +72,17 @@ class _JsonBudget:
     items: int = 0
 
 
+@dataclass(frozen=True)
+class _AuthenticatedEngineBundle:
+    pretrained_config: dict[str, Any]
+    build_config: dict[str, Any]
+    config_version: str
+    engine_bundle_tree_sha256: str
+    file_inventory_sha256: str
+    builder_config_sha256: str
+    rank_inventory: tuple[dict[str, object], ...]
+
+
 def _stat_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
     return (
         value.st_dev,
@@ -140,9 +151,11 @@ def _open_root_without_symlinks(path: str | os.PathLike[str]) -> int:
                 raise TensorRTLLMIdentityError(
                     "engine bundle path contains a symlink or inaccessible directory"
                 ) from exc
-            if not stat.S_ISDIR(before.st_mode) or _stat_identity(
-                before
-            ) != _stat_identity(opened):
+            if (
+                not stat.S_ISDIR(before.st_mode)
+                or not stat.S_ISDIR(opened.st_mode)
+                or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)
+            ):
                 os.close(next_descriptor)
                 raise TensorRTLLMIdentityError(
                     "engine bundle directory changed while being opened"
@@ -601,32 +614,11 @@ def _tree_digest(inventory_bytes: bytes) -> str:
     ).hexdigest()
 
 
-def read_tensorrt_llm_artifact_identity(
+def _read_authenticated_engine_bundle(
     bundle_path: str | os.PathLike[str],
-    *,
-    target_compute_capability: str,
-    tokenizer_metadata_sha256: str,
-) -> TensorRTLLMArtifactIdentity:
-    """Authenticate one closed-layout TensorRT-LLM engine bundle.
+) -> _AuthenticatedEngineBundle:
+    """Authenticate one closed engine tree and derive all byte identities once."""
 
-    ``target_compute_capability`` is an authenticated build/deployment input.
-    Current TensorRT-LLM engine ``config.json`` files do not carry it, so the
-    caller must obtain it from the pinned build contract.  It is included both
-    in the typed identity and the derived engine-metadata digest.
-
-    TensorRT-LLM engines consume a tokenizer outside this closed bundle.
-    ``tokenizer_metadata_sha256`` authenticates the external tokenizer contract
-    used to encode prompts and decode generated token IDs.
-    """
-
-    if _COMPUTE_CAPABILITY.fullmatch(target_compute_capability) is None:
-        raise TensorRTLLMIdentityError(
-            "target_compute_capability must use major.minor notation"
-        )
-    if _SHA256.fullmatch(tokenizer_metadata_sha256) is None:
-        raise TensorRTLLMIdentityError(
-            "tokenizer_metadata_sha256 must be a lowercase sha256 digest"
-        )
     root_descriptor = _open_root_without_symlinks(bundle_path)
     try:
         records = _collect_files(root_descriptor)
@@ -674,44 +666,86 @@ def read_tensorrt_llm_artifact_identity(
                 "TensorRT-LLM engine bundle changed while being authenticated"
             )
 
-        inventory = _inventory_payload(hashed)
-        inventory_bytes = _canonical_json(inventory)
-        inventory_sha256 = hashlib.sha256(inventory_bytes).hexdigest()
-        tree_sha256 = _tree_digest(inventory_bytes)
-        builder_sha256 = hashlib.sha256(_canonical_json(build)).hexdigest()
+        inventory_bytes = _canonical_json(_inventory_payload(hashed))
         hashed_by_name = {entry.logical_name: entry for entry in hashed}
-        rank_inventory = [
-            {
-                "byte_length": hashed_by_name[f"rank{rank}.engine"].byte_length,
-                "rank": rank,
-                "sha256": hashed_by_name[f"rank{rank}.engine"].sha256,
-            }
-            for rank in range(world_size)
-        ]
-        engine_metadata = {
-            "config_version": version,
-            "pretrained_config": pretrained,
-            "rank_engines": rank_inventory,
-            "target_compute_capability": target_compute_capability,
-            "tokenizer_metadata_sha256": tokenizer_metadata_sha256,
-        }
-        engine_metadata_sha256 = hashlib.sha256(
-            _canonical_json(engine_metadata)
-        ).hexdigest()
-        return TensorRTLLMArtifactIdentity(
-            bundle_name=f"tensorrt-llm-sha256-{tree_sha256}",
-            engine_bundle_tree_sha256=tree_sha256,
-            file_inventory_sha256=inventory_sha256,
-            builder_config_sha256=builder_sha256,
-            tokenizer_metadata_sha256=tokenizer_metadata_sha256,
-            engine_metadata_sha256=engine_metadata_sha256,
-            target_compute_capability=target_compute_capability,
+        return _AuthenticatedEngineBundle(
+            pretrained_config=pretrained,
+            build_config=build,
+            config_version=version,
+            engine_bundle_tree_sha256=_tree_digest(inventory_bytes),
+            file_inventory_sha256=hashlib.sha256(inventory_bytes).hexdigest(),
+            builder_config_sha256=hashlib.sha256(_canonical_json(build)).hexdigest(),
+            rank_inventory=tuple(
+                {
+                    "byte_length": hashed_by_name[f"rank{rank}.engine"].byte_length,
+                    "rank": rank,
+                    "sha256": hashed_by_name[f"rank{rank}.engine"].sha256,
+                }
+                for rank in range(world_size)
+            ),
         )
     finally:
         os.close(root_descriptor)
 
 
+def read_tensorrt_llm_engine_tree_sha256(
+    bundle_path: str | os.PathLike[str],
+) -> str:
+    """Authenticate a closed TensorRT-LLM bundle and return its tree digest."""
+
+    return _read_authenticated_engine_bundle(bundle_path).engine_bundle_tree_sha256
+
+
+def read_tensorrt_llm_artifact_identity(
+    bundle_path: str | os.PathLike[str],
+    *,
+    target_compute_capability: str,
+    tokenizer_metadata_sha256: str,
+) -> TensorRTLLMArtifactIdentity:
+    """Authenticate one closed-layout TensorRT-LLM engine bundle.
+
+    ``target_compute_capability`` is an authenticated build/deployment input.
+    Current TensorRT-LLM engine ``config.json`` files do not carry it, so the
+    caller must obtain it from the pinned build contract.  It is included both
+    in the typed identity and the derived engine-metadata digest.
+
+    TensorRT-LLM engines consume a tokenizer outside this closed bundle.
+    ``tokenizer_metadata_sha256`` authenticates the external tokenizer contract
+    used to encode prompts and decode generated token IDs.
+    """
+
+    if _COMPUTE_CAPABILITY.fullmatch(target_compute_capability) is None:
+        raise TensorRTLLMIdentityError(
+            "target_compute_capability must use major.minor notation"
+        )
+    if _SHA256.fullmatch(tokenizer_metadata_sha256) is None:
+        raise TensorRTLLMIdentityError(
+            "tokenizer_metadata_sha256 must be a lowercase sha256 digest"
+        )
+    authenticated = _read_authenticated_engine_bundle(bundle_path)
+    engine_metadata = {
+        "config_version": authenticated.config_version,
+        "pretrained_config": authenticated.pretrained_config,
+        "rank_engines": authenticated.rank_inventory,
+        "target_compute_capability": target_compute_capability,
+        "tokenizer_metadata_sha256": tokenizer_metadata_sha256,
+    }
+    engine_metadata_sha256 = hashlib.sha256(
+        _canonical_json(engine_metadata)
+    ).hexdigest()
+    return TensorRTLLMArtifactIdentity(
+        bundle_name=("tensorrt-llm-sha256-" + authenticated.engine_bundle_tree_sha256),
+        engine_bundle_tree_sha256=authenticated.engine_bundle_tree_sha256,
+        file_inventory_sha256=authenticated.file_inventory_sha256,
+        builder_config_sha256=authenticated.builder_config_sha256,
+        tokenizer_metadata_sha256=tokenizer_metadata_sha256,
+        engine_metadata_sha256=engine_metadata_sha256,
+        target_compute_capability=target_compute_capability,
+    )
+
+
 __all__ = [
     "TensorRTLLMIdentityError",
     "read_tensorrt_llm_artifact_identity",
+    "read_tensorrt_llm_engine_tree_sha256",
 ]

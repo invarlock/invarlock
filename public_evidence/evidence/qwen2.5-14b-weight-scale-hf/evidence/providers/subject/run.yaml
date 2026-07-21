@@ -1,0 +1,1 @@
+{"artifact_identity_sha256":"e28002f44de04766e571ecae372289331040553c80fc5a21f3bd9ce9901d28ba","format":"invarlock/runtime-side-config-v1","policy_digest":"sha256:4d2a98344605b4f81f1218544c2ca4e49d82bdbbec98ef883d20a3fdf77e7d01","provider":"hf_transformers","role":"subject","schedule_sha256":"3552a65f461677b7f6a27d24c157f043a6ff5b016f2ddc5834e5f304c7d8be00"}

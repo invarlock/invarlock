@@ -9,7 +9,7 @@ from typing import cast
 import pytest
 
 from invarlock.core.runtime_provider import EvaluationBatch, EvaluationRecord
-from invarlock.reporting.validation.runtime_behavioral_observation import (
+from invarlock.core.runtime_provider.behavioral_observation import (
     RuntimeBehavioralObservationError,
     verify_runtime_behavioral_observation,
 )
@@ -30,7 +30,7 @@ def _records_sha256(records: Sequence[Mapping[str, object]]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _batch() -> EvaluationBatch:
+def _batch(metric: str = "exact_match") -> EvaluationBatch:
     return EvaluationBatch(
         schedule_sha256=_sha256("schedule"),
         records=(
@@ -47,6 +47,7 @@ def _batch() -> EvaluationBatch:
                 expected_output="A",
             ),
         ),
+        metric=metric,  # type: ignore[arg-type]
     )
 
 
@@ -99,6 +100,61 @@ def test_verifier_recomputes_exact_match_from_record_facts() -> None:
     assert result.correct_records == 1
     assert result.total_records == 2
     assert result.aggregate_source_sha256 == _payload()["aggregate_source_sha256"]
+
+
+def test_verifier_recomputes_normalized_nll_from_record_facts() -> None:
+    payload = _payload()
+    records = copy.deepcopy(payload["records"])
+    assert isinstance(records, list)
+    assert isinstance(records[0], dict)
+    assert isinstance(records[1], dict)
+    records[0].update(logprob_sum=-5.0, token_count=2, utf8_byte_count=5)
+    records[1].update(logprob_sum=-2.0, token_count=1, utf8_byte_count=1)
+    payload["records"] = records
+    payload["aggregate_source_sha256"] = _records_sha256(records)
+
+    result = verify_runtime_behavioral_observation(
+        payload,
+        expected_provider_name="llama_cpp",
+        expected_artifact_identity_sha256=_sha256("artifact"),
+        expected_batch=_batch("normalized_nll_per_utf8_byte"),
+        metric="normalized_nll_per_utf8_byte",
+    )
+
+    assert result.metric == "normalized_nll_per_utf8_byte"
+    assert result.value == 1.5
+    assert result.correct_records is None
+    assert result.total_records == 2
+
+
+def test_normalized_nll_rejects_provider_controlled_byte_denominator() -> None:
+    payload = _payload()
+    records = copy.deepcopy(payload["records"])
+    assert isinstance(records, list)
+    assert isinstance(records[0], dict)
+    records[0].update(logprob_sum=-1.0, token_count=1, utf8_byte_count=4)
+    payload["records"] = records
+    payload["aggregate_source_sha256"] = _records_sha256(records)
+
+    with pytest.raises(RuntimeBehavioralObservationError, match="utf8_byte_count"):
+        verify_runtime_behavioral_observation(
+            payload,
+            expected_provider_name="llama_cpp",
+            expected_artifact_identity_sha256=_sha256("artifact"),
+            expected_batch=_batch("normalized_nll_per_utf8_byte"),
+            metric="normalized_nll_per_utf8_byte",
+        )
+
+
+def test_verifier_rejects_metric_that_disagrees_with_batch() -> None:
+    with pytest.raises(RuntimeBehavioralObservationError, match="expected batch"):
+        verify_runtime_behavioral_observation(
+            _payload(),
+            expected_provider_name="llama_cpp",
+            expected_artifact_identity_sha256=_sha256("artifact"),
+            expected_batch=_batch(),
+            metric="normalized_nll_per_utf8_byte",
+        )
 
 
 @pytest.mark.parametrize("output", ["paris", " Paris", "Paris\n"])

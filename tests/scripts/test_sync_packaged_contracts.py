@@ -139,3 +139,79 @@ def test_sync_packaged_contracts_write_allows_missing_packaged_dir(
     assert json.loads((packaged_dir / "alpha.json").read_text(encoding="utf-8")) == {
         "alpha": 1
     }
+
+
+def test_sync_packaged_contracts_defaults_to_check_mode(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
+    source_dir = tmp_path / "contracts"
+    packaged_dir = tmp_path / "packaged"
+    _write_json(source_dir / "alpha.json", {"alpha": 1})
+    _write_json(packaged_dir / "alpha.json", {"alpha": 1})
+
+    proc = _run_sync_script(
+        script,
+        source_dir=source_dir,
+        packaged_dir=packaged_dir,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "Packaged contracts are in sync (1 files)." in proc.stdout
+
+
+def test_sync_packaged_contracts_write_and_check_is_idempotent(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
+    source_dir = tmp_path / "contracts"
+    packaged_dir = tmp_path / "packaged"
+    _write_json(source_dir / "alpha.json", {"alpha": 1})
+    _write_json(packaged_dir / "alpha.json", {"alpha": 1})
+
+    proc = _run_sync_script(
+        script,
+        source_dir=source_dir,
+        packaged_dir=packaged_dir,
+        extra_args=["--write", "--check"],
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "updated=0, removed=0" in proc.stdout
+    assert "Packaged contracts are in sync" in proc.stdout
+
+
+def test_sync_packaged_contracts_write_rejects_missing_source(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
+
+    proc = _run_sync_script(
+        script,
+        source_dir=tmp_path / "missing-source",
+        packaged_dir=tmp_path / "packaged",
+        extra_args=["--write"],
+    )
+
+    assert proc.returncode == 1
+    assert "contract directory not found" in proc.stderr
+
+
+def test_sync_packaged_contracts_ignores_hidden_and_non_file_json_entries(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
+    source_dir = tmp_path / "contracts"
+    packaged_dir = tmp_path / "packaged"
+    _write_json(source_dir / "alpha.json", {"alpha": 1})
+    _write_json(packaged_dir / "alpha.json", {"alpha": 1})
+    _write_json(source_dir / ".ignored.json", {"ignored": True})
+    (source_dir / "directory.json").mkdir()
+
+    proc = _run_sync_script(
+        script,
+        source_dir=source_dir,
+        packaged_dir=packaged_dir,
+        extra_args=["--check"],
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "in sync (1 files)" in proc.stdout

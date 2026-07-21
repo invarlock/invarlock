@@ -11,7 +11,6 @@ It then audits the current public-evidence index. It does not publish anything.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -42,10 +41,9 @@ import sys
 from pathlib import Path
 import invarlock
 import invarlock.cli.app
-import invarlock.cli.commands.runtime_behavior
 import invarlock.runtime_providers.hf_transformers
-import invarlock.runtime_providers.llama_cpp
-import invarlock.runtime_providers.tensorrt_llm
+import invarlock.runtime_providers.gguf_identity
+import invarlock.runtime_providers.tensorrt_llm_identity
 
 distribution = metadata.distribution(\"invarlock\")
 distribution_root = Path(distribution.locate_file(\"\")).resolve()
@@ -65,9 +63,6 @@ print(json.dumps({
     \"invarlock_modules\": invarlock_modules,
 }, sort_keys=True))
 """
-_RUNTIME_BEHAVIOR_COMMANDS = frozenset(
-    {"build-schedule", "prepare-binding", "build-policy", "run-side", "verify-pair"}
-)
 _FIRST_PARTY_RUNTIME_PROVIDERS = {
     "hf_transformers": {
         "module": "invarlock.runtime_providers.hf_transformers",
@@ -76,81 +71,42 @@ _FIRST_PARTY_RUNTIME_PROVIDERS = {
         "runtime_qualification": "not_probed",
         "support_tier": "core_supported",
     },
-    "llama_cpp": {
-        "module": "invarlock.runtime_providers.llama_cpp",
-        "connector_status": "ready",
-        "backend_delivery": "oci_image",
-        "runtime_qualification": "not_probed",
-        "support_tier": "first_party_experimental",
-    },
-    "tensorrt_llm": {
-        "module": "invarlock.runtime_providers.tensorrt_llm",
-        "connector_status": "ready",
-        "backend_delivery": "oci_image",
-        "runtime_qualification": "not_probed",
-        "support_tier": "first_party_experimental",
-    },
 }
 _PROBED_INVARLOCK_MODULES = frozenset(
     {
         "invarlock",
         "invarlock.cli.app",
-        "invarlock.cli.commands.runtime_behavior",
         "invarlock.runtime_providers.hf_transformers",
-        "invarlock.runtime_providers.llama_cpp",
-        "invarlock.runtime_providers.tensorrt_llm",
+        "invarlock.runtime_providers.gguf_identity",
+        "invarlock.runtime_providers.tensorrt_llm_identity",
     }
 )
 
 
 try:
-    from scripts.release.release_distribution_validation import (  # noqa: F401
-        DistributionArtifacts,
+    from scripts.release.first_party_distribution_validation import (
+        validate_first_party_addin_distributions,
+    )
+    from scripts.release.release_distribution_validation import (
         InstalledWheelImport,
         ReleasePreflightConfig,
         ReleasePreflightError,
-        _CaseSensitiveConfigParser,
-        _checkout_runtime_files,
-        _directory_is_needed,
-        _entry_point_group,
-        _expected_entry_points,
-        _find_distribution_artifacts,
-        _is_import_affecting_path,
         _is_within,
-        _load_hash_manifest,
-        _parse_entry_points,
-        _parse_package_metadata,
         _require_executable_file,
         _require_regular_file,
-        _resolve_from_repo,
-        _safe_archive_member_name,
-        _sha256,
-        _tar_member_sha256,
-        _validate_checkout_bound_sdist_member,
-        _validate_distribution_checkout_binding,
-        _validate_egg_info_member,
-        _validate_entry_points,
-        _validate_generated_sdist_setup_cfg,
-        _validate_sdist_entry_points,
-        _validate_sdist_metadata,
-        _validate_sdist_surface,
-        _validate_wheel_entry_points,
-        _validate_wheel_metadata,
-        _validate_wheel_package_directories,
-        _validate_wheel_record,
-        _validate_wheel_surface,
-        _zip_member_sha256,
         validate_distributions,
     )
 except ImportError:  # pragma: no cover - direct script execution path
-    from release_distribution_validation import (  # noqa: F401
+    from first_party_distribution_validation import (  # type: ignore[import-not-found, no-redef]
+        validate_first_party_addin_distributions,
+    )
+    from release_distribution_validation import (  # type: ignore[import-not-found, no-redef]  # noqa: F401
         InstalledWheelImport,
         ReleasePreflightConfig,
         ReleasePreflightError,
         _is_within,
         _require_executable_file,
         _require_regular_file,
-        _resolve_from_repo,
         validate_distributions,
     )
 
@@ -341,229 +297,30 @@ def _require_successful_installed_wheel_command(
     return completed
 
 
-def _validate_runtime_behavior_help(payload: str) -> None:
-    missing = sorted(
-        command for command in _RUNTIME_BEHAVIOR_COMMANDS if command not in payload
+def _smoke_installed_wheel_cli(cli: Path, *, cwd: Path) -> None:
+    """Prove the installed wheel exposes the supported public journey."""
+
+    root_help = _require_successful_installed_wheel_command(
+        [str(cli), "--help"],
+        cwd=cwd,
+        label="root CLI help",
     )
-    if missing:
-        raise ReleasePreflightError(
-            "installed-wheel runtime-behavior help omitted commands: "
-            + ", ".join(missing)
-        )
-
-
-def _validate_runtime_provider_inventory(payload: str) -> None:
-    try:
-        value = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise ReleasePreflightError(
-            "installed-wheel runtime-provider inventory did not return JSON"
-        ) from exc
-    if not isinstance(value, dict) or value.get("category") != "runtime-providers":
-        raise ReleasePreflightError(
-            "installed-wheel runtime-provider inventory returned an invalid payload"
-        )
-    items = value.get("items")
-    if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
-        raise ReleasePreflightError(
-            "installed-wheel runtime-provider inventory omitted provider items"
-        )
-    providers = {item.get("name"): item for item in items}
-    if set(providers) != set(_FIRST_PARTY_RUNTIME_PROVIDERS):
-        raise ReleasePreflightError(
-            "installed-wheel runtime-provider inventory does not contain exactly "
-            "the three first-party providers"
-        )
-    for name, expected in _FIRST_PARTY_RUNTIME_PROVIDERS.items():
-        item = providers[name]
-        required = {
-            "entry_point": name,
-            "entry_point_group": "invarlock.runtime_providers",
-            "kind": "runtime_provider",
-            "origin": "builtin",
-            "status": "ready",
-            **expected,
-        }
-        if any(
-            item.get(field) != expected_value
-            for field, expected_value in required.items()
-        ):
+    for command in ("evaluate", "verify", "report"):
+        if command not in root_help.stdout:
             raise ReleasePreflightError(
-                f"installed-wheel runtime-provider metadata is invalid for {name}"
+                f"installed-wheel root help omitted {command!r}"
+            )
+    for retired in ("advanced", "calibrate", "doctor", "plugins"):
+        if retired in root_help.stdout:
+            raise ReleasePreflightError(
+                f"installed-wheel root help retained retired command {retired!r}"
             )
 
-
-def _write_runtime_behavior_smoke_inputs(cwd: Path) -> tuple[Path, Path, Path, Path]:
-    records = cwd / "runtime-records.json"
-    dataset_identity = cwd / "runtime-dataset-identity.json"
-    baseline_binding = cwd / "runtime-baseline-binding.json"
-    subject_binding = cwd / "runtime-subject-binding.json"
-    records.write_text(
-        json.dumps(
-            [
-                {
-                    "record_id": "release-smoke-1",
-                    "input_text": "Return the literal answer.",
-                    "expected_output": "answer",
-                }
-            ],
-            sort_keys=True,
-            separators=(",", ":"),
-        ),
-        encoding="utf-8",
-    )
-    dataset_identity.write_text(
-        json.dumps(
-            {
-                "provider": "local_manifest",
-                "dataset_name": None,
-                "config_name": None,
-                "revision": None,
-                "split": "validation",
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ),
-        encoding="utf-8",
-    )
-
-    def _write_binding(
-        path: Path, *, provider_name: str, artifact_format: str, marker: str
-    ) -> None:
-        path.write_text(
-            json.dumps(
-                {
-                    "provider_name": provider_name,
-                    "artifact_format": artifact_format,
-                    "artifact_identity_sha256": marker * 64,
-                    "outer_image_digest": f"sha256:{marker * 64}",
-                    "execution_settings_sha256": marker * 64,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-            encoding="utf-8",
-        )
-
-    _write_binding(
-        baseline_binding,
-        provider_name="llama_cpp",
-        artifact_format="gguf",
-        marker="a",
-    )
-    _write_binding(
-        subject_binding,
-        provider_name="tensorrt_llm",
-        artifact_format="tensorrt_llm_engine",
-        marker="b",
-    )
-    return records, dataset_identity, baseline_binding, subject_binding
-
-
-def _require_canonical_json_file(path: Path, *, label: str) -> dict[str, Any]:
-    try:
-        raw = path.read_bytes()
-        value = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ReleasePreflightError(f"installed-wheel {label} is unreadable") from exc
-    if not isinstance(value, dict):
-        raise ReleasePreflightError(f"installed-wheel {label} is not a JSON object")
-    canonical = json.dumps(
-        value,
-        ensure_ascii=False,
-        allow_nan=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    if raw != canonical:
-        raise ReleasePreflightError(f"installed-wheel {label} is not canonical JSON")
-    return value
-
-
-def _smoke_installed_wheel_cli(cli: Path, *, cwd: Path) -> None:
-    help_result = _require_successful_installed_wheel_command(
-        [str(cli), "advanced", "runtime-behavior", "--help"],
-        cwd=cwd,
-        label="runtime-behavior help",
-    )
-    _validate_runtime_behavior_help(help_result.stdout)
-
-    inventory_result = _require_successful_installed_wheel_command(
-        [str(cli), "advanced", "plugins", "runtime-providers", "--json"],
-        cwd=cwd,
-        label="runtime-provider inventory",
-    )
-    _validate_runtime_provider_inventory(inventory_result.stdout)
-
-    records, dataset_identity, baseline_binding, subject_binding = (
-        _write_runtime_behavior_smoke_inputs(cwd)
-    )
-    schedule = cwd / "runtime-schedule.json"
-    _require_successful_installed_wheel_command(
-        [
-            str(cli),
-            "advanced",
-            "runtime-behavior",
-            "build-schedule",
-            "--records",
-            str(records),
-            "--dataset-identity",
-            str(dataset_identity),
-            "--out",
-            str(schedule),
-            "--json",
-        ],
-        cwd=cwd,
-        label="runtime schedule journey",
-    )
-    schedule_payload = _require_canonical_json_file(schedule, label="runtime schedule")
-    if (
-        schedule_payload.get("format_version")
-        != "invarlock/runtime-behavioral-schedule-v1"
-        or len(schedule_payload.get("records", [])) != 1
-    ):
-        raise ReleasePreflightError(
-            "installed-wheel runtime schedule journey returned an invalid schedule"
-        )
-
-    policy = cwd / "runtime-policy.json"
-    _require_successful_installed_wheel_command(
-        [
-            str(cli),
-            "advanced",
-            "runtime-behavior",
-            "build-policy",
-            "--schedule",
-            str(schedule),
-            "--baseline-binding",
-            str(baseline_binding),
-            "--subject-binding",
-            str(subject_binding),
-            "--minimum-subject-score",
-            "0.9",
-            "--maximum-regression",
-            "0.05",
-            "--evidence-surface",
-            "behavior",
-            "--evidence-surface",
-            "tokenizer",
-            "--out",
-            str(policy),
-            "--json",
-        ],
-        cwd=cwd,
-        label="runtime policy journey",
-    )
-    policy_payload = _require_canonical_json_file(policy, label="runtime policy")
-    behavioral_claim = policy_payload.get("behavioral_claim")
-    schedule_sha256 = hashlib.sha256(schedule.read_bytes()).hexdigest()
-    if (
-        policy_payload.get("format") != "policy-pack-v3"
-        or not isinstance(behavioral_claim, dict)
-        or behavioral_claim.get("schedule_sha256") != schedule_sha256
-    ):
-        raise ReleasePreflightError(
-            "installed-wheel runtime policy journey returned an invalid policy"
+    for command in ("evaluate", "verify", "report"):
+        _require_successful_installed_wheel_command(
+            [str(cli), command, "--help"],
+            cwd=cwd,
+            label=f"{command} help",
         )
 
 
@@ -688,6 +445,11 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
     """Validate a release candidate and return only portable result details."""
     validate_clean_exact_checkout(config)
     artifacts = validate_distributions(config)
+    addin_artifacts = validate_first_party_addin_distributions(
+        repo_root=config.repo_root,
+        expected_version=config.expected_version,
+        dist_dir=config.dist_dir / "addins",
+    )
     _probe_installed_wheel(config, artifacts.wheel)
     _run_current_public_evidence_audit(config)
     validate_clean_exact_checkout(config)
@@ -706,6 +468,14 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
                 "sha256": artifacts.hashes[artifacts.sdist.name],
             },
         ],
+        "first_party_addins": [
+            {
+                "name": item.distribution,
+                "sdist": item.sdist,
+                "wheel": item.wheel,
+            }
+            for item in addin_artifacts
+        ],
         "installed_wheel_import": "isolated_venv_from_candidate_wheel",
         "installed_wheel_runtime_surface": "passed",
         "current_public_evidence": "passed",
@@ -723,14 +493,34 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _resolve_release_input(repo_root: Path, value: Path) -> Path:
+    candidate = value if value.is_absolute() else repo_root / value
+    lexical = Path(os.path.abspath(os.fspath(candidate)))
+    if lexical.is_symlink():
+        raise ReleasePreflightError("release input must not be a symbolic link")
+    try:
+        canonical_parent = lexical.parent.resolve(strict=True)
+    except OSError as exc:
+        raise ReleasePreflightError("release input parent is unavailable") from exc
+    resolved = canonical_parent / lexical.name
+    if resolved.is_symlink():
+        raise ReleasePreflightError("release input must not be a symbolic link")
+    return resolved
+
+
 def _config_from_args(args: argparse.Namespace) -> ReleasePreflightConfig:
-    repo_root = args.repo_root.resolve()
+    try:
+        repo_root = args.repo_root.resolve(strict=True)
+    except OSError as exc:
+        raise ReleasePreflightError("release checkout is unavailable") from exc
+    if not repo_root.is_dir():
+        raise ReleasePreflightError("release checkout must be a directory")
     return ReleasePreflightConfig(
         repo_root=repo_root,
         release_sha=args.release_sha,
         expected_version=args.expected_version,
-        dist_dir=_resolve_from_repo(repo_root, args.dist_dir),
-        hash_manifest=_resolve_from_repo(repo_root, args.hash_manifest),
+        dist_dir=_resolve_release_input(repo_root, args.dist_dir),
+        hash_manifest=_resolve_release_input(repo_root, args.hash_manifest),
     )
 
 

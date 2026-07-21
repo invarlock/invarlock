@@ -50,10 +50,13 @@ jobs:
     - name: Resolve docs version
       id: version
       shell: bash
+      env:
+        INVARLOCK_DOCS_VERSION_OVERRIDE: ${{ github.event.inputs.docs_version }}
+        INVARLOCK_DOCS_REF_NAME: ${{ github.ref_name }}
       run: |
         set -euo pipefail
-        override='${{ github.event.inputs.docs_version }}'
-        ref_name='${{ github.ref_name }}'
+        override="${INVARLOCK_DOCS_VERSION_OVERRIDE}"
+        ref_name="${INVARLOCK_DOCS_REF_NAME}"
         docs_version=''
         if [ -n "${override}" ]; then
           docs_version="${override}"
@@ -63,6 +66,12 @@ jobs:
           docs_version="${ref_name#release/v}"
         else
           docs_version="${ref_name}"
+        fi
+        if [[ ! "${docs_version}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] \
+          || [ "${docs_version}" = "." ] \
+          || [ "${docs_version}" = ".." ]; then
+          echo "docs_version must be one safe path component" >&2
+          exit 1
         fi
         echo "docs_version=${docs_version}" >> "${GITHUB_OUTPUT}"
 

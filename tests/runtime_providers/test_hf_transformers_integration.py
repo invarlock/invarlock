@@ -13,10 +13,11 @@ from invarlock.core.runtime_provider import (
     EvaluationRecord,
     HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
+    RuntimeArtifactResources,
     RuntimeExecutionContext,
     artifact_identity_sha256,
 )
-from invarlock.reporting.validation.runtime_behavioral_observation import (
+from invarlock.core.runtime_provider.behavioral_observation import (
     verify_runtime_behavioral_observation,
 )
 from invarlock.runtime_provider_evidence import encode_scoring_observation
@@ -73,7 +74,8 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
         "<bos>": 1,
         "<eos>": 2,
         "<unk>": 3,
-        **{f"token-{index}": index + 4 for index in range(28)},
+        **{f"token-{index}": index + 4 for index in range(27)},
+        "target": 31,
     }
     tokenizer_backend = tokenizers.Tokenizer(
         tokenizers.models.WordLevel(vocab, unk_token="<unk>")
@@ -92,7 +94,6 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
     spec = ModelRuntimeSpec(
         provider_name="hf_transformers",
         model_id=str(checkpoint),
-        adapter_name="hf_causal",
         settings={
             "batch_size": 1,
             "checkpoint_tree_sha256": tree_sha256,
@@ -114,51 +115,37 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
                 record_id="tiny-1",
                 input_text=input_text,
                 input_sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                # This expectation is fixed from the deterministic seed/model
+                # contract before the provider runs. Do not derive it from the
+                # observation under test.
+                expected_output="token-13",
             ),
         ),
     )
 
-    scorer = HFTransformersCausalScorer(
-        model=model,
-        tokenizer=tokenizer,
-        artifact_identity_sha256=artifact_identity_sha256(identity),
-    )
-
-    session = provider.open(
+    context = provider.prepare_execution(
         spec,
-        RuntimeExecutionContext(
-            strict=True,
-            allow_network=False,
-            container_image_digest=_IMAGE_DIGEST,
+        RuntimeArtifactResources(
+            root=tmp_path,
+            primary_artifact=checkpoint.name,
+            support_resources={},
             device_kind="cpu",
-            artifact_identity_sha256=artifact_identity_sha256(identity),
-            model_adapter=object(),
-            native_model=model,
-            scorer=scorer,
+            container_image_digest=_IMAGE_DIGEST,
         ),
     )
+    session = provider.open(spec, context)
     observation = session.score(batch)
     receipt = session.runtime_receipt()
-    verified_batch = EvaluationBatch(
-        schedule_sha256=batch.schedule_sha256,
-        records=(
-            EvaluationRecord(
-                record_id=batch.records[0].record_id,
-                input_text=batch.records[0].input_text,
-                input_sha256=batch.records[0].input_sha256,
-                expected_output=observation.records[0].output_text,
-            ),
-        ),
-    )
     verified = verify_runtime_behavioral_observation(
         json.loads(encode_scoring_observation(observation)),
         expected_provider_name="hf_transformers",
         expected_artifact_identity_sha256=artifact_identity_sha256(identity),
-        expected_batch=verified_batch,
+        expected_batch=batch,
         metric="exact_match",
     )
 
     assert observation.records[0].status == "ok"
+    assert observation.records[0].output_text == "token-13"
     assert verified.total_records == 1
     assert verified.value == 1.0
     assert receipt.backend.name == "transformers+torch"
@@ -177,8 +164,42 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
     )
     assert str(tmp_path) not in repr(receipt)
 
+    nll_batch = EvaluationBatch(
+        schedule_sha256=hashlib.sha256(b"tiny-local-hf-nll-schedule").hexdigest(),
+        records=(
+            EvaluationRecord(
+                record_id="tiny-nll-1",
+                input_text=input_text,
+                input_sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                expected_output=" target",
+            ),
+        ),
+        metric="normalized_nll_per_utf8_byte",
+    )
+    nll_observation = session.score(nll_batch)
+    nll_receipt = session.runtime_receipt()
+    nll_verified = verify_runtime_behavioral_observation(
+        json.loads(encode_scoring_observation(nll_observation)),
+        expected_provider_name="hf_transformers",
+        expected_artifact_identity_sha256=artifact_identity_sha256(identity),
+        expected_batch=nll_batch,
+        metric="normalized_nll_per_utf8_byte",
+    )
+    nll_record = nll_observation.records[0]
+    assert nll_record.output_text is None
+    assert nll_record.logprob_sum is not None and nll_record.logprob_sum < 0
+    assert nll_record.token_count == 1
+    assert nll_record.utf8_byte_count == len(b" target")
+    assert nll_verified.value > 0
+    assert (
+        nll_receipt.scoring_observation_sha256
+        == hashlib.sha256(encode_scoring_observation(nll_observation)).hexdigest()
+    )
+
+    prepared_model = context.provider_state
+    assert prepared_model is not None
     with torch.no_grad():
-        next(model.parameters()).add_(1)
+        next(prepared_model.parameters()).add_(1)
     with pytest.raises(ValueError, match="tensors do not match"):
         session.score(batch)
     with pytest.raises(RuntimeError, match="unavailable before scoring"):
@@ -219,7 +240,6 @@ def test_hf_strict_open_rejects_loaded_weights_from_another_checkpoint(
     spec = ModelRuntimeSpec(
         provider_name="hf_transformers",
         model_id=str(checkpoint),
-        adapter_name="hf_causal",
         settings={
             "batch_size": 1,
             "checkpoint_tree_sha256": checkpoint_tree_sha256(checkpoint),
@@ -247,8 +267,38 @@ def test_hf_strict_open_rejects_loaded_weights_from_another_checkpoint(
                 container_image_digest=_IMAGE_DIGEST,
                 device_kind="cpu",
                 artifact_identity_sha256=identity_sha256,
-                model_adapter=object(),
-                native_model=unrelated_model,
+                provider_state=unrelated_model,
                 scorer=scorer,
             ),
+        )
+
+
+def test_hf_strict_loader_rejects_real_partial_checkpoint(tmp_path: Path) -> None:
+    pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    config = transformers.GPT2Config(
+        vocab_size=32,
+        n_positions=8,
+        n_embd=8,
+        n_layer=1,
+        n_head=1,
+        bos_token_id=1,
+        eos_token_id=2,
+        pad_token_id=0,
+    )
+    model = transformers.GPT2LMHeadModel(config)
+    checkpoint = tmp_path / "partial-hf"
+    checkpoint.mkdir()
+    config.save_pretrained(checkpoint)
+    safetensors_torch.save_file(
+        {"transformer.wte.weight": model.state_dict()["transformer.wte.weight"]},
+        checkpoint / "model.safetensors",
+        metadata={"format": "pt"},
+    )
+
+    with pytest.raises(ValueError, match="loading reported missing"):
+        hf_transformers.load_hf_model_with_strict_loading_info(
+            transformers.AutoModelForCausalLM.from_pretrained,
+            checkpoint,
         )

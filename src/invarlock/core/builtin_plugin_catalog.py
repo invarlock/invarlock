@@ -1,4 +1,4 @@
-"""Table-driven catalog for shipped plugin metadata."""
+"""Table-driven catalog for the single built-in runtime provider."""
 
 from __future__ import annotations
 
@@ -7,195 +7,36 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class BuiltinPluginSpec:
+    """Import metadata for a provider shipped by the core distribution."""
+
     name: str
     module: str
     class_name: str
     required_deps: tuple[str, ...] = ()
-    support_tier: str = "core_supported"
-    strict_assurance_allowed: bool = True
-    maintained_catalog: bool = False
-    deployment_claim: bool = False
-
-    def support_metadata(self) -> dict[str, object]:
-        return {
-            "support_tier": self.support_tier,
-            "strict_assurance_allowed": self.strict_assurance_allowed,
-            "maintained_catalog": self.maintained_catalog,
-            "deployment_claim": self.deployment_claim,
-        }
 
 
-BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
-    "runtime_providers": (
-        BuiltinPluginSpec(
-            name="hf_transformers",
-            module="invarlock.runtime_providers.hf_transformers",
-            class_name="HFTransformersProvider",
-            required_deps=("torch", "transformers"),
-        ),
-        BuiltinPluginSpec(
-            name="llama_cpp",
-            module="invarlock.runtime_providers.llama_cpp",
-            class_name="LlamaCppProvider",
-            support_tier="first_party_experimental",
-        ),
-        BuiltinPluginSpec(
-            name="tensorrt_llm",
-            module="invarlock.runtime_providers.tensorrt_llm",
-            class_name="TensorRTLLMProvider",
-            support_tier="first_party_experimental",
-        ),
+BUILTIN_RUNTIME_PROVIDERS = (
+    BuiltinPluginSpec(
+        name="hf_transformers",
+        module="invarlock.runtime_providers.hf_transformers",
+        class_name="HFTransformersProvider",
+        # Identity and import-mode verification stay available in the base
+        # distribution; execution imports the optional backend lazily.
+        required_deps=(),
     ),
-    "adapters": (
-        BuiltinPluginSpec(
-            name="hf_causal",
-            module="invarlock.adapters.hf_causal",
-            class_name="HF_Causal_Adapter",
-        ),
-        BuiltinPluginSpec(
-            name="hf_mlm",
-            module="invarlock.adapters.hf_mlm",
-            class_name="HF_MLM_Adapter",
-        ),
-        BuiltinPluginSpec(
-            name="hf_multimodal",
-            module="invarlock.adapters.hf_multimodal",
-            class_name="HF_Multimodal_Adapter",
-        ),
-        BuiltinPluginSpec(
-            name="hf_seq2seq",
-            module="invarlock.adapters.hf_seq2seq",
-            class_name="HF_Seq2Seq_Adapter",
-        ),
-        BuiltinPluginSpec(
-            name="hf_auto",
-            module="invarlock.adapters.auto",
-            class_name="HF_Auto_Adapter",
-        ),
-        BuiltinPluginSpec(
-            name="hf_gptq",
-            module="invarlock.plugins",
-            class_name="HF_GPTQ_Adapter",
-            required_deps=("gptqmodel",),
-            support_tier="optional_backend_loader",
-        ),
-        BuiltinPluginSpec(
-            name="hf_awq",
-            module="invarlock.plugins",
-            class_name="HF_AWQ_Adapter",
-            required_deps=("gptqmodel",),
-            support_tier="optional_backend_loader",
-        ),
-        BuiltinPluginSpec(
-            name="hf_bnb",
-            module="invarlock.plugins",
-            class_name="HF_BNB_Adapter",
-            required_deps=("bitsandbytes",),
-            support_tier="optional_backend_loader",
-        ),
-        BuiltinPluginSpec(
-            name="hf_torchao",
-            module="invarlock.plugins",
-            class_name="HF_TorchAO_Adapter",
-            required_deps=("torchao",),
-            support_tier="optional_backend_loader",
-        ),
-        BuiltinPluginSpec(
-            name="hf_hqq",
-            module="invarlock.plugins",
-            class_name="HF_HQQ_Adapter",
-            required_deps=("hqq",),
-            support_tier="optional_backend_loader",
-        ),
-        BuiltinPluginSpec(
-            name="hf_quanto",
-            module="invarlock.plugins",
-            class_name="HF_Quanto_Adapter",
-            required_deps=("optimum.quanto",),
-            support_tier="optional_backend_loader",
-        ),
-        BuiltinPluginSpec(
-            name="hf_ct",
-            module="invarlock.plugins",
-            class_name="HF_CompressedTensors_Adapter",
-            required_deps=("compressed_tensors",),
-            support_tier="optional_backend_loader",
-            # A packed checkpoint can be loaded for diagnostic use, but strict
-            # assurance cannot establish packed-storage provenance yet.
-            strict_assurance_allowed=False,
-        ),
-    ),
-    "edits": (
-        BuiltinPluginSpec(
-            name="quant_rtn",
-            module="invarlock.edits.quant_rtn",
-            class_name="RTNQuantEdit",
-            support_tier="validation_simulation",
-        ),
-        BuiltinPluginSpec(
-            name="noop",
-            module="invarlock.edits",
-            class_name="NoopEdit",
-            support_tier="internal_baseline_edit",
-        ),
-    ),
-    "guards": (
-        BuiltinPluginSpec(
-            name="invariants",
-            module="invarlock.guards.invariants",
-            class_name="InvariantsGuard",
-        ),
-        BuiltinPluginSpec(
-            name="spectral",
-            module="invarlock.guards.spectral",
-            class_name="SpectralGuard",
-        ),
-        BuiltinPluginSpec(
-            name="variance",
-            module="invarlock.guards.variance",
-            class_name="VarianceGuard",
-        ),
-        BuiltinPluginSpec(
-            name="rmt",
-            module="invarlock.guards.rmt",
-            class_name="RMTGuard",
-        ),
-        BuiltinPluginSpec(
-            name="demo_hello_guard",
-            module="invarlock.plugins",
-            class_name="HelloGuard",
-            support_tier="demo_only",
-            strict_assurance_allowed=False,
-        ),
-    ),
-}
+)
 
 
 def builtin_plugin_specs(plugin_type: str) -> tuple[BuiltinPluginSpec, ...]:
-    try:
-        return BUILTIN_PLUGIN_CATALOG[plugin_type]
-    except KeyError as error:
-        raise ValueError(f"Unknown plugin catalog type: {plugin_type}") from error
+    """Return the closed built-in catalog for the runtime-provider ABI."""
 
-
-def builtin_plugin_support_metadata(
-    plugin_type: str,
-    name: str,
-) -> dict[str, object]:
-    for spec in builtin_plugin_specs(plugin_type):
-        if spec.name == name:
-            return spec.support_metadata()
-    return {
-        "support_tier": "third_party",
-        "strict_assurance_allowed": False,
-        "maintained_catalog": False,
-        "deployment_claim": False,
-    }
+    if plugin_type != "runtime_providers":
+        raise ValueError(f"Unknown plugin catalog type: {plugin_type}")
+    return BUILTIN_RUNTIME_PROVIDERS
 
 
 __all__ = [
+    "BUILTIN_RUNTIME_PROVIDERS",
     "BuiltinPluginSpec",
-    "BUILTIN_PLUGIN_CATALOG",
     "builtin_plugin_specs",
-    "builtin_plugin_support_metadata",
 ]

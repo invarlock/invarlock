@@ -1,91 +1,109 @@
-"""
-InvarLock Core Registry
-===================
-
-Unified plugin registry using entry point discovery.
-Provides centralized access to adapters, edits, and guards.
-"""
+"""Runtime-integration discovery for the paired evaluation engine."""
 
 from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from importlib.metadata import (
-    EntryPoint,
-    PackageNotFoundError,
-    entry_points,
-)
-from importlib.metadata import (
-    version as metadata_version,
-)
+from importlib.metadata import EntryPoint, PackageNotFoundError, entry_points
+from importlib.metadata import version as metadata_version
+from pathlib import Path
 from typing import Any, cast
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.runtime_security import third_party_plugins_allowed
 
-from . import INVARLOCK_CORE_ABI
-from .api import Guard, ModelAdapter, ModelEdit
 from .builtin_plugin_catalog import builtin_plugin_specs
-from .exceptions import DependencyError, PluginError
 
-__all__ = ["PluginInfo", "CoreRegistry", "get_registry"]
+__all__ = ["CoreRegistry", "PluginInfo", "get_registry"]
 
 _DISCOVERY_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
-_PLUGIN_LOAD_ERRORS = (
-    AttributeError,
-    DependencyError,
-    ImportError,
-    PluginError,
-    RuntimeError,
-    TypeError,
-    ValueError,
-)
+_LOAD_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
+_NAME_RE = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
+_FIRST_PARTY_RUNTIME_ADDINS = {
+    "hf_vision_text": (
+        "invarlock-runtime-hf-vision-text",
+        "invarlock_addins.multimodal.provider:HFVisionTextProvider",
+    ),
+    "llama_cpp": (
+        "invarlock-runtime-gguf",
+        "invarlock_addins.gguf.provider:LlamaCppProvider",
+    ),
+    "tensorrt_llm": (
+        "invarlock-runtime-tensorrt-llm",
+        "invarlock_addins.tensorrt_llm.provider:TensorRTLLMProvider",
+    ),
+}
+_QUALIFICATION_CANDIDATE_SITE = "INVARLOCK_QUALIFICATION_CANDIDATE_SITE"
 
 
 @dataclass
 class PluginInfo:
-    """Plugin information from entry points."""
+    """Deferred runtime-provider entry-point metadata."""
 
     name: str
     module: str
     class_name: str
+    required_deps: tuple[str, ...]
     available: bool
-    status: str
     package: str | None = None
     version: str | None = None
     entry_point: Any | None = None
-    support_tier: str = "third_party"
-    strict_assurance_allowed: bool = False
-    maintained_catalog: bool = False
-    deployment_claim: bool = False
 
 
-def _select_entry_points(eps: Any, group: str) -> list[EntryPoint]:
-    """Return entry points for a given group across importlib versions."""
-
+def _select_entry_points(eps: Any) -> list[EntryPoint]:
     selected: Iterable[EntryPoint]
     if hasattr(eps, "select"):
-        selected = cast("Iterable[EntryPoint]", eps.select(group=group))
+        selected = cast(
+            "Iterable[EntryPoint]",
+            eps.select(group="invarlock.runtime_providers"),
+        )
     else:
-        selected = cast("Iterable[EntryPoint]", eps.get(group, []))
+        selected = cast(
+            "Iterable[EntryPoint]",
+            eps.get("invarlock.runtime_providers", []),
+        )
     return list(selected)
 
 
 def _normalized_distribution_name(value: str) -> str:
-    """Normalize a distribution name using the packaging-name equivalence rule."""
-
     return re.sub(r"[-_.]+", "-", value).lower()
 
 
-def _is_identical_shipped_entry_point(
-    entry_point: EntryPoint,
-    plugin_type: str,
-) -> bool:
-    """Return whether discovery rediscovered this installed InvarLock built-in."""
+def _qualification_candidate_site() -> Path | None:
+    value = os.environ.get(_QUALIFICATION_CANDIDATE_SITE)
+    if value is None:
+        return None
+    lexical = Path(os.path.abspath(value))
+    try:
+        resolved = lexical.resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError("Qualification candidate site is unavailable") from exc
+    if resolved != lexical or not resolved.is_dir():
+        raise RuntimeError("Qualification candidate site is invalid")
+    return resolved
 
+
+def _entry_point_is_from(
+    entry_point: EntryPoint,
+    *,
+    candidate_site: Path,
+) -> bool:
+    dist = getattr(entry_point, "dist", None)
+    locate_file = getattr(dist, "locate_file", None)
+    if not callable(locate_file):
+        return False
+    try:
+        location = Path(locate_file("")).resolve(strict=True)
+    except (OSError, TypeError, ValueError):
+        return False
+    return location == candidate_site or location.is_relative_to(candidate_site)
+
+
+def _is_shipped_entry_point(entry_point: EntryPoint) -> bool:
     dist = getattr(entry_point, "dist", None)
     dist_name = getattr(dist, "name", None)
     dist_version = getattr(dist, "version", None)
@@ -95,284 +113,169 @@ def _is_identical_shipped_entry_point(
         or dist_version != INVARLOCK_VERSION
     ):
         return False
-
     value = getattr(entry_point, "value", None)
-    for spec in builtin_plugin_specs(plugin_type):
-        if entry_point.name == spec.name:
-            return value == f"{spec.module}:{spec.class_name}"
-    return False
+    return any(
+        entry_point.name == spec.name and value == f"{spec.module}:{spec.class_name}"
+        for spec in builtin_plugin_specs("runtime_providers")
+    )
+
+
+def _is_approved_first_party_addin(entry_point: EntryPoint) -> bool:
+    expected = _FIRST_PARTY_RUNTIME_ADDINS.get(entry_point.name)
+    if expected is None:
+        return False
+    dist = getattr(entry_point, "dist", None)
+    dist_name = getattr(dist, "name", None)
+    dist_version = getattr(dist, "version", None)
+    value = getattr(entry_point, "value", None)
+    expected_distribution, expected_value = expected
+    if (
+        not isinstance(dist_name, str)
+        or _normalized_distribution_name(dist_name) != expected_distribution
+        or dist_version != INVARLOCK_VERSION
+        or value != expected_value
+    ):
+        raise RuntimeError(
+            "Invalid first-party runtime add-in entry point: "
+            f"{entry_point.name!r} must come from {expected_distribution!r} "
+            f"at version {INVARLOCK_VERSION!r} and resolve to {expected_value!r}"
+        )
+    return True
 
 
 class CoreRegistry:
-    """
-    Central registry for InvarLock plugins using entry point discovery.
+    """Discover and instantiate runtime providers without importing backends."""
 
-    Discovers and manages adapters, edits, and guards through
-    setuptools entry points without requiring imports.
-    """
-
-    def __init__(self):
-        self._adapters: dict[str, PluginInfo] = {}
-        self._edits: dict[str, PluginInfo] = {}
-        self._guards: dict[str, PluginInfo] = {}
+    def __init__(self) -> None:
         self._runtime_providers: dict[str, PluginInfo] = {}
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
-        """Lazy initialization of plugin discovery."""
-        if self._initialized:
-            return
-
-        self._discover_plugins()
-        self._initialized = True
+        if not self._initialized:
+            self._discover_plugins()
+            self._initialized = True
 
     def _discover_plugins(self) -> None:
-        """Register built-ins and discover third-party plugins."""
-        self._register_builtin_plugins()
-        if not third_party_plugins_allowed():
-            return
-
+        self._register_builtins()
         try:
-            eps = entry_points()
-            self._register_entry_points(
-                self._adapters,
-                _select_entry_points(eps, "invarlock.adapters"),
-                "adapters",
-            )
-            self._register_entry_points(
-                self._edits,
-                _select_entry_points(eps, "invarlock.edits"),
-                "edits",
-            )
-            self._register_entry_points(
-                self._guards,
-                _select_entry_points(eps, "invarlock.guards"),
-                "guards",
-            )
-            self._register_entry_points(
-                self._runtime_providers,
-                _select_entry_points(eps, "invarlock.runtime_providers"),
-                "runtime_providers",
-            )
+            candidates = _select_entry_points(entry_points())
+            allow_third_party = third_party_plugins_allowed()
+            candidate_site = _qualification_candidate_site()
+            for entry_point in candidates:
+                if (
+                    candidate_site is not None
+                    and entry_point.name in _FIRST_PARTY_RUNTIME_ADDINS
+                    and not _entry_point_is_from(
+                        entry_point,
+                        candidate_site=candidate_site,
+                    )
+                ):
+                    continue
+                first_party = _is_approved_first_party_addin(entry_point)
+                if first_party or allow_third_party:
+                    self._register_entry_point(entry_point)
         except _DISCOVERY_ERRORS as error:
-            raise RuntimeError(f"Plugin discovery failed: {error}") from error
+            raise RuntimeError(f"Runtime-provider discovery failed: {error}") from error
 
-    def _register_builtin_plugins(self) -> None:
-        """Register the shipped plugin surface explicitly."""
-
-        def _register_builtin(
-            registry: dict[str, PluginInfo],
-            name: str,
-            module: str,
-            class_name: str,
-            required_deps: list[str] | None = None,
-        ) -> None:
-            if name in registry:
-                raise RuntimeError(f"Duplicate built-in plugin registration: {name}")
-            actual_available = True
-            actual_status = "Built-in"
-            if required_deps:
-                missing = self._check_runtime_dependencies(required_deps)
-                if missing:
-                    actual_available = False
-                    actual_status = f"Needs extra: {', '.join(missing)}"
-
-            registry[name] = PluginInfo(
-                name=name,
-                module=module,
-                class_name=class_name,
-                available=actual_available,
-                status=actual_status,
+    def _register_builtins(self) -> None:
+        for spec in builtin_plugin_specs("runtime_providers"):
+            if spec.name in self._runtime_providers:
+                raise RuntimeError(f"Duplicate built-in runtime provider: {spec.name}")
+            missing = self._missing_dependencies(spec.required_deps)
+            self._runtime_providers[spec.name] = PluginInfo(
+                name=spec.name,
+                module=spec.module,
+                class_name=spec.class_name,
+                required_deps=spec.required_deps,
+                available=not missing,
                 package="invarlock",
                 version=INVARLOCK_VERSION,
             )
 
-        registries = {
-            "adapters": self._adapters,
-            "edits": self._edits,
-            "guards": self._guards,
-            "runtime_providers": self._runtime_providers,
-        }
-        for plugin_type, registry in registries.items():
-            for spec in builtin_plugin_specs(plugin_type):
-                _register_builtin(
-                    registry,
-                    spec.name,
-                    spec.module,
-                    spec.class_name,
-                    required_deps=list(spec.required_deps) or None,
-                )
-                registry[spec.name].support_tier = spec.support_tier
-                registry[
-                    spec.name
-                ].strict_assurance_allowed = spec.strict_assurance_allowed
-                registry[spec.name].maintained_catalog = spec.maintained_catalog
-                registry[spec.name].deployment_claim = spec.deployment_claim
-
-    def _register_entry_points(
-        self,
-        registry: dict[str, PluginInfo],
-        entry_points_for_group: list[EntryPoint],
-        plugin_type: str,
-    ) -> None:
-        for entry_point in entry_points_for_group:
-            if (
-                plugin_type == "runtime_providers"
-                and re.fullmatch(r"[a-z][a-z0-9_]{0,63}", entry_point.name) is None
-            ):
-                raise RuntimeError(
-                    f"Invalid runtime provider plugin name: {entry_point.name!r}"
-                )
-            if entry_point.name in registry:
-                if _is_identical_shipped_entry_point(entry_point, plugin_type):
-                    continue
-                raise RuntimeError(
-                    f"Duplicate {plugin_type.rstrip('s')} plugin name: {entry_point.name}"
-                )
-            registry[entry_point.name] = self._create_plugin_info(
-                entry_point, plugin_type
-            )
-
-    def _check_runtime_dependencies(self, deps: list[str]) -> list[str]:
-        """
-        Check if runtime dependencies are actually present on the system.
-
-        Uses importlib.util.find_spec to avoid importing packages and triggering
-        heavy side effects (e.g., GPU-only extensions).
-
-        Returns:
-            List of missing dependency names.
-        """
+    @staticmethod
+    def _missing_dependencies(dependencies: tuple[str, ...]) -> list[str]:
         missing: list[str] = []
-        for dep in deps:
+        for dependency in dependencies:
             try:
-                spec = importlib.util.find_spec(dep)
-            except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
+                spec = importlib.util.find_spec(dependency)
+            except _DISCOVERY_ERRORS:
                 spec = None
             if spec is None:
-                missing.append(dep)
+                missing.append(dependency)
         return missing
 
-    def _parse_entry_point_value(self, entry_point: EntryPoint) -> tuple[str, str]:
+    @staticmethod
+    def _parse_entry_point(entry_point: EntryPoint) -> tuple[str, str]:
         value = getattr(entry_point, "value", None)
         if not isinstance(value, str):
-            raise TypeError("entry point value must be a string")
-        module_path, separator, class_name = value.partition(":")
-        if not module_path or separator != ":" or not class_name:
-            raise ValueError(f"malformed entry point value: {value}")
-        return module_path, class_name
+            raise TypeError("runtime-provider entry point value must be a string")
+        module, separator, class_name = value.partition(":")
+        if not module or separator != ":" or not class_name:
+            raise ValueError(f"malformed runtime-provider entry point: {value}")
+        return module, class_name
 
-    def _create_plugin_info(
-        self, entry_point: EntryPoint, plugin_type: str
-    ) -> PluginInfo:
-        """Create plugin info from entry point."""
-        _ = plugin_type
-        module_path, class_name = self._parse_entry_point_value(entry_point)
-
-        # Determine package/version metadata
-        package_name: str | None = None
+    def _register_entry_point(self, entry_point: EntryPoint) -> None:
+        if _NAME_RE.fullmatch(entry_point.name) is None:
+            raise RuntimeError(
+                f"Invalid runtime provider plugin name: {entry_point.name!r}"
+            )
+        if entry_point.name in self._runtime_providers:
+            if _is_shipped_entry_point(entry_point):
+                return
+            raise RuntimeError(f"Duplicate runtime provider name: {entry_point.name}")
+        module, class_name = self._parse_entry_point(entry_point)
+        package: str | None = None
         version: str | None = None
-
         dist = getattr(entry_point, "dist", None)
         if dist is not None:
-            metadata = getattr(dist, "metadata", None)
-            if isinstance(metadata, dict):
-                meta_name = metadata.get("Name")
-                if isinstance(meta_name, str) and meta_name:
-                    package_name = meta_name
-            if not package_name:
-                dist_name = getattr(dist, "name", None)
-                if isinstance(dist_name, str) and dist_name:
-                    package_name = dist_name
+            dist_name = getattr(dist, "name", None)
+            if isinstance(dist_name, str) and dist_name:
+                package = dist_name
             dist_version = getattr(dist, "version", None)
             if isinstance(dist_version, str) and dist_version:
                 version = dist_version
-
-        if not package_name:
-            package_name = module_path.split(".")[0]
+        if package is None:
+            package = module.split(".")[0]
             try:
-                version = metadata_version(package_name)
+                version = metadata_version(package)
             except PackageNotFoundError:
                 version = None
-
-        # Defer import to instantiation time to avoid heavy imports here
-        return PluginInfo(
+        self._runtime_providers[entry_point.name] = PluginInfo(
             name=entry_point.name,
-            module=module_path,
+            module=module,
             class_name=class_name,
+            required_deps=(),
             available=True,
-            status="Deferred load",
-            package=package_name,
+            package=package,
             version=version,
             entry_point=entry_point,
         )
 
-    def _resolve_plugin_class(self, info: PluginInfo) -> Any:
+    @staticmethod
+    def _resolve_provider_class(info: PluginInfo) -> Any:
         if info.entry_point:
             return info.entry_point.load()
         module = importlib.import_module(info.module)
         return getattr(module, info.class_name)
 
-    def _validate_plugin_abi(self, cls: Any) -> None:
-        provider_mod = importlib.import_module(cls.__module__)
-        plugin_abi = getattr(provider_mod, "INVARLOCK_CORE_ABI", None)
-        if not isinstance(plugin_abi, str) or not plugin_abi.strip():
-            raise ImportError(
-                "ABI missing: plugin must declare "
-                f"INVARLOCK_CORE_ABI={INVARLOCK_CORE_ABI}"
-            )
-        if plugin_abi != INVARLOCK_CORE_ABI:
-            raise ImportError(
-                f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
-            )
-
-    def _validate_runtime_provider_abi(self, cls: Any) -> None:
-        from .runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI
-
-        provider_mod = importlib.import_module(cls.__module__)
-        plugin_abi = getattr(provider_mod, "INVARLOCK_RUNTIME_PROVIDER_ABI", None)
-        if not isinstance(plugin_abi, str) or not plugin_abi.strip():
-            raise ImportError(
-                "ABI missing: runtime provider must declare "
-                "INVARLOCK_RUNTIME_PROVIDER_ABI="
-                f"{INVARLOCK_RUNTIME_PROVIDER_ABI}"
-            )
-        if plugin_abi != INVARLOCK_RUNTIME_PROVIDER_ABI:
-            raise ImportError(
-                "ABI mismatch: runtime provider="
-                f"{plugin_abi} != core={INVARLOCK_RUNTIME_PROVIDER_ABI}"
-            )
-
-    def _instantiate_plugin(
-        self,
-        info: PluginInfo,
-        *,
-        expected_type: type[Any],
-        kind: str,
-    ) -> Any:
-        try:
-            cls = self._resolve_plugin_class(info)
-            self._validate_plugin_abi(cls)
-            instance = cls()
-        except _PLUGIN_LOAD_ERRORS as error:
-            raise ImportError(
-                f"Failed to load {kind} '{info.name}': {error}"
-            ) from error
-        if not isinstance(instance, expected_type):
-            raise ImportError(
-                f"Failed to load {kind} '{info.name}': "
-                f"Expected {expected_type.__name__}, got {type(instance)}"
-            )
-        return instance
-
-    def _instantiate_runtime_provider(self, info: PluginInfo) -> Any:
+    def _instantiate(self, info: PluginInfo) -> Any:
         from .runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI, RuntimeProvider
 
         try:
-            cls = self._resolve_plugin_class(info)
-            self._validate_runtime_provider_abi(cls)
-            instance = cls()
-        except _PLUGIN_LOAD_ERRORS as error:
+            provider_class = self._resolve_provider_class(info)
+            provider_module = importlib.import_module(provider_class.__module__)
+            declared_abi = getattr(
+                provider_module,
+                "INVARLOCK_RUNTIME_PROVIDER_ABI",
+                None,
+            )
+            if declared_abi != INVARLOCK_RUNTIME_PROVIDER_ABI:
+                raise ImportError(
+                    "ABI mismatch: runtime provider="
+                    f"{declared_abi!r} != core={INVARLOCK_RUNTIME_PROVIDER_ABI}"
+                )
+            instance = provider_class()
+        except _LOAD_ERRORS as error:
             raise ImportError(
                 f"Failed to load runtime provider '{info.name}': {error}"
             ) from error
@@ -388,237 +291,70 @@ class CoreRegistry:
             )
         if instance.abi_version != INVARLOCK_RUNTIME_PROVIDER_ABI:
             raise ImportError(
-                f"Failed to load runtime provider '{info.name}': ABI mismatch: "
-                f"instance={instance.abi_version} != "
-                f"core={INVARLOCK_RUNTIME_PROVIDER_ABI}"
+                f"Failed to load runtime provider '{info.name}': "
+                f"instance ABI {instance.abi_version!r} does not match "
+                f"{INVARLOCK_RUNTIME_PROVIDER_ABI!r}"
             )
         return instance
 
-    def list_adapters(self) -> list[str]:
-        """List all registered adapter names."""
-        self._ensure_initialized()
-        return list(self._adapters.keys())
-
-    def list_edits(self) -> list[str]:
-        """List all registered edit names."""
-        self._ensure_initialized()
-        return list(self._edits.keys())
-
-    def list_guards(self) -> list[str]:
-        """List all registered guard names."""
-        self._ensure_initialized()
-        return list(self._guards.keys())
-
     def list_runtime_providers(self) -> list[str]:
-        """List registered runtime providers without importing their backends."""
+        """List provider names without importing their implementations."""
+
         self._ensure_initialized()
-        return list(self._runtime_providers.keys())
-
-    def get_adapter(self, name: str) -> ModelAdapter:
-        """Get an adapter instance by name."""
-        self._ensure_initialized()
-
-        if name not in self._adapters:
-            available = list(self._adapters.keys())
-            raise KeyError(f"Unknown adapter '{name}'. Available: {available}")
-
-        info = self._adapters[name]
-        if not info.available:
-            raise ImportError(f"Adapter '{name}' unavailable: {info.status}")
-
-        return cast(
-            ModelAdapter,
-            self._instantiate_plugin(
-                info,
-                expected_type=ModelAdapter,
-                kind="adapter",
-            ),
-        )
-
-    def get_edit(self, name: str) -> ModelEdit:
-        """Get an edit instance by name."""
-        self._ensure_initialized()
-
-        if name not in self._edits:
-            available = list(self._edits.keys())
-            raise KeyError(f"Unknown edit '{name}'. Available: {available}")
-
-        info = self._edits[name]
-        if not info.available:
-            raise ImportError(f"Edit '{name}' unavailable: {info.status}")
-
-        return cast(
-            ModelEdit,
-            self._instantiate_plugin(
-                info,
-                expected_type=ModelEdit,
-                kind="edit",
-            ),
-        )
-
-    def get_guard(self, name: str) -> Guard:
-        """Get a guard instance by name."""
-        self._ensure_initialized()
-
-        if name not in self._guards:
-            available = list(self._guards.keys())
-            raise KeyError(f"Unknown guard '{name}'. Available: {available}")
-
-        info = self._guards[name]
-        if not info.available:
-            raise ImportError(f"Guard '{name}' unavailable: {info.status}")
-
-        return cast(
-            Guard,
-            self._instantiate_plugin(
-                info,
-                expected_type=Guard,
-                kind="guard",
-            ),
-        )
+        return list(self._runtime_providers)
 
     def get_runtime_provider(self, name: str) -> Any:
-        """Instantiate a runtime provider after exact ABI validation."""
+        """Instantiate one provider after exact identity and ABI validation."""
+
         self._ensure_initialized()
-
-        if name not in self._runtime_providers:
-            available = list(self._runtime_providers.keys())
-            raise KeyError(f"Unknown runtime provider '{name}'. Available: {available}")
-
-        info = self._runtime_providers[name]
+        info = self._runtime_providers.get(name)
+        if info is None:
+            raise KeyError(
+                f"Unknown runtime provider {name!r}. "
+                f"Available: {list(self._runtime_providers)}"
+            )
         if not info.available:
-            raise ImportError(f"Runtime provider '{name}' unavailable: {info.status}")
-        return self._instantiate_runtime_provider(info)
+            dependencies = ", ".join(info.required_deps) or "unspecified"
+            raise ImportError(
+                f"Runtime provider {name!r} unavailable; "
+                f"required dependencies: {dependencies}"
+            )
+        return self._instantiate(info)
 
     def get_plugin_info(self, name: str, plugin_type: str) -> dict[str, Any]:
-        """Get plugin information without instantiation."""
-        self._ensure_initialized()
+        """Return runtime-provider metadata without importing its backend."""
 
-        if plugin_type == "adapters":
-            registry = self._adapters
-            entry_group = "invarlock.adapters"
-        elif plugin_type == "edits":
-            registry = self._edits
-            entry_group = "invarlock.edits"
-        elif plugin_type == "guards":
-            registry = self._guards
-            entry_group = "invarlock.guards"
-        elif plugin_type == "runtime_providers":
-            registry = self._runtime_providers
-            entry_group = "invarlock.runtime_providers"
-        else:
+        if plugin_type != "runtime_providers":
             raise ValueError(f"Unknown plugin type: {plugin_type}")
-
-        if name not in registry:
-            return {"available": False, "status": "Not found", "module": "unknown"}
-
-        info = registry[name]
+        self._ensure_initialized()
+        info = self._runtime_providers.get(name)
+        if info is None:
+            return {
+                "name": name,
+                "module": None,
+                "class_name": None,
+                "required_deps": (),
+                "available": False,
+                "package": None,
+                "version": None,
+                "entry_point": None,
+            }
         return {
-            "available": info.available,
-            "status": info.status,
+            "name": info.name,
             "module": info.module,
+            "class_name": info.class_name,
+            "required_deps": info.required_deps,
+            "available": info.available,
             "package": info.package,
             "version": info.version,
             "entry_point": info.entry_point.name if info.entry_point else None,
-            "entry_point_group": entry_group if info.entry_point else None,
-            "support_tier": info.support_tier,
-            "strict_assurance_allowed": info.strict_assurance_allowed,
-            "maintained_catalog": info.maintained_catalog,
-            "deployment_claim": info.deployment_claim,
         }
 
-    def get_plugin_metadata(self, name: str, plugin_type: str) -> dict[str, Any]:
-        """Return comprehensive metadata for a plugin."""
-        metadata = self.get_plugin_info(name, plugin_type)
-        if metadata.get("module") == "unknown":
-            raise KeyError(f"Unknown {plugin_type.rstrip('s')} plugin '{name}'")
 
-        metadata.update(
-            {
-                "name": name,
-                "type": plugin_type,
-            }
-        )
-        return metadata
-
-    # Typed-error wrappers that preserve existing behavior for existing methods
-    def get_adapter_typed(self, name: str) -> ModelAdapter:
-        try:
-            return self.get_adapter(name)
-        except (ImportError, KeyError) as e:  # pragma: no cover - exercised in tests
-            details = {"name": name, "kind": "adapter", "reason": type(e).__name__}
-            if isinstance(e, ImportError | ModuleNotFoundError):
-                raise DependencyError(
-                    code="E702", message="PLUGIN-DEPENDENCY-MISSING", details=details
-                ) from e
-            raise PluginError(
-                code="E701", message="PLUGIN-LOAD-FAILED", details=details
-            ) from e
-
-    def get_edit_typed(self, name: str) -> ModelEdit:
-        try:
-            return self.get_edit(name)
-        except (ImportError, KeyError) as e:  # pragma: no cover - exercised in tests
-            details = {"name": name, "kind": "edit", "reason": type(e).__name__}
-            if isinstance(e, ImportError | ModuleNotFoundError):
-                raise DependencyError(
-                    code="E702", message="PLUGIN-DEPENDENCY-MISSING", details=details
-                ) from e
-            raise PluginError(
-                code="E701", message="PLUGIN-LOAD-FAILED", details=details
-            ) from e
-
-    def get_guard_typed(self, name: str) -> Guard:
-        try:
-            return self.get_guard(name)
-        except (ImportError, KeyError) as e:  # pragma: no cover - exercised in tests
-            details = {"name": name, "kind": "guard", "reason": type(e).__name__}
-            if isinstance(e, ImportError | ModuleNotFoundError):
-                raise DependencyError(
-                    code="E702", message="PLUGIN-DEPENDENCY-MISSING", details=details
-                ) from e
-            raise PluginError(
-                code="E701", message="PLUGIN-LOAD-FAILED", details=details
-            ) from e
-
-    def validate_configuration(
-        self, adapter_name: str, edit_name: str, guard_names: list[str]
-    ) -> tuple[bool, str]:
-        """Validate that a configuration is available."""
-        self._ensure_initialized()
-
-        issues = []
-        # Check adapter
-        if adapter_name not in self._adapters:
-            issues.append(f"Unknown adapter: {adapter_name}")
-        elif not self._adapters[adapter_name].available:
-            issues.append(f"Adapter unavailable: {adapter_name}")
-
-        # Check edit
-        if edit_name not in self._edits:
-            issues.append(f"Unknown edit: {edit_name}")
-        elif not self._edits[edit_name].available:
-            issues.append(f"Edit unavailable: {edit_name}")
-
-        # Check guards
-        for guard_name in guard_names:
-            if guard_name == "noop":
-                continue  # noop is always available
-            if guard_name not in self._guards:
-                issues.append(f"Unknown guard: {guard_name}")
-            elif not self._guards[guard_name].available:
-                issues.append(f"Guard unavailable: {guard_name}")
-
-        if issues:
-            return False, "; ".join(issues)
-
-        return True, "Configuration is valid"
-
-
-# Global registry instance
 _global_registry = CoreRegistry()
 
 
 def get_registry() -> CoreRegistry:
-    """Get the global plugin registry instance."""
+    """Return the process-global lazy runtime-provider registry."""
+
     return _global_registry
