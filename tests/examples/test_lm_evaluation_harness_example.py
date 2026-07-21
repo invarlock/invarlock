@@ -1428,7 +1428,7 @@ def test_container_recipe_pins_the_harness_and_real_worker() -> None:
 
     assert "lm-evaluation-harness-py312.txt" in dockerfile
     assert "--require-hashes" in dockerfile
-    assert "download.pytorch.org/whl/cu128" not in dockerfile
+    assert "download.pytorch.org/whl/cu" not in dockerfile
     assert 'pip install --no-compile "lm_eval' not in dockerfile
     assert "lm-eval==0.4.12" in lock.read_text(encoding="utf-8")
     assert "--hash=sha256:" in lock.read_text(encoding="utf-8")

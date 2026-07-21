@@ -49,13 +49,13 @@ RUN python -m pip install \
       --no-deps \
       --require-hashes \
       --only-binary=:all: \
-      --extra-index-url https://download.pytorch.org/whl/cu128 \
+      --extra-index-url https://download.pytorch.org/whl/cu126 \
       -r /opt/invarlock/requirements/multimodal-runtime-py312.txt \
     && set -- /opt/invarlock/addin-wheels/invarlock_runtime_hf_vision_text-*.whl \
     && test "$#" -eq 1 \
     && python -m pip install --no-compile --no-deps --no-index "$1" \
     && python -m invarlock_addins.multimodal.conformance \
-    && python -c "from PIL import Image; import torchvision; from transformers import Qwen2VLImageProcessor, Qwen2VLVideoProcessor; assert Image.__version__ == '12.3.0'; assert torchvision.__version__ == '0.26.0+cu128'; assert Qwen2VLImageProcessor().to_dict(); assert Qwen2VLVideoProcessor().to_dict()" \
+    && python -c "from PIL import Image; import torchvision; from transformers import Qwen2VLImageProcessor, Qwen2VLVideoProcessor; assert Image.__version__ == '12.3.0'; assert torchvision.__version__ == '0.28.0+cu126'; assert Qwen2VLImageProcessor().to_dict(); assert Qwen2VLVideoProcessor().to_dict()" \
     && find /opt/invarlock /usr/local/lib/python3.12 /usr/local/bin \
       -xdev -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 WORKDIR /work

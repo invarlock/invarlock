@@ -47,11 +47,11 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
         '    "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert (
-        '"${WORKFLOW_DIR}/runtime-image-cu128.in" \\\n'
-        '    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
+        '"${WORKFLOW_DIR}/runtime-image-cu126.in" \\\n'
+        '    "${WORKFLOW_DIR}/runtime-image-py312-cu126.txt"'
     ) in text
     assert text.count("--torch-backend cpu") == 3
-    assert text.count("--torch-backend cu128") == 2
+    assert text.count("--torch-backend cu126") == 2
     assert (
         '"${WORKFLOW_DIR}/multimodal-runtime.in" \\\n'
         '    "${WORKFLOW_DIR}/multimodal-runtime-py312.txt"'
@@ -130,17 +130,17 @@ def test_runtime_image_locks_are_cpu_only() -> None:
 
 
 def test_cuda_runtime_image_lock_is_separate_and_backend_pinned() -> None:
-    cuda_input = WORKFLOW_REQUIREMENTS / "runtime-image-cu128.in"
+    cuda_input = WORKFLOW_REQUIREMENTS / "runtime-image-cu126.in"
     assert cuda_input.is_file()
     input_text = cuda_input.read_text(encoding="utf-8")
-    assert "torch==2.11.0" in input_text
-    assert "torch==2.13.0" not in input_text
+    assert "torch==2.13.0" in input_text
+    assert "torch==2.11.0" not in input_text
 
-    text = (WORKFLOW_REQUIREMENTS / "runtime-image-py312-cu128.txt").read_text(
+    text = (WORKFLOW_REQUIREMENTS / "runtime-image-py312-cu126.txt").read_text(
         encoding="utf-8"
     )
 
-    assert "torch==2.11.0+cu128" in text
+    assert "torch==2.13.0+cu126" in text
     assert "nvidia-cuda-runtime-cu12==" in text
     assert "--hash=sha256:" in text
     assert "bitsandbytes==" not in text
@@ -159,7 +159,7 @@ def test_multimodal_runtime_lock_pins_cuda_matched_torchvision() -> None:
         encoding="utf-8"
     )
 
-    assert "torchvision==0.26.0+cu128" in text
+    assert "torchvision==0.28.0+cu126" in text
     assert "pillow==12.3.0" in text
     assert "torch==" not in text
     assert "--hash=sha256:" in text

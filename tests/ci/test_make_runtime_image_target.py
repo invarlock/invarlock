@@ -79,8 +79,11 @@ def test_make_cuda_runtime_smoke_requires_a_visible_gpu() -> None:
     assert "accelerate.__version__ == '1.14.0'" in block
     assert "safetensors.__version__ == '0.8.0'" in block
     assert "transformers.__version__ == '5.14.1'" in block
-    assert "assert torch.version.cuda == '12.8'" in block
+    assert "assert torch.__version__ == '2.13.0+cu126'" in block
+    assert "assert torch.version.cuda == '12.6'" in block
     assert "assert torch.cuda.is_available()" in block
+    assert "assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'" in block
+    assert "torch.bmm(left, right)" in block
     assert (
         "RUNTIME_CUDA_DEVICE_ARGS = $(if $(filter podman,$(CONTAINER_ENGINE)),"
         "--device nvidia.com/gpu=all,--gpus all)"

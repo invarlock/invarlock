@@ -193,7 +193,11 @@ def test_multimodal_runtime_has_conformance_and_shared_qualification() -> None:
     assert '--require-base-source-labels "$(BASE_IMAGE)"' in makefile
     assert "--network none --gpus all" in makefile
     assert "torch.cuda.is_available" in makefile
-    assert "torchvision.__version__ == '0.26.0+cu128'" in makefile
+    assert "torch.__version__ == '2.13.0+cu126'" in makefile
+    assert "torch.version.cuda == '12.6'" in makefile
+    assert "TORCH_DISABLE_NATIVE_JIT" in makefile
+    assert "torch.bmm(left, right)" in makefile
+    assert "torchvision.__version__ == '0.28.0+cu126'" in makefile
     assert "Qwen2VLImageProcessor" in makefile
     assert "Qwen2VLVideoProcessor" in makefile
     _assert_frozen_source_labels(dockerfile)
@@ -205,8 +209,11 @@ def test_multimodal_runtime_has_conformance_and_shared_qualification() -> None:
     assert "multimodal-runtime-py312.txt" in dockerfile
     assert "--require-hashes" in dockerfile
     assert "--no-deps" in dockerfile
-    assert "https://download.pytorch.org/whl/cu128" in dockerfile
-    assert "torchvision.__version__ == '0.26.0+cu128'" in dockerfile
+    assert "https://download.pytorch.org/whl/cu126" in dockerfile
+    assert "TORCH_DISABLE_NATIVE_JIT=1" in ROOT.joinpath(
+        "runtime/Dockerfile.cuda"
+    ).read_text(encoding="utf-8")
+    assert "torchvision.__version__ == '0.28.0+cu126'" in dockerfile
     assert 'ENTRYPOINT ["python", "-m", "invarlock"]' in dockerfile
     for build_input in (
         "!requirements/workflows/multimodal-runtime-py312.txt",
