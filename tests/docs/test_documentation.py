@@ -443,6 +443,7 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
     example = _read("examples/README.md")
     for fragment in (
         "make example-hf-transformers",
+        "make example-hf-vision-text",
         "make example-peft-lora",
         "make example-evidence-handoff",
         "separately generated trust inputs",

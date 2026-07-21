@@ -51,7 +51,7 @@ MYPY_TYPED_SURFACE := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-peft-lora
+.PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -278,6 +278,11 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \
 		examples/integrations/launch.py hf-transformers $(EXAMPLE_ARGS)
+
+example-hf-vision-text:  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
+	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --extra hf \
+		--with ./addins/multimodal python \
+		examples/integrations/launch.py hf-vision-text $(EXAMPLE_ARGS)
 
 example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
 	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
