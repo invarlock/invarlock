@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import inspect
 import math
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -399,6 +401,23 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     }
     assert "github.event_name == 'push'" not in publish["if"]
     assert "github.event_name == 'workflow_dispatch'" in publish["if"]
+    assert publish["strategy"]["fail-fast"] is False
+    assert publish["strategy"]["matrix"]["include"] == [
+        {"package": "core", "environment_suffix": ""},
+        {"package": "diagnostics", "environment_suffix": "-diagnostics"},
+        {"package": "runtime-gguf", "environment_suffix": "-runtime-gguf"},
+        {
+            "package": "runtime-hf-vision-text",
+            "environment_suffix": "-runtime-hf-vision-text",
+        },
+        {
+            "package": "runtime-tensorrt-llm",
+            "environment_suffix": "-runtime-tensorrt-llm",
+        },
+    ]
+    assert publish["environment"] == (
+        "${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}"
+    )
     publish_download = _step(publish["steps"], "Download dist artifacts")
     assert publish_download["with"]["run-id"] == (
         "${{ needs.authorize_candidate.outputs.artifact_run_id }}"
@@ -412,6 +431,17 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "user" not in publish_step.get("with", {})
     assert "password" not in publish_step.get("with", {})
     assert publish_step["with"]["skip-existing"] is True
+    stage_publish = _step(publish["steps"], "Stage publish distributions")
+    assert stage_publish["env"]["INVARLOCK_PACKAGE"] == "${{ matrix.package }}"
+    for package in (
+        "core",
+        "diagnostics",
+        "runtime-gguf",
+        "runtime-hf-vision-text",
+        "runtime-tensorrt-llm",
+    ):
+        assert f"{package})" in stage_publish["run"]
+    assert 'if [ "${#distributions[@]}" -ne 2 ]' in stage_publish["run"]
     tag_recheck = _step(publish["steps"], "Reconfirm immutable release tag")
     assert tag_recheck["env"] == {
         "INVARLOCK_RELEASE_SHA": (
@@ -436,7 +466,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert 'Path("_release_dist/SHA256SUMS")' in publish_verify
     assert "distribution digest ledger changed after build" in publish_verify
     assert 'Path("publish-dist").iterdir()' in publish_verify
-    assert "set(staged) != set(expected)" in publish_verify
+    assert "len(staged) != 2" in publish_verify
+    assert "unknown = set(staged) - set(expected)" in publish_verify
     assert "distribution digest mismatch" in publish_verify
     verify_index = next(
         index
@@ -450,29 +481,42 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     assert verify_index + 1 == attest_index
 
+    hosted_job = jobs["verify_hosted_release"]
+    assert set(hosted_job["needs"]) == {
+        "authorize_candidate",
+        "publish",
+        "resolve_release_ref",
+    }
+    assert hosted_job["permissions"] == {"actions": "read", "contents": "read"}
+    hosted_checkout = hosted_job["steps"][0]
+    assert hosted_checkout["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    hosted_ledger = _step(hosted_job["steps"], "Download candidate distribution ledger")
+    assert hosted_ledger["with"]["run-id"] == (
+        "${{ needs.authorize_candidate.outputs.artifact_run_id }}"
+    )
     hosted_verify = _step(
-        publish["steps"], "Verify hosted release artifacts match build"
+        hosted_job["steps"], "Verify hosted release artifacts match build"
     )
     assert hosted_verify["env"] == {
         "EXPECTED_DIST_LEDGER_SHA256": (
             "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
         ),
-        "INVARLOCK_PUBLISH_TARGET": "${{ steps.vars.outputs.publish_target }}",
+        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
         "INVARLOCK_RELEASE_VERSION": (
             "${{ needs.resolve_release_ref.outputs.release_tag }}"
         ),
     }
     assert "scripts/release/verify_hosted_distributions.py" in hosted_verify["run"]
     assert "--ledger _release_dist/SHA256SUMS" in hosted_verify["run"]
-    publish_index = publish["steps"].index(publish_step)
-    assert publish_index + 1 == publish["steps"].index(hosted_verify)
     assert "if" not in hosted_verify
 
     testpypi = jobs["testpypi_smoke"]
     assert set(testpypi["needs"]) == {
         "authorize_candidate",
-        "publish",
         "resolve_release_ref",
+        "verify_hosted_release",
     }
     assert testpypi["permissions"] == {"actions": "read", "contents": "read"}
     testpypi_checkout = testpypi["steps"][0]
@@ -556,8 +600,49 @@ def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
     )
     required_job_minutes = math.ceil(verifier_worst_case_seconds / 60) + 15
 
-    assert jobs["publish"]["timeout-minutes"] >= required_job_minutes
+    assert jobs["verify_hosted_release"]["timeout-minutes"] >= required_job_minutes
     assert jobs["testpypi_smoke"]["timeout-minutes"] >= required_job_minutes
+
+
+def test_release_stages_each_distribution_in_its_own_publish_job(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    publish = workflow["jobs"]["publish"]
+    stage = _step(publish["steps"], "Stage publish distributions")["run"]
+    release_dist = tmp_path / "_release_dist"
+    addin_dist = release_dist / "addins"
+    addin_dist.mkdir(parents=True)
+
+    expected_prefixes = {
+        "core": (release_dist, "invarlock"),
+        "diagnostics": (addin_dist, "invarlock_diagnostics"),
+        "runtime-gguf": (addin_dist, "invarlock_runtime_gguf"),
+        "runtime-hf-vision-text": (
+            addin_dist,
+            "invarlock_runtime_hf_vision_text",
+        ),
+        "runtime-tensorrt-llm": (
+            addin_dist,
+            "invarlock_runtime_tensorrt_llm",
+        ),
+    }
+    for root, prefix in expected_prefixes.values():
+        (root / f"{prefix}-0.13.0-py3-none-any.whl").write_bytes(b"wheel")
+        (root / f"{prefix}-0.13.0.tar.gz").write_bytes(b"source")
+
+    for package, (_, prefix) in expected_prefixes.items():
+        subprocess.run(
+            ["bash", "-c", stage],
+            cwd=tmp_path,
+            env={**os.environ, "INVARLOCK_PACKAGE": package},
+            check=True,
+        )
+        staged = sorted(path.name for path in (tmp_path / "publish-dist").iterdir())
+        assert staged == [
+            f"{prefix}-0.13.0-py3-none-any.whl",
+            f"{prefix}-0.13.0.tar.gz",
+        ]
 
 
 def test_docs_publish_validates_dispatch_input_before_using_it_as_a_path() -> None:

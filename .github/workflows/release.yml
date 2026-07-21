@@ -520,10 +520,22 @@ jobs:
   publish:
     needs: [authorize_candidate, resolve_release_ref]
     runs-on: ubuntu-latest
-    # Hosted verification can consume about 92 minutes at its documented
-    # 12 attempts, 15 serial requests per attempt, and 30-second request timeout.
-    timeout-minutes: 120
-    environment: ${{ inputs.target }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: core
+            environment_suffix: ""
+          - package: diagnostics
+            environment_suffix: -diagnostics
+          - package: runtime-gguf
+            environment_suffix: -runtime-gguf
+          - package: runtime-hf-vision-text
+            environment_suffix: -runtime-hf-vision-text
+          - package: runtime-tensorrt-llm
+            environment_suffix: -runtime-tensorrt-llm
+    environment: ${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}
     permissions:
       actions: read
       contents: read
@@ -552,14 +564,53 @@ jobs:
           run-id: ${{ needs.authorize_candidate.outputs.artifact_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Stage publish distributions
+        env:
+          INVARLOCK_PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
           rm -rf publish-dist
           mkdir -p publish-dist
-          cp _release_dist/*.whl publish-dist/
-          cp _release_dist/*.tar.gz publish-dist/
-          cp _release_dist/addins/*.whl publish-dist/
-          cp _release_dist/addins/*.tar.gz publish-dist/
+          case "${INVARLOCK_PACKAGE}" in
+            core)
+              distribution_root="_release_dist"
+              distribution_prefix="invarlock"
+              ;;
+            diagnostics)
+              distribution_root="_release_dist/addins"
+              distribution_prefix="invarlock_diagnostics"
+              ;;
+            runtime-gguf)
+              distribution_root="_release_dist/addins"
+              distribution_prefix="invarlock_runtime_gguf"
+              ;;
+            runtime-hf-vision-text)
+              distribution_root="_release_dist/addins"
+              distribution_prefix="invarlock_runtime_hf_vision_text"
+              ;;
+            runtime-tensorrt-llm)
+              distribution_root="_release_dist/addins"
+              distribution_prefix="invarlock_runtime_tensorrt_llm"
+              ;;
+            *)
+              echo "unsupported first-party package: ${INVARLOCK_PACKAGE}" >&2
+              exit 1
+              ;;
+          esac
+
+          distributions=()
+          while IFS= read -r distribution; do
+            distributions+=("${distribution}")
+          done < <(
+            find "${distribution_root}" -maxdepth 1 -type f \
+              \( -name "${distribution_prefix}-*.whl" \
+                 -o -name "${distribution_prefix}-*.tar.gz" \) \
+              -print | sort
+          )
+          if [ "${#distributions[@]}" -ne 2 ]; then
+            echo "expected one wheel and one source archive for ${INVARLOCK_PACKAGE}" >&2
+            exit 1
+          fi
+          cp "${distributions[@]}" publish-dist/
       - name: Resolve publish target
         id: vars
         run: |
@@ -606,9 +657,19 @@ jobs:
               for path in Path("publish-dist").iterdir()
               if path.is_file()
           }
-          if set(staged) != set(expected):
+          if len(staged) != 2:
               raise SystemExit(
-                  "staged distribution set does not match the build digest ledger"
+                  "each publication job must stage one wheel and one source archive"
+              )
+          if not any(name.endswith(".whl") for name in staged) or not any(
+              name.endswith(".tar.gz") for name in staged
+          ):
+              raise SystemExit("staged package formats are incomplete")
+          unknown = set(staged) - set(expected)
+          if unknown:
+              raise SystemExit(
+                  "staged distributions are absent from the build digest ledger: "
+                  f"{sorted(unknown)}"
               )
           for name, path in sorted(staged.items()):
               observed = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -624,7 +685,7 @@ jobs:
       - name: Upload provenance bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-provenance
+          name: release-provenance-${{ matrix.package }}
           path: ${{ steps.attest_release.outputs.bundle-path }}
           if-no-files-found: error
           retention-days: 3
@@ -647,10 +708,35 @@ jobs:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
           skip-existing: true
+
+  verify_hosted_release:
+    needs: [authorize_candidate, publish, resolve_release_ref]
+    runs-on: ubuntu-latest
+    # Hosted verification can consume about 92 minutes at its documented
+    # 12 attempts, 15 serial requests per attempt, and 30-second request timeout.
+    timeout-minutes: 120
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Download candidate distribution ledger
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dist
+          path: _release_dist
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.authorize_candidate.outputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify hosted release artifacts match build
         env:
           EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
-          INVARLOCK_PUBLISH_TARGET: ${{ steps.vars.outputs.publish_target }}
+          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
           INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           python scripts/release/verify_hosted_distributions.py \
@@ -660,7 +746,7 @@ jobs:
             --version "${INVARLOCK_RELEASE_VERSION}"
 
   testpypi_smoke:
-    needs: [authorize_candidate, publish, resolve_release_ref]
+    needs: [authorize_candidate, resolve_release_ref, verify_hosted_release]
     if: >-
       ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
     runs-on: ubuntu-latest
