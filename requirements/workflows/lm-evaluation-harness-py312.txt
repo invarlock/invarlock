@@ -510,10 +510,6 @@ joblib==1.5.3 \
     # via
     #   nltk
     #   scikit-learn
-lm-eval==0.4.12 \
-    --hash=sha256:02971ff68284dd14cfa7fce9310a58452c4162e8d413ba96aa7988a0ff9352ef \
-    --hash=sha256:45938d7c8024d5eee5c8a0da36abe7cc09c252413c577cf81666f0fcd28b4345
-    # via -r requirements/workflows/lm-evaluation-harness.in
 lxml==6.1.1 \
     --hash=sha256:05a82eb6e1530a64f26225b55cbd178113bd0b5af1c2b625f25e5296742c26d2 \
     --hash=sha256:07a4a68e286ee7a1ed7dfb8af83e615757c0ccfe9f18c6b4ea6771388d9ba8c9 \
@@ -1625,9 +1621,6 @@ six==1.17.0 \
     # via
     #   python-dateutil
     #   rouge-score
-sqlitedict==2.1.0 \
-    --hash=sha256:03d9cfb96d602996f1d4c2db2856f1224b96a9c431bdd16e78032a72940f9e8c
-    # via lm-eval
 sympy==1.14.0 \
     --hash=sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517 \
     --hash=sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5

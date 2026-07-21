@@ -10,6 +10,7 @@ trust anchors and signing key.
 | Journey | Command | What actually runs |
 | --- | --- | --- |
 | Hugging Face Transformers | `make example-hf-transformers` | A pinned Qwen3-0.6B checkpoint and an explicit behavioral derivative scored by the built-in provider |
+| Hugging Face vision-text | `make example-hf-vision-text` | Pinned Qwen2-VL 2B and 7B checkpoints scored on a four-record authenticated image fixture through the optional vision-text provider |
 | PEFT LoRA merge | `make example-peft-lora` | Real adapter training, save, reload, merge, model scoring, verification, and reporting |
 | TorchAO INT8 | `make example-torchao-int8` | Real weight-only quantization, exact dense-state materialization, authenticated live-kernel observations, and checkpoint comparison |
 | GGUF with llama.cpp | `make example-gguf-llama-cpp` | An official Qwen3-0.6B Q8 GGUF and its authenticated Q5 derivative executed through a source-bound llama.cpp image |
@@ -38,6 +39,7 @@ its implementation under `addins/multimodal`.
 | Journeys | Requirements |
 | --- | --- |
 | Hugging Face, PEFT, TorchAO | `uv`, Git, Docker or Podman, enough memory for Qwen3-0.6B, and network access for the first locked dependency and image build; CUDA is used when available |
+| Hugging Face vision-text | Linux, Docker with the NVIDIA container runtime, one GPU with at least 24 GB of memory, `uv`, Git, first-run network access, and roughly 35 GB of temporary disk |
 | GGUF | The common requirements plus roughly 3 GB of temporary disk for two pinned downloads and conversion output |
 | LM Evaluation Harness | The common requirements plus the pinned Harness dependency; model execution is offline after the image build |
 | TensorRT-LLM | Linux, Docker with two visible H100 GPUs, and roughly 20 GB of temporary disk |
@@ -48,11 +50,15 @@ its runtime is authenticated against the committed tree.
 
 ## Inspect inputs without starting a runtime
 
-The Hugging Face, PEFT, and TorchAO journeys support preparation-only mode:
+The Hugging Face, vision-text, PEFT, and TorchAO journeys support
+preparation-only mode:
 
 ```bash
 make example-hf-transformers \
   EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-hf-inputs"
+
+make example-hf-vision-text \
+  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-vision-inputs"
 
 make example-peft-lora \
   EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs"
@@ -61,9 +67,11 @@ make example-torchao-int8 \
   EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-torchao-inputs"
 ```
 
-Preparation writes the request, policy, schedule, checkpoints, keys, and trust
-profile. Complete execution requires a clean committed checkout because the
-runtime image is authenticated against that exact Git source tree.
+Preparation writes the request, policy, schedule, keys, trust profile, and the
+authenticated vision content store. The vision-text preparation records the
+immutable model coordinates without downloading either checkpoint. Complete
+execution requires a clean committed checkout because the runtime image is
+authenticated against that exact Git source tree.
 
 These small schedules demonstrate integration behavior. Public model evidence
 uses representative digest-pinned schedules and explicit precision controls;

@@ -32,7 +32,10 @@ new path. Otherwise the launcher creates a temporary workspace and prints its
 location.
 
 The command builds the repository's source-authenticated CPU runtime and adds
-the pinned optional `lm-eval` dependency. It needs roughly 7 GB of temporary
+a deterministic cache-free package derived from the hash-pinned upstream
+`lm-eval` 0.4.12 wheel. The integration never reads or writes Harness response
+caches, and its image contains neither the vulnerable `sqlitedict` package nor
+a cache entry point. It needs roughly 7 GB of temporary
 disk for the two Qwen3 snapshots, runtime images, and outputs. Both model runs
 execute without network access inside that derived image. The inspected
 immutable image ID is bound into both runtime receipts before the import

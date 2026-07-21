@@ -12,11 +12,15 @@ runtime-image locks select the container's Torch backend explicitly.
 The CPU and aarch64 locks share `runtime-image.in`. The CUDA runtime uses
 `runtime-image-cu126.in` so its platform-specific wheel closure remains
 explicit while matching the patched Torch release used by the CPU images.
-`lm-evaluation-harness-py312.txt` pins the complete Python 3.12 Linux x86_64
-dependency closure used only by the LM Evaluation Harness integration image;
-it is compiled from `lm-evaluation-harness.in` against the canonical CPU
-runtime input so the derived image cannot resolve a second inference stack at
-build time.
+`lm-evaluation-harness-py312.txt` pins the Python 3.12 Linux x86_64 dependency
+closure used only by the LM Evaluation Harness integration image. The refresh
+starts from `lm-evaluation-harness.in` against the canonical CPU runtime input,
+then removes the upstream wheel and its unused `sqlitedict` response-cache
+dependency. `lm-evaluation-harness-upstream-wheel.txt` separately authenticates
+the exact upstream wheel from which the image builds a deterministic,
+cache-free local-version wheel. The image runs `pip check` after installing the
+two surfaces, so the resulting environment remains metadata-consistent without
+resolving a second inference stack.
 `release-install-py312.txt` and `release-install-py313.txt` are the
 Python-version-specific, hash-pinned dependency closures installed before the
 coordinated local release wheels. Both are compiled from
@@ -49,9 +53,12 @@ minimal, hand-maintained bootstrap surfaces:
 - `runtime-wheel-build-py312.txt` contains only the versions and hashes needed
   to build the core and runtime-provider wheels without build isolation.
 
-When their source pins change, update those two files in the same review,
+When their source pins change, update those files in the same review,
 confirm each hash against the downloaded index artifact, and keep their inline
-ownership comments. The refresh script does not rewrite them.
+ownership comments. The refresh script does not rewrite them. The same rule
+applies to `lm-evaluation-harness-upstream-wheel.txt`: update its reviewed wheel
+hash and the cache-free derivation script together when the upstream Harness
+version changes.
 
 After refreshing, run the lock and security checks:
 

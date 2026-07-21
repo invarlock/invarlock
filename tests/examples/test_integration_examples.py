@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from examples.integrations import launch, qwen3_profile
+from examples.integrations import launch, local_registry, qwen3_profile
 from examples.integrations import run as integration
 
 ZERO_DIGEST = "sha256:" + ("0" * 64)
@@ -924,6 +924,283 @@ def test_runtime_image_builds_from_authenticated_source(
         build / "runtime-build.json"
     )
 
+
+def test_runtime_image_authenticates_a_layered_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    commands: list[list[str]] = []
+    base = "registry.example/runtime@sha256:" + ("a" * 64)
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if "qualification_source.py" in " ".join(command):
+            output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif command[1:4] == ["image", "inspect", "--format"]:
+            output = "sha256:" + ("d" * 64)
+        else:
+            output = ""
+        return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+    monkeypatch.setattr(launch, "_run", fake_run)
+    launch._runtime_image(
+        repository=repository,
+        build_root=build,
+        container_engine="docker",
+        dockerfile="addins/multimodal/runtime/Dockerfile",
+        authenticated_base_image=base,
+    )
+    command = next(
+        item for item in commands if "authenticated_runtime_build.py" in " ".join(item)
+    )
+    assert command[command.index("--require-base-source-labels") + 1] == base
+    assert f"RUNTIME_BASE_IMAGE={base}" in command
+
+
+def test_local_image_publication_is_digest_bound_and_disposable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+    digest = "sha256:" + ("a" * 64)
+    endpoint = "127.0.0.1:49152"
+    volume = "invarlock-example-registry-fixed"
+    container = volume
+    published = f"{endpoint}/example-runtime:{'a' * 12}"
+    canonical = f"{endpoint}/example-runtime@{digest}"
+    monkeypatch.setattr(local_registry.secrets, "token_hex", lambda _length: "fixed")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if command[1:3] == ["volume", "create"]:
+            output = volume
+        elif command[1] == "run":
+            output = "b" * 64
+        elif command[1] == "port":
+            output = endpoint
+        elif command[1:3] == ["image", "inspect"]:
+            output = f'{digest} ["{canonical}"]'
+        else:
+            output = ""
+        return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+    monkeypatch.setattr(local_registry, "_run", fake_run)
+    with local_registry.published_local_image(
+        repository=tmp_path,
+        container_engine="docker",
+        image=digest,
+        image_digest=digest,
+        repository_name="example-runtime",
+    ) as reference:
+        assert reference == canonical
+        assert commands[-1][1] == "image"
+    run = next(command for command in commands if command[1] == "run")
+    assert local_registry.REGISTRY_IMAGE in run
+    assert "--read-only" in run
+    assert "--cap-drop=ALL" in run
+    assert "127.0.0.1::5000" in run
+    assert ["docker", "push", published] in commands
+    assert commands[-3:] == [
+        ["docker", "image", "remove", published],
+        ["docker", "container", "rm", "--force", container],
+        ["docker", "volume", "rm", "--force", volume],
+    ]
+
+
+def test_local_registry_command_runner_reports_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_subprocess_run(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command == ["success"]:
+            return subprocess.CompletedProcess(command, 0, stdout="ready", stderr="")
+        if command == ["stderr"]:
+            return subprocess.CompletedProcess(command, 9, stdout="", stderr="denied")
+        return subprocess.CompletedProcess(command, 7, stdout="", stderr="")
+
+    monkeypatch.setattr(local_registry.subprocess, "run", fake_subprocess_run)
+    assert (
+        local_registry._run(["success"], cwd=tmp_path, capture_output=True).stdout
+        == "ready"
+    )
+    with pytest.raises(RuntimeError, match=r"status 9: stderr\ndenied"):
+        local_registry._run(["stderr"], cwd=tmp_path)
+    with pytest.raises(RuntimeError, match=r"status 7: silent$"):
+        local_registry._run(["silent"], cwd=tmp_path)
+
+
+def test_local_image_publication_cleans_nothing_when_volume_creation_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+    digest = "sha256:" + ("a" * 64)
+    monkeypatch.setattr(local_registry.secrets, "token_hex", lambda _length: "fixed")
+
+    def fail_first_command(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        raise OSError("volume creation failed")
+
+    monkeypatch.setattr(local_registry, "_run", fail_first_command)
+    with pytest.raises(OSError, match="volume creation failed"):
+        with local_registry.published_local_image(
+            repository=tmp_path,
+            container_engine="docker",
+            image=digest,
+            image_digest=digest,
+            repository_name="example-runtime",
+        ):
+            raise AssertionError("publication must fail before yielding")
+    assert commands == [
+        ["docker", "volume", "create", "invarlock-example-registry-fixed"]
+    ]
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    (
+        ("volume", "unexpected registry volume"),
+        ("container", "invalid registry identity"),
+        ("endpoint", "invalid registry endpoint"),
+        ("large-port", "invalid registry endpoint"),
+        ("identity", "changed identity"),
+        ("json", "digests are unreadable"),
+        ("json-object", "invalid shape"),
+        ("digest", "lacks one canonical digest"),
+    ),
+)
+def test_local_image_publication_fails_closed_and_cleans_up(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    message: str,
+) -> None:
+    commands: list[list[str]] = []
+    digest = "sha256:" + ("a" * 64)
+    volume = "invarlock-example-registry-fixed"
+    endpoint = "127.0.0.1:49152"
+    monkeypatch.setattr(local_registry.secrets, "token_hex", lambda _length: "fixed")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if command[1:3] == ["volume", "create"]:
+            output = "wrong" if failure == "volume" else volume
+        elif command[1] == "run":
+            output = "invalid" if failure == "container" else "b" * 64
+        elif command[1] == "port":
+            if failure == "endpoint":
+                output = "0.0.0.0:49152"
+            elif failure == "large-port":
+                output = "127.0.0.1:99999"
+            else:
+                output = endpoint
+        elif command[1:3] == ["image", "inspect"]:
+            observed = "sha256:" + ("b" * 64) if failure == "identity" else digest
+            if failure == "json":
+                details = "not-json"
+            elif failure == "json-object":
+                details = "{}"
+            elif failure == "digest":
+                details = "[]"
+            else:
+                details = json.dumps([f"{endpoint}/example-runtime@{digest}"])
+            output = f"{observed} {details}"
+        else:
+            output = ""
+        return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+    monkeypatch.setattr(local_registry, "_run", fake_run)
+    with pytest.raises(RuntimeError, match=message):
+        with local_registry.published_local_image(
+            repository=tmp_path,
+            container_engine="docker",
+            image=digest,
+            image_digest=digest,
+            repository_name="example-runtime",
+        ):
+            raise AssertionError("publication must fail before yielding")
+    assert commands[-1] == ["docker", "volume", "rm", "--force", volume]
+
+
+def test_local_image_publication_supports_podman_and_cleanup_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+    digest = "sha256:" + ("a" * 64)
+    endpoint = "127.0.0.1:49152"
+    canonical = f"{endpoint}/example-runtime@{digest}"
+    monkeypatch.setattr(local_registry.secrets, "token_hex", lambda _length: "fixed")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if "remove" in command or "rm" in command:
+            raise RuntimeError("cleanup failed")
+        if command[1:3] == ["volume", "create"]:
+            output = "invarlock-example-registry-fixed"
+        elif command[1] == "run":
+            output = "b" * 64
+        elif command[1] == "port":
+            output = endpoint
+        elif command[1:3] == ["image", "inspect"]:
+            output = f'{digest} ["{canonical}"]'
+        else:
+            output = ""
+        return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+    monkeypatch.setattr(local_registry, "_run", fake_run)
+    with local_registry.published_local_image(
+        repository=tmp_path,
+        container_engine="podman",
+        image=digest,
+        image_digest=digest,
+        repository_name="example-runtime",
+    ) as reference:
+        assert reference == canonical
+    assert [
+        "podman",
+        "push",
+        "--tls-verify=false",
+        f"{endpoint}/example-runtime:aaaaaaaaaaaa",
+    ] in commands
+    local_registry._cleanup_command(["podman", "rm", "missing"], cwd=tmp_path)
+
+
+def test_local_image_publication_rejects_invalid_input_digest(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="sha256 image digest"):
+        with local_registry.published_local_image(
+            repository=tmp_path,
+            container_engine="docker",
+            image="not-an-image",
+            image_digest="not-a-digest",
+            repository_name="example-runtime",
+        ):
+            raise AssertionError("invalid digest must fail before yielding")
+
+
+def test_runtime_image_rejects_non_digest_engine_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
+
     def invalid_inspect(
         command: list[str], *, cwd: Path, capture_output: bool = False
     ) -> subprocess.CompletedProcess[str]:
@@ -968,6 +1245,18 @@ def test_launch_main_dispatches_prepare_and_full_runs(
         == 0
     )
     assert "--prepare-only" in commands[-1]
+
+    disposable = tmp_path / "generated"
+    disposable.mkdir()
+    monkeypatch.setattr(
+        launch.tempfile,
+        "mkdtemp",
+        lambda *, prefix: str(disposable),
+    )
+    assert launch.main(["hf-transformers", "--prepare-only"]) == 0
+    assert commands[-1][commands[-1].index("--workspace") + 1] == str(
+        disposable / "transaction"
+    )
 
     runtime_calls: list[dict[str, object]] = []
 

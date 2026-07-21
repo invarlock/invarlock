@@ -40,7 +40,7 @@ from invarlock.runtime_import_authoring import (
 )
 from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
-VERSION = "0.4.12"
+VERSION = "0.4.12+invarlock.nocache.1"
 MAX_GENERATION_TOKENS = 1
 HARNESS_BATCH_SIZE = 8
 HARNESS_SEED = 20_260_716

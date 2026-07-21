@@ -51,7 +51,7 @@ MYPY_TYPED_SURFACE := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-peft-lora
+.PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -237,6 +237,7 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
 		tests/scripts/test_prepare_qualification_suites.py \
+		tests/scripts/test_build_cache_free_lm_eval_wheel.py \
 		tests/scripts/test_cve_audit.py \
 		tests/scripts/test_filter_scorecard_sarif.py \
 		tests/scripts/test_run_pip_audit.py \
@@ -277,15 +278,20 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \
-		examples/integrations/launch.py hf-transformers $(EXAMPLE_ARGS)
+		-m examples.integrations.launch hf-transformers $(EXAMPLE_ARGS)
+
+example-hf-vision-text:  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
+	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --extra hf \
+		--with ./addins/multimodal python \
+		-m examples.integrations.launch hf-vision-text $(EXAMPLE_ARGS)
 
 example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
 	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
-		examples/integrations/launch.py peft-lora $(EXAMPLE_ARGS)
+		-m examples.integrations.launch peft-lora $(EXAMPLE_ARGS)
 
 example-torchao-int8:  ## Quantize with TorchAO, then evaluate, verify, and report
 	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-torchao python \
-		examples/integrations/launch.py torchao-int8 $(EXAMPLE_ARGS)
+		-m examples.integrations.launch torchao-int8 $(EXAMPLE_ARGS)
 
 example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \

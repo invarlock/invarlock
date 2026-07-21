@@ -1423,14 +1423,28 @@ def test_launcher_rejects_image_identity_drift(
 
 def test_container_recipe_pins_the_harness_and_real_worker() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 
     lock = ROOT / "requirements/workflows/lm-evaluation-harness-py312.txt"
+    upstream = ROOT / "requirements/workflows/lm-evaluation-harness-upstream-wheel.txt"
 
     assert "lm-evaluation-harness-py312.txt" in dockerfile
+    assert "lm-evaluation-harness-upstream-wheel.txt" in dockerfile
+    assert "build_cache_free_lm_eval_wheel.py" in dockerfile
     assert "--require-hashes" in dockerfile
+    assert "python -m pip check" in dockerfile
     assert "download.pytorch.org/whl/cu" not in dockerfile
     assert 'pip install --no-compile "lm_eval' not in dockerfile
-    assert "lm-eval==0.4.12" in lock.read_text(encoding="utf-8")
+    assert "lm-eval==" not in lock.read_text(encoding="utf-8")
+    assert "sqlitedict==" not in lock.read_text(encoding="utf-8")
+    assert "lm-eval==0.4.12" in upstream.read_text(encoding="utf-8")
     assert "--hash=sha256:" in lock.read_text(encoding="utf-8")
     assert "org.invarlock.example.base-image-id" in dockerfile
     assert "lm-evaluation-harness-example.py" in dockerfile
+    for source in (
+        "!requirements/workflows/lm-evaluation-harness-py312.txt",
+        "!requirements/workflows/lm-evaluation-harness-upstream-wheel.txt",
+        "!scripts/security/build_cache_free_lm_eval_wheel.py",
+        "!examples/integrations/lm-evaluation-harness/example.py",
+    ):
+        assert source in dockerignore

@@ -15,6 +15,14 @@
 !requirements/workflows/core-py312.txt
 !requirements/workflows/multimodal-runtime-py312.txt
 !requirements/workflows/lm-evaluation-harness-py312.txt
+!requirements/workflows/lm-evaluation-harness-upstream-wheel.txt
+!scripts/
+!scripts/security/
+!scripts/security/build_cache_free_lm_eval_wheel.py
+!examples/
+!examples/integrations/
+!examples/integrations/lm-evaluation-harness/
+!examples/integrations/lm-evaluation-harness/example.py
 !runtime/
 !runtime/Dockerfile
 !runtime/Dockerfile.cuda

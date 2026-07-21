@@ -136,6 +136,7 @@ The repository examples exercise real public commands:
 
 ```console
 make example-hf-transformers
+make example-hf-vision-text
 make example-peft-lora
 make example-torchao-int8
 make example-gguf-llama-cpp

@@ -74,7 +74,10 @@ _MAINTAINED_INTEGRATION_PATHS = {
     "examples/integrations/gguf-llama-cpp/records.json",
     "examples/integrations/gguf_llama_cpp.py",
     "examples/integrations/hf-transformers/README.md",
+    "examples/integrations/hf-vision-text/README.md",
+    "examples/integrations/hf_vision_text.py",
     "examples/integrations/launch.py",
+    "examples/integrations/local_registry.py",
     "examples/integrations/lm-evaluation-harness/Dockerfile",
     "examples/integrations/lm-evaluation-harness/README.md",
     "examples/integrations/lm-evaluation-harness/example.py",
@@ -210,6 +213,7 @@ def test_maintained_integration_commands_are_complete_in_committed_head() -> Non
     text = makefile.stdout.decode("utf-8")
     for target in (
         "example-hf-transformers",
+        "example-hf-vision-text",
         "example-peft-lora",
         "example-torchao-int8",
         "example-gguf-llama-cpp",
