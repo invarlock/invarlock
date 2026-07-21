@@ -134,6 +134,7 @@ jobs:
       - name: Install build tooling
         run: |
           python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
           npm ci
       - name: Install actionlint

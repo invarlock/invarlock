@@ -197,6 +197,10 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert _step(build["steps"], "Run complete repository gates")["run"] == (
         "make verify"
     )
+    build_tooling = _step(build["steps"], "Install build tooling")["run"]
+    assert "requirements/workflows/ci-hf-py313.txt" in build_tooling
+    assert "requirements/workflows/docs-ci-py313.txt" in build_tooling
+    assert "requirements/workflows/release-security-py313.txt" in build_tooling
     release_lock_audit = _step(build["steps"], "Audit maintained dependency locks")[
         "run"
     ]
