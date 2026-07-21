@@ -71,6 +71,7 @@ def _runtime_image(
     dockerfile: str = "runtime/Dockerfile",
     image_prefix: str = "invarlock-example-runtime",
     build_arguments: tuple[str, ...] = (),
+    authenticated_base_image: str | None = None,
 ) -> tuple[str, str]:
     commit = _require_committed_checkout(repository)
     source_bundle = build_root / "source.tar"
@@ -119,6 +120,15 @@ def _runtime_image(
     ]
     for argument in build_arguments:
         build_command.extend(("--build-arg", argument))
+    if authenticated_base_image is not None:
+        build_command.extend(
+            (
+                "--build-arg",
+                f"RUNTIME_BASE_IMAGE={authenticated_base_image}",
+                "--require-base-source-labels",
+                authenticated_base_image,
+            )
+        )
     _run(
         build_command,
         cwd=repository,
@@ -215,27 +225,26 @@ def main(argv: list[str] | None = None) -> int:
             build_root = workspace / "build"
             build_root.mkdir()
             if arguments.integration == "hf-vision-text":
-                commit = _require_committed_checkout(repository)
                 base_build = build_root / "base"
                 vision_build = build_root / "vision"
                 base_build.mkdir()
                 vision_build.mkdir()
                 base_prefix = "invarlock-example-runtime-cuda"
-                _runtime_image(
+                _, base_digest = _runtime_image(
                     repository=repository,
                     build_root=base_build,
                     container_engine=arguments.container_engine,
                     dockerfile="runtime/Dockerfile.cuda",
                     image_prefix=base_prefix,
                 )
-                base_image = f"{base_prefix}:{commit[:12]}"
+                base_image = f"{base_prefix}@{base_digest}"
                 image, image_digest = _runtime_image(
                     repository=repository,
                     build_root=vision_build,
                     container_engine=arguments.container_engine,
                     dockerfile="addins/multimodal/runtime/Dockerfile",
                     image_prefix="invarlock-example-hf-vision-text",
-                    build_arguments=(f"RUNTIME_BASE_IMAGE={base_image}",),
+                    authenticated_base_image=base_image,
                 )
             else:
                 image, image_digest = _runtime_image(

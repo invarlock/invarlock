@@ -924,6 +924,56 @@ def test_runtime_image_builds_from_authenticated_source(
         build / "runtime-build.json"
     )
 
+
+def test_runtime_image_authenticates_a_layered_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    commands: list[list[str]] = []
+    base = "registry.example/runtime@sha256:" + ("a" * 64)
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if "qualification_source.py" in " ".join(command):
+            output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif command[1:4] == ["image", "inspect", "--format"]:
+            output = "sha256:" + ("d" * 64)
+        else:
+            output = ""
+        return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+    monkeypatch.setattr(launch, "_run", fake_run)
+    launch._runtime_image(
+        repository=repository,
+        build_root=build,
+        container_engine="docker",
+        dockerfile="addins/multimodal/runtime/Dockerfile",
+        authenticated_base_image=base,
+    )
+    command = next(
+        item for item in commands if "authenticated_runtime_build.py" in " ".join(item)
+    )
+    assert command[command.index("--require-base-source-labels") + 1] == base
+    assert f"RUNTIME_BASE_IMAGE={base}" in command
+
+
+def test_runtime_image_rejects_non_digest_engine_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
+
     def invalid_inspect(
         command: list[str], *, cwd: Path, capture_output: bool = False
     ) -> subprocess.CompletedProcess[str]:

@@ -384,8 +384,8 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
         "runtime/Dockerfile.cuda",
         "addins/multimodal/runtime/Dockerfile",
     ]
-    assert builds[1]["build_arguments"] == (
-        "RUNTIME_BASE_IMAGE=invarlock-example-runtime-cuda:" + ("c" * 12),
+    assert builds[1]["authenticated_base_image"] == (
+        "invarlock-example-runtime-cuda@sha256:" + ("1" * 64)
     )
     dockerfile = Path(__file__).resolve().parents[2] / (
         "addins/multimodal/runtime/Dockerfile"
