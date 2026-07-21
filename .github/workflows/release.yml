@@ -123,7 +123,7 @@ jobs:
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
           cache: pip
@@ -443,7 +443,7 @@ jobs:
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
       - name: Set up promotion Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
       - name: Validate publication inputs
@@ -533,7 +533,7 @@ jobs:
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
       - name: Download dist artifacts
@@ -667,7 +667,7 @@ jobs:
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
       - name: Download candidate distribution ledger
@@ -741,7 +741,7 @@ jobs:
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
       - name: Set up promotion Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
       - name: Record exact TestPyPI promotion candidate
