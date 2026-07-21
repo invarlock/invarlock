@@ -1,0 +1,2475 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/security/best-practices/">
+      
+      
+        <link rel="prev" href="../threat-model/">
+      
+      
+        <link rel="next" href="../dependency-audit/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Security practices - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#security-practices" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Security practices
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#operating-assumptions-and-residual-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operating assumptions and residual risk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#separate-roles-and-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate roles and keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Separate roles and keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-custody-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key-custody baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fingerprint-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fingerprint handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-and-materialize-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin and materialize inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keep-runtime-configuration-outside-request-authority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep runtime configuration outside request authority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorize-scorer-extensions-explicitly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorize scorer extensions explicitly
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authorize scorer extensions explicitly">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-per-side-oci-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use per-side OCI isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#establish-independent-anchors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Establish independent anchors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#precommit-schedule-and-run-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Precommit schedule and run selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preserve-canonical-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preserve canonical artifacts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Preserve canonical artifacts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-handling-and-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data handling and retention
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#harden-the-execution-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Harden the execution environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#respond-to-key-or-runtime-compromise" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Respond to key or runtime compromise
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-before-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review before acceptance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#operating-assumptions-and-residual-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operating assumptions and residual risk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#separate-roles-and-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate roles and keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Separate roles and keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-custody-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key-custody baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fingerprint-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fingerprint handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-and-materialize-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin and materialize inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keep-runtime-configuration-outside-request-authority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep runtime configuration outside request authority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorize-scorer-extensions-explicitly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorize scorer extensions explicitly
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authorize scorer extensions explicitly">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-per-side-oci-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use per-side OCI isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#establish-independent-anchors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Establish independent anchors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#precommit-schedule-and-run-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Precommit schedule and run selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preserve-canonical-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preserve canonical artifacts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Preserve canonical artifacts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-handling-and-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data handling and retention
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#harden-the-execution-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Harden the execution environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#respond-to-key-or-runtime-compromise" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Respond to key or runtime compromise
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-before-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review before acceptance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="security-practices">Security practices<a class="headerlink" href="#security-practices" title="Permanent link">&para;</a></h1>
+<p>These practices preserve the trust separation described in the
+<a href="../trust-model/">Trust model</a>. They supplement rather than replace host,
+container, key-management, and model-safety controls.</p>
+<div class="admonition warning">
+<p class="admonition-title">Security guidance</p>
+<p><strong>In plain language:</strong> Keep signing authority, fixed inputs, and
+acceptance decisions separate so one compromised role cannot silently
+manufacture a trusted result.</p>
+<p><strong>Objective:</strong> Operate evidence production and verification while
+preserving key separation, immutable inputs, independent anchors, and
+fail-closed handling.</p>
+<p><strong>Assets or boundary:</strong> Evidence signer and verifier keys, artifact and runtime
+identities, schedules, policies, evidence bundles, receipts, and the host
+controls outside InvarLock's evidence contract.</p>
+<p><strong>Use this page when:</strong> Deploying or reviewing an InvarLock workflow,
+defining custody and retention controls, or responding to suspected key,
+runtime, or artifact compromise.</p>
+</div>
+<h2 id="operating-assumptions-and-residual-risk">Operating assumptions and residual risk<a class="headerlink" href="#operating-assumptions-and-residual-risk" title="Permanent link">&para;</a></h2>
+<p>These practices assume that the deployment can keep private keys out of
+untrusted provider code, maintain an authoritative fingerprint and anchor
+source, restrict access to materialized inputs, and preserve immutable outputs.
+If those capabilities are absent, signature and replay checks can still expose
+inconsistency but cannot create the missing trust separation.</p>
+<p>The controls below reduce accidental substitution, key misuse, mutable-input
+drift, and unsafe artifact handling. They do not attest execution, prove that a
+provider reported truthful measurements, establish that a schedule or
+threshold is sufficient, or harden the host and accelerator. Use the
+<a href="../threat-model/">Threat model</a> to decide which residual risks require external
+controls.</p>
+<p>The stock OCI run path uses a single orchestrating process on the host plus two
+model workers. The host loads the evidence-signing key, prepares the canonical
+schedule, launches the separately pinned workers, validates their closed
+outputs, and signs the finalized bundle. Each worker sees only its own
+read-only artifact and support material, the read-only side job, and an
+isolated writable output directory. The signing key remains host-side and is
+never mounted into model workers.</p>
+<p>The host coordinator is still a signing trust boundary: compromise of that
+process can reach file-backed key material and can misstate worker execution.
+InvarLock does not currently expose a KMS, HSM, or remote-signer interface.
+Treat file-backed signing as the baseline implementation. A deployment needing
+a stronger signing boundary can create complete records in isolated execution,
+then use import mode in a controlled signing environment until an external
+signer interface is available.</p>
+<h2 id="separate-roles-and-keys">Separate roles and keys<a class="headerlink" href="#separate-roles-and-keys" title="Permanent link">&para;</a></h2>
+<p>Use different Ed25519 keys for evidence production and independent
+verification. Generate keys under a restrictive umask when a managed signing
+service is unavailable:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">umask</span><span class="w"> </span><span class="m">077</span>
+openssl<span class="w"> </span>genpkey<span class="w"> </span>-algorithm<span class="w"> </span>ED25519<span class="w"> </span>-out<span class="w"> </span>evidence-signer.pem
+openssl<span class="w"> </span>genpkey<span class="w"> </span>-algorithm<span class="w"> </span>ED25519<span class="w"> </span>-out<span class="w"> </span>evidence-verifier.pem
+</code></pre></div>
+
+<ul>
+<li>keep private keys outside request, evidence, logs, shell history, images, and
+  source control;</li>
+<li>authorize evidence-signer and verifier fingerprints through an authorized channel;</li>
+<li>pin the expected evidence-signer fingerprint during every verification;</li>
+<li>pin the verifier identity and fingerprint when consuming receipts;</li>
+<li>document rotation and revocation; and</li>
+<li>treat any output signed after suspected compromise as untrusted until
+  independently assessed.</li>
+</ul>
+<p>An evidence pack records its signing-key fingerprint in <code>manifest.json</code>. A signed
+receipt records the verifier fingerprint. Those embedded values identify the
+signing keys used; they are not their own authorization source.</p>
+<h3 id="key-custody-baseline">Key-custody baseline<a class="headerlink" href="#key-custody-baseline" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Lifecycle stage</th>
+<th>Minimum practice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generation</td>
+<td>Generate evidence signer and verifier keys in separate controlled contexts with cryptographically secure system randomness.</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>Keep private keys in a managed signer, hardware-backed store, or access-controlled file unavailable to untrusted model/provider code.</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Bind the raw-public-key fingerprint to role, owner, scope, activation, and expiry in authorized configuration.</td>
+</tr>
+<tr>
+<td>Use</td>
+<td>Restrict each key to its role; log signing requests without logging private material or sensitive evidence content.</td>
+</tr>
+<tr>
+<td>Backup</td>
+<td>Encrypt, access-control, inventory, and recovery-test any backup; omit backup if recovery policy prefers rotation.</td>
+</tr>
+<tr>
+<td>Rotation</td>
+<td>Authorize the successor before use, stop new use of the predecessor, and retain historical authorization needed to interpret old signatures.</td>
+</tr>
+<tr>
+<td>Revocation</td>
+<td>Publish the affected fingerprint and effective time through the same or stronger channel used for authorization.</td>
+</tr>
+<tr>
+<td>Destruction</td>
+<td>Remove active, cached, staged, and backup copies under a documented process.</td>
+</tr>
+</tbody>
+</table>
+<p>File mode <code>0600</code> is useful hygiene but not isolation from the same user,
+administrator, debugger, memory reader, or compromised process. High-impact
+signing should place the key behind a narrowly authorized signing interface.
+That last control is deployment guidance: the current CLI accepts a local
+PKCS#8 Ed25519 key path and does not natively call a managed signer.</p>
+<h3 id="fingerprint-handling">Fingerprint handling<a class="headerlink" href="#fingerprint-handling" title="Permanent link">&para;</a></h3>
+<p>InvarLock fingerprints the raw 32-byte Ed25519 public key with SHA-256 and
+prefixes the lowercase hexadecimal digest with <code>sha256:</code>. Do not substitute a
+SHA-256 digest of PEM text or SubjectPublicKeyInfo DER; those are different
+bytes and produce a different value.</p>
+<p>Bootstrap fingerprints through an authorized identity record or out-of-band
+comparison. Reading the first observed fingerprint from an untrusted pack and
+authorizing it automatically is trust on first use and does not resist an
+initial substitution attack.</p>
+<h2 id="pin-and-materialize-inputs">Pin and materialize inputs<a class="headerlink" href="#pin-and-materialize-inputs" title="Permanent link">&para;</a></h2>
+<p>Before evaluation:</p>
+<ul>
+<li>materialize checkpoint, tokenizer, dataset source, policy, provider
+  executable, and support files;</li>
+<li>for run-mode JSONL, review the input/expected-output field mapping, optional
+  ID field, exact-prefix limit, source order, and SHA-256 digest before subject
+  results are visible;</li>
+<li>use immutable upstream revisions and verify local content digests;</li>
+<li>place request-owned material under one access-controlled request root;</li>
+<li>configure optional provider support beneath caller-owned resource roots;</li>
+<li>address the OCI runtime image by SHA-256 digest; and</li>
+<li>prevent writes to fixed inputs during the transaction.</li>
+</ul>
+<p>Do not accept a mutable tag, branch, <code>latest</code> reference, or moving dataset
+revision as the identity for an acceptance decision.</p>
+<p>Record both a portable locator and authenticated material digest where the
+provider supports them. A locator helps a decision owner find material; only the
+digest or typed immutable identity determines equality.</p>
+<h2 id="keep-runtime-configuration-outside-request-authority">Keep runtime configuration outside request authority<a class="headerlink" href="#keep-runtime-configuration-outside-request-authority" title="Permanent link">&para;</a></h2>
+<p>The request expresses comparison intent. Runtime image digest, device, and
+optional provider support resources come from caller-owned configuration. Keep
+network, remote code, and third-party plugin access disabled unless a separate
+risk review explicitly authorizes them.</p>
+<p>The in-process network guard is defense in depth, not a sandbox or host
+firewall. Use container or infrastructure-level egress controls for an
+adversarial workload.</p>
+<p>Treat the container image as one layer of the trusted computing base. Patch and
+harden the host, container engine, kernel, driver, firmware, and device access;
+containers share host resources and do not by themselves supply execution
+attestation or a complete security boundary.</p>
+<h2 id="authorize-scorer-extensions-explicitly">Authorize scorer extensions explicitly<a class="headerlink" href="#authorize-scorer-extensions-explicitly" title="Permanent link">&para;</a></h2>
+<p>When <code>comparison.scorer_extension</code> is selected, review the scorer
+implementation and configuration before use. Pin its ID, version, descriptor
+digest, and configuration digest in independently controlled policy bytes, and
+pass the same explicit <code>ScorerExtensionRegistry</code> to evaluation and
+verification. Installed code or a binding submitted inside evidence is not an
+authorization source.</p>
+<p>An acceptance scorer executes inside the evaluation and verifier trust
+boundaries. Keep it deterministic and local, and reject implementations that
+use a network, external model, human judgment, SQL or code execution,
+model-based semantic similarity, or an LLM judge. Attach judge or review
+results as authenticated observations when useful; observations remain outside
+policy arithmetic. The extension declaration and replay checks do not provide
+process isolation; enforce these restrictions with reviewed code and the
+deployment sandbox.</p>
+<h3 id="use-per-side-oci-isolation">Use per-side OCI isolation<a class="headerlink" href="#use-per-side-oci-isolation" title="Permanent link">&para;</a></h3>
+<p>For run mode, pin the baseline and subject image digests independently. Common
+image, device, and entrypoint options are convenience defaults; per-side
+options select the exact worker configuration when the sides differ. Keep
+schedule preparation, output validation, and evidence signing on the host.</p>
+<p>The launcher runs CPU workers together when resources permit. It runs workers
+with the same explicit CUDA index or a generic <code>cuda</code> selection sequentially
+to avoid accidental contention. Distinct explicit indexes such as <code>cuda:0</code>
+and <code>cuda:1</code> permit parallel worker execution. Device isolation remains a
+property of the container engine, driver, and host configuration.</p>
+<h2 id="establish-independent-anchors">Establish independent anchors<a class="headerlink" href="#establish-independent-anchors" title="Permanent link">&para;</a></h2>
+<p>The verification operator should obtain these values independently of the
+submitted pack:</p>
+<ul>
+<li>exact acceptance-policy bytes;</li>
+<li>expected baseline artifact-identity digest;</li>
+<li>expected subject artifact-identity digest;</li>
+<li>expected canonical schedule digest;</li>
+<li>expected baseline runtime digest;</li>
+<li>expected subject runtime digest;</li>
+<li>expected evidence-signer fingerprint;</li>
+<li>verifier key authorization; and</li>
+<li>verifier identity.</li>
+</ul>
+<p>Store them in protected CI or release configuration. A closed
+<code>invarlock/trust-inputs-v1</code> profile keeps the values reviewable as one unit;
+protect the referenced verifier key separately and do not populate the profile
+by parsing the evidence immediately before verification.</p>
+<p><code>invarlock evaluate</code> always completes its execution-free validation before it
+allocates accelerators. Run it with <code>--preflight</code> when you want to stop at that
+boundary and inspect the exact request, signing key, and runtime-image options.
+The v2 preflight output can confirm a policy's minimum record count. It reports
+the interval-width requirement as <code>pending_execution</code>; do not treat that state
+as proof that precision or the final verdict will pass.
+The check is local
+and non-mutating: it does not pull images, start containers, load model
+weights, run inference, publish evidence, or sign a result. Treat it as
+configuration qualification, not as evidence that execution or policy will
+pass. For a scorer-bound request, the same preflight must load the explicitly
+authorized scorer and validate its exact descriptor, configuration schema, and
+task compatibility before compute is allocated.</p>
+<p>For release qualification, first use <code>runtime-qualification-canary</code> or the
+provider's <code>qualify-canary</code> target to run one representative, strictly verified
+transaction through the exact image digest. Retain that canary's evidence,
+signed receipt, and verifier-owned trust profile. The maintained readiness and
+evidence targets reverify all three and reject a canary bound to another image.
+Changing the image digest requires a new signed canary.</p>
+<p>Then use the maintained readiness and evidence targets with the actual Git
+source archive, its digest and commit, a runtime image built with the matching
+source labels, and fresh target evidence, receipt, report, and private-summary
+destinations. The driver runs from the authenticated source archive through a
+private snapshot and empty working directory. It verifies each caller-digested
+candidate wheel against that archive, then runs the candidate core and maintained
+add-ins through an isolated interpreter bootstrap that does not process installed
+<code>.pth</code> files or <code>sitecustomize</code>. The private summary records the candidate-wheel
+and interpreter digests. It compares preflight's complete
+normalized-request digest with the strictly verified pack, independently
+validates the signed receipt, and requires the renderer to report the same pack
+identity. Fixed request material can remain read-only because the driver places
+its byte snapshot in private temporary storage while retaining the original
+request root for relative inputs. All output parents must already exist, be
+real directories without symlink ancestors, and remain outside the evidence
+destination. A readiness result authorizes the bounded execution attempt; it
+is not itself an acceptance result.</p>
+<p>The signed canary prevents broad image-level fan-out after a representative
+transaction fails. It is not evidence that a different model will load, fit
+the device, satisfy backend compatibility, or complete its own evaluation.
+Readiness remains execution-free and model-specific failures remain possible.</p>
+<p>The named commit must exist in the local qualification repository. The driver
+recreates that commit's archive with system Git and compares the complete
+execution-source inventory and bytes with the supplied bundle. A copied tar
+whose PAX comment merely names another commit is rejected.</p>
+<p>Run the complete verification transaction:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--trust-profile<span class="w"> </span>trust/trust-inputs.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--receipt<span class="w"> </span>verification.receipt.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--json
+</code></pre></div>
+
+<p>Treat a nonzero exit as nonacceptance. Retain a signed failure receipt when the
+transaction produced one; it records which anchors and evidence were verified.</p>
+<p>Before automation relies on a receipt, verify it against the expected verifier
+identity and fingerprint from the same independent configuration class. The
+receipt's embedded public key is not an authorization record.</p>
+<h2 id="precommit-schedule-and-run-selection">Precommit schedule and run selection<a class="headerlink" href="#precommit-schedule-and-run-selection" title="Permanent link">&para;</a></h2>
+<p>Pairing prevents the two sides from seeing different records. It does not
+prevent cherry-picking. Before subject results are visible, approve:</p>
+<ul>
+<li>baseline and subject identities;</li>
+<li>schedule and expected outputs;</li>
+<li>metric and acceptance threshold;</li>
+<li>runtime and provider configuration;</li>
+<li>seed or decoding choices;</li>
+<li>run-selection and retry rules; and</li>
+<li>the treatment of failures and superseded attempts.</li>
+</ul>
+<p>Use independent or held-out schedules when repeated tuning would otherwise
+leak evaluation information.</p>
+<p>When evidence informs a high-impact decision, separate the person or service
+that selects the subject and retries from the person or service that controls
+the schedule and accepts the receipt.</p>
+<h2 id="preserve-canonical-artifacts">Preserve canonical artifacts<a class="headerlink" href="#preserve-canonical-artifacts" title="Permanent link">&para;</a></h2>
+<p>Treat the published evidence directory as immutable. Never edit, normalize,
+compress in place, or insert a receipt after publication. Store related output
+beside it:</p>
+<div class="codehilite"><pre><span></span><code>review/
+├── evidence/                    # signed immutable evidence bundle
+├── verification.receipt.json   # verifier-signed acceptance statement
+├── evidence.html               # optional, regenerable presentation
+└── external-attestation/       # optional independently trusted material
+</code></pre></div>
+
+<p>Verify again after transport and before relying on the evidence. The HTML view
+and copied summaries are not substitutes for the bundle and signed receipt.</p>
+<p>Do not include secrets, access tokens, private host names, local filesystem
+paths, environment dumps, or private keys in public evidence or reports.
+Inspect imported provider output before publication; a cryptographically valid
+pack can still disclose sensitive content intentionally placed in a record.</p>
+<h3 id="data-handling-and-retention">Data handling and retention<a class="headerlink" href="#data-handling-and-retention" title="Permanent link">&para;</a></h3>
+<p>Provider inputs and outputs can contain prompts, labels, model responses, or
+other regulated data. Encrypt request roots, evidence, receipts, and backups at
+rest when their classification requires it; use encrypted transport; restrict
+read access independently from signing authority; and define retention and
+deletion periods before evaluation. Public-evidence screening detects selected
+disclosure patterns, not every secret, identifier, copyrighted passage, or
+personal-data category. A human or domain-specific disclosure review remains
+required before publication.</p>
+<p>Keep the immutable evidence bundle for as long as the decision must remain
+auditable. Retain receipts and the historical evidence-signer and verifier authorization
+records for the same interval. Delete temporary materializations, caches, and
+private keys according to the deployment policy without modifying the signed
+bundle that remains under retention.</p>
+<h2 id="harden-the-execution-environment">Harden the execution environment<a class="headerlink" href="#harden-the-execution-environment" title="Permanent link">&para;</a></h2>
+<ul>
+<li>run untrusted model and provider material in an isolated, patched runtime;</li>
+<li>deny network egress at the infrastructure boundary;</li>
+<li>disable remote model code and plugins that are not explicitly authorized;</li>
+<li>prefer formats and loaders that avoid executable deserialization;</li>
+<li>run with least filesystem, device, process, and secret privileges;</li>
+<li>pin and scan dependencies and images;</li>
+<li>keep signing keys host-side and unavailable to model/provider workers;</li>
+<li>collect host or workload attestation when the decision requires proof of
+  execution; and</li>
+<li>independently rerun high-impact or boundary decisions.</li>
+</ul>
+<p>InvarLock's runtime manifest and provider receipt improve traceability. They do
+not secure the host or attest that the declared image executed.</p>
+<h2 id="respond-to-key-or-runtime-compromise">Respond to key or runtime compromise<a class="headerlink" href="#respond-to-key-or-runtime-compromise" title="Permanent link">&para;</a></h2>
+<p>When compromise is suspected:</p>
+<ol>
+<li>stop evaluation or verification signing with the affected key;</li>
+<li>preserve audit records and identify the exposure interval;</li>
+<li>revoke the fingerprint in the authoritative identity source;</li>
+<li>enumerate affected packs and receipts by recorded fingerprint;</li>
+<li>invalidate downstream acceptance until source evidence is reverified;</li>
+<li>rotate keys and independently distribute new fingerprints; and</li>
+<li>regenerate evidence or receipts from trusted environments as required.</li>
+</ol>
+<p>Changing an expected fingerprint locally without a recorded authorization
+update hides the incident. Re-signing an old receipt under a new verifier key
+can renew verifier accountability only after the underlying pack and anchors
+are rechecked.</p>
+<p>For a compromised runtime image, revoke the digest in the runtime-anchor
+source, determine which packs bind it, and create new evidence under an authorized
+replacement image. Do not treat an unchanged Dockerfile as evidence that the
+new image is byte-identical or that the old result remains trustworthy.</p>
+<h2 id="review-before-acceptance">Review before acceptance<a class="headerlink" href="#review-before-acceptance" title="Permanent link">&para;</a></h2>
+<p>Use the one-screen <a href="../../assurance/acceptance-checklist/">acceptance checklist</a>.
+Pay particular attention to:</p>
+<ul>
+<li>whether the finite schedule matches the intended decision scope;</li>
+<li>whether the policy threshold was chosen before results;</li>
+<li>whether a pass is close enough to the threshold to merit replication;</li>
+<li>whether baseline trust is justified independently; and</li>
+<li>whether execution attestation is required in addition to digest matching.</li>
+</ul>
+<p>Read the <a href="../threat-model/">Threat model</a> before using evidence for a
+high-impact decision.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>National Institute of Standards and Technology,
+  <a href="https://doi.org/10.6028/NIST.SP.800-57pt1r5">SP 800-57 Part 1 Revision 5: Recommendation for Key Management</a>,
+  2020.</li>
+<li>National Institute of Standards and Technology,
+  <a href="https://doi.org/10.6028/NIST.FIPS.186-5">Digital Signature Standard</a>,
+  2023.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8032">RFC 8032: Edwards-Curve Digital Signature Algorithm</a>,
+  2017.</li>
+<li>National Institute of Standards and Technology,
+  <a href="https://doi.org/10.6028/NIST.SP.800-190">SP 800-190: Application Container Security Guide</a>,
+  2017.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
