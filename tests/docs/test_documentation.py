@@ -384,12 +384,13 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
     ):
         assert stale.lower() not in diagram
     for connection in (
-        'd="M 580 99 L 620 99"',
-        'd="M 1020 99 L 980 99"',
-        'd="M 800 141 L 800 163"',
-        'd="M 800 241 L 800 263"',
-        'd="M 430 753 L 430 765"',
-        'd="M 610 753 C 650 758 740 760 790 765"',
+        'd="M 530 99 L 565 99"',
+        'd="M 1100 99 L 1065 99"',
+        'd="M 815 141 L 815 163"',
+        'd="M 815 241 L 815 263"',
+        'd="M 510 680 L 510 700"',
+        'd="M 440 775 L 440 795"',
+        'd="M 650 775 C 700 783 790 788 840 795"',
     ):
         assert connection in svg
     assert 'd="M 610 794 L 640 794"' not in svg
