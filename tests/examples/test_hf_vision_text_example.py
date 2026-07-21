@@ -403,6 +403,13 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
     assert commands[-1][commands[-1].index("--runtime-device") + 1] == "cuda:1"
 
 
+def test_vision_example_rejects_unqualified_container_engine(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert launch.main(["hf-vision-text", "--container-engine", "podman"]) == 2
+    assert "requires Docker" in capsys.readouterr().err
+
+
 def test_makefile_and_docs_expose_one_command_vision_example() -> None:
     root = Path(__file__).resolve().parents[2]
     makefile = root.joinpath("Makefile").read_text(encoding="utf-8")

@@ -196,6 +196,16 @@ def _runtime_device_argument(value: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    if (
+        arguments.integration == "hf-vision-text"
+        and arguments.container_engine != "docker"
+    ):
+        print(
+            "FAIL the vision-text example requires Docker for its authenticated "
+            "layered runtime build",
+            file=sys.stderr,
+        )
+        return 2
     repository = Path(__file__).resolve().parents[2]
     workspace = (
         arguments.workspace.expanduser().resolve()

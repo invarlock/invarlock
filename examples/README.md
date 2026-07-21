@@ -39,7 +39,7 @@ its implementation under `addins/multimodal`.
 | Journeys | Requirements |
 | --- | --- |
 | Hugging Face, PEFT, TorchAO | `uv`, Git, Docker or Podman, enough memory for Qwen3-0.6B, and network access for the first locked dependency and image build; CUDA is used when available |
-| Hugging Face vision-text | The common requirements, an NVIDIA GPU with at least 24 GB of memory, and roughly 35 GB of temporary disk for two checkpoints and the layered runtime image |
+| Hugging Face vision-text | Linux, Docker with the NVIDIA container runtime, one GPU with at least 24 GB of memory, `uv`, Git, first-run network access, and roughly 35 GB of temporary disk |
 | GGUF | The common requirements plus roughly 3 GB of temporary disk for two pinned downloads and conversion output |
 | LM Evaluation Harness | The common requirements plus the pinned Harness dependency; model execution is offline after the image build |
 | TensorRT-LLM | Linux, Docker with two visible H100 GPUs, and roughly 20 GB of temporary disk |

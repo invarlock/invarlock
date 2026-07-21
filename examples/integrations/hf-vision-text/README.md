@@ -22,7 +22,7 @@ store; the schedule contains no host path or URL.
 
 ## Requirements
 
-- Linux with Docker or Podman and the NVIDIA container runtime;
+- Linux with Docker and the NVIDIA container runtime;
 - one NVIDIA GPU with at least 24 GB of available memory;
 - `uv` and Git;
 - network access for the first dependency, image, and checkpoint download;
