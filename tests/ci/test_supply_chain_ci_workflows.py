@@ -251,8 +251,16 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     install_smoke = _step(build["steps"], "Install smoke from wheel")["run"]
     assert install_smoke.index("release-install-py313.txt") < install_smoke.index(
-        "--no-deps dist/*.whl dist/addins/*.whl"
+        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
     )
+    for isolation_command in (
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONSAFEPATH=1",
+        "unset PYTHONPATH",
+    ):
+        assert install_smoke.index(isolation_command) < install_smoke.index(
+            "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+        )
     assert "python -m pip check" in install_smoke
     assert "CoreRegistry" in install_smoke
     assert "get_runtime_provider" in install_smoke
@@ -278,8 +286,16 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "run"
     ]
     assert install_surface.index("release-install-py313.txt") < install_surface.index(
-        "--no-deps dist/*.whl dist/addins/*.whl"
+        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
     )
+    for isolation_command in (
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONSAFEPATH=1",
+        "unset PYTHONPATH",
+    ):
+        assert install_surface.index(isolation_command) < install_surface.index(
+            "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+        )
     assert "python -m pip check" in install_surface
 
     upload_verify = _step(
@@ -476,8 +492,16 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     smoke = _step(testpypi["steps"], "Install published wheel and smoke test")
     assert "requirements/workflows/pip-bootstrap.txt" in smoke["run"]
     assert smoke["run"].index("release-install-py313.txt") < smoke["run"].index(
-        "--no-deps wheelhouse/*.whl"
+        "--no-deps --force-reinstall wheelhouse/*.whl"
     )
+    for isolation_command in (
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONSAFEPATH=1",
+        "unset PYTHONPATH",
+    ):
+        assert smoke["run"].index(isolation_command) < smoke["run"].index(
+            "--no-deps --force-reinstall wheelhouse/*.whl"
+        )
     assert "python -m pip check" in smoke["run"]
     assert "CoreRegistry" in smoke["run"]
     assert "get_runtime_provider" in smoke["run"]

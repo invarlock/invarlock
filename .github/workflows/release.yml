@@ -338,9 +338,12 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
+          export PYTHONNOUSERSITE=1
+          export PYTHONSAFEPATH=1
+          unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps dist/*.whl dist/addins/*.whl
+          python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
           python -m pip check
           invarlock --help
           python -c "import invarlock.cli.app"
@@ -378,9 +381,12 @@ jobs:
           rm -rf .artifact-venv
           python -m venv .artifact-venv
           . .artifact-venv/bin/activate
+          export PYTHONNOUSERSITE=1
+          export PYTHONSAFEPATH=1
+          unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps dist/*.whl dist/addins/*.whl
+          python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
           python -m pip check
           site_packages="$(python - <<'PY'
           import site
@@ -696,9 +702,12 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
+          export PYTHONNOUSERSITE=1
+          export PYTHONSAFEPATH=1
+          unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps wheelhouse/*.whl
+          python -m pip install --no-deps --force-reinstall wheelhouse/*.whl
           python -m pip check
           invarlock --help
           python -c "import invarlock.cli.app"

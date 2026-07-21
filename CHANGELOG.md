@@ -139,7 +139,8 @@ from the same canonical JSON.
   bytes, image labels, signed canaries, rendered packs, verification receipts,
   and published artifact digests must remain bound to the same candidate. The
   clean-export safeguard prevents ignored local fixtures from producing a false
-  green result.
+  green result, while artifact-install smokes clear source and user import paths
+  before force-installing the exact release wheels.
 - Updated maintained dependency locks to use patched CPU and CUDA packages.
   The LM Evaluation Harness image now derives a deterministic cache-free wheel
   from an authenticated upstream wheel, rejects response-cache use explicitly,
