@@ -235,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
                     container_engine=arguments.container_engine,
                     dockerfile="addins/multimodal/runtime/Dockerfile",
                     image_prefix="invarlock-example-hf-vision-text",
-                    build_arguments=(f"BASE_IMAGE={base_image}",),
+                    build_arguments=(f"RUNTIME_BASE_IMAGE={base_image}",),
                 )
             else:
                 image, image_digest = _runtime_image(
