@@ -969,6 +969,18 @@ def test_launch_main_dispatches_prepare_and_full_runs(
     )
     assert "--prepare-only" in commands[-1]
 
+    disposable = tmp_path / "generated"
+    disposable.mkdir()
+    monkeypatch.setattr(
+        launch.tempfile,
+        "mkdtemp",
+        lambda *, prefix: str(disposable),
+    )
+    assert launch.main(["hf-transformers", "--prepare-only"]) == 0
+    assert commands[-1][commands[-1].index("--workspace") + 1] == str(
+        disposable / "transaction"
+    )
+
     runtime_calls: list[dict[str, object]] = []
 
     def fake_runtime(**kwargs: object) -> tuple[str, str]:
