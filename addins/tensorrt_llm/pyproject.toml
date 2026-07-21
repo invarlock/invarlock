@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock-runtime-tensorrt-llm"
-version = "0.12.1"
+version = "0.13.0"
 description = "First-party TensorRT-LLM runtime provider add-in for InvarLock"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["invarlock==0.12.1"]
+dependencies = ["invarlock==0.13.0"]
 
 [project.entry-points."invarlock.runtime_providers"]
 tensorrt_llm = "invarlock_addins.tensorrt_llm.provider:TensorRTLLMProvider"

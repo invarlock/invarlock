@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.13.0] - 2026-07-21
+
 This release provides one paired model release-regression evaluation. A closed
 request authenticates the baseline and subject artifacts,
 dataset, providers, runtimes, policy, metric or deterministic scorer, execution

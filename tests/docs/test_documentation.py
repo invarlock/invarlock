@@ -588,19 +588,20 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
         assert fragment in security
 
 
-def test_unreleased_changelog_is_a_product_synthesis() -> None:
+def test_latest_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
-    unreleased = changelog.split("## [0.12.1]", maxsplit=1)[0]
-    normalized = " ".join(unreleased.split())
+    unreleased, remainder = changelog.split("## [0.13.0]", maxsplit=1)
+    release = remainder.split("## [0.12.1]", maxsplit=1)[0]
+    normalized = " ".join(release.split())
+    assert "paired model release-regression evaluation" not in unreleased
     assert "paired model release-regression evaluation" in normalized
     assert "exact two-sided McNemar" in normalized
     assert "perplexity ratio as a verifier-derived likelihood" in normalized
-    assert "paired schedule-resampling interval" in unreleased
-    assert "host-to-OCI" in unreleased
-    assert "canonical evidence bundles" in unreleased
-    assert "invarlock.engine" in unreleased
-    assert "invarlock-diagnostics" in unreleased
-    assert "### Added" in unreleased
-    assert "### Changed" in unreleased
-    assert "### Removed" in unreleased
-    assert "### Fixed" in unreleased
+    assert "paired schedule-resampling interval" in release
+    assert "host-to-OCI" in release
+    assert "canonical evidence bundles" in release
+    assert "invarlock.engine" in release
+    assert "invarlock-diagnostics" in release
+    for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
+        assert heading in unreleased
+        assert heading in release
