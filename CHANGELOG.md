@@ -80,7 +80,9 @@ from the same canonical JSON.
 - Aligned the x86_64 CUDA and vision-text runtimes on CUDA 12.6, Torch 2.13,
   and the matching TorchVision release, removing the older CUDA-only Torch and
   Setuptools security exceptions while retaining broad H100/H200 driver
-  compatibility.
+  compatibility. The indexed 400-record Mistral 7B text and Qwen2-VL
+  vision-text comparisons were requalified and independently verified against
+  the resulting runtime images.
 - Consolidated bounded native-process communication across GGUF and
   TensorRT-LLM and introduced a repository-wide complexity ceiling for core,
   add-in, example, and maintenance Python code.
