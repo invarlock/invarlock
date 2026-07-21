@@ -40,14 +40,16 @@ from the same canonical JSON.
   `invarlock.engine` embedding facade. The accepted, rejected, and tamper
   examples now execute from a clean Git export with every required fixture
   tracked.
-- Added maintained ecosystem journeys for Hugging Face checkpoints, PEFT LoRA,
-  TorchAO INT8 materialization, GGUF/llama.cpp, LM Evaluation Harness, and
-  TensorRT-LLM. Each journey obtains or creates its real artifacts and preserves
-  the upstream operation or runtime boundary while completing the same
-  exact-source evaluation, independent verification, and report transaction.
-  The model-based journeys use pinned Qwen3-0.6B-family artifacts across direct
-  checkpoint scoring, adapter merge, weight-only quantization, GGUF execution,
-  harness import, and BF16-to-FP8 TensorRT engine conversion. The offline
+- Added maintained ecosystem journeys for Hugging Face text and vision-text
+  checkpoints, PEFT LoRA, TorchAO INT8 materialization, GGUF/llama.cpp, LM
+  Evaluation Harness, and TensorRT-LLM. Each journey obtains or creates its real
+  artifacts and preserves the upstream operation or runtime boundary while
+  completing the same exact-source evaluation, independent verification, and
+  report transaction. The text and transformation journeys use pinned
+  Qwen3-0.6B-family artifacts across direct checkpoint scoring, adapter merge,
+  weight-only quantization, GGUF execution, harness import, and BF16-to-FP8
+  TensorRT engine conversion. The vision-text journey compares pinned Qwen2-VL
+  2B and 7B checkpoints on a small authenticated image fixture. The offline
   handoff journey covers accepted evidence, a valid policy failure, and byte
   tampering without model downloads.
 
@@ -128,13 +130,15 @@ from the same canonical JSON.
   and published artifact digests must remain bound to the same candidate. The
   clean-export safeguard prevents ignored local fixtures from producing a false
   green result.
-- Updated maintained dependency locks to use patched CPU and CUDA packages while
-  keeping narrowly scoped, expiring exceptions for harness dependencies that do
-  not yet have compatible fixed releases. Pull-request, tag, and release
-  workflows now audit the authoritative locks and retain their reports even
-  when a finding blocks the run. Full-history secret scanning correctly
-  recognizes only the intended digest and key-type metadata fields while still
-  detecting unrelated credentials in the same file.
+- Updated maintained dependency locks to use patched CPU and CUDA packages.
+  The LM Evaluation Harness image now derives a deterministic cache-free wheel
+  from an authenticated upstream wheel, rejects response-cache use explicitly,
+  and excludes the vulnerable, unused `sqlitedict` dependency. The dependency
+  audit allowlist is empty. Pull-request, tag, and release workflows audit the
+  authoritative locks and retain their reports even when a finding blocks the
+  run. Full-history secret scanning recognizes only the intended digest and
+  key-type metadata fields while still detecting unrelated credentials in the
+  same file.
 - Made trust-boundary and TensorRT-LLM examples use fresh private workspaces and
   least-privilege runtime ownership instead of deleting fixed output paths or
   granting world-writable permissions.
