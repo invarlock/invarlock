@@ -38,6 +38,7 @@ from invarlock.evidence_pack_integrity import public_key_fingerprint
 
 _SEED = 20_260_721
 IMAGE_CONTENT_ID = "tutorial_color_grid"
+_SNAPSHOT_REPOSITORY_METADATA = (".gitattributes", "LICENSE", "README.md")
 
 
 @dataclass(frozen=True)
@@ -184,6 +185,7 @@ def download_models(models_root: Path) -> None:
             repo_id=profile.model_id,
             revision=profile.revision,
             local_dir=destination,
+            ignore_patterns=_SNAPSHOT_REPOSITORY_METADATA,
         )
         _make_worker_readable(destination)
         observed = checkpoint_tree_sha256(destination)

@@ -140,6 +140,10 @@ def test_download_models_authenticates_exact_revision_and_tree(
         hf_vision_text.MODEL_PROFILES["baseline"].revision,
         hf_vision_text.MODEL_PROFILES["subject"].revision,
     ]
+    assert all(
+        call["ignore_patterns"] == (".gitattributes", "LICENSE", "README.md")
+        for call in calls
+    )
     assert all(path.stat().st_mode & 0o004 for path in tmp_path.rglob("config.json"))
 
     monkeypatch.setattr(
