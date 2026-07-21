@@ -11,6 +11,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from examples.integrations.local_registry import published_local_image
+
 _INTEGRATIONS = (
     "hf-transformers",
     "hf-vision-text",
@@ -230,22 +232,28 @@ def main(argv: list[str] | None = None) -> int:
                 base_build.mkdir()
                 vision_build.mkdir()
                 base_prefix = "invarlock-example-runtime-cuda"
-                _, base_digest = _runtime_image(
+                base_image, base_digest = _runtime_image(
                     repository=repository,
                     build_root=base_build,
                     container_engine=arguments.container_engine,
                     dockerfile="runtime/Dockerfile.cuda",
                     image_prefix=base_prefix,
                 )
-                base_image = f"{base_prefix}@{base_digest}"
-                image, image_digest = _runtime_image(
+                with published_local_image(
                     repository=repository,
-                    build_root=vision_build,
                     container_engine=arguments.container_engine,
-                    dockerfile="addins/multimodal/runtime/Dockerfile",
-                    image_prefix="invarlock-example-hf-vision-text",
-                    authenticated_base_image=base_image,
-                )
+                    image=base_image,
+                    image_digest=base_digest,
+                    repository_name=base_prefix,
+                ) as published_base:
+                    image, image_digest = _runtime_image(
+                        repository=repository,
+                        build_root=vision_build,
+                        container_engine=arguments.container_engine,
+                        dockerfile="addins/multimodal/runtime/Dockerfile",
+                        image_prefix="invarlock-example-hf-vision-text",
+                        authenticated_base_image=published_base,
+                    )
             else:
                 image, image_digest = _runtime_image(
                     repository=repository,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -364,8 +365,15 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
         digest = "sha256:" + str(len(builds)) * 64
         return digest, digest
 
+    @contextmanager
+    def fake_publish(**kwargs: object):
+        assert kwargs["image"] == "sha256:" + ("1" * 64)
+        assert kwargs["image_digest"] == "sha256:" + ("1" * 64)
+        yield "127.0.0.1:49152/invarlock-example-runtime-cuda@sha256:" + ("1" * 64)
+
     monkeypatch.setattr(launch, "_run", fake_run)
     monkeypatch.setattr(launch, "_runtime_image", fake_runtime)
+    monkeypatch.setattr(launch, "published_local_image", fake_publish)
     monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
 
     assert (
@@ -385,7 +393,7 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
         "addins/multimodal/runtime/Dockerfile",
     ]
     assert builds[1]["authenticated_base_image"] == (
-        "invarlock-example-runtime-cuda@sha256:" + ("1" * 64)
+        "127.0.0.1:49152/invarlock-example-runtime-cuda@sha256:" + ("1" * 64)
     )
     dockerfile = Path(__file__).resolve().parents[2] / (
         "addins/multimodal/runtime/Dockerfile"
@@ -416,6 +424,7 @@ def test_vision_example_sources_are_tracked_for_clean_export() -> None:
     expected = {
         "examples/integrations/hf_vision_text.py",
         "examples/integrations/hf-vision-text/README.md",
+        "examples/integrations/local_registry.py",
     }
     tracked = set(
         subprocess.run(

@@ -77,6 +77,7 @@ _MAINTAINED_INTEGRATION_PATHS = {
     "examples/integrations/hf-vision-text/README.md",
     "examples/integrations/hf_vision_text.py",
     "examples/integrations/launch.py",
+    "examples/integrations/local_registry.py",
     "examples/integrations/lm-evaluation-harness/Dockerfile",
     "examples/integrations/lm-evaluation-harness/README.md",
     "examples/integrations/lm-evaluation-harness/example.py",
