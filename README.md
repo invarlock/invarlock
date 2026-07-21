@@ -202,7 +202,7 @@ make runtime-image \
   RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cpu.json"
 make runtime-smoke
 
-# x86_64 NVIDIA CUDA 12.8
+# x86_64 NVIDIA CUDA 12.6
 make runtime-image-cuda \
   RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
   RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \

@@ -5,9 +5,9 @@ rich==14.3.3
 pyyaml==6.0.3
 jsonschema==4.26.0
 accelerate==1.14.0
-# PyTorch 2.11 is the newest CUDA 12.8 wheel. Keep this pin isolated so CPU
-# runtimes can use the fixed release while the CUDA image migration is tested.
-torch==2.11.0
+# CUDA 12.6 retains compatibility with the qualified H100/H200 fleet while
+# using the same patched Torch release as the CPU and aarch64 runtimes.
+torch==2.13.0
 transformers==5.14.1
 safetensors==0.8.0
 protobuf==7.34.1

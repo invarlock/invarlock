@@ -635,7 +635,7 @@ runtime-smoke-cuda:  ## Confirm the CUDA runtime imports and sees an NVIDIA GPU
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE_CUDA) \
-		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.version.cuda == '12.8'; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu126'; assert torch.version.cuda == '12.6'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: runtime-smoke-cuda  ## Smoke the CUDA runtime image with Podman

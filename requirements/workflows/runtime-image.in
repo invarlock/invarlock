@@ -5,8 +5,7 @@ rich==14.3.3
 pyyaml==6.0.3
 jsonschema==4.26.0
 accelerate==1.14.0
-# CPU and aarch64 use the patched Torch line. CUDA 12.8 has a separate input
-# because PyTorch does not publish a 2.13 wheel for that backend.
+# CPU and aarch64 use the same patched Torch line as the CUDA runtime.
 torch==2.13.0
 transformers==5.14.1
 safetensors==0.8.0

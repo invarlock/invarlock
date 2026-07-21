@@ -169,18 +169,18 @@ run_workflow_locks() {
     --torch-backend cpu
 
   compile_req_platform \
-    "${WORKFLOW_DIR}/runtime-image-cu128.in" \
-    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt" \
+    "${WORKFLOW_DIR}/runtime-image-cu126.in" \
+    "${WORKFLOW_DIR}/runtime-image-py312-cu126.txt" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
-    --torch-backend cu128
+    --torch-backend cu126
 
   compile_req_platform \
     "${WORKFLOW_DIR}/multimodal-runtime.in" \
     "${WORKFLOW_DIR}/multimodal-runtime-py312.txt" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
-    --torch-backend cu128 \
+    --torch-backend cu126 \
     --no-deps
 
   compile_req_platform \

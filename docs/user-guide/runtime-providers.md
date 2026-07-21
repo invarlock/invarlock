@@ -246,7 +246,7 @@ RUNTIME_SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
 make runtime-smoke-cuda
 ```
 
-The CPU target uses `runtime/Dockerfile`; the NVIDIA CUDA 12.8 target uses
+The CPU target uses `runtime/Dockerfile`; the NVIDIA CUDA 12.6 target uses
 `runtime/Dockerfile.cuda`. A CUDA device flag only exposes a GPU to a
 CUDA-capable image.
 

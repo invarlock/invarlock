@@ -109,7 +109,7 @@ bundle path, and bundle digest described in the
 | Runtime | Definition | Build | Smoke check |
 | --- | --- | --- | --- |
 | CPU | `runtime/Dockerfile` | `make runtime-image` | `make runtime-smoke` |
-| x86_64 CUDA 12.8 | `runtime/Dockerfile.cuda` | `make runtime-image-cuda` | `make runtime-smoke-cuda` |
+| x86_64 CUDA 12.6 | `runtime/Dockerfile.cuda` | `make runtime-image-cuda` | `make runtime-smoke-cuda` |
 
 `--runtime-device cuda` and the matching environment variables expose a GPU to
 the selected worker. They do not install CUDA-enabled PyTorch in an image.

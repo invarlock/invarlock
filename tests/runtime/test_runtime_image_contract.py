@@ -156,8 +156,8 @@ def test_cuda_runtime_is_a_separate_minimal_hf_image() -> None:
 
     assert "FROM ${RUNTIME_BUILD_BASE_IMAGE} AS public-wheel" in text
     assert "FROM ${RUNTIME_BASE_IMAGE}" in text
-    assert "runtime-image-py312-cu128.txt" in text
-    assert "https://download.pytorch.org/whl/cu128" in text
+    assert "runtime-image-py312-cu126.txt" in text
+    assert "https://download.pytorch.org/whl/cu126" in text
     assert "NVIDIA_DRIVER_CAPABILITIES=compute,utility" in text
     assert "NVIDIA_VISIBLE_DEVICES=all" not in text
     assert 'test "${TARGETARCH:-amd64}" = amd64' in text
@@ -176,10 +176,10 @@ def test_cuda_runtime_is_a_separate_minimal_hf_image() -> None:
 
 def test_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
     text = ROOT.joinpath(
-        "requirements", "workflows", "runtime-image-py312-cu128.txt"
+        "requirements", "workflows", "runtime-image-py312-cu126.txt"
     ).read_text(encoding="utf-8")
 
-    assert "torch==2.11.0+cu128" in text
+    assert "torch==2.13.0+cu126" in text
     assert "nvidia-cublas-cu12==" in text
     assert "nvidia-cuda-runtime-cu12==" in text
     assert "triton==" in text
@@ -202,7 +202,7 @@ def test_dockerignore_exposes_only_the_canonical_runtime_inputs() -> None:
         "!runtime/Dockerfile",
         "!requirements/workflows/runtime-image-py312.txt",
         "!requirements/workflows/runtime-image-py312-aarch64.txt",
-        "!requirements/workflows/runtime-image-py312-cu128.txt",
+        "!requirements/workflows/runtime-image-py312-cu126.txt",
         "!requirements/workflows/runtime-wheel-build-py312.txt",
         "!runtime/Dockerfile.cuda",
         "!LICENSE",
@@ -226,6 +226,11 @@ def test_make_exposes_separate_cuda_build_and_gpu_smoke_targets() -> None:
     assert "runtime-smoke-cuda:" in text
     assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in text
     assert "--device nvidia.com/gpu=all,--gpus all" in text
-    assert "assert torch.version.cuda == '12.8'" in text
+    assert "assert torch.__version__ == '2.13.0+cu126'" in text
+    assert "assert torch.version.cuda == '12.6'" in text
     assert "assert torch.cuda.is_available()" in text
+    assert "TORCH_DISABLE_NATIVE_JIT=1" in ROOT.joinpath(
+        "runtime/Dockerfile.cuda"
+    ).read_text(encoding="utf-8")
+    assert "torch.bmm(left, right)" in text
     assert "runtime-image-cuda-quant" not in text

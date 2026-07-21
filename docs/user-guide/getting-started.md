@@ -59,7 +59,7 @@ Pass its commit, path, and digest to the build target shown below.
 | Device | Dockerfile | Build and smoke |
 | --- | --- | --- |
 | CPU, including the matching Apple Silicon closure | `runtime/Dockerfile` | `make runtime-image && make runtime-smoke` |
-| x86_64 NVIDIA CUDA 12.8 | `runtime/Dockerfile.cuda` | `make runtime-image-cuda && make runtime-smoke-cuda` |
+| x86_64 NVIDIA CUDA 12.6 | `runtime/Dockerfile.cuda` | `make runtime-image-cuda && make runtime-smoke-cuda` |
 
 The CUDA device flag only exposes a GPU to a CUDA-capable image. It does not
 add CUDA libraries to the CPU image.

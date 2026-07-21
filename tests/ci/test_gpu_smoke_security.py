@@ -40,6 +40,8 @@ def test_cuda_runtime_smoke_is_local_only_and_unprivileged() -> None:
     _assert_hardened_container_smoke(recipe)
     assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in recipe
     assert "torch.cuda.is_available()" in recipe
+    assert "TORCH_DISABLE_NATIVE_JIT" in recipe
+    assert "torch.bmm" in recipe
 
 
 def test_multimodal_smoke_is_local_only_and_unprivileged() -> None:
@@ -49,6 +51,8 @@ def test_multimodal_smoke_is_local_only_and_unprivileged() -> None:
     assert "--gpus all" in recipe
     assert '--entrypoint python "$(IMAGE)"' in recipe
     assert "torch.cuda.is_available()" in recipe
+    assert "TORCH_DISABLE_NATIVE_JIT" in recipe
+    assert "torch.bmm" in recipe
 
 
 def test_gguf_smoke_is_local_only_and_unprivileged() -> None:

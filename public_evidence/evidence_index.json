@@ -7,19 +7,19 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:68098cb03cd54f2949af38af29369077ecbc469ab782a6d82b2dd55a7e0d297e",
-            "manifest.json": "sha256:fd810f879423890605abaa4b404e02cc79f149fd91c93ab8ede1155755845faa",
-            "manifest.signature.json": "sha256:76519df5bdb4e85d1327b273c02f471122fa0a71dc7eabc205e55e852f2e82e4"
+            "checksums.sha256": "sha256:3003ec6176c6bd97bb1fc79aa5532929d9d2a80e5c520357ce0e8a4102fcaee5",
+            "manifest.json": "sha256:c6072084720867a75502fb29159b597e4ee35577e0b2e6c9406cba2482f12c14",
+            "manifest.signature.json": "sha256:a83054e7fd24729e3a118707b828149aeaba6fcef16bb08565c2e915c88bcdff"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence",
-          "size_bytes": 760517
+          "size_bytes": 760481
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json",
-          "sha256": "sha256:0da31486e42a510c1e703ac3e397f6ad7b7f9cb00ef6aa1f7f5350a40b7f000e",
+          "sha256": "sha256:7ead1bdb3caf3b599f98de78537b71cf70014b212029f3116cabd545a5c9bf00",
           "size_bytes": 1477
         }
       },
@@ -32,19 +32,19 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
-            "checksums.sha256": "sha256:b060d96ae9c10a9aa6e493b0c1cd7500b1f4262d717ff7bd69ec147bfcee5350",
-            "manifest.json": "sha256:562a8ab1c410518bf91e0649680297affb67d24878b2dc5ba0d75a187f357cd6",
-            "manifest.signature.json": "sha256:0b16dec8bf9a9aa39737b16def9690916e87925362e26a7d85e89ecd5f183ef9"
+            "checksums.sha256": "sha256:58eca47da2354b6cf4c2d526e448efb15142f6380ea383bea7254e1f2e6f119e",
+            "manifest.json": "sha256:f85d0b94ccf3f1cb58afb235463d5ea72a2172bc39f1ae278d12f6dc039501fe",
+            "manifest.signature.json": "sha256:93d4649ac5c10f395e5b5954491b4639e027e81f070ccc54d6ff07d2eb626f85"
           },
           "file_count": 25,
           "kind": "directory",
           "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/evidence",
-          "size_bytes": 674336
+          "size_bytes": 674300
         },
         "verification_receipt": {
           "kind": "file",
           "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/verification.receipt.json",
-          "sha256": "sha256:2527f0f9d9f32c85257d22b0ed39fab9177a35ce2750e0d31666ed64a06b430d",
+          "sha256": "sha256:1fc76fac363eadf4b7500e1fadf2c856327f18ba7d5a4ed98ab3022a2f629b30",
           "size_bytes": 1477
         }
       },
@@ -106,7 +106,7 @@
   ],
   "evidence_count": 4,
   "evidence_file_count": 104,
-  "evidence_size_bytes": 3012908,
+  "evidence_size_bytes": 3012836,
   "format_version": "invarlock/public-evidence-index-v1",
   "status": "available",
   "status_label": "Evidence available"
