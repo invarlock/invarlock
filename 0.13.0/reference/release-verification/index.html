@@ -2001,9 +2001,9 @@ dependency and must also match runtime-provider ABI <code>1</code> when loaded.<
 <li>audits the installed dependency surface and generates an SBOM;</li>
 <li>records all ten archives in one SHA-256 ledger and attaches build-provenance
     attestations during the tag run; and</li>
-<li>after either TestPyPI or PyPI publication, verifies every hosted archive
-    against that tag-run ledger, installs the hosted wheels together, and
-    repeats the conformance smoke.</li>
+<li>after a complete TestPyPI or PyPI publication, verifies every hosted
+    archive against that tag-run ledger, installs the hosted wheels together,
+    and repeats the conformance smoke.</li>
 </ol>
 <p>These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
@@ -2078,12 +2078,24 @@ provider-conformance, and entry-point smoke.</p>
 tag-to-commit checks, release notes, security review, provenance, and the tag
 workflow are complete, dispatch the workflow again from the release tag,
 select <code>pypi</code>, and provide the same tag workflow run ID as <code>candidate_run_id</code>.
+Use the default <code>complete</code> publication phase for an ordinary release.
 The production jobs consume the exact archives built by the tag run; they do
 not rebuild them or depend on TestPyPI state. A stale, incomplete, or
 filename-colliding TestPyPI project therefore cannot silently select or alter a
 production candidate. Production publication also refuses existing filenames;
 the post-publication verifier cannot turn a mixed or partially replaced release
 into a successful run.</p>
+<p>PyPI permits only three pending trusted publishers at once. When a coordinated
+release creates four new add-in projects for the first time, use the production
+<code>bootstrap</code> phase to publish the core plus the diagnostics, GGUF, and
+vision-text distributions. After those pending publishers become ordinary
+project publishers, register the TensorRT-LLM publisher and dispatch the
+<code>finish</code> phase with the same release tag and <code>candidate_run_id</code>. The finish run
+first confirms that all eight bootstrap archives are hosted byte-for-byte from
+that ledger, publishes only TensorRT-LLM, then verifies all ten hosted archives
+and installs all five wheels together. The two special phases are rejected for
+TestPyPI; later releases use <code>complete</code> and publish all five projects in one
+dispatch.</p>
 <p>Configure a protected <code>v*</code> tag ruleset that blocks updates and deletion. Protect
 each project-scoped PyPI environment with required reviewers and an appropriate
 deployment policy. These repository controls provide the authorization layer
