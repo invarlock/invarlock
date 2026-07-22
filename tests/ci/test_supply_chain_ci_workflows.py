@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import inspect
+import json
 import math
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -177,14 +180,28 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "${{ inputs.release_tag }}" not in resolve_step["run"]
     assert "${{ github.sha }}" not in resolve_step["run"]
     assert resolve_step["env"]["INVARLOCK_EVENT_SHA"] == "${{ github.sha }}"
+    assert resolve_step["env"]["INVARLOCK_MANUAL_CANDIDATE_VERSION"] == (
+        "${{ inputs.candidate_version }}"
+    )
+    assert resolve_step["env"]["INVARLOCK_MANUAL_PUBLISH"] == ("${{ inputs.publish }}")
     assert resolve_step["env"]["INVARLOCK_MANUAL_RELEASE_TAG"] == (
         "${{ inputs.release_tag }}"
     )
     inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-    assert inputs["promotion_run_id"]["default"] == ""
+    assert inputs["candidate_version"]["default"] == ""
+    assert inputs["candidate_run_id"]["default"] == ""
+    assert inputs["publication_phase"]["default"] == "complete"
+    assert inputs["publication_phase"]["options"] == [
+        "complete",
+        "bootstrap",
+        "finish",
+    ]
 
     build = jobs["build_check"]
+    assert "github.event_name == 'push'" in build["if"]
+    assert "inputs.publish != true" in build["if"]
     assert build["timeout-minutes"] >= 120
+    assert build["permissions"] == {"contents": "read"}
     checkout = build["steps"][0]
     assert checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -197,12 +214,19 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert _step(build["steps"], "Run complete repository gates")["run"] == (
         "make verify"
     )
+    build_tooling = _step(build["steps"], "Install build tooling")["run"]
+    assert "requirements/workflows/ci-hf-py313.txt" in build_tooling
+    assert "requirements/workflows/docs-ci-py313.txt" in build_tooling
+    assert "requirements/workflows/release-security-py313.txt" in build_tooling
     release_lock_audit = _step(build["steps"], "Audit maintained dependency locks")[
         "run"
     ]
     assert "scripts/security/cve_audit.py" in release_lock_audit
     release_lock_upload = _step(build["steps"], "Upload dependency audit report")
-    assert release_lock_upload["if"] == "${{ always() }}"
+    assert release_lock_upload["if"] == (
+        "${{ always() && steps.dependency_audit.outcome != 'skipped' }}"
+    )
+    assert release_lock_upload["with"]["if-no-files-found"] == "warn"
     assert "cve-audit.json" in release_lock_upload["with"]["path"]
     assert (
         build["steps"].index(release_lock_upload)
@@ -247,8 +271,16 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     install_smoke = _step(build["steps"], "Install smoke from wheel")["run"]
     assert install_smoke.index("release-install-py313.txt") < install_smoke.index(
-        "--no-deps dist/*.whl dist/addins/*.whl"
+        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
     )
+    for isolation_command in (
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONSAFEPATH=1",
+        "unset PYTHONPATH",
+    ):
+        assert install_smoke.index(isolation_command) < install_smoke.index(
+            "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+        )
     assert "python -m pip check" in install_smoke
     assert "CoreRegistry" in install_smoke
     assert "get_runtime_provider" in install_smoke
@@ -274,8 +306,16 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "run"
     ]
     assert install_surface.index("release-install-py313.txt") < install_surface.index(
-        "--no-deps dist/*.whl dist/addins/*.whl"
+        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
     )
+    for isolation_command in (
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONSAFEPATH=1",
+        "unset PYTHONPATH",
+    ):
+        assert install_surface.index(isolation_command) < install_surface.index(
+            "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+        )
     assert "python -m pip check" in install_surface
 
     upload_verify = _step(
@@ -323,44 +363,80 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         if step.get("name") == "Build first-party distributions"
     )
     assert build["steps"].index(gitleaks_scan) < secret_upload_index
+    assert build["steps"][secret_upload_index]["if"] == (
+        "${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}"
+    )
+    assert build["steps"][secret_upload_index]["with"]["if-no-files-found"] == ("warn")
+    assert build["steps"][secret_failure_index]["if"] == (
+        "${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}"
+    )
     assert secret_upload_index + 1 == secret_failure_index
     assert secret_failure_index < distribution_build_index
 
+    sbom = _step(build["steps"], "Generate release install-surface SBOM")
+    assert sbom["id"] == "generate_sbom"
+    sbom_upload = _step(build["steps"], "Upload SBOM artifact")
+    assert sbom_upload["if"] == (
+        "${{ always() && steps.generate_sbom.outcome != 'skipped' }}"
+    )
+    assert sbom_upload["with"]["if-no-files-found"] == "warn"
+
+    attestation = jobs["attest_candidate"]
+    assert set(attestation["needs"]) == {"build_check", "resolve_release_ref"}
+    assert attestation["if"] == "${{ github.event_name == 'push' }}"
+    assert attestation["permissions"] == {
+        "actions": "read",
+        "attestations": "write",
+        "contents": "read",
+        "id-token": "write",
+    }
+    attestation_download = _step(
+        attestation["steps"], "Download validated distributions"
+    )
+    assert attestation_download["with"] == {"name": "dist", "path": "dist"}
+    attestation_ledger = _step(
+        attestation["steps"], "Reconfirm validated distribution ledger"
+    )
+    assert attestation_ledger["env"]["EXPECTED_DIST_LEDGER_SHA256"] == (
+        "${{ needs.build_check.outputs.dist_ledger_sha256 }}"
+    )
+    assert "sha256sum --check SHA256SUMS" in attestation_ledger["run"]
+    candidate_attestation = _step(
+        attestation["steps"], "Attest tagged release candidate"
+    )
+    assert candidate_attestation["with"]["subject-checksums"] == "dist/SHA256SUMS"
+    provenance_upload = _step(
+        attestation["steps"], "Upload tagged candidate provenance"
+    )
+    assert provenance_upload["with"]["path"] == (
+        "${{ steps.attest_candidate.outputs.bundle-path }}"
+    )
+    assert (
+        attestation["steps"].index(attestation_download)
+        < attestation["steps"].index(attestation_ledger)
+        < attestation["steps"].index(candidate_attestation)
+        < attestation["steps"].index(provenance_upload)
+    )
+
     authorization = jobs["authorize_candidate"]
+    assert authorization["needs"] == "resolve_release_ref"
     assert authorization["permissions"] == {"actions": "read", "contents": "read"}
     authorization_checkout = _step(authorization["steps"], "Checkout release source")
     assert authorization_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
     validate_publication = _step(authorization["steps"], "Validate publication inputs")
-    assert validate_publication["env"]["INVARLOCK_PROMOTION_RUN_ID"] == (
-        "${{ inputs.promotion_run_id }}"
+    assert validate_publication["env"]["INVARLOCK_CANDIDATE_RUN_ID"] == (
+        "${{ inputs.candidate_run_id }}"
     )
     assert (
-        "promotion_run_id must identify a successful TestPyPI run"
+        "candidate_run_id must identify a successful tagged release run"
         in (validate_publication["run"])
     )
-    promotion_download = _step(
-        authorization["steps"], "Download promoted candidate authorization"
-    )
-    assert promotion_download["if"] == "${{ inputs.target == 'pypi' }}"
-    assert promotion_download["with"]["name"] == "testpypi-promotion"
-    assert promotion_download["with"]["run-id"] == (
-        "${{ steps.validate_publication.outputs.candidate_run_id }}"
-    )
-    assert promotion_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
-    authorize = _step(authorization["steps"], "Authorize exact publication candidate")[
-        "run"
-    ]
-    assert authorization["steps"].index(authorization_checkout) < next(
-        index
-        for index, step in enumerate(authorization["steps"])
-        if step.get("name") == "Authorize exact publication candidate"
-    )
+    authenticate = _step(authorization["steps"], "Authenticate tagged candidate run")
+    authenticate_run = authenticate["run"]
     for required in (
-        "scripts/release/testpypi_promotion.py current",
-        "scripts/release/testpypi_promotion.py authorize",
-        "--manifest _promotion/promotion.json",
+        "scripts/release/tagged_release_candidate.py authenticate",
         '--release-sha "${INVARLOCK_RELEASE_SHA}"',
         '--release-tag "${INVARLOCK_RELEASE_TAG}"',
         '--candidate-run-id "${INVARLOCK_CANDIDATE_RUN_ID}"',
@@ -368,32 +444,106 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         '--api-url "${GITHUB_API_URL}"',
         '--github-output "${GITHUB_OUTPUT}"',
     ):
-        assert required in authorize
+        assert required in authenticate_run
+    candidate_download = _step(
+        authorization["steps"], "Download tagged candidate distributions"
+    )
+    assert candidate_download["with"]["name"] == "dist"
+    assert candidate_download["with"]["run-id"] == (
+        "${{ steps.authenticate.outputs.artifact_run_id }}"
+    )
+    assert candidate_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
+    verify_candidate = _step(authorization["steps"], "Verify tagged candidate ledger")
+    assert (
+        "scripts/release/tagged_release_candidate.py verify-ledger"
+        in (verify_candidate["run"])
+    )
+    assert "--dist-dir _release_dist" in verify_candidate["run"]
+    assert authorization["outputs"] == {
+        "artifact_run_id": "${{ steps.authenticate.outputs.artifact_run_id }}",
+        "dist_ledger_sha256": (
+            "${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}"
+        ),
+    }
+    assert (
+        authorization["steps"].index(authenticate)
+        < authorization["steps"].index(candidate_download)
+        < authorization["steps"].index(verify_candidate)
+    )
+    verify_bootstrap = _step(
+        authorization["steps"], "Verify completed bootstrap publication"
+    )
+    assert "inputs.target == 'pypi'" in verify_bootstrap["if"]
+    assert "inputs.publication_phase == 'finish'" in verify_bootstrap["if"]
+    assert verify_bootstrap["env"] == {
+        "EXPECTED_DIST_LEDGER_SHA256": (
+            "${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}"
+        ),
+        "INVARLOCK_RELEASE_VERSION": (
+            "${{ needs.resolve_release_ref.outputs.release_tag }}"
+        ),
+    }
+    for project in (
+        "invarlock",
+        "invarlock-diagnostics",
+        "invarlock-runtime-gguf",
+        "invarlock-runtime-hf-vision-text",
+    ):
+        assert f"--project {project}" in verify_bootstrap["run"]
+    assert "invarlock-runtime-tensorrt-llm" not in verify_bootstrap["run"]
 
-    publish = jobs["publish"]
-    assert publish["permissions"] == {
+    publication_plan = jobs["publication_plan"]
+    assert set(publication_plan["needs"]) == {
+        "authorize_candidate",
+        "resolve_release_ref",
+    }
+    plan_step = _step(publication_plan["steps"], "Resolve publication phase")
+    assert plan_step["env"] == {
+        "INVARLOCK_PUBLICATION_PHASE": "${{ inputs.publication_phase }}",
+        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
+    }
+    for phase in ("complete", "bootstrap", "finish"):
+        assert f"{phase})" in plan_step["run"]
+    assert "bootstrap publication is only valid for production PyPI" in plan_step["run"]
+    assert "finish publication is only valid for production PyPI" in plan_step["run"]
+
+    preparation = jobs["prepare_publication"]
+    assert set(preparation["needs"]) == {
+        "authorize_candidate",
+        "publication_plan",
+        "resolve_release_ref",
+    }
+    assert preparation["permissions"] == {
         "actions": "read",
         "contents": "read",
-        "id-token": "write",
-        "attestations": "write",
     }
-    assert "github.event_name == 'push'" not in publish["if"]
-    assert "github.event_name == 'workflow_dispatch'" in publish["if"]
-    publish_download = _step(publish["steps"], "Download dist artifacts")
-    assert publish_download["with"]["run-id"] == (
+    assert "environment" not in preparation
+    assert "github.event_name == 'push'" not in preparation["if"]
+    assert "github.event_name == 'workflow_dispatch'" in preparation["if"]
+    assert preparation["strategy"]["fail-fast"] is False
+    assert preparation["strategy"]["matrix"] == (
+        "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
+    )
+    candidate_download = _step(preparation["steps"], "Download dist artifacts")
+    assert candidate_download["with"]["run-id"] == (
         "${{ needs.authorize_candidate.outputs.artifact_run_id }}"
     )
-    assert publish_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
-    publish_step = next(
-        step
-        for step in publish["steps"]
-        if str(step.get("uses", "")).startswith("pypa/gh-action-pypi-publish@")
+    assert candidate_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
+    stage_publish = _step(preparation["steps"], "Stage publish distributions")
+    assert stage_publish["env"]["INVARLOCK_PACKAGE"] == "${{ matrix.package }}"
+    for package in (
+        "core",
+        "diagnostics",
+        "runtime-gguf",
+        "runtime-hf-vision-text",
+        "runtime-tensorrt-llm",
+    ):
+        assert f"{package})" in stage_publish["run"]
+    assert 'if [ "${#distributions[@]}" -ne 2 ]' in stage_publish["run"]
+    preparation_tag_recheck = _step(
+        preparation["steps"], "Reconfirm immutable release tag"
     )
-    assert "user" not in publish_step.get("with", {})
-    assert "password" not in publish_step.get("with", {})
-    assert publish_step["with"]["skip-existing"] is True
-    tag_recheck = _step(publish["steps"], "Reconfirm immutable release tag")
-    assert tag_recheck["env"] == {
+    assert preparation_tag_recheck["env"] == {
         "INVARLOCK_RELEASE_SHA": (
             "${{ needs.resolve_release_ref.outputs.release_sha }}"
         ),
@@ -401,13 +551,13 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
             "${{ needs.resolve_release_ref.outputs.release_tag }}"
         ),
     }
-    assert "git ls-remote --tags" in tag_recheck["run"]
-    assert "release tag changed after candidate authorization" in tag_recheck["run"]
-    assert publish["steps"].index(tag_recheck) + 1 == publish["steps"].index(
-        publish_step
+    assert "git ls-remote --tags" in preparation_tag_recheck["run"]
+    assert (
+        "release tag changed after candidate authorization"
+        in preparation_tag_recheck["run"]
     )
     publish_verify = _step(
-        publish["steps"], "Verify distribution digests before publish"
+        preparation["steps"], "Verify distribution digests before publish"
     )
     assert publish_verify["env"]["EXPECTED_DIST_LEDGER_SHA256"] == (
         "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
@@ -416,64 +566,171 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert 'Path("_release_dist/SHA256SUMS")' in publish_verify
     assert "distribution digest ledger changed after build" in publish_verify
     assert 'Path("publish-dist").iterdir()' in publish_verify
-    assert "set(staged) != set(expected)" in publish_verify
+    assert "len(staged) != 2" in publish_verify
+    assert "unknown = set(staged) - set(expected)" in publish_verify
     assert "distribution digest mismatch" in publish_verify
+    conflict_check = _step(
+        preparation["steps"], "Reject conflicting hosted distributions"
+    )
+    assert conflict_check["env"] == {
+        "EXPECTED_DIST_LEDGER_SHA256": (
+            "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
+        ),
+        "INVARLOCK_PACKAGE": "${{ matrix.package }}",
+        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
+        "INVARLOCK_RELEASE_VERSION": (
+            "${{ needs.resolve_release_ref.outputs.release_tag }}"
+        ),
+    }
+    for project in (
+        "invarlock",
+        "invarlock-diagnostics",
+        "invarlock-runtime-gguf",
+        "invarlock-runtime-hf-vision-text",
+        "invarlock-runtime-tensorrt-llm",
+    ):
+        assert project in conflict_check["run"]
+    for required in (
+        "scripts/release/verify_hosted_distributions.py",
+        "--ledger _release_dist/SHA256SUMS",
+        '--expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}"',
+        '--target "${INVARLOCK_PUBLISH_TARGET}"',
+        '--version "${INVARLOCK_RELEASE_VERSION}"',
+        "--attempts 1",
+        '--project "${project}"',
+        "--allow-missing",
+    ):
+        assert required in conflict_check["run"]
     verify_index = next(
         index
-        for index, step in enumerate(publish["steps"])
+        for index, step in enumerate(preparation["steps"])
         if step.get("name") == "Verify distribution digests before publish"
     )
-    attest_index = next(
-        index
-        for index, step in enumerate(publish["steps"])
-        if step.get("name") == "Attest release artifacts"
+    preparation_tag_index = preparation["steps"].index(preparation_tag_recheck)
+    conflict_index = preparation["steps"].index(conflict_check)
+    prepared_upload = _step(preparation["steps"], "Upload verified publication files")
+    assert prepared_upload["with"] == {
+        "name": "publish-dist-${{ matrix.package }}",
+        "path": "publish-dist/*",
+        "if-no-files-found": "error",
+        "retention-days": 1,
+    }
+    assert (
+        verify_index
+        < conflict_index
+        < preparation_tag_index
+        < preparation["steps"].index(prepared_upload)
     )
-    assert verify_index + 1 == attest_index
 
+    publish = jobs["publish"]
+    assert set(publish["needs"]) == {
+        "prepare_publication",
+        "publication_plan",
+        "resolve_release_ref",
+    }
+    assert publish["permissions"] == {"actions": "read", "id-token": "write"}
+    assert publish["strategy"]["fail-fast"] is False
+    assert publish["strategy"]["matrix"] == (
+        "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
+    )
+    assert publish["environment"] == (
+        "${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}"
+    )
+    assert not any(
+        str(step.get("uses", "")).startswith("actions/checkout@")
+        or str(step.get("uses", "")).startswith("actions/setup-python@")
+        for step in publish["steps"]
+    )
+    prepared_download = _step(publish["steps"], "Download verified publication files")
+    assert prepared_download["with"] == {
+        "name": "publish-dist-${{ matrix.package }}",
+        "path": "publish-dist",
+    }
+    publish_tag_recheck = _step(publish["steps"], "Reconfirm immutable release tag")
+    assert "scripts/" not in publish_tag_recheck["run"]
+    assert "git ls-remote --tags" in publish_tag_recheck["run"]
+    assert (
+        "release tag changed after publication preparation"
+        in (publish_tag_recheck["run"])
+    )
+    publish_step = _step(publish["steps"], "Publish to TestPyPI/PyPI")
+    assert "user" not in publish_step.get("with", {})
+    assert "password" not in publish_step.get("with", {})
+    assert publish_step["with"]["skip-existing"] is True
+    assert (
+        publish["steps"].index(prepared_download)
+        < publish["steps"].index(publish_tag_recheck)
+        < publish["steps"].index(publish_step)
+    )
+
+    hosted_job = jobs["verify_hosted_release"]
+    assert set(hosted_job["needs"]) == {
+        "authorize_candidate",
+        "publish",
+        "resolve_release_ref",
+    }
+    assert hosted_job["permissions"] == {"actions": "read", "contents": "read"}
+    assert "inputs.publication_phase != 'bootstrap'" in hosted_job["if"]
+    hosted_checkout = hosted_job["steps"][0]
+    assert hosted_checkout["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    hosted_ledger = _step(hosted_job["steps"], "Download candidate distribution ledger")
+    assert hosted_ledger["with"]["run-id"] == (
+        "${{ needs.authorize_candidate.outputs.artifact_run_id }}"
+    )
     hosted_verify = _step(
-        publish["steps"], "Verify hosted release artifacts match build"
+        hosted_job["steps"], "Verify hosted release artifacts match build"
     )
     assert hosted_verify["env"] == {
         "EXPECTED_DIST_LEDGER_SHA256": (
             "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
         ),
-        "INVARLOCK_PUBLISH_TARGET": "${{ steps.vars.outputs.publish_target }}",
+        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
         "INVARLOCK_RELEASE_VERSION": (
             "${{ needs.resolve_release_ref.outputs.release_tag }}"
         ),
     }
     assert "scripts/release/verify_hosted_distributions.py" in hosted_verify["run"]
     assert "--ledger _release_dist/SHA256SUMS" in hosted_verify["run"]
-    publish_index = publish["steps"].index(publish_step)
-    assert publish_index + 1 == publish["steps"].index(hosted_verify)
     assert "if" not in hosted_verify
 
-    testpypi = jobs["testpypi_smoke"]
-    assert set(testpypi["needs"]) == {
+    published_smoke = jobs["published_install_smoke"]
+    assert set(published_smoke["needs"]) == {
         "authorize_candidate",
-        "publish",
         "resolve_release_ref",
+        "verify_hosted_release",
     }
-    assert testpypi["permissions"] == {"actions": "read", "contents": "read"}
-    testpypi_checkout = testpypi["steps"][0]
-    assert testpypi_checkout["with"]["ref"] == (
+    assert published_smoke["permissions"] == {"actions": "read", "contents": "read"}
+    assert "inputs.publication_phase != 'bootstrap'" in published_smoke["if"]
+    published_checkout = published_smoke["steps"][0]
+    assert published_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
     hosted_download = _step(
-        testpypi["steps"], "Download ledger-selected TestPyPI wheels"
+        published_smoke["steps"], "Download ledger-selected hosted wheels"
     )
     assert hosted_download["env"]["EXPECTED_DIST_LEDGER_SHA256"] == (
         "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
     )
     assert "scripts/release/verify_hosted_distributions.py" in hosted_download["run"]
     assert "--ledger _release_dist/SHA256SUMS" in hosted_download["run"]
+    assert '--target "${INVARLOCK_PUBLISH_TARGET}"' in hosted_download["run"]
     assert "--wheelhouse wheelhouse" in hosted_download["run"]
     assert "urllib.request" not in hosted_download["run"]
-    smoke = _step(testpypi["steps"], "Install published wheel and smoke test")
+    smoke = _step(published_smoke["steps"], "Install published wheels and smoke test")
     assert "requirements/workflows/pip-bootstrap.txt" in smoke["run"]
     assert smoke["run"].index("release-install-py313.txt") < smoke["run"].index(
-        "--no-deps wheelhouse/*.whl"
+        "--no-deps --force-reinstall wheelhouse/*.whl"
     )
+    for isolation_command in (
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONSAFEPATH=1",
+        "unset PYTHONPATH",
+    ):
+        assert smoke["run"].index(isolation_command) < smoke["run"].index(
+            "--no-deps --force-reinstall wheelhouse/*.whl"
+        )
     assert "python -m pip check" in smoke["run"]
     assert "CoreRegistry" in smoke["run"]
     assert "get_runtime_provider" in smoke["run"]
@@ -481,34 +738,82 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "is_relative_to(site)" in smoke["run"]
     assert "first-party version mismatch" in smoke["run"]
 
-    promotion = jobs["record_testpypi_promotion"]
-    assert set(promotion["needs"]) == {
-        "authorize_candidate",
-        "resolve_release_ref",
-        "testpypi_smoke",
-    }
-    assert "needs.testpypi_smoke.result == 'success'" in promotion["if"]
-    promotion_checkout = _step(promotion["steps"], "Checkout release source")
-    assert promotion_checkout["with"]["ref"] == (
-        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    assert "record_testpypi_promotion" not in jobs
+
+
+def test_release_nonpublishing_dispatch_validates_the_event_commit(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    resolve = _step(
+        workflow["jobs"]["resolve_release_ref"]["steps"],
+        "Resolve release ref",
     )
-    promotion_record = _step(
-        promotion["steps"], "Record exact TestPyPI promotion candidate"
+    output = tmp_path / "github-output"
+    event_sha = "a" * 40
+    subprocess.run(
+        ["bash", "-c", resolve["run"]],
+        env={
+            **os.environ,
+            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "GITHUB_OUTPUT": str(output),
+            "GITHUB_REPOSITORY": "invarlock/invarlock",
+            "INVARLOCK_EVENT_SHA": event_sha,
+            "INVARLOCK_MANUAL_CANDIDATE_VERSION": "0.13.0",
+            "INVARLOCK_MANUAL_PUBLISH": "false",
+            "INVARLOCK_MANUAL_RELEASE_TAG": "",
+        },
+        check=True,
+    )
+    assert output.read_text(encoding="utf-8").splitlines() == [
+        "release_tag=v0.13.0",
+        f"release_sha={event_sha}",
+    ]
+
+
+def test_release_nonpublishing_dispatch_rejects_tag_or_invalid_version(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    run = _step(
+        workflow["jobs"]["resolve_release_ref"]["steps"],
+        "Resolve release ref",
     )["run"]
-    assert promotion["steps"].index(promotion_checkout) < next(
-        index
-        for index, step in enumerate(promotion["steps"])
-        if step.get("name") == "Record exact TestPyPI promotion candidate"
+    common = {
+        **os.environ,
+        "GITHUB_EVENT_NAME": "workflow_dispatch",
+        "GITHUB_OUTPUT": str(tmp_path / "github-output"),
+        "GITHUB_REPOSITORY": "invarlock/invarlock",
+        "INVARLOCK_EVENT_SHA": "a" * 40,
+        "INVARLOCK_MANUAL_PUBLISH": "false",
+    }
+    tagged = subprocess.run(
+        ["bash", "-c", run],
+        env={
+            **common,
+            "INVARLOCK_MANUAL_CANDIDATE_VERSION": "0.13.0",
+            "INVARLOCK_MANUAL_RELEASE_TAG": "v0.13.0",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
     )
-    assert "scripts/release/testpypi_promotion.py record" in promotion_record
-    assert '--release-sha "${INVARLOCK_RELEASE_SHA}"' in promotion_record
-    assert '--release-tag "${INVARLOCK_RELEASE_TAG}"' in promotion_record
-    assert '--source-run-id "${GITHUB_RUN_ID}"' in promotion_record
-    promotion_upload = _step(
-        promotion["steps"], "Upload TestPyPI promotion authorization"
+    assert tagged.returncode != 0
+    assert "release_tag must be empty" in tagged.stderr
+
+    invalid = subprocess.run(
+        ["bash", "-c", run],
+        env={
+            **common,
+            "INVARLOCK_MANUAL_CANDIDATE_VERSION": "v0.13.0",
+            "INVARLOCK_MANUAL_RELEASE_TAG": "",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
     )
-    assert promotion_upload["with"]["name"] == "testpypi-promotion"
-    assert promotion_upload["with"]["if-no-files-found"] == "error"
+    assert invalid.returncode != 0
+    assert "candidate_version must be a version" in invalid.stderr
 
 
 def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
@@ -528,8 +833,105 @@ def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
     )
     required_job_minutes = math.ceil(verifier_worst_case_seconds / 60) + 15
 
-    assert jobs["publish"]["timeout-minutes"] >= required_job_minutes
-    assert jobs["testpypi_smoke"]["timeout-minutes"] >= required_job_minutes
+    assert jobs["verify_hosted_release"]["timeout-minutes"] >= required_job_minutes
+    assert jobs["published_install_smoke"]["timeout-minutes"] >= required_job_minutes
+
+
+def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    step = _step(
+        workflow["jobs"]["publication_plan"]["steps"],
+        "Resolve publication phase",
+    )
+    expected = {
+        "complete": [
+            "core",
+            "diagnostics",
+            "runtime-gguf",
+            "runtime-hf-vision-text",
+            "runtime-tensorrt-llm",
+        ],
+        "bootstrap": [
+            "core",
+            "diagnostics",
+            "runtime-gguf",
+            "runtime-hf-vision-text",
+        ],
+        "finish": ["runtime-tensorrt-llm"],
+    }
+    output = tmp_path / "github-output"
+    for phase, expected_packages in expected.items():
+        output.write_text("", encoding="utf-8")
+        subprocess.run(
+            ["bash", "-c", step["run"]],
+            env={
+                **os.environ,
+                "GITHUB_OUTPUT": str(output),
+                "INVARLOCK_PUBLICATION_PHASE": phase,
+                "INVARLOCK_PUBLISH_TARGET": "pypi",
+            },
+            check=True,
+        )
+        line = output.read_text(encoding="utf-8").strip()
+        assert line.startswith("matrix=")
+        matrix = json.loads(line.removeprefix("matrix="))
+        assert [entry["package"] for entry in matrix["include"]] == expected_packages
+
+    rejected = subprocess.run(
+        ["bash", "-c", step["run"]],
+        env={
+            **os.environ,
+            "GITHUB_OUTPUT": str(output),
+            "INVARLOCK_PUBLICATION_PHASE": "bootstrap",
+            "INVARLOCK_PUBLISH_TARGET": "testpypi",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert rejected.returncode != 0
+    assert "only valid for production PyPI" in rejected.stderr
+
+
+def test_release_stages_each_distribution_before_its_publish_job(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    preparation = workflow["jobs"]["prepare_publication"]
+    stage = _step(preparation["steps"], "Stage publish distributions")["run"]
+    release_dist = tmp_path / "_release_dist"
+    addin_dist = release_dist / "addins"
+    addin_dist.mkdir(parents=True)
+
+    expected_prefixes = {
+        "core": (release_dist, "invarlock"),
+        "diagnostics": (addin_dist, "invarlock_diagnostics"),
+        "runtime-gguf": (addin_dist, "invarlock_runtime_gguf"),
+        "runtime-hf-vision-text": (
+            addin_dist,
+            "invarlock_runtime_hf_vision_text",
+        ),
+        "runtime-tensorrt-llm": (
+            addin_dist,
+            "invarlock_runtime_tensorrt_llm",
+        ),
+    }
+    for root, prefix in expected_prefixes.values():
+        (root / f"{prefix}-0.13.0-py3-none-any.whl").write_bytes(b"wheel")
+        (root / f"{prefix}-0.13.0.tar.gz").write_bytes(b"source")
+
+    for package, (_, prefix) in expected_prefixes.items():
+        subprocess.run(
+            ["bash", "-c", stage],
+            cwd=tmp_path,
+            env={**os.environ, "INVARLOCK_PACKAGE": package},
+            check=True,
+        )
+        staged = sorted(path.name for path in (tmp_path / "publish-dist").iterdir())
+        assert staged == [
+            f"{prefix}-0.13.0-py3-none-any.whl",
+            f"{prefix}-0.13.0.tar.gz",
+        ]
 
 
 def test_docs_publish_validates_dispatch_input_before_using_it_as_a_path() -> None:

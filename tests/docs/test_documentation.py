@@ -384,12 +384,13 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
     ):
         assert stale.lower() not in diagram
     for connection in (
-        'd="M 580 99 L 620 99"',
-        'd="M 1020 99 L 980 99"',
-        'd="M 800 141 L 800 163"',
-        'd="M 800 241 L 800 263"',
-        'd="M 430 753 L 430 765"',
-        'd="M 610 753 C 650 758 740 760 790 765"',
+        'd="M 530 99 L 565 99"',
+        'd="M 1100 99 L 1065 99"',
+        'd="M 815 141 L 815 163"',
+        'd="M 815 241 L 815 263"',
+        'd="M 510 680 L 510 700"',
+        'd="M 440 775 L 440 795"',
+        'd="M 650 775 C 700 783 790 788 840 795"',
     ):
         assert connection in svg
     assert 'd="M 610 794 L 640 794"' not in svg
@@ -588,19 +589,20 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
         assert fragment in security
 
 
-def test_unreleased_changelog_is_a_product_synthesis() -> None:
+def test_latest_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
-    unreleased = changelog.split("## [0.12.1]", maxsplit=1)[0]
-    normalized = " ".join(unreleased.split())
+    unreleased, remainder = changelog.split("## [0.13.0]", maxsplit=1)
+    release = remainder.split("## [0.12.1]", maxsplit=1)[0]
+    normalized = " ".join(release.split())
+    assert "paired model release-regression evaluation" not in unreleased
     assert "paired model release-regression evaluation" in normalized
     assert "exact two-sided McNemar" in normalized
     assert "perplexity ratio as a verifier-derived likelihood" in normalized
-    assert "paired schedule-resampling interval" in unreleased
-    assert "host-to-OCI" in unreleased
-    assert "canonical evidence bundles" in unreleased
-    assert "invarlock.engine" in unreleased
-    assert "invarlock-diagnostics" in unreleased
-    assert "### Added" in unreleased
-    assert "### Changed" in unreleased
-    assert "### Removed" in unreleased
-    assert "### Fixed" in unreleased
+    assert "paired schedule-resampling interval" in release
+    assert "host-to-OCI" in release
+    assert "canonical evidence bundles" in release
+    assert "invarlock.engine" in release
+    assert "invarlock-diagnostics" in release
+    for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
+        assert heading in unreleased
+        assert heading in release

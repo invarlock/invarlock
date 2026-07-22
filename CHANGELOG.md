@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.13.0] - 2026-07-21
+
 This release provides one paired model release-regression evaluation. A closed
 request authenticates the baseline and subject artifacts,
 dataset, providers, runtimes, policy, metric or deterministic scorer, execution
@@ -125,11 +135,30 @@ from the same canonical JSON.
 - Fixed worker-unreadable artifact and support mounts to fail on the host with
   an actionable diagnostic before container launch instead of an opaque runtime
   authentication error.
-- Fixed release qualification so deterministic source archives, matching wheel
-  bytes, image labels, signed canaries, rendered packs, verification receipts,
-  and published artifact digests must remain bound to the same candidate. The
-  clean-export safeguard prevents ignored local fixtures from producing a false
-  green result.
+- Fixed release qualification so source, runtime images, signed canaries,
+  rendered packs, verification receipts, and published archive digests remain
+  bound to the same candidate. The protected tag run now builds and attests one
+  authoritative ten-archive distribution set recorded in a single digest
+  ledger. A non-publishing branch dispatch exercises the same Linux release
+  gates before a tag exists. Manual TestPyPI or PyPI publication authenticates
+  and reuses the exact tag-run artifact instead of rebuilding it; TestPyPI
+  remains an optional smoke rather than a production prerequisite. Coordinated
+  core and add-in distributions publish through separate project-scoped trusted
+  identities, including a bounded first-publication sequence for package indexes
+  that limit pending projects, then pass ledger-wide hosted-artifact verification
+  and a clean hosted-wheel install smoke. Interrupted multi-project publication
+  is safely resumable: already hosted files must match the candidate ledger
+  byte-for-byte before they can be skipped, while missing files remain
+  publishable. Diagnostic uploads now remain available after their own gate
+  runs without adding misleading failures when an earlier release gate stops
+  the job. Attestation write access and its OIDC token are confined to a short
+  tag-only job after the read-only build job validates and uploads the
+  digest-bound archive set. PyPI identity tokens are confined to minimal
+  environment-gated jobs that consume previously validated per-project
+  archives and do not execute candidate Python code. Clean-export and
+  isolated-install
+  safeguards prevent ignored local fixtures or source-path imports from
+  producing a false green result.
 - Updated maintained dependency locks to use patched CPU and CUDA packages.
   The LM Evaluation Harness image now derives a deterministic cache-free wheel
   from an authenticated upstream wheel, rejects response-cache use explicitly,

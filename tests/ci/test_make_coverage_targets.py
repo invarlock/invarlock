@@ -81,7 +81,7 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
         "first_party_distribution_validation.py",
         "release_distribution_validation.py",
         "release_preflight.py",
-        "testpypi_promotion.py",
+        "tagged_release_candidate.py",
         "verify_hosted_distributions.py",
     ):
         assert f"--include='scripts/release/{script}' --fail-under=90" in block
@@ -145,7 +145,7 @@ def test_every_maintained_script_is_assigned_to_one_coverage_surface() -> None:
             cwd=ROOT,
             text=True,
         ).splitlines()
-        if not line.endswith("/__init__.py")
+        if not line.endswith("/__init__.py") and (ROOT / line).is_file()
     }
     assigned: Counter[str] = Counter()
     for relative in (

@@ -141,10 +141,16 @@ def _verify_project(
     expected: Mapping[str, str],
     timeout: float,
     wheel_destination: Path | None = None,
+    allow_missing: bool = False,
 ) -> None:
     metadata_url = f"{api_root}/{project}/{version}/json"
-    with _open_url(metadata_url, timeout=timeout) as response:
-        metadata_bytes = response.read(_MAX_METADATA_BYTES + 1)
+    try:
+        with _open_url(metadata_url, timeout=timeout) as response:
+            metadata_bytes = response.read(_MAX_METADATA_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        if allow_missing and exc.code == 404:
+            return
+        raise
     if len(metadata_bytes) > _MAX_METADATA_BYTES:
         raise HostedDistributionVerificationError(
             f"hosted metadata is too large for {project}"
@@ -171,13 +177,22 @@ def _verify_project(
                 f"hosted metadata has malformed or duplicate files for {project}"
             )
         hosted[filename] = entry
-    if set(hosted) != set(expected):
+    if allow_missing:
+        unexpected = set(hosted) - set(expected)
+        if unexpected:
+            raise HostedDistributionVerificationError(
+                f"hosted filename set has conflicts for {project}: "
+                f"expected={sorted(expected)} observed={sorted(hosted)}"
+            )
+    elif set(hosted) != set(expected):
         raise HostedDistributionVerificationError(
             f"hosted filename set differs for {project}: "
             f"expected={sorted(expected)} observed={sorted(hosted)}"
         )
 
-    for name, expected_digest in sorted(expected.items()):
+    names_to_verify = hosted if allow_missing else expected
+    for name in sorted(names_to_verify):
+        expected_digest = expected[name]
         entry = hosted[name]
         digests = entry.get("digests")
         declared_digest = digests.get("sha256") if isinstance(digests, dict) else None
@@ -288,6 +303,8 @@ def verify_hosted_distributions(
     timeout: float = 30.0,
     sleep: Callable[[float], None] = time.sleep,
     wheelhouse: Path | None = None,
+    projects: Sequence[str] | None = None,
+    allow_missing: bool = False,
 ) -> None:
     """Verify hosted metadata and bytes against one authenticated build ledger."""
     if target not in API_ROOTS:
@@ -299,6 +316,17 @@ def verify_hosted_distributions(
         raise HostedDistributionVerificationError("release version is malformed")
     if attempts < 1 or retry_delay < 0 or timeout <= 0:
         raise HostedDistributionVerificationError("retry configuration is invalid")
+    if allow_missing and wheelhouse is not None:
+        raise HostedDistributionVerificationError(
+            "missing hosted files cannot be allowed when materializing wheels"
+        )
+    selected_projects = PROJECTS if projects is None else tuple(projects)
+    if (
+        not selected_projects
+        or len(set(selected_projects)) != len(selected_projects)
+        or not set(selected_projects).issubset(PROJECTS)
+    ):
+        raise HostedDistributionVerificationError("hosted project selection is invalid")
     expected = _parse_build_ledger(
         ledger_path,
         expected_ledger_sha256=expected_ledger_sha256,
@@ -317,7 +345,7 @@ def verify_hosted_distributions(
                         dir=wheel_destination.parent,
                     )
                 )
-            for project in PROJECTS:
+            for project in selected_projects:
                 _verify_project(
                     api_root=API_ROOTS[target],
                     project=project,
@@ -325,6 +353,7 @@ def verify_hosted_distributions(
                     expected=expected[project],
                     timeout=timeout,
                     wheel_destination=temporary,
+                    allow_missing=allow_missing,
                 )
             if temporary is not None and wheel_destination is not None:
                 _publish_wheelhouse(temporary, wheel_destination)
@@ -359,6 +388,15 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--retry-delay", type=float, default=10.0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--wheelhouse", type=Path)
+    parser.add_argument("--project", action="append", choices=PROJECTS)
+    parser.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help=(
+            "accept absent hosted files while still rejecting any hosted file "
+            "that differs from the build ledger"
+        ),
+    )
     return parser
 
 
@@ -374,6 +412,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             retry_delay=args.retry_delay,
             timeout=args.timeout,
             wheelhouse=args.wheelhouse,
+            projects=args.project,
+            allow_missing=args.allow_missing,
         )
     except HostedDistributionVerificationError as exc:
         raise SystemExit(str(exc)) from exc

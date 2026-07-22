@@ -29,10 +29,13 @@ dependency and must also match runtime-provider ABI `1` when loaded.
 
 ## What the release workflow checks
 
-For a tagged or explicitly selected release commit, the repository workflow:
+For a tagged release commit or an explicitly selected pre-tag candidate, the
+repository workflow:
 
-1. resolves the exact tag commit;
-2. requires the workflow event commit to equal the resolved tag commit;
+1. binds a pre-tag validation to the workflow event commit and declared package
+   version, or resolves the exact tag commit for a tag build or publication;
+2. requires a tag build or publication event commit to equal the resolved tag
+   commit;
 3. runs the complete repository, coverage, documentation, contract, and
    workflow gates;
 4. scans the release history range for secrets;
@@ -45,26 +48,40 @@ For a tagged or explicitly selected release commit, the repository workflow:
 9. exercises the public CLI, all provider conformance commands, diagnostics,
    and entry-point discovery;
 10. audits the installed dependency surface and generates an SBOM;
-11. attaches build-provenance attestations to the distributions before
-   publication; and
-12. for a TestPyPI release, verifies every hosted archive against the build
-    ledger, installs the hosted wheels together, repeats the conformance smoke,
-    and records the immutable run and ledger authorized for promotion.
+11. records all ten archives in one SHA-256 ledger and attaches build-provenance
+    attestations during the tag run; and
+12. after a complete TestPyPI or PyPI publication, verifies every hosted
+    archive against that tag-run ledger, installs the hosted wheels together,
+    and repeats the conformance smoke.
 
 These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
 Those belong to the evaluate/verify trust model.
 
-The workflow resolves and checks out the release tag's exact commit before it
-builds. A tag push validates the candidate but does not publish it. Publication
-is an explicit manual action against an existing tag, and the manual workflow
-must be dispatched with that tag as its workflow ref so the event commit and
-resolved tag commit are identical. TestPyPI publication uses
-the distributions built and gated by that run. Production publication requires
-the successful TestPyPI run ID and reuses that run's immutable distribution
-artifact after authenticating its workflow result, release tag, commit, and
-digest ledger. The distribution and promotion artifacts are retained for 14
-days, so production promotion must complete within that interval.
+Before tagging, dispatch the release workflow from the candidate branch with
+`publish` disabled, `release_tag` empty, and `candidate_version` set to the
+package version without a leading `v`. This runs the complete Linux build and
+release gates against the workflow event commit without creating an
+authoritative candidate or publishing anything. The validation job has
+read-only repository permissions. Attestation write access and the OIDC token
+used for provenance are granted only to the short tag-only job that downloads
+the already validated archive set, rechecks its ledger, and creates the
+provenance statement.
+Publication preparation likewise runs without an identity token. Each
+environment-gated publish job downloads only its two previously validated archives,
+rechecks the immutable tag, and invokes the pinned trusted-publishing action;
+it does not check out or execute candidate Python code.
+
+For a tag build or publication, the workflow resolves and checks out the
+release tag's exact commit before it builds. A tag push validates and builds
+the authoritative candidate but does not publish it. Publication is an
+explicit manual action against an existing tag. The manual workflow must be
+dispatched with that tag as its workflow ref and the successful tag-run ID as
+`candidate_run_id`, so the event commit, resolved tag commit, workflow-run
+identity, and downloaded artifact agree.
+Manual publication does not rebuild the archives. The tagged distribution and
+provenance artifacts are retained for 14 days, so publication must complete
+within that interval.
 
 Build provenance uses GitHub's [artifact-attestation
 mechanism](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
@@ -109,7 +126,9 @@ artifacts by base name. `X.Y.Z` is
 the candidate version without a leading `v`; preflight rejects a dirty checkout,
 a different `HEAD`, unexpected artifacts, metadata/content mismatch, or a hash
 change. A passing result is release-candidate evidence, not authorization to
-tag or publish.
+tag or publish. Run the non-publishing branch workflow after these local checks
+to exercise the same release surface on the hosted Linux runner before creating
+a release tag.
 
 The local preflight intentionally validates the core pair in depth while
 `make dist-check` validates every archive against its checkout source and
@@ -120,36 +139,56 @@ preflight.
 
 ## Test index and production publication
 
-For a candidate tag, use a manual TestPyPI publication first, selecting the
-release tag itself as the workflow ref. Leave `promotion_run_id` empty for this
-run. The workflow
-downloads all five published wheels from the index, compares each download with
-the digest returned by that index, installs the set together, and reruns the
-CLI, diagnostics, provider-conformance, and entry-point smoke. Review the
-provenance bundle and SBOM produced by the same tag workflow. A successful
-smoke produces a `testpypi-promotion` artifact bound to the exact release tag,
-commit, distribution ledger, and workflow run.
+TestPyPI is an optional publication and installation smoke, not the source of
+the production candidate. To use it, dispatch the release workflow from the
+release tag, select `testpypi`, and provide the successful tag workflow run's
+numeric ID as `candidate_run_id`. The workflow authenticates that the supplied
+run is a successful tag-push execution of the release workflow at the exact tag
+and commit. It then downloads that run's immutable distribution artifact,
+checks the closed ten-file set and its ledger, publishes through the five
+project-scoped TestPyPI identities, verifies all hosted archives, installs the
+five hosted wheels together, and reruns the CLI, diagnostics,
+provider-conformance, and entry-point smoke.
 
-Publish to the production index only when the TestPyPI smoke, local preflight,
-tag-to-commit check, release notes, and security review all refer to the same
-candidate. Start a separate manual production run with that successful
-TestPyPI run's numeric ID as `promotion_run_id`, again selecting the release
-tag as the workflow ref. The production job retrieves the immutable
-distribution artifact from that run and rejects a failed run, a different
-workflow, tag, commit, target, or digest ledger. Production publication remains
-a separate trusted-environment action; copying a TestPyPI URL or its downloaded
-bytes is not by itself publication authorization.
+Production uses the same tagged candidate directly. Once local preflight,
+tag-to-commit checks, release notes, security review, provenance, and the tag
+workflow are complete, dispatch the workflow again from the release tag,
+select `pypi`, and provide the same tag workflow run ID as `candidate_run_id`.
+Use the default `complete` publication phase for an ordinary release.
+The production jobs consume the exact archives built by the tag run; they do
+not rebuild them or depend on TestPyPI state. A stale, incomplete, or
+filename-colliding TestPyPI project therefore cannot silently select or alter a
+production candidate. Before upload, each publication job downloads and checks
+any already hosted files for its exact version against the candidate ledger.
+Absent files may be uploaded and ledger-identical files may be skipped, making
+an interrupted multi-project publication safe to resume. Any conflicting
+filename, metadata digest, or downloaded bytes fail before upload, and the
+post-publication verifier cannot turn a mixed or partially replaced release
+into a successful run.
 
-Configure a protected `v*` tag ruleset that blocks updates and deletion, and
-protect the `pypi` environment with required reviewers and an appropriate
+PyPI permits only three pending trusted publishers at once. When a coordinated
+release creates four new add-in projects for the first time, use the production
+`bootstrap` phase to publish the core plus the diagnostics, GGUF, and
+vision-text distributions. After those pending publishers become ordinary
+project publishers, register the TensorRT-LLM publisher and dispatch the
+`finish` phase with the same release tag and `candidate_run_id`. The finish run
+first confirms that all eight bootstrap archives are hosted byte-for-byte from
+that ledger, publishes only TensorRT-LLM, then verifies all ten hosted archives
+and installs all five wheels together. The two special phases are rejected for
+TestPyPI; later releases use `complete` and publish all five projects in one
+dispatch.
+
+Configure a protected `v*` tag ruleset that blocks updates and deletion. Protect
+each project-scoped PyPI environment with required reviewers and an appropriate
 deployment policy. These repository controls provide the authorization layer
-around the workflow's commit, artifact, and promotion checks.
+around the workflow's commit, tag-run artifact, ledger, and trusted-publisher
+identity.
 
-After production publication, download the five wheels again from the
-production index, compare hosted digests, install them together in a clean
-environment, and repeat the conformance smoke. Reconcile the published
-filenames, version, source tag, provenance subjects, and release assets before
-announcing completion.
+After production publication, the workflow downloads all ten archives from
+PyPI, compares their hashes with the tag-run ledger, installs the five hosted
+wheels together in a clean environment, and repeats the conformance smoke.
+Reconcile the published filenames, version, source tag, provenance subjects,
+and release assets before announcing completion.
 
 ## Installation and provenance checks
 

@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import re
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,162 @@ def test_verify_hosted_distributions_accepts_exact_build_bytes(
     )
 
 
+def test_verify_hosted_distributions_accepts_authenticated_project_subset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = "pypi"
+    ledger, ledger_digest, metadata, downloads = _release_fixture(
+        tmp_path, target=target
+    )
+    selected = verifier.PROJECTS[:-1]
+    tensorrt_metadata = (
+        f"{verifier.API_ROOTS[target]}/{verifier.PROJECTS[-1]}/1.2.3/json"
+    )
+    metadata.pop(tensorrt_metadata)
+    _install_fake_network(
+        monkeypatch,
+        metadata=metadata,
+        downloads=downloads,
+    )
+
+    verifier.verify_hosted_distributions(
+        ledger_path=ledger,
+        expected_ledger_sha256=ledger_digest,
+        target=target,
+        version="v1.2.3",
+        attempts=1,
+        projects=selected,
+    )
+
+
+def test_hosted_project_allows_absent_release_during_conflict_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing(url: str, *, timeout: float) -> io.BytesIO:
+        raise urllib.error.HTTPError(url, 404, "missing", None, None)
+
+    monkeypatch.setattr(verifier, "_open_url", missing)
+    verifier._verify_project(
+        api_root=verifier.API_ROOTS["pypi"],
+        project="invarlock",
+        version="1.2.3",
+        expected={
+            "invarlock-1.2.3-py3-none-any.whl": "1" * 64,
+            "invarlock-1.2.3.tar.gz": "2" * 64,
+        },
+        timeout=30,
+        allow_missing=True,
+    )
+
+
+def test_hosted_project_allows_only_ledger_identical_existing_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = "invarlock"
+    version = "1.2.3"
+    filename = "invarlock-1.2.3-py3-none-any.whl"
+    payload = b"already hosted candidate wheel"
+    digest = hashlib.sha256(payload).hexdigest()
+    metadata_url = f"{verifier.API_ROOTS['pypi']}/{project}/{version}/json"
+    download_url = f"https://files.example.invalid/{filename}"
+    metadata = {
+        metadata_url: json.dumps(
+            {
+                "urls": [
+                    {
+                        "filename": filename,
+                        "digests": {"sha256": digest},
+                        "url": download_url,
+                    }
+                ]
+            }
+        ).encode()
+    }
+    _install_fake_network(
+        monkeypatch,
+        metadata=metadata,
+        downloads={download_url: payload},
+    )
+
+    verifier._verify_project(
+        api_root=verifier.API_ROOTS["pypi"],
+        project=project,
+        version=version,
+        expected={filename: digest, "invarlock-1.2.3.tar.gz": "2" * 64},
+        timeout=30,
+        allow_missing=True,
+    )
+
+
+@pytest.mark.parametrize("mutation", ["filename", "declared-digest", "bytes"])
+def test_hosted_project_rejects_conflicting_existing_files(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    project = "invarlock"
+    version = "1.2.3"
+    filename = "invarlock-1.2.3-py3-none-any.whl"
+    payload = b"already hosted candidate wheel"
+    digest = hashlib.sha256(payload).hexdigest()
+    hosted_name = "conflicting.whl" if mutation == "filename" else filename
+    declared_digest = "0" * 64 if mutation == "declared-digest" else digest
+    download_url = f"https://files.example.invalid/{hosted_name}"
+    hosted_payload = b"different bytes" if mutation == "bytes" else payload
+    metadata_url = f"{verifier.API_ROOTS['pypi']}/{project}/{version}/json"
+    metadata = {
+        metadata_url: json.dumps(
+            {
+                "urls": [
+                    {
+                        "filename": hosted_name,
+                        "digests": {"sha256": declared_digest},
+                        "url": download_url,
+                    }
+                ]
+            }
+        ).encode()
+    }
+    _install_fake_network(
+        monkeypatch,
+        metadata=metadata,
+        downloads={download_url: hosted_payload},
+    )
+
+    with pytest.raises(
+        verifier.HostedDistributionVerificationError,
+        match="conflicts|digest differs|bytes differ",
+    ):
+        verifier._verify_project(
+            api_root=verifier.API_ROOTS["pypi"],
+            project=project,
+            version=version,
+            expected={filename: digest, "invarlock-1.2.3.tar.gz": "2" * 64},
+            timeout=30,
+            allow_missing=True,
+        )
+
+
+@pytest.mark.parametrize("projects", [(), ("unknown",), ("invarlock", "invarlock")])
+def test_verify_hosted_distributions_rejects_invalid_project_subset(
+    tmp_path: Path, projects: tuple[str, ...]
+) -> None:
+    ledger, ledger_digest, _metadata, _downloads = _release_fixture(
+        tmp_path, target="pypi"
+    )
+    with pytest.raises(
+        verifier.HostedDistributionVerificationError,
+        match="project selection is invalid",
+    ):
+        verifier.verify_hosted_distributions(
+            ledger_path=ledger,
+            expected_ledger_sha256=ledger_digest,
+            target="pypi",
+            version="v1.2.3",
+            attempts=1,
+            projects=projects,
+        )
+
+
 def test_verify_hosted_distributions_materializes_only_ledger_selected_wheels(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -147,6 +304,23 @@ def test_verify_hosted_distributions_refuses_existing_wheelhouse(
             version="v1.2.3",
             attempts=1,
             wheelhouse=wheelhouse,
+        )
+
+
+def test_conflict_check_cannot_materialize_an_incomplete_wheelhouse(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        verifier.HostedDistributionVerificationError,
+        match="cannot be allowed when materializing wheels",
+    ):
+        verifier.verify_hosted_distributions(
+            ledger_path=tmp_path / "unused",
+            expected_ledger_sha256="0" * 64,
+            target="pypi",
+            version="1.2.3",
+            wheelhouse=tmp_path / "wheelhouse",
+            allow_missing=True,
         )
 
 
@@ -298,11 +472,44 @@ def test_cli_verifies_hosted_release(
             "v1.2.3",
             "--attempts",
             "1",
+            "--project",
+            "invarlock",
         ]
     )
 
     assert result == 0
     assert "testpypi release 1.2.3 matches build ledger" in capsys.readouterr().out
+
+
+def test_cli_forwards_allow_missing_for_safe_publication_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    observed: dict[str, Any] = {}
+
+    def capture(**kwargs: Any) -> None:
+        observed.update(kwargs)
+
+    monkeypatch.setattr(verifier, "verify_hosted_distributions", capture)
+    assert (
+        verifier.main(
+            [
+                "--ledger",
+                str(tmp_path / "SHA256SUMS"),
+                "--expected-ledger-sha256",
+                "0" * 64,
+                "--target",
+                "pypi",
+                "--version",
+                "1.2.3",
+                "--project",
+                "invarlock",
+                "--allow-missing",
+            ]
+        )
+        == 0
+    )
+    assert observed["allow_missing"] is True
 
 
 @pytest.mark.parametrize(
