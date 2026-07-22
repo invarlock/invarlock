@@ -2016,9 +2016,10 @@ Those belong to the evaluate/verify trust model.</p>
 package version without a leading <code>v</code>. This runs the complete Linux build and
 release gates against the workflow event commit without creating an
 authoritative candidate or publishing anything. The validation job has
-read-only repository permissions. OIDC and attestation write permissions are
-granted only to the short tag-only job that downloads the already validated
-archive set, rechecks its ledger, and creates the provenance statement.
+read-only repository permissions. Attestation write access and the OIDC token
+used for provenance are granted only to the short tag-only job that downloads
+the already validated archive set, rechecks its ledger, and creates the
+provenance statement.
 Publication preparation likewise runs without an identity token. Each
 environment-gated publish job downloads only its two previously validated archives,
 rechecks the immutable tag, and invokes the pinned trusted-publishing action;
