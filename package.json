@@ -6,9 +6,9 @@
   },
   "devDependencies": {
     "cspell": "^10.0.1",
-    "markdownlint-cli2": "^0.23.0"
+    "markdownlint-cli2": "^0.23.1"
   },
   "dependencies": {
-    "katex": "^0.17.0"
+    "katex": "^0.18.1"
   }
 }

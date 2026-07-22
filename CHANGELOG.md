@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refreshed the maintained Python, documentation, and GitHub Actions dependency
+  baselines together with their hash-pinned workflow locks, and added direct
+  declaration-to-lock parity coverage so automation cannot silently exercise
+  versions outside the repository's declared constraints.
+
 ### Removed
 
 ### Fixed
