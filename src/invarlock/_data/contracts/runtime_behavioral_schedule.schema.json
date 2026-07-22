@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_behavioral_schedule.schema.json",
+  "title": "InvarLock Runtime Behavioral Schedule",
+  "$comment": "Loaders reject source or canonical schedule material over 16777216 UTF-8 bytes.",
+  "type": "object",
+  "required": ["format_version", "task", "dataset_identity", "records"],
+  "properties": {
+    "format_version": {
+      "const": "invarlock/runtime-behavioral-schedule-v1"
+    },
+    "task": {"$ref": "#/$defs/taskName"},
+    "dataset_identity": {"$ref": "#/$defs/datasetIdentity"},
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "providerName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "taskName": {
+      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; the canonical pattern permits later add-in tasks without changing the provider ABI.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "logicalName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*:/)(?!.*//)(?!.*\\/$)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]*\\S$"
+    },
+    "recordId": {
+      "allOf": [
+        {"$ref": "#/$defs/logicalName"},
+        {"maxLength": 256}
+      ]
+    },
+    "splitName": {
+      "allOf": [
+        {"$ref": "#/$defs/logicalName"},
+        {"maxLength": 128}
+      ]
+    },
+    "immutableRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "datasetIdentity": {
+      "type": "object",
+      "required": [
+        "provider",
+        "dataset_name",
+        "config_name",
+        "revision",
+        "split"
+      ],
+      "properties": {
+        "provider": {"$ref": "#/$defs/providerName"},
+        "dataset_name": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/logicalName"}
+          ]
+        },
+        "config_name": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/logicalName"}
+          ]
+        },
+        "revision": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/immutableRevision"}
+          ]
+        },
+        "split": {"$ref": "#/$defs/splitName"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "provider": {
+                "enum": ["hf_text", "hf_seq2seq", "wikitext2"]
+              }
+            },
+            "required": ["provider"]
+          },
+          "then": {
+            "properties": {
+              "dataset_name": {"$ref": "#/$defs/logicalName"},
+              "config_name": {"$ref": "#/$defs/logicalName"},
+              "revision": {"$ref": "#/$defs/immutableRevision"}
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "record": {
+      "type": "object",
+      "required": [
+        "record_id",
+        "input_parts",
+        "input_sha256",
+        "expected_output"
+      ],
+      "properties": {
+        "record_id": {"$ref": "#/$defs/recordId"},
+        "input_parts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/inputPart"}
+        },
+        "input_sha256": {"$ref": "#/$defs/sha256"},
+        "expected_output": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": false
+    },
+    "inputPart": {
+      "oneOf": [
+        {"$ref": "#/$defs/textInputPart"},
+        {"$ref": "#/$defs/contentInputPart"}
+      ]
+    },
+    "partRole": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "textInputPart": {
+      "type": "object",
+      "required": ["kind", "role", "text", "sha256"],
+      "properties": {
+        "kind": {"const": "text"},
+        "role": {"$ref": "#/$defs/partRole"},
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "pattern": "\\S"
+        },
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "contentInputPart": {
+      "$comment": "content_id is a caller-owned canonical identifier, never a path or URI. A provider resolves it through caller-supplied resources and authenticates the declared size and digest before use.",
+      "type": "object",
+      "required": [
+        "kind",
+        "role",
+        "content_id",
+        "media_type",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {"const": "content"},
+        "role": {"$ref": "#/$defs/partRole"},
+        "content_id": {"$ref": "#/$defs/partRole"},
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$"
+        },
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

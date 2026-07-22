@@ -1,2034 +1,678 @@
 #!/usr/bin/env python3
-"""Audit public evidence classification and verifier metadata."""
+"""Audit the canonical public evidence index and any local evidence packs."""
 
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
-import math
 import re
 import sys
-from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlsplit
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PUBLIC_EVIDENCE_ROOT = REPO_ROOT / "public_evidence"
-META_FILENAME = "evidence.meta.json"
-SCHEMA = "invarlock.public_evidence.meta.v1"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-
-EVIDENCE_CLASS_REGISTRY: dict[str, dict[str, str | None]] = {
-    "contract_fixture": {"kind": "fixture", "specialized_checker": None},
-    "strict_pass_fixture": {"kind": "fixture", "specialized_checker": None},
-    "caught_regression_fixture": {"kind": "fixture", "specialized_checker": None},
-    "policy_failure_fixture": {"kind": "fixture", "specialized_checker": None},
-    "byoe_subject_fixture": {"kind": "fixture", "specialized_checker": None},
-    "real_model_run": {"kind": "real", "specialized_checker": None},
-    "real_guard_value_demo": {
-        "kind": "real",
-        "specialized_checker": "guard_value_demo",
-    },
-    "signed_real_model_pack": {"kind": "real", "specialized_checker": None},
-    "runtime_backend_compatibility": {
-        "kind": "summary",
-        "specialized_checker": "runtime_backend_compatibility",
-    },
-    "evidence_pack_lifecycle_stress": {
-        "kind": "summary",
-        "specialized_checker": "evidence_pack_lifecycle_stress",
-    },
-    "attention_backend_compatibility": {
-        "kind": "summary",
-        "specialized_checker": "attention_backend_compatibility",
-    },
-    "larger_model_validation_findings": {
-        "kind": "summary",
-        "specialized_checker": "larger_model_validation_findings",
-    },
-}
-RUNTIME_BACKEND_COMPATIBILITY_SUMMARY_SCHEMA = (
-    "invarlock.runtime_backend_compatibility.cuda128.summary.v1"
+from invarlock.evidence_pack_integrity import (  # noqa: E402
+    public_key_fingerprint,
 )
-RUNTIME_BACKEND_COMPATIBILITY_HASH_SCHEMA = (
-    "invarlock.runtime_backend_compatibility.cuda128.hash_inventory.v1"
+from invarlock.evidence_reporting import (  # noqa: E402
+    EvidenceReportError,
+    render_evidence,
 )
-EVIDENCE_PACK_LIFECYCLE_STRESS_SUMMARY_SCHEMA = (
-    "invarlock.evidence_pack_lifecycle_stress.summary.v1"
-)
-EVIDENCE_PACK_LIFECYCLE_STRESS_HASH_SCHEMA = (
-    "invarlock.evidence_pack_lifecycle_stress.hash_inventory.v1"
-)
-ATTENTION_BACKEND_SUMMARY_SCHEMA = (
-    "invarlock.attention_backend_compatibility.summary.v1"
-)
-ATTENTION_BACKEND_HASH_SCHEMA = (
-    "invarlock.attention_backend_compatibility.hash_inventory.v1"
-)
-LARGER_MODEL_VALIDATION_LANE_OUTCOMES_SCHEMA = (
-    "invarlock.larger_model_validation_findings.lane_outcomes.v1"
-)
-LARGER_MODEL_VALIDATION_HASH_SCHEMA = (
-    "invarlock.larger_model_validation_findings.hash_inventory.v1"
-)
-RUNTIME_BACKEND_FAMILIES = {
-    "cuda-bnb": ("hf_bnb",),
-    "cuda-compressed-tensors": ("hf_ct",),
-    "cuda-gptqmodel": ("hf_awq", "hf_gptq"),
-    "cuda-hqq": ("hf_hqq",),
-    "cuda-quanto": ("hf_quanto",),
-    "cuda-torchao": ("hf_torchao",),
-}
-RUNTIME_BACKEND_IMAGE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY = 0.10
-PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES = 200
-PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE = 0.95
-PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_WORDS = 12
-PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_CHARS = 80
-PUBLIC_TEXT_SUFFIXES = {".json", ".jsonl", ".md", ".txt", ".yaml", ".yml"}
-
-PRIVATE_EXECUTION_PATTERNS = (
-    (
-        "root_ssh_target",
-        re.compile(r"\broot@[A-Za-z0-9._-]+\b"),
-        "replace root SSH targets with a generic CUDA validation host label",
-    ),
-    (
-        "private_ip_address",
-        re.compile(
-            r"(?<![A-Za-z0-9])"
-            r"(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}"
-            r"(?:25[0-5]|2[0-4]\d|1?\d?\d)"
-            r"(?![A-Za-z0-9])"
-        ),
-        "replace private host IP addresses with a generic host label",
-    ),
-    (
-        "absolute_root_path",
-        re.compile(r"(?<![A-Za-z0-9._-])/root(?:/[^\s\"'`,)}\]]*)?"),
-        "replace absolute root paths with generic validation-root placeholders",
-    ),
-    (
-        "private_tmp_path",
-        re.compile(r"(?<![A-Za-z0-9._-])/private/tmp(?:/[^\s\"'`,)}\]]*)?"),
-        "replace private temporary paths with generic local-run placeholders",
-    ),
-    (
-        "macos_var_folder_path",
-        re.compile(r"(?<![A-Za-z0-9._-])/var/folders(?:/[^\s\"'`,)}\]]*)?"),
-        "replace macOS temporary paths with generic local-temp placeholders",
-    ),
-    (
-        "home_directory_path",
-        re.compile(r"(?<![A-Za-z0-9._-])/home/[A-Za-z0-9._-]+(?:/[^\s\"'`,)}\]]*)?"),
-        "replace home-directory paths with generic validation-root placeholders",
-    ),
+from scripts.checks.sync_packaged_public_evidence import (  # noqa: E402
+    EVIDENCE_DIRNAME,
+    INDEX_FILENAME,
+    INDEX_FORMAT_VERSION,
+    PACKAGED_ROOT,
+    SOURCE_ROOT,
+    _artifact_summary,
+    _read_object,
+    _validate_index,
+    _validate_metadata,
 )
 
-
-def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        return None, f"{path}: unable to read JSON: {exc}"
-    except json.JSONDecodeError as exc:
-        return None, f"{path}: invalid JSON: {exc}"
-    if not isinstance(payload, dict):
-        return None, f"{path}: expected JSON object"
-    return payload, None
-
-
-def _is_inside_special_dir(path: Path, root: Path) -> bool:
-    parts = set(path.relative_to(root).parts)
-    return bool(parts & {"artifact_package", "evidence_pack"})
-
-
-def _artifact_dirs(root: Path) -> set[Path]:
-    dirs: set[Path] = set()
-    for metadata in root.rglob(META_FILENAME):
-        if metadata.is_file() and not _is_inside_special_dir(metadata, root):
-            dirs.add(metadata.parent)
-    for path in root.rglob("*"):
-        if not path.is_file() or path.name.startswith("."):
-            continue
-        if _is_inside_special_dir(path, root):
-            continue
-        if path.name in {
-            "evaluation.report.json",
-            "runtime.manifest.json",
-            "checkpoint_refs.json",
-            "evidence_pack_recipe.json",
-        }:
-            dirs.add(path.parent)
-    for manifest in root.rglob("evidence_pack/manifest.json"):
-        dirs.add(manifest.parent.parent)
-    return dirs
+_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
+_IDENTITY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+_RECEIPT_FORMAT_V1 = "invarlock/evidence-verification-receipt-v1"
+_RECEIPT_FORMAT_V2 = "invarlock/evidence-verification-receipt-v2"
+_RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
+_PRIVATE_MARKERS = (
+    "/Users/",
+    "/home/",
+    "/root/",
+    "ssh root@",
+    "INVARLOCK_SIGNING_KEY",
+    "PRIVATE KEY",
+)
+_OBSOLETE_MARKERS = (
+    "published_basis",
+    "frozen-v1",
+    "catalog_evidence_index",
+    "catalog_evidence/",
+)
+_IGNORED_LOCAL_METADATA = frozenset({".DS_Store"})
 
 
-def _relative(path: Path, root: Path = REPO_ROOT) -> str:
-    try:
-        return path.relative_to(root).as_posix()
-    except ValueError:
-        return str(path)
+def _is_ignored_local_metadata(path: Path) -> bool:
+    return (
+        path.name in _IGNORED_LOCAL_METADATA
+        and path.is_file()
+        and not path.is_symlink()
+    )
 
 
-def _check_public_evidence_privacy(errors: list[str], root: Path) -> None:
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix not in PUBLIC_TEXT_SUFFIXES:
-            continue
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except (OSError, UnicodeDecodeError) as exc:
-            errors.append(f"{_relative(path)}: unable to scan public text: {exc}")
-            continue
-        for line_number, line in enumerate(lines, start=1):
-            for name, pattern, message in PRIVATE_EXECUTION_PATTERNS:
-                if pattern.search(line):
-                    errors.append(f"{_relative(path)}:{line_number}: {name}: {message}")
+def _canonical_json_bytes(value: object) -> bytes:
+    return (
+        json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
 
 
-def _require_path(
+def _sha256_bytes(value: bytes) -> str:
+    return f"sha256:{hashlib.sha256(value).hexdigest()}"
+
+
+def _valid_digest(value: object) -> bool:
+    return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
+
+
+def _check_receipt_anchors(
     errors: list[str],
-    base: Path,
-    artifact_paths: dict[str, Any],
-    key: str,
+    receipt: Path,
+    anchors: object,
     *,
-    directory: bool = False,
-) -> Path | None:
-    raw = artifact_paths.get(key)
-    if not isinstance(raw, str) or not raw.strip():
-        errors.append(f"{_relative(base)}: artifact_paths.{key} is required")
-        return None
-    path = base / raw
-    exists = path.is_dir() if directory else path.is_file()
-    if not exists:
-        kind = "directory" if directory else "file"
-        errors.append(f"{_relative(base)}: missing {kind} {raw!r}")
-        return None
-    return path
-
-
-def _as_finite_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        result = float(value)
-        return result if math.isfinite(result) else None
-    return None
-
-
-def _as_int(value: Any) -> int | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    return None
-
-
-def _report_primary_metric(report: dict[str, Any]) -> dict[str, Any]:
-    primary = report.get("primary_metric")
-    if isinstance(primary, dict):
-        return primary
-    metrics = report.get("metrics")
-    if isinstance(metrics, dict) and isinstance(metrics.get("primary_metric"), dict):
-        return metrics["primary_metric"]
-    return {}
-
-
-def _classification_final_counts(
-    report: dict[str, Any],
-) -> tuple[int | None, int | None]:
-    metrics = report.get("metrics")
-    classification = (
-        metrics.get("classification") if isinstance(metrics, dict) else None
-    )
-    if not isinstance(classification, dict):
-        classification = report.get("classification")
-    if not isinstance(classification, dict):
-        return None, None
-    final = classification.get("final")
-    if isinstance(final, dict):
-        return _as_int(final.get("correct_total")), _as_int(final.get("total"))
-    return None, None
-
-
-def _is_direct_published_basis_artifact(artifact_dir: Path, root: Path) -> bool:
-    try:
-        parts = artifact_dir.relative_to(root).parts
-    except ValueError:
-        return False
-    return len(parts) == 2 and parts[0] == "published_basis"
-
-
-def _is_vision_text_accuracy_report(report: dict[str, Any]) -> bool:
-    dataset = report.get("dataset")
-    provider = dataset.get("provider") if isinstance(dataset, dict) else None
-    return (
-        provider == "vision_text"
-        and _report_primary_metric(report).get("kind") == "accuracy"
-    )
-
-
-_ANSWER_FIELD_RE = re.compile(
-    r'"answer"\s*:\s*"(?P<answer>(?:\\.|[^"\\])*)"', re.DOTALL
-)
-
-
-def _extract_answer_shape_text(prediction: Any) -> str:
-    text = str(prediction or "").strip()
-    if not text:
-        return ""
-    for candidate in (text, text.strip("` \n")):
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            parsed = None
-        if isinstance(parsed, dict):
-            answer = parsed.get("answer")
-            if isinstance(answer, str):
-                return " ".join(answer.split())
-    match = _ANSWER_FIELD_RE.search(text)
-    if match:
-        try:
-            return " ".join(json.loads(f'"{match.group("answer")}"').split())
-        except json.JSONDecodeError:
-            return " ".join(match.group("answer").split())
-    return " ".join(text.split())
-
-
-def _answer_shape_ok(prediction: Any) -> bool:
-    answer = _extract_answer_shape_text(prediction)
-    if not answer:
-        return False
-    return (
-        len(answer) <= PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_CHARS
-        and len(answer.split()) <= PUBLISHED_BASIS_MULTIMODAL_MAX_ANSWER_WORDS
-    )
-
-
-def _embedded_answer_shape_rate(report: dict[str, Any]) -> tuple[int, int] | None:
-    eval_windows = report.get("eval_windows")
-    final_window = eval_windows.get("final") if isinstance(eval_windows, dict) else None
-    records = final_window.get("records") if isinstance(final_window, dict) else None
-    if not isinstance(records, list) or not records:
-        return None
-    total = 0
-    ok = 0
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        if "prediction" not in record:
-            continue
-        total += 1
-        ok += int(_answer_shape_ok(record.get("prediction")))
-    if total <= 0:
-        return None
-    return ok, total
-
-
-def _check_published_basis_multimodal_quality(
-    errors: list[str],
-    base: Path,
-    report_path: Path,
+    require_request: bool = False,
 ) -> None:
-    report, error = _load_json(report_path)
-    if error:
-        errors.append(error)
+    expected_fields = {
+        "policy_digest",
+        "artifact_digests",
+        "schedule_digest",
+        "runtime_digests",
+        "pack_signer_fingerprint",
+    }
+    if require_request:
+        expected_fields.add("request_digest")
+    if not isinstance(anchors, dict) or set(anchors) != expected_fields:
+        errors.append(f"{receipt}: signed receipt anchor fields are invalid")
         return
-    assert report is not None
-    if not _is_vision_text_accuracy_report(report):
-        return
-
-    primary = _report_primary_metric(report)
-    final_accuracy = _as_finite_float(primary.get("final"))
-    n_final = _as_int(primary.get("n_final"))
-    correct_total, total = _classification_final_counts(report)
-    if n_final is None:
-        n_final = total
-    if final_accuracy is None and correct_total is not None and total:
-        final_accuracy = correct_total / total
-
-    if primary.get("counts_source") != "measured" or primary.get("estimated") is True:
-        errors.append(
-            f"{_relative(base)}: published image-text basis requires measured accuracy counts"
-        )
-    if n_final is None or n_final < PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES:
-        errors.append(
-            f"{_relative(base)}: published image-text basis requires at least "
-            f"{PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_EXAMPLES} final examples"
-        )
+    if not _valid_digest(anchors.get("policy_digest")):
+        errors.append(f"{receipt}: signed receipt policy digest is invalid")
+    if not _valid_digest(anchors.get("pack_signer_fingerprint")):
+        errors.append(f"{receipt}: signed receipt pack signer is invalid")
+    artifacts = anchors.get("artifact_digests")
     if (
-        final_accuracy is None
-        or final_accuracy < PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY
+        not isinstance(artifacts, dict)
+        or set(artifacts) != {"baseline", "subject"}
+        or any(not _valid_digest(digest) for digest in artifacts.values())
     ):
-        observed = "missing" if final_accuracy is None else f"{final_accuracy:.4f}"
+        errors.append(f"{receipt}: signed receipt artifact anchors are invalid")
+    if not _valid_digest(anchors.get("schedule_digest")):
+        errors.append(f"{receipt}: signed receipt schedule anchor is invalid")
+    runtimes = anchors.get("runtime_digests")
+    if (
+        not isinstance(runtimes, dict)
+        or set(runtimes) != {"baseline", "subject"}
+        or any(not _valid_digest(digest) for digest in runtimes.values())
+    ):
+        errors.append(f"{receipt}: signed receipt runtime anchors are invalid")
+    if require_request and not _valid_digest(anchors.get("request_digest")):
+        errors.append(f"{receipt}: signed receipt request digest is invalid")
+
+
+def _public_pack_request_context(
+    errors: list[str], *, receipt: Path, manifest_path: Path
+) -> tuple[str | None, bool]:
+    try:
+        manifest = _read_object(manifest_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"{manifest_path}: could not read pack request binding: {exc}")
+        return None, False
+    evidence = manifest.get("evidence")
+    reference = evidence.get("request") if isinstance(evidence, dict) else None
+    if not isinstance(reference, dict):
+        return None, False
+    if reference.get("path") != "request.json":
+        errors.append(f"{manifest_path}: request reference path is invalid")
+        return None, False
+    request_path = manifest_path.parent / "request.json"
+    try:
+        raw = request_path.read_bytes()
+        request = json.loads(raw)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"{request_path}: could not read pack request: {exc}")
+        return None, False
+    digest = _sha256_bytes(raw)
+    if reference.get("digest") != digest:
+        errors.append(f"{receipt}: pack request digest does not match manifest")
+    comparison = request.get("comparison") if isinstance(request, dict) else None
+    providers: list[object] = []
+    if isinstance(comparison, dict):
+        for side in ("baseline", "subject"):
+            side_value = comparison.get(side)
+            runtime = (
+                side_value.get("runtime") if isinstance(side_value, dict) else None
+            )
+            providers.append(
+                runtime.get("provider") if isinstance(runtime, dict) else None
+            )
+    return digest, "llama_cpp" in providers
+
+
+def _check_receipt_verifier(
+    errors: list[str], receipt: Path, verifier: object
+) -> object:
+    if not isinstance(verifier, dict) or set(verifier) != {
+        "identity",
+        "signing_key_fingerprint",
+        "trust_profile_digest",
+    }:
+        errors.append(f"{receipt}: signed receipt verifier fields are invalid")
+        return None
+    identity = verifier.get("identity")
+    if not isinstance(identity, str) or _IDENTITY.fullmatch(identity) is None:
+        errors.append(f"{receipt}: signed receipt verifier identity is invalid")
+    fingerprint = verifier.get("signing_key_fingerprint")
+    if not _valid_digest(fingerprint):
+        errors.append(f"{receipt}: signed receipt verifier fingerprint is invalid")
+    profile_digest = verifier.get("trust_profile_digest")
+    if profile_digest is not None and not _valid_digest(profile_digest):
+        errors.append(f"{receipt}: signed receipt trust profile digest is invalid")
+    return fingerprint
+
+
+def _check_receipt_verdict(errors: list[str], receipt: Path, verdict: object) -> None:
+    if not isinstance(verdict, dict) or set(verdict) != {
+        "ok",
+        "integrity_ok",
+        "policy_verdict",
+        "verification_status",
+    }:
+        errors.append(f"{receipt}: signed receipt verdict fields are invalid")
+        return
+    ok = verdict.get("ok")
+    integrity_ok = verdict.get("integrity_ok")
+    policy_verdict = verdict.get("policy_verdict")
+    status = verdict.get("verification_status")
+    if not isinstance(ok, bool) or not isinstance(integrity_ok, bool):
+        errors.append(f"{receipt}: signed receipt verdict booleans are invalid")
+    if policy_verdict not in {"pass", "fail", None}:
+        errors.append(f"{receipt}: signed receipt policy verdict is invalid")
+    if isinstance(status, bool) or not isinstance(status, int) or status < 0:
+        errors.append(f"{receipt}: signed receipt verification status is invalid")
+    if not (
+        ok is True and integrity_ok is True and policy_verdict == "pass" and status == 0
+    ):
         errors.append(
-            f"{_relative(base)}: published image-text basis final accuracy "
-            f"{observed} is below "
-            f"{PUBLISHED_BASIS_MULTIMODAL_MIN_FINAL_ACCURACY:.2f}"
+            f"{receipt}: signed receipt must record successful strict acceptance"
         )
 
-    shape_counts = _embedded_answer_shape_rate(report)
-    if shape_counts is not None:
-        ok, total_shape = shape_counts
-        rate = ok / total_shape
-        if rate < PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE:
-            errors.append(
-                f"{_relative(base)}: published image-text basis answer-shape rate "
-                f"{rate:.4f} is below "
-                f"{PUBLISHED_BASIS_MULTIMODAL_MIN_ANSWER_SHAPE_RATE:.2f}"
-            )
+
+def _receipt_public_key(
+    errors: list[str], receipt: Path, signature: object
+) -> ed25519.Ed25519PublicKey | None:
+    if (
+        not isinstance(signature, dict)
+        or set(signature) != {"algorithm", "format", "public_key", "value"}
+        or signature.get("format") != _RECEIPT_SIGNATURE_FORMAT
+        or signature.get("algorithm") != "ed25519"
+    ):
+        errors.append(f"{receipt}: signed verification receipt signature is required")
+        return None
+    public_key_block = signature.get("public_key")
+    if (
+        not isinstance(public_key_block, dict)
+        or set(public_key_block) != {"encoding", "value"}
+        or public_key_block.get("encoding") != "pem"
+    ):
+        errors.append(f"{receipt}: signed receipt public key is invalid")
+        return None
+    public_key_value = public_key_block.get("value")
+    if not isinstance(public_key_value, str):
+        errors.append(f"{receipt}: signed receipt public key is invalid")
+        return None
+    try:
+        loaded = serialization.load_pem_public_key(public_key_value.encode("ascii"))
+        if not isinstance(loaded, ed25519.Ed25519PublicKey):
+            raise TypeError("public key is not Ed25519")
+        return loaded
+    except (TypeError, UnicodeEncodeError, ValueError) as exc:
+        errors.append(f"{receipt}: signed receipt public key is invalid: {exc}")
+        return None
 
 
-def _check_signed_pack(
+def _check_signed_receipt(
     errors: list[str],
-    base: Path,
-    metadata: dict[str, Any],
-    artifact_paths: dict[str, Any],
+    *,
+    receipt: Path,
+    value: dict[str, Any],
+    manifest_path: Path,
 ) -> None:
-    pack_dir = _require_path(
-        errors,
-        base,
-        artifact_paths,
-        "evidence_pack",
-        directory=True,
-    )
-    expected = metadata.get("expected_fingerprint")
-    if not isinstance(expected, str) or not expected.startswith("sha256:"):
-        errors.append(
-            f"{_relative(base)}: signed evidence pack requires expected_fingerprint"
-        )
-        return
-    if pack_dir is None:
-        return
-    manifest_path = pack_dir / "manifest.json"
-    if not manifest_path.is_file():
-        errors.append(f"{_relative(pack_dir)}: missing manifest.json")
-        return
-    manifest, error = _load_json(manifest_path)
-    if error:
-        errors.append(error)
-        return
-    signer = manifest.get("signing_key_fingerprint") if manifest else None
-    if signer != expected:
-        errors.append(
-            f"{_relative(base)}: expected_fingerprint does not match pack signer"
-        )
-    commands = metadata.get("verifier_commands")
-    command_text = "\n".join(commands) if isinstance(commands, list) else ""
-    if "--expected-fingerprint" not in command_text:
-        errors.append(
-            f"{_relative(base)}: signed pack verifier command must pin fingerprint"
-        )
+    if set(value) != {"statement", "signature"}:
+        errors.append(f"{receipt}: signed receipt fields are not closed")
 
-
-def _check_guard_value_demo(
-    errors: list[str],
-    base: Path,
-    artifact_paths: dict[str, Any],
-) -> None:
-    manifest_path = _require_path(errors, base, artifact_paths, "guard_value_manifest")
-    _require_path(errors, base, artifact_paths, "guard_value_summary")
-    _require_path(errors, base, artifact_paths, "artifact_package", directory=True)
-    if manifest_path is None:
+    statement = value.get("statement")
+    signature = value.get("signature")
+    if not isinstance(statement, dict):
+        errors.append(f"{receipt}: signed verification receipt statement is required")
         return
-    manifest, error = _load_json(manifest_path)
-    if error:
-        errors.append(error)
-        return
-    assert manifest is not None
-    files = manifest.get("files")
-    if not isinstance(files, list) or not files:
-        errors.append(f"{_relative(manifest_path)}: files must be a non-empty list")
-        return
-    for index, entry in enumerate(files):
-        if not isinstance(entry, dict):
-            errors.append(f"{_relative(manifest_path)}: files[{index}] must be object")
-            continue
-        rel_path = entry.get("path")
-        expected_hash = entry.get("sha256")
-        expected_size = entry.get("size_bytes")
-        if not isinstance(rel_path, str) or not rel_path:
-            errors.append(f"{_relative(manifest_path)}: files[{index}].path required")
-            continue
-        path = base / rel_path
-        if not path.is_file():
-            errors.append(f"{_relative(base)}: manifest file missing {rel_path!r}")
-            continue
-        content = path.read_bytes()
-        actual_hash = hashlib.sha256(content).hexdigest()
-        if actual_hash != expected_hash:
-            errors.append(f"{_relative(base)}: manifest hash mismatch for {rel_path!r}")
-        if len(content) != expected_size:
-            errors.append(f"{_relative(base)}: manifest size mismatch for {rel_path!r}")
-
-
-def _check_runtime_backend_hash_inventory(
-    errors: list[str],
-    base: Path,
-    inventory_path: Path,
-) -> None:
-    inventory, error = _load_json(inventory_path)
-    if error:
-        errors.append(error)
-        return
-    assert inventory is not None
-    if inventory.get("schema") != RUNTIME_BACKEND_COMPATIBILITY_HASH_SCHEMA:
-        errors.append(
-            f"{_relative(inventory_path)}: schema must be {RUNTIME_BACKEND_COMPATIBILITY_HASH_SCHEMA}"
-        )
-    if inventory.get("status") != "completed":
-        errors.append(f"{_relative(inventory_path)}: status must be completed")
-    artifacts = inventory.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
-        return
-    for index, artifact in enumerate(artifacts):
-        if not isinstance(artifact, dict):
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
-            )
-            continue
-        rel_path = artifact.get("path")
-        expected_sha = artifact.get("sha256")
-        expected_bytes = artifact.get("bytes")
-        if not isinstance(rel_path, str) or not rel_path:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path required"
-            )
-            continue
-        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
-            )
-            continue
-        path = base / rel_path
-        if not path.is_file():
-            errors.append(
-                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
-            )
-            continue
-        content = path.read_bytes()
-        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
-        if actual_sha != expected_sha:
-            errors.append(
-                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
-            )
-        if len(content) != expected_bytes:
-            errors.append(
-                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
-            )
-
-
-def _check_runtime_backend_compatibility(
-    errors: list[str],
-    base: Path,
-    artifact_paths: dict[str, Any],
-) -> None:
-    summary_path = _require_path(errors, base, artifact_paths, "compatibility_summary")
-    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
-    if inventory_path is not None:
-        _check_runtime_backend_hash_inventory(errors, base, inventory_path)
-    if summary_path is None:
-        return
-    summary, error = _load_json(summary_path)
-    if error:
-        errors.append(error)
-        return
-    assert summary is not None
-    if summary.get("schema") != RUNTIME_BACKEND_COMPATIBILITY_SUMMARY_SCHEMA:
-        errors.append(
-            f"{_relative(summary_path)}: schema must be {RUNTIME_BACKEND_COMPATIBILITY_SUMMARY_SCHEMA}"
-        )
-    if summary.get("status") != "completed":
-        errors.append(f"{_relative(summary_path)}: status must be completed")
-    if summary.get("validation_environment") != "CUDA-capable validation host":
-        errors.append(
-            f"{_relative(summary_path)}: validation_environment must be generic"
-        )
-    if summary.get("raw_logs_published") is not False:
-        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
-    if summary.get("weights_vendored") is not False:
-        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
-
-    families = summary.get("families")
-    if not isinstance(families, list) or not families:
-        errors.append(f"{_relative(summary_path)}: families must be non-empty")
-        return
-    observed: set[str] = set()
-    for index, family in enumerate(families):
-        if not isinstance(family, dict):
-            errors.append(
-                f"{_relative(summary_path)}: families[{index}] must be object"
-            )
-            continue
-        family_name = family.get("family")
-        if family_name not in RUNTIME_BACKEND_FAMILIES:
-            errors.append(f"{_relative(summary_path)}: unknown family {family_name!r}")
-            continue
-        observed.add(str(family_name))
-        expected_adapters = list(RUNTIME_BACKEND_FAMILIES[str(family_name)])
-        if family.get("adapter_smoke") != expected_adapters:
-            errors.append(
-                f"{_relative(summary_path)}: {family_name} adapter_smoke mismatch"
-            )
-        if family.get("build_rc") != 0 or family.get("smoke_rc") != 0:
-            errors.append(f"{_relative(summary_path)}: {family_name} rc must be zero")
-        if family.get("gpu_required") is not True:
-            errors.append(f"{_relative(summary_path)}: {family_name} must require GPU")
-        requirements_lock = family.get("requirements_lock")
-        if not isinstance(requirements_lock, str) or not requirements_lock:
-            errors.append(
-                f"{_relative(summary_path)}: {family_name} requirements_lock required"
-            )
-        elif (
-            requirements_lock.startswith("/")
-            or not (REPO_ROOT / requirements_lock).is_file()
-        ):
-            errors.append(
-                f"{_relative(summary_path)}: {family_name} requirements_lock invalid"
-            )
-        for command_key in ("build_command", "smoke_command"):
-            command = family.get(command_key)
-            if not isinstance(command, str) or command.startswith("/"):
-                errors.append(
-                    f"{_relative(summary_path)}: {family_name} {command_key} invalid"
-                )
-        image_id = family.get("image_id")
-        if not isinstance(image_id, str) or not RUNTIME_BACKEND_IMAGE_ID_RE.match(
-            image_id
-        ):
-            errors.append(f"{_relative(summary_path)}: {family_name} image_id invalid")
-        image_size = family.get("image_size_bytes")
-        if not isinstance(image_size, int) or image_size <= 0:
-            errors.append(
-                f"{_relative(summary_path)}: {family_name} image_size_bytes invalid"
-            )
-        smoke_result = family.get("smoke_result")
-        if not isinstance(smoke_result, str) or not smoke_result.startswith(
-            "quant runtime image imports ok:"
-        ):
-            errors.append(
-                f"{_relative(summary_path)}: {family_name} smoke_result invalid"
-            )
-    if observed != set(RUNTIME_BACKEND_FAMILIES):
-        missing = sorted(set(RUNTIME_BACKEND_FAMILIES) - observed)
-        extra = sorted(observed - set(RUNTIME_BACKEND_FAMILIES))
-        errors.append(
-            f"{_relative(summary_path)}: family coverage mismatch "
-            f"missing={missing} extra={extra}"
-        )
-
-
-def _check_lifecycle_stress_hash_inventory(
-    errors: list[str],
-    base: Path,
-    inventory_path: Path,
-) -> None:
-    inventory, error = _load_json(inventory_path)
-    if error:
-        errors.append(error)
-        return
-    assert inventory is not None
-    if inventory.get("schema") != EVIDENCE_PACK_LIFECYCLE_STRESS_HASH_SCHEMA:
-        errors.append(
-            f"{_relative(inventory_path)}: schema must be {EVIDENCE_PACK_LIFECYCLE_STRESS_HASH_SCHEMA}"
-        )
-    if inventory.get("status") != "completed":
-        errors.append(f"{_relative(inventory_path)}: status must be completed")
-    artifacts = inventory.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
-        return
-    for index, artifact in enumerate(artifacts):
-        if not isinstance(artifact, dict):
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
-            )
-            continue
-        rel_path = artifact.get("path")
-        expected_sha = artifact.get("sha256")
-        expected_bytes = artifact.get("bytes")
-        if not isinstance(rel_path, str) or not rel_path:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path required"
-            )
-            continue
-        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
-            )
-            continue
-        path = base / rel_path
-        if not path.is_file():
-            errors.append(
-                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
-            )
-            continue
-        content = path.read_bytes()
-        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
-        if actual_sha != expected_sha:
-            errors.append(
-                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
-            )
-        if len(content) != expected_bytes:
-            errors.append(
-                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
-            )
-
-
-def _check_evidence_pack_lifecycle_stress(
-    errors: list[str],
-    base: Path,
-    artifact_paths: dict[str, Any],
-) -> None:
-    summary_path = _require_path(errors, base, artifact_paths, "lifecycle_summary")
-    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
-    if inventory_path is not None:
-        _check_lifecycle_stress_hash_inventory(errors, base, inventory_path)
-    if summary_path is None:
-        return
-    summary, error = _load_json(summary_path)
-    if error:
-        errors.append(error)
-        return
-    assert summary is not None
-    if summary.get("schema") != EVIDENCE_PACK_LIFECYCLE_STRESS_SUMMARY_SCHEMA:
-        errors.append(
-            f"{_relative(summary_path)}: schema must be {EVIDENCE_PACK_LIFECYCLE_STRESS_SUMMARY_SCHEMA}"
-        )
-    if summary.get("status") != "completed":
-        errors.append(f"{_relative(summary_path)}: status must be completed")
-    if summary.get("validation_environment") != "CUDA-capable validation host":
-        errors.append(
-            f"{_relative(summary_path)}: validation_environment must be generic"
-        )
-    if summary.get("raw_logs_published") is not False:
-        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
-    if summary.get("weights_vendored") is not False:
-        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
-
-    suites = summary.get("suites")
-    if not isinstance(suites, list) or len(suites) < 2:
-        errors.append(f"{_relative(summary_path)}: suites must include both checks")
-        return
-    observed = {suite.get("name"): suite for suite in suites if isinstance(suite, dict)}
-    expected = {
-        "queue_manager_shell": 74,
-        "queue_state_python": 3,
+    expected_statement_fields = {
+        "format",
+        "pack_manifest_digest",
+        "anchors",
+        "verifier",
+        "verdict",
     }
-    for name, expected_passed in expected.items():
-        suite = observed.get(name)
-        if not isinstance(suite, dict):
-            errors.append(f"{_relative(summary_path)}: missing suite {name}")
-            continue
-        if suite.get("rc") != 0 or suite.get("tests_failed") != 0:
-            errors.append(f"{_relative(summary_path)}: {name} must pass cleanly")
-        if suite.get("tests_passed") != expected_passed:
-            errors.append(
-                f"{_relative(summary_path)}: {name} tests_passed must be {expected_passed}"
-            )
-        command = suite.get("command")
-        if not isinstance(command, str) or command.startswith("/"):
-            errors.append(f"{_relative(summary_path)}: {name} command invalid")
-        surface = suite.get("coverage_surface")
-        if not isinstance(surface, list) or not surface:
-            errors.append(
-                f"{_relative(summary_path)}: {name} coverage_surface required"
-            )
+    if set(statement) != expected_statement_fields:
+        errors.append(f"{receipt}: signed receipt statement fields are invalid")
+    receipt_format = statement.get("format")
+    if receipt_format not in {_RECEIPT_FORMAT_V1, _RECEIPT_FORMAT_V2}:
+        errors.append(f"{receipt}: signed receipt format is invalid")
 
-
-def _check_attention_backend_hash_inventory(
-    errors: list[str],
-    base: Path,
-    inventory_path: Path,
-) -> None:
-    inventory, error = _load_json(inventory_path)
-    if error:
-        errors.append(error)
-        return
-    assert inventory is not None
-    if inventory.get("schema") != ATTENTION_BACKEND_HASH_SCHEMA:
-        errors.append(
-            f"{_relative(inventory_path)}: schema must be {ATTENTION_BACKEND_HASH_SCHEMA}"
-        )
-    if inventory.get("status") != "completed":
-        errors.append(f"{_relative(inventory_path)}: status must be completed")
-    artifacts = inventory.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
-        return
-    for index, artifact in enumerate(artifacts):
-        if not isinstance(artifact, dict):
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
-            )
-            continue
-        rel_path = artifact.get("path")
-        expected_sha = artifact.get("sha256")
-        expected_bytes = artifact.get("bytes")
-        if not isinstance(rel_path, str) or not rel_path:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path required"
-            )
-            continue
-        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
-            )
-            continue
-        path = base / rel_path
-        if not path.is_file():
-            errors.append(
-                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
-            )
-            continue
-        content = path.read_bytes()
-        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
-        if actual_sha != expected_sha:
-            errors.append(
-                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
-            )
-        if len(content) != expected_bytes:
-            errors.append(
-                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
-            )
-
-
-def _check_attention_backend_compatibility(
-    errors: list[str],
-    base: Path,
-    artifact_paths: dict[str, Any],
-) -> None:
-    summary_path = _require_path(errors, base, artifact_paths, "compatibility_summary")
-    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
-    if inventory_path is not None:
-        _check_attention_backend_hash_inventory(errors, base, inventory_path)
-    if summary_path is None:
-        return
-    summary, error = _load_json(summary_path)
-    if error:
-        errors.append(error)
-        return
-    assert summary is not None
-    if summary.get("schema") != ATTENTION_BACKEND_SUMMARY_SCHEMA:
-        errors.append(
-            f"{_relative(summary_path)}: schema must be {ATTENTION_BACKEND_SUMMARY_SCHEMA}"
-        )
-    if summary.get("status") != "completed":
-        errors.append(f"{_relative(summary_path)}: status must be completed")
-    if summary.get("validation_environment") != "CUDA-capable validation host":
-        errors.append(
-            f"{_relative(summary_path)}: validation_environment must be generic"
-        )
-    if summary.get("raw_logs_published") is not False:
-        errors.append(f"{_relative(summary_path)}: raw_logs_published must be false")
-    if summary.get("weights_vendored") is not False:
-        errors.append(f"{_relative(summary_path)}: weights_vendored must be false")
-    if summary.get("optimized_attention_success_claimed") is not False:
-        errors.append(
-            f"{_relative(summary_path)}: "
-            "optimized_attention_success_claimed must be false"
-        )
-
-    probe = summary.get("cuda_probe")
-    if not isinstance(probe, dict):
-        errors.append(f"{_relative(summary_path)}: cuda_probe must be object")
+    manifest_claim = statement.get("pack_manifest_digest")
+    if not _valid_digest(manifest_claim):
+        errors.append(f"{receipt}: signed receipt manifest digest is invalid")
     else:
-        if probe.get("rc") != 0:
-            errors.append(f"{_relative(summary_path)}: cuda_probe rc must be zero")
-        if probe.get("torch_cuda_available") is not True:
-            errors.append(f"{_relative(summary_path)}: CUDA must be available")
-        if (
-            not isinstance(probe.get("torch_cuda_device_count"), int)
-            or probe.get("torch_cuda_device_count") < 1
-        ):
-            errors.append(f"{_relative(summary_path)}: CUDA device count invalid")
-        if probe.get("flash_attn_importable") is not False:
-            errors.append(
-                f"{_relative(summary_path)}: flash_attn_importable must be false"
-            )
-        if probe.get("transformers_flash_attn_2_available") is not False:
-            errors.append(
-                f"{_relative(summary_path)}: transformers optimized attention availability must be false"
-            )
-        command = probe.get("command")
-        if not isinstance(command, str) or command.startswith("/"):
-            errors.append(f"{_relative(summary_path)}: cuda_probe command invalid")
-
-    checks = summary.get("checks")
-    if not isinstance(checks, list) or len(checks) < 2:
-        errors.append(f"{_relative(summary_path)}: checks must include both checks")
-        return
-    observed = {check.get("name"): check for check in checks if isinstance(check, dict)}
-    expected = {
-        "flash_attention_dependency_paths": 3,
-        "attention_config_selection": 1,
-    }
-    for name, expected_passed in expected.items():
-        check = observed.get(name)
-        if not isinstance(check, dict):
-            errors.append(f"{_relative(summary_path)}: missing check {name}")
-            continue
-        if check.get("rc") != 0 or check.get("tests_failed") != 0:
-            errors.append(f"{_relative(summary_path)}: {name} must pass cleanly")
-        if check.get("tests_passed") != expected_passed:
-            errors.append(
-                f"{_relative(summary_path)}: {name} tests_passed must be {expected_passed}"
-            )
-        command = check.get("command")
-        if not isinstance(command, str) or command.startswith("/"):
-            errors.append(f"{_relative(summary_path)}: {name} command invalid")
-        surface = check.get("coverage_surface")
-        if not isinstance(surface, list) or not surface:
-            errors.append(
-                f"{_relative(summary_path)}: {name} coverage_surface required"
-            )
-
-
-def _check_summary_hash_inventory(
-    errors: list[str],
-    base: Path,
-    inventory_path: Path,
-    *,
-    expected_schema: str,
-) -> None:
-    inventory, error = _load_json(inventory_path)
-    if error:
-        errors.append(error)
-        return
-    assert inventory is not None
-    if inventory.get("schema") != expected_schema:
-        errors.append(f"{_relative(inventory_path)}: schema must be {expected_schema}")
-    if inventory.get("status") != "completed":
-        errors.append(f"{_relative(inventory_path)}: status must be completed")
-    artifacts = inventory.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        errors.append(f"{_relative(inventory_path)}: artifacts must be non-empty")
-        return
-    for index, artifact in enumerate(artifacts):
-        if not isinstance(artifact, dict):
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}] must be object"
-            )
-            continue
-        rel_path = artifact.get("path")
-        expected_sha = artifact.get("sha256")
-        expected_bytes = artifact.get("bytes")
-        if not isinstance(rel_path, str) or not rel_path:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path required"
-            )
-            continue
-        if rel_path.startswith("/") or ".." in Path(rel_path).parts:
-            errors.append(
-                f"{_relative(inventory_path)}: artifacts[{index}].path must be relative"
-            )
-            continue
-        path = base / rel_path
-        if not path.is_file():
-            errors.append(
-                f"{_relative(base)}: hash inventory file missing {rel_path!r}"
-            )
-            continue
-        content = path.read_bytes()
-        actual_sha = "sha256:" + hashlib.sha256(content).hexdigest()
-        if actual_sha != expected_sha:
-            errors.append(
-                f"{_relative(base)}: hash inventory mismatch for {rel_path!r}"
-            )
-        if len(content) != expected_bytes:
-            errors.append(
-                f"{_relative(base)}: hash inventory byte mismatch for {rel_path!r}"
-            )
-
-
-def _check_larger_model_validation_bounded_smoke_category(
-    errors: list[str],
-    artifact_path: Path,
-    category: dict[str, Any],
-) -> None:
-    if category.get("source_window") != "bounded_smoke_matrix":
-        errors.append(
-            f"{_relative(artifact_path)}: bounded smoke source_window invalid"
-        )
-    if category.get("suite") != "model-catalog-gpu":
-        errors.append(f"{_relative(artifact_path)}: bounded smoke suite invalid")
-
-    clean_lanes = category.get("clean_lanes")
-    failed_findings = category.get("failed_findings")
-    duplicates = category.get("duplicate_clean_runs")
-    counts = category.get("counts")
-    if not isinstance(clean_lanes, list) or not clean_lanes:
-        errors.append(
-            f"{_relative(artifact_path)}: bounded smoke clean_lanes must be non-empty"
-        )
-        clean_lanes = []
-    if not isinstance(failed_findings, list) or not failed_findings:
-        errors.append(
-            f"{_relative(artifact_path)}: bounded smoke failed_findings must be non-empty"
-        )
-        failed_findings = []
-    if not isinstance(duplicates, list):
-        errors.append(
-            f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs must be a list"
-        )
-        duplicates = []
-    if not isinstance(counts, dict):
-        errors.append(
-            f"{_relative(artifact_path)}: bounded smoke counts must be object"
-        )
-        counts = {}
-
-    seen_clean: set[str] = set()
-    duplicate_extra_runs = 0
-    for index, lane in enumerate(clean_lanes):
-        if not isinstance(lane, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}] "
-                "must be object"
-            )
-            continue
-        slug = lane.get("slug")
-        if not isinstance(slug, str) or not slug:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}].slug "
-                "required"
-            )
-        elif slug in seen_clean:
-            errors.append(f"{_relative(artifact_path)}: duplicate smoke lane {slug!r}")
+        try:
+            manifest_digest = _sha256_bytes(manifest_path.read_bytes())
+        except OSError as exc:
+            errors.append(f"{manifest_path}: could not read pack manifest: {exc}")
         else:
-            seen_clean.add(slug)
-        model_id = lane.get("model_id")
-        preset = lane.get("preset")
-        if not isinstance(model_id, str) or not model_id:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}]."
-                "model_id required"
-            )
-        if (
-            not isinstance(preset, str)
-            or preset.startswith("/")
-            or not (REPO_ROOT / preset).is_file()
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke clean_lanes[{index}]."
-                "preset invalid"
-            )
-        if lane.get("rc") != 0:
-            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
-        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
-            )
-        if lane.get("report_materialized") is not True:
-            errors.append(f"{_relative(artifact_path)}: {slug} report must materialize")
-        if lane.get("verify_materialized") is not True:
-            errors.append(f"{_relative(artifact_path)}: {slug} verify must materialize")
-        if lane.get("status") != "ok":
-            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
+            if manifest_claim != manifest_digest:
+                errors.append(
+                    f"{receipt}: signed receipt does not bind the pack manifest"
+                )
 
-    for index, duplicate in enumerate(duplicates):
-        if not isinstance(duplicate, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs[{index}] "
-                "must be object"
-            )
-            continue
-        slug = duplicate.get("slug")
-        extra = duplicate.get("additional_clean_runs")
-        if slug not in seen_clean:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs[{index}]."
-                "slug unknown"
-            )
-        if not isinstance(extra, int) or extra <= 0:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke duplicate_clean_runs[{index}] "
-                "additional_clean_runs invalid"
-            )
-        else:
-            duplicate_extra_runs += extra
-
-    unique_failed: set[str] = set()
-    failed_attempts = 0
-    pre_verification_failures = 0
-    for index, finding in enumerate(failed_findings):
-        if not isinstance(finding, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
-                "must be object"
-            )
-            continue
-        slug = finding.get("slug")
-        if not isinstance(slug, str) or not slug:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
-                "slug required"
-            )
-        else:
-            unique_failed.add(slug)
-        preset = finding.get("preset")
-        if (
-            not isinstance(preset, str)
-            or preset.startswith("/")
-            or not (REPO_ROOT / preset).is_file()
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
-                "preset invalid"
-            )
-        attempts = finding.get("attempts")
-        if not isinstance(attempts, int) or attempts <= 0:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
-                "attempts invalid"
-            )
-            attempts = 0
-        failed_attempts += attempts
-        if finding.get("status") != "evaluate_failed_before_report":
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
-                "status invalid"
-            )
-        if finding.get("classification") != "pre_verification_evaluate_failure":
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}]."
-                "classification invalid"
-            )
-        if finding.get("evaluate_exit") != 1 or finding.get("verify_exit") is not None:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
-                "exit fields invalid"
-            )
-        if finding.get("report_materialized") is not False:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
-                "report must be false"
-            )
-        if finding.get("verify_materialized") is not False:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke failed_findings[{index}] "
-                "verify must be false"
-            )
-        pre_verification_failures += attempts
-
-    expected_counts = {
-        "unique_clean_lanes": len(seen_clean),
-        "unique_failed_lanes": len(unique_failed),
-        "clean_runs": len(seen_clean) + duplicate_extra_runs,
-        "failed_runs": failed_attempts,
-        "pre_verification_failures": pre_verification_failures,
-        "report_materialized_clean": len(seen_clean) + duplicate_extra_runs,
-        "verify_materialized_clean": len(seen_clean) + duplicate_extra_runs,
-    }
-    expected_counts["completed_runs"] = (
-        expected_counts["clean_runs"] + expected_counts["failed_runs"]
+    request_digest, llama_cpp = _public_pack_request_context(
+        errors, receipt=receipt, manifest_path=manifest_path
     )
-    for key, expected in expected_counts.items():
-        if counts.get(key) != expected:
-            errors.append(
-                f"{_relative(artifact_path)}: bounded smoke counts.{key} "
-                f"must be {expected}"
-            )
-
-
-VALIDATION_FAILURE_CLASSIFICATIONS = {
-    "initial_attempt_failed_later_clean",
-    "pre_verification_evaluate_failure",
-    "grouped_execution_cuda_failure_later_clean",
-}
-VALIDATION_FAILURE_STATUSES = {
-    "evaluate_failed_before_verifier",
-    "cuda_launch_failure_before_verifier",
-}
-
-
-def _check_larger_model_validation_findings(
-    errors: list[str],
-    base: Path,
-    artifact_paths: dict[str, Any],
-) -> None:
-    outcomes_path = _require_path(errors, base, artifact_paths, "lane_outcomes")
-    inventory_path = _require_path(errors, base, artifact_paths, "hash_inventory")
-    if inventory_path is not None:
-        _check_summary_hash_inventory(
-            errors,
-            base,
-            inventory_path,
-            expected_schema=LARGER_MODEL_VALIDATION_HASH_SCHEMA,
-        )
-    if outcomes_path is None:
-        return
-
-    outcomes, error = _load_json(outcomes_path)
-    if error:
-        errors.append(error)
-        return
-    assert outcomes is not None
-    if outcomes.get("schema") != LARGER_MODEL_VALIDATION_LANE_OUTCOMES_SCHEMA:
+    require_request = receipt_format == _RECEIPT_FORMAT_V2
+    if llama_cpp and not require_request:
         errors.append(
-            f"{_relative(outcomes_path)}: schema must be "
-            f"{LARGER_MODEL_VALIDATION_LANE_OUTCOMES_SCHEMA}"
+            f"{receipt}: llama_cpp evidence requires signed receipt format v2"
         )
-    if outcomes.get("status") != "completed":
-        errors.append(f"{_relative(outcomes_path)}: status must be completed")
-    if outcomes.get("validation_environment") != "CUDA-capable validation host":
-        errors.append(
-            f"{_relative(outcomes_path)}: validation_environment must be generic"
-        )
-    for key in (
-        "raw_logs_published",
-        "weights_vendored",
-        "support_matrix_change_claimed",
-        "model_quality_claimed",
+    _check_receipt_anchors(
+        errors,
+        receipt,
+        statement.get("anchors"),
+        require_request=require_request,
+    )
+    anchors = statement.get("anchors")
+    if require_request and (
+        not isinstance(anchors, dict) or anchors.get("request_digest") != request_digest
     ):
-        if outcomes.get(key) is not False:
-            errors.append(f"{_relative(outcomes_path)}: {key} must be false")
-    if outcomes.get("execution_mode") != "container":
-        errors.append(f"{_relative(outcomes_path)}: execution_mode must be container")
-
-    categories = outcomes.get("categories")
-    if not isinstance(categories, list) or not categories:
-        errors.append(f"{_relative(outcomes_path)}: categories must be non-empty")
-        return
-    by_category: dict[str, dict[str, Any]] = {}
-    for index, category in enumerate(categories):
-        if not isinstance(category, dict):
-            errors.append(
-                f"{_relative(outcomes_path)}: categories[{index}] must be object"
-            )
-            continue
-        name = category.get("category")
-        if not isinstance(name, str) or not name:
-            errors.append(
-                f"{_relative(outcomes_path)}: categories[{index}].category required"
-            )
-            continue
-        if name in by_category:
-            errors.append(f"{_relative(outcomes_path)}: duplicate category {name!r}")
-            continue
-        by_category[name] = category
-
-    expected_categories = {
-        "bounded_smoke_matrix",
-        "initial_validation_matrix",
-        "clean_resolutions",
-        "followup_lanes",
-        "published_basis_verification",
-    }
-    observed_categories = set(by_category)
-    if observed_categories != expected_categories:
         errors.append(
-            f"{_relative(outcomes_path)}: category coverage mismatch "
-            f"missing={sorted(expected_categories - observed_categories)} "
-            f"extra={sorted(observed_categories - expected_categories)}"
+            f"{receipt}: signed request anchor does not bind the pack request"
         )
-
-    smoke = by_category.get("bounded_smoke_matrix")
-    initial = by_category.get("initial_validation_matrix")
-    resolutions = by_category.get("clean_resolutions")
-    followup = by_category.get("followup_lanes")
-    published_basis = by_category.get("published_basis_verification")
-    if smoke is not None:
-        _check_larger_model_validation_bounded_smoke_category(
-            errors, outcomes_path, smoke
-        )
-    if initial is not None:
-        _check_larger_model_validation_initial_category(errors, outcomes_path, initial)
-    if resolutions is not None:
-        _check_larger_model_validation_clean_resolutions(
-            errors, outcomes_path, resolutions
-        )
-    if followup is not None:
-        _check_larger_model_validation_followup_lanes(errors, outcomes_path, followup)
-    if published_basis is not None:
-        _check_larger_model_validation_published_basis_verification(
-            errors, outcomes_path, published_basis
-        )
-
-    counts = outcomes.get("counts")
-    if not isinstance(counts, dict):
-        errors.append(f"{_relative(outcomes_path)}: counts must be object")
+    recorded_fingerprint = _check_receipt_verifier(
+        errors, receipt, statement.get("verifier")
+    )
+    _check_receipt_verdict(errors, receipt, statement.get("verdict"))
+    public_key = _receipt_public_key(errors, receipt, signature)
+    if public_key is None:
         return
 
-    def category_list(category: dict[str, Any] | None, key: str) -> list[Any]:
-        if category is None:
-            return []
-        value = category.get(key)
-        return value if isinstance(value, list) else []
-
-    expected_counts = {
-        "categories": len(expected_categories),
-        "bounded_smoke_clean_lanes": len(category_list(smoke, "clean_lanes")),
-        "bounded_smoke_failed_lanes": len(category_list(smoke, "failed_findings")),
-        "initial_clean_lanes": len(category_list(initial, "clean_lanes")),
-        "initial_failed_lanes": len(category_list(initial, "failed_findings")),
-        "clean_resolution_lanes": len(
-            category_list(resolutions, "clean_resolution_lanes")
-        ),
-        "followup_clean_lanes": len(category_list(followup, "clean_followup_lanes")),
-        "followup_diagnostic_lanes": len(category_list(followup, "diagnostic_lanes")),
-        "followup_strict_policy_findings": len(
-            category_list(followup, "strict_policy_findings")
-        ),
-        "published_basis_clean_lanes": len(
-            category_list(published_basis, "published_basis_clean_lanes")
-        ),
-        "published_basis_followup_lanes": len(
-            category_list(published_basis, "followup_clean_lanes")
-        ),
-    }
-    for key, expected in expected_counts.items():
-        if counts.get(key) != expected:
-            errors.append(
-                f"{_relative(outcomes_path)}: counts.{key} must be {expected}"
-            )
-
-
-def _check_larger_model_validation_initial_category(
-    errors: list[str],
-    artifact_path: Path,
-    category: dict[str, Any],
-) -> None:
-    if category.get("source_window") != "initial_validation_matrix":
-        errors.append(f"{_relative(artifact_path)}: initial source_window invalid")
-    if category.get("suite") != "model-catalog-gpu":
-        errors.append(f"{_relative(artifact_path)}: initial suite invalid")
-
-    clean_lanes = category.get("clean_lanes")
-    failed_findings = category.get("failed_findings")
-    duplicates = category.get("duplicate_clean_runs")
-    counts = category.get("counts")
-    if not isinstance(clean_lanes, list) or not clean_lanes:
-        errors.append(f"{_relative(artifact_path)}: clean_lanes must be non-empty")
-        clean_lanes = []
-    if not isinstance(failed_findings, list):
-        errors.append(f"{_relative(artifact_path)}: failed_findings must be a list")
-        failed_findings = []
-    if not isinstance(duplicates, list):
+    if recorded_fingerprint != public_key_fingerprint(public_key):
         errors.append(
-            f"{_relative(artifact_path)}: duplicate_clean_runs must be a list"
+            f"{receipt}: signed receipt verifier fingerprint does not match its key"
         )
-        duplicates = []
-    if not isinstance(counts, dict):
-        errors.append(f"{_relative(artifact_path)}: initial counts must be object")
-        counts = {}
+    try:
+        encoded_signature = signature.get("value")
+        if not isinstance(encoded_signature, str):
+            raise ValueError("signature value is not text")
+        signature_bytes = base64.b64decode(encoded_signature, validate=True)
+        public_key.verify(signature_bytes, _canonical_json_bytes(statement))
+    except (
+        InvalidSignature,
+        TypeError,
+        ValueError,
+        binascii.Error,
+    ):
+        errors.append(f"{receipt}: signed receipt signature verification failed")
 
-    seen_clean: set[str] = set()
-    duplicate_extra_runs = 0
-    for index, lane in enumerate(clean_lanes):
-        if not isinstance(lane, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: clean_lanes[{index}] must be object"
-            )
-            continue
-        slug = lane.get("slug")
-        if not isinstance(slug, str) or not slug:
-            errors.append(
-                f"{_relative(artifact_path)}: clean_lanes[{index}].slug required"
-            )
-        elif slug in seen_clean:
-            errors.append(f"{_relative(artifact_path)}: duplicate clean lane {slug!r}")
-        else:
-            seen_clean.add(slug)
-        model_id = lane.get("model_id")
-        preset = lane.get("preset")
-        if not isinstance(model_id, str) or not model_id:
-            errors.append(
-                f"{_relative(artifact_path)}: clean_lanes[{index}].model_id required"
-            )
-        if (
-            not isinstance(preset, str)
-            or preset.startswith("/")
-            or not (REPO_ROOT / preset).is_file()
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: clean_lanes[{index}].preset invalid"
-            )
-        if lane.get("rc") != 0:
-            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
-        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
-            )
-        if lane.get("report_materialized") is not True:
-            errors.append(f"{_relative(artifact_path)}: {slug} report must materialize")
-        if lane.get("verify_materialized") is not True:
-            errors.append(f"{_relative(artifact_path)}: {slug} verify must materialize")
-        if lane.get("status") != "ok":
-            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
 
-    for index, duplicate in enumerate(duplicates):
-        if not isinstance(duplicate, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: duplicate_clean_runs[{index}] must be object"
-            )
-            continue
-        slug = duplicate.get("slug")
-        extra = duplicate.get("additional_clean_runs")
-        if slug not in seen_clean:
-            errors.append(
-                f"{_relative(artifact_path)}: duplicate_clean_runs[{index}].slug unknown"
-            )
-        if not isinstance(extra, int) or extra <= 0:
-            errors.append(
-                f"{_relative(artifact_path)}: duplicate_clean_runs[{index}] "
-                "additional_clean_runs invalid"
-            )
-        else:
-            duplicate_extra_runs += extra
-
-    unique_failed: set[str] = set()
-    failed_attempts = 0
-    for index, finding in enumerate(failed_findings):
-        if not isinstance(finding, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}] must be object"
-            )
-            continue
-        slug = finding.get("slug")
-        if not isinstance(slug, str) or not slug:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}].slug required"
-            )
-        else:
-            unique_failed.add(slug)
-        model_id = finding.get("model_id")
-        if not isinstance(model_id, str) or not model_id:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}].model_id required"
-            )
-        preset = finding.get("preset")
-        if (
-            not isinstance(preset, str)
-            or preset.startswith("/")
-            or not (REPO_ROOT / preset).is_file()
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}].preset invalid"
-            )
-        attempts = finding.get("attempts")
-        if not isinstance(attempts, int) or attempts <= 0:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}].attempts invalid"
-            )
-            attempts = 0
-        failed_attempts += attempts
-        if finding.get("status") not in VALIDATION_FAILURE_STATUSES:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}].status invalid"
-            )
-        if finding.get("classification") not in VALIDATION_FAILURE_CLASSIFICATIONS:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}].classification invalid"
-            )
-        if finding.get("evaluate_exit") != 1 or finding.get("verify_exit") is not None:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}] exit fields invalid"
-            )
-        if not isinstance(finding.get("report_materialized"), bool):
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}] report flag invalid"
-            )
-        if finding.get("verify_materialized") is not False:
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}] verify must be false"
-            )
-        if not isinstance(finding.get("later_clean_run_observed"), bool):
-            errors.append(
-                f"{_relative(artifact_path)}: failed_findings[{index}] "
-                "later_clean_run_observed must be boolean"
-            )
-
-    expected_counts = {
-        "unique_clean_lanes": len(seen_clean),
-        "unique_failed_lanes": len(unique_failed),
-        "clean_runs": len(seen_clean) + duplicate_extra_runs,
-        "failed_runs": failed_attempts,
-        "pre_verification_failures": failed_attempts,
-        "report_materialized_clean": len(seen_clean) + duplicate_extra_runs,
-        "verify_materialized_clean": len(seen_clean) + duplicate_extra_runs,
-    }
-    expected_counts["completed_runs"] = (
-        expected_counts["clean_runs"] + expected_counts["failed_runs"]
+def _safe_logical_path(value: object, *, prefix: str) -> bool:
+    if not isinstance(value, str):
+        return False
+    path = PurePosixPath(value)
+    return (
+        value == path.as_posix()
+        and not path.is_absolute()
+        and ".." not in path.parts
+        and value.startswith(prefix)
     )
-    for key, expected in expected_counts.items():
-        if counts.get(key) != expected:
-            errors.append(
-                f"{_relative(artifact_path)}: initial counts.{key} must be {expected}"
-            )
 
 
-def _check_larger_model_validation_clean_resolutions(
-    errors: list[str],
-    artifact_path: Path,
-    payload: dict[str, Any],
+def _safe_external_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and bool(parsed.hostname)
+        and parsed.username is None
+        and parsed.password is None
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def _check_artifact_summary(
+    errors: list[str], entry: dict[str, Any], role: str, root: Path
 ) -> None:
-    if payload.get("source_window") != "validation_resolution_runs":
-        errors.append(f"{_relative(artifact_path)}: source_window invalid")
-
-    counts = payload.get("counts")
-    if not isinstance(counts, dict):
-        errors.append(f"{_relative(artifact_path)}: counts must be object")
-        counts = {}
-
-    clean_lanes = payload.get("clean_resolution_lanes")
-    if not isinstance(clean_lanes, list) or not clean_lanes:
-        errors.append(
-            f"{_relative(artifact_path)}: clean_resolution_lanes must be non-empty"
-        )
-        clean_lanes = []
-
-    seen_clean: set[str] = set()
-    for index, lane in enumerate(clean_lanes):
-        if not isinstance(lane, dict):
+    artifacts = entry.get("artifacts")
+    summary = artifacts.get(role) if isinstance(artifacts, dict) else None
+    if not isinstance(summary, dict):
+        errors.append(f"{entry.get('slug', '<entry>')}: missing {role}")
+        return
+    logical = summary.get("path")
+    slug = entry.get("slug")
+    prefix = f"public_evidence/evidence/{slug}/"
+    if not isinstance(slug, str) or not _safe_logical_path(logical, prefix=prefix):
+        errors.append(f"{entry.get('slug', '<entry>')}: unsafe {role} path")
+        return
+    local = root.parent / str(logical)
+    external = summary.get("external_asset")
+    kind = summary.get("kind")
+    common_fields = {"kind", "path", "size_bytes"}
+    if kind == "file":
+        required_fields = common_fields | {"sha256"}
+    elif kind == "directory":
+        required_fields = common_fields | {"file_count", "control_hashes"}
+    else:
+        errors.append(f"{logical}: artifact kind must be file or directory")
+        return
+    if set(summary) != required_fields | ({"external_asset"} if external else set()):
+        errors.append(f"{logical}: artifact summary fields are not closed")
+    size = summary.get("size_bytes")
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+        errors.append(f"{logical}: artifact size is invalid")
+    if kind == "file" and _DIGEST.fullmatch(str(summary.get("sha256") or "")) is None:
+        errors.append(f"{logical}: artifact digest is invalid")
+    if kind == "directory":
+        count = summary.get("file_count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            errors.append(f"{logical}: artifact file count is invalid")
+        controls = summary.get("control_hashes")
+        if not isinstance(controls, dict) or any(
+            name not in {"manifest.json", "manifest.signature.json", "checksums.sha256"}
+            or _DIGEST.fullmatch(str(digest)) is None
+            for name, digest in (controls.items() if isinstance(controls, dict) else ())
+        ):
+            errors.append(f"{logical}: artifact control hashes are invalid")
+    if not local.exists() and not isinstance(external, dict):
+        errors.append(f"{logical}: missing local artifact and external_asset")
+    if isinstance(external, dict):
+        if set(external) != {"sha256", "url"}:
+            errors.append(f"{logical}: external asset fields are not closed")
+        if not _safe_external_url(external.get("url")):
             errors.append(
-                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}] "
-                "must be object"
+                f"{logical}: external asset URL must be credential-free HTTPS "
+                "without query or fragment"
             )
-            continue
-        slug = lane.get("slug")
-        if not isinstance(slug, str) or not slug:
-            errors.append(
-                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}].slug "
-                "required"
-            )
-        elif slug in seen_clean:
-            errors.append(f"{_relative(artifact_path)}: duplicate clean lane {slug!r}")
+        if _DIGEST.fullmatch(str(external.get("sha256") or "")) is None:
+            errors.append(f"{logical}: external asset digest is invalid")
+        if local.exists():
+            errors.append(f"{logical}: artifact must use one publication carrier")
+    if local.is_symlink():
+        errors.append(f"{logical}: symlinks are not allowed")
+    elif local.exists():
+        try:
+            observed = _artifact_summary(local, source_root=root)
+        except (OSError, ValueError) as exc:
+            errors.append(str(exc))
         else:
-            seen_clean.add(slug)
-        model_id = lane.get("model_id")
-        if not isinstance(model_id, str) or not model_id:
-            errors.append(
-                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}]."
-                "model_id required"
-            )
-        preset = lane.get("preset")
-        if (
-            not isinstance(preset, str)
-            or preset.startswith("/")
-            or not (REPO_ROOT / preset).is_file()
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}].preset "
-                "invalid"
-            )
-        if lane.get("suite") != "model-catalog-gpu":
-            errors.append(
-                f"{_relative(artifact_path)}: clean_resolution_lanes[{index}].suite "
-                "invalid"
-            )
-        if lane.get("rc") != 0:
-            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
-        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
-            )
-        if lane.get("report_materialized") is not True:
-            errors.append(f"{_relative(artifact_path)}: {slug} report must materialize")
-        if lane.get("verify_materialized") is not True:
-            errors.append(f"{_relative(artifact_path)}: {slug} verify must materialize")
-        if lane.get("status") != "ok":
-            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
+            expected = {
+                key: value for key, value in summary.items() if key != "external_asset"
+            }
+            if observed != expected:
+                errors.append(f"{logical}: artifact summary does not match its bytes")
 
-    rerun_classifications = payload.get("rerun_classifications")
-    if not isinstance(rerun_classifications, list):
+
+def _check_local_entry(errors: list[str], entry_root: Path) -> None:
+    metadata_path = entry_root / "evidence.meta.json"
+    if not metadata_path.is_file() or metadata_path.is_symlink():
+        errors.append(f"{entry_root}: missing safe evidence.meta.json")
+        return
+    try:
+        metadata = _read_object(metadata_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return
+    try:
+        artifact_paths, _summary = _validate_metadata(metadata_path, metadata)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    pack_name = artifact_paths.get("evidence_pack")
+    receipt_name = artifact_paths.get("verification_receipt")
+    assert isinstance(pack_name, str) and isinstance(receipt_name, str)
+    pack = entry_root / pack_name
+    receipt = entry_root / receipt_name
+    if not pack.is_dir() or pack.is_symlink():
+        errors.append(f"{pack}: evidence pack is missing or unsafe")
+        return
+    manifest_path = pack / "manifest.json"
+    try:
+        manifest = _read_object(manifest_path)
+        receipt_value = _read_object(receipt)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return
+    if manifest.get("format") != "invarlock/evidence-pack-v1":
         errors.append(
-            f"{_relative(artifact_path)}: rerun_classifications must be a list"
+            f"{pack}: only the canonical invarlock/evidence-pack-v1 is publishable"
         )
-        rerun_classifications = []
-    for index, classification in enumerate(rerun_classifications):
-        if not isinstance(classification, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: rerun_classifications[{index}] "
-                "must be object"
-            )
-            continue
-        slug = classification.get("slug")
-        if slug not in seen_clean:
-            errors.append(
-                f"{_relative(artifact_path)}: rerun_classifications[{index}].slug "
-                "must reference a clean lane"
-            )
-        if classification.get("previous_classification") not in (
-            VALIDATION_FAILURE_CLASSIFICATIONS
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: rerun_classifications[{index}] "
-                "previous_classification invalid"
-            )
-        if classification.get("later_clean_run_observed") is not True:
-            errors.append(
-                f"{_relative(artifact_path)}: rerun_classifications[{index}] "
-                "must observe a later clean run"
-            )
-
-    excluded_lanes = payload.get("excluded_lanes")
-    if not isinstance(excluded_lanes, list):
-        errors.append(f"{_relative(artifact_path)}: excluded_lanes must be a list")
-        excluded_lanes = []
-    for index, lane in enumerate(excluded_lanes):
-        if not isinstance(lane, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: excluded_lanes[{index}] must be object"
-            )
-            continue
-        slug = lane.get("slug")
-        model_id = lane.get("model_id")
-        reason = lane.get("reason")
-        if not isinstance(slug, str) or not slug:
-            errors.append(
-                f"{_relative(artifact_path)}: excluded_lanes[{index}].slug required"
-            )
-        if not isinstance(model_id, str) or not model_id:
-            errors.append(
-                f"{_relative(artifact_path)}: excluded_lanes[{index}].model_id required"
-            )
-        if not isinstance(reason, str) or not reason:
-            errors.append(
-                f"{_relative(artifact_path)}: excluded_lanes[{index}].reason required"
-            )
-
-    expected_counts = {
-        "clean_resolution_lanes": len(seen_clean),
-        "rerun_clean_resolutions": len(rerun_classifications),
-        "excluded_lanes": len(excluded_lanes),
-    }
-    for key, expected in expected_counts.items():
-        if counts.get(key) != expected:
-            errors.append(
-                f"{_relative(artifact_path)}: counts.{key} must be {expected}"
-            )
-
-
-def _check_larger_model_validation_followup_lanes(
-    errors: list[str],
-    artifact_path: Path,
-    payload: dict[str, Any],
-) -> None:
-    if payload.get("source_window") != "model_family_followup_runs":
-        errors.append(f"{_relative(artifact_path)}: source_window invalid")
-
-    counts = payload.get("counts")
-    if not isinstance(counts, dict):
-        errors.append(f"{_relative(artifact_path)}: counts must be object")
-        counts = {}
-
-    clean_lanes = payload.get("clean_followup_lanes")
-    if not isinstance(clean_lanes, list) or not clean_lanes:
-        errors.append(
-            f"{_relative(artifact_path)}: clean_followup_lanes must be non-empty"
-        )
-        clean_lanes = []
-    for index, lane in enumerate(clean_lanes):
-        if not isinstance(lane, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
-                "must be object"
-            )
-            continue
-        if lane.get("rc") != 0 or lane.get("evaluate_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
-                "must have clean evaluation"
-            )
-        if lane.get("verify_exit") != 0 or lane.get("status") != "ok":
-            errors.append(
-                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
-                "must have clean verification"
-            )
-        preset = lane.get("preset_basis")
-        if not isinstance(preset, str) or not (REPO_ROOT / preset).is_file():
-            errors.append(
-                f"{_relative(artifact_path)}: clean_followup_lanes[{index}] "
-                "preset_basis must be a repo file"
-            )
-
-    diagnostics = payload.get("diagnostic_lanes")
-    if not isinstance(diagnostics, list) or not diagnostics:
-        errors.append(f"{_relative(artifact_path)}: diagnostic_lanes must be non-empty")
-        diagnostics = []
-    for index, lane in enumerate(diagnostics):
-        if not isinstance(lane, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: diagnostic_lanes[{index}] must be object"
-            )
-            continue
-        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: diagnostic_lanes[{index}] must pass"
-            )
-        if lane.get("support_claimed") is not False:
-            errors.append(
-                f"{_relative(artifact_path)}: diagnostic_lanes[{index}] "
-                "support_claimed must be false"
-            )
-
-    strict_findings = payload.get("strict_policy_findings")
-    if not isinstance(strict_findings, list) or not strict_findings:
-        errors.append(
-            f"{_relative(artifact_path)}: strict_policy_findings must be non-empty"
-        )
-        strict_findings = []
-    for index, finding in enumerate(strict_findings):
-        if not isinstance(finding, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
-                "must be object"
-            )
-            continue
-        if finding.get("detail") != "policy_fail":
-            errors.append(
-                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
-                "detail must be policy_fail"
-            )
-        if finding.get("verify_exit") != 1 or finding.get("evaluate_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
-                "must fail only at verification"
-            )
-        if finding.get("classification") != "strict_spectral_cap_budget_boundary":
-            errors.append(
-                f"{_relative(artifact_path)}: strict_policy_findings[{index}] "
-                "classification invalid"
-            )
-
-    dependency_findings = payload.get("dependency_findings")
-    if not isinstance(dependency_findings, list):
-        errors.append(f"{_relative(artifact_path)}: dependency_findings must be a list")
-        dependency_findings = []
-    for index, finding in enumerate(dependency_findings):
-        if not isinstance(finding, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: dependency_findings[{index}] "
-                "must be object"
-            )
-            continue
-        if finding.get("classification") != "runtime_dependency_missing":
-            errors.append(
-                f"{_relative(artifact_path)}: dependency_findings[{index}] "
-                "classification invalid"
-            )
-        if finding.get("verify_exit") is not None:
-            errors.append(
-                f"{_relative(artifact_path)}: dependency_findings[{index}] "
-                "verify_exit must be null"
-            )
-
-    expected_counts = {
-        "followup_clean_lanes": len(clean_lanes),
-        "diagnostic_lanes": len(diagnostics),
-        "strict_policy_findings": len(strict_findings),
-        "dependency_findings": len(dependency_findings),
-    }
-    for key, expected in expected_counts.items():
-        if counts.get(key) != expected:
-            errors.append(
-                f"{_relative(artifact_path)}: counts.{key} must be {expected}"
-            )
-
-
-def _check_larger_model_validation_published_basis_verification(
-    errors: list[str],
-    artifact_path: Path,
-    payload: dict[str, Any],
-) -> None:
-    if payload.get("source_window") != "published_basis_verification_runs":
-        errors.append(f"{_relative(artifact_path)}: source_window invalid")
-
-    counts = payload.get("counts")
-    if not isinstance(counts, dict):
-        errors.append(f"{_relative(artifact_path)}: counts must be object")
-        counts = {}
-
-    published_basis_lanes = payload.get("published_basis_clean_lanes")
-    followup_lanes = payload.get("followup_clean_lanes")
-    if not isinstance(published_basis_lanes, list) or not published_basis_lanes:
-        errors.append(
-            f"{_relative(artifact_path)}: published_basis_clean_lanes must be non-empty"
-        )
-        published_basis_lanes = []
-    if not isinstance(followup_lanes, list) or not followup_lanes:
-        errors.append(
-            f"{_relative(artifact_path)}: followup_clean_lanes must be non-empty"
-        )
-        followup_lanes = []
-
-    expected_published_basis = {
-        "google_gemma_4_e2b_it_image_text",
-        "qwen_qwen3_5_4b",
-        "qwen_qwen3_5_2b",
-    }
-    expected_followup = {"qwen3_8b_public", "qwen3_5_9b_public"}
-    published_basis_seen = _check_published_basis_verification_lanes(
+    _check_signed_receipt(
         errors,
-        artifact_path,
-        published_basis_lanes,
-        "published_basis_clean_lanes",
-        expected_suite="support-matrix-backlog-gpu",
-        expected_metric_kinds={"accuracy"},
+        receipt=receipt,
+        value=receipt_value,
+        manifest_path=manifest_path,
     )
-    followup_seen = _check_published_basis_verification_lanes(
-        errors,
-        artifact_path,
-        followup_lanes,
-        "followup_clean_lanes",
-        expected_suite="repo-mentioned-gpu",
-        expected_metric_kinds={"ppl_causal"},
+    statement = receipt_value.get("statement")
+    anchors = statement.get("anchors") if isinstance(statement, dict) else None
+    artifacts = anchors.get("artifact_digests") if isinstance(anchors, dict) else None
+    schedule = anchors.get("schedule_digest") if isinstance(anchors, dict) else None
+    runtimes = anchors.get("runtime_digests") if isinstance(anchors, dict) else None
+    policy_digest = anchors.get("policy_digest") if isinstance(anchors, dict) else None
+    signer = (
+        anchors.get("pack_signer_fingerprint") if isinstance(anchors, dict) else None
     )
-    if published_basis_seen != expected_published_basis:
-        errors.append(
-            f"{_relative(artifact_path)}: published-basis lane coverage mismatch "
-            f"missing={sorted(expected_published_basis - published_basis_seen)} "
-            f"extra={sorted(published_basis_seen - expected_published_basis)}"
-        )
-    if followup_seen != expected_followup:
-        errors.append(
-            f"{_relative(artifact_path)}: follow-up lane coverage mismatch "
-            f"missing={sorted(expected_followup - followup_seen)} "
-            f"extra={sorted(followup_seen - expected_followup)}"
-        )
-
-    all_lanes = [*published_basis_lanes, *followup_lanes]
-    expected_counts = {
-        "published_basis_clean_lanes": len(published_basis_lanes),
-        "followup_clean_lanes": len(followup_lanes),
-        "report_materialized": sum(
-            1
-            for lane in all_lanes
-            if isinstance(lane, dict) and lane.get("report_materialized") is True
-        ),
-        "verify_materialized": sum(
-            1
-            for lane in all_lanes
-            if isinstance(lane, dict) and lane.get("verify_materialized") is True
-        ),
-        "runtime_provenance_verified": sum(
-            1
-            for lane in all_lanes
-            if isinstance(lane, dict)
-            and lane.get("runtime_provenance_verified") is True
-        ),
-        "guard_warning_free": sum(
-            1
-            for lane in all_lanes
-            if isinstance(lane, dict) and lane.get("guard_warnings_present") is False
-        ),
-    }
-    for key, expected in expected_counts.items():
-        if counts.get(key) != expected:
-            errors.append(
-                f"{_relative(artifact_path)}: counts.{key} must be {expected}"
-            )
-
-
-def _check_published_basis_verification_lanes(
-    errors: list[str],
-    artifact_path: Path,
-    lanes: list[Any],
-    field: str,
-    *,
-    expected_suite: str,
-    expected_metric_kinds: set[str],
-) -> set[str]:
-    seen: set[str] = set()
-    for index, lane in enumerate(lanes):
-        if not isinstance(lane, dict):
-            errors.append(
-                f"{_relative(artifact_path)}: {field}[{index}] must be object"
-            )
-            continue
-        slug = lane.get("slug")
-        if not isinstance(slug, str) or not slug:
-            errors.append(f"{_relative(artifact_path)}: {field}[{index}].slug required")
-        elif slug in seen:
-            errors.append(
-                f"{_relative(artifact_path)}: duplicate published-basis lane {slug!r}"
-            )
+    if (
+        isinstance(artifacts, dict)
+        and set(artifacts) == {"baseline", "subject"}
+        and all(_valid_digest(value) for value in artifacts.values())
+        and _valid_digest(schedule)
+        and isinstance(runtimes, dict)
+        and set(runtimes) == {"baseline", "subject"}
+        and all(_valid_digest(value) for value in runtimes.values())
+        and _valid_digest(policy_digest)
+        and _valid_digest(signer)
+    ):
+        inputs = manifest.get("inputs")
+        expected_materials = {
+            "baseline": artifacts["baseline"],
+            "subject": artifacts["subject"],
+            "dataset": schedule,
+            "policy": policy_digest,
+            "baseline_runtime": runtimes["baseline"],
+            "subject_runtime": runtimes["subject"],
+        }
+        if not isinstance(inputs, dict):
+            errors.append(f"{manifest_path}: manifest inputs are invalid")
         else:
-            seen.add(slug)
-        model_id = lane.get("model_id")
-        if not isinstance(model_id, str) or not model_id:
-            errors.append(
-                f"{_relative(artifact_path)}: {field}[{index}].model_id required"
-            )
-        preset = lane.get("preset")
-        if (
-            not isinstance(preset, str)
-            or preset.startswith("/")
-            or not (REPO_ROOT / preset).is_file()
-        ):
-            errors.append(
-                f"{_relative(artifact_path)}: {field}[{index}].preset invalid"
-            )
-        if lane.get("suite") != expected_suite:
-            errors.append(f"{_relative(artifact_path)}: {slug} suite invalid")
-        if lane.get("rc") != 0:
-            errors.append(f"{_relative(artifact_path)}: {slug} rc must be zero")
-        if lane.get("evaluate_exit") != 0 or lane.get("verify_exit") != 0:
-            errors.append(
-                f"{_relative(artifact_path)}: {slug} evaluate/verify exits must be zero"
-            )
-        for key in ("summary_ok", "verify_summary_ok", "runtime_provenance_verified"):
-            if lane.get(key) is not True:
-                errors.append(f"{_relative(artifact_path)}: {slug} {key} must be true")
-        if lane.get("guard_warnings_present") is not False:
-            errors.append(
-                f"{_relative(artifact_path)}: {slug} guard_warnings_present must be false"
-            )
-        if lane.get("warning_count") != 0:
-            errors.append(f"{_relative(artifact_path)}: {slug} warning_count must be 0")
-        for key in ("report_materialized", "verify_materialized"):
-            if lane.get(key) is not True:
-                errors.append(f"{_relative(artifact_path)}: {slug} {key} must be true")
-        if lane.get("status") != "ok":
-            errors.append(f"{_relative(artifact_path)}: {slug} status must be ok")
-
-        metric = lane.get("metric")
-        if not isinstance(metric, dict):
-            errors.append(f"{_relative(artifact_path)}: {slug} metric must be object")
-        else:
-            if metric.get("kind") not in expected_metric_kinds:
-                errors.append(f"{_relative(artifact_path)}: {slug} metric kind invalid")
-            if _as_finite_float(metric.get("final")) is None:
-                errors.append(
-                    f"{_relative(artifact_path)}: {slug} metric final invalid"
+            for role, expected_digest in expected_materials.items():
+                reference = inputs.get(role)
+                observed_digest = (
+                    reference.get("material_digest")
+                    if isinstance(reference, dict)
+                    else None
                 )
-            if _as_finite_float(metric.get("ratio_vs_baseline")) is None:
+                if observed_digest != expected_digest:
+                    errors.append(
+                        f"{receipt}: signed receipt {role} anchor does not bind "
+                        "the pack manifest"
+                    )
+        if manifest.get("signing_key_fingerprint") != signer:
+            errors.append(
+                f"{receipt}: signed receipt signer anchor does not bind the pack"
+            )
+        try:
+            rendered = render_evidence(pack)
+        except EvidenceReportError as exc:
+            errors.append(f"{pack}: signed pack validation failed: {exc}")
+        else:
+            if rendered.evidence_signer != signer:
                 errors.append(
-                    f"{_relative(artifact_path)}: {slug} metric ratio invalid"
+                    f"{receipt}: signed receipt signer anchor does not match "
+                    "the verified pack signer"
                 )
 
-        for key in (
-            "existing_public_evidence_report",
-            "existing_public_runtime_manifest",
-        ):
-            rel_path = lane.get(key)
-            if (
-                not isinstance(rel_path, str)
-                or rel_path.startswith("/")
-                or ".." in Path(rel_path).parts
-                or not (REPO_ROOT / rel_path).is_file()
-            ):
-                errors.append(f"{_relative(artifact_path)}: {slug} {key} invalid")
-    return seen
+
+def _check_index_entry(errors: list[str], raw_entry: object, root: Path) -> None:
+    if not isinstance(raw_entry, dict):
+        errors.append("public evidence entry must be an object")
+        return
+    slug = raw_entry.get("slug")
+    if not isinstance(slug, str) or not slug or "/" in slug:
+        errors.append("public evidence entry slug is invalid")
+        return
+    if raw_entry.get("evidence_class") != "signed_evidence_pack":
+        errors.append(f"{slug}: evidence_class must be signed_evidence_pack")
+    expected_path = f"public_evidence/{EVIDENCE_DIRNAME}/{slug}"
+    if raw_entry.get("path") != expected_path:
+        errors.append(f"{slug}: entry path must be {expected_path}")
+    _check_artifact_summary(errors, raw_entry, "evidence_pack", root)
+    _check_artifact_summary(errors, raw_entry, "verification_receipt", root)
 
 
-EvidenceChecker = Callable[[list[str], Path, dict[str, Any]], None]
+def _artifact_totals(entries: list[object]) -> tuple[int, int]:
+    artifact_file_count = 0
+    artifact_size_bytes = 0
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            continue
+        artifacts = raw_entry.get("artifacts")
+        if not isinstance(artifacts, dict):
+            continue
+        for summary in artifacts.values():
+            if not isinstance(summary, dict):
+                continue
+            count = 1 if summary.get("kind") == "file" else summary.get("file_count")
+            size = summary.get("size_bytes")
+            if isinstance(count, int) and not isinstance(count, bool):
+                artifact_file_count += count
+            if isinstance(size, int) and not isinstance(size, bool):
+                artifact_size_bytes += size
+    return artifact_file_count, artifact_size_bytes
 
 
-SPECIALIZED_EVIDENCE_CHECKERS: dict[str, EvidenceChecker] = {
-    "guard_value_demo": _check_guard_value_demo,
-    "runtime_backend_compatibility": _check_runtime_backend_compatibility,
-    "evidence_pack_lifecycle_stress": _check_evidence_pack_lifecycle_stress,
-    "attention_backend_compatibility": _check_attention_backend_compatibility,
-    "larger_model_validation_findings": _check_larger_model_validation_findings,
-}
+def _check_local_evidence_tree(
+    errors: list[str], root: Path, entries: list[object]
+) -> None:
+    evidence_root = root / EVIDENCE_DIRNAME
+    if not evidence_root.is_dir():
+        return
+    local_entries = sorted(path for path in evidence_root.iterdir() if path.is_dir())
+    indexed = {entry.get("slug") for entry in entries if isinstance(entry, dict)}
+    if not {path.name for path in local_entries}.issubset(indexed):
+        errors.append("every local evidence directory must appear in the index")
+    for entry_root in local_entries:
+        _check_local_entry(errors, entry_root)
+    unexpected_children = sorted(
+        item.name
+        for item in evidence_root.iterdir()
+        if not item.is_dir() and not _is_ignored_local_metadata(item)
+    )
+    if unexpected_children:
+        errors.append(
+            "unexpected files in public evidence directory: "
+            + ", ".join(unexpected_children)
+        )
 
 
-def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
+def check_public_evidence(root: Path = SOURCE_ROOT) -> list[str]:
     errors: list[str] = []
     root = root.resolve()
-    if not (root / "README.md").is_file():
-        errors.append(f"{_relative(root)}: README.md is required")
     if not root.is_dir():
         return [f"public evidence root not found: {root}"]
-    _check_public_evidence_privacy(errors, root)
-
-    for artifact_dir in sorted(_artifact_dirs(root)):
-        meta_path = artifact_dir / META_FILENAME
-        if not meta_path.is_file():
-            errors.append(f"{_relative(artifact_dir)}: missing {META_FILENAME}")
-            continue
-
-        metadata, error = _load_json(meta_path)
-        if error:
-            errors.append(error)
-            continue
-        assert metadata is not None
-
-        if metadata.get("schema") != SCHEMA:
-            errors.append(f"{_relative(meta_path)}: schema must be {SCHEMA}")
-
-        evidence_class = metadata.get("evidence_class")
-        if not isinstance(evidence_class, str):
-            errors.append(f"{_relative(meta_path)}: invalid evidence_class")
-            continue
-        class_spec = EVIDENCE_CLASS_REGISTRY.get(evidence_class)
-        if class_spec is None:
-            errors.append(f"{_relative(meta_path)}: invalid evidence_class")
-            continue
-
-        summary = str(metadata.get("summary") or "").lower()
-        class_kind = class_spec["kind"]
-        specialized_checker = class_spec["specialized_checker"]
-
-        if class_kind == "fixture" and "fixture" not in summary:
-            errors.append(f"{_relative(meta_path)}: fixture evidence must say fixture")
-
-        artifact_paths = metadata.get("artifact_paths")
-        if not isinstance(artifact_paths, dict):
-            errors.append(f"{_relative(meta_path)}: artifact_paths must be an object")
-            continue
-
-        if (artifact_dir / "evaluation.report.json").is_file():
-            report_path = _require_path(
-                errors, artifact_dir, artifact_paths, "evaluation_report"
-            )
-            _require_path(errors, artifact_dir, artifact_paths, "runtime_manifest")
-            if report_path is not None and _is_direct_published_basis_artifact(
-                artifact_dir, root
-            ):
-                _check_published_basis_multimodal_quality(
-                    errors, artifact_dir, report_path
-                )
-
-        if class_kind == "real":
-            _require_path(errors, artifact_dir, artifact_paths, "run_command")
-            if "invarlock evaluate" not in str(metadata.get("generated_by") or ""):
-                errors.append(
-                    f"{_relative(meta_path)}: real runs must record invarlock evaluate"
-                )
-            if "fixture" in summary:
-                errors.append(
-                    f"{_relative(meta_path)}: real-run summary must not say fixture"
-                )
-
-        if "evidence_pack" in artifact_paths:
-            _check_signed_pack(errors, artifact_dir, metadata, artifact_paths)
-
-        if specialized_checker is not None:
-            checker = SPECIALIZED_EVIDENCE_CHECKERS[specialized_checker]
-            checker(errors, artifact_dir, artifact_paths)
-
-        commands = metadata.get("verifier_commands")
-        if not isinstance(commands, list) or not commands:
-            errors.append(
-                f"{_relative(meta_path)}: verifier_commands must be a non-empty list"
-            )
-
+    if not (root / "README.md").is_file():
+        errors.append("public_evidence/README.md is required")
+    index_path = root / INDEX_FILENAME
+    if not index_path.is_file():
+        errors.append(f"public_evidence/{INDEX_FILENAME} is required")
+        return errors
+    try:
+        index = _read_object(index_path)
+        _validate_index(index_path, index)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return errors
+    if index.get("format_version") != INDEX_FORMAT_VERSION:
+        errors.append("public evidence index format is invalid")
+    encoded = index_path.read_text(encoding="utf-8")
+    for marker in _PRIVATE_MARKERS:
+        if marker in encoded:
+            errors.append(f"public evidence index contains private marker {marker!r}")
+    for marker in _OBSOLETE_MARKERS:
+        if marker in encoded:
+            errors.append(f"public evidence index contains obsolete marker {marker!r}")
+    entries = index.get("entries")
+    assert isinstance(entries, list)
+    for raw_entry in entries:
+        _check_index_entry(errors, raw_entry, root)
+    artifact_file_count, artifact_size_bytes = _artifact_totals(entries)
+    if index.get("evidence_file_count") != artifact_file_count:
+        errors.append("evidence_file_count must match artifact summaries")
+    if index.get("evidence_size_bytes") != artifact_size_bytes:
+        errors.append("evidence_size_bytes must match artifact summaries")
+    _check_local_evidence_tree(errors, root, entries)
+    allowed_root_files = {"README.md", INDEX_FILENAME}
+    unexpected = sorted(
+        item.name
+        for item in root.iterdir()
+        if item.name not in allowed_root_files
+        and item.name != EVIDENCE_DIRNAME
+        and not _is_ignored_local_metadata(item)
+    )
+    if unexpected:
+        errors.append("unexpected public evidence surfaces: " + ", ".join(unexpected))
+    if root == SOURCE_ROOT.resolve():
+        packaged_index = PACKAGED_ROOT / INDEX_FILENAME
+        if (
+            not packaged_index.is_file()
+            or packaged_index.read_bytes() != index_path.read_bytes()
+        ):
+            errors.append("source and packaged public evidence indexes differ")
     return errors
 
 
-def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--root",
-        type=Path,
-        default=PUBLIC_EVIDENCE_ROOT,
-        help="Public evidence root to audit.",
-    )
-    return parser.parse_args(argv)
-
-
 def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(argv)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=SOURCE_ROOT)
+    args = parser.parse_args(argv)
     errors = check_public_evidence(args.root)
     if errors:
         for error in errors:
-            print(error, file=sys.stderr)
+            print(error)
         return 1
     print("Public evidence audit passed.")
     return 0

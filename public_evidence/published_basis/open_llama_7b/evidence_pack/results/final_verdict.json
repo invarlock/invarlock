@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/open_llama_7b/evaluation.report.json",
-  "evidence_run": "20260613TpromotionGapReleasePromoteA",
-  "model_id": "openlm-research/open_llama_7b",
-  "note": "Container-backed release-profile OpenLLaMA 7B published-basis no-op preservation evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

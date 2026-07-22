@@ -1,407 +1,344 @@
 # Troubleshooting
 
-## Overview
+InvarLock fails closed: a missing binding, unverifiable input, or ambiguous
+destination stops publication or produces a rejected verification result.
 
-| Aspect | Details |
-| --- | --- |
-| **Purpose** | Consolidated error code reference and troubleshooting guide. |
-| **Audience** | Users encountering errors during `evaluate`, `verify`, or advanced workflows. |
-| **Exit codes** | Core verify/evaluate use `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. Evidence-pack verification also uses structured pack codes `4`-`7`. |
-| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`, `src/invarlock/evidence_pack_support.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
+!!! tip "User guide"
 
-## Quick Start
+    **Outcome:** Identify the earliest failing transaction boundary and recover
+    without mutating signed evidence or weakening independent verification.
 
-```bash
-# Check environment and configuration
-invarlock doctor --config <config.yaml> --profile ci
+    **Audience:** Evaluation operators, verifier operators, runtime integrators,
+    and decision owners investigating an evaluation, verification, or report error.
 
-# Validate a container-backed report bundle
-invarlock verify reports/eval/evaluation.report.json --profile ci
+    **Prerequisites:** The original command and structured error, unchanged
+    submitted artifacts, independently sourced anchors, and knowledge of which
+    output paths existed before the attempt.
 
-# Enable debug output for detailed traces
-INVARLOCK_DEBUG_TRACE=1 \
-  invarlock evaluate --allow-network --execution-mode host --baseline gpt2 --subject gpt2 --preset <config.yaml>
-```
+## Triage by transaction boundary
 
-For container-backed outputs, `verify` expects `runtime.manifest.json` next to
-the evaluation report. Host-mode outputs are an unverified provenance path; use
-`--runtime-provenance host --assurance off` only when that non-assurance mode is
-intentional.
+Start with the first boundary that failed. Later artifacts may not exist and
+should not be synthesized.
 
-## Error Code Reference
-
-### Pairing Errors (E001–E006)
-
-These errors relate to window pairing, tokenizer consistency, and evidence integrity.
-
-#### E001 — Pairing Schedule Mismatch
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E001` |
-| **Category** | Pairing |
-| **Severity** | Hard abort in CI/Release |
-| **Exit code** | `3` (CI/Release) or `1` (dev) |
-
-**Triggers:**
-
-- `PAIRING-EVIDENCE-MISSING`: Baseline report path does not exist or cannot be parsed
-- `PAIRING-SCHEDULE-MISMATCH`: Window matching fraction ≠ 1.0, window overlap > 0, or counts diverge after stratification
-- `PAIRED-WINDOWS-COLLAPSED`: `paired_windows ≤ 0` under paired baseline
-
-**Common causes:**
-
-- Missing or corrupted baseline `report.json`
-- Baseline lacks `evaluation_windows` section
-- Dataset settings differ between baseline and subject runs
-- Sequence length / stride mismatch
-
-**Fixes:**
-
-1. Ensure baseline `report.json` exists and contains `evaluation_windows`
-2. Verify dataset settings match: `provider`, `seq_len`, `stride`, `split`
-3. Regenerate baseline with the same configuration
-4. Check that tokenizer hash matches between runs
-
-**Example error:**
-
-```text
-[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: window_match_fraction=0.950
-```
-
----
-
-#### E002 — Tokenizer Digest Mismatch
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E002` |
-| **Category** | Pairing |
-| **Severity** | Hard abort in CI/Release |
-| **Exit code** | `3` (CI/Release) |
-
-**Triggers:**
-
-- Subject and baseline tokenizers produce different vocabulary hashes
-
-**Common causes:**
-
-- Different tokenizer versions or configurations
-- Model checkpoint with a different vocabulary
-- Trust-remote-code flag inconsistency
-
-**Fixes:**
-
-1. Ensure both runs use the same model checkpoint
-2. Pin tokenizer version via `revision` in config
-3. Regenerate the baseline with the tokenizer used for the subject run
-
-**Example error:**
-
-```text
-[INVARLOCK:E002] TOKENIZER-DIGEST-MISMATCH: subject and baseline tokenizers differ
-```
-
----
-
-#### E003 — Mask Parity Mismatch
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E003` |
-| **Category** | Pairing |
-| **Severity** | Hard abort in CI/Release |
-| **Exit code** | `3` (CI/Release) |
-
-**Triggers:**
-
-- MLM mask positions differ between subject and baseline under identical tokenizers
-
-**Common causes:**
-
-- Different masking seeds between runs
-- Baseline generated with different `mask_prob` or `mask_seed`
-- Labels in baseline report corrupted or missing
-
-**Fixes:**
-
-1. Ensure `eval.loss.seed` matches between runs
-2. Regenerate baseline with consistent masking configuration
-3. Verify baseline contains MLM labels in `evaluation_windows`
-
-**Example error:**
-
-```text
-[INVARLOCK:E003] MASK-PARITY-MISMATCH: mask positions differ under matched tokenizers
-```
-
----
-
-#### E004 — Provider Digest Missing
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E004` |
-| **Category** | Pairing |
-| **Severity** | Hard abort in CI/Release |
-| **Exit code** | `3` (CI/Release) |
-
-**Triggers:**
-
-- Subject or baseline is missing the provider digest (ids/tokenizer hash)
-
-**Common causes:**
-
-- Baseline report missing digest-tracking metadata
-- Report truncated or missing `provenance` section
-- Windows not materialized due to `INVARLOCK_STORE_EVAL_WINDOWS=0`
-
-**Fixes:**
-
-1. Regenerate the baseline with the InvarLock version used for verification
-2. Ensure `INVARLOCK_STORE_EVAL_WINDOWS=1` (default)
-3. Check `report.provenance.provider_digest` exists
-
-**Example error:**
-
-```text
-[INVARLOCK:E004] PROVIDER-DIGEST-MISSING: subject or baseline missing ids/tokenizer digest
-```
-
----
-
-#### E006 — Window IDs Digest Mismatch
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E006` |
-| **Category** | Pairing |
-| **Severity** | Hard abort in CI/Release |
-| **Exit code** | `3` (CI/Release) |
-
-**Triggers:**
-
-- Subject and baseline window IDs differ (different windows selected)
-
-**Common causes:**
-
-- Different dataset splits or stratification seeds
-- Capacity constraints forced window reduction
-- Baseline generated with different `preview_n`/`final_n`
-
-**Fixes:**
-
-1. Use identical `dataset.seed` and window counts
-2. Verify capacity allows requested windows
-3. Regenerate baseline with matching configuration
-
-**Example error:**
-
-```text
-[INVARLOCK:E006] IDS-DIGEST-MISMATCH: subject and baseline window IDs differ
-```
-
----
-
-### Primary Metric Errors (E111)
-
-#### E111 — Primary Metric Degraded
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E111` |
-| **Category** | Quality |
-| **Severity** | report emitted, then hard abort in CI/Release |
-| **Exit code** | `3` (CI/Release) |
-
-**Triggers:**
-
-- Primary metric (perplexity/accuracy) is non-finite (NaN, Inf)
-- Primary metric degraded beyond acceptable ratio
-
-**Common causes:**
-
-- Numerical instability (overflow/underflow)
-- Model weights corrupted by edit
-- Insufficient precision (try float32)
-- Empty or malformed evaluation windows
-
-**Fixes:**
-
-1. Force `dtype: float32` in model config
-2. Reduce batch size if memory-constrained
-3. Use an accelerator (CUDA/MPS) for better precision
-4. Lower `plan.max_modules` to reduce edit scope
-5. Check that evaluation windows contain valid tokens
-
-**Example error:**
-
-```text
-[INVARLOCK:E111] Primary metric degraded or non-finite (preview=inf, final=nan)
-```
-
-**Notes:**
-
-- `invarlock evaluate` always emits a report before exiting on E111
-- internal `run` flows log a warning for non-finite PM but do not raise E111
-
----
-
-### Verification Errors (E601)
-
-#### E601 — report Verification Failed
-
-| Field | Value |
-| --- | --- |
-| **Code** | `E601` |
-| **Category** | Verification |
-| **Severity** | Verification failure |
-| **Exit code** | `2` for malformed/schema-invalid input; `3` for CI/Release policy or gate failure |
-
-**Triggers:**
-
-- report fails schema validation or is malformed
-- Pairing math recomputation fails
-- Gate checks fail in CI/Release profile
-
-**Common causes:**
-
-- report JSON corrupted or hand-edited
-- Schema version mismatch (`schema_version` ≠ `v1`)
-- Missing required fields (`run_id`, `meta`, `dataset`, etc.)
-
-**Fixes:**
-
-1. Regenerate report via `invarlock evaluate`
-2. Ensure report is unmodified from generation
-3. Check `schema_version` is `"v1"`
-
-**Example error:**
-
-```text
-[INVARLOCK:E601] report schema validation failed
-```
-
----
-
-## Exit Code Summary
-
-| Exit Code | Meaning | Typical causes |
+| Boundary | Typical signal | Expected output state |
 | --- | --- | --- |
-| `0` | Success | Run/verification passed all gates |
-| `1` | Generic failure | Unknown error, missing dependencies |
-| `2` | Schema/config invalid | YAML parse error, invalid config keys, `ValidationError` |
-| `3` | Hard abort | E001–E006, E111, E601 in CI/Release profile |
-| `4` | Evidence-pack format failure | Manifest or pack contract malformed |
-| `5` | Evidence-pack signature failure | Missing/invalid `manifest.signature.json` or untrusted signer |
-| `6` | Evidence-pack integrity failure | Checksum or digest binding mismatch |
-| `7` | Evidence-pack report failure | Bundled report verification failed |
+| Request loading | Schema, YAML, path, provider, or metric error | No provider execution and no evidence directory |
+| Provider execution | Artifact identity, runtime, backend, device, or record error | No published evidence directory |
+| Import authentication | Sidecar, schedule, runtime-manifest, or pair mismatch | No published evidence directory |
+| Publication | Signing, staging, parent identity, or destination error | No partial published destination |
+| Verification | Nonzero result with integrity, policy, or anchor errors | Bundle unchanged; signed rejection receipt when the transaction completed |
+| Reporting | Invalid bundle or existing HTML destination | Bundle unchanged; no new HTML |
 
-## Common Issues
-
-### Network Blocked
-
-**Symptom:** Downloads fail silently or model loading hangs.
-
-**Fix:**
+Use machine-readable output for the first two core transactions:
 
 ```bash
-invarlock evaluate --allow-network --baseline gpt2 --subject gpt2
+invarlock evaluate request.yaml --signing-key evidence-signer.pem --json
+invarlock verify evidence/ \
+  --policy trusted/acceptance.json \
+  --expected-baseline-artifact sha256:PINNED_BASELINE_ARTIFACT_DIGEST \
+  --expected-subject-artifact sha256:PINNED_SUBJECT_ARTIFACT_DIGEST \
+  --expected-schedule sha256:PINNED_CANONICAL_SCHEDULE_DIGEST \
+  --expected-baseline-runtime sha256:PINNED_BASELINE_DIGEST \
+  --expected-subject-runtime sha256:PINNED_SUBJECT_DIGEST \
+  --expected-signer sha256:AUTHORIZED_EVIDENCE_SIGNER_FINGERPRINT \
+  --receipt verification.receipt.json \
+  --verifier-signing-key verifier.pem \
+  --verifier-identity release-verifier \
+  --json
 ```
 
-### Dependency Missing
+Read the earliest error first. A downstream checksum, report, or policy error
+may be a consequence of an earlier identity or binding failure.
 
-**Symptom:** `ModuleNotFoundError` for `torch`, `transformers`, etc.
+## Safe recovery pattern
 
-**Fix:**
+1. Preserve the submitted evidence and any signed rejection receipt.
+2. Classify the failure as request, runtime, import, publication,
+   verification, or presentation.
+3. Correct the source input or environment, not the signed artifact.
+4. Use a new evidence, receipt, or HTML destination.
+5. Repeat independent verification from the original independently maintained anchors.
+
+Do not turn a mismatch into a pass by copying the observed digest or signer
+from the failed bundle into verifier configuration.
+
+## `an Ed25519 evidence signing key is required`
+
+Pass a PKCS8 Ed25519 private key with `--signing-key` or
+`INVARLOCK_SIGNING_KEY`. Other key algorithms are rejected.
+
+For the offline example:
 
 ```bash
-pip install "invarlock[hf]"       # HF adapters + evaluation stack
-pip install "invarlock[guards]"   # Guard math
-pip install "invarlock[adapters]" # Core HF adapters
+cd examples
+python generate_keys.py --output-dir .keys
+invarlock evaluate request.yaml --signing-key .keys/evidence-signer.pem
 ```
 
-### Calibration Data Not Indexable
+## Output or receipt destination already exists
 
-**Symptom:** Runner fails with "calibration data must be indexable."
+Evidence publication and receipt creation are no-clobber operations. Choose a
+new destination in the request or verify command. For a disposable tutorial,
+start from a fresh copy of `examples/`. Do not remove or mutate an artifact that
+has already been distributed.
 
-**Fix:**
+HTML rendering is also no-clobber. Choose a new `--html` path.
+
+## Request path is rejected
+
+Request file references must be nonempty, relative, root-confined paths. They
+cannot contain absolute prefixes, URLs, backslashes, `.` or `..` segments,
+duplicate separators, control characters, leading/trailing whitespace, or a
+trailing slash. Symbolic links and identity changes during the transaction fail
+closed. Put all request inputs beneath one real directory and use forward-slash
+relative paths.
+
+## Run-mode JSONL preparation fails
+
+Run mode authenticates the exact JSONL source before deriving the canonical
+schedule. Check that:
+
+- `comparison.dataset.sha256` is the bare lowercase SHA-256 of the source bytes;
+- the file contains one nonempty JSON object per line and no blank lines;
+- `input_field`, `expected_output_field`, and optional `id_field` name fields
+  present on every selected record;
+- IDs are unique when `id_field` is supplied;
+- `limit`, when present, selects an available exact prefix; and
+- the source file and its parent path are regular, root-confined, and unchanged
+  during the read.
+
+Without `id_field`, InvarLock derives stable IDs as
+`record/{source_index:08d}` while preserving source order.
+
+## Import schedule bytes are not canonical
+
+Import mode requires the exact compact, key-sorted UTF-8 serialization that
+InvarLock authenticates. Rebuild it with
+`build_runtime_behavioral_schedule_from_material` and
+`canonical_runtime_behavioral_schedule_json`; do not pretty-print it afterward.
+
+Also confirm:
+
+- every text-part digest hashes its UTF-8 text and every `input_sha256` hashes
+  the canonical ordered `input_parts` array;
+- record IDs are unique;
+- record order has not changed; and
+- `comparison.dataset` and import-mode `execution.schedule` identify the same
+  exact bytes.
+
+## Observation or pairing mismatch
+
+Baseline and subject observations must bind the same schedule digest and repeat
+the exact ordered `(record_id, input_sha256)` sequence. The imported paired
+records must equal InvarLock's derivation byte-for-byte in canonical JSON.
+Regenerate provider output from the frozen schedule; do not edit paired scores
+to make them agree.
+
+If import mode fails, check the sidecars as one atomic set:
+
+- `model-artifact.identity.json` must equal a fresh identity derived by the
+  installed provider from request settings;
+- `runtime-provider.receipt.json` must bind that identity, provider,
+  capabilities, settings, device, outer image, and observation;
+- `runtime-scoring.observation.json` must bind the same schedule and contain
+  one successful record per scheduled ID in order;
+- `report.json` must bind the provider, identity, observation, schedule, and
+  record count;
+- `runtime.manifest.json` must name the exact sibling bytes; and
+- imported paired records must equal InvarLock's fresh derivation.
+
+Replacing only the file named by the first error usually creates the next
+cross-binding error. Re-export the complete side from the original provider
+execution.
+
+## Runtime image digest is missing or mismatched
+
+Run mode requires independently known lowercase `sha256:` image digests and
+references embedding the corresponding digest. A shared image can be supplied
+once; cross-runtime comparisons supply the side-specific image bindings
+documented by `invarlock evaluate --help`.
 
 ```bash
-INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 \
-  invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 --preset <config.yaml>
+export INVARLOCK_RUNTIME_IMAGE=registry.example/runtime@sha256:PINNED_DIGEST
+export INVARLOCK_RUNTIME_IMAGE_DIGEST=sha256:PINNED_DIGEST
 ```
 
-### Guard Prepare Failures
+The executing container must report the same identity. Do not replace the
+expected digest with the value copied from a failed evidence bundle.
 
-**Symptom:** Guard initialization fails in strict mode.
+During verification, pass the baseline and subject digests from the decision
+authority. They may be equal when both sides intentionally used one runtime.
 
-**Fix (local debugging only):**
+## Provider is unavailable
 
-```yaml
-context:
-  run:
-    strict_guard_prepare: false
-```
+The base package includes the HF text provider and can authenticate its local
+snapshot identity for import mode without Torch or Transformers. Install
+`invarlock[hf]` before run-mode execution. GGUF, TensorRT-LLM, and Hugging Face
+vision-text providers are separate first-party add-ins and must be installed
+and qualified in their required runtimes. A
+request naming an undiscoverable provider fails before evidence publication.
 
-### Non-Finite Metrics on CPU
-
-**Symptom:** Perplexity returns `inf` or `nan` on CPU runs.
-
-**Fixes:**
-
-1. Use an accelerator when available: `--device cuda` or `--device mps`
-2. Force higher precision: `dtype: float32` in config
-3. Reduce edit scope or batch size
-
-### Explicit CUDA Request Rejected Before Container Launch
-
-**Symptom:** Default runtime-container `evaluate`, advanced calibration, or
-internal config-runner flows exit early with a message that `--device cuda` was
-requested but no NVIDIA runtime is visible on the host.
-
-**Cause:** Explicit CUDA requests are fail-closed for delegated container runs.
-InvarLock requires either `/dev/nvidiactl` or `nvidia-smi` to be visible before
-it adds `--gpus all` to the container launch.
-
-**Fixes:**
-
-1. Install or expose NVIDIA container support so `nvidia-smi` works on the host
-2. Use `--device auto` if CPU fallback is acceptable
-3. Use `--device cpu` when you want a deterministic CPU-only run
-
-## Debug Tools
-
-### Doctor Command
-
-Run comprehensive environment checks:
+Run the add-in's conformance entry point in the same Python environment:
 
 ```bash
-invarlock doctor --config <config.yaml> --profile ci --strict
+invarlock-gguf-conformance
+invarlock-tensorrt-llm-conformance
+invarlock-hf-vision-text-conformance
 ```
 
-### Debug Trace
+If the command is missing, compare `python -m pip --version`, `which
+invarlock`, and the active virtual environment. If conformance passes but
+evaluation fails, troubleshoot the concrete artifact, backend resources,
+runtime image, and device; conformance does not execute the model.
 
-Enable detailed logging:
+For GGUF, confirm the artifact, pinned `llama.cpp` executable, and source
+archive are the same inputs used to derive request settings. For TensorRT-LLM,
+also confirm the engine was inspected on the target compute capability with the
+same tokenizer contract and runner. For vision-text, confirm the processor
+contract and every content ID, media type, byte length, and digest against the
+caller-authorized content store.
+
+## Strict runtime refuses the environment
+
+Strict run mode expects a real container boundary, a digest-bearing image
+identity, offline execution, remote code disabled, third-party plugins
+disabled, and `batch_size=1`.
+
+Environment switches do not simulate those controls. In particular:
+
+- `INVARLOCK_CONTAINER_EXECUTION=true` does not replace kernel-visible
+  container evidence;
+- setting `INVARLOCK_ALLOW_NETWORK` makes the environment unsuitable for the
+  strict evidence path;
+- enabling remote code or arbitrary third-party plugins can make strict
+  evaluation reject; and
+- a mutable image tag is not a runtime digest.
+
+Invoke the host CLI with the pinned image bindings. It establishes the
+network-disabled Docker or Podman workers and the strict child context. If the
+host launch fails, inspect local engine availability, exact image presence,
+digest agreement, signing-key placement, and device syntax. If a child starts
+but rejects the boundary, inspect its image entrypoint, container markers,
+offline flags, and runtime-integration resources. See
+[Runtime providers](runtime-providers.md) for provider-specific setup.
+
+## Policy digest mismatch
+
+Verification uses the exact bytes at `--policy`; it never trusts a policy found
+only inside submitted evidence. Obtain the approved policy file from the
+acceptance authority. Reformatting equivalent JSON changes its digest. If the
+policy truly changed, produce a new comparison rather than relabeling the old
+bundle.
+
+## Signer fingerprint is invalid or unexpected
+
+Fingerprints must be `sha256:` plus 64 lowercase hexadecimal characters and
+must hash raw Ed25519 public-key bytes. Do not hash PEM text. Read the expected
+evidence-signer value from a trusted registry or the example's independently generated
+`evidence-signer.fingerprint`, not from `manifest.signature.json`.
+
+## Verification fails but a receipt exists
+
+This is expected when enough inputs are available to sign a rejection. Preserve
+the receipt: it records the evidence manifest digest, external anchors, verifier
+identity, and failed verdict. Inspect the CLI error or `--json` result, correct
+the external or evaluation-side cause, and use a new receipt destination for any
+new verification attempt.
+
+Never treat the existence of a receipt as a passing result. Check its signed
+verdict and independently pin the verifier fingerprint.
+
+## A received receipt does not validate
+
+The stable receipt reader checks six independent relationships: verifier
+signature, verifier identity and fingerprint, pack manifest digest, policy
+digest, both runtime digests, and evidence-signer fingerprint.
+
+Classify the error before retrying:
+
+| Error family | Likely cause |
+| --- | --- |
+| Signature or embedded public-key mismatch | Receipt was changed, malformed, or signed by another key. |
+| Verifier identity or fingerprint mismatch | Caller trust configuration does not authorize the signer. |
+| Manifest digest mismatch | Receipt belongs to another pack or pack bytes changed. |
+| Policy/runtime/evidence-signer anchor mismatch | Caller and verifier did not use the same independently maintained trust inputs. |
+| Receipt is inside the evidence pack | The closed bundle was modified or packaged incorrectly. |
+
+Do not read expected values from the failing receipt to silence these errors.
+Locate the correct evidence/receipt pair and compare both with the independent
+authorization record.
+
+## Exact match is unexpectedly zero
+
+Exact match is literal Unicode string equality. Whitespace, case, punctuation,
+and line endings are significant. If normalization is part of the desired
+metric, define and authenticate it before provider observation; do not normalize
+only one side after execution.
+
+## Normalized NLL fails closed
+
+Each successful record needs finite `logprob_sum`, positive `token_count`, and
+positive `utf8_byte_count`. InvarLock derives `-logprob_sum / utf8_byte_count`.
+The baseline mean must be greater than zero. Confirm both providers use the same
+scoring target and byte-count definition before comparing them.
+
+## Perplexity interpretation is unavailable
+
+The verifier derives a token-weighted perplexity ratio only when normalized-NLL
+evidence binds matching authenticated tokenizer digests and equal positive
+target-token counts for every pair. If those facts differ or are unavailable,
+the report records a closed unavailable reason. The byte-normalized NLL decision
+remains authoritative; do not copy one side's tokenizer facts into the other.
+
+## Point value appears within policy but the verdict fails
+
+The point comparison is descriptive. Exact match passes only when the paired
+Newcombe interval's lower bound meets `delta_min_pp`; normalized NLL passes only
+when the schedule-resampling interval's upper bound meets `ratio_max`.
+If the policy enables sample qualification, the observed record count must also
+meet `minimum_record_count` and the observed width must not exceed the matching
+maximum-width field. Inspect `sample_qualification` before changing the metric
+threshold.
+Review the authenticated schedule, interval method, and record-level variation.
+Changing the threshold or schedule requires a new evidence transaction.
+
+## Report rejects an otherwise visible directory
+
+`report` authenticates the closed inventory before rendering. Extra files,
+missing files, changed bytes, non-canonical manifest/report JSON, symbolic links,
+or an invalid evidence signature are fatal. Keep receipts and HTML outside the
+evidence directory. Recover from an immutable trusted copy; do not repair files
+inside a signed bundle.
+
+## Machine-readable diagnostics
+
+Use `--json` for evaluation and verification automation:
 
 ```bash
-INVARLOCK_DEBUG_TRACE=1 \
-  invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 --preset <config.yaml>
+invarlock evaluate request.yaml --signing-key evidence-signer.pem --json
+invarlock verify evidence/ ... --receipt receipt.json --json
 ```
 
-### Plugins Inspection
+The report command intentionally renders human-facing console or HTML output.
+The canonical JSON report remains inside the authenticated bundle.
 
-List available adapters/guards/edits:
+## Before escalating a bug
 
-```bash
-invarlock advanced plugins list --verbose
-invarlock advanced plugins adapters --explain hf_causal
-```
+Collect the smallest non-sensitive reproduction that preserves the failing
+contract:
 
-## Related Documentation
+- InvarLock and first-party add-in versions;
+- the command name and structured error text;
+- request shape with private locators and content redacted consistently;
+- which boundary failed and whether any output was published;
+- provider name, ABI, artifact kind, and high-level device class;
+- whether the offline example passes in the same installation; and
+- a synthetic schedule or sidecar fixture when the failure can be reproduced
+  without private model or dataset material.
 
-- [CLI Reference](../reference/cli.md)
-- [Configuration Schema](../reference/config-schema.md)
-- [Dataset Providers](../reference/datasets.md)
-- [Environment Variables](../reference/env-vars.md)
-- [reports](../reference/reports.md)
+Do not attach private keys, local absolute paths, access tokens, environment
+dumps, proprietary prompts, raw checkpoints, or evidence bundles not approved
+for publication to a public issue.
+
+For exact contract shapes, see [Public contracts](../reference/contracts.md).
+For trust implications, see the [Threat model](../security/threat-model.md).

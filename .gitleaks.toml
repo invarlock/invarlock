@@ -4,12 +4,28 @@ title = "InvarLock gitleaks configuration"
 useDefault = true
 
 [[allowlists]]
-description = "Tokenizer digest fields in published evidence reports are hashes, not secrets."
+description = "Authenticated tokenizer digest fields contain public hashes, not secrets."
 condition = "AND"
 regexTarget = "match"
 paths = [
-  '''public_evidence/published_basis/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$''',
+  '''public_evidence/(?:catalog_evidence|published_basis)/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$''',
+  '''public_evidence/evidence/.*\.json$''',
+  '''docs/reference/qualification-suites\.manifest\.json$''',
+  '''docs/user-guide/runtime-providers\.md$''',
 ]
 regexes = [
-  '''tokenizer_(?:hash|sha256)"\s*:\s*"[0-9A-Fa-f]{32,128}"''',
+  '''tokenizer_(?:hash|sha256|metadata_sha256|contract_sha256)"?\s*:\s*"?(?:[0-9A-Fa-f]{8,128}|PINNED_64_HEX_DIGEST)"?''',
+]
+
+[[allowlists]]
+description = "Ed25519 type annotations name a public algorithm, not key material."
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''src/invarlock/evaluation_transaction\.py$''',
+  '''src/invarlock/evidence_pack_publication\.py$''',
+  '''tests/evidence_packs/test_evidence_reporting\.py$''',
+]
+regexes = [
+  '''(?:signing_key|private_key|key):\s*ed25519''',
 ]

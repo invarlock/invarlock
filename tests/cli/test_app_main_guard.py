@@ -26,5 +26,5 @@ def test_app_main_guard_runs_without_invoking_real_typer(monkeypatch):
 
     monkeypatch.setattr(typer.Typer, "__call__", noop_call)
 
-    # Execute the module as __main__ to flip the main-guard branch
-    runpy.run_module("invarlock.cli.app", run_name="__main__")
+    module_globals = runpy.run_module("invarlock.cli.app", run_name="__main__")
+    assert "app" in module_globals

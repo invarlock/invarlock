@@ -1,42 +1,139 @@
 from __future__ import annotations
 
-import re
+import subprocess
+import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-MAKEFILE = REPO_ROOT / "Makefile"
-
-EXPECTED_TEST_DIR_TARGETS = {
-    "adapters",
-    "calibration",
-    "ci",
-    "cli",
-    "core",
-    "docs",
-    "edits",
-    "eval",
-    "fuzzing",
-    "guards",
-    "integration",
-    "lint",
-    "observability",
-    "plugins",
-    "evidence_packs",
-    "reporting",
-    "runtime",
-    "scripts",
-}
+MAKEFILE = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
+    encoding="utf-8"
+)
 
 
-def test_make_test_dir_targets_cover_executable_tree() -> None:
-    text = MAKEFILE.read_text(encoding="utf-8")
-    match = re.search(r"^TEST_DIR_TARGETS := (.+)$", text, flags=re.MULTILINE)
-    assert match is not None
-    actual = set(match.group(1).split())
-    assert actual == EXPECTED_TEST_DIR_TARGETS
+def test_test_directories_use_one_pattern_target() -> None:
+    assert "test-%:" in MAKEFILE
+    assert "tests/$*" in MAKEFILE
+    assert "TEST_DIR_TARGETS" not in MAKEFILE
 
 
-def test_makefile_declares_runtime_and_reporting_targets() -> None:
-    text = MAKEFILE.read_text(encoding="utf-8")
-    for target in ("test-runtime", "test-reporting"):
-        assert re.search(rf"^{target}:", text, flags=re.MULTILINE), target
+def test_root_tooling_has_no_legacy_product_workflows() -> None:
+    forbidden = (
+        "evidence-pack-v1",
+        "scripts/evidence_packs",
+        "scripts/model_evidence",
+        "guard-validation-smoke",
+        "architecture-fragmentation-check",
+        "empirical-guard-inventory-check",
+        "eval-loop",
+        "--edit-config",
+        "runtime-image-gguf",
+        "runtime-image-tensorrt-llm",
+        "runtime-image-cuda-quant",
+    )
+    assert [value for value in forbidden if value in MAKEFILE] == []
+
+
+def test_optional_provider_runtime_images_stay_outside_root_tooling() -> None:
+    assert "gguf_runtime_blackbox.py" not in MAKEFILE
+    assert "tensorrt_llm_runtime_fixture.py" not in MAKEFILE
+    assert "runtime-image-gguf" not in MAKEFILE
+    assert "runtime-image-tensorrt-llm" not in MAKEFILE
+    for addin in ("gguf", "tensorrt_llm"):
+        assert (
+            Path(__file__).resolve().parents[2] / "addins" / addin / "Makefile"
+        ).is_file()
+
+
+def test_first_party_addins_share_test_and_distribution_gates() -> None:
+    assert "addins-test:" in MAKEFILE
+    assert "addins-install-smoke:" in MAKEFILE
+    for path in (
+        "addins/diagnostics",
+        "addins/gguf",
+        "addins/multimodal",
+        "addins/tensorrt_llm",
+    ):
+        assert path in MAKEFILE
+    install_smoke = MAKEFILE.split("addins-install-smoke:", 1)[1].split(
+        "packaging-smoke-minimal:", 1
+    )[0]
+    assert "CoreRegistry" in install_smoke
+    assert "get_runtime_provider" in install_smoke
+    assert "get_plugin_info" in install_smoke
+    assert "ADDINS_SMOKE_RELEASE_LOCK" in install_smoke
+    assert "--require-hashes" in install_smoke
+    assert 'mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX"' in install_smoke
+    assert 'cleanup_smoke_venv() { rm -rf "$$smoke_venv"; }' in install_smoke
+    assert "trap cleanup_smoke_venv EXIT" in install_smoke
+    assert "trap 'exit 129' HUP" in install_smoke
+    assert "trap 'exit 130' INT" in install_smoke
+    assert "trap 'exit 143' TERM" in install_smoke
+    assert (
+        "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
+        '"$$smoke_venv/bin/python" -m pip install '
+        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl" in install_smoke
+    )
+    assert "-m pip check" in install_smoke
+    assert "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH=" in install_smoke
+    assert ".addins-smoke-site" not in install_smoke
+
+    clean = MAKEFILE.split("clean:", 1)[1].split("docsclean:", 1)[0]
+    assert "src/*.egg-info" in clean
+
+
+def test_install_smoke_signal_trap_exits_and_cleans(tmp_path: Path) -> None:
+    smoke_venv = tmp_path / "smoke-venv"
+    resumed = tmp_path / "resumed"
+    smoke_venv.mkdir()
+    script = f"""
+        smoke_venv='{smoke_venv}'
+        cleanup_smoke_venv() {{ rm -rf "$smoke_venv"; }}
+        trap cleanup_smoke_venv EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        : > "$smoke_venv/ready"
+        while :; do sleep 0.05; done
+        : > '{resumed}'
+    """
+    process = subprocess.Popen(["/bin/sh", "-c", script])
+    try:
+        deadline = time.monotonic() + 5
+        while not (smoke_venv / "ready").exists():
+            assert process.poll() is None
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        process.terminate()
+        assert process.wait(timeout=5) == 143
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+
+    assert not smoke_venv.exists()
+    assert not resumed.exists()
+
+
+def test_container_smoke_explicitly_enables_the_gated_integration_test() -> None:
+    block = MAKEFILE.split("container-front-door-smoke:", 1)[1].split(
+        "##@ Verification", 1
+    )[0]
+
+    assert "INVARLOCK_RUN_CONTAINER_SMOKE=1" in block
+    assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in block
+    assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in block
+    assert "tests/integration/test_container_front_door_journey.py" in block
+
+
+def test_standard_tools_own_general_repository_gates() -> None:
+    for tool in (
+        "ruff",
+        "mypy",
+        "pytest",
+        "mkdocs",
+        "markdownlint-cli2",
+        "cspell",
+        "actionlint",
+        "python -m build",
+        "python -m twine",
+    ):
+        assert tool in MAKEFILE.lower()

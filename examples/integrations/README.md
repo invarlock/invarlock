@@ -1,70 +1,29 @@
-# Integration Examples
+# Runnable integrations
 
-This directory contains first-party, optional examples for attaching InvarLock
-regression evidence to model-edit workflows owned by external tools.
+Every entry in this directory has one maintained command that performs the
+named upstream operation or runtime call and completes InvarLock's
+`evaluate → verify → report` transaction.
 
-Each example is intentionally small enough to inspect quickly and writes
-generated outputs outside tracked source files. Model weights, large reports,
-and downloaded datasets belong outside the repository.
+| Integration | Command | Execution |
+| --- | --- | --- |
+| [Hugging Face Transformers](hf-transformers/) | `make example-hf-transformers` | Qwen3-0.6B checkpoint and an explicit behavioral derivative |
+| [Hugging Face vision-text](hf-vision-text/) | `make example-hf-vision-text` | Qwen2-VL 2B and 7B checkpoints on an authenticated four-color image fixture |
+| [Hugging Face PEFT](peft-lora/) | `make example-peft-lora` | Qwen3-0.6B LoRA training, save/reload, and merge |
+| [TorchAO](torchao-int8/) | `make example-torchao-int8` | Qwen3-0.6B INT8 weight-only quantization and a materialized checkpoint |
+| [GGUF with llama.cpp](gguf-llama-cpp/) | `make example-gguf-llama-cpp` | Official Qwen3-0.6B Q8 GGUF and an authenticated Q5 derivative |
+| [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | CPU, real upstream per-record output imported into the evidence transaction |
+| [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two H100 GPUs, and Qwen3-0.6B BF16-to-FP8 conversion |
 
-## Current Status
+All seven commands obtain or create their artifacts and complete the transaction
+from a clean committed checkout. The TensorRT-LLM showcase builds its engines
+on the target H100s and authenticates the resulting engine identities; it does
+not assume that independently compiled engine bytes will be identical. The
+first-party runtime packages also expose conformance and real-model
+qualification commands beside their implementations under `addins/`.
 
-The shared scaffold is active. Each example directory owns its status,
-prerequisites, commands, and generated artifact list.
+The GPU-backed checkpoint examples accept an explicit device when several
+accelerators are available, for example
+`EXAMPLE_ARGS="--runtime-device cuda:1"`.
 
-## Shared Assets
-
-- `_shared/evidence-scope.md` defines the evidence scope for integration
-  examples.
-- `_shared/expected-artifacts.md` lists the artifacts each runnable example
-  should produce.
-- `source_matrix.json` binds explicit strict-evidence README claims to the
-  target runner, runtime image source, lane label, verifier expectation, and
-  required core and target-specific sidecars.
-- `_shared/preflight.sh` contains shared host-lane preflight and artifact-lane
-  labeling helpers.
-- `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
-  for HF-loadable checkpoints and adapter-backed subject paths.
-- `public_e2e/` turns the shipped external-edit public evidence into verifier,
-  HTML, MLflow tag, model-card, release-review, and CI summary artifacts.
-- `ci_registry/` shows how to attach report verification, HTML, MLflow tags,
-  Hugging Face model-card evidence, and release-review packets to existing CI
-  and registry workflows.
-- `_shared/validate_source_matrix_artifacts.py` checks generated strict-lane
-  artifact directories against `source_matrix.json`.
-- `_runtime_images/` contains example-only CUDA image definitions for optional
-  quant backends. These images are not the regular InvarLock runtime images.
-
-## Example Lifecycle
-
-1. Confirm the optional backend and adapter status with `invarlock doctor` and
-   `invarlock advanced plugins list --json`.
-2. Create or reference the subject path, whether that is a materialized
-   checkpoint or a runtime adapter loading mode.
-3. Document and, where possible, run `cuda-container-strict` as the primary
-   evidence path. Host lanes are secondary comparison paths: `cuda-host-off`
-   for host CUDA setup and `cpu-host-off` for non-CUDA setup when that backend
-   actually supports CPU. The user-facing shortcuts remain `--lane cuda` and
-   `--lane host`; host lanes should pass an explicit `--device cpu` or
-   `--device cuda` when comparing lanes. Optional quant examples should use the
-   narrowest matching image under `_runtime_images/`; dense examples should use
-   the standard InvarLock CUDA runtime.
-4. Run `invarlock evaluate` against the baseline and subject.
-5. Run `invarlock verify --json` and render `evaluation.html`.
-6. Validate generated strict-lane artifacts against `source_matrix.json` when
-   using verified strict-evidence README claims:
-
-   ```bash
-   python3 examples/integrations/_shared/validate_source_matrix_artifacts.py \
-     --targets <target>
-   ```
-
-   Omit `--targets` only after every source-matrix entry has generated
-   strict-lane reports in the checkout.
-
-7. Record the output paths and any backend limitations in the example README.
-
-Use these examples as public, reproducible reference flows when discussing
-integrations with upstream projects. Each README should make the status
-explicit: `runnable`, `reference-pattern`, `exploratory-host`, or
-`compatibility-investigation`.
+The root `make example-evidence-handoff` command runs accepted, policy-rejected,
+and tampered evidence through separately signed verification.

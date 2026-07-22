@@ -1,79 +1,50 @@
 site_name: InvarLock Documentation
-site_description: Official documentation for the InvarLock toolkit
+site_description: Paired model release-regression evaluation with independently verifiable evidence
 site_url: https://invarlock.github.io/invarlock/
 repo_url: https://github.com/invarlock/invarlock
 repo_name: invarlock
 
 nav:
   - Overview: README.md
-  - User Guide:
-      - Getting Started: user-guide/getting-started.md
-      - Quickstart: user-guide/quickstart.md
-      - Primary Metric Smoke: user-guide/primary-metric-smoke.md
-      - Compare & Evaluate (BYOE): user-guide/compare-and-evaluate.md
-      - Knowledge & Self-Edit Workflows: user-guide/knowledge-and-self-edit-workflows.md
-      - Live Examples: user-guide/live-examples.md
-      - Integration Examples: user-guide/integrations.md
-      - Public Evidence Walkthrough: user-guide/public-evidence-walkthrough.md
-      - Bring Your Own Data: user-guide/bring-your-own-data.md
-      - Plugin Workflow: user-guide/plugins.md
-      - Configuration Gallery: user-guide/config-gallery.md
-      - Example Reports: user-guide/example-reports.md
-      - Failure Examples: user-guide/failure-examples.md
-      - Reading a Report: user-guide/reading-report.md
-      - Evidence Packs: user-guide/evidence-packs.md
-      - Evidence Pack Internals: user-guide/evidence-packs-internals.md
+  - User guide:
+      - Getting started: user-guide/getting-started.md
+      - Change scenarios: user-guide/change-scenarios.md
+      - Key management: user-guide/key-management.md
+      - Runtime providers: user-guide/runtime-providers.md
+      - Evaluation request: user-guide/evaluation-request.md
+      - Schedule and policy: user-guide/schedule-and-policy.md
+      - Evidence and verification: user-guide/evidence-and-verification.md
+      - Verification failure lab: user-guide/verification-failure-lab.md
+      - Optional diagnostics: user-guide/diagnostics.md
+      - CI integration: user-guide/ci-integration.md
+      - Publish public evidence: user-guide/public-evidence.md
       - Troubleshooting: user-guide/troubleshooting.md
-  - CLI Reference:
-      - CLI Overview: reference/cli.md
-  - Reference:
-      - Index: reference/index.md
-      - Architecture: reference/architecture.md
-      - One Run Lifecycle: reference/one-run-lifecycle.md
-      - API Guide: reference/api-guide.md
-      - Programmatic Quickstart: reference/programmatic-quickstart.md
-      - Guards: reference/guards.md
-      - Reports: reference/reports.md
-      - Report Outline: reference/report-outline.md
-      - Environment Variables: reference/env-vars.md
-      - Model Adapters: reference/model-adapters.md
-      - Model Family Catalog: reference/model-family-catalog.md
-      - Public Contracts: reference/contracts.md
-      - Configuration Schema: reference/config-schema.md
-      - Tier Policy Catalog: reference/tier-policy-catalog.md
-      - Datasets: reference/datasets.md
-      - Artifact Layout: reference/artifacts.md
-      - Observability: reference/observability.md
-      - Calibration: reference/calibration.md
-      - Alternatives Comparison: reference/alternatives-comparison.md
   - Assurance:
-      - Assurance Case: assurance/00-assurance-case.md
-      - Trust Model: assurance/14-trust-model.md
-      - Strict Assurance Checklist: assurance/15-strict-assurance-checklist.md
+      - Assurance case: assurance/assurance-case.md
+      - Decision semantics: assurance/decision-semantics.md
+      - Pairing and replay: assurance/pairing-and-replay.md
+      - Reproducibility: assurance/reproducibility.md
+      - Acceptance checklist: assurance/acceptance-checklist.md
       - Glossary: assurance/glossary.md
-      # Merged into Evaluation Math
-      - Evaluation Math Derivation: assurance/01-eval-math-derivation.md
-      - Coverage & Pairing Plan: assurance/02-coverage-and-pairing.md
-      - BCa Bootstrap (Paired Δlog): assurance/03-bca-bootstrap.md
-      - Guard Contracts & Primer: assurance/04-guard-contracts.md
-      - Spectral False-Positive Control: assurance/05-spectral-fpr-derivation.md
-      - RMT ε-Rule: assurance/06-rmt-epsilon-rule.md
-      - VE Predictive Gate: assurance/07-ve-gate-power.md
-      - Determinism Contracts: assurance/08-determinism-contracts.md
-      - Tier Policy v1 Calibration (Pilot): assurance/09-tier-v1-calibration.md
-      - Guard Overhead Method: assurance/10-guard-overhead-method.md
-      - Policy Provenance & Digest: assurance/11-policy-provenance.md
-      - Device Drift Bands: assurance/12-device-drift-bands.md
-      - GPU/MPS-First Guard Measurement Contracts: assurance/13-gpu-mps-first-guards.md
-      - Guard Validation Smoke: assurance/16-guard-validation-smoke.md
-      - Empirical Guard Evidence: assurance/17-empirical-guard-evidence.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Architecture: reference/architecture.md
+      - Contracts: reference/contracts.md
+      - Python API: reference/api-guide.md
+      - Artifacts: reference/artifacts.md
+      - Reports: reference/reports.md
+      - Runtime providers: reference/runtime-providers.md
+      - Runtime-security API: reference/runtime-security.md
+      - Environment: reference/environment.md
+      - Lifecycle: reference/lifecycle.md
+      - Release verification: reference/release-verification.md
+      - Documentation development: reference/documentation.md
   - Security:
-      - Best Practices: security/best-practices.md
-      - Release Verification: security/release-verification.md
-      - Threat Model: security/threat-model.md
-      - Architecture: security/architecture.md
-      - Runtime Provenance Guide: security/runtime-provenance-guide.md
-      - Pip Audit Allowlist: security/pip-audit-allowlist.md
+      - Trust model: security/trust-model.md
+      - Threat model: security/threat-model.md
+      - Security practices: security/best-practices.md
+      - Dependency-audit exceptions: security/dependency-audit.md
+
 theme:
   name: material
   language: en
@@ -87,29 +58,31 @@ theme:
     primary: custom
     accent: custom
   features:
+    - content.code.copy
+    - navigation.sections
     - navigation.expand
     - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
 
 markdown_extensions:
   - admonition
+  - attr_list
   - codehilite
   - footnotes
+  - md_in_html
   - tables
   - toc:
       permalink: true
-  - pymdownx.snippets
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.snippets
 
 plugins:
   - search
-  # Disable mermaid2 by default to avoid network checks in strict/offline builds.
-  # Enable explicitly with: INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict
-  - mermaid2:
-      enabled: !ENV [INVARLOCK_DOCS_MERMAID, false]
 
-# Load the local MathJax configuration before the runtime loader. The CDN asset is
-# browser-loaded only; `mkdocs build --strict` validates the local config path.
 extra_javascript:
   - assets/javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js

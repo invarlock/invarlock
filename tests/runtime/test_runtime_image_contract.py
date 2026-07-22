@@ -1,179 +1,236 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
+ROOT = Path.cwd()
 
-def test_runtime_dockerfile_installs_hf_stack() -> None:
-    text = (Path.cwd() / "runtime" / "Dockerfile").read_text(encoding="utf-8")
-    assert (
-        "ARG RUNTIME_BASE_IMAGE=python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4"
-        in text
-    )
+
+def test_every_maintained_runtime_image_rejects_unbound_source_identity() -> None:
+    for relative in (
+        "runtime/Dockerfile",
+        "runtime/Dockerfile.cuda",
+        "addins/gguf/runtime/Dockerfile",
+        "addins/multimodal/runtime/Dockerfile",
+        "addins/tensorrt_llm/runtime/Dockerfile",
+    ):
+        text = ROOT.joinpath(relative).read_text(encoding="utf-8")
+        assert "INVARLOCK_SOURCE_BUNDLE_SHA256=unbound" not in text
+        assert "INVARLOCK_SOURCE_COMMIT=unbound" not in text
+        assert "invalid INVARLOCK_SOURCE_COMMIT" in text
+        assert "invalid INVARLOCK_SOURCE_BUNDLE_SHA256" in text
+
+
+def test_runtime_dockerfile_builds_and_installs_one_final_wheel() -> None:
+    text = ROOT.joinpath("runtime", "Dockerfile").read_text(encoding="utf-8")
+
+    assert "FROM ${RUNTIME_BUILD_BASE_IMAGE} AS public-wheel" in text
+    assert "--wheel-dir /wheelhouse" in text
+    assert "--no-build-isolation" in text
     assert "FROM ${RUNTIME_BASE_IMAGE}" in text
-    assert "ARG TARGETARCH" in text
-    assert "COPY requirements/workflows/runtime-image-py312.txt" in text
-    assert "COPY requirements/workflows/runtime-image-py312-aarch64.txt" in text
-    assert "COPY requirements/workflows/runtime-image-py312-cu128.txt" in text
-    assert "COPY requirements/workflows/runtime-image-quant-py312-cu128.txt" in text
-    assert "ARG RUNTIME_REQUIREMENTS_AMD64" in text
-    assert "ARG RUNTIME_REQUIREMENTS_ARM64" in text
-    assert "ARG RUNTIME_CUDA_HOME" in text
-    assert "ARG RUNTIME_KEEP_BUILD_TOOLCHAIN=0" in text
-    assert "ARG RUNTIME_KEEP_BUILD_TOOLCHAIN" in text
-    assert "ARG RUNTIME_PATH_PREFIX" in text
-    assert "ARG PYTORCH_EXTRA_INDEX_URL" in text
-    assert "PIP_BREAK_SYSTEM_PACKAGES=1" in text
-    assert "CUDA_HOME=${RUNTIME_CUDA_HOME}" in text
-    assert "PATH=${RUNTIME_PATH_PREFIX}${PATH}" in text
-    assert '--extra-index-url "${PYTORCH_EXTRA_INDEX_URL}"' in text
-    assert 'amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}"' in text
-    assert 'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"' in text
-    assert "apt-get install -y --no-install-recommends build-essential" in text
-    assert "python3 python3-pip python3-venv python-is-python3" in text
-    assert 'if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" = "1" ]' in text
-    assert "apt-get install -y --no-install-recommends python3-dev" in text
-    assert 'if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" != "1" ]' in text
-    assert "apt-get purge -y --auto-remove build-essential" in text
-    assert "python -m pip install" in text
-    assert "--require-hashes" in text
-    assert "python -m pip install --no-deps -e /opt/invarlock" not in text
+    assert '/opt/invarlock/artifacts/$(basename "$1")' in text
+    assert "--no-deps" in text
+    assert 'ENTRYPOINT ["python", "-m", "invarlock"]' in text
+    assert "pip install --no-deps -e" not in text
+    assert "PYTHONPATH=/" not in text
+    assert 'org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"' in text
     assert (
-        "pip install --index-url https://download.pytorch.org/whl/cpu torch" not in text
+        'dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}"' in text
     )
-    assert "PYTHONPATH=/opt/invarlock/src" in text
 
 
-def test_runtime_dockerfile_copied_requirement_files_exist() -> None:
-    root = Path.cwd()
-    text = (root / "runtime" / "Dockerfile").read_text(encoding="utf-8")
+def test_runtime_dockerfile_has_one_hf_runtime_dependency_surface() -> None:
+    text = ROOT.joinpath("runtime", "Dockerfile").read_text(encoding="utf-8")
+
     copied_requirements = re.findall(r"COPY (requirements/workflows/[^ ]+) ", text)
+    assert copied_requirements == [
+        "requirements/workflows/runtime-image-py312.txt",
+        "requirements/workflows/runtime-image-py312-aarch64.txt",
+        "requirements/workflows/runtime-wheel-build-py312.txt",
+    ]
+    assert "RUNTIME_REQUIREMENTS_AMD64" in text
+    assert "RUNTIME_REQUIREMENTS_ARM64" in text
+    assert "runtime-image-py312-cu" not in text
+    assert "runtime-image-quant" not in text
+    assert "gptq" not in text.lower()
+    assert "CUDA_HOME" not in text
+    assert "RUNTIME_KEEP_BUILD_TOOLCHAIN" not in text
+    assert "RUNTIME_PATH_PREFIX" not in text
+    for relative in copied_requirements:
+        assert ROOT.joinpath(relative).is_file()
 
-    assert copied_requirements
-    for relpath in copied_requirements:
-        assert (root / relpath).is_file(), f"missing Dockerfile input: {relpath}"
+
+def test_runtime_dockerfile_is_offline_by_default_and_hash_locked() -> None:
+    text = ROOT.joinpath("runtime", "Dockerfile").read_text(encoding="utf-8")
+
+    assert "HF_HUB_OFFLINE=1" in text
+    assert "TRANSFORMERS_OFFLINE=1" in text
+    assert "--require-hashes" in text
+    assert '--extra-index-url "${PYTORCH_EXTRA_INDEX_URL}"' in text
+    assert "ARG SOURCE_DATE_EPOCH" in text
+    assert 'touch -h -d "@${SOURCE_DATE_EPOCH}"' in text
 
 
-def test_runtime_dockerignore_keeps_runtime_inputs() -> None:
-    text = (Path.cwd() / ".dockerignore").read_text(encoding="utf-8")
+def test_runtime_input_is_the_core_plus_canonical_hf_dependencies() -> None:
+    text = ROOT.joinpath("requirements", "workflows", "runtime-image.in").read_text(
+        encoding="utf-8"
+    )
+
+    required = {
+        "typer",
+        "click",
+        "cryptography",
+        "rich",
+        "pyyaml",
+        "jsonschema",
+        "accelerate",
+        "torch",
+        "transformers",
+        "safetensors",
+        "protobuf",
+        "sentencepiece",
+        "tiktoken",
+    }
+    observed = {
+        line.split("=", 1)[0].split(">", 1)[0].split("!", 1)[0]
+        for line in text.splitlines()
+        if line and not line.startswith("#")
+    }
+    assert observed == required
+    for retired in (
+        "autoawq",
+        "bitsandbytes",
+        "compressed-tensors",
+        "datasets",
+        "gptqmodel",
+        "hqq",
+        "optimum-quanto",
+        "peft",
+        "torchao",
+        "torchvision",
+    ):
+        assert retired not in text.lower()
+
+
+def test_hf_extra_declares_fp8_runtime_support() -> None:
+    project = tomllib.loads(ROOT.joinpath("pyproject.toml").read_text(encoding="utf-8"))
+    requirements = project["project"]["optional-dependencies"]["hf"]
+
+    assert any(str(item).startswith("accelerate>=1.14.0") for item in requirements)
+    assert any(str(item).startswith("safetensors>=0.8.0") for item in requirements)
+
+
+def test_runtime_smokes_assert_the_supported_hf_stack() -> None:
+    makefile = ROOT.joinpath("Makefile").read_text(encoding="utf-8")
+
+    for expected in (
+        "import accelerate, safetensors, torch, transformers",
+        "accelerate.__version__ == '1.14.0'",
+        "safetensors.__version__ == '0.8.0'",
+        "transformers.__version__ == '5.14.1'",
+    ):
+        assert makefile.count(expected) == 2
+
+
+def test_runtime_platform_locks_are_cpu_only_and_hash_locked() -> None:
+    locks = (
+        ROOT.joinpath("requirements", "workflows", "runtime-image-py312.txt"),
+        ROOT.joinpath("requirements", "workflows", "runtime-image-py312-aarch64.txt"),
+    )
+    for path in locks:
+        text = path.read_text(encoding="utf-8")
+        assert "torch==2.13.0+cpu" in text
+        assert "--hash=sha256:" in text
+        assert "transformers==" in text
+        assert "safetensors==" in text
+        assert "nvidia-cublas-cu12" not in text
+        assert "nvidia-cuda-runtime-cu12" not in text
+        assert "triton==" not in text
+        assert "gptqmodel==" not in text
+        assert "bitsandbytes==" not in text
+
+
+def test_cuda_runtime_is_a_separate_minimal_hf_image() -> None:
+    text = ROOT.joinpath("runtime", "Dockerfile.cuda").read_text(encoding="utf-8")
+
+    assert "FROM ${RUNTIME_BUILD_BASE_IMAGE} AS public-wheel" in text
+    assert "FROM ${RUNTIME_BASE_IMAGE}" in text
+    assert "runtime-image-py312-cu126.txt" in text
+    assert "https://download.pytorch.org/whl/cu126" in text
+    assert "NVIDIA_DRIVER_CAPABILITIES=compute,utility" in text
+    assert "NVIDIA_VISIBLE_DEVICES=all" not in text
+    assert 'test "${TARGETARCH:-amd64}" = amd64' in text
+    assert "--wheel-dir /wheelhouse" in text
+    assert "--require-hashes" in text
+    assert "--no-deps" in text
+    assert 'ENTRYPOINT ["python", "-m", "invarlock"]' in text
+    assert "runtime-image-quant" not in text
+    assert "bitsandbytes" not in text
+    assert "gptq" not in text.lower()
+    assert 'org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"' in text
+    assert (
+        'dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}"' in text
+    )
+
+
+def test_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
+    text = ROOT.joinpath(
+        "requirements", "workflows", "runtime-image-py312-cu126.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "torch==2.13.0+cu126" in text
+    assert "nvidia-cublas-cu12==" in text
+    assert "nvidia-cuda-runtime-cu12==" in text
+    assert "triton==" in text
+    assert "--hash=sha256:" in text
+    assert "accelerate==1.14.0" in text
+    assert "transformers==5.14.1" in text
+    assert "safetensors==0.8.0" in text
+    assert "bitsandbytes==" not in text
+    assert "gptqmodel==" not in text
+
+
+def test_dockerignore_exposes_only_the_canonical_runtime_inputs() -> None:
+    text = ROOT.joinpath(".dockerignore").read_text(encoding="utf-8")
 
     assert "**" in text
-    assert "!README.md" in text
-    assert "!pyproject.toml" in text
-    assert "!contracts/**" in text
-    assert "!runtime/Dockerfile" in text
-    assert "!requirements/workflows/runtime-image-py312.txt" in text
-    assert "!requirements/workflows/runtime-image-py312-aarch64.txt" in text
-    assert "!requirements/workflows/runtime-image-py312-cu128.txt" in text
-    assert "!requirements/workflows/runtime-image-quant-py312-cu128.txt" in text
-    assert "!src/**" in text
-
-
-def test_runtime_image_x86_requirements_are_hash_locked_cpu_only() -> None:
-    text = (
-        Path.cwd() / "requirements" / "workflows" / "runtime-image-py312.txt"
-    ).read_text(encoding="utf-8")
-
-    assert "torch==" in text
-    assert "+cpu" in text
-    assert "--hash=sha256:" in text
-    assert "nvidia-cublas-cu12" not in text
-    assert "nvidia-cuda-runtime-cu12" not in text
-    assert "triton==" not in text
-
-
-def test_runtime_image_aarch64_requirements_are_hash_locked() -> None:
-    text = (
-        Path.cwd() / "requirements" / "workflows" / "runtime-image-py312-aarch64.txt"
-    ).read_text(encoding="utf-8")
-
-    assert "torch==" in text
-    assert "+cpu" in text
-    assert "--hash=sha256:" in text
-    assert "nvidia-cublas-cu12" not in text
-    assert "nvidia-cuda-runtime-cu12" not in text
-    assert "triton==" not in text
-
-
-def test_runtime_image_cuda_requirements_are_hash_locked() -> None:
-    text = (
-        Path.cwd() / "requirements" / "workflows" / "runtime-image-py312-cu128.txt"
-    ).read_text(encoding="utf-8")
-
-    assert "torch==" in text
-    assert "+cu128" in text
-    assert "--hash=sha256:" in text
-    assert "nvidia-cublas-cu12" in text
-    assert "nvidia-cuda-runtime-cu12" in text
-    assert "triton==" in text
-
-
-def test_runtime_image_quant_cuda_requirements_are_hash_locked() -> None:
-    text = (
-        Path.cwd()
-        / "requirements"
-        / "workflows"
-        / "runtime-image-quant-py312-cu128.txt"
-    ).read_text(encoding="utf-8")
-
-    assert "torch==" in text
-    assert "+cu128" in text
-    assert "--hash=sha256:" in text
-    assert "bitsandbytes==" in text
-    assert "gptqmodel==" in text
-    assert "hqq==" in text
-    assert "optimum-quanto==" in text
-    assert "compressed-tensors==" in text
-    assert "torchao==" in text
-    assert "autoawq==" not in text
-
-
-def test_cuda_quant_runtime_smoke_covers_supported_quant_adapters() -> None:
-    root = Path.cwd()
-    makefile_text = (root / "Makefile").read_text(encoding="utf-8")
-    smoke_text = (
-        root
-        / "examples"
-        / "integrations"
-        / "_runtime_images"
-        / "quant_runtime_image_smoke.py"
-    ).read_text(encoding="utf-8")
-
-    assert (
-        "examples/integrations/_runtime_images/quant_runtime_image_smoke.py"
-        in makefile_text
-    )
-    for adapter in (
-        "hf_bnb",
-        "hf_awq",
-        "hf_gptq",
-        "hf_torchao",
-        "hf_hqq",
-        "hf_quanto",
-        "hf_ct",
+    for item in (
+        "!README.md",
+        "!pyproject.toml",
+        "!contracts/**",
+        "!runtime/Dockerfile",
+        "!requirements/workflows/runtime-image-py312.txt",
+        "!requirements/workflows/runtime-image-py312-aarch64.txt",
+        "!requirements/workflows/runtime-image-py312-cu126.txt",
+        "!requirements/workflows/runtime-wheel-build-py312.txt",
+        "!runtime/Dockerfile.cuda",
+        "!LICENSE",
+        "!MANIFEST.in",
+        "!src/**",
     ):
-        assert adapter in smoke_text
-    for backend in (
-        "bitsandbytes",
-        "gptqmodel",
-        "torchao",
-        "hqq",
-        "optimum.quanto",
-        "compressed_tensors",
-    ):
-        assert backend in smoke_text
-    assert "_patch_gptqmodel_transformers_hub_compat" in smoke_text
-    assert "_apply_runtime_compat_patches()" in smoke_text
+        assert item in text
+    assert "runtime-image-quant" not in text
 
 
-def test_current_quant_dependency_surfaces_do_not_pin_autoawq() -> None:
-    root = Path.cwd()
-    surfaces = (
-        root / "pyproject.toml",
-        root / "requirements" / "workflows" / "advanced-py313.txt",
-        root / "requirements" / "workflows" / "runtime-image-quant.in",
-        root / "requirements" / "workflows" / "runtime-image-quant-py312-cu128.txt",
-    )
+def test_make_exposes_separate_cuda_build_and_gpu_smoke_targets() -> None:
+    text = ROOT.joinpath("Makefile").read_text(encoding="utf-8")
 
-    for surface in surfaces:
-        assert "autoawq" not in surface.read_text(encoding="utf-8").lower()
+    assert "RUNTIME_IMAGE_CUDA ?= invarlock-runtime:hf-cuda-local" in text
+    assert "runtime-image-cuda:" in text
+    assert "scripts/authenticated_runtime_build.py" in text
+    assert "--dockerfile runtime/Dockerfile.cuda" in text
+    assert '--image "$(RUNTIME_IMAGE_CUDA)"' in text
+    assert '--source-bundle "$(RUNTIME_SOURCE_BUNDLE)"' in text
+    assert "--platform linux/amd64" in text
+    assert "runtime-smoke-cuda:" in text
+    assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in text
+    assert "--device nvidia.com/gpu=all,--gpus all" in text
+    assert "assert torch.__version__ == '2.13.0+cu126'" in text
+    assert "assert torch.version.cuda == '12.6'" in text
+    assert "assert torch.cuda.is_available()" in text
+    assert "TORCH_DISABLE_NATIVE_JIT=1" in ROOT.joinpath(
+        "runtime/Dockerfile.cuda"
+    ).read_text(encoding="utf-8")
+    assert "torch.bmm(left, right)" in text
+    assert "runtime-image-cuda-quant" not in text

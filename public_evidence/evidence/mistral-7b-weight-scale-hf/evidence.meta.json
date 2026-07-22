@@ -1,0 +1,8 @@
+{
+  "artifact_paths": {
+    "evidence_pack": "evidence",
+    "verification_receipt": "verification.receipt.json"
+  },
+  "format_version": "invarlock/public-evidence-meta-v1",
+  "summary": "Strictly verified Mistral 7B text-causal comparison of an authenticated checkpoint and a 0.99-scaled derivative over a balanced 400-record MMLU-Pro normalized-NLL schedule"
+}

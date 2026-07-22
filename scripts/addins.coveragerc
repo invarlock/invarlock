@@ -1,0 +1,12 @@
+[run]
+branch = True
+parallel = True
+patch = subprocess
+source =
+    addins
+omit =
+    addins/*/tests/*
+
+[report]
+show_missing = True
+precision = 2

@@ -1,0 +1,8 @@
+{
+  "artifact_paths": {
+    "evidence_pack": "evidence",
+    "verification_receipt": "verification.receipt.json"
+  },
+  "format_version": "invarlock/public-evidence-meta-v1",
+  "summary": "Strictly verified TensorRT-LLM comparison of two authenticated TinyLlama 1.1B checkpoint engines over a balanced 400-record MMLU-Pro exact-match schedule"
+}

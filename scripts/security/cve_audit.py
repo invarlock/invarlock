@@ -216,7 +216,7 @@ def collect_inventory(repo_root: Path) -> list[Component]:
     return merged
 
 
-def load_allowlist(path: Path) -> dict[str, dict[str, str]]:
+def load_allowlist(path: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     _owner, parsed_entries = load_pip_audit_allowlist(path)
@@ -224,6 +224,9 @@ def load_allowlist(path: Path) -> dict[str, dict[str, str]]:
     for entry in parsed_entries:
         entries[entry.advisory] = {
             "expires": entry.expires.isoformat(),
+            "packages": list(entry.packages),
+            "versions": list(entry.versions),
+            "allowed_sources": list(entry.allowed_sources),
             "owner": entry.owner,
             "tracking_issue": entry.tracking_issue,
             "reason": entry.reason,
@@ -368,11 +371,27 @@ def advisory_ids(vuln: dict[str, Any]) -> list[str]:
 
 
 def classify_status(
-    ids: list[str], allowlist: dict[str, dict[str, str]], today: date
-) -> tuple[str, dict[str, str] | None]:
+    ids: list[str],
+    allowlist: dict[str, dict[str, Any]],
+    today: date,
+    *,
+    component: Component,
+) -> tuple[str, dict[str, Any] | None]:
     for advisory_id in ids:
         entry = allowlist.get(advisory_id)
         if entry is None:
+            continue
+        packages = {
+            normalize_package_name(str(value)) for value in entry.get("packages", [])
+        }
+        versions = {str(value) for value in entry.get("versions", [])}
+        allowed_sources = {str(value) for value in entry.get("allowed_sources", [])}
+        if (
+            normalize_package_name(component.name) not in packages
+            or component.version not in versions
+            or not component.sources
+            or not component.sources <= allowed_sources
+        ):
             continue
         expires = parse_date(entry.get("expires"))
         if expires is None:
@@ -387,7 +406,7 @@ def build_findings(
     components: list[Component],
     osv_results: dict[tuple[str, str, str], list[dict[str, Any]]],
     *,
-    allowlist: dict[str, dict[str, str]],
+    allowlist: dict[str, dict[str, Any]],
     today: date,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
@@ -396,7 +415,9 @@ def build_findings(
             published = parse_date(vuln.get("published"))
             modified = parse_date(vuln.get("modified"))
             ids = advisory_ids(vuln)
-            status, allowlist_entry = classify_status(ids, allowlist, today)
+            status, allowlist_entry = classify_status(
+                ids, allowlist, today, component=component
+            )
             findings.append(
                 {
                     "component": component.name,

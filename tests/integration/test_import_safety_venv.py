@@ -137,7 +137,7 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
     assert res_help.returncode == 0, res_help.stderr
     assert "Usage:" in res_help.stdout
 
-    # Version command must also work without torch installed.
-    res_version = _run(python_exe, ["-m", "invarlock", "version"])
+    # Version flag must also work without torch installed.
+    res_version = _run(python_exe, ["-m", "invarlock", "--version"])
     assert res_version.returncode == 0, res_version.stderr
     assert "InvarLock" in res_version.stdout

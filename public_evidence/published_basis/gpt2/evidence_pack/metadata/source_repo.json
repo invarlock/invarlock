@@ -1,9 +1,0 @@
-{
-  "artifact_class": "public_evidence_fixture",
-  "fixture_paths": [
-    "public_evidence/published_basis/gpt2/evaluation.report.json",
-    "public_evidence/published_basis/gpt2/runtime.manifest.json"
-  ],
-  "repo": "invarlock-public",
-  "source_ref": "public-published-basis-fixture-v1"
-}

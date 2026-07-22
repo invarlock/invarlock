@@ -1,52 +1,47 @@
 name: Documentation CI
 
 on:
-  # Cost optimization: main branch docs build is already in ci.yml
-  # This workflow handles docs-only validation on integration/release branches.
   push:
-    branches: [ main, staging/next, 'release/v*' ]
+    branches: [main, staging/next, 'release/v*']
     paths:
+      - '*.md'
+      - '.github/**/*.md'
+      - 'addins/**/*.md'
       - 'docs/**'
-      - 'README.md'
-      - 'CONTRIBUTING.md'
+      - 'examples/**/*.md'
+      - 'public_evidence/**/*.md'
+      - 'requirements/**/*.md'
+      - 'scripts/**/*.md'
+      - 'tests/README.md'
+      - 'tests/docs/**'
       - 'mkdocs.yml'
       - 'Makefile'
-      - 'notebooks/**'
       - 'package.json'
       - 'package-lock.json'
       - 'requirements/workflows/docs-ci-py313.txt'
-      - 'scripts/docs/docs_check.py'
-      - 'scripts/docs/docs_lint.py'
-      - 'scripts/docs/lint_assurance_xrefs.py'
-      - 'scripts/docs/test_cli_examples.py'
-      - 'scripts/docs/verify_live_examples.py'
-      - 'scripts/docs/verify_markdown_bash_blocks.py'
-      - 'scripts/docs/verify_notebooks_smoke.py'
       - '.github/workflows/docs-ci.yml'
-  workflow_dispatch:
   pull_request:
-    branches: [ main, staging/next, 'release/v*' ]
+    branches: [main, staging/next, 'release/v*']
     paths:
+      - '*.md'
+      - '.github/**/*.md'
+      - 'addins/**/*.md'
       - 'docs/**'
-      - 'README.md'
-      - 'CONTRIBUTING.md'
+      - 'examples/**/*.md'
+      - 'public_evidence/**/*.md'
+      - 'requirements/**/*.md'
+      - 'scripts/**/*.md'
+      - 'tests/README.md'
+      - 'tests/docs/**'
       - 'mkdocs.yml'
       - 'Makefile'
-      - 'notebooks/**'
       - 'package.json'
       - 'package-lock.json'
       - 'requirements/workflows/docs-ci-py313.txt'
-      - 'scripts/docs/docs_check.py'
-      - 'scripts/docs/docs_lint.py'
-      - 'scripts/docs/lint_assurance_xrefs.py'
-      - 'scripts/docs/test_cli_examples.py'
-      - 'scripts/docs/verify_live_examples.py'
-      - 'scripts/docs/verify_markdown_bash_blocks.py'
-      - 'scripts/docs/verify_notebooks_smoke.py'
       - '.github/workflows/docs-ci.yml'
   schedule:
-    # Run weekly to check external links
-    - cron: '0 2 * * 1'  # Monday 2 AM UTC
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -56,161 +51,58 @@ permissions:
   contents: read
 
 jobs:
-  # Single consolidated job for docs validation (saves ~10 min setup overhead)
-  docs-validate:
-    name: Docs Build & Validate
+  docs:
+    if: ${{ github.event_name != 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install Python dependencies
+        run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
+      - name: Install documentation linters
+        run: npm ci
+      - name: Check documentation
+        run: make docs-check
+      - name: Exercise documented commands
+        run: make docs-live-fast
+      - name: Upload rendered documentation
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: documentation
+          path: site/
+          retention-days: 3
+      - name: Confirm a clean source tree
+        run: |
+          rm -rf site
+          git diff --exit-code
+
+  external-links:
+    if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      PYTHONPATH: ${{ github.workspace }}/src
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-      with:
-        fetch-depth: 0
-
-    - name: Setup Python
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-      with:
-        python-version: '3.13'
-
-    - name: Setup Node.js
-      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
-      with:
-        node-version: '22'
-
-    - name: Install docs lint toolchain
-      run: npm ci
-
-    - name: Cache pip
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-      # `act` can clobber PATH after setup-python on some hosts; cache is optional.
-      if: ${{ !env.ACT }}
-      with:
-        path: ~/.cache/pip
-        key: docs-pip-${{ hashFiles('pyproject.toml') }}
-        restore-keys: docs-pip-
-
-    - name: Install dependencies
-      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
-
-    - name: Build docs (strict)
-      run: mkdocs build --strict
-
-    - name: Check internal links
-      run: python scripts/docs/docs_check.py --links
-
-    - name: Lint markdown
-      run: python scripts/docs/docs_lint.py --markdown
-
-    - name: Spell check
-      run: python scripts/docs/docs_lint.py --spell
-
-    - name: Check consistency
-      run: python scripts/docs/docs_check.py --consistency
-
-    - name: Run curated live examples
-      run: make docs-live-fast
-
-    - name: Check for secrets
-      run: |
-        if grep -r -E "sk-[a-zA-Z0-9]{48}" docs/; then
-          exit 1
-        fi
-        if grep -r -E "ghp_[a-zA-Z0-9]{36}" docs/; then
-          exit 1
-        fi
-        if grep -r -E "/home/|/Users/|C:\\\\" docs/; then
-          exit 1
-        fi
-
-    - name: Validate examples
-      run: python scripts/docs/docs_check.py --examples
-      timeout-minutes: 5
-
-    - name: Check build size
-      run: |
-        SITE_SIZE=$(du -sm site | cut -f1)
-        echo "Documentation site size: ${SITE_SIZE}MB"
-        if [ "${SITE_SIZE}" -gt 50 ]; then echo "Warning: Site > 50MB"; exit 1; fi
-
-    - name: Upload build artifacts
-      if: github.event_name == 'pull_request'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: docs-build
-        path: site/
-        retention-days: 3
-
-    - name: Ensure clean working tree
-      run: |
-        rm -rf site
-        git diff --exit-code
-
-  # External links only on schedule (avoids rate limiting)
-  check-external-links:
-    name: Check External Links
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
-    timeout-minutes: 15
-    env:
-      PYTHONPATH: ${{ github.workspace }}/src
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
-    - name: Setup Python
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-      with:
-        python-version: '3.13'
-
-    - name: Install link checker
-      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
-
-    - name: Check external links
-      run: linkchecker --check-extern docs/
-
-  # Deploy preview only on PRs when Netlify secrets are configured
-  deploy-preview:
-    name: Deploy Preview
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.repository == 'invarlock/invarlock'
-    needs: [docs-validate]
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: write
-    env:
-      PYTHONPATH: ${{ github.workspace }}/src
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
-    - name: Setup Python
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-      with:
-        python-version: '3.13'
-
-    - name: Install dependencies
-      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
-
-    - name: Build documentation
-      run: mkdocs build
-
-    - name: Deploy to Netlify
-      if: env.NETLIFY_AUTH_TOKEN != ''
-      uses: nwtgck/actions-netlify@d22a32a27c918fe470bbc562e984f80ec48c2668
-      with:
-        publish-dir: './site'
-        production-branch: main
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        deploy-message: "Deploy from GitHub Actions"
-        enable-pull-request-comment: true
-        enable-commit-comment: false
-        overwrites-pull-request-comment: true
-      env:
-        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
+      - name: Check external links
+        run: linkchecker --check-extern docs/

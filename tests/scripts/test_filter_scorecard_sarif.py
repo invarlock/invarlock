@@ -116,3 +116,28 @@ def test_cli_writes_filtered_output(tmp_path: Path) -> None:
     filtered = json.loads(output_path.read_text(encoding="utf-8"))
     assert filtered["runs"][0]["results"] == []
     assert filtered["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+def test_filter_sarif_preserves_absent_or_wrong_shaped_optional_sections() -> None:
+    without_runs = {"version": "2.1.0", "runs": {"unexpected": True}}
+    assert filter_sarif(without_runs, {"rule"}) is without_runs
+
+    payload = {
+        "runs": [
+            {
+                "results": {"unexpected": True},
+                "tool": {
+                    "driver": "unexpected",
+                    "extensions": ["unexpected", {"rules": "unexpected"}],
+                },
+            },
+            {
+                "tool": {
+                    "driver": {"rules": "unexpected"},
+                    "extensions": "unexpected",
+                }
+            },
+        ]
+    }
+
+    assert filter_sarif(payload, {"rule"}) == payload

@@ -68,20 +68,57 @@ We will not pursue legal action against researchers who:
 
 When using InvarLock:
 
-1. **Keep dependencies updated**: Run `pip install --upgrade invarlock` regularly
-2. **Review evaluation reports**: Always verify evaluation report integrity before trusting results
-3. **Isolate sensitive workloads**: Use virtual environments or containers
-4. **Network isolation**: Set `INVARLOCK_ALLOW_NETWORK=0` (default) except when needed
-5. **Audit configurations**: Review config files before running evaluation workflows
+1. **Keep dependencies updated**: install a current InvarLock release and audit
+   the complete environment, including optional provider runtimes.
+2. **Verify with external trust anchors**: supply the policy, baseline and
+   subject artifact-identity digests, canonical schedule digest, both expected
+   runtime digests, and expected evidence-signer fingerprint independently of
+   the evidence bundle. Write and retain a separately signed verifier receipt.
+3. **Inspect authenticated evidence**: use `invarlock report` only after the
+   bundle has passed independent verification.
+4. **Isolate sensitive workloads**: use virtual environments or containers and
+   protect evidence-signer and verifier signing keys separately. In OCI run
+   mode, the host prepares the schedule and launches a separately pinned worker
+   for each side. Model workers receive only read-only job, artifact, and support
+   mounts plus an isolated writable output directory; the evidence-signing key
+   remains in the host process and is never mounted into a model worker. A local
+   key file is not isolation from compromise of that host process.
+5. **Keep evaluation offline by default**: leave `INVARLOCK_ALLOW_NETWORK=0`
+   unless an explicitly authorized provider operation requires network access.
+6. **Audit requests**: review every request, referenced input, output
+   destination, provider, and policy before evaluation.
 
 ## Security Features
 
 InvarLock includes several security features:
 
-- **Network disabled by default**: External network access requires explicit opt-in
-- **Supply chain verification**: SBOM generation and dependency auditing in CI
-- **Report integrity**: Cryptographic verification of evaluation results
-- **Minimal permissions**: Least-privilege design throughout the codebase
+- **Python-process network guard by default**: Python socket creation requires
+  explicit opt-in; strict evidence additionally requires an independently
+  enforced network-disabled container boundary.
+- **Supply chain checks**: SBOM generation and dependency auditing in CI
+- **Evidence-pack signatures**: Ed25519 manifest signatures authenticate the
+  canonical pack when the verifier receives the expected evidence-signer
+  fingerprint independently.
+- **Closed evidence binding**: the signed manifest binds the normalized request,
+  paired schedule and records, comparison report, and runtime-side provider
+  evidence carried by the bundle. The verifier also requires an external
+  policy, baseline and subject artifact-identity digests, canonical schedule
+  digest, and both expected runtime digests.
+- **Independent verifier receipts**: verification can write a separately signed
+  receipt that binds the verifier identity, decision, policy, trust inputs, and
+  evidence digest. The receipt is not stored inside the signed evidence pack.
+
+These mechanisms authenticate claims and detect tampering; they do not attest
+actual container execution. A compromised evaluation environment can fabricate
+internally consistent evidence that names an expected digest. Use isolated
+evaluation infrastructure, protect signing keys, and obtain policies, runtime
+digests, artifact identities, schedule digests, signer fingerprints, and
+verifier trust anchors through separate release or deployment channels.
+
+See the [security practices](docs/security/best-practices.md) for the current
+file-backed signer limitation, key custody, data retention, runtime isolation,
+and incident response, and the [runtime-security API](docs/reference/runtime-security.md)
+for the exact process-local controls and their limits.
 
 ## Acknowledgments
 

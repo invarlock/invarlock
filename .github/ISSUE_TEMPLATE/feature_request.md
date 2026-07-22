@@ -10,7 +10,8 @@ labels: enhancement
 
 ### Proposed Solution
 
-<!-- Describe the change. Config/CLI/API surface if applicable. -->
+<!-- Describe the change. Identify any request, CLI, provider ABI, evidence,
+receipt, or report surface it would affect. -->
 
 ### Alternatives Considered
 

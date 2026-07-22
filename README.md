@@ -11,310 +11,309 @@
   </picture>
 </p>
 
-<p align="center"><em>Auditable strict verification for edited model checkpoints</em></p>
+<p align="center"><em>Run paired release-regression checks. Verify the evidence independently. Render one clear report.</em></p>
 
 <p align="center">
-  <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" />
-  </a>
-  <a href="https://pypi.org/project/invarlock/">
-    <img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" />
-  </a>
-  <a href="https://invarlock.github.io/invarlock/0.12.1/">
-    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" />
-  </a>
-  <a href="LICENSE">
-    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" />
-  </a>
-  <a href="https://www.python.org/downloads/release/python-3120/">
-    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" />
-  </a>
+  <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" /></a>
+  <a href="https://pypi.org/project/invarlock/"><img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" /></a>
+  <a href="https://invarlock.github.io/invarlock/"><img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" /></a>
+  <a href="https://github.com/invarlock/invarlock/blob/main/LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" /></a>
+  <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
 </p>
 
-<p align="center">
-  <strong>Catch silent quality regressions in edited model checkpoints before they ship.</strong>
-</p>
+InvarLock is an open-source assurance engine for one paired
+baseline-versus-subject release-regression decision. A closed request pins the
+two model artifacts, a local JSONL evaluation source, runtime settings, one
+built-in metric or scorer binding, and policy. `evaluate` runs both sides on
+the same deterministic schedule, publishes a signed evidence bundle, and
+records whether the selected paired interval satisfies the policy. A separate
+verifier replays the
+bundle against independently supplied trust anchors.
 
-Quantizing, pruning, or otherwise editing a model's weights can silently degrade quality.
-InvarLock compares an edited **subject** checkpoint against a fixed **baseline** with paired
-evaluation windows, enforces the canonical guard chain (`invariants` -> `spectral` -> `RMT`
--> `variance` -> `invariants`), and produces a machine-readable evaluation report you can gate
-in CI.
-
-InvarLock validates baseline-vs-subject checkpoint comparisons. The subject can
-come from any external edit workflow: quantization, pruning, LoRA merge,
-fine-tuning, or another weight-edit pipeline. The built-in `quant_rtn` edit is
-for demos and smoke tests; production workflows are
-bring-your-own-edited-checkpoint (BYOE). The repo ships strict-verifiable BYOE
-fixtures for dense magnitude pruning, LoRA-merge, and fine-tune subjects under
-`public_evidence/byoe_examples/`. The evidence-pack harness also includes
-deterministic generated validation-subject lanes for quantization, pruning,
-LoRA merge, and fine-tune coverage. Real model runs under
-`public_evidence/real_runs/` include an external magnitude-prune BYOE run and a
-tiny GPT-2 quantization smoke.
-
-The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
-validate report, runtime-manifest, failure-policy, and evidence-pack contracts;
-`public_evidence/real_runs/` contains concrete GPT-2-family `invarlock evaluate`
-runs with signed, fingerprint-pinned evidence packs.
-The strongest public guard-value artifact is the Mistral 7B scenario package at
-`public_evidence/published_basis/mistral_7b/guard_value_demo/`: PM-only accepts
-the selected edits, while the evidence-pack PM+guards comparison records
-baseline-relative spectral, RMT, and variance/VE guard movement from clean
-reruns.
-
-## Why InvarLock?
-
-- **Quality gates for edited checkpoints**: catch regressions before deployment.
-- **Paired statistical evidence**: primary metrics with confidence intervals.
-- **Auditable evidence**: deterministic pairing metadata + policy digests in `evaluation.report.json`.
-- **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “evidence packs”.
-- **Offline-first**: network is disabled by default; enable downloads per command.
-- **Explicit assurance boundary**: the [trust model](docs/assurance/14-trust-model.md) states the scope of a strict pass.
-
-## Who is this for?
-
-- ML engineers shipping edited model checkpoints, including quantized, pruned,
-  fine-tuned, adapter-merged, or otherwise weight-modified variants.
-- MLOps and platform teams building CI gates, runtime-provenance verification, and reviewable evaluation artifacts.
-- Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
-
-## How it works
+```bash
+invarlock evaluate request.yaml
+invarlock verify evidence/
+invarlock report evidence/
+```
 
 <p align="center">
   <img
-    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
-    alt="InvarLock evaluation and verification flow"
+    src="docs/assets/evaluation-verification-flow.svg"
+    alt="A pinned paired evaluation request runs baseline and subject providers, publishes signed evidence, is independently verified, and is rendered as a report"
     width="100%"
   />
 </p>
 
-Flow summary: baseline and subject checkpoints enter `invarlock evaluate`,
-which produces paired run traces plus `evaluation.report.json` and
-`runtime.manifest.json`. `invarlock verify` checks schema, pairing, gates, and
-runtime provenance; passing reports can then be rendered with
-`invarlock report html` or packaged as evidence.
+## The release-regression decision
 
-## Quick Start
+Both sides score the same authenticated records in the same order. InvarLock
+derives one of two built-in paired comparisons:
 
-Colab (CPU-friendly):
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.12.1/notebooks/invarlock_quickstart_cpu.ipynb)
-
-The public front door is `evaluate -> verify -> report html`. The README keeps
-the three common onboarding paths separate:
-
-- **Wheel user / report reader**: install `invarlock`, inspect an existing
-  `evaluation.report.json`, and render HTML without cloning the repository.
-- **Evaluator**: install `invarlock[hf]` when you want `evaluate` to load
-  Hugging Face models and emit a fresh evaluation bundle.
-- **Repo maintainer**: clone the repo and build the local runtime image when you
-  need maintainer smokes, repo presets, or local container-image iteration.
-
-The default `evaluate` path runs model-loading commands inside the runtime
-container and expects an OCI engine such as `podman` or `docker`. Host-side
-workflows can opt into `--execution-mode host`, but the default verification
-path below expects a container-backed report with sibling runtime provenance.
-`evaluate` also defaults to the current strict assurance contract: CI/release
-profile, balanced/conservative tier, canonical guard order, complete evidence,
-strict paired metrics, and verified runtime provenance are required for an
-assurance pass. Use `--assurance off` only for exploratory reports.
-
-```bash
-# Evaluator path: create a fresh bundle
-pip install "invarlock[hf]"
-
-invarlock --version
-
-# Compare baseline vs subject (downloads require explicit network enable)
-INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
-  --baseline gpt2 \
-  --subject  distilgpt2 \
-  --baseline-adapter auto --subject-adapter auto \
-  --profile ci \
-  --assurance strict \
-  --report-out reports/eval \
-  --quiet
-
-# Validate the container-backed evaluation report
-test -f reports/eval/runtime.manifest.json
-invarlock verify reports/eval/evaluation.report.json
-
-# Render HTML for sharing
-invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-```
-
-Wheel-only verification path:
-`pip install invarlock`, `invarlock doctor`,
-`invarlock verify /path/to/evaluation.report.json`,
-`invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
-`invarlock report explain --evaluation-report /path/to/evaluation.report.json`,
-and `invarlock report export -i /path/to/evaluation.report.json --format mlflow-tags`.
-
-Repo maintainers can build the local runtime image once with `make runtime-image`;
-InvarLock automatically prefers `invarlock-runtime:local` when it is present.
-
-Artifact model:
-
-| Artifact | Produced by | Primary consumers |
+| Metric | Point comparison | Policy verdict |
 | --- | --- | --- |
-| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report export`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
-| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
+| `exact_match` | Subject accuracy minus baseline accuracy, with paired regression/improvement counts and an exact McNemar test | Lower bound of the paired Newcombe 95% interval is at least `delta_min_pp` |
+| `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of per-record byte-normalized expected-continuation NLL | Upper bound of the paired schedule-resampling interval is at most `ratio_max` |
 
-`invarlock verify` expects `evaluation.report.json`; if you only have a raw
-run directory containing `report.json`, first build the evaluation bundle with
-`invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
-`invarlock advanced runtime-verify` is narrower: it checks runtime manifest
-binding/provenance; report/gate verification remains the evidence gate.
+For exact match, InvarLock reports baseline-pass to subject-fail regressions,
+baseline-fail to subject-pass improvements, the exact two-sided McNemar
+probability, and a continuity-corrected paired Newcombe 95% effect-size
+interval. For normalized
+NLL, it uses 2,048 paired percentile-bootstrap replicates whose index draws are
+derived from the authenticated schedule digest. In both cases the policy reads
+the conservative interval bound, not the point value alone.
 
-Example output (abridged; counts vary by profile/config):
+A policy may also require a minimum paired-record count and a maximum interval
+width. Those controls are supplied together. When present, the report passes
+only when the metric bound, record-count minimum, and precision ceiling all
+pass. Preflight can prove the schedule count before execution; it reports the
+interval-width check as pending until paired results exist.
 
-```text
-INVARLOCK v<version> - EVALUATE
-Baseline: gpt2 -> Subject: distilgpt2 - Profile: ci
-Status: PASS - Gates: <passed>/<total> passed
-Primary metric ratio: <ratio>
-Output: reports/eval/evaluation.report.json
-Runtime provenance: reports/eval/runtime.manifest.json
-```
+Normalized NLL is teacher-forced expected-continuation likelihood regression.
+It does not measure general model quality. When both artifacts bind the same
+authenticated tokenizer and every pair has the same positive target-token
+count, the verifier also renders a token-weighted perplexity ratio as a derived
+likelihood interpretation. That derived value has no threshold, interval, or
+verdict authority.
 
-## Command Surface
+For a task-specific deterministic text scorer, `comparison` can select one
+fully bound `scorer_extension` instead of a built-in `metric`. The runtime still
+collects authenticated expected output, output text, and output digest facts.
+An explicitly authorized scorer replays those facts into one `[0,1]`
+higher-is-better value per record; core owns the arithmetic means, paired
+percentage-point delta, deterministic interval, and policy decision. Separately
+installed scorer packages can implement deterministic F1, structured
+extraction, or VQA answer normalization and require explicit authorization
+through this extension contract. The public CLI loads the exact installed
+scorer bound by the request only when `--allow-installed-scorers` is supplied to
+both `evaluate` and `verify`.
 
-- First touch in a fresh install: `invarlock --help`, `invarlock --version`,
-  `invarlock report --help`, and `invarlock advanced --help`.
-- Core workflow: `invarlock evaluate` -> `invarlock verify` ->
-  `invarlock report html`.
-- Follow-on report analysis after the core loop: `invarlock report generate`,
-  `invarlock report explain`, `invarlock report export`, and
-  `invarlock report validate`.
-- Environment and release checks: `invarlock doctor` plus the JSON surfaces
-  emitted by `doctor --json` and `advanced plugins ... --json`.
-- Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
-- The public contract catalog exposed by those JSON surfaces includes
-  `model_classification`, `validation_keys`, `console_labels`, and
-  `metric_kinds`, plus the compact `public_evidence_index`.
-- Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
-  `invarlock advanced plugins`, and `invarlock advanced calibrate`.
-- Host execution for the core evaluate path uses `--execution-mode host`.
-- Optional adapter/backend installs use normal Python extras such as
-  `pip install "invarlock[hf]"` rather than CLI install commands.
+Executable SQL or code scoring, model-based semantic similarity, network or
+human scoring, external models, and LLM judges are outside this acceptance
+contract. Judge results can be attached as authenticated observations until a
+separate deterministic replay contract and calibration justify more.
 
-## Evidence packs (portable evidence bundles)
+## Run a comparison
 
-Evidence packs bundle reports + verification metadata into a distributable artifact.
+Install the built-in Hugging Face provider and prepare:
 
-- Guide: <https://invarlock.github.io/invarlock/0.12.1/user-guide/evidence-packs/>
-- Verify from an installed wheel:
-  `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
-- Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
-- For recurring signers, use `--trust-store <json>` or
-  `~/.config/invarlock/trusted-signers.json` with the package-native verifier.
-
-Note: `configs/` and most `scripts/` remain repo resources and are not included in
-wheels. Installed wheels include the public contracts and the
-`invarlock advanced evidence-pack verify` verifier, so installed packages can
-check bundles without cloning the repository.
-Full published-basis public evidence artifacts live in the source tree and
-release tags under `public_evidence/`; wheels carry the compact
-`published_basis_index.json` summary with hashes, sizes, coverage, and source
-paths instead of duplicating the full artifact corpus.
-
-## Installation
+- local baseline and subject snapshots;
+- a digest-pinned JSONL file with prompt, expected-output, and optional stable
+  ID fields;
+- a one-metric policy file;
+- a digest-addressed InvarLock runtime image available to Docker or Podman; and
+- an Ed25519 evidence-signing key available only to the host transaction.
 
 ```bash
-# Minimal CLI (no torch/transformers)
-pip install invarlock
-
-# HF workflows (torch/transformers)
-pip install "invarlock[hf]"
+python -m pip install "invarlock[hf]"
 ```
 
-HF-backed extras require `transformers>=5.12.0`; this covers text, multimodal,
-and quantized adapter loading through one tested HF runtime floor.
+Run requests bind a dataset object. `evaluate` authenticates the JSONL bytes
+and deterministically prepares the canonical paired schedule inside the
+transaction:
 
-Optional extras: `invarlock[probes]`, `invarlock[gpu]`,
-`invarlock[awq,gptq]`, `invarlock[torchao]`, `invarlock[hqq]`,
-`invarlock[quanto]`, and `invarlock[compressed-tensors]`. The `awq` and
-`gptq` extras use GPTQModel-backed subject loading. Full setup:
-<https://invarlock.github.io/invarlock/0.12.1/user-guide/getting-started/>.
+```yaml
+format_version: invarlock/evaluation-request-v1
+comparison:
+  baseline:
+    artifact:
+      path: artifacts/baseline
+      model_id: acme/baseline
+      locator: hf://acme/baseline@0123456789abcdef0123456789abcdef01234567
+    runtime:
+      provider: hf_transformers
+      settings:
+        batch_size: 1
+        checkpoint_tree_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
+        context_length: 2048
+        immutable_revision: 0123456789abcdef0123456789abcdef01234567
+        max_output_tokens: 64
+        offline: true
+        seed: 7
+        timeout_seconds: 300
+        tokenizer_metadata_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+  subject:
+    artifact:
+      path: artifacts/subject
+      model_id: acme/subject
+      locator: hf://acme/subject@fedcba9876543210fedcba9876543210fedcba98
+    runtime:
+      provider: hf_transformers
+      settings:
+        batch_size: 1
+        checkpoint_tree_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
+        context_length: 2048
+        immutable_revision: fedcba9876543210fedcba9876543210fedcba98
+        max_output_tokens: 64
+        offline: true
+        seed: 7
+        timeout_seconds: 300
+        tokenizer_metadata_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+  dataset:
+    path: inputs/release-regression.jsonl
+    sha256: "4444444444444444444444444444444444444444444444444444444444444444"
+    format: jsonl
+    name: release-regression
+    split: validation
+    input_field: prompt
+    expected_output_field: expected
+    id_field: case_id
+  policy: policy/acceptance.json
+  task: text_causal
+  metric: normalized_nll_per_utf8_byte
+execution:
+  mode: run
+output:
+  evidence: artifacts/evidence-001
+```
 
-The minimal install covers the core verification and reporting flows. Add
-`invarlock[hf]` only for model-loading evaluate runs, and use the installed
-wheel's evidence-pack verifier when you need to inspect a bundle without cloning
-the repository.
+`evaluate` always performs the complete execution-free validation before it
+starts model runtimes. Use `--preflight` to stop after that validation and
+inspect its machine-readable result without creating output:
+
+```bash
+invarlock evaluate request.yaml --signing-key evidence-signer.pem \
+  --runtime-image registry.example/invarlock-runtime@sha256:... \
+  --preflight --json
+```
+
+Preflight emits `invarlock/evaluation-preflight-v2` and checks configuration
+and local availability. When the policy includes sample qualification, it also
+reports the observed record count and leaves interval width explicitly
+`pending_execution`. Continuing with the real evaluation is still required to
+establish runtime execution, interval precision, and the policy result.
+
+Replace the illustrative digests with values derived from the exact inputs.
+Then invoke the host CLI. In run mode, the host prepares the authenticated
+schedule and launches a separately pinned worker for each side; Docker is the
+default engine and Podman is supported.
+
+Build the authenticated Git source bundle as shown in the
+[runtime-provider guide](docs/user-guide/runtime-providers.md#build-or-obtain-the-runtime-image),
+then build and smoke-test the image that matches the intended device:
+
+```bash
+mkdir -p artifacts
+
+# CPU, including Apple Silicon through the matching multi-architecture lock
+make runtime-image \
+  RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
+  RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+  RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+  RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cpu.json"
+make runtime-smoke
+
+# x86_64 NVIDIA CUDA 12.6
+make runtime-image-cuda \
+  RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
+  RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
+  RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
+  RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cuda.json"
+make runtime-smoke-cuda
+```
+
+```bash
+invarlock evaluate request.yaml \
+  --signing-key evidence-signer.pem \
+  --baseline-runtime-image registry.example/invarlock-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --baseline-runtime-image-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --subject-runtime-image registry.example/invarlock-runtime@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
+  --subject-runtime-image-digest sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
+  --container-engine docker \
+  --baseline-runtime-device cuda:0 \
+  --subject-runtime-device cuda:1
+```
+
+Shared `--runtime-image`, `--runtime-image-digest`, `--runtime-device`, and
+`--runtime-entrypoint` options remain convenient defaults when both sides use
+the same settings. `--runtime-device cuda` exposes a GPU only to an image that
+already contains the CUDA runtime; it does not turn the CPU image into a CUDA
+image.
+
+Each worker receives its own artifact and support resources read-only plus an
+isolated writable output directory. The host validates both outputs, publishes
+the no-clobber evidence bundle, and signs it without exposing the private key to
+either worker. Workers sharing a generic or identical CUDA device run
+sequentially; explicitly different CUDA indexes can run in parallel.
+
+## Verify and report
+
+Verification supplies the expected artifact identities, canonical schedule,
+policy, runtime identities, and evidence signer independently of the bundle.
+Keep those inputs in one closed verifier-owned profile:
+
+```bash
+invarlock verify artifacts/evidence-001/ \
+  --trust-profile trust/trust-inputs.json \
+  --receipt verification.receipt.json
+
+invarlock report artifacts/evidence-001/ --html evidence.html --explain
+```
+
+The evidence signer authenticates the comparison bytes. The verifier decides
+whether those bytes satisfy the independently maintained anchors and signs a
+separate receipt that binds the profile digest. `report` renders the
+signature-authenticated comparison; independent verification remains the
+acceptance record. The [CLI reference](docs/reference/cli.md#verify) defines
+the closed profile and the equivalent explicit options.
+
+## Import existing measurements
+
+The repository's
+[`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
+directory contains maintained Hugging Face, PEFT, TorchAO, GGUF/llama.cpp,
+TensorRT-LLM, Hugging Face vision-text, and LM Evaluation Harness journeys.
+They create or obtain real artifacts and complete the source-bound `evaluate`,
+`verify`, and `report` transaction. The TensorRT-LLM journey builds BF16 and
+calibrated FP8 Qwen3-0.6B engines concurrently on the target H100 GPUs before
+authenticating their resulting identities. The vision-text journey compares
+two pinned Qwen2-VL checkpoints on authenticated image content. The repository
+also includes an offline evidence-handoff journey for complete per-record
+results produced elsewhere. Import mode requires the canonical schedule, typed
+observations, runtime bindings, and paired records; InvarLock re-derives the
+comparison before publication.
+
+The [model-change workflow guide](docs/user-guide/change-scenarios.md) maps
+fine-tuning, pruning, quantization, GGUF, TensorRT-LLM, multimodal, harness, and
+endpoint outputs to the appropriate built-in, optional-runtime, or import
+boundary.
+
+## Providers and diagnostics
+
+Hugging Face Transformers is the built-in reference provider and supports both
+built-in metrics. First-party optional GGUF/llama.cpp, TensorRT-LLM, and Hugging
+Face vision-text packages are independently installable runtime integrations
+with their own dependency sets. The vision-text add-in supports exact-match
+comparisons over authenticated prompt and image parts.
+See [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md).
+
+Spectral, random-matrix, and variance summaries live in the optional
+`invarlock-diagnostics` package. They are observation-only diagnostics; the
+selected paired comparison and policy exclusively determine acceptance. Their
+canonical JSON can be attached to the signed bundle and appears in a separate report
+section without changing the verdict. See
+[diagnostics](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/diagnostics.md).
 
 ## Documentation
 
-- Docs home: <https://invarlock.github.io/invarlock/0.12.1/>
-- Quickstart: <https://invarlock.github.io/invarlock/0.12.1/user-guide/quickstart/>
-- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.12.1/user-guide/compare-and-evaluate/>
-- Reading a report: <https://invarlock.github.io/invarlock/0.12.1/user-guide/reading-report/>
-- CLI reference: <https://invarlock.github.io/invarlock/0.12.1/reference/cli/>
-- Assurance case: <https://invarlock.github.io/invarlock/0.12.1/assurance/00-assurance-case/>
-  (repo source: `docs/assurance/00-assurance-case.md`)
-- Threat model: <https://invarlock.github.io/invarlock/0.12.1/security/threat-model/>
+- **Run and review:** [getting started](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md),
+  [evaluation requests](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evaluation-request.md),
+  [schedule and policy](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/schedule-and-policy.md), and
+  [evidence and verification](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evidence-and-verification.md).
+- **Understand the claim:** [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md),
+  [decision semantics](https://github.com/invarlock/invarlock/blob/main/docs/assurance/decision-semantics.md), and
+  [trust model](https://github.com/invarlock/invarlock/blob/main/docs/security/trust-model.md).
+- **Integrate:** [CLI](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md),
+  [contracts](https://github.com/invarlock/invarlock/blob/main/docs/reference/contracts.md),
+  [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/reference/runtime-providers.md), and
+  [Python API](https://github.com/invarlock/invarlock/blob/main/docs/reference/api-guide.md).
 
-## Community
+InvarLock is pre-1.0. Canonical artifact formats carry explicit format versions;
+the Python embedding facade may evolve between minor releases.
 
-- Questions/ideas: <https://github.com/invarlock/invarlock/discussions>
-- Bug reports: <https://github.com/invarlock/invarlock/issues>
-- Contact: <mailto:support@invarlock.dev>
+Questions and design discussions belong in
+[GitHub Discussions](https://github.com/invarlock/invarlock/discussions). Report
+bugs through [GitHub Issues](https://github.com/invarlock/invarlock/issues) and
+security concerns through [SECURITY.md](https://github.com/invarlock/invarlock/blob/main/SECURITY.md).
 
-## Citation
-
-If you use InvarLock in scientific work, please cite it (canonical metadata is in `CITATION.cff`):
-
-```bibtex
-@software{invarlock,
-  title  = {InvarLock: Auditable strict verification for edited model checkpoints},
-  author = {{InvarLock}},
-  url    = {https://github.com/invarlock/invarlock},
-}
-```
-
-## Limitations
-
-- Results are baseline-relative to a specific configuration and evidence profile.
-- The project scope is edited-checkpoint regression evidence; application-level policy and alignment assessment require separate review.
-- Linux is the primary support target; Windows users should use WSL2 or Linux.
-
-## Support matrix
-
-<!-- markdownlint-disable MD060 -->
-| Platform               | Status          | Notes                                     |
-| ---------------------- | --------------- | ----------------------------------------- |
-| Python 3.12+           | ✅ Required      | CI covers 3.12 minimum and 3.13 primary   |
-| Linux                  | ✅ Full          | Primary dev target                        |
-| macOS (Intel/M-series) | ✅ Full          | MPS supported (default on Apple Silicon)  |
-| Windows                | ❌ Not supported | Use WSL2 or a Linux container if required |
-| CUDA                   | ✅ Recommended   | For larger models                         |
-| CPU                    | ✅ Fallback      | Slower but functional                     |
-<!-- markdownlint-enable MD060 -->
-
-## Project status
-
-InvarLock is pre-1.0 as a package, but the core evidence-artifact surfaces are
-versioned and intended to be stable within their declared contract versions.
-Minor releases may still change non-contract package APIs before 1.0. See
-[`docs/reference/contracts.md`](docs/reference/contracts.md) and
-[`CHANGELOG.md`](CHANGELOG.md).
-
-For guidance on where to ask questions, how to report bugs, and what to expect in terms of response times, see
-[`SUPPORT.md`](SUPPORT.md).
-
-## Contributing
-
-- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Local setup: `make dev-install`
-- Everyday checks: `make test`, `make lint`, and `make docs-check`
-- Optional parallel fast tests: `make test-parallel` or
-  `make test-fast PYTEST_WORKERS=auto`. Keep `make coverage-enforce` serial;
-  it writes combined coverage artifacts.
-- Maintainer PR gate: `git diff --check origin/staging/next...HEAD`,
-  `make lock-sync`, `pre-commit run --all-files --show-diff-on-failure`,
-  `make workflow-lint`, `make docs-check`, `make mypy-typed-surface`,
-  `make coverage-enforce`, `make packaging-smoke-minimal`, and `make security`
-- Broader local confirmation before protected-branch PRs: `make verify`
-
-## License
-
-Apache-2.0 — see `LICENSE`.
+Apache-2.0 — see the
+[license](https://github.com/invarlock/invarlock/blob/main/LICENSE).

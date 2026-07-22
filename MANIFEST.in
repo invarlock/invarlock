@@ -9,5 +9,6 @@ recursive-exclude docs *
 prune scripts
 prune configs
 
-# Ensure license is included in source distributions
+# Ensure license and third-party notices are included in source distributions
 include LICENSE
+include THIRD_PARTY_NOTICES.md

@@ -13,7 +13,7 @@ Usage: scripts/security/refresh_pinned_requirements.sh [options]
 Options:
   --write              Rewrite checked-in requirement locks (default).
   --check              Compile into a temporary copy without modifying requirements/.
-  --group GROUP        all, workflows, or evidence-packs (default: all).
+  --group GROUP        all or workflows (default: all).
   --help, -h           Show this help message.
 EOF
 }
@@ -49,9 +49,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${GROUP}" in
-  all|workflows|evidence-packs) ;;
+  all|workflows) ;;
   *)
-    echo "ERROR: --group must be one of: all, workflows, evidence-packs" >&2
+    echo "ERROR: --group must be one of: all, workflows" >&2
     exit 2
     ;;
 esac
@@ -71,9 +71,8 @@ if [[ "${MODE}" == "check" ]]; then
 fi
 
 WORKFLOW_DIR="${REQ_DIR}/workflows"
-EVIDENCE_PACK_DIR="${REQ_DIR}/evidence-packs"
 
-mkdir -p "${WORKFLOW_DIR}" "${EVIDENCE_PACK_DIR}"
+mkdir -p "${WORKFLOW_DIR}"
 
 compile_pyproject() {
   local output="$1"
@@ -86,26 +85,6 @@ compile_pyproject() {
     cd "${ROOT_DIR}"
     uv pip compile pyproject.toml \
       --python-platform x86_64-unknown-linux-gnu \
-      --generate-hashes \
-      --output-file "${output_arg}" \
-      "$@"
-  )
-}
-
-compile_req_in() {
-  local input="$1"
-  local output="$2"
-  local input_arg="$1"
-  local output_arg="$2"
-  shift 2
-  if [[ "${input}" == "${ROOT_DIR}/"* && "${output}" == "${ROOT_DIR}/"* ]]; then
-    input_arg="${input#${ROOT_DIR}/}"
-    output_arg="${output#${ROOT_DIR}/}"
-  fi
-  (
-    cd "${ROOT_DIR}"
-    uv pip compile "${input_arg}" \
-      --universal \
       --generate-hashes \
       --output-file "${output_arg}" \
       "$@"
@@ -131,6 +110,28 @@ compile_req_platform() {
   )
 }
 
+compile_release_install() {
+  local output="$1"
+  local python_version="$2"
+  local python_tag="${python_version/./}"
+  local output_arg="$1"
+  if [[ "${output}" == "${ROOT_DIR}/"* ]]; then
+    output_arg="${output#${ROOT_DIR}/}"
+  fi
+  (
+    cd "${ROOT_DIR}"
+    uv pip compile \
+      requirements/workflows/release-install.in \
+      --python-platform x86_64-unknown-linux-gnu \
+      --python-version "${python_version}" \
+      --constraints requirements/workflows/release-security-py313.txt \
+      --constraints "requirements/workflows/ci-hf-py${python_tag}.txt" \
+      --generate-hashes \
+      --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows" \
+      --output-file "${output_arg}"
+  )
+}
+
 run_workflow_locks() {
   compile_pyproject "${WORKFLOW_DIR}/ci-hf-py312.txt" \
     --python-version 3.12 \
@@ -145,27 +146,13 @@ run_workflow_locks() {
     --extra hf \
     --extra ci
 
-  compile_pyproject "${WORKFLOW_DIR}/core-py313.txt" \
-    --python-version 3.13
-
   compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
     --python-version 3.13 \
-    --extra ci \
-    --extra docs-ci
-
-  compile_pyproject "${WORKFLOW_DIR}/assurance-ci-py313.txt" \
-    --python-version 3.13 \
-    --extra hf \
-    --extra ci \
     --extra docs-ci
 
   compile_pyproject "${WORKFLOW_DIR}/hf-py313.txt" \
     --python-version 3.13 \
     --extra hf
-
-  compile_pyproject "${WORKFLOW_DIR}/advanced-py313.txt" \
-    --python-version 3.13 \
-    --extra advanced
 
   compile_req_platform \
     "${WORKFLOW_DIR}/runtime-image.in" \
@@ -176,24 +163,43 @@ run_workflow_locks() {
 
   compile_req_platform \
     "${WORKFLOW_DIR}/runtime-image.in" \
-    "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt" \
-    --python-version 3.12 \
-    --python-platform x86_64-unknown-linux-gnu \
-    --torch-backend cu128
-
-  compile_req_platform \
-    "${WORKFLOW_DIR}/runtime-image-quant.in" \
-    "${WORKFLOW_DIR}/runtime-image-quant-py312-cu128.txt" \
-    --python-version 3.12 \
-    --python-platform x86_64-unknown-linux-gnu \
-    --torch-backend cu128
-
-  compile_req_platform \
-    "${WORKFLOW_DIR}/runtime-image.in" \
     "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt" \
     --python-version 3.12 \
     --python-platform aarch64-unknown-linux-gnu \
     --torch-backend cpu
+
+  compile_req_platform \
+    "${WORKFLOW_DIR}/runtime-image-cu126.in" \
+    "${WORKFLOW_DIR}/runtime-image-py312-cu126.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --torch-backend cu126
+
+  compile_req_platform \
+    "${WORKFLOW_DIR}/multimodal-runtime.in" \
+    "${WORKFLOW_DIR}/multimodal-runtime-py312.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --torch-backend cu126 \
+    --no-deps
+
+  local harness_full_lock="${WORKFLOW_DIR}/.lm-evaluation-harness-full-py312.txt"
+  compile_req_platform \
+    "${WORKFLOW_DIR}/lm-evaluation-harness.in" \
+    "${harness_full_lock}" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints requirements/workflows/runtime-image.in \
+    --torch-backend cpu \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_cache_free_lm_eval_wheel.py" \
+    filter-lock \
+    --input "${harness_full_lock}" \
+    --output "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt"; then
+    rm -f "${harness_full_lock}"
+    return 1
+  fi
+  rm -f "${harness_full_lock}"
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \
@@ -204,54 +210,20 @@ run_workflow_locks() {
     --extra release-ci \
     --extra security-ci
 
+  compile_release_install "${WORKFLOW_DIR}/release-install-py312.txt" 3.12
+  compile_release_install "${WORKFLOW_DIR}/release-install-py313.txt" 3.13
+
   compile_pyproject "${WORKFLOW_DIR}/security-ci-py313.txt" \
     --python-version 3.13 \
     --extra security-ci
 }
 
-run_evidence_pack_locks() {
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/accelerate.in" \
-    "${EVIDENCE_PACK_DIR}/accelerate.txt" \
-    --no-deps
-
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/cuda-nvcc.in" \
-    "${EVIDENCE_PACK_DIR}/cuda-nvcc.txt" \
-    --no-deps
-
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/flash-attn.in" \
-    "${EVIDENCE_PACK_DIR}/flash-attn.txt" \
-    --no-deps
-
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/huggingface_hub.in" \
-    "${EVIDENCE_PACK_DIR}/huggingface_hub.txt"
-
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/protobuf.in" \
-    "${EVIDENCE_PACK_DIR}/protobuf.txt"
-
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/pyyaml.in" \
-    "${EVIDENCE_PACK_DIR}/pyyaml.txt"
-
-  compile_req_in \
-    "${EVIDENCE_PACK_DIR}/sentencepiece.in" \
-    "${EVIDENCE_PACK_DIR}/sentencepiece.txt"
-}
-
 case "${GROUP}" in
   all)
     run_workflow_locks
-    run_evidence_pack_locks
     ;;
   workflows)
     run_workflow_locks
-    ;;
-  evidence-packs)
-    run_evidence_pack_locks
     ;;
 esac
 

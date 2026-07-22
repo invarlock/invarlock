@@ -1,9 +1,0 @@
-{
-  "assurance": "strict",
-  "basis": "public_evidence/published_basis/qwen3_5_9b/evaluation.report.json",
-  "evidence_run": "20260612TremainingExperimentalZ",
-  "model_id": "Qwen/Qwen3.5-9B",
-  "note": "Container-backed CI-profile Qwen3.5 9B published-basis evidence run.",
-  "profile": "release",
-  "verdict": "PASS"
-}

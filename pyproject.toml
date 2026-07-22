@@ -1,20 +1,19 @@
 [build-system]
-requires      = ["setuptools>=82.0.1", "wheel"]
+requires      = ["setuptools>=83.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.12.1"
-description = "Auditable strict verification for edited model checkpoints (InvarLock framework)"
+version = "0.13.0"
+description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
 license = "Apache-2.0"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
 keywords = [
-  "machine-learning", "deep-learning", "transformers", "pytorch", "llm",
-  "quantization", "evaluation", "verification", "model-editing",
-  "release-assurance", "reproducibility"
+  "machine-learning", "evaluation", "verification", "evidence",
+  "model-assurance", "release-regression", "reproducibility"
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -24,213 +23,36 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Operating System :: OS Independent",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
   "Typing :: Typed",
 ]
 dependencies = [
-    "typer>=0.15",
-    "click>=8.1",
-    "shellingham>=1.5.4",
+    "typer>=0.24.1",
+    "click>=8.3.3",
     "cryptography>=48.0.1",
-    "pydantic>=2.0",
     "rich>=13.0",
     "pyyaml>=6.0",
-    "markdown>=3.5",
-    "psutil>=5.9",
     "jsonschema>=4.0",
-    "idna>=3.15",
 ]
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.12.1/"
+Documentation = "https://invarlock.github.io/invarlock/0.13.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.12.1/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.13.0/CHANGELOG.md"
 
 [project.optional-dependencies]
-# Core torch dependencies for adapters
-adapters = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-  "protobuf>=4.25",
-  "sentencepiece>=0.2.1",
-  "tiktoken>=0.9.0",
-  "pillow>=11.3.0",
-]
-
-# Hugging Face workflow (adapters + evaluation stack)
+# Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate
+# first-party distributions under addins/.
 hf = [
+  "accelerate>=1.14.0",
   "torch>=2.11.0,!=2.12.0",
-  "accelerate>=0.26.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
+  "transformers>=5.14.1",
+  "safetensors>=0.8.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
-  "datasets>=3.0",
-  "requests>=2.33.0",
-  "numpy>=1.24",
-  "huggingface_hub>=1.0.0",
-  "aiohttp>=3.14.0",
-  "h2>=4.3.0",
-  "pillow>=11.3.0",
-]
-
-# Hugging Face image-text / multimodal workflow.
-multimodal = [
-  "torch>=2.11.0,!=2.12.0",
-  "accelerate>=0.26.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-  "protobuf>=4.25",
-  "sentencepiece>=0.2.1",
-  "tiktoken>=0.9.0",
-  "datasets>=3.0",
-  "requests>=2.33.0",
-  "numpy>=1.24",
-  "huggingface_hub>=1.0.0",
-  "aiohttp>=3.14.0",
-  "h2>=4.3.0",
-  "pillow>=11.3.0",
-  "torchvision>=0.26.0",
-]
-
-# Full guards functionality
-guards = [
-  "torch>=2.11.0,!=2.12.0",
-  "numpy>=1.24",
-]
-
-# Edit functionality
-edits = [
-  "torch>=2.11.0,!=2.12.0",
-]
-
-# Evaluation functionality
-eval = [
-  "torch>=2.11.0,!=2.12.0",
-  "datasets>=3.0",
-  "requests>=2.33.0",
-]
-
-# Dedicated probe stack for mutual-information/probe execution.
-probes = [
-  "scikit-learn>=1.4",
-]
-
-# External edit integrations
-gptq = [
-  "torch>=2.11.0,!=2.12.0",
-  "torchvision>=0.23.0",
-  "gptqmodel>=7.0.0",
-  "triton>=2.3.0; platform_system == \"Linux\"",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-]
-
-
-awq = [
-  "torch>=2.11.0,!=2.12.0",
-  "torchvision>=0.23.0",
-  "gptqmodel>=7.0.0",
-  "transformers>=5.12.0",
-  "accelerate>=0.27",
-  "safetensors>=0.4.0",
-  "triton>=2.3.0; platform_system == \"Linux\"",
-]
-
-torchao = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-  "torchao>=0.17.0",
-]
-
-hqq = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-  "accelerate>=0.27",
-  "hqq>=0.2.8",
-]
-
-quanto = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-  "accelerate>=0.27",
-  "optimum-quanto>=0.2.7",
-]
-
-compressed-tensors = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "safetensors>=0.4.0",
-  "accelerate>=0.27",
-  "compressed-tensors>=0.10.0",
-]
-
-# GPU helper stack (optional extras for CUDA/MPS optimisations)
-gpu = [
-  "torch>=2.11.0,!=2.12.0",
-  "accelerate>=0.27",
-  "transformers>=5.12.0",
-  "bitsandbytes>=0.41",
-  "safetensors>=0.4.0",
-]
-
-# Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
-advanced = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "protobuf>=4.25",
-  "sentencepiece>=0.2.1",
-  "tiktoken>=0.9.0",
-  "datasets>=3.0",
-  "requests>=2.33.0",
-  "numpy>=1.24",
-  "scikit-learn>=1.4",
-  "huggingface_hub>=1.0.0",
-  "torchvision>=0.26.0",
-  "accelerate>=0.27",
-  "bitsandbytes>=0.41",
-  "gptqmodel>=7.0.0",
-  "torchao>=0.17.0",
-  "hqq>=0.2.8",
-  "optimum-quanto>=0.2.7",
-  "compressed-tensors>=0.10.0",
-  "triton>=2.3.0; platform_system == \"Linux\"",
-  "aiohttp>=3.14.0",
-  "h2>=4.3.0",
-  "pillow>=11.3.0",
-]
-
-
-# Complete installation with all features
-all = [
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.12.0",
-  "protobuf>=4.25",
-  "sentencepiece>=0.2.1",
-  "tiktoken>=0.9.0",
-  "datasets>=3.0",
-  "requests>=2.33.0",
-  "numpy>=1.24",
-  "scikit-learn>=1.4",
-  "huggingface_hub>=1.0.0",
-  "torchvision>=0.26.0",
-  "accelerate>=0.27",
-  "bitsandbytes>=0.41",
-  "gptqmodel>=7.0.0",
-  "torchao>=0.17.0",
-  "hqq>=0.2.8",
-  "optimum-quanto>=0.2.7",
-  "compressed-tensors>=0.10.0",
-  "triton>=2.3.0; platform_system == \"Linux\"",
-  "aiohttp>=3.14.0",
-  "h2>=4.3.0",
-  "pillow>=11.3.0",
 ]
 
 # Development dependencies
@@ -238,43 +60,45 @@ dev = [
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
-  "ruff==0.15.20",
-  "black>=23.0",
-  "mypy>=1.0",
+  "pillow>=11.3,<13",
+  "ruff==0.15.22",
+  "mypy==1.20.0",
+  "types-jsonschema>=4.26",
   "hypothesis>=6.98",
   "pre-commit>=3.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
   "mkdocs-mermaid2-plugin>=1.2.3",
-  "sphinx>=7.0",
-  "matplotlib>=3.10.9",
-  "bitsandbytes>=0.41",
+  "pymdown-extensions>=10.21.3",
   "build>=0.10.0",
-  "wheel>=0.46.0",
-  "requests>=2.33.0",
+  "wheel>=0.47.0",
   "twine>=4.0.0",
+  "peft==0.19.1",
+  "torchao==0.17.0",
 ]
 
 ci = [
+  "setuptools>=83.0.0",
   "pytest>=7.0",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
+  "pillow>=11.3,<13",
   "hypothesis>=6.98",
-  "ruff==0.15.20",
-  "mypy>=1.0",
-  "mkdocs>=1.5",
-  "mkdocs-material>=9.7.6",
-  "mkdocs-mermaid2-plugin>=1.2.3",
-  "pymdown-extensions>=10.21.3",
+  "ruff==0.15.22",
+  "mypy==1.20.0",
+  "types-jsonschema>=4.26",
   "build>=0.10.0",
-  "wheel>=0.46.0",
-  "requests>=2.33.0",
+  "wheel>=0.47.0",
+  "twine>=4.0.0",
+  "peft==0.19.1",
+  "torchao==0.17.0",
 ]
 
 docs-ci = [
   "linkchecker>=10.5",
-  "numpy>=1.24",
-  "requests>=2.33.0",
+  "mkdocs>=1.5",
+  "mkdocs-material>=9.7.6",
+  "mkdocs-mermaid2-plugin>=1.2.3",
   "pymdown-extensions>=10.21.3",
 ]
 
@@ -284,7 +108,8 @@ precommit-ci = [
 
 release-ci = [
   "build>=0.10.0",
-  "requests>=2.33.0",
+  "setuptools>=83.0.0",
+  "wheel==0.47.0",
   "twine>=4.0.0",
   "cyclonedx-bom>=4.1",
 ]
@@ -293,34 +118,19 @@ security-ci = [
   "pip>=26.1.2",
   "pip-audit>=2.8",
   "msgpack>=1.2.1",
-  "requests>=2.33.0",
   "cyclonedx-bom>=4.1",
 ]
 
-# Entry points for built-in and optional plugins
-[project.entry-points."invarlock.edits"]
-quant_rtn = "invarlock.edits:RTNQuantEdit"
+[dependency-groups]
+example-peft = [
+  "peft==0.19.1",
+]
+example-torchao = [
+  "torchao==0.17.0",
+]
 
-[project.entry-points."invarlock.guards"]
-spectral = "invarlock.guards:SpectralGuard"
-variance = "invarlock.guards:VarianceGuard"
-rmt = "invarlock.guards:RMTGuard"
-invariants = "invarlock.guards:InvariantsGuard"
-demo_hello_guard = "invarlock.plugins:HelloGuard"
-
-[project.entry-points."invarlock.adapters"]
-hf_causal = "invarlock.adapters:HF_Causal_Adapter"
-hf_mlm = "invarlock.adapters:HF_MLM_Adapter"
-hf_seq2seq = "invarlock.adapters:HF_Seq2Seq_Adapter"
-hf_auto = "invarlock.adapters:HF_Auto_Adapter"
-hf_multimodal = "invarlock.adapters.hf_multimodal:HF_Multimodal_Adapter"
-hf_gptq = "invarlock.plugins:HF_GPTQ_Adapter"
-hf_awq = "invarlock.plugins:HF_AWQ_Adapter"
-hf_bnb = "invarlock.plugins:HF_BNB_Adapter"
-hf_torchao = "invarlock.plugins:HF_TorchAO_Adapter"
-hf_hqq = "invarlock.plugins:HF_HQQ_Adapter"
-hf_quanto = "invarlock.plugins:HF_Quanto_Adapter"
-hf_ct = "invarlock.plugins:HF_CompressedTensors_Adapter"
+[project.entry-points."invarlock.runtime_providers"]
+hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"
 
 # Console scripts
 [project.scripts]
@@ -334,10 +144,6 @@ where = ["src"]
 "invarlock" = [
   "_data/contracts/*.json",
   "_data/public_evidence/*.json",
-]
-"invarlock._data.runtime" = [
-  "profiles/*.yaml",
-  "tiers.yaml",
 ]
 
 # Enable namespace packages
@@ -356,35 +162,20 @@ select = [
     "F",  # pyflakes
     "I",  # isort
     "B",  # flake8-bugbear
+    "C90", # mccabe complexity
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
 ]
 ignore = [
-    "E501", # line too long, handled by black
+    "E501", # line too long, handled by the Ruff formatter
     "B008", # do not perform function calls in argument defaults
-    "C901", # too complex
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 30
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # imported but unused
-
-[tool.black]
-line-length = 88
-target-version = ['py312']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
 
 [tool.mypy]
 python_version = "3.13"
@@ -403,108 +194,19 @@ strict_equality = true
 
 [[tool.mypy.overrides]]
 module = [
-    "psutil",
-    "psutil.*",
     "torch.*",
     "transformers.*",
-    "gptqmodel.*",
-    "requests",
-    "requests.*",
+    "safetensors",
+    "safetensors.*",
     "yaml",
-    "jsonschema",
-    "datasets.*",
-    "sklearn.*",
-    "matplotlib.*",
-    "tqdm.*",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# Temporary debt allowlist from a no-ignore mypy audit. Keep this list module
-# and error-code specific so newly clean modules remain type-checked and new
-# error classes cannot hide behind blanket ignore_errors.
 module = [
-    "invarlock.adapters.hf_causal",
-    "invarlock.adapters.hf_mixin",
-    "invarlock.adapters.hf_mlm",
-    "invarlock.adapters.hf_multimodal",
-    "invarlock.edits.quant_rtn",
-    "invarlock.eval.bench_policy",
-    "invarlock.eval.bench_runner",
-    "invarlock.eval.data",
-    "invarlock.eval.metrics_activation",
-    "invarlock.eval.metrics_runtime",
-    "invarlock.eval.metrics_support",
-    "invarlock.eval.probes.importance",
-    "invarlock.eval.tail_stats",
-    "invarlock.guards.invariants",
-    "invarlock.guards.rmt",
-    "invarlock.guards.rmt_activation_runtime",
-    "invarlock.guards.rmt_analysis",
-    "invarlock.guards.rmt_detection",
-    "invarlock.guards.rmt_policy",
-    "invarlock.guards.rmt_runtime",
-    "invarlock.guards.spectral_control",
-    "invarlock.guards.spectral",
-    "invarlock.guards.tier_config",
-    "invarlock.guards.variance",
-    "invarlock.guards.variance_batching",
-    "invarlock.guards.variance_evaluation",
-    "invarlock.guards.variance_scaling",
-    "invarlock.guards.variance_targets",
-    "invarlock.utils",
-    "invarlock.core.runner",
-    "invarlock.cli.commands.calibrate",
-    "invarlock.cli.commands.doctor",
-    "invarlock.cli.commands.explain_gates",
-    "invarlock.cli.commands.evidence_pack",
-    "invarlock.cli.commands.plugins",
-    "invarlock.cli.config_execution",
-    "invarlock.cli.device",
-    "invarlock.cli.output",
-    "invarlock.cli.run_config",
-    "invarlock.cli.run_execution",
-    "invarlock.cli.run_execution_output",
-    "invarlock.cli.run_overhead",
-    "invarlock.cli.run_pairing",
-    "invarlock.cli.run_pairing_baseline",
-    "invarlock.cli.run_runtime_exec",
-    "invarlock.cli.security_helpers",
-]
-disable_error_code = [
-    "arg-type",
-    "assignment",
-    "attr-defined",
-    "call-arg",
-    "call-overload",
-    "dict-item",
-    "import-not-found",
-    "index",
-    "misc",
-    "name-defined",
-    "no-any-return",
-    "no-redef",
-    "operator",
-    "redundant-cast",
-    "return-value",
-    "typeddict-item",
-    "typeddict-unknown-key",
-    "union-attr",
-    "unreachable",
-    "unused-ignore",
-    "var-annotated",
-]
-
-[[tool.mypy.overrides]]
-module = [
-    "invarlock.adapters.auto",
     "invarlock.cli.__init__",
     "invarlock.cli.__main__",
     "invarlock.cli.app",
-    "invarlock.cli.commands.evaluate",
-    "invarlock.cli.commands.verify",
-    "invarlock.cli.evaluate_output",
-    "invarlock.cli.evaluate_phases",
 ]
 ignore_errors = false
 
@@ -523,56 +225,24 @@ markers = [
     "slow: Tests that take longer than 30 seconds",
     "gpu: Tests that require GPU (CUDA/MPS)",
     "notebook: Tests for Jupyter notebook functionality",
-    "extras: Tests requiring optional dependencies (e.g., gptq, awq)",
+    "extras: Tests requiring optional provider dependencies",
     "manual: Requires manual setup; excluded from default CI runs",
 ]
-filterwarnings = [
-    "ignore::UserWarning",
-    "ignore::RuntimeWarning",
-    "ignore::FutureWarning",
-    "ignore::DeprecationWarning",
-]
-
 [tool.coverage.run]
 branch = true
-source = [
-    "src",
-    "scripts/release",
-    "scripts/evidence_workflows",
-    "scripts/evidence_packs/python",
-]
+parallel = true
+patch = ["subprocess"]
+source = ["src/invarlock"]
 omit = [
     "*/tests/*",
     "*/test_*",
     "*/__init__.py",
-    "src/*/__main__.py",
 ]
 
 [tool.coverage.report]
 show_missing = true
 precision = 2
-include = [
-    "scripts/release/*.py",
-    "scripts/evidence_workflows/*.py",
-    "scripts/evidence_packs/python/workflow_frontdoor.py",
-    "scripts/evidence_packs/python/create_edit_model.py",
-    "scripts/evidence_packs/python/create_edits_batch.py",
-    "scripts/evidence_packs/python/editing/implementations.py",
-    "scripts/evidence_packs/python/editing/tensor_ops.py",
-    "scripts/evidence_packs/python/preset_generator.py",
-    "scripts/evidence_packs/python/task_tools_reports.py",
-    "src/invarlock/eval/*",
-    "src/invarlock/guards/*",
-    "src/invarlock/calibration.py",
-    "src/invarlock/cli/*",
-    "src/invarlock/reporting/*",
-    "src/invarlock/core/*",
-    "src/invarlock/adapters/hf_causal.py",
-    "src/invarlock/adapters/hf_causal_specs.py",
-    "src/invarlock/adapters/hf_multimodal.py",
-    "src/invarlock/public_contracts.py",
-    "src/invarlock/policy_pack.py",
-]
+fail_under = 90
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

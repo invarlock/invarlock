@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/model_artifact_identity.schema.json",
+  "title": "InvarLock Model Artifact Identity",
+  "oneOf": [
+    {"$ref": "#/$defs/hfSnapshot"},
+    {"$ref": "#/$defs/gguf"},
+    {"$ref": "#/$defs/tensorrtLlmEngine"}
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "logicalName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]+$"
+    },
+    "basename": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\\\u0000-\\u001f]+$",
+      "not": {"enum": [".", ".."]}
+    },
+    "hfSnapshot": {
+      "type": "object",
+      "required": [
+        "format_version",
+        "artifact_format",
+        "model_id",
+        "immutable_revision",
+        "checkpoint_tree_sha256",
+        "tokenizer_metadata_sha256"
+      ],
+      "properties": {
+        "format_version": {"const": "invarlock/model-artifact-identity-v1"},
+        "artifact_format": {"const": "hf_snapshot"},
+        "model_id": {"$ref": "#/$defs/logicalName"},
+        "immutable_revision": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}
+          ]
+        },
+        "checkpoint_tree_sha256": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/sha256"}
+          ]
+        },
+        "tokenizer_metadata_sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "anyOf": [
+        {"properties": {"immutable_revision": {"type": "string"}}},
+        {"properties": {"checkpoint_tree_sha256": {"type": "string"}}}
+      ],
+      "additionalProperties": false
+    },
+    "gguf": {
+      "type": "object",
+      "required": [
+        "format_version",
+        "artifact_format",
+        "artifact_name",
+        "sha256",
+        "byte_length",
+        "gguf_metadata_sha256",
+        "tensor_inventory_sha256",
+        "tokenizer_metadata_sha256"
+      ],
+      "properties": {
+        "format_version": {"const": "invarlock/model-artifact-identity-v1"},
+        "artifact_format": {"const": "gguf"},
+        "artifact_name": {"$ref": "#/$defs/basename"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "gguf_metadata_sha256": {"$ref": "#/$defs/sha256"},
+        "tensor_inventory_sha256": {"$ref": "#/$defs/sha256"},
+        "tokenizer_metadata_sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "tensorrtLlmEngine": {
+      "type": "object",
+      "required": [
+        "format_version",
+        "artifact_format",
+        "bundle_name",
+        "engine_bundle_tree_sha256",
+        "file_inventory_sha256",
+        "builder_config_sha256",
+        "tokenizer_metadata_sha256",
+        "engine_metadata_sha256",
+        "target_compute_capability"
+      ],
+      "properties": {
+        "format_version": {"const": "invarlock/model-artifact-identity-v1"},
+        "artifact_format": {"const": "tensorrt_llm_engine"},
+        "bundle_name": {"$ref": "#/$defs/basename"},
+        "engine_bundle_tree_sha256": {"$ref": "#/$defs/sha256"},
+        "file_inventory_sha256": {"$ref": "#/$defs/sha256"},
+        "builder_config_sha256": {"$ref": "#/$defs/sha256"},
+        "tokenizer_metadata_sha256": {"$ref": "#/$defs/sha256"},
+        "engine_metadata_sha256": {"$ref": "#/$defs/sha256"},
+        "target_compute_capability": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]?)\\.(0|[1-9][0-9]?)$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

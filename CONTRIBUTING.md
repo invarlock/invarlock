@@ -1,569 +1,179 @@
 # Contributing to InvarLock
 
-Thank you for your interest in contributing to InvarLock.
-This guide summarizes how to set up a dev environment, run checks, and open
-high-quality PRs that match the repo layout and tooling.
+Thank you for improving InvarLock. The repository is intentionally centered on
+one user journey:
 
----
-
-## 1. Development Environment
-
-### 1.1 Prerequisites
-
-- **Python 3.12+** (required)
-- **Git**
-- **PyTorch / extras** are pulled in via optional dependencies when needed
-- **Node.js 22.18+ + npm** (required for docs linting: markdownlint/cspell via local installs or `npx`)
-
-InvarLock runs offline by default. For commands that need downloads
-(models/datasets), enable network explicitly per run. Model-loading commands use
-the runtime container by default; host-side development outside that
-container should use `--execution-mode host` on the public `evaluate` path:
-
-```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject distilgpt2 --baseline-adapter auto --subject-adapter auto
-# repo preset example:
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject gpt2 --baseline-adapter auto --subject-adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+```text
+invarlock evaluate request.yaml
+invarlock verify evidence/
+invarlock report evidence/
 ```
 
-### 1.2 Quick setup (recommended)
+Changes should make that transaction easier to understand, safer to execute,
+or easier to verify.
+
+## Development setup
+
+InvarLock requires Python 3.12 or newer. Clone the repository, create a virtual
+environment, and install the development dependencies:
 
 ```bash
-git clone https://github.com/invarlock/invarlock
-cd invarlock
-
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# Editable install + dev tooling (pytest, ruff, mypy, mkdocs, etc.)
-make dev-install
-
-# Optional if you are not touching docs: install the Node-based linters on demand.
-# The repo requires Node 22.18+ for these tools and `npm ci` will fail early on older versions.
-npm install --save-dev markdownlint-cli2 cspell
-
-# Pre-commit hooks (lint/format on commit)
-pre-commit install
+source .venv/bin/activate
+python -m pip install -e ".[dev,hf]"
+npm ci
 ```
 
-If you prefer a direct `pip` invocation:
+Run the local gate before opening a pull request:
 
 ```bash
-pip install -e ".[dev]"
+make verify-fast
 ```
 
-### 1.3 Quick verification
-
-You can mirror the main local workflow from `README.md`:
+`make verify`, `make verify-fast`, and `make coverage-enforce` run independent
+suites concurrently and use bounded pytest-xdist workers. Set
+`VERIFY_TARGET_JOBS=1 COVERAGE_TARGET_JOBS=1 PYTEST_WORKERS=0` when diagnosing
+a failure sequentially.
+`make verify` adds the complete test and documentation build. The opt-in
+container journey builds the final runtime image and exercises all three
+commands:
 
 ```bash
-make test            # pytest -q tests/
-make lint            # ruff + mypy
-make format          # ruff format/check
-make docs            # mkdocs build --strict
-make verify          # tests, lint, format, markdownlint
+make container-front-door-smoke
 ```
 
-For a basic smoke check:
+## Repository shape
+
+- `src/invarlock/` contains the request transaction, provider ABI, canonical
+  evidence bundle, independent verifier, and report renderer.
+- `contracts/` contains the shipped JSON contracts.
+- `addins/` contains the independently installable GGUF, TensorRT-LLM,
+  Hugging Face vision-text, and diagnostics packages.
+- `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
+  surfaces.
+- `scripts/` contains repository checks, release validation, and security
+  utilities used by maintainers; user-facing operations remain in the installed
+  CLI.
+
+Hugging Face Transformers is the built-in reference provider. New runtime
+integrations implement the provider ABI in an optional package. Keep runtime-
+specific dependencies out of the core distribution.
+
+## Contract changes
+
+The request, runtime manifest, provider evidence, evidence pack, and signed
+verification receipt are security boundaries. Contract changes must:
+
+1. start with adversarial tests that demonstrate the intended failure mode;
+2. keep schemas closed with `additionalProperties: false` where applicable;
+3. authenticate every interpreted path, digest, identity, and policy input;
+4. preserve independent verifier-owned trust anchors;
+5. fail closed on missing, ambiguous, or unsupported inputs; and
+6. update the root and packaged contract copies together with
+   `make contracts-sync`.
+
+The project is pre-1.0 and currently uses one canonical version of each public
+contract. Do not add compatibility readers or parallel contract generations
+without a concrete interoperability requirement.
+
+## Provider changes
+
+A provider owns artifact identification, deterministic paired scoring, runtime
+facts, and its authenticated evidence sidecars. The core owns pairing, canonical
+publication, policy evaluation, verification, and reporting. Providers must not
+select acceptance thresholds or mutate the evidence contract.
+
+Provider tests should cover:
+
+- exact artifact identity and immutable runtime bindings;
+- offline and no-remote-code behavior;
+- pairing and record-order preservation;
+- deterministic settings and timeout behavior;
+- receipt and scoring-observation cross-binding; and
+- rejection of unsupported settings and missing dependencies.
+
+## Tests and quality
+
+Use pytest for behavior and adversarial tests, Ruff for lint and formatting,
+mypy for the typed public surface, MkDocs plus markdownlint/cspell for docs, and
+actionlint for workflows. Avoid repository-specific meta-frameworks when an
+established tool expresses the same check.
+
+Useful targets:
 
 ```bash
-invarlock --help
-invarlock doctor --json
-```
-
-For maintainer-facing CLI smoke coverage, use the lane scripts directly:
-
-```bash
-bash scripts/smoke/cli_smoke_fast.sh
-bash scripts/smoke/cli_smoke_negative.sh
-INVARLOCK_SMOKE_LANES=realistic bash scripts/smoke/cli_smoke_matrix.sh
-
-# or dispatch the full matrix
-bash scripts/smoke/cli_smoke_matrix.sh
-```
-
-Lane intent:
-
-- `cli_smoke_fast.sh` covers broad command-surface and positive-path tiny-model flows
-- `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
-- `INVARLOCK_SMOKE_LANES=realistic cli_smoke_matrix.sh` wraps the GPT-2-sized smoke campaign
-
-Delegated config execution and calibration internals re-enter through the
-package-internal `python -m invarlock.cli.config_execution` module, not a
-public CLI command. Public docs and user examples should continue to use
-`evaluate`, `verify`, `report`, `doctor`, and `advanced ...`.
-
----
-
-## 2. Repository Layout
-
-Top-level structure (simplified):
-
-```text
-invarlock/
-├── src/invarlock/           # Library + CLI implementation
-│   ├── core/            # Runner, registry, contracts, auto-tuning, events, types
-│   ├── guards/          # Guard mechanisms (invariants, spectral, rmt, variance, policies)
-│   ├── eval/            # Evaluation metrics and helpers
-│   ├── reporting/       # Evaluation report + reporting surface
-│   ├── cli/             # Typer-based CLI app and commands
-│   ├── adapters/        # External model adapters (HF, etc.)
-│   ├── edits/           # Edit abstractions and demos
-│   ├── observability/   # Logging, telemetry, diagnostics
-│   ├── plugins/         # Pluggable edits/adapters/guards
-│   └── _data/runtime/   # Profiles/tiers included with the package
-├── tests/               # Test suite (pytest)
-│   ├── unit/            # Focused unit tests
-│   ├── integration/     # End-to-end and pipeline tests
-│   ├── cli/, core/, ... # Module-focused tests
-│   ├── fixtures/        # Shared data + helpers
-│   └── README.md        # Extra testing guidance
-├── configs/             # Task/edit presets and CI configs
-├── scripts/             # Dev/CI scripts (coverage, docs, matrix, etc.)
-├── docs/                # MkDocs documentation site
-├── Makefile             # Common dev targets (install, test, lint, docs)
-└── pyproject.toml       # Packaging + tooling configuration
-```
-
-Source code lives exclusively under `src/invarlock/` (namespace `invarlock.*`).
-New modules should follow this layout and naming pattern.
-
----
-
-## 3. Coding Standards & Tooling
-
-### 3.1 Style, typing, and linting
-
-Configured in `pyproject.toml`:
-
-- **Formatter**: Black‑compatible style (88‑char lines)
-- **Linting**: Ruff (`python -m ruff check`)
-- **Typing**: MyPy (`mypy src/`)
-- **Tests**: pytest (configured via `[tool.pytest.ini_options]`)
-
-Typical local invocations (equivalent to Makefile targets):
-
-```bash
-make lint
-# or, explicitly:
-python -m ruff check src/ tests/ scripts/
-mypy src/
-```
-
-Avoid introducing new one‑letter variable names, keep functions small,
-and ensure all public APIs are type‑annotated.
-
-### 3.2 Tests and markers
-
-Tests live under `tests/` and follow the `test_*.py` pattern.
-Markers (see `pyproject.toml`) include:
-
-- `unit`: focused, fast unit tests
-- `integration`: cross‑component / end‑to‑end paths
-- `regression`: stability and regression checks
-- `slow`: long‑running tests (often skipped locally)
-- `gpu`: CUDA/MPS‑dependent tests
-- `notebook`: notebook‑related flows
-- `extras`: optional‑dependency tests (e.g., `gptq`, `awq`)
-- `manual`: require manual setup or inspection
-
-Common patterns:
-
-```bash
-# Fast local run (no integration/slow/manual)
-INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
-pytest -q -m "not integration and not slow and not manual" tests
-
-# Same lane via Makefile
 make test-fast
-
-# Optional pytest-xdist workers for the fast lane
-make test-parallel
-make test-fast PYTEST_WORKERS=auto
-
-# Full suite (can be slow)
-pytest -q
-
-# Integration tests (auto‑marked via tests/integration/conftest.py)
-pytest -q tests/integration
-
-# Same integration/smoke backstop via Makefile
-make test-integration
-```
-
-For more curated examples (including the CI subset), see `tests/README.md`.
-Keep coverage runs serial unless the coverage target is explicitly updated to
-combine per-worker data; `make coverage-enforce` writes shared coverage reports.
-
-### 3.3 Coverage policy
-
-Coverage configuration lives in `pyproject.toml` under `[tool.coverage.*]`.
-The canonical threshold/source-of-truth lives in
-`scripts/coverage/check_coverage_thresholds.py`, which is also consumed by
-the Makefile coverage targets. Per-file branch coverage thresholds are
-enforced by `make coverage-enforce`.
-
-Key points:
-
-- Generate coverage with:
-
-  ```bash
-  make coverage
-  ```
-
-- `make coverage` intentionally includes grouped test sets for the
-  core/guards/reporting/calibration suites, the split run/verify/config
-  surfaces, targeted CLI command suites, and a small helper-coverage set
-  (for example adapter auto-resolution, no-color console handling, and
-  guard-overhead extraction) so the project-wide floor reflects the real
-  command surface instead of only the split core paths.
-
-- The project-wide floor is enforced at **90%** via pytest-cov in `make coverage`.
-
-- Enforce thresholds:
-
-  ```bash
-  make coverage-enforce
-  # internally: python scripts/coverage/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
-  ```
-
-- **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
-  `CORE_FILES` in `scripts/coverage/check_coverage_thresholds.py`):
-  - Core runtime: everything under `src/invarlock/core/`
-    (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
-  - Guards: everything under `src/invarlock/guards/`
-    (invariants, spectral, spectral_analysis, rmt, variance, policies)
-  - Observability/runtime support: everything under `src/invarlock/observability/`
-    plus explicit runtime/config entry points such as
-    `src/invarlock/config.py` and `src/invarlock/adapters/auto.py`
-  - Evaluation/reporting entry points and contracts:
-    `src/invarlock/eval/metrics.py`,
-    `src/invarlock/reporting/report_contract.py`,
-    `src/invarlock/reporting/report_types.py`,
-    `src/invarlock/reporting/report_schema.py`,
-    `src/invarlock/reporting/validate.py`,
-    `src/invarlock/public_contracts.py`,
-    `src/invarlock/policy_pack.py`,
-  - CLI commands:
-    `src/invarlock/cli/commands/run.py`,
-    `src/invarlock/cli/commands/evaluate.py`,
-    `src/invarlock/cli/app.py`,
-    `src/invarlock/cli/commands/policy.py`,
-    `src/invarlock/runtime_verify.py`
-
-- Split-aware enforcement uses four levels:
-  - **100% branch** for lifecycle shells:
-    `src/invarlock/core/runner.py`,
-    `src/invarlock/guards/variance.py`,
-    `src/invarlock/guards/spectral.py`
-  - **100% branch** for pure contract / policy / result / selection helpers:
-    `src/invarlock/reporting/report_schema.py`,
-    `src/invarlock/public_contracts.py`,
-    `src/invarlock/policy_pack.py`,
-    `src/invarlock/cli/commands/policy.py`,
-    `src/invarlock/cli/verify_output.py`,
-    `src/invarlock/core/runner_lifecycle.py`,
-    `src/invarlock/core/runner_pairing.py`,
-    `src/invarlock/core/runner_services.py`,
-    `src/invarlock/guards/variance_policy.py`,
-    `src/invarlock/guards/variance_results.py`,
-    `src/invarlock/guards/spectral_analysis.py`,
-    `src/invarlock/guards/spectral_policy.py`,
-    `src/invarlock/guards/spectral_results.py`,
-    `src/invarlock/guards/spectral_selection.py`
-  - **≥95% branch** for numerical / mutation helpers and large validation helpers:
-    `src/invarlock/core/runner_context.py`,
-    `src/invarlock/core/runner_eval_phase.py`,
-    `src/invarlock/core/runner_latency.py`,
-    `src/invarlock/core/runner_eval_windows.py`,
-    `src/invarlock/cli/verify_checks.py`,
-    `src/invarlock/guards/variance_batching.py`,
-    `src/invarlock/guards/variance_evaluation.py`,
-    `src/invarlock/guards/variance_prepare.py`,
-    `src/invarlock/guards/variance_ops.py`,
-    `src/invarlock/guards/variance_scaling.py`,
-    `src/invarlock/guards/spectral_control.py`,
-    `src/invarlock/guards/spectral_measurement.py`
-  - **≥90% branch** for the rest of the critical surface until it is split further,
-    including orchestration helpers such as
-    `src/invarlock/core/runner_eval_metrics.py`,
-    `src/invarlock/core/runner_finalize.py`, and
-    `src/invarlock/core/runner_guards.py`
-
-When you modify a file covered by thresholds, please:
-
-- Add or extend tests to keep its measured coverage at or above its enforced floor
-- Update/add entries in `scripts/coverage/check_coverage_thresholds.py` if you
-  expand the critical surface or add new core modules
-
-If the checker reports **“no coverage data present”**, ensure the module is
-included in the `--cov=` targets and that a fresh XML report was generated.
-
----
-
-## 4. Docs and Markdown
-
-The documentation site is built with MkDocs (Material theme) using `mkdocs.yml`.
-
-### 4.1 Local docs workflow
-
-Common commands:
-
-```bash
-make docs           # mkdocs build --strict
-make docs-serve     # mkdocs serve -a 127.0.0.1:8000
-make docs-check     # consolidated docs validation plus curated live examples
-make docs-live-fast # curated deterministic live docs/notebook subset
-make docs-lint      # markdown + spell lint (via scripts/docs/docs_lint.py)
-```
-
-Granular helpers:
-
-```bash
-make docs-check-build     # strict build + link checks
-make docs-check-links     # link checks only
-make docs-lint-markdown   # markdownlint only
-make docs-lint-spell      # cspell only
-```
-
-### 4.2 Docs linting (markdownlint + cspell)
-
-`python scripts/docs/docs_lint.py` wraps common linters:
-
-- Requires Node 22.18+.
-- Uses `markdownlint`, `markdownlint-cli2`, or `npx markdownlint-cli*`
-- Uses `cspell` or `npx cspell`
-
-This script runs over `README.md`, `CONTRIBUTING.md`, and all `docs/**/*.md`.
-To keep docs CI‑clean, please run at least:
-
-```bash
-python scripts/docs/docs_lint.py --markdown   # style
-python scripts/docs/docs_lint.py --spell      # spelling
-```
-
-If you only have Node installed, the script will look for `node_modules/.bin` first.
-To allow `npx` fetching, set `DOCS_LINT_ALLOW_NPX_INSTALL=1` (CI sets this);
-otherwise it skips with a warning.
-
-### 4.3 Writing docs
-
-- Keep CLI behavior and configuration examples in sync with `mkdocs.yml`,
-  `configs/`, and the actual CLI (`invarlock` commands).
-- For API changes, update:
-  - In‑code docstrings and type hints
-  - Relevant pages under `docs/reference/` and `docs/user-guide/`
-- When adding new CLI switches or config fields, update:
-  - `docs/reference/cli.md`
-  - `docs/reference/config-schema.md` (and run `scripts/docs/docs_check.py --config-schema-sync`)
-
----
-
-## 5. Development Workflow
-
-### 5.1 Issues and branches
-
-- Prefer opening an issue before larger changes (new guards, adapters, or edits)
-- Use descriptive branch names:
-
-  ```bash
-  git checkout -b feat/add-hello-guard
-  git checkout -b fix/guards-spectral-thresholds
-  git checkout -b docs/update-config-schema-reference
-  ```
-
-### 5.2 TDD and tests
-
-We aim for test‑driven changes wherever practical:
-
-- Start by adding/expanding tests under `tests/` to describe the behavior
-- Run focused invocations:
-
-  ```bash
-  pytest -q tests/guards/test_spectral_guard.py::test_basic_spectral_gate
-  pytest -q tests/cli/test_doctor_json.py::test_doctor_json_round_trip
-  ```
-
-- For broader validation, run:
-
-  ```bash
-  make test
-  ```
-
-When touching core runtime or guards, bias toward deterministic tests
-(fixed seeds, CPU or MPS where possible, controlled randomness).
-
-### 5.3 Code quality checks
-
-Before opening a PR, run the focused checks for the files you changed. For
-small code changes this usually starts with:
-
-```bash
-make test
+make trust-smoke
 make lint
-make format
-make docs
-python scripts/docs/docs_lint.py --markdown
-```
-
-For maintainer PRs targeting protected branches, the expected bar is stronger:
-run the practical local equivalent of the GitHub checks before pushing, then
-use GitHub as confirmation rather than discovery. Start with:
-
-```bash
-git diff --check origin/staging/next...HEAD
-make lock-sync
-pre-commit run --all-files --show-diff-on-failure
-make workflow-lint
 make docs-check
-make mypy-typed-surface
+make workflow-lint
 make coverage-enforce
-make packaging-smoke-minimal
-make security
+make dist-check
 ```
 
-For broader functional validation, use:
+Tests must exercise production code and assert meaningful outcomes. A passing
+test that only restates fixture data is not evidence that a user journey works.
+`make dist-check` builds and validates the core, diagnostics, GGUF connector,
+Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
 
-```bash
-make verify
-```
+## Documentation and public text
 
-This runs tests, a smoke regression (`scripts/smoke/run_smoke_regression.sh`),
-CLI command-surface smokes, ruff lint, ruff format (check mode), packaged
-contract sync checks, repository maintenance checks, public evidence audit, and
-strict docs linting.
+Document what the current repository does. Keep local paths, hosts, private
+artifact locations, credentials, internal run notes, and unrelated product
+planning out of public files and pull requests. Examples should use portable
+request-relative paths and placeholder digests.
 
-### 5.4 Supply-chain and artifact checks
+Documentation lint covers maintained Markdown at the repository root and under
+`.github/`, `addins/`, `docs/`, `examples/`, `public_evidence/`,
+`requirements/`, `scripts/`, and the test-tree overview. Update these public
+surfaces together when a product or release boundary changes.
 
-For security-sensitive, public-evidence, release, or artifact-heavy PRs, also
-run a PR-range secret scan before pushing. Install the same scanner version used
-by the GitHub workflow if needed:
+### Documentation type contracts
 
-```bash
-go install github.com/zricethezav/gitleaks/v8@v8.30.0
-gitleaks git . \
-  --redact \
-  --no-banner \
-  --log-opts origin/staging/next..HEAD \
-  --report-format json \
-  --report-path artifacts/supply-chain/gitleaks-pr.json
-```
+Choose the document type from the reader's task, then make that type visible
+in a short opening admonition. The fields in the admonition are a reader
+contract, not decorative metadata: they should say why the page exists, who or
+what it applies to, and what a reader can decide or accomplish with it.
 
-Keep large generated outputs out of the PR. GitHub rejects files over 10 MB in
-the PR diff and generated directories such as `site/`, `dist/`, `build/`,
-`runs/`, and report-output directories. If you must add review artifacts, prefer
-compact canonical JSON and verifier-ready metadata over opaque archives.
+| Type | Opening contract | Page responsibilities |
+| --- | --- | --- |
+| User guide | `Outcome`, `Audience`, `Prerequisites` | Lead the reader through a complete task. Show the expected result, how to validate it, and how to recover or continue. |
+| Assurance note | `In plain language`, `Question`, `Decision use`, `Evidence` | State the scoped claim or question, develop the argument or derivation, identify runtime enforcement and observable evidence, and name assumptions, defeaters, and limits. |
+| Reference | `Surface`, `Stability`, `Use this page when` | Describe the exact current interface or contract. Include defaults, accepted forms, outputs, and failure behavior, with a minimal example and security notes where they affect correct use. |
+| Security guidance | `In plain language`, `Objective`, `Assets or boundary`, `Use this page when` | Identify threats and trust assumptions, connect controls to residual risks, and state operational response, non-goals, and authoritative references where applicable. |
 
-### 5.5 Public evidence changes
+Use headings that fit the subject instead of reproducing a rigid outline. A
+glossary, acceptance checklist, CLI reference, and threat model should remain
+recognizably different documents. They still share the opening contract and
+must cover the responsibilities relevant to their type. Omit an inapplicable
+section rather than adding filler.
 
-Public evidence is part of the trust surface. When changing `public_evidence/`
-or packaged evidence under `src/invarlock/_data/public_evidence/`, run:
+Use `In plain language` to translate assurance and security reasoning into one
+direct statement before introducing formal terms. It must explain the practical
+meaning rather than repeat the title or weaken the scoped claim.
 
-```bash
-make public-evidence-audit
-uv run invarlock verify <evidence-dir>/evaluation.report.json --profile release --assurance strict
-uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
-  --strict \
-  --profile release \
-  --report-assurance strict \
-  --expected-fingerprint sha256:<fingerprint>
-```
+Keep tutorials and explanations in the user guide, lookup material in
+reference pages, claim reasoning in assurance notes, and adversarial analysis
+in security guidance. Link across types instead of duplicating substantial
+content. End a page with references or related documentation when the reader
+needs a next source, but do not add a link list merely to satisfy a template.
 
-Verifier examples must preserve the provenance link to the matching
-`runtime.manifest.json`; readers need that manifest to confirm execution
-context, profile, and artifact integrity.
+Update `CHANGELOG.md` under `Unreleased` by logical user-facing change, not by
+enumerating commits.
 
-Evidence metadata should be scanner-friendly and reader-friendly. Store file
-hashes as records such as `{"path": "...", "sha256": "..."}` instead of using
-file names as JSON keys when those names can look like secret/token fields to
-generic scanners.
+## Pull requests
 
----
+Create branches with the `work/` prefix. Keep commits small enough to review,
+but group implementation, tests, and documentation for one logical change.
+Pull requests should explain:
 
-## 6. Commits, PRs, and Releases
+- the user or verifier problem being solved;
+- the contract and trust-boundary impact;
+- the validation performed; and
+- any intentionally unsupported scope.
 
-### 6.1 Commit messages
+Do not include generated build output, local evidence, model weights, signing
+keys, or caches. Report security issues through [SECURITY.md](SECURITY.md), not
+a public issue.
 
-We use a conventional‑commit style:
-
-- Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `build`, `test`
-- Optional scope: `feat(guards): …`, `fix(cli): …`, etc.
-
-Examples:
-
-```text
-feat(guards): add variance gate toggle
-
-fix(cli): improve doctor JSON error handling
-
-docs(reference): sync config-schema with runtime
-```
-
-Keep commits reasonably scoped and focused on one logical change set.
-
-### 6.2 Pull requests
-
-PRs should:
-
-1. Have a clear title and description
-2. Link to any relevant issues
-3. Include tests for new or changed behavior
-4. Update docs when CLI/config/schema or user‑visible behavior changes
-5. Target `staging/next` unless a maintainer explicitly asks otherwise
-6. Pass the relevant local gates before pushing
-7. Pass GitHub checks and required review before merge
-
-Force-pushing a PR can invalidate an earlier approval. After a force-push,
-confirm the review decision and check status again before merging.
-
-A simple checklist to include in the PR description:
-
-```markdown
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration/regression tests added/updated (if applicable)
-- [ ] Focused tests for changed files
-
-## Docs
-- [ ] User docs updated (if user-facing behavior changed)
-- [ ] Reference docs updated (if CLI/config/API changed)
-
-## Quality
-- [ ] pre-commit run --all-files --show-diff-on-failure
-- [ ] make docs-check (docs/user-facing changes)
-- [ ] make mypy-typed-surface (typed-surface changes)
-- [ ] make coverage-enforce (core/guards/reporting/CLI changes)
-- [ ] make security or PR-range gitleaks scan (security/evidence/artifact changes)
-- [ ] make public-evidence-audit (public evidence changes)
-```
-
-### 6.3 Release flow (maintainers)
-
-At a high level, maintainers:
-
-1. Bump the version in `pyproject.toml`.
-2. Update `CHANGELOG.md` with release notes.
-3. Run the full verification and coverage gates (for example, `make verify` and `make coverage-enforce`).
-4. Build distribution artifacts (for example, `python -m build` to produce wheel and sdist under `dist/`).
-5. Run a pre‑release smoke test from the built artifacts, including a minimal `invarlock evaluate`/`invarlock verify` flow.
-6. Tag the release and push tags to GitHub.
-7. Let CI publish to PyPI/TestPyPI.
-
-If you are not a maintainer, you do not need to run the release tooling.
-
----
-
-## 7. Getting Help
-
-- **Bug reports and feature requests**: GitHub Issues
-- **Usage questions and discussion**: GitHub Discussions (or issues if in doubt)
-- **Support expectations**: see `SUPPORT.md`
-
-When filing issues, please include:
-
-- CLI command (or minimal Python snippet) you ran
-- InvarLock version (`invarlock --version`) and Python version
-- Platform (OS, CPU/GPU, CUDA/MPS details)
-- Relevant logs (e.g., `events.jsonl`, `report.json`, or stack traces)
-
-For security‑sensitive reports, please follow the guidance in `SECURITY.md`.
+By contributing, you agree that your work is licensed under Apache-2.0.

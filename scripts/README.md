@@ -1,79 +1,87 @@
-# Scripts Directory
+# Maintainer scripts
 
-`scripts/` contains repo-maintainer tooling, not install-time package APIs. The
-root directory is intentionally small; stable commands live under family
-subdirectories and are normally reached through `make` targets or documented
-workflow paths.
-
-The checked taxonomy lives in `scripts/scripts_inventory.toml`:
-
-- `scripts-governance`: scripts-tree inventory, hygiene, and Python selection.
-- `repo-contracts`: repo consistency checks for contracts, claims, config, CLI,
-  guards, and version metadata.
-- `docs-assurance`: docs, examples, links, and assurance cross-reference checks.
-- `coverage`: coverage surface selection and threshold checks.
-- `smoke-runtime`: local smoke, runtime, tiny-model, and guard-validation entry
-  points. See `scripts/smoke/README.md` for the per-script smoke map.
-- `model-evidence`: model-evidence sweep planning and remote launch helpers.
-- `evidence-packs`: evidence-pack orchestration, helpers, and shell tests.
-- `release`: release evidence and offline-bundle helpers.
-- `security-supply-chain`: SBOM, CVE audit, pip-audit, requirements pinning, and
-  scorecard helpers.
-
-High-signal workflow front doors:
-
-- `bash scripts/smoke/run_tiny_all_matrix.sh`: write a dry-run checklist for the
-  tiny model evaluation matrix. Set `RUN=1` to execute it and `NET=1` when model
-  downloads are allowed. This covers compact causal-LM, encoder-MLM, and quant
-  demo evaluation paths.
-- `python scripts/smoke/run_tiny_fine_tune_byoe_smoke.py`: run the local
-  CPU-only BYOE fine-tune smoke against a cached tiny GPT-2 model, then verify
-  the enriched report with evaluation-realism, topology, and delta/privacy
-  metadata. Generated fine-tune validation-subject coverage lives in the
-  evidence-pack harness.
-- `python scripts/smoke/run_training_evidence_campaign.py --dry-run`: inspect
-  the real PEFT LoRA train-and-merge plus full fine-tune training-evidence
-  campaign. Remove `--dry-run` for local tiny CPU lanes, or use
-  `--execution-lane cuda` on a CUDA-capable validation host for the strict
-  CUDA/container matrix. Generated checkpoints stay local; publish only the
-  public summary and hash inventory after review.
-- `make model-evidence-list`: print the maintained shipped-model evidence lane
-  manifest.
-- `make model-evidence-sweep MODEL_EVIDENCE_ARGS='--dry-run'`: inspect the
-  commands for the maintained model-evidence sweep without running downloads or
-  evaluations. Remove `--dry-run` for a real sweep; use `MODEL_EVIDENCE_ARGS`
-  for `--suite`, `--slug`, `--lane-id`, `--device`, sharding, and execution-mode
-  overrides.
-- `python scripts/checks/check_model_candidate_compatibility.py`: run the
-  offline candidate compatibility audit used by `make contracts-check` before
-  spending GPU time on named model-evidence lanes.
-- `scripts/evidence_packs/run_suite.sh`: run evidence-pack scenarios without
-  packaging the result. This is for development/debugging.
-- `scripts/evidence_packs/run_pack.sh`: run the suite and build a distributable
-  evidence pack. Prefer this over `run_suite.sh` for release or public
-  artifacts.
-
-Each family records owner, purpose, stability, audience, expected runtime,
-network/GPU needs, and known callers. The audit expands those family entries to
-one row per file:
+The installed CLI provides InvarLock's user workflow:
 
 ```bash
-python scripts/check_scripts_inventory.py --json
+invarlock evaluate request.yaml
+invarlock verify evidence/
+invarlock report evidence/
 ```
 
-The JSON payload includes `referenced_by` and `unreferenced` fields based on
-Makefile, GitHub workflow, docs, and test references. Unreferenced files are not
-deleted automatically; use the list to mark deprecations or consolidate helpers
-around stable entry points.
+Scripts in this directory provide repository maintenance, release validation,
+and security checks.
 
-Current top-level files are limited to this README, the inventory, the inventory
-checker, and `select_workspace_python.sh`. Run
-`make scripts-inventory-check` after adding, moving, or deleting anything under
-`scripts/`; run `make scripts-audit` when reorganizing the tree. New broad
-workflow code must go under an existing family subdirectory unless it is the
-inventory checker itself.
+## Maintained families
 
-`make architecture-fragmentation-check` also includes tracked `scripts/` metrics
-for large shell files, small-file churn, evidence-pack script concentration, and
-ignored generated cruft. Use those metrics when deciding whether to consolidate
-helpers before sharing generated evidence or examples externally.
+- `checks/` contains the packaged-contract synchronizer, public-evidence and
+  example-scenario audits, and the source-tree cruft check.
+- `release/` validates a clean release checkout and built distributions.
+  `make dist-check` binds the core wheel/sdist and all four first-party
+  optional wheel/sdist pairs to their exact checkout sources, metadata, and
+  entry points. `make addins-install-smoke` then installs the pinned base
+  dependency closure and all five wheels in a disposable environment, runs
+  `pip check`, and exercises provider discovery and conformance without using
+  the checkout or user site. It selects the maintained Python 3.12 or 3.13
+  lock for the invoking interpreter.
+- `security/` generates the SBOM and runs dependency vulnerability checks.
+- `authenticated_runtime_build.py` consumes an authenticated Git archive,
+  validates Dockerfile base overrides as named `repository@sha256:...`
+  manifest references, and can publish a no-clobber build statement. Raw local
+  config IDs remain valid execution identities but are rejected as `FROM`
+  inputs.
+- `tensorrt_llm_canary_preflight.py` authenticates the closed engine tree,
+  tokenizer contract, immutable image reference, and canonical input root
+  before the TensorRT-LLM wrapper starts a GPU container.
+- `qualification_render_preflight.py` authenticates a frozen qualification
+  schedule and replays the exact tokenizer or processor rendering contract
+  before an expensive runtime evaluation. It records path-free bindings and
+  token bounds for Hugging Face text, TensorRT-LLM, and vision-text inputs; the
+  GGUF profile verifies a signer-pinned live-prefix statement from the exact
+  runtime because the published GGUF image exposes no separate tokenizer API.
+- `select_workspace_python.sh` selects the repository Python interpreter used
+  by the Makefile.
+
+Ruff, mypy, pytest/pytest-cov, MkDocs, markdownlint, cspell, actionlint, build,
+twine, pip-audit, and OSV provide the general lint, test, documentation,
+packaging, and security gates. The Makefile composes those established tools.
+
+## Public evidence
+
+`scripts/checks/check_public_evidence.py` validates the closed publication
+index, carrier layout, local byte summaries, the receipt's Ed25519 signature
+and embedded verifier-key fingerprint, and the receipt-to-manifest binding. It
+does not substitute for cryptographic `invarlock verify` or signed-receipt
+authorization against independent policy, runtime, evidence-signer, and verifier
+anchors. An empty index is valid only when it uses the status label
+`Evidence not yet created`. The wheel contains a compact index; evidence may
+be carried separately as a release asset.
+
+Refresh the byte-identical source and packaged indexes, then check both with:
+
+```bash
+make public-evidence-sync
+make public-evidence-audit
+```
+
+## Release checks
+
+Release preflight is intentionally read-only and does not publish, tag, or
+merge:
+
+```bash
+make addins-install-smoke
+make release-preflight RELEASE_PREFLIGHT_ARGS="\
+  --release-sha COMMIT_SHA \
+  --expected-version X.Y.Z \
+  --hash-manifest PATH/TO/core-dist.sha256"
+```
+
+`COMMIT_SHA` must be the lowercase 40-character SHA of the clean checkout. The
+hash manifest uses `sha256sum` format and lists exactly the core wheel and sdist
+from `dist/` by base name. Pass `--json` when machine-readable output is
+required. Preflight does not approve or publish a release.
+
+GGUF, TensorRT-LLM, and Hugging Face vision-text conformance commands are
+shipped by their optional first-party distributions under `addins/`. The
+release workflow publishes those runtime packages, the diagnostics package,
+and the core distribution together.

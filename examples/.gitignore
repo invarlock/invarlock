@@ -1,0 +1,8 @@
+.keys/
+artifacts/
+evidence.html
+verification.receipt.json
+*.receipt.json
+!import/baseline/runtime-provider.receipt.json
+!import/subject/runtime-provider.receipt.json
+!import/rejected-subject/runtime-provider.receipt.json

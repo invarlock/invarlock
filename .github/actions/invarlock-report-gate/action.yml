@@ -1,136 +1,277 @@
-name: InvarLock report gate
-description: Verify an InvarLock evaluation report and publish verification artifacts.
+name: InvarLock evidence gate
+description: Verify an InvarLock evidence pack, issue a signed receipt, and render HTML.
 
 inputs:
-  report:
-    description: Path to evaluation.report.json.
+  evidence:
+    description: Path to the immutable evidence-pack-v1 directory.
     required: true
-  profile:
-    description: Verification and policy profile label.
-    required: false
-    default: ci
+  policy:
+    description: Path to the independently managed acceptance policy.
+    required: true
+  expected-baseline-artifact:
+    description: Independently approved sha256 artifact-identity digest for the baseline.
+    required: true
+  expected-subject-artifact:
+    description: Independently approved sha256 artifact-identity digest for the subject.
+    required: true
+  expected-schedule:
+    description: Independently approved sha256 canonical schedule digest.
+    required: true
+  expected-baseline-runtime:
+    description: Independently approved sha256 runtime digest for the baseline.
+    required: true
+  expected-subject-runtime:
+    description: Independently approved sha256 runtime digest for the subject.
+    required: true
+  expected-signer:
+    description: Independently approved evidence-signer Ed25519 fingerprint.
+    required: true
+  verifier-signing-key:
+    description: Path to the verifier-owned Ed25519 private-key file.
+    required: true
+  verifier-identity:
+    description: Stable verifier identity written into the signed receipt.
+    required: true
   python:
     description: Python executable used to run InvarLock.
     required: false
     default: python
-  html-output:
-    description: Path for rendered report HTML.
+  receipt-output:
+    description: New path for the signed verification receipt.
     required: false
-    default: reports/eval/evaluation.html
+    default: reports/invarlock/verification.receipt.json
   verify-output:
-    description: Path for machine-readable verify JSON.
+    description: New path for the machine-readable verification result.
     required: false
-    default: reports/eval/invarlock-verify.json
-  review-output:
-    description: Path for generated release-review Markdown.
+    default: reports/invarlock/verification.result.json
+  html-output:
+    description: New path for the self-contained human report.
     required: false
-    default: reports/eval/release-review.md
-  mlflow-tags-output:
-    description: Path for generated MLflow tag export JSON.
-    required: false
-    default: reports/eval/mlflow-tags.json
+    default: reports/invarlock/evidence.html
   artifact-name:
-    description: Uploaded artifact name.
+    description: Uploaded artifact name for the evidence and review outputs.
     required: false
     default: invarlock-evidence
   fail-on-verify:
-    description: Fail the job when invarlock verify exits non-zero.
+    description: Fail the job when InvarLock verification exits nonzero.
     required: false
     default: "true"
-  assurance:
-    description: Assurance verification mode passed to invarlock verify.
-    required: false
-    default: report
-  runtime-provenance:
-    description: Runtime provenance mode passed to invarlock verify.
-    required: false
-    default: container
-  warning-policy:
-    description: Warning policy passed to invarlock verify.
-    required: false
-    default: pass
 
 runs:
   using: composite
   steps:
-    - name: Prepare InvarLock artifact directories
+    - name: Prepare InvarLock output directories
       shell: bash
+      env:
+        INVARLOCK_ACTION_PYTHON: ${{ inputs.python }}
+        INVARLOCK_ACTION_EVIDENCE: ${{ inputs.evidence }}
+        INVARLOCK_ACTION_POLICY: ${{ inputs.policy }}
+        INVARLOCK_ACTION_VERIFIER_SIGNING_KEY: ${{ inputs.verifier-signing-key }}
+        INVARLOCK_ACTION_RECEIPT_OUTPUT: ${{ inputs.receipt-output }}
+        INVARLOCK_ACTION_VERIFY_OUTPUT: ${{ inputs.verify-output }}
+        INVARLOCK_ACTION_HTML_OUTPUT: ${{ inputs.html-output }}
+        INVARLOCK_ACTION_ARTIFACT_NAME: ${{ inputs.artifact-name }}
       run: |
-        mkdir -p "$(dirname "${{ inputs.html-output }}")"
-        mkdir -p "$(dirname "${{ inputs.verify-output }}")"
-        mkdir -p "$(dirname "${{ inputs.review-output }}")"
-        mkdir -p "$(dirname "${{ inputs.mlflow-tags-output }}")"
+        set -euo pipefail
+        "$INVARLOCK_ACTION_PYTHON" -c '
+        from pathlib import Path
+        import sys
 
-    - name: Verify InvarLock report
+        def safe_input(value, *, label):
+            if (
+                not value
+                or value != value.strip()
+                or any(
+                    ord(character) < 32 or ord(character) == 127
+                    for character in value
+                )
+            ):
+                raise SystemExit(
+                    f"InvarLock {label} contains unsafe characters"
+                )
+            return value
+
+        def safe_path(value, *, label):
+            value = safe_input(value, label=label)
+            upload_syntax = (
+                "*", "?", "[", "]", "{", "}", "!", "~", "\\", "#"
+            )
+            if any(character in upload_syntax for character in value):
+                raise SystemExit(
+                    f"InvarLock {label} contains upload-pattern syntax"
+                )
+            return value
+
+        evidence_input = Path(
+            safe_path(sys.argv[1], label="evidence path")
+        )
+        if evidence_input.is_symlink() or not evidence_input.is_dir():
+            raise SystemExit(
+                "InvarLock evidence must be a real directory"
+            )
+        evidence = evidence_input.resolve()
+        if any(candidate.is_symlink() for candidate in evidence.rglob("*")):
+            raise SystemExit(
+                "InvarLock evidence must not contain symbolic links"
+            )
+        policy = Path(
+            safe_path(sys.argv[2], label="policy path")
+        ).resolve()
+        verifier_key = Path(
+            safe_path(sys.argv[3], label="verifier signing-key path")
+        ).resolve()
+        outputs = [
+            Path(safe_path(value, label="output path")).resolve()
+            for value in sys.argv[4:7]
+        ]
+        safe_input(sys.argv[7], label="artifact name")
+        for label, trusted_input in (
+            ("policy", policy),
+            ("verifier signing key", verifier_key),
+        ):
+            if trusted_input == evidence or evidence in trusted_input.parents:
+                raise SystemExit(
+                    f"InvarLock {label} must remain outside evidence"
+                )
+        if len(set(outputs)) != len(outputs):
+            raise SystemExit("InvarLock output paths must be distinct")
+        for output in outputs:
+            if output == evidence or evidence in output.parents:
+                raise SystemExit(
+                    f"InvarLock output must remain outside evidence: {output}"
+                )
+            if output.exists() or output.is_symlink():
+                raise SystemExit(f"InvarLock output already exists: {output}")
+        ' \
+          "$INVARLOCK_ACTION_EVIDENCE" \
+          "$INVARLOCK_ACTION_POLICY" \
+          "$INVARLOCK_ACTION_VERIFIER_SIGNING_KEY" \
+          "$INVARLOCK_ACTION_RECEIPT_OUTPUT" \
+          "$INVARLOCK_ACTION_VERIFY_OUTPUT" \
+          "$INVARLOCK_ACTION_HTML_OUTPUT" \
+          "$INVARLOCK_ACTION_ARTIFACT_NAME"
+        mkdir -p "$(dirname -- "$INVARLOCK_ACTION_RECEIPT_OUTPUT")"
+        mkdir -p "$(dirname -- "$INVARLOCK_ACTION_VERIFY_OUTPUT")"
+        mkdir -p "$(dirname -- "$INVARLOCK_ACTION_HTML_OUTPUT")"
+        printf 'INVARLOCK_ACTION_LAYOUT_SAFE=true\n' >> "$GITHUB_ENV"
+
+    - name: Verify InvarLock evidence
       shell: bash
+      env:
+        INVARLOCK_ACTION_PYTHON: ${{ inputs.python }}
+        INVARLOCK_ACTION_EVIDENCE: ${{ inputs.evidence }}
+        INVARLOCK_ACTION_POLICY: ${{ inputs.policy }}
+        INVARLOCK_ACTION_EXPECTED_BASELINE_ARTIFACT: ${{ inputs.expected-baseline-artifact }}
+        INVARLOCK_ACTION_EXPECTED_SUBJECT_ARTIFACT: ${{ inputs.expected-subject-artifact }}
+        INVARLOCK_ACTION_EXPECTED_SCHEDULE: ${{ inputs.expected-schedule }}
+        INVARLOCK_ACTION_EXPECTED_BASELINE_RUNTIME: ${{ inputs.expected-baseline-runtime }}
+        INVARLOCK_ACTION_EXPECTED_SUBJECT_RUNTIME: ${{ inputs.expected-subject-runtime }}
+        INVARLOCK_ACTION_EXPECTED_SIGNER: ${{ inputs.expected-signer }}
+        INVARLOCK_ACTION_VERIFIER_SIGNING_KEY: ${{ inputs.verifier-signing-key }}
+        INVARLOCK_ACTION_VERIFIER_IDENTITY: ${{ inputs.verifier-identity }}
+        INVARLOCK_ACTION_RECEIPT_OUTPUT: ${{ inputs.receipt-output }}
+        INVARLOCK_ACTION_VERIFY_OUTPUT: ${{ inputs.verify-output }}
       run: |
+        set -uo pipefail
+        set -o noclobber
         set +e
-        "${{ inputs.python }}" -m invarlock verify \
-          "${{ inputs.report }}" \
-          --profile "${{ inputs.profile }}" \
-          --assurance "${{ inputs.assurance }}" \
-          --runtime-provenance "${{ inputs.runtime-provenance }}" \
-          --warning-policy "${{ inputs.warning-policy }}" \
-          --json > "${{ inputs.verify-output }}"
+        "$INVARLOCK_ACTION_PYTHON" -m invarlock verify \
+          "$INVARLOCK_ACTION_EVIDENCE" \
+          --policy "$INVARLOCK_ACTION_POLICY" \
+          --expected-baseline-artifact "$INVARLOCK_ACTION_EXPECTED_BASELINE_ARTIFACT" \
+          --expected-subject-artifact "$INVARLOCK_ACTION_EXPECTED_SUBJECT_ARTIFACT" \
+          --expected-schedule "$INVARLOCK_ACTION_EXPECTED_SCHEDULE" \
+          --expected-baseline-runtime "$INVARLOCK_ACTION_EXPECTED_BASELINE_RUNTIME" \
+          --expected-subject-runtime "$INVARLOCK_ACTION_EXPECTED_SUBJECT_RUNTIME" \
+          --expected-signer "$INVARLOCK_ACTION_EXPECTED_SIGNER" \
+          --receipt "$INVARLOCK_ACTION_RECEIPT_OUTPUT" \
+          --verifier-signing-key "$INVARLOCK_ACTION_VERIFIER_SIGNING_KEY" \
+          --verifier-identity "$INVARLOCK_ACTION_VERIFIER_IDENTITY" \
+          --json > "$INVARLOCK_ACTION_VERIFY_OUTPUT"
         status=$?
-        cat "${{ inputs.verify-output }}"
+        set -e
+        cat "$INVARLOCK_ACTION_VERIFY_OUTPUT"
         printf 'INVARLOCK_VERIFY_EXIT_CODE=%s\n' "$status" >> "$GITHUB_ENV"
 
     - name: Render InvarLock HTML report
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && env.INVARLOCK_VERIFY_EXIT_CODE == '0' }}
       shell: bash
+      env:
+        INVARLOCK_ACTION_PYTHON: ${{ inputs.python }}
+        INVARLOCK_ACTION_EVIDENCE: ${{ inputs.evidence }}
+        INVARLOCK_ACTION_HTML_OUTPUT: ${{ inputs.html-output }}
       run: |
-        "${{ inputs.python }}" -m invarlock report html \
-          --input "${{ inputs.report }}" \
-          --output "${{ inputs.html-output }}" \
-          --force
+        "$INVARLOCK_ACTION_PYTHON" -m invarlock report \
+          "$INVARLOCK_ACTION_EVIDENCE" \
+          --html "$INVARLOCK_ACTION_HTML_OUTPUT" \
+          --explain
 
-    - name: Export InvarLock MLflow tags
+    - name: Append InvarLock job summary
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' }}
       shell: bash
-      run: |
-        "${{ inputs.python }}" -m invarlock report export \
-          --evaluation-report "${{ inputs.report }}" \
-          --format mlflow-tags \
-          --policy-profile "${{ inputs.profile }}" \
-          --verify-result "${{ inputs.verify-output }}" \
-          --output "${{ inputs.mlflow-tags-output }}" \
-          --force
-
-    - name: Export InvarLock review packet
-      shell: bash
-      run: |
-        "${{ inputs.python }}" -m invarlock report export \
-          --evaluation-report "${{ inputs.report }}" \
-          --format release-review-md \
-          --policy-profile "${{ inputs.profile }}" \
-          --verify-result "${{ inputs.verify-output }}" \
-          --output "${{ inputs.review-output }}" \
-          --force
-
-    - name: Append InvarLock PR summary
-      shell: bash
+      env:
+        INVARLOCK_ACTION_EVIDENCE: ${{ inputs.evidence }}
+        INVARLOCK_ACTION_RECEIPT_OUTPUT: ${{ inputs.receipt-output }}
+        INVARLOCK_ACTION_VERIFY_OUTPUT: ${{ inputs.verify-output }}
+        INVARLOCK_ACTION_HTML_OUTPUT: ${{ inputs.html-output }}
       run: |
         {
-          echo "### InvarLock"
+          echo "### InvarLock evidence verification"
           echo
-          cat "${{ inputs.review-output }}"
+          echo "- Verification exit code: ${INVARLOCK_VERIFY_EXIT_CODE:-unavailable}"
+          echo "- Evidence: \`$INVARLOCK_ACTION_EVIDENCE\`"
+          echo "- Verification result: \`$INVARLOCK_ACTION_VERIFY_OUTPUT\`"
+          echo "- Signed receipt: \`$INVARLOCK_ACTION_RECEIPT_OUTPUT\`"
+          echo "- HTML report: \`$INVARLOCK_ACTION_HTML_OUTPUT\`"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload InvarLock evidence
-      uses: actions/upload-artifact@v4
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && env.INVARLOCK_VERIFY_EXIT_CODE == '0' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ inputs.artifact-name }}
         if-no-files-found: error
         path: |
-          ${{ inputs.report }}
+          ${{ inputs.evidence }}
           ${{ inputs.verify-output }}
+          ${{ inputs.receipt-output }}
           ${{ inputs.html-output }}
-          ${{ inputs.review-output }}
-          ${{ inputs.mlflow-tags-output }}
 
-    - name: Fail on InvarLock verification result
+    - name: Upload InvarLock verification failure
+      if: ${{ always() && env.INVARLOCK_ACTION_LAYOUT_SAFE == 'true' && env.INVARLOCK_VERIFY_EXIT_CODE != '0' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: ${{ inputs.artifact-name }}-verification-failure
+        if-no-files-found: warn
+        path: ${{ inputs.verify-output }}
+
+    - name: Enforce InvarLock verification result
+      if: ${{ always() }}
       shell: bash
+      env:
+        INVARLOCK_ACTION_FAIL_ON_VERIFY: ${{ inputs.fail-on-verify }}
       run: |
-        status="${INVARLOCK_VERIFY_EXIT_CODE:-0}"
-        if [ "$status" -ne 0 ] && [ "${{ inputs.fail-on-verify }}" = "true" ]; then
-          exit "$status"
+        status="${INVARLOCK_VERIFY_EXIT_CODE:-1}"
+        case "$status" in
+          ''|*[!0-9]*)
+            echo "InvarLock verification exit code is invalid" >&2
+            exit 2
+            ;;
+        esac
+        if [ "$status" -gt 255 ]; then
+          echo "InvarLock verification exit code is out of range" >&2
+          exit 2
         fi
+        case "$INVARLOCK_ACTION_FAIL_ON_VERIFY" in
+          true)
+            if [ "$status" -ne 0 ]; then
+              exit "$status"
+            fi
+            ;;
+          false)
+            ;;
+          *)
+            echo "fail-on-verify must be true or false" >&2
+            exit 2
+            ;;
+        esac

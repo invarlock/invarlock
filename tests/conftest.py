@@ -3,35 +3,20 @@ from __future__ import annotations
 import os
 import sys
 from importlib import import_module
-from pathlib import Path
 
 import pytest
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 _PATCH_TARGET_MODULES = (
-    "invarlock.cli.bench",
-    "invarlock.core.auto_tuning",
     "invarlock.core.bootstrap",
-    "invarlock.core.config_loader",
     "invarlock.core.determinism_policy",
     "invarlock.core.metric_provider_resolution",
     "invarlock.core.registry",
-    "invarlock.core.run_orchestrator_execute",
-    "invarlock.core.runner",
     "invarlock.runtime_verify",
-    "invarlock.eval.bench_runner",
-    "invarlock.eval.data",
-    "invarlock.eval.metrics_activation",
-    "invarlock.eval.metrics_support",
     "invarlock.eval.primary_metric",
     "invarlock.model_profile",
-    "invarlock.observability.core",
-    "invarlock.observability.health",
     "invarlock.plugins.bitsandbytes",
     "invarlock.evidence_pack",
-    "invarlock.reporting.report_summary",
-    "invarlock.reporting.report_make",
-    "invarlock.reporting.report_builder_support",
 )
 
 
@@ -53,8 +38,6 @@ def _reattach_parent_package_attrs(module_name: str) -> None:
 def _restore_invarlock_env():
     # Snapshot environment variables that some tests may mutate without cleanup
     keys = [
-        "INVARLOCK_ALLOW_HOST_EXECUTION",
-        "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE",
         "INVARLOCK_ALLOW_NETWORK",
         "INVARLOCK_ALLOW_REMOTE_CODE",
         "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
@@ -88,53 +71,8 @@ def _materialize_patch_targets(request: pytest.FixtureRequest):
     yield
 
 
-@pytest.fixture(autouse=True)
-def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
-    # The product is container-first, but the general pytest harness stays on
-    # host execution unless an individual test opts back into the
-    # security-default path explicitly.
+@pytest.fixture
+def allow_host_execution_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
     yield
-
-
-@pytest.fixture(autouse=True)
-def _path_write_text_with_append(monkeypatch: pytest.MonkeyPatch):
-    # Some tests use Path.write_text(..., append=True) which is not available
-    # in all Python versions. Provide a local append-capable test helper.
-    def _write_text(
-        self: Path,
-        data: str,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-        *,
-        append: bool = False,
-    ) -> int:
-        if append:
-            # Append mode
-            self.parent.mkdir(parents=True, exist_ok=True)
-            with self.open(
-                "a", encoding=encoding, errors=errors, newline=newline
-            ) as fh:
-                return fh.write(data)
-        with self.open("w", encoding=encoding, errors=errors, newline=newline) as fh:
-            return fh.write(data)
-
-    monkeypatch.setattr(Path, "write_text", _write_text, raising=True)
-    yield
-
-
-@pytest.fixture(autouse=True)
-def _stabilize_memory_for_integration(request: pytest.FixtureRequest):
-    # Some environments fluctuate in memory accounting. For the integration
-    # pipeline memory test, hold a temporary buffer alive across the test to
-    # normalize baseline vs final deltas without affecting functionality.
-    if request.node.name == "test_memory_management":
-        buf = bytearray(200 * 1024 * 1024)
-        try:
-            yield
-        finally:
-            del buf
-    else:
-        yield

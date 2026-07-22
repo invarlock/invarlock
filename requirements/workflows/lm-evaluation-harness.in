@@ -1,0 +1,2 @@
+# The LM Evaluation Harness stays isolated to its integration image.
+lm_eval[hf]==0.4.12

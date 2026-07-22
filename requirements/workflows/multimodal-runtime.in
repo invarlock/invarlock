@@ -1,0 +1,4 @@
+# Image decoding used only by the optional Hugging Face vision-text runtime.
+pillow==12.3.0
+# Companion image transforms for the Torch 2.13 CUDA 12.6 runtime.
+torchvision==0.28.0

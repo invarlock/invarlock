@@ -1,188 +1,463 @@
-# Public Contracts
+# Public contracts
 
-## Overview
+The workflow uses closed, versioned JSON contracts. Source mirrors live in
+[`contracts/`](https://github.com/invarlock/invarlock/tree/main/contracts), and
+byte-identical package-owned copies ship in the core wheel. Verification always
+loads the package-owned copies: a working directory or environment variable
+cannot substitute a different schema.
 
-This page documents the stable public contracts that InvarLock exposes for
-reports, verification, evidence packs, calibration artifacts, and policy packs.
-These contracts are intended to be consumed as-is by automation, review, and
-auditing workflows.
+!!! info "Reference"
 
-InvarLock is pre-1.0 as a package, but the core evidence-artifact surfaces are
-versioned and intended to be stable within their declared contract versions.
+    - **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
+    - **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
+    - **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
 
-The public contract surface covers:
+## Schema-backed contracts
 
-- `evaluation.report.json` semantics and report schema validation
-- `invarlock verify` JSON and exit semantics, including runtime-manifest
-  provenance for container-backed outputs via `runtime.manifest.json`
-- evidence-pack manifest format and strict verification rules
-- plugin ABI compatibility rules
-- adapter capability metadata
-- runtime tiers/profiles and calibration artifact semantics
-- policy digests, policy provenance, and policy-pack verification
-
-## Versioned sub-contracts
-
-| Sub-contract | Version field | Current value | Canonical source |
-| --- | --- | --- | --- |
-| Report schema | `evaluation.report.json.schema_version` | `v1` | `invarlock.reporting.report_schema.REPORT_JSON_SCHEMA` |
-| Evidence-pack format | `manifest.json.format` | `evidence-pack-v1` | `contracts/evidence_pack_manifest.schema.json` |
-| Verifier output | `invarlock verify --json.format_version` | `verify-v1` | `contracts/verify_output.schema.json` |
-| Runtime manifest | `runtime.manifest.json.verifier_contract_version` | `runtime-manifest-v1` | `contracts/runtime_manifest.schema.json` |
-| CLI stability policy | policy identifier | `cli-stability-v1` | `docs/reference/cli.md` |
-| Adapter/model support tiers | `support_matrix.support_tiers[]` | `published_basis`, `supported_experimental`, `community_experimental` | `contracts/support_matrix.json` |
-
-Compatibility rules:
-
-- Within a `v1` contract, new optional fields may be added and consumers should
-  ignore fields they do not understand.
-- Removing a required field, renaming a field, changing a field type, or
-  changing pass/fail semantics requires a new version value.
-- Report, evidence-pack, runtime-manifest, and verifier validators fail closed
-  on mismatched explicit version fields.
-- Optional report blocks can graduate into the required core only with a report
-  schema version bump.
-
-## Machine-readable contract files
-
-| Contract | Path | Purpose |
+| File | Format | Purpose |
 | --- | --- | --- |
-| Support matrix | `contracts/support_matrix.json` | Normalized support tiers and public evidence references |
-| Model family catalog | `contracts/model_family_catalog.json` | Declared support, code-level coverage, usage-only checkpoints, and recommended additions |
-| Model classification | `contracts/model_classification.json` | Lifecycle classification for published, backlog, blocked, smoke-only, usage-only, and out-of-scope model status |
-| Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
-| Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
-| Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for `runtime.manifest.json` sidecars |
-| Verify output | `contracts/verify_output.schema.json` | JSON output schema for `invarlock verify --json` |
-| Evidence-pack manifest | `contracts/evidence_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material signed provenance fields |
-| Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |
-| Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |
-| Console labels | `contracts/console_labels.json` | Stable report console labels |
-| Metric kinds | `contracts/metric_kinds.json` | Stable metric kind catalog for report surfaces |
+| `evaluation_request.schema.json` | `invarlock/evaluation-request-v1` | One closed run-or-import request |
+| `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
+| `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
+| `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
 
-These JSON files are included in installed wheels under
-`invarlock/_data/contracts/*.json`. The logical public contract names remain
-`contracts/<name>.json`, and `invarlock.public_contracts` resolves them from the
-repo checkout when present or from packaged wheel data otherwise.
+## Provider contracts
 
-The public contract catalog exposes the model lifecycle ledger and list-shaped
-files as first-class entries too: `model_classification`, `validation_keys`,
-`console_labels`, and `metric_kinds` are surfaced by
-`invarlock.public_contracts.contract_catalog()` and embedded in the JSON payloads
-emitted by `invarlock doctor --json` and `invarlock advanced plugins ... --json`.
+The provider ABI uses these schema-backed documents:
 
-## CLI surfaces
+| File | Format | Purpose |
+| --- | --- | --- |
+| `model_artifact_identity.schema.json` | `invarlock/model-artifact-identity-v1` | Portable HF, GGUF, or TensorRT-LLM artifact identity |
+| `runtime_provider_receipt.schema.json` | `invarlock/runtime-provider-receipt-v1` | Provider, backend, artifact, settings, device, image, and observation binding |
+| `runtime_scoring_observation.schema.json` | `invarlock/runtime-scoring-observation-v1` | Ordered backend-measured record facts |
+| `runtime_behavioral_schedule.schema.json` | `invarlock/runtime-behavioral-schedule-v1` | Dataset identity and ordered input records |
+| `runtime_manifest.schema.json` | `runtime-manifest-v1` | Strict execution envelope and sibling sidecar digests |
+| `runtime_provider_capabilities.json` | `runtime-provider-capabilities-v1` | Provider ABI, artifacts, tasks, metrics, execution modes, and requirements |
 
-The CLI exposes these contracts directly:
+Python callers can load these exact packaged objects with functions from
+`invarlock.public_contracts`. Those loaders return schema dictionaries; they do
+not validate semantic cross-bindings by themselves.
 
-- `invarlock verify --json`
-- `invarlock advanced runtime-verify --json`
-- `invarlock advanced plugins list --json`
-- `invarlock advanced plugins adapters --json`
-- `invarlock doctor --json`
-- `invarlock advanced evidence-pack verify --json`
-- `invarlock advanced policy build`
-- `invarlock advanced policy verify --json`
-- `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict`
-
-The first eight surfaces are available from installed packages. The low-level
-`invarlock advanced runtime-verify` command is the package-native
-runtime-manifest verifier used for direct report/manifest checks. The repo
-shell verifier remains available for evidence-pack workflow maintainers, and
-pure wheel installs can verify packs with `invarlock advanced evidence-pack
-verify`.
-
-Third-party plugins are fail-closed on ABI declaration: adapters, edits, and
-guards must declare `INVARLOCK_CORE_ABI`, and the value must match the exact
-core ABI published in `contracts/plugin_compatibility.json`.
-
-For support-related automation, `plugins adapters --json` and `doctor --json`
-expose both the strict `support_matrix` contract and the broader
-`model_family_catalog` contract. Lifecycle decisions such as `published`,
-`backlog`, `blocked`, `usage_only`, and `out_of_scope` live in
-`model_classification`; update that manifest and rerun `make contracts-check`
-to refresh support surfaces. The same JSON surfaces also include the `validation_keys`,
-`console_labels`, and `metric_kinds` entries from the public contract catalog.
-
-The versioned JSON surfaces are intentionally explicit:
-
-- `invarlock doctor --json` emits `format_version: "doctor-v1"`
-- `invarlock verify --json` emits `format_version: "verify-v1"`
-- `invarlock advanced runtime-verify --json` emits
-  `format_version: "runtime-verify-v1"`
-- `invarlock advanced plugins list --json` and
-  `invarlock advanced plugins adapters --json` emit
-  `format_version: "plugins-v1"`
-- `invarlock advanced policy verify --json` emits
-  `format_version: "policy-pack-verify-v1"`
-- `invarlock advanced evidence-pack verify --json` emits
-  `format_version: "evidence-pack-verify-v1"` and nests the bundled report
-  verification result under `verify.format_version: "verify-v1"`
-
-The CLI stability policy covers command names, documented options, exit-code
-meaning, and the required fields of the listed JSON envelopes. Commands under
-`advanced` remain outside the core user loop, but the JSON surfaces listed here
-are public automation contracts.
-
-## Adapter support tiers
-
-Adapter availability and public assurance support are separate concepts.
-`contracts/adapter_capabilities.json` describes whether an adapter can load,
-snapshot, restore, and expose guard-compatible modules. `contracts/support_matrix.json`
-describes the public support tier for a model/runtime/adapter lane.
-
-| Tier | Meaning |
-| --- | --- |
-| `published_basis` | Maintained public evidence floor with report, runtime-manifest, and evidence-pack provenance where available. |
-| `supported_experimental` | Repo ships preset/config/test/smoke paths, but no published-basis fixture set is claimed. |
-| `community_experimental` | Adapter/runtime path is usable for community experimentation without a maintained public evidence basis. |
-
-Policy packs that declare `compatibility.support_tiers` must use one of those
-three tier values.
-
-## Packaged public contract data
-
-The maintained public contract data ships in two places:
-
-- installed wheels, under `invarlock/_data/contracts/*.json`
-- source tags in the repository
-
-Repo tags and installed wheels are the only maintained public contract
-carriers.
-
-The support-matrix published-basis evidence paths remain logical
-`public_evidence/published_basis/...` references. Source repository tags carry
-the full public evidence artifacts at those paths: reports, runtime manifests,
-evidence-pack recipes, signed packs where present, and guard-value demo
-packages.
-
-Installed wheels intentionally do not duplicate the full published-basis
-artifact tree. Instead, they ship the compact generated index at
-`invarlock/_data/public_evidence/published_basis_index.json`. That index records
-the published-basis entries, logical source paths, lane IDs, file hashes, sizes,
-directory control-file hashes, and the carrier policy. Wheel users can inspect
-which public evidence exists and where it lives in the source tag; verifying or
-rendering the full public evidence artifacts requires the repository source
-tree or an explicit artifact copy.
-
-## Policy packs
-
-Policy packs are Git-native artifacts that bind:
-
-- `resolved_policy`
-- ordered `overrides`
-- a deterministic `policy_digest`
-- compatibility metadata
-- optional approval metadata
-
-Build and verify them with:
-
-```bash
-invarlock advanced policy build \
-  --resolved-policy resolved_policy.json \
-  --overrides overrides.json \
-  --compatibility compatibility.json \
-  --out policy-pack.json
-
-invarlock advanced policy verify policy-pack.json --json
+```python
+from invarlock.public_contracts import (
+    load_evaluation_request_schema,
+    load_evidence_observation_schema,
+    load_evidence_pack_schema,
+    load_trust_inputs_schema,
+    load_model_artifact_identity_schema,
+    load_runtime_behavioral_schedule_schema,
+    load_runtime_manifest_schema,
+    load_runtime_provider_capabilities_schema,
+    load_runtime_provider_receipt_schema,
+    load_runtime_scoring_observation_schema,
+)
 ```
+
+Each loader returns a new dictionary decoded from the package-owned contract.
+`ContractLoadError` identifies a missing, malformed, or non-object packaged
+contract. Format constants such as `EVALUATION_REQUEST_FORMAT_VERSION`,
+`EVIDENCE_PACK_FORMAT_VERSION`, `TRUST_INPUTS_FORMAT_VERSION`, and
+`RUNTIME_PROVIDER_ABI_VERSION` are exported from the same module for exact
+comparisons.
+
+The schemas use [JSON Schema Draft
+2020-12](https://json-schema.org/draft/2020-12). Every contract object is
+closed: fields not named by its schema or exact code-enforced shape are
+rejected rather than ignored.
+
+## Independent trust-input profile
+
+`invarlock/trust-inputs-v1` is the portable caller-owned input to independent
+verification. It contains the policy path, baseline and subject artifact
+digests, schedule digest, both runtime digests, evidence-signer fingerprint,
+verifier identity, verifier signing-key path, and installed-scorer
+authorization. The object and all nested objects are closed.
+
+Policy and key paths are safe relative paths resolved from the profile's
+directory. Absolute paths, traversal, symlinks, duplicate JSON members,
+unknown fields, and missing files are rejected. Formatting does not affect the
+profile digest: the loader hashes canonical JSON and the verifier records that
+digest in its signed receipt. The profile never contains private-key bytes.
+
+## Evaluation request fields
+
+The request root contains four required fields and one optional field:
+
+| Field | Type | Required value or role |
+| --- | --- | --- |
+| `format_version` | String | `invarlock/evaluation-request-v1` |
+| `comparison` | Object | Baseline, subject, dataset, task, policy, and exactly one metric or scorer-extension binding |
+| `execution` | Object | Exactly one `run` or `import` transaction |
+| `observations` | Array | Zero to 64 authenticated context attachments |
+| `output` | Object | Exactly `evidence`, a safe relative destination |
+
+Each comparison side has the same closed shape:
+
+| Path | Type | Requirement | Meaning |
+| --- | --- | --- | --- |
+| `artifact.model_id` | String | Yes | Human-stable artifact name; URL syntax is rejected |
+| `artifact.locator` | String | Yes | Portable source locator bound into request intent |
+| `artifact.path` | Safe relative path | Required in run mode | Artifact path below the request root |
+| `runtime.provider` | Provider name | Yes | Selected runtime-provider ABI implementation |
+| `runtime.settings` | Object of JSON scalars | Yes | Provider-owned settings validated against capabilities |
+
+`comparison.policy` is always a safe relative path. `comparison.dataset` is
+mode-specific:
+
+- run mode requires a closed local-dataset object with `path`, bare lowercase
+  `sha256`, `format: jsonl`, `name`, `split`, `input_field`, and
+  `expected_output_field`, plus optional `id_field`, an all-or-none content
+  role and field mapping, and `limit`;
+- import mode requires a safe relative path to canonical
+  `invarlock/runtime-behavioral-schedule-v1` bytes.
+
+The canonical `comparison.task` binds the request, schedule, provider
+capabilities, evaluation batches, and provider receipts. Built-in identifiers
+are `text_causal`, `masked_language`, `text_seq2seq`, and
+`vision_text_generation`; a provider must explicitly declare execution
+support. The request selects exactly one built-in `metric` or one complete
+`scorer_extension` binding. Built-in metrics are `exact_match` and
+`normalized_nll_per_utf8_byte`; request loading requires both selected
+providers to declare the chosen built-in metric. A scorer extension instead
+uses `exact_match` as its provider collection metric so that expected and
+observed text are authenticated for verifier replay. The built-in
+`hf_transformers` provider declares both built-in metrics. The
+first-party `llama_cpp`, `tensorrt_llm`, and `hf_vision_text` add-ins currently
+declare exact match for their tasks.
+
+### Deterministic scorer extension
+
+`comparison.scorer_extension` is a closed
+`invarlock/scorer-extension-binding-v1` object. It binds scorer ABI `1`, a
+dotted scorer ID, semantic version, descriptor digest, configuration object,
+and canonical configuration digest. The descriptor fixes supported tasks and
+input/output kinds, the configuration-schema digest, and these v1 semantics:
+
+- replay reads exactly authenticated `expected_output`, `output_text`, and
+  `output_sha256` facts for every ordered record;
+- each result is a finite higher-is-better value in `[0, 1]`;
+- the core computes the arithmetic mean, subject-minus-baseline percentage-
+  point delta, and fixed 2,048-replicate paired interval; and
+- network access, an external model, and human judgment are forbidden in an
+  acceptance scorer.
+
+The independently supplied policy must contain
+`resolved_policy.metrics.scorer_extension` with the same `scorer_id`,
+`scorer_version`, `descriptor_sha256`, and `configuration_sha256`, plus
+`delta_min_pp`. Evaluation and verification require an explicitly authorized
+`ScorerExtensionRegistry`; the request and evidence cannot authorize scorer
+code. The verifier runs the scorer twice, requires identical canonical
+results, then independently reconstructs the core-owned aggregate, paired
+interval, threshold comparison, and verdict.
+
+This boundary can support deterministic text scorers such as token F1,
+structured-field extraction, or VQA answer normalization when separately
+implemented and authorized. Those scorer packages are separately installed and
+require explicit authorization. SQL or code execution, model-based semantic
+similarity, network services,
+human review, and LLM judges require different trust contracts; judge outputs
+can be attached as authenticated observations without acceptance authority.
+
+### Run request
+
+```yaml
+format_version: invarlock/evaluation-request-v1
+comparison:
+  baseline:
+    artifact:
+      model_id: acme/baseline
+      locator: registry://acme/baseline@immutable-revision
+      path: models/baseline
+    runtime:
+      provider: hf_transformers
+      settings:
+        immutable_revision: 0123456789abcdef0123456789abcdef01234567
+        checkpoint_tree_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
+        tokenizer_metadata_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+        batch_size: 1
+        context_length: 2048
+        max_output_tokens: 64
+        offline: true
+        seed: 7
+        timeout_seconds: 120
+  subject:
+    artifact:
+      model_id: acme/subject
+      locator: registry://acme/subject@immutable-revision
+      path: models/subject
+    runtime:
+      provider: hf_transformers
+      settings:
+        immutable_revision: fedcba9876543210fedcba9876543210fedcba98
+        checkpoint_tree_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
+        tokenizer_metadata_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+        batch_size: 1
+        context_length: 2048
+        max_output_tokens: 64
+        offline: true
+        seed: 7
+        timeout_seconds: 120
+  dataset:
+    path: inputs/release-regression.jsonl
+    sha256: "4444444444444444444444444444444444444444444444444444444444444444"
+    format: jsonl
+    name: release-regression
+    split: validation
+    input_field: prompt
+    expected_output_field: expected
+    id_field: case_id
+    limit: 400
+  policy: policy/acceptance.json
+  task: text_causal
+  metric: normalized_nll_per_utf8_byte
+execution:
+  mode: run
+output:
+  evidence: artifacts/evidence
+```
+
+The digest values are illustrative. A real request must bind the actual source,
+artifact, and tokenizer bytes. Provider identity digests in `runtime.settings`
+and `comparison.dataset.sha256` use bare lowercase 64-character values; general
+bundle and runtime identities use the `sha256:` prefix where their contracts
+require it.
+
+For run mode, the transaction verifies the JSONL digest, preserves source
+order, maps the declared top-level text fields, selects the exact prefix named
+by `limit`, derives stable IDs or deterministic position IDs, and builds the
+canonical schedule. Blank lines, invalid JSON objects, missing mapped text,
+duplicate IDs, digest mismatch, or a limit larger than the source fail closed.
+
+### Import request
+
+Import mode replaces provider execution with authenticated sidecars. In
+addition to `mode`, it requires `records`, `schedule`, and these six references
+for both `baseline` and `subject`:
+
+| Import-side field | Expected document |
+| --- | --- |
+| `identity` | `invarlock/model-artifact-identity-v1` |
+| `receipt` | `invarlock/runtime-provider-receipt-v1` |
+| `observation` | `invarlock/runtime-scoring-observation-v1` |
+| `run_report` | `invarlock/runtime-side-report-v1` |
+| `runtime_manifest` | `runtime-manifest-v1` |
+| `runtime_config` | Canonical provider run configuration |
+
+```yaml
+execution:
+  mode: import
+  records: import/paired-records.json
+  schedule: inputs/schedule.json
+  baseline:
+    identity: import/baseline/model-artifact.identity.json
+    receipt: import/baseline/runtime-provider.receipt.json
+    observation: import/baseline/runtime-scoring.observation.json
+    run_report: import/baseline/report.json
+    runtime_manifest: import/baseline/runtime.manifest.json
+    runtime_config: import/baseline/run.yaml
+  subject:
+    identity: import/subject/model-artifact.identity.json
+    receipt: import/subject/runtime-provider.receipt.json
+    observation: import/subject/runtime-scoring.observation.json
+    run_report: import/subject/report.json
+    runtime_manifest: import/subject/runtime.manifest.json
+    runtime_config: import/subject/run.yaml
+```
+
+This fragment is inserted under the same request root as the `comparison` and
+`output` objects. In import mode, `comparison.dataset` and
+`execution.schedule` both name the canonical schedule. Evaluation re-derives
+artifact identities and paired records; supplying a valid-looking aggregate is
+not sufficient.
+
+## Parser and path limits
+
+| Boundary | Limit or rule |
+| --- | --- |
+| Request YAML | At most 1 MiB, 64 nested levels, and 10,000 syntax nodes |
+| Policy input | At most 4 MiB |
+| Other request input | At most 64 MiB per file |
+| Local JSONL source or schedule bytes | At most 16 MiB and 1 to 10,000 selected records |
+| References | Relative, root-confined, forward-slash paths; no links, traversal, URLs, drive prefixes, or empty components |
+
+The YAML loader accepts only a JSON-compatible mapping. It rejects aliases,
+anchors, tags, directives, merge keys, duplicate keys, include-like keys,
+unsafe scalar types, and non-canonical scalar spellings. File reads repeat
+component-by-component no-follow checks at use time, so a path that passed the
+first parse cannot be replaced with a symbolic link unnoticed.
+
+The built-in comparison metrics are `exact_match` and
+`normalized_nll_per_utf8_byte`. Exact-match reports include paired outcome
+counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
+95% interval whose lower bound controls policy. New v2 reports use the
+continuity-corrected method; strict verification preserves the original v1
+method for legacy v1 reports. Normalized-NLL reports include the
+fixed 2,048-replicate `paired_percentile_bootstrap_sha256_v1` interval over the
+authenticated schedule and apply the policy ceiling to its upper bound. A
+scorer-extension comparison uses the same fixed paired-resampling method over
+unit-interval record values and applies `delta_min_pp` to the lower bound.
+[Decision semantics](../assurance/decision-semantics.md) defines the exact
+arithmetic.
+
+Every metric policy may contain only its threshold, or its threshold plus the
+coupled `minimum_record_count` and maximum-width fields. Exact match and scorer
+extensions use `maximum_interval_width_pp`; normalized NLL uses
+`maximum_interval_width_ratio`. A v2 report with those controls passes only
+when the threshold, count, and width checks all pass.
+
+## Provider document field map
+
+The schemas remain authoritative for types, patterns, nullability, and nested
+conditional rules. This map makes every top-level contract field discoverable:
+
+| Contract | Required top-level fields |
+| --- | --- |
+| Runtime capabilities | `format_version`, `provider_abi`, `provider_name`, `artifact_formats`, `tasks`, `metrics`, `execution_modes`, `required_extra`, `required_image` |
+| Artifact identity | `format_version`, `artifact_format`, plus the format-specific identity fields listed in the runtime-provider reference |
+| Scoring observation | `format_version`, `provider_name`, `artifact_identity_sha256`, `schedule_sha256`, `records`, `aggregate_source_sha256` |
+| Provider receipt | `format_version`, `plugin`, `backend`, `capabilities`, `artifact_identity`, `execution_settings`, `device`, `outer_image_digest`, `scoring_observation_sha256` |
+| Runtime manifest | `manifest_version`, `generated_at_utc`, `verifier_contract_version`, `report`, `config`, `execution_mode`, `outer_container`, `runtime_provider` |
+| Behavioral schedule | `format_version`, `dataset_identity`, `records` |
+
+Nested provider-receipt groups are closed:
+
+| Group | Fields |
+| --- | --- |
+| `plugin` | provider name, distribution, distribution version, provider ABI |
+| `backend` | name, version, and at least one source, binary, or build SHA-256 |
+| `execution_settings` | seed, context length, batch size, output limit, timeout, network permission |
+| `device` | kind, name, optional compute capability, driver, and CUDA runtime |
+| `capabilities` | the complete capability object above |
+| `artifact_identity` | one exact HF, GGUF, or TensorRT-LLM identity variant |
+
+Each scoring record requires `record_id`, `input_sha256`, and `status`. An `ok`
+record contains output text plus its digest, log-likelihood facts, or both. An
+`error` record contains only a canonical `error_code` and no measured facts.
+Log-likelihood facts are finite `logprob_sum`, positive `token_count`, and
+positive `utf8_byte_count`. Byte-normalized NLL verifies the byte count against
+the scheduled target. Matching authenticated tokenizer metadata and equal
+positive paired token counts allow a verifier-derived perplexity interpretation
+without adding a metric or policy surface.
+
+The runtime manifest fixes `execution_mode` to `container`. Its outer-container
+object binds the image reference/digest and observed execution switches; its
+runtime-provider object binds the provider name, ABI, and sibling identity,
+observation, and receipt files. `report` and `config` bind their sibling files
+by digest. Unknown fields at any of these levels are rejected.
+
+## Closed formats without standalone schemas
+
+Several exact shapes are enforced by code and verifier replay rather than a
+separate JSON Schema file:
+
+| Format | Role |
+| --- | --- |
+| `invarlock/evidence-input-identity-v1` | One input role, material digest, and optional locator/media type |
+| `invarlock/paired-records-v1` | Verifier-derived baseline/subject scores in schedule order |
+| `invarlock/runtime-side-report-v1` | Minimal link from one side to its provider observation |
+| `invarlock/scorer-extension-descriptor-v1` | One scorer's capabilities, input facts, result semantics, and trust constraints |
+| `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
+| `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
+| `invarlock/comparison-report-v2` | Current canonical means, point comparison, metric-specific paired interval, optional sample qualification, threshold, and verdict |
+| `invarlock/comparison-report-v1` | Legacy canonical report replayed with its original exact-match interval method; accepted for backward verification, not emitted for new evaluations |
+| `invarlock/evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
+| `invarlock/evidence-pack-verify-v1` | Machine-readable independent verification result |
+| `invarlock/evidence-verification-receipt-v1` | Signed statement binding the pack, artifact/schedule/policy/runtime/signer anchors, verifier, optional trust-profile digest, and verdict |
+| `invarlock/evidence-verification-receipt-v2` | The v1 statement plus an independently supplied normalized-request digest; emitted when that anchor is present and required for GGUF evidence |
+| `invarlock/evidence-verification-receipt-signature-v1` | Ed25519 envelope for the receipt statement |
+
+These are documented for inspection and interchange, not as permission to
+construct partial objects. Use `evaluate` to produce bundles, `verify` to
+produce receipts, and the stable Python
+`verify_signed_verification_receipt` facade to validate a received receipt.
+
+## Canonical JSON and digests
+
+Canonical JSON uses UTF-8, sorted object keys, compact separators, and finite
+numbers. Newline behavior is contract-specific: most bundle JSON documents and
+signed receipt statements use one trailing line feed, while canonical schedule,
+artifact-identity, scoring-observation, and embedded substructure hash inputs
+use the same representation without a final line feed. Writers and readers
+must use the contract serializer rather than normalize whitespace themselves.
+
+The base JSON syntax follows [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259).
+InvarLock deliberately narrows it with unique keys, finite numbers, closed
+schemas, exact encodings, and semantic cross-replay.
+
+Bundle-level digests use lowercase `sha256:<64 hex>`. Some provider ABI fields
+and the checksum-file digest use a bare lowercase 64-character SHA-256 value;
+their schemas identify that distinction. Signatures use Ed25519. A key
+fingerprint is `sha256:` followed by the SHA-256 of the raw Ed25519 public key.
+Ed25519 is specified by [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032).
+
+## Digest and signature dependency chain
+
+```text
+input/runtime bytes -> typed identity or material digest
+provider observation + receipt + runtime manifest -> side report
+schedule + both observations -> paired records -> comparison report
+all payload bytes -> checksums.sha256
+payload references + checksum-file digest -> manifest.json
+canonical manifest bytes -> Ed25519 evidence signature
+manifest digest + independent anchors (+ GGUF request digest) + verdict -> verifier-signed receipt
+```
+
+A later layer authenticates references to earlier layers; it does not replace
+their semantic checks. In particular, a valid evidence signature proves that
+one key signed the manifest, not that artifact identities, scores, policy, or
+runtime declarations are true. Independent verification supplies and checks
+those acceptance anchors.
+
+## Semantic validation
+
+Schema validity is only the first layer. The verifier also recomputes:
+
+- fixed path and closed-inventory rules;
+- canonical bytes and file digests;
+- artifact, schedule, runtime, observation, and request cross-bindings;
+- record order, input digests, and observation-record digests;
+- exact-match or normalized-NLL scores, or explicitly authorized scorer-
+  extension results replayed twice from authenticated text facts;
+- paired exact-match counts, exact McNemar probability, and the report-version-specific Newcombe interval,
+  or deterministic paired replicates and interval endpoints for normalized NLL
+  and scorer-extension deltas;
+- derived perplexity facts when tokenizer and paired token counts are
+  comparable;
+- comparison means, threshold arithmetic, optional count/interval-width
+  qualification, and policy verdict; and
+- evidence signer and verifier signature bindings.
+
+A custom reader that performs schema validation alone is not equivalent to
+`invarlock verify`.
+
+## Version and change discipline
+
+A format identifier names one exact shape and interpretation. Additive fields
+are not silently accepted by closed objects. A breaking artifact change requires
+a new format identifier and explicit reader behavior. Runtime providers must
+also match ABI `1` exactly.
+
+The v2 comparison report is the current writer format. Strict verification
+continues to reconstruct a v1 report with the v1 exact-match method when a
+signed legacy pack identifies that format; it never applies v2 arithmetic and
+then relabels the result as v1.
+
+Receipt v1 remains valid for existing evidence whose runtime does not require a
+request-level executable binding. A supplied request digest selects receipt v2.
+GGUF verification requires that external request anchor because the normalized
+request authorizes the exact llama.cpp binary, source, version, execution
+settings, and GGUF identity reconciled with provider evidence.
+
+Core and first-party add-ins are released at the same package version. Provider
+add-ins declare the exact coordinated core release, while the provider ABI remains
+the runtime compatibility gate. See [Release verification](release-verification.md).
+
+## Related documentation
+
+- [Evidence artifacts](artifacts.md) maps contract roles to fixed bundle paths.
+- [Runtime providers](runtime-providers.md) defines the typed ABI that produces
+  provider contract objects.
+- [Reports and receipts](reports.md) explains the decision and independent
+  verification objects.
+- [Release verification](release-verification.md) separates package versioning
+  from evidence-format and provider-ABI compatibility.

@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       - name: Set up uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
         with:
           version: "0.10.10"
       - name: Check uv.lock sync
@@ -25,7 +25,7 @@ jobs:
   no-generated-artifacts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       - name: Detect forbidden files in PR diff
@@ -36,26 +36,15 @@ jobs:
           head="${{ github.sha }}"
           files="$(git diff --name-only --diff-filter=ACMR "$base" "$head")"
           if echo "$files" | grep -E '^(site/|node_modules/|dist/|build/|reports_report/|reports_.*/|runs/)' ; then
-            echo "❌ Generated artifacts detected in the PR diff."; exit 1;
+            echo "Generated artifacts detected in the pull request."; exit 1;
           else
-            echo "✅ No generated artifacts in the PR diff.";
+            echo "No generated artifacts detected."
           fi
-      - name: Ensure no duplicate test basenames
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t dups < <(find tests -type f -name 'test_*.py' -exec basename {} \; | sort | uniq -d)
-          if [ ${#dups[@]} -gt 0 ]; then
-            echo "❌ Duplicate test filenames detected:";
-            printf '  - %s\n' "${dups[@]}";
-            exit 1;
-          fi
-          echo "✅ No duplicate test basenames in tests/."
 
   large-files:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       - name: Prevent >10MB files in PR diff
@@ -70,7 +59,7 @@ jobs:
             [ -f "$f" ] || continue
             sz=$(wc -c <"$f")
             if [ "$sz" -gt "$threshold" ]; then
-              echo "❌ $f is ${sz} bytes (>10MB)"; rc=1
+              echo "$f is ${sz} bytes (>10MB)"; rc=1
             fi
           done < <(git diff --name-only --diff-filter=ACMR "$base" "$head")
           exit $rc

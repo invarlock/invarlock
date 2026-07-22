@@ -1,2 +1,0 @@
--r ../../../../requirements/workflows/runtime-image.in
-optimum-quanto>=0.2.7

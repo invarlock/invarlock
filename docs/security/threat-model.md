@@ -1,176 +1,273 @@
-# Threat Model
+# Threat model
 
-This document provides a high-level threat model for InvarLock deployments. It is
-intentionally aligned with the **assurance case scope**: InvarLock’s primary goal
-is to control **regression risk from weight edits relative to a baseline**
-under specified configurations, not to provide a complete solution to model
-security or alignment.
+This threat model covers the `evaluate`, `verify`, and `report`
+transactions and the public provider contracts. It distinguishes attacks that
+the evidence verifier can detect from claims that require controls outside
+InvarLock.
 
-## Assumptions
+!!! warning "Security guidance"
 
-- Users operate in isolated virtual environments or containers on Linux/macOS
-  hosts with supported HF/PyTorch versions.
-- Models and datasets may be sourced from public repositories, but are treated
-  as potentially untrusted artifacts.
-- Default runtime posture disables outbound network connections unless
-  `INVARLOCK_ALLOW_NETWORK=1` is explicitly set.
-- Default runtime posture keeps model-loading commands inside the runtime
-  container unless a public host-side workflow uses `invarlock evaluate --execution-mode host`
-  or an advanced/internal workflow explicitly sets `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
-- Evaluation runs use the pairing, windowing, and bootstrap profiles
-  described in the assurance docs and configs.
+    **In plain language:** InvarLock can detect tampering and inconsistent
+    evidence, but it cannot prove that an honest runtime executed or that the
+    chosen test and threshold are sufficient.
 
-## Security Flow Overview
+    **Objective:** Identify threats to one evidence transaction and distinguish
+    verifier-enforced properties from risks that require deployment controls.
+
+    **Assets or boundary:** The `evaluate`, `verify`, and `report` data flow,
+    provider-contract inputs, signing identities, independent anchors, and
+    signed outputs; host and accelerator security remain external boundaries.
+
+    **Use this page when:** Performing architecture review, assigning controls,
+    interpreting a verifier failure, or deciding whether a deployment needs
+    attestation or safeguards beyond InvarLock.
+
+## Security objectives
+
+| Objective | Required property |
+| --- | --- |
+| Bundle integrity | Every accepted file is inventoried, checksummed, path-safe, and transitively bound by the signed manifest. |
+| Evidence signer authenticity | The manifest signature verifies under the independently expected evidence-signer fingerprint. |
+| Input and runtime binding | Request, artifact, schedule, provider, observation, and runtime identities agree across all contract layers. |
+| Replay correctness | Pairing, built-in scores or explicitly authorized scorer results, comparison arithmetic, paired interval, optional count/width qualification, and policy verdict are reconstructed from lower-level facts. |
+| Independent acceptance | Policy, artifact, schedule, runtime, and evidence-signer anchors are controlled outside the submitted evidence path. |
+| Receipt accountability | The verdict and exact anchors are bound to a separately recorded verifier identity and key. |
+| Fail-closed handling | Missing, malformed, unknown, partial, extra, or inconsistent material cannot become accepted evidence. |
+
+Availability and confidentiality are not primary bundle-verification
+objectives. Size limits and safe path handling reduce resource abuse, while
+deployment controls must protect sensitive model, dataset, and key material.
+
+## Assets
+
+- baseline and subject artifact identities;
+- schedule, inputs, expected outputs, and dataset coordinates;
+- provider observations, receipts, runtime manifests, and support resources;
+- acceptance policy and artifact, schedule, and runtime trust anchors;
+- scorer binding, configuration, implementation, and independent authorization
+  when an extension is selected;
+- canonical evidence pack and signed verification receipt;
+- evidence signer and verifier private keys; and
+- the authorization mapping from actor identities to public-key fingerprints.
+
+## Adversaries and failure sources
+
+The model considers accidental corruption, unsafe input, a malicious evidence
+submitter, compromised evidence signer or verifier environments, compromised provider
+add-ins, key theft, and a decision owner who obtains trust anchors from the submitted
+evidence. It also considers nonmalicious selection bias and numerical drift.
+
+The model does not assume that an evidence signature makes the evidence signer honest.
+The verifier treats the bundle as untrusted until replay succeeds, but replay
+can only reason about the facts in that bundle.
+
+## Adversary capability classes
+
+| Class | Capability | Expected outcome |
+| --- | --- | --- |
+| Transport attacker | Can add, remove, reorder, or alter bundle files but lacks authorized private keys | Detected by inventory, checksum, canonical-form, or signature verification |
+| Unauthorized evidence signer | Can create internally consistent evidence and sign with an unrecognized key | Rejected by independently pinned evidence-signer fingerprint |
+| Authorized malicious evidence signer | Controls provider facts and authorized evidence-signing key | Can fabricate mutually consistent evidence; requires independent execution control or attestation to address |
+| Configuration attacker | Attempts to replace policy, artifact expectations, schedule, runtime expectations, provider or scorer support, or request paths | Independent anchors, explicit scorer authorization, and root-confined resolution detect covered substitutions |
+| Selection attacker | Chooses favorable schedule, baseline, subject build, seed, retry, or stopping rule | Not detectable from one internally valid pack; prevented or exposed by advance commitment and attempt retention |
+| Verifier attacker | Controls verifier host/key or anchor source | Can issue misleading receipts; requires independent verifier authorization, key custody, and audit |
+| Receipt-verification error | Trusts embedded keys, HTML, or copied summaries without independent checks | Prevented only by independent receipt verification and authorization discipline |
+
+## Threats, controls, and residual risk
+
+| Threat | InvarLock control | Residual risk |
+| --- | --- | --- |
+| File changed, removed, inserted, or renamed after publication | Complete checksummed inventory, manifest binding, no-extra-files check, canonical paths, and evidence signature | An evidence signer can sign fabricated but internally consistent files. |
+| Attacker substitutes its own signed bundle | Verifier requires an evidence-signer fingerprint obtained independently | Fingerprint authorization, revocation, and secure distribution are external. |
+| Bundle weakens or replaces acceptance policy | Verifier reads policy bytes from a caller-owned path and requires their digest to match the bundle identity and report | The external policy may itself be poorly chosen or compromised. |
+| Bundle substitutes the baseline or subject | Verifier requires caller-owned artifact-identity digests and cross-checks both sides through the request, provider evidence, runtime manifests, report, and receipt | Digest equality identifies declared authenticated material; it does not establish suitability or execution. |
+| Bundle substitutes the evaluation records | Verifier requires a caller-owned canonical schedule digest and reconstructs the ordered schedule and record bindings | A schedule approved in advance can still be unrepresentative or insufficient. |
+| Bundle claims another runtime | Verifier requires independent per-side image digests and cross-checks manifests, identities, and provider receipts | Digest equality does not prove that the image executed. |
+| Baseline and subject use different records | Canonical schedule, unique record IDs, input digests, exact ordered pairing, and record-level replay | The shared schedule can still be unrepresentative or cherry-picked. |
+| Provider supplies a false aggregate | InvarLock ignores provider aggregates for acceptance and derives per-record scores and the report | A malicious provider can fabricate the underlying record facts. |
+| Bundle selects or substitutes scorer code | Request binding and independent policy pin scorer identity, descriptor, and configuration; verifier requires an explicitly authorized registry and repeats canonical replay | Authorized scorer code executes in the verifier trust boundary and can be malicious or flawed; code review and controlled distribution remain external. |
+| Observation or sidecar is transplanted between artifacts or runs | Artifact, provider, schedule, runtime, observation, report, and receipt cross-bindings | A fully compromised evidence signer can fabricate all bindings together. |
+| Error or record with a value that is not finite is hidden | Every scheduled record must be present, successful, finite where scored, and included in the canonical record-array digest | An evidence signer can select a different successful run unless run-selection policy is external. |
+| Unsafe request path or YAML feature escapes the request root | Strict schema, bounded YAML, no aliases/includes/tags, relative no-follow path traversal, and output revalidation | The surrounding host and dependencies remain trusted computing base. |
+| Host launch substitutes an image, engine argument, device, or input mount | The host CLI requires per-side digest agreement, uses argv-only Docker/Podman execution with `--pull=never`, allowlists environment, validates device selection, and mounts each side's job, artifact, and support material read-only with an isolated writable output | The container engine, host coordinator, kernel, and device remain trusted computing base. |
+| Malicious model or provider code executes during evaluation | Built-in strict HF path uses local safetensors, disables remote code and network access, and authenticates checkpoint/tokenizer material | Native libraries, container runtime, kernel, driver, add-ins, and optional backends can contain vulnerabilities. InvarLock is not a sandbox. |
+| Human report differs from machine evidence | Renderer authenticates the bundle and reads the canonical bound report | Screenshots, copied text, or externally modified HTML are not acceptance records. Verify the bundle and receipt. |
+| Evidence signer or verifier private key is stolen | Ed25519 signatures expose stable fingerprints suitable for pinning and rotation | Key storage, compromise detection, revocation, and incident response are external. |
+
+## Trust-boundary data flow
+
+The critical transitions are:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     SECURITY BOUNDARY LAYERS                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ NETWORK LAYER                                                     │  │
-│  │ INVARLOCK_ALLOW_NETWORK=0 by default; outbound blocked unless     │  │
-│  │ explicitly enabled.                                               │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-│                               │                                         │
-│                               ▼                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ RUNTIME LAYER                                                     │  │
-│  │ container execution by default; host execution only with          │  │
-│  │ `evaluate --execution-mode host` (public) or advanced/internal host bypass │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-│                               │                                         │
-│                               ▼                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ ARTIFACT LAYER                                                    │  │
-│  │ model loading | dataset loading | config loading                  │  │
-│  │ adapter checks | pairing checks | schema checks                   │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-│                               │                                         │
-│                               ▼                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ VALIDATION LAYER                                                  │  │
-│  │ invarlock doctor -> invarlock evaluate -> invarlock verify        │  │
-│  │ env/config checks | pairing math | schema + contracts             │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-│                               │                                         │
-│                               ▼                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ EVIDENCE LAYER                                                    │  │
-│  │ evaluation.report.json with seeds, hashes, policy digest, and     │  │
-│  │ guard measurement contracts plus runtime.manifest.json for audit. │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+host CLI -> separately pinned per-side OCI workers -> paired records -> host-signed pack
+signed pack + independent anchors -> verifier replay -> signed receipt
+signed pack -> authenticated renderer -> console/HTML
 ```
 
-## Assets and adversaries (in scope)
+At the first transition, the host prepares the canonical schedule and launches
+one worker for each side with network disabled, reduced privileges, a read-only
+container root, read-only job and model material, and an isolated writable
+output. The evidence-signing key remains host-side; workers never receive it.
+The host validates both closed outputs before it creates and signs the pack.
+Workers sharing a generic or identical CUDA selection run sequentially; workers
+on distinct explicit CUDA indexes may run in parallel. Model and
+runtime-integration code can still affect reported facts. At the second, the
+verifier treats every pack byte as hostile and must keep policy, artifact,
+schedule, runtime, and signer anchor sources outside the pack. At the third,
+presentation is read-only and carries no acceptance authority. The
+[evidence signer/verifier diagram](../assets/evidence-signer-verifier-trust.svg) shows the
+separate signing boundaries.
 
-**Assets**
+## Key attack scenarios
 
-- Baseline and subject model weights for supported task families.
-- Evaluation datasets, pairing schedules, and seed bundles.
-- Evaluation artifacts: reports, logs, and policy digests.
+### Mutually consistent fabricated execution
 
-**Adversaries / failure modes**
+A compromised evidence signer writes plausible artifact identities, runtime facts,
+provider observations, reports, and a runtime digest without running the model,
+then signs the pack. Internal replay can pass because every submitted binding
+agrees.
 
-- Malicious or malformed model artifacts (e.g., unsafe pickle payloads) used as
-  baselines or subjects.
-- Misconfigured edits or guard policies that silently degrade quality or break
-  structural invariants while “appearing to run”.
-- Dependency vulnerabilities in the Python stack and transitive extras that
-  could affect evaluation or guard logic.
+**What helps:** independent evidence-signer authorization prevents an arbitrary
+key from being accepted; external artifact, schedule, and runtime digests keep
+the pack from choosing different declared inputs; an independent rerun or
+measured-execution attestation can test the execution claim.
 
-## Mitigations (built-in + process)
+**What does not help:** checksums, an evidence signature, and digest agreement do
+not prove execution or measurement truth.
 
-- Network guard (`invarlock.security`) denies outbound sockets by default; network
-  use must be opted into per command.
-- Runtime security defaults keep model-loading commands containerized, third-party
-  plugins disabled, and remote model code off unless explicitly allowed.
-- Supply-chain checks in CI and PR validation (install-surface SBOM
-  generation, `pip-audit` on the base/`hf`/`advanced` shipped surfaces,
-  `gitleaks` git-delta JSON scanning), with tag-gated release checks and a
-  scheduled full-history secret scan for drift detection.
-- CodeQL scans shipped Python code plus repository helper scripts, and the
-  analysis workflow fails closed if upload/analysis cannot complete.
-- Release automation only rebuilds and publishes from validated tags resolved
-  to an immutable commit SHA.
-- Strict configuration and report validation (`invarlock doctor`,
-  `invarlock verify`) to detect misconfiguration, schema drift, and runtime
-  provenance mismatches.
-- report fields for seeds, windowing, dataset/tokenizer hashes, and guard
-  telemetry so auditors can audit the assurance evidence.
+### Biased schedule or run selection
 
-## Attack Scenarios
+An evidence signer selects favorable records, expected outputs, baseline, subject
+build, seed, or run after observing results. Exact pairing and deterministic
+replay still pass.
 
-Concrete attack scenarios InvarLock is designed to address or explicitly
-delegates to external processes:
+**Mitigation:** approve and retain the schedule digest, policy, artifacts, run
+selection rule, and stopping rule before subject results are visible. Review
+failed and superseded attempts according to the decision process. Use a held-
+out or independently selected schedule where appropriate.
 
-### 1. Poisoned Baseline Model
+### Circular trust anchors
 
-**Threat:** Attacker provides a pre-backdoored baseline that passes all guards.
+A decision owner copies the expected evidence-signer fingerprint, policy,
+artifact identities, schedule digest, runtime digest, or GGUF request digest from the pack and
+passes those values to `verify`. Verification can establish internal
+consistency but not independent acceptance.
 
-**Mitigation:** Baseline provenance is the caller's responsibility. InvarLock
-compares subject to baseline but does not validate baseline correctness.
+**Mitigation:** obtain all anchors from authorized configuration or another
+independent channel. Compare the signed receipt with that source before acting.
+For GGUF, approve the execution-free preflight request digest before evaluation;
+the verifier uses it to reject substituted llama.cpp backend, artifact, or
+execution settings even when the submitted bundle is internally consistent.
 
-**Detection:** None — baseline is trusted by design. Use external model
-provenance checks (e.g., model cards, hash verification) before evaluation.
+### Compromised verifier
 
-### 2. Malformed Pickle in Subject Checkpoint
+A compromised verifier can sign a misleading receipt or use unauthorized
+anchors. Receipt verifiers that trust only the embedded verifier key may accept it.
 
-**Threat:** Unsafe deserialization executes arbitrary code during model load.
+**Mitigation:** pin the expected verifier fingerprint and identity outside the
+receipt, protect verifier keys separately from evidence-signing keys, and retain the
+policy, artifact, schedule, and runtime sources used for the decision. Receipt
+verification must use those external expectations.
 
-**Mitigation:** InvarLock does not use pickle-capable adapter snapshot restore
-in the default path, and adapters using `from_pretrained` inherit HF's
-safetensors preference.
+### Key compromise and replayed history
 
-**Detection:** Invariants guard checks for non-finite values post-load; does
-not catch code execution during load itself.
+An attacker obtains an authorized evidence signer or verifier private key and signs
+new material. Cryptographic verification succeeds until receipt verifiers learn that
+the key is no longer authorized.
 
-### 3. Edit That Evades Guards
+**Mitigation:** maintain activation, expiry, and revocation records; timestamp
+or log approval events in a trusted system; rotate keys with explicit
+predecessor/successor records; and preserve the decision-time authorization
+state. InvarLock does not provide trusted time or revocation lookup.
 
-**Threat:** Carefully crafted edit stays within spectral/RMT bounds but causes
-task-specific degradation not captured by primary metric.
+After compromise, identify every bundle or receipt signed during the exposure
+window, suspend reliance, re-verify source evidence, and reissue receipts under
+a newly selected verifier key where appropriate. Re-signing fabricated
+evidence does not repair it; obtain new evidence from a trusted evaluation
+environment.
 
-**Mitigation:** Primary metric gate + guard ensemble provides layered defense.
-Tighten tier (conservative) for high-stakes releases.
+### Denial of service through hostile evidence
 
-**Detection:** `validation.primary_metric_acceptable = false` or guard warnings
-in report. Manual review of `report.guards[]` evidence.
+A submitter provides oversized, deeply nested, symlinked, sparse, or malformed
+material to consume verifier resources or escape the pack boundary.
 
-### 4. Configuration Drift Attack
+**Mitigation:** contract size/count limits, strict JSON/YAML decoding, regular-
+file requirements, path normalization, symlink rejection, exact inventory,
+and bounded reads. Run verification with operating-system resource limits when
+processing adversarial input; parser checks do not replace process isolation.
 
-**Threat:** Attacker modifies config to weaken guards (larger ε, disabled
-checks) hoping auditors do not notice.
+## Security boundaries
 
-**Mitigation:** reports capture `resolved_policy.*` and `policy_digest`
-for audit. `invarlock verify` enforces schema compliance.
+### Enforced by the engine
 
-**Detection:** Policy changes appear in `policy_digest.changed = true`.
-Compare reports side-by-side for unexpected policy drift.
+- strict, versioned and bounded request/evidence/provider documents;
+- root-confined and no-follow request paths;
+- authenticated file inventory and canonical encodings;
+- Ed25519 evidence signature with caller-pinned fingerprint;
+- exact provider, artifact, schedule, runtime, and record cross-bindings;
+- verifier-owned deterministic metric or explicitly authorized scorer replay
+  and policy arithmetic; and
+- an external Ed25519 receipt binding independent anchors and verdict.
 
-### 5. Window Schedule Manipulation
+### Required from the deployment
 
-**Threat:** Attacker provides crafted baseline windows that inflate subject
-performance (cherry-picked easy examples).
+- protected and separately authorized evidence-signing and verifier keys;
+- independently distributed policy, artifact, schedule, runtime,
+  evidence-signer, and verifier anchors;
+- immutable artifact and runtime acquisition;
+- trusted host, container engine, dependencies, drivers, provider code, and any
+  authorized scorer implementation;
+- representative schedule and run-selection governance;
+- external execution attestation or independent rerun when required; and
+- retention, revocation, and incident-response procedures.
 
-**Mitigation:** Pairing enforcement requires `window_match_fraction = 1.0` and
-`window_overlap_fraction = 0.0`. CI/Release profiles fail on pairing violations.
+## Verification-failure handling
 
-**Detection:** `[INVARLOCK:E001]` error on pairing schedule mismatch.
+Do not make a verifier error disappear by deleting files, relaxing signer
+pins, substituting the embedded policy, or changing runtime expectations. Use
+this triage order:
 
-## Out of scope (security non-goals)
+1. preserve the original evidence and command output;
+2. classify format/integrity, authentication, binding, replay, or policy
+   failure;
+3. determine whether the source transaction is invalid or infrastructure
+   transport failed;
+4. fix the evaluation or transport cause; and
+5. create new evidence when any signed byte or evaluation input changes.
 
-These match the assurance **non-goals**:
+A valid policy failure is evidence of nonacceptance, not an infrastructure
+error. An invalid bundle is no accepted evidence, not proof that the subject
+failed the metric.
 
-- Multi-tenant GPU isolation, kernel-level sandboxing, and host hardening.
-- Protection against prompt-level attacks, content harms (toxicity, bias,
-  jailbreaks), or general alignment failures.
-- Guarantees for environments outside the documented support matrix (e.g.,
-  native Windows, arbitrary CUDA stacks, unpinned dependency versions).
+## Explicit non-goals
 
-## See also
+InvarLock does not claim to:
 
-- [Assurance Overview and scope](../assurance/00-assurance-case.md)
-- [Security Best Practices](best-practices.md)
-- [Security Architecture](architecture.md)
+- prove that a model or runtime actually executed;
+- verify semantic truth of provider measurements;
+- establish population performance, confidence, or statistical power;
+- detect every malicious checkpoint, dependency, backend, or native library;
+- validate model safety, alignment, fairness, privacy, robustness, or content;
+- authorize deployment or replace domain-specific review;
+- secure a host, container engine, kernel, accelerator, or multi-tenant system;
+- issue or revoke identities and keys; or
+- establish the baseline as correct or trustworthy.
+
+See [Security practices](best-practices.md) for operating guidance and the
+[acceptance checklist](../assurance/acceptance-checklist.md) for one evidence
+decision.
+
+## References
+
+- National Institute of Standards and Technology,
+  [SP 800-190: Application Container Security Guide](https://doi.org/10.6028/NIST.SP.800-190),
+  2017.
+- National Institute of Standards and Technology,
+  [SP 800-218: Secure Software Development Framework 1.1](https://doi.org/10.6028/NIST.SP.800-218),
+  2022.
+- National Institute of Standards and Technology,
+  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://doi.org/10.6028/NIST.SP.800-57pt1r5),
+  2020.
+- in-toto project,
+  [Attestation Framework Specification 1.2](https://github.com/in-toto/attestation/blob/v1.2.0/spec/README.md),
+  2026.

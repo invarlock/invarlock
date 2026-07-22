@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/runtime_provider_capabilities.json",
+  "title": "InvarLock Runtime Provider Capabilities",
+  "type": "object",
+  "required": [
+    "format_version",
+    "provider_name",
+    "provider_abi",
+    "artifact_formats",
+    "tasks",
+    "metrics",
+    "execution_modes",
+    "required_extra",
+    "required_image"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "runtime-provider-capabilities-v1"
+    },
+    "provider_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "provider_abi": {
+      "const": "1"
+    },
+    "artifact_formats": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["hf_snapshot", "gguf", "tensorrt_llm_engine"]
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; canonical add-in task identifiers need no ABI revision.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "exact_match",
+          "normalized_nll_per_utf8_byte"
+        ]
+      }
+    },
+    "execution_modes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["in_process", "local_process", "container"]
+      }
+    },
+    "required_extra": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}
+      ]
+    },
+    "required_image": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^\\S+$"}
+      ]
+    }
+  },
+  "additionalProperties": false
+}

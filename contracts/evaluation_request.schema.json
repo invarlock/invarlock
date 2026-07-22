@@ -1,0 +1,413 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evaluation_request.schema.json",
+  "title": "InvarLock Evaluation Request",
+  "$comment": "One closed baseline-versus-subject comparison. Runtime settings are scalar provider-owned configuration validated through the provider ABI. The loader additionally enforces strict YAML limits and root-confined no-follow path resolution.",
+  "type": "object",
+  "required": ["format_version", "comparison", "execution", "output"],
+  "properties": {
+    "format_version": {
+      "const": "invarlock/evaluation-request-v1"
+    },
+    "comparison": {
+      "$ref": "#/$defs/comparison"
+    },
+    "execution": {
+      "$ref": "#/$defs/execution"
+    },
+    "observations": {
+      "$ref": "#/$defs/observations"
+    },
+    "output": {
+      "$ref": "#/$defs/output"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "safeReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+    },
+    "providerName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "taskName": {
+      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; optional add-ins may use another canonical identifier.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "settingName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "recordFieldName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+    },
+    "modelId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*://)[^\\u0000-\\u001f]+$"
+    },
+    "artifactLocator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001f]+$"
+    },
+    "jsonScalar": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "string", "maxLength": 4096}
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["model_id", "locator"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safeReference"},
+        "model_id": {"$ref": "#/$defs/modelId"},
+        "locator": {"$ref": "#/$defs/artifactLocator"}
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["provider", "settings"],
+      "properties": {
+        "provider": {"$ref": "#/$defs/providerName"},
+        "settings": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/settingName"},
+          "additionalProperties": {"$ref": "#/$defs/jsonScalar"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "comparisonSide": {
+      "type": "object",
+      "required": ["artifact", "runtime"],
+      "properties": {
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "runtime": {"$ref": "#/$defs/runtime"}
+      },
+      "additionalProperties": false
+    },
+    "comparison": {
+      "type": "object",
+      "required": ["baseline", "subject", "dataset", "policy", "task"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/comparisonSide"},
+        "subject": {"$ref": "#/$defs/comparisonSide"},
+        "dataset": {
+          "oneOf": [
+            {"$ref": "#/$defs/safeReference"},
+            {"$ref": "#/$defs/localDataset"},
+            {"$ref": "#/$defs/preparedLocalDataset"}
+          ]
+        },
+        "policy": {"$ref": "#/$defs/safeReference"},
+        "task": {"$ref": "#/$defs/taskName"},
+        "metric": {
+          "enum": [
+            "exact_match",
+            "normalized_nll_per_utf8_byte"
+          ]
+        },
+        "scorer_extension": {"$ref": "#/$defs/scorerExtensionBinding"}
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {"required": ["metric"], "not": {"required": ["scorer_extension"]}},
+        {"required": ["scorer_extension"], "not": {"required": ["metric"]}}
+      ]
+    },
+    "scorerExtensionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format_version",
+        "scorer_abi",
+        "scorer_id",
+        "scorer_version",
+        "descriptor_sha256",
+        "configuration",
+        "configuration_sha256"
+      ],
+      "properties": {
+        "format_version": {"const": "invarlock/scorer-extension-binding-v1"},
+        "scorer_abi": {"const": "1"},
+        "scorer_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+$"
+        },
+        "scorer_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "descriptor_sha256": {"$ref": "#/$defs/sha256"},
+        "configuration": {
+          "type": "object",
+          "maxProperties": 256
+        },
+        "configuration_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "localDataset": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256",
+        "format",
+        "name",
+        "split",
+        "input_field",
+        "expected_output_field"
+      ],
+      "properties": {
+        "path": {"$ref": "#/$defs/safeReference"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "format": {"const": "jsonl"},
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "input_field": {"$ref": "#/$defs/recordFieldName"},
+        "expected_output_field": {"$ref": "#/$defs/recordFieldName"},
+        "id_field": {"$ref": "#/$defs/recordFieldName"},
+        "content_role": {"$ref": "#/$defs/providerName"},
+        "content_id_field": {"$ref": "#/$defs/recordFieldName"},
+        "content_sha256_field": {"$ref": "#/$defs/recordFieldName"},
+        "content_byte_length_field": {"$ref": "#/$defs/recordFieldName"},
+        "content_media_type_field": {"$ref": "#/$defs/recordFieldName"},
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      },
+      "dependentRequired": {
+        "content_role": ["content_id_field", "content_sha256_field", "content_byte_length_field", "content_media_type_field"],
+        "content_id_field": ["content_role", "content_sha256_field", "content_byte_length_field", "content_media_type_field"],
+        "content_sha256_field": ["content_role", "content_id_field", "content_byte_length_field", "content_media_type_field"],
+        "content_byte_length_field": ["content_role", "content_id_field", "content_sha256_field", "content_media_type_field"],
+        "content_media_type_field": ["content_role", "content_id_field", "content_sha256_field", "content_byte_length_field"]
+      },
+      "additionalProperties": false
+    },
+    "preparedLocalDataset": {
+      "$comment": "Path-free run preparation descriptor emitted only in the signed normalized request. The authored request loader requires localDataset instead.",
+      "type": "object",
+      "required": [
+        "format_version",
+        "source_sha256",
+        "source_format",
+        "name",
+        "split",
+        "input_field",
+        "expected_output_field",
+        "id_field",
+        "content_role",
+        "content_id_field",
+        "content_sha256_field",
+        "content_byte_length_field",
+        "content_media_type_field",
+        "limit",
+        "selected_record_count"
+      ],
+      "properties": {
+        "format_version": {
+          "const": "invarlock/local-jsonl-preparation-v1"
+        },
+        "source_sha256": {"$ref": "#/$defs/sha256"},
+        "source_format": {"const": "jsonl"},
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "input_field": {"$ref": "#/$defs/recordFieldName"},
+        "expected_output_field": {"$ref": "#/$defs/recordFieldName"},
+        "id_field": {
+          "oneOf": [
+            {"$ref": "#/$defs/recordFieldName"},
+            {"type": "null"}
+          ]
+        },
+        "content_role": {
+          "oneOf": [
+            {"$ref": "#/$defs/providerName"},
+            {"type": "null"}
+          ]
+        },
+        "content_id_field": {
+          "oneOf": [
+            {"$ref": "#/$defs/recordFieldName"},
+            {"type": "null"}
+          ]
+        },
+        "content_sha256_field": {
+          "oneOf": [
+            {"$ref": "#/$defs/recordFieldName"},
+            {"type": "null"}
+          ]
+        },
+        "content_byte_length_field": {
+          "oneOf": [
+            {"$ref": "#/$defs/recordFieldName"},
+            {"type": "null"}
+          ]
+        },
+        "content_media_type_field": {
+          "oneOf": [
+            {"$ref": "#/$defs/recordFieldName"},
+            {"type": "null"}
+          ]
+        },
+        "limit": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            {"type": "null"}
+          ]
+        },
+        "selected_record_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      },
+      "additionalProperties": false
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/observationInput"},
+          {"$ref": "#/$defs/preparedObservation"}
+        ]
+      }
+    },
+    "observationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "observationKind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "observationInput": {
+      "$comment": "Authored requests name a root-confined canonical JSON payload. The normalized signed request replaces path with payload_digest.",
+      "type": "object",
+      "required": ["id", "kind", "scope", "path"],
+      "properties": {
+        "id": {"$ref": "#/$defs/observationId"},
+        "kind": {"$ref": "#/$defs/observationKind"},
+        "scope": {"enum": ["baseline", "subject", "comparison"]},
+        "path": {"$ref": "#/$defs/safeReference"}
+      },
+      "additionalProperties": false
+    },
+    "preparedObservation": {
+      "$comment": "Path-free descriptor emitted only in the normalized signed request.",
+      "type": "object",
+      "required": ["id", "kind", "scope", "payload_digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/observationId"},
+        "kind": {"$ref": "#/$defs/observationKind"},
+        "scope": {"enum": ["baseline", "subject", "comparison"]},
+        "payload_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "importSide": {
+      "type": "object",
+      "required": [
+        "identity",
+        "receipt",
+        "observation",
+        "run_report",
+        "runtime_manifest",
+        "runtime_config"
+      ],
+      "properties": {
+        "identity": {"$ref": "#/$defs/safeReference"},
+        "receipt": {"$ref": "#/$defs/safeReference"},
+        "observation": {"$ref": "#/$defs/safeReference"},
+        "run_report": {"$ref": "#/$defs/safeReference"},
+        "runtime_manifest": {"$ref": "#/$defs/safeReference"},
+        "runtime_config": {"$ref": "#/$defs/safeReference"}
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "oneOf": [
+        {
+          "type": "object",
+          "$comment": "Run requests select the provider work but cannot select host OCI images, devices, CPU or memory ceilings, container users, or engine policy. Those remain caller-owned launch controls.",
+          "required": ["mode"],
+          "properties": {
+            "mode": {"const": "run"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "records",
+            "schedule",
+            "baseline",
+            "subject"
+          ],
+          "properties": {
+            "mode": {"const": "import"},
+            "records": {"$ref": "#/$defs/safeReference"},
+            "schedule": {"$ref": "#/$defs/safeReference"},
+            "baseline": {"$ref": "#/$defs/importSide"},
+            "subject": {"$ref": "#/$defs/importSide"}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "output": {
+      "type": "object",
+      "required": ["evidence"],
+      "properties": {
+        "evidence": {"$ref": "#/$defs/safeReference"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

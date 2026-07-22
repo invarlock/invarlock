@@ -1,6 +1,6 @@
 # InvarLock – Changelog
 
-All notable changes to the InvarLock framework will be documented in this file.
+All notable changes to the InvarLock engine will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -14,6 +14,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+## [0.13.0] - 2026-07-21
+
+This release provides one paired model release-regression evaluation. A closed
+request authenticates the baseline and subject artifacts,
+dataset, providers, runtimes, policy, metric or deterministic scorer, execution
+mode, and evidence destination. `invarlock evaluate request.yaml` executes or
+imports both sides over one deterministic schedule, publishes a canonical
+signed evidence bundle, and records the paired policy result. `invarlock verify
+evidence/` replays that bundle against independently supplied trust anchors,
+while `invarlock report evidence/` renders the signer-authenticated comparison
+from the same canonical JSON.
+
+### Added
+
+- Added one closed evaluation request that authenticates the baseline, subject,
+  dataset, runtime providers, policy, selected metric or scorer, execution mode,
+  and evidence destination. Digest-pinned JSONL input now produces stable record
+  identities and one immutable paired schedule shared by both sides.
+- Added paired exact-match regression statistics covering regressions,
+  improvements, an exact two-sided McNemar probability, and a paired Newcombe
+  95% effect-size interval. Normalized negative log-likelihood per expected
+  UTF-8 byte uses a paired schedule-resampling interval, with the perplexity
+  ratio as a verifier-derived likelihood interpretation when tokenizer
+  contracts are comparable.
+- Added a bounded deterministic scorer extension whose per-record results remain
+  subject to verifier-owned aggregation, confidence intervals, policy, and
+  verdict calculation.
+- Added canonical evidence bundles with typed provider and runtime identities,
+  paired records, observations, inventories, checksums, and Ed25519 signatures.
+  Separately signed receipts and verifier-owned trust profiles bind the caller's
+  artifacts, schedule, policy, runtime, evidence signer, and verifier anchors.
+- Added execution-free preflight, isolated host-to-OCI run mode, and the
+  `invarlock.engine` embedding facade. The accepted, rejected, and tamper
+  examples now execute from a clean Git export with every required fixture
+  tracked.
+- Added maintained ecosystem journeys for Hugging Face text and vision-text
+  checkpoints, PEFT LoRA, TorchAO INT8 materialization, GGUF/llama.cpp, LM
+  Evaluation Harness, and TensorRT-LLM. Each journey obtains or creates its real
+  artifacts and preserves the upstream operation or runtime boundary while
+  completing the same exact-source evaluation, independent verification, and
+  report transaction. The text and transformation journeys use pinned
+  Qwen3-0.6B-family artifacts across direct checkpoint scoring, adapter merge,
+  weight-only quantization, GGUF execution, harness import, and BF16-to-FP8
+  TensorRT engine conversion. The vision-text journey compares pinned Qwen2-VL
+  2B and 7B checkpoints on a small authenticated image fixture. The offline
+  handoff journey covers accepted evidence, a valid policy failure, and byte
+  tampering without model downloads.
+
+### Changed
+
+- Unified executed and imported comparisons under `invarlock evaluate`,
+  `invarlock verify`, and `invarlock report`, with one canonical publication and
+  independent-verification transaction.
+- GGUF/llama.cpp, TensorRT-LLM, and Hugging Face vision-text ship as coordinated
+  first-party optional distributions; Hugging Face Transformers remains the
+  built-in text-causal provider. All use the same request, schedule, evidence,
+  verification, and reporting contracts.
+- Moved spectral, random-matrix, and variance calculations to the optional
+  `invarlock-diagnostics` package. Their canonical outputs can be authenticated
+  as observations but do not participate in acceptance.
+- Documentation, diagrams, packaged contracts, workflows, examples, and public
+  evidence use the closed transaction. The public index contains only
+  `invarlock/evidence-pack-v1` comparisons qualified on balanced,
+  pinned 400-record MMLU-Pro or MMMU-Pro schedules, with independent signed
+  receipts and a checked-in, hash-pinned suite manifest. The indexed entries
+  span Hugging Face text and vision-text execution plus TensorRT-LLM runtime
+  qualification; comparisons without current large-sample evidence use the
+  explicit **Evidence not yet created** state.
+- Bound source archives, core and add-in wheels, runtime images, signed
+  canaries, published artifacts, and final receipts in one reproducible release
+  qualification flow, with isolated suite data, at least 90% aggregate branch
+  coverage across runtime, example, qualification, release, check, and security
+  Python code, together with the same branch floor and a combined-coverage
+  ratchet for every branch-bearing maintained module.
+- Aligned the x86_64 CUDA and vision-text runtimes on CUDA 12.6, Torch 2.13,
+  and the matching TorchVision release, removing the older CUDA-only Torch and
+  Setuptools security exceptions while retaining broad H100/H200 driver
+  compatibility. The indexed 400-record Mistral 7B text and Qwen2-VL
+  vision-text comparisons were requalified and independently verified against
+  the resulting runtime images.
+- Consolidated bounded native-process communication across GGUF and
+  TensorRT-LLM and introduced a repository-wide complexity ceiling for core,
+  add-in, example, and maintenance Python code.
+
+### Removed
+
+- Removed catalog and calibration command families, built-in model editing,
+  training and quantization commands, the custom observability stack, and
+  duplicate report formats.
+- Removed built-in masked-LM and sequence-to-sequence execution support.
+  External transformation systems provide authenticated artifacts and receipts;
+  bounded vision-text execution remains an optional package.
+
+### Fixed
+
+- Hardened trust profiles, policies, keys, checkpoint trees, provider resources,
+  evidence publication, and receipt replay with bounded descriptor-anchored
+  reads, immutable snapshots, and rejection of symlink or path substitution.
+- Hardened Hugging Face loading against corrupt or incompletely bound
+  safetensors and unauthenticated live parameters while preserving validated
+  canonical layouts, storage-proven tied weights, explicit runtime-added
+  quantization defaults, one-to-one native checkpoint renames, and narrowly
+  audited non-executing auxiliary weights. Authenticated Qwen 3.5 and 3.6 BF16
+  materialization now accepts only their native model/configuration classes,
+  declared BF16 runtime state, and the exact documented Qwen 3.5 mixed-storage
+  inventory; partial or additional casts and quantized runtime state fail
+  closed.
+- Hardened GGUF and TensorRT-LLM readiness so authenticated models, executables,
+  static engine layouts, tokenizer contracts, immutable images, and configured
+  resource bounds are checked before native execution. Runner protocol, engine
+  loadability, and GPU behavior then fail closed inside the isolated runtime.
+  GGUF verification also requires an independently approved normalized-request
+  digest and reconciles its artifact, backend, and execution settings with the
+  authenticated provider receipt.
+- Made container and native-process cancellation terminate late-identified
+  containers and whole process groups, including descendants that retain pipe
+  descriptors after their launcher exits.
+- Fixed worker-unreadable artifact and support mounts to fail on the host with
+  an actionable diagnostic before container launch instead of an opaque runtime
+  authentication error.
+- Fixed release qualification so source, runtime images, signed canaries,
+  rendered packs, verification receipts, and published archive digests remain
+  bound to the same candidate. The protected tag run now builds and attests one
+  authoritative ten-archive distribution set recorded in a single digest
+  ledger. A non-publishing branch dispatch exercises the same Linux release
+  gates before a tag exists. Manual TestPyPI or PyPI publication authenticates
+  and reuses the exact tag-run artifact instead of rebuilding it; TestPyPI
+  remains an optional smoke rather than a production prerequisite. Coordinated
+  core and add-in distributions publish through separate project-scoped trusted
+  identities, including a bounded first-publication sequence for package indexes
+  that limit pending projects, then pass ledger-wide hosted-artifact verification
+  and a clean hosted-wheel install smoke. Interrupted multi-project publication
+  is safely resumable: already hosted files must match the candidate ledger
+  byte-for-byte before they can be skipped, while missing files remain
+  publishable. Diagnostic uploads now remain available after their own gate
+  runs without adding misleading failures when an earlier release gate stops
+  the job. Attestation write access and its OIDC token are confined to a short
+  tag-only job after the read-only build job validates and uploads the
+  digest-bound archive set. PyPI identity tokens are confined to minimal
+  environment-gated jobs that consume previously validated per-project
+  archives and do not execute candidate Python code. Clean-export and
+  isolated-install
+  safeguards prevent ignored local fixtures or source-path imports from
+  producing a false green result.
+- Updated maintained dependency locks to use patched CPU and CUDA packages.
+  The LM Evaluation Harness image now derives a deterministic cache-free wheel
+  from an authenticated upstream wheel, rejects response-cache use explicitly,
+  and excludes the vulnerable, unused `sqlitedict` dependency. The dependency
+  audit allowlist is empty. Pull-request, tag, and release workflows audit the
+  authoritative locks and retain their reports even when a finding blocks the
+  run. Full-history secret scanning recognizes only the intended digest and
+  key-type metadata fields while still detecting unrelated credentials in the
+  same file.
+- Made trust-boundary and TensorRT-LLM examples use fresh private workspaces and
+  least-privilege runtime ownership instead of deleting fixed output paths or
+  granting world-writable permissions.
 
 ## [0.12.1] - 2026-07-05
 
@@ -276,7 +433,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed remote model-evidence branch sync for `work/...` branches by fetching
   the current branch ref explicitly before fast-forwarding the remote checkout.
 - Fixed Mistral guard-demo manifests, run-log tracking, and public evidence
-  scope notes so the published demo no longer overclaims
+  scope notes so the published demo accurately identifies
   non-baseline-relative FP8 guard signals.
 - Fixed Gemma/Qwen multimodal evaluation gates by using classification-count
   accuracy intervals, delta semantics for accuracy drift, paired multimodal
@@ -330,8 +487,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs, checkpoint-reference artifact packages, non-quant BYOE examples, and
   caught-regression fixtures for guard and policy failures.
 - Added `make public-evidence-audit` and CI coverage for classifying public
-  evidence fixtures, verifying signed pack metadata, and preventing overclaims
-  in packaged public evidence.
+  evidence fixtures, verifying signed pack metadata, and enforcing evidence
+  scope in packaged public evidence.
 - Added public evidence walkthrough documentation with pinned evidence-pack
   verification commands and explicit integrity-versus-authenticity guidance.
 - Added scripts inventory governance, architecture-fragmentation tracking, and
@@ -433,8 +590,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forwarding, dev-profile rejection, strict PASS requirements, runtime sidecar
   requirements, signed-pack requirements, and deployable sidecar semantic
   validation failures.
-- Fixed evidence-pack verification and host evidence semantics for
-  expected-failure reports and host model evidence that should not claim strict
+- Fixed evidence-pack verification and host evidence semantics so
+  expected-failure reports and host model evidence are ineligible for strict
   assurance.
 - Fixed invariant-vocabulary guard compatibility for quantized wrapper models.
 - Fixed pseudo-accuracy handling so non-dev report generation fails unless
@@ -487,8 +644,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated reports now distinguish declared runtime provenance from verifier
   confirmation, preserve a separate report-local verdict, and record the actual
   runtime-provenance verification result in `verify` output.
-- Consolidated open dependency/security PR content into this branch: CodeQL
-  action SHA refresh, Ruff 0.15.14, `idna>=3.15`, and
+- Updated dependency and security tooling with a CodeQL action SHA refresh,
+  Ruff 0.15.14, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
 - Durable assurance and reference docs now describe the current strict contract
   without patch-release dating, and assurance documentation filenames now use
@@ -951,9 +1108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed docs to match the post-`v0.5.0` architecture and operations model,
   including the shell/core redesign, current evaluate contract, and updated
   report-artifact guidance.
-- Added remediation closeout records from the refactor program and updated the
-  maintainer smoke notes to distinguish the push-gated tiny container smoke from
-  the heavier GPT-2 canary workflow.
+- Updated maintainer smoke notes to distinguish the push-gated tiny container
+  smoke from the heavier GPT-2 canary workflow.
 - Documented the Python-only runtime-verifier contract and removed the obsolete
   external-verifier environment-variable guidance.
 - Updated the architecture/security references so runtime provenance
@@ -1392,8 +1548,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI/Release reports require perfect pairing, non-overlapping windows, and coverage floors.
 - Determinism preset chooses `CUBLAS_WORKSPACE_CONFIG` based on GPU memory and disables
   `TOKENIZERS_PARALLELISM` under strict settings.
-- Guard overhead metric fields standardized to `bare_ppl`/`guarded_ppl`; primary metric `display_ci`
-  is aligned with log-space CI for ppl-like metrics.
+- Guard metric impact reporting introduced paired bare/guarded primary-metric
+  measurements; primary metric `display_ci` is aligned with log-space CI for
+  perplexity metrics.
 - B200 validation workflow upgraded to v2.1.0 with dynamic scheduling, GPU lock management,
   and expanded task orchestration scripts.
 
@@ -1411,7 +1568,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calibration CLI (`invarlock calibrate`) and runtime modules for policy and guard tuning.
 - Determinism utilities and CLI flows to exercise repeatable runs and presets.
 - Bench policy regression harness and additional regression tests for guards and reports.
-- Benchmark policy regression golden `bench-golden-2025-12-13` (`2627b8872cd6bfc37bda31fbc11b78ed814751cbf2a9ad1396e173f1f4e5383a`) tracked to guard guard-effect CI against silent gate/output shifts.
+- Benchmark policy regression golden `bench-golden-2025-12-13` (`ae8094204c998fc51bf51052d7d1457d3cdc17bab9bc4785e88c4f07d0234ad3`) tracks guard-effect quality impact, runtime overhead, and memory overhead against silent gate/output shifts.
 
 ### Changed
 - Guard policies and tier runtime configuration updated to support calibration and determinism flows.
@@ -1425,7 +1582,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2025-12-10
 
 ### Added
-- **INVARLOCK_SKIP_OVERHEAD_CHECK env var** - Skip guard overhead measurement even with ci/release profiles for large models.
+- **INVARLOCK_SKIP_GUARD_METRIC_IMPACT_CHECK env var** - Skip guard metric impact measurement even with ci/release profiles for large models.
 - **Configurable PM acceptance range** - Set via preset config or `INVARLOCK_PM_ACCEPTANCE_MIN/MAX` environment variables.
 - **Comprehensive evidence pack guide** - New documentation at `docs/user-guide/evidence-packs.md`.
 

@@ -1,0 +1,38 @@
+{
+  "config": {
+    "path": "run.yaml",
+    "sha256": "bb802b9f3e1050ca32d97c7764d64d01b2a3b2a65944592fd708e6a950101ebc",
+    "source": "file"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-07-21T04:21:12.143720+00:00",
+  "manifest_version": 1,
+  "outer_container": {
+    "allow_network": false,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:11961f749a570b57916654b71dfc1b7ec8a2bc7507b9c435a2e47f0de9dff32d",
+    "image_ref": "sha256:11961f749a570b57916654b71dfc1b7ec8a2bc7507b9c435a2e47f0de9dff32d"
+  },
+  "report": {
+    "filename": "report.json",
+    "path": "report.json",
+    "sha256": "f75d29a025809d78df09f23927161546657dd0870073fa053f0b71b85a729e73"
+  },
+  "runtime_provider": {
+    "artifact_identity": {
+      "filename": "model-artifact.identity.json",
+      "sha256": "e0c212077d5985587d77d3f25b39c1d4325d1bed413ec27c06d6b2063d5ed4c9"
+    },
+    "receipt": {
+      "filename": "runtime-provider.receipt.json",
+      "sha256": "d26fb994a6d5e9ca64b9c966db1b1ff4ac29661fa6e948f32378aae0f107d262"
+    },
+    "scoring_observation": {
+      "filename": "runtime-scoring.observation.json",
+      "sha256": "905dadd977f7266b89bbe81edfe7c00eba25a20c58884e0886fa50e3fa5830b4"
+    }
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}
