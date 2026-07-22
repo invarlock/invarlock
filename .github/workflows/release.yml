@@ -23,6 +23,11 @@ on:
         description: "Successful tagged release workflow run ID required for publication"
         type: string
         default: ""
+      publication_phase:
+        description: "Publication phase (complete normally; bootstrap/finish only for first-time PyPI projects)"
+        type: choice
+        options: [ complete, bootstrap, finish ]
+        default: complete
 
 permissions:
   contents: read
@@ -522,25 +527,87 @@ jobs:
             --dist-dir _release_dist \
             --release-tag "${INVARLOCK_RELEASE_TAG}" \
             --github-output "${GITHUB_OUTPUT}"
+      - name: Verify completed bootstrap publication
+        if: >-
+          ${{
+            inputs.target == 'pypi' &&
+            inputs.publication_phase == 'finish'
+          }}
+        env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}
+          INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          python scripts/release/verify_hosted_distributions.py \
+            --ledger _release_dist/SHA256SUMS \
+            --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
+            --target pypi \
+            --version "${INVARLOCK_RELEASE_VERSION}" \
+            --project invarlock \
+            --project invarlock-diagnostics \
+            --project invarlock-runtime-gguf \
+            --project invarlock-runtime-hf-vision-text
+
+  publication_plan:
+    needs: [authorize_candidate, resolve_release_ref]
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.release_tag != ''
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Resolve publication phase
+        id: plan
+        shell: bash
+        env:
+          INVARLOCK_PUBLICATION_PHASE: ${{ inputs.publication_phase }}
+          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+
+          if [ "${INVARLOCK_PUBLISH_TARGET}" != "pypi" ]; then
+            case "${INVARLOCK_PUBLICATION_PHASE}" in
+              bootstrap)
+                echo "bootstrap publication is only valid for production PyPI" >&2
+                exit 1
+                ;;
+              finish)
+                echo "finish publication is only valid for production PyPI" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+          case "${INVARLOCK_PUBLICATION_PHASE}" in
+            complete)
+              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"},{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
+              ;;
+            bootstrap)
+              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"}]}'
+              ;;
+            finish)
+              matrix='{"include":[{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
+              ;;
+            *)
+              echo "unsupported publication phase" >&2
+              exit 1
+              ;;
+          esac
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
 
   publish:
-    needs: [authorize_candidate, resolve_release_ref]
+    needs: [authorize_candidate, publication_plan, resolve_release_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - package: core
-            environment_suffix: ""
-          - package: diagnostics
-            environment_suffix: -diagnostics
-          - package: runtime-gguf
-            environment_suffix: -runtime-gguf
-          - package: runtime-hf-vision-text
-            environment_suffix: -runtime-hf-vision-text
-          - package: runtime-tensorrt-llm
-            environment_suffix: -runtime-tensorrt-llm
+      matrix: ${{ fromJSON(needs.publication_plan.outputs.matrix) }}
     environment: ${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}
     permissions:
       actions: read
@@ -704,6 +771,12 @@ jobs:
 
   verify_hosted_release:
     needs: [authorize_candidate, publish, resolve_release_ref]
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.publication_phase != 'bootstrap'
+      }}
     runs-on: ubuntu-latest
     # Hosted verification can consume about 92 minutes at its documented
     # 12 attempts, 15 serial requests per attempt, and 30-second request timeout.
@@ -741,7 +814,11 @@ jobs:
   published_install_smoke:
     needs: [authorize_candidate, resolve_release_ref, verify_hosted_release]
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.publication_phase != 'bootstrap'
+      }}
     runs-on: ubuntu-latest
     # Leave the same bounded verification budget plus installation headroom.
     timeout-minutes: 120

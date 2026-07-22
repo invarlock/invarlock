@@ -288,6 +288,7 @@ def verify_hosted_distributions(
     timeout: float = 30.0,
     sleep: Callable[[float], None] = time.sleep,
     wheelhouse: Path | None = None,
+    projects: Sequence[str] | None = None,
 ) -> None:
     """Verify hosted metadata and bytes against one authenticated build ledger."""
     if target not in API_ROOTS:
@@ -299,6 +300,13 @@ def verify_hosted_distributions(
         raise HostedDistributionVerificationError("release version is malformed")
     if attempts < 1 or retry_delay < 0 or timeout <= 0:
         raise HostedDistributionVerificationError("retry configuration is invalid")
+    selected_projects = PROJECTS if projects is None else tuple(projects)
+    if (
+        not selected_projects
+        or len(set(selected_projects)) != len(selected_projects)
+        or not set(selected_projects).issubset(PROJECTS)
+    ):
+        raise HostedDistributionVerificationError("hosted project selection is invalid")
     expected = _parse_build_ledger(
         ledger_path,
         expected_ledger_sha256=expected_ledger_sha256,
@@ -317,7 +325,7 @@ def verify_hosted_distributions(
                         dir=wheel_destination.parent,
                     )
                 )
-            for project in PROJECTS:
+            for project in selected_projects:
                 _verify_project(
                     api_root=API_ROOTS[target],
                     project=project,
@@ -359,6 +367,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--retry-delay", type=float, default=10.0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--wheelhouse", type=Path)
+    parser.add_argument("--project", action="append", choices=PROJECTS)
     return parser
 
 
@@ -374,6 +383,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             retry_delay=args.retry_delay,
             timeout=args.timeout,
             wheelhouse=args.wheelhouse,
+            projects=args.project,
         )
     except HostedDistributionVerificationError as exc:
         raise SystemExit(str(exc)) from exc

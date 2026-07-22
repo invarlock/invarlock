@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import math
 import os
 import re
@@ -184,6 +185,12 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     inputs = workflow["on"]["workflow_dispatch"]["inputs"]
     assert inputs["candidate_run_id"]["default"] == ""
+    assert inputs["publication_phase"]["default"] == "complete"
+    assert inputs["publication_phase"]["options"] == [
+        "complete",
+        "bootstrap",
+        "finish",
+    ]
 
     build = jobs["build_check"]
     assert "github.event_name == 'push'" in build["if"]
@@ -411,8 +418,49 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         < authorization["steps"].index(candidate_download)
         < authorization["steps"].index(verify_candidate)
     )
+    verify_bootstrap = _step(
+        authorization["steps"], "Verify completed bootstrap publication"
+    )
+    assert "inputs.target == 'pypi'" in verify_bootstrap["if"]
+    assert "inputs.publication_phase == 'finish'" in verify_bootstrap["if"]
+    assert verify_bootstrap["env"] == {
+        "EXPECTED_DIST_LEDGER_SHA256": (
+            "${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}"
+        ),
+        "INVARLOCK_RELEASE_VERSION": (
+            "${{ needs.resolve_release_ref.outputs.release_tag }}"
+        ),
+    }
+    for project in (
+        "invarlock",
+        "invarlock-diagnostics",
+        "invarlock-runtime-gguf",
+        "invarlock-runtime-hf-vision-text",
+    ):
+        assert f"--project {project}" in verify_bootstrap["run"]
+    assert "invarlock-runtime-tensorrt-llm" not in verify_bootstrap["run"]
+
+    publication_plan = jobs["publication_plan"]
+    assert set(publication_plan["needs"]) == {
+        "authorize_candidate",
+        "resolve_release_ref",
+    }
+    plan_step = _step(publication_plan["steps"], "Resolve publication phase")
+    assert plan_step["env"] == {
+        "INVARLOCK_PUBLICATION_PHASE": "${{ inputs.publication_phase }}",
+        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
+    }
+    for phase in ("complete", "bootstrap", "finish"):
+        assert f"{phase})" in plan_step["run"]
+    assert "bootstrap publication is only valid for production PyPI" in plan_step["run"]
+    assert "finish publication is only valid for production PyPI" in plan_step["run"]
 
     publish = jobs["publish"]
+    assert set(publish["needs"]) == {
+        "authorize_candidate",
+        "publication_plan",
+        "resolve_release_ref",
+    }
     assert publish["permissions"] == {
         "actions": "read",
         "contents": "read",
@@ -421,19 +469,9 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "github.event_name == 'push'" not in publish["if"]
     assert "github.event_name == 'workflow_dispatch'" in publish["if"]
     assert publish["strategy"]["fail-fast"] is False
-    assert publish["strategy"]["matrix"]["include"] == [
-        {"package": "core", "environment_suffix": ""},
-        {"package": "diagnostics", "environment_suffix": "-diagnostics"},
-        {"package": "runtime-gguf", "environment_suffix": "-runtime-gguf"},
-        {
-            "package": "runtime-hf-vision-text",
-            "environment_suffix": "-runtime-hf-vision-text",
-        },
-        {
-            "package": "runtime-tensorrt-llm",
-            "environment_suffix": "-runtime-tensorrt-llm",
-        },
-    ]
+    assert publish["strategy"]["matrix"] == (
+        "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
+    )
     assert publish["environment"] == (
         "${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}"
     )
@@ -505,6 +543,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "resolve_release_ref",
     }
     assert hosted_job["permissions"] == {"actions": "read", "contents": "read"}
+    assert "inputs.publication_phase != 'bootstrap'" in hosted_job["if"]
     hosted_checkout = hosted_job["steps"][0]
     assert hosted_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -536,6 +575,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "verify_hosted_release",
     }
     assert published_smoke["permissions"] == {"actions": "read", "contents": "read"}
+    assert "inputs.publication_phase != 'bootstrap'" in published_smoke["if"]
     published_checkout = published_smoke["steps"][0]
     assert published_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -593,6 +633,62 @@ def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
 
     assert jobs["verify_hosted_release"]["timeout-minutes"] >= required_job_minutes
     assert jobs["published_install_smoke"]["timeout-minutes"] >= required_job_minutes
+
+
+def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    step = _step(
+        workflow["jobs"]["publication_plan"]["steps"],
+        "Resolve publication phase",
+    )
+    expected = {
+        "complete": [
+            "core",
+            "diagnostics",
+            "runtime-gguf",
+            "runtime-hf-vision-text",
+            "runtime-tensorrt-llm",
+        ],
+        "bootstrap": [
+            "core",
+            "diagnostics",
+            "runtime-gguf",
+            "runtime-hf-vision-text",
+        ],
+        "finish": ["runtime-tensorrt-llm"],
+    }
+    output = tmp_path / "github-output"
+    for phase, expected_packages in expected.items():
+        output.write_text("", encoding="utf-8")
+        subprocess.run(
+            ["bash", "-c", step["run"]],
+            env={
+                **os.environ,
+                "GITHUB_OUTPUT": str(output),
+                "INVARLOCK_PUBLICATION_PHASE": phase,
+                "INVARLOCK_PUBLISH_TARGET": "pypi",
+            },
+            check=True,
+        )
+        line = output.read_text(encoding="utf-8").strip()
+        assert line.startswith("matrix=")
+        matrix = json.loads(line.removeprefix("matrix="))
+        assert [entry["package"] for entry in matrix["include"]] == expected_packages
+
+    rejected = subprocess.run(
+        ["bash", "-c", step["run"]],
+        env={
+            **os.environ,
+            "GITHUB_OUTPUT": str(output),
+            "INVARLOCK_PUBLICATION_PHASE": "bootstrap",
+            "INVARLOCK_PUBLISH_TARGET": "testpypi",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert rejected.returncode != 0
+    assert "only valid for production PyPI" in rejected.stderr
 
 
 def test_release_stages_each_distribution_in_its_own_publish_job(

@@ -130,8 +130,10 @@ def test_authenticate_tagged_run_rejects_wrong_workflow_run(
         ("candidate_run_id", "01", "run ID"),
         ("repository", "one-component", "repository"),
         ("api_url", "http://api.github.com", "API URL"),
+        ("api_url", "https:///missing-host", "API URL"),
         ("api_url", "https://user@example.test", "API URL"),
         ("api_url", "https://api.github.com?token=value", "API URL"),
+        ("api_url", "https://api.github.com#fragment", "API URL"),
     ],
 )
 def test_authenticate_tagged_run_rejects_malformed_identity(
@@ -187,6 +189,16 @@ def test_authenticate_tagged_run_closes_network_and_json_failures() -> None:
             **common,
             opener=lambda *_args, **_kwargs: FakeResponse(b'{"id":1,"id":2}\n'),
         )
+    with pytest.raises(candidate.CandidateError, match="strict JSON"):
+        candidate.authenticate_tagged_run(
+            **common,
+            opener=lambda *_args, **_kwargs: FakeResponse(b'{"value":NaN}\n'),
+        )
+    with pytest.raises(candidate.CandidateError, match="JSON object"):
+        candidate.authenticate_tagged_run(
+            **common,
+            opener=lambda *_args, **_kwargs: FakeResponse(b"[]\n"),
+        )
     with pytest.raises(candidate.CandidateError, match="metadata is too large"):
         candidate.authenticate_tagged_run(
             **common,
@@ -232,6 +244,14 @@ def test_verify_distribution_ledger_rejects_missing_unexpected_and_changed_files
         candidate.verify_distribution_ledger(tmp_path, TAG)
 
     _dist_tree(tmp_path)
+    (tmp_path / "unexpected.txt").write_text("not part of the candidate\n")
+    with pytest.raises(
+        candidate.CandidateError, match="artifact has the wrong file set"
+    ):
+        candidate.verify_distribution_ledger(tmp_path, TAG)
+    (tmp_path / "unexpected.txt").unlink()
+
+    _dist_tree(tmp_path)
     first_relative = sorted(candidate.expected_distribution_paths("1.2.3"))[0]
     (tmp_path / first_relative).write_bytes(b"changed")
     with pytest.raises(candidate.CandidateError, match="digest mismatch"):
@@ -270,6 +290,14 @@ def test_github_output_helpers_emit_only_validated_scalars(tmp_path: Path) -> No
     assert output.read_text(encoding="utf-8") == (
         f"artifact_run_id={RUN_ID}\ndist_ledger_sha256={'b' * 64}\n"
     )
+
+    with pytest.raises(candidate.CandidateError, match="ledger digest"):
+        candidate.write_ledger_output(output, "not-a-digest")
+
+
+def test_expected_distribution_paths_rejects_malformed_version() -> None:
+    with pytest.raises(candidate.CandidateError, match="release version"):
+        candidate.expected_distribution_paths("latest")
 
 
 def test_main_authenticates_then_verifies_candidate(

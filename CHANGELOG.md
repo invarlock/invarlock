@@ -143,9 +143,11 @@ from the same canonical JSON.
   exact tag-run artifact instead of rebuilding it; TestPyPI remains an optional
   smoke rather than a production prerequisite. Coordinated core and add-in
   distributions publish through separate project-scoped trusted identities,
-  then pass ledger-wide hosted-artifact verification and a clean hosted-wheel
-  install smoke. Clean-export and isolated-install safeguards prevent ignored
-  local fixtures or source-path imports from producing a false green result.
+  including a bounded first-publication sequence for package indexes that limit
+  pending projects, then pass ledger-wide hosted-artifact verification and a
+  clean hosted-wheel install smoke. Clean-export and isolated-install safeguards
+  prevent ignored local fixtures or source-path imports from producing a false
+  green result.
 - Updated maintained dependency locks to use patched CPU and CUDA packages.
   The LM Evaluation Harness image now derives a deterministic cache-free wheel
   from an authenticated upstream wheel, rejects response-cache use explicitly,

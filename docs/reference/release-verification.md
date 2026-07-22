@@ -47,9 +47,9 @@ For a tagged or explicitly selected release commit, the repository workflow:
 10. audits the installed dependency surface and generates an SBOM;
 11. records all ten archives in one SHA-256 ledger and attaches build-provenance
     attestations during the tag run; and
-12. after either TestPyPI or PyPI publication, verifies every hosted archive
-    against that tag-run ledger, installs the hosted wheels together, and
-    repeats the conformance smoke.
+12. after a complete TestPyPI or PyPI publication, verifies every hosted
+    archive against that tag-run ledger, installs the hosted wheels together,
+    and repeats the conformance smoke.
 
 These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
@@ -134,12 +134,25 @@ Production uses the same tagged candidate directly. Once local preflight,
 tag-to-commit checks, release notes, security review, provenance, and the tag
 workflow are complete, dispatch the workflow again from the release tag,
 select `pypi`, and provide the same tag workflow run ID as `candidate_run_id`.
+Use the default `complete` publication phase for an ordinary release.
 The production jobs consume the exact archives built by the tag run; they do
 not rebuild them or depend on TestPyPI state. A stale, incomplete, or
 filename-colliding TestPyPI project therefore cannot silently select or alter a
 production candidate. Production publication also refuses existing filenames;
 the post-publication verifier cannot turn a mixed or partially replaced release
 into a successful run.
+
+PyPI permits only three pending trusted publishers at once. When a coordinated
+release creates four new add-in projects for the first time, use the production
+`bootstrap` phase to publish the core plus the diagnostics, GGUF, and
+vision-text distributions. After those pending publishers become ordinary
+project publishers, register the TensorRT-LLM publisher and dispatch the
+`finish` phase with the same release tag and `candidate_run_id`. The finish run
+first confirms that all eight bootstrap archives are hosted byte-for-byte from
+that ledger, publishes only TensorRT-LLM, then verifies all ten hosted archives
+and installs all five wheels together. The two special phases are rejected for
+TestPyPI; later releases use `complete` and publish all five projects in one
+dispatch.
 
 Configure a protected `v*` tag ruleset that blocks updates and deletion. Protect
 each project-scoped PyPI environment with required reviewers and an appropriate

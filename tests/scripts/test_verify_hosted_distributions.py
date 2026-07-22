@@ -86,6 +86,55 @@ def test_verify_hosted_distributions_accepts_exact_build_bytes(
     )
 
 
+def test_verify_hosted_distributions_accepts_authenticated_project_subset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = "pypi"
+    ledger, ledger_digest, metadata, downloads = _release_fixture(
+        tmp_path, target=target
+    )
+    selected = verifier.PROJECTS[:-1]
+    tensorrt_metadata = (
+        f"{verifier.API_ROOTS[target]}/{verifier.PROJECTS[-1]}/1.2.3/json"
+    )
+    metadata.pop(tensorrt_metadata)
+    _install_fake_network(
+        monkeypatch,
+        metadata=metadata,
+        downloads=downloads,
+    )
+
+    verifier.verify_hosted_distributions(
+        ledger_path=ledger,
+        expected_ledger_sha256=ledger_digest,
+        target=target,
+        version="v1.2.3",
+        attempts=1,
+        projects=selected,
+    )
+
+
+@pytest.mark.parametrize("projects", [(), ("unknown",), ("invarlock", "invarlock")])
+def test_verify_hosted_distributions_rejects_invalid_project_subset(
+    tmp_path: Path, projects: tuple[str, ...]
+) -> None:
+    ledger, ledger_digest, _metadata, _downloads = _release_fixture(
+        tmp_path, target="pypi"
+    )
+    with pytest.raises(
+        verifier.HostedDistributionVerificationError,
+        match="project selection is invalid",
+    ):
+        verifier.verify_hosted_distributions(
+            ledger_path=ledger,
+            expected_ledger_sha256=ledger_digest,
+            target="pypi",
+            version="v1.2.3",
+            attempts=1,
+            projects=projects,
+        )
+
+
 def test_verify_hosted_distributions_materializes_only_ledger_selected_wheels(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -298,6 +347,8 @@ def test_cli_verifies_hosted_release(
             "v1.2.3",
             "--attempts",
             "1",
+            "--project",
+            "invarlock",
         ]
     )
 
