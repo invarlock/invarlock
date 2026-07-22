@@ -151,11 +151,12 @@ from the same canonical JSON.
   byte-for-byte before they can be skipped, while missing files remain
   publishable. Diagnostic uploads now remain available after their own gate
   runs without adding misleading failures when an earlier release gate stops
-  the job. OIDC and attestation write permissions are confined to a short
+  the job. Attestation write access and its OIDC token are confined to a short
   tag-only job after the read-only build job validates and uploads the
   digest-bound archive set. PyPI identity tokens are confined to minimal
-  environment-gated jobs that consume prevalidated per-project archives and do
-  not execute candidate Python code. Clean-export and isolated-install
+  environment-gated jobs that consume previously validated per-project
+  archives and do not execute candidate Python code. Clean-export and
+  isolated-install
   safeguards prevent ignored local fixtures or source-path imports from
   producing a false green result.
 - Updated maintained dependency locks to use patched CPU and CUDA packages.
