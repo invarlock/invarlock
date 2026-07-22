@@ -5,6 +5,10 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+import pytest
+from packaging.requirements import Requirement
+from packaging.version import Version
+
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_REQUIREMENTS = ROOT / "requirements" / "workflows"
 REFRESH_SCRIPT = ROOT / "scripts" / "security" / "refresh_pinned_requirements.sh"
@@ -87,6 +91,43 @@ def test_type_checker_version_is_identical_in_local_and_workflow_locks() -> None
         for python_tag in ("312", "313")
     }
     assert {uv_version, *workflow_versions} == declared
+
+
+@pytest.mark.parametrize(
+    ("lock_name", "extra_names"),
+    (
+        ("core-py312.txt", ()),
+        ("hf-py313.txt", ("hf",)),
+        ("ci-hf-py312.txt", ("hf", "ci")),
+        ("ci-hf-py313.txt", ("hf", "ci")),
+        ("docs-ci-py313.txt", ("docs-ci",)),
+        ("precommit-ci-py313.txt", ("precommit-ci",)),
+        ("release-security-py313.txt", ("release-ci", "security-ci")),
+        ("security-ci-py313.txt", ("security-ci",)),
+    ),
+)
+def test_workflow_locks_satisfy_every_declared_direct_requirement(
+    lock_name: str,
+    extra_names: tuple[str, ...],
+) -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    requirements = list(project["dependencies"])
+    optional = project["optional-dependencies"]
+    for extra_name in extra_names:
+        requirements.extend(optional[extra_name])
+
+    lock_path = WORKFLOW_REQUIREMENTS / lock_name
+    for raw_requirement in requirements:
+        requirement = Requirement(raw_requirement)
+        locked_version = Version(
+            _hashed_requirement_version(lock_path, requirement.name.lower())
+        )
+        assert locked_version in requirement.specifier, (
+            f"{lock_name} pins {requirement.name}=={locked_version}, which does not "
+            f"satisfy the declared requirement {requirement}"
+        )
 
 
 def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
