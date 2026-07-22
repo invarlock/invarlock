@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/artifacts/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/runtime-security/">
       
       
-        <link rel="prev" href="../api-guide/">
+        <link rel="prev" href="../runtime-providers/">
       
       
-        <link rel="next" href="../reports/">
+        <link rel="next" href="../environment/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Artifacts - InvarLock Documentation</title>
+        <title>Runtime-security API - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#evidence-artifacts" class="md-skip">
+        <a href="#runtime-security-api" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Artifacts
+              Runtime-security API
             
           </span>
         </div>
@@ -1163,37 +1163,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artifacts
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -1209,114 +1182,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#manifest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manifest
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#checksums-and-closed-inventory" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Checksums and closed inventory
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#paired-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Paired records
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#provider-sidecars" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider sidecars
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#publication-and-immutability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Publication and immutability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#external-outputs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        External outputs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1382,10 +1247,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../runtime-security/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1401,6 +1293,98 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-observation-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime observation facade
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime observation facade">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#image-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#process-security-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process-security facade
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-and-concurrency-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure and concurrency behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container-user-and-resource-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container user and resource boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1725,10 +1709,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
+  <a href="#runtime-observation-facade" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Directory layout
+        Runtime observation facade
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime observation facade">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#image-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#process-security-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process-security facade
       
     </span>
   </a>
@@ -1736,10 +1748,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#manifest" class="md-nav__link">
+  <a href="#failure-and-concurrency-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Manifest
+        Failure and concurrency behavior
       
     </span>
   </a>
@@ -1747,54 +1759,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#checksums-and-closed-inventory" class="md-nav__link">
+  <a href="#container-user-and-resource-boundary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Checksums and closed inventory
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#paired-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Paired records
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#provider-sidecars" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider sidecars
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#publication-and-immutability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Publication and immutability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#external-outputs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        External outputs
+        Container user and resource boundary
       
     </span>
   </a>
@@ -1832,366 +1800,244 @@
   
 
 
-<h1 id="evidence-artifacts">Evidence artifacts<a class="headerlink" href="#evidence-artifacts" title="Permanent link">&para;</a></h1>
-<p>An <code>invarlock/evidence-pack-v1</code> bundle is a closed, signed evidence directory. Its paths
-are fixed by the manifest schema; additional files are rejected in strict
-verification.</p>
+<h1 id="runtime-security-api">Runtime-security API<a class="headerlink" href="#runtime-security-api" title="Permanent link">&para;</a></h1>
+<p>The public runtime-security facades expose the small set of primitives used to
+observe strict execution context and to harden an embedding process. They are
+defense-in-depth tools; they do not turn a Python process or container into a
+trusted execution environment.</p>
 <div class="admonition info">
 <p class="admonition-title">Reference</p>
 <ul>
-<li><strong>Surface:</strong> <code>invarlock/evidence-pack-v1</code> directory, manifest, payload inventory, and external outputs</li>
-<li><strong>Stability:</strong> Versioned public artifact contract; fixed paths and closed inventory are verification requirements</li>
-<li><strong>Use this page when:</strong> Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim</li>
+<li><strong>Surface:</strong> <code>invarlock.runtime_security</code> and <code>invarlock.security</code></li>
+<li><strong>Stability:</strong> Documented names are public; kernel, container, and socket behavior remains platform-dependent</li>
+<li><strong>Use this page when:</strong> Embedding the engine, constructing runtime manifests, or applying process-local network and temporary-file controls</li>
 </ul>
 </div>
-<p><img alt="Evidence dependency map" src="../../assets/reference-evidence-dependency.svg" /></p>
-<h2 id="directory-layout">Directory layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>evidence/
-├── manifest.json
-├── manifest.signature.json
-├── checksums.sha256
-├── request.json
-├── inputs/
-│   ├── baseline.json
-│   ├── subject.json
-│   ├── dataset.json
-│   ├── baseline_runtime.json
-│   ├── subject_runtime.json
-│   └── policy.json
-├── schedule/
-│   └── runtime-behavioral-schedule.json
-├── records/
-│   └── paired-records.json
-├── reports/
-│   └── evaluation.report.json
-├── runs/
-│   ├── baseline/report.json
-│   └── subject/report.json
-└── providers/
-    ├── baseline/
-    │   ├── run.yaml
-    │   ├── runtime.manifest.json
-    │   ├── model-artifact.identity.json
-    │   ├── runtime-provider.receipt.json
-    │   └── runtime-scoring.observation.json
-    └── subject/
-        └── ...the same five files...
-</code></pre></div>
-
-<p><code>inputs/*.json</code> are identity records, not copies of model weights, the dataset,
-or the policy. Each carries a material digest and may carry a stable locator or
-media type. The exact normalized request, schedule, provider material, paired
-records, and canonical report are separate payloads referenced by the manifest.</p>
+<h2 id="runtime-observation-facade">Runtime observation facade<a class="headerlink" href="#runtime-observation-facade" title="Permanent link">&para;</a></h2>
+<p><code>invarlock.runtime_security</code> exports constants, immutable manifest value types,
+and pure observations over the current environment.</p>
 <table>
 <thead>
 <tr>
-<th>Path or group</th>
-<th>Cardinality</th>
-<th>Authority in replay</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>request.json</code></td>
-<td>One</td>
-<td>Normalized evaluation intent; never substitutes for independent verifier anchors</td>
-</tr>
-<tr>
-<td><code>inputs/*.json</code></td>
-<td>Six</td>
-<td>Role-specific identity records and material digests</td>
-</tr>
-<tr>
-<td><code>schedule/*.json</code></td>
-<td>One</td>
-<td>Ordered dataset records and expected outputs</td>
-</tr>
-<tr>
-<td><code>providers/{side}/*</code></td>
-<td>Five per side</td>
-<td>Artifact, observation, provider, configuration, and runtime provenance</td>
-</tr>
-<tr>
-<td><code>runs/{side}/report.json</code></td>
-<td>One per side</td>
-<td>Minimal side-to-observation binding</td>
-</tr>
-<tr>
-<td><code>records/paired-records.json</code></td>
-<td>One</td>
-<td>Verifier-reproducible record scores; not an accepted aggregate</td>
-</tr>
-<tr>
-<td><code>reports/evaluation.report.json</code></td>
-<td>One</td>
-<td>Canonical means, comparison, paired interval, threshold, optional sample qualification, and verdict reproduced by verification</td>
-</tr>
-<tr>
-<td><code>observations/*.json</code></td>
-<td>Zero to 64</td>
-<td>Authenticated typed context; descriptive only and excluded from policy replay</td>
-</tr>
-<tr>
-<td><code>checksums.sha256</code></td>
-<td>One</td>
-<td>Exact payload-byte inventory</td>
-</tr>
-<tr>
-<td><code>manifest.json</code> and signature</td>
-<td>One each</td>
-<td>Closed references and signer authentication</td>
-</tr>
-</tbody>
-</table>
-<h2 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h2>
-<p><code>manifest.json</code> contains exactly:</p>
-<ul>
-<li><code>format</code> and deterministic <code>comparison_id</code>;</li>
-<li>six input references: baseline, subject, dataset, both runtimes, and policy;</li>
-<li>fifteen evidence-role references at their fixed paths;</li>
-<li>the paired-record path, digest, and count;</li>
-<li>optional typed observation references with fixed paths, digests, kinds, and scopes;</li>
-<li>the checksum-file path and digest; and</li>
-<li>the evidence-signing key fingerprint.</li>
-</ul>
-<p>Every input reference has a digest of the identity file and a distinct
-<code>material_digest</code> for the authenticated input. Every evidence reference has a
-digest of the exact file bytes.</p>
-<p>The manifest structure is equivalent to this abbreviated, non-copyable view:</p>
-<div class="codehilite"><pre><span></span><code>{
-  &quot;format&quot;: &quot;invarlock/evidence-pack-v1&quot;,
-  &quot;comparison_id&quot;: &quot;...&quot;,
-  &quot;inputs&quot;: {
-    &quot;baseline&quot;: {
-      &quot;path&quot;: &quot;inputs/baseline.json&quot;,
-      &quot;digest&quot;: &quot;sha256:...&quot;,
-      &quot;material_digest&quot;: &quot;sha256:...&quot;
-    },
-    &quot;subject&quot;: { ... },
-    &quot;dataset&quot;: { ... },
-    &quot;baseline_runtime&quot;: { ... },
-    &quot;subject_runtime&quot;: { ... },
-    &quot;policy&quot;: { ... }
-  },
-  &quot;evidence&quot;: {
-    &quot;request&quot;: {&quot;path&quot;: &quot;request.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;schedule&quot;: {&quot;path&quot;: &quot;schedule/runtime-behavioral-schedule.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;evaluation_report&quot;: {&quot;path&quot;: &quot;reports/evaluation.report.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;...&quot;: &quot;twelve additional fixed evidence roles&quot;
-  },
-  &quot;paired_records&quot;: {
-    &quot;path&quot;: &quot;records/paired-records.json&quot;,
-    &quot;digest&quot;: &quot;sha256:...&quot;,
-    &quot;count&quot;: 20
-  },
-  &quot;checksums_sha256&quot;: &quot;checksums.sha256&quot;,
-  &quot;checksums_sha256_digest&quot;: &quot;...bare sha256...&quot;,
-  &quot;signing_key_fingerprint&quot;: &quot;sha256:...&quot;
-}
-</code></pre></div>
-
-<p>The real object has no comments, ellipses, or abbreviated roles. It has exactly
-six input references and fifteen evidence references at schema-fixed paths.</p>
-<p><code>manifest.signature.json</code> embeds the Ed25519 public key, its fingerprint, and a
-base64 signature over the exact canonical <code>manifest.json</code> bytes. The public key
-is evidence of who signed only after its fingerprint is matched to an
-independent expected signer.</p>
-<table>
-<thead>
-<tr>
-<th>Signature field</th>
+<th>Export</th>
+<th>Return or value</th>
 <th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>format</code></td>
-<td><code>invarlock/evidence-pack-signature-v1</code></td>
+<td><code>ALLOW_NETWORK_ENV</code></td>
+<td><code>INVARLOCK_ALLOW_NETWORK</code></td>
+<td>Process-local network switch name</td>
 </tr>
 <tr>
-<td><code>algorithm</code></td>
-<td>Ed25519</td>
+<td><code>ALLOW_REMOTE_CODE_ENV</code></td>
+<td><code>INVARLOCK_ALLOW_REMOTE_CODE</code></td>
+<td>Remote-code switch name</td>
 </tr>
 <tr>
-<td>Embedded public key</td>
-<td>Verification material, not an independent trust anchor</td>
+<td><code>ALLOW_THIRD_PARTY_PLUGINS_ENV</code></td>
+<td><code>INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS</code></td>
+<td>Arbitrary provider-discovery switch name</td>
 </tr>
 <tr>
-<td>Public-key fingerprint</td>
-<td>SHA-256 of the raw Ed25519 public key</td>
+<td><code>CONTAINER_EXECUTION_ENV</code></td>
+<td><code>INVARLOCK_CONTAINER_EXECUTION</code></td>
+<td>Explicit container-intent switch name</td>
 </tr>
 <tr>
-<td>Signature</td>
-<td>Authentication of the exact canonical manifest bytes</td>
+<td><code>RUNTIME_IMAGE_ENV</code></td>
+<td><code>INVARLOCK_RUNTIME_IMAGE</code></td>
+<td>Current side worker's OCI image reference input</td>
+</tr>
+<tr>
+<td><code>RUNTIME_IMAGE_DIGEST_ENV</code></td>
+<td><code>INVARLOCK_RUNTIME_IMAGE_DIGEST</code></td>
+<td>Current side worker's pinned image digest input</td>
+</tr>
+<tr>
+<td><code>RUNTIME_MANIFEST_FILENAME</code></td>
+<td><code>runtime.manifest.json</code></td>
+<td>Fixed sidecar name</td>
+</tr>
+<tr>
+<td><code>RUNTIME_MANIFEST_VERSION</code></td>
+<td><code>1</code></td>
+<td>Runtime manifest implementation version</td>
+</tr>
+<tr>
+<td><code>network_allowed()</code></td>
+<td><code>bool</code></td>
+<td>Whether the network switch is truthy</td>
+</tr>
+<tr>
+<td><code>remote_code_allowed()</code></td>
+<td><code>bool</code></td>
+<td>Whether remote code is explicitly enabled</td>
+</tr>
+<tr>
+<td><code>third_party_plugins_allowed()</code></td>
+<td><code>bool</code></td>
+<td>Whether arbitrary provider discovery is enabled</td>
+</tr>
+<tr>
+<td><code>running_inside_container()</code></td>
+<td><code>bool</code></td>
+<td>Whether explicit container intent is set</td>
+</tr>
+<tr>
+<td><code>current_execution_mode()</code></td>
+<td><code>host</code> or <code>container</code></td>
+<td>Intent-derived execution label</td>
+</tr>
+<tr>
+<td><code>strict_container_boundary_present()</code></td>
+<td><code>bool</code></td>
+<td>Explicit intent plus kernel-visible container evidence</td>
+</tr>
+<tr>
+<td><code>resolve_runtime_image_digest()</code></td>
+<td>digest or <code>None</code></td>
+<td>Validated explicit or embedded digest</td>
+</tr>
+<tr>
+<td><code>resolve_runtime_image()</code></td>
+<td>image reference</td>
+<td>Reference normalized with its declared digest</td>
 </tr>
 </tbody>
 </table>
-<h2 id="checksums-and-closed-inventory">Checksums and closed inventory<a class="headerlink" href="#checksums-and-closed-inventory" title="Permanent link">&para;</a></h2>
-<p><code>checksums.sha256</code> covers every payload below the manifest, but not the manifest
-or its signature. The manifest separately binds the checksum file. Verification
-checks both directions:</p>
-<ul>
-<li>every manifest payload must be covered; and</li>
-<li>no checksum or directory entry may introduce an undeclared payload.</li>
-</ul>
-<p>Regular-file, no-symbolic-link, size, and safe-relative-path rules apply while
-reading. A valid checksum does not make a file semantically valid; cross-file
-replay follows the integrity checks.</p>
-<p>The manifest is outside the checksum payload because it binds the checksum
-file. The signature is outside both because it authenticates the canonical
-manifest. This avoids a self-referential digest while still closing every pack
-byte into one directed dependency graph.</p>
-<h2 id="paired-records">Paired records<a class="headerlink" href="#paired-records" title="Permanent link">&para;</a></h2>
-<p><code>records/paired-records.json</code> has exactly:</p>
-<div class="codehilite"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/paired-records-v1&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;metric&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exact_match&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;schedule_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;records&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;record_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example-1&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;input_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;baseline&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;observation_record_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;subject&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;observation_record_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">]</span>
-<span class="p">}</span>
+<p><code>RuntimeManifestExecution</code> is the immutable execution-fact record written into
+a runtime manifest. <code>RuntimeProviderManifestFiles</code> names the artifact identity,
+scoring observation, and provider receipt files that the manifest binds.</p>
+<h3 id="image-resolution">Image resolution<a class="headerlink" href="#image-resolution" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.runtime_security</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">resolve_runtime_image</span><span class="p">,</span>
+    <span class="n">resolve_runtime_image_digest</span><span class="p">,</span>
+    <span class="n">strict_container_boundary_present</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">strict_container_boundary_present</span><span class="p">():</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;strict execution requires an observed container&quot;</span><span class="p">)</span>
+
+<span class="n">image</span> <span class="o">=</span> <span class="n">resolve_runtime_image</span><span class="p">()</span>
+<span class="n">digest</span> <span class="o">=</span> <span class="n">resolve_runtime_image_digest</span><span class="p">()</span>
+<span class="k">if</span> <span class="n">digest</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;strict execution requires a runtime digest&quot;</span><span class="p">)</span>
 </code></pre></div>
 
-<p>The engine derives this file from the canonical schedule and both scoring
-observations. It rejects failed observation records, order changes, input-digest
-mismatches, output-text/digest mismatches, and schedules without expected
-outputs. Import mode must supply byte-canonical paired records equal to that
-fresh derivation; imported scores are never accepted as authority.</p>
-<p>For <code>exact_match</code>, each score is <code>1.0</code> when output text exactly equals expected
-output and <code>0.0</code> otherwise. For <code>normalized_nll_per_utf8_byte</code>, each score is
-<code>-logprob_sum / utf8_byte_count</code>; required counts must be positive and the result
-finite and non-negative.</p>
-<p>When a scorer extension is selected, the paired-record object also binds the
-exact scorer configuration and each side's replay result. The explicitly
-authorized scorer receives only authenticated <code>expected_output</code>, <code>output_text</code>,
-and <code>output_sha256</code> facts and returns one higher-is-better value in <code>[0, 1]</code>
-per record. The core verifies result order and digests, computes the arithmetic
-mean and paired percentage-point delta, and owns the interval and verdict.</p>
-<p>Normalized NLL is teacher-forced expected-continuation likelihood regression,
-not a general model-quality measure. The paired-record object may also carry a
-verifier-derived perplexity interpretation when the authenticated tokenizer
-contracts and every pair's positive target-token counts match. That object has
-no policy, interval, or verdict authority; an unavailable interpretation does
-not invalidate the byte-normalized NLL comparison.</p>
-<p>The canonical report adds the metric-specific paired interval to the two side
-means and point comparison. New reports use
-<code>invarlock/comparison-report-v2</code>; the verifier also replays existing
-<code>invarlock/comparison-report-v1</code> packs under their original arithmetic. Exact
-match records paired regression and improvement counts, an exact two-sided
-McNemar probability, and the paired Newcombe 95% effect-size interval whose
-lower bound controls policy. Normalized NLL uses the upper bound of its
-authenticated-schedule resampling interval. An authorized scorer extension
-uses the lower bound of the same fixed paired-resampling method against
-<code>metrics.scorer_extension.delta_min_pp</code>.</p>
-<p>When the policy supplies the coupled sample controls, the v2 report also
-contains <code>sample_qualification</code>. It records the minimum and observed paired
-count, maximum and observed interval width, units, each check's result, and the
-combined result. The final verdict is the conjunction of that result and the
-metric-bound result.</p>
-<h2 id="provider-sidecars">Provider sidecars<a class="headerlink" href="#provider-sidecars" title="Permanent link">&para;</a></h2>
-<p>Each comparison side includes:</p>
+<p>When no image input is present, <code>resolve_runtime_image()</code> returns the mutable
+development fallback <code>ghcr.io/invarlock/invarlock-runtime:latest</code>. That value is
+not acceptable for strict evidence. The strict transaction separately requires
+a canonical digest, a digest-bearing reference, and agreement between them.
+Callers must not interpret the fallback as a pinned runtime identity.</p>
+<p><code>running_inside_container()</code> reads explicit intent only.
+<code>strict_container_boundary_present()</code> additionally checks <code>/.dockerenv</code>,
+<code>/run/.containerenv</code>, or bounded cgroup markers. Neither function proves which
+image ran, supplies host attestation, or validates the container engine.</p>
+<p>The host launcher resolves common and per-side image inputs before starting
+workers. Inside each worker, these two common variables identify only that
+side's selected image. The evidence-signing and verifier keys remain in the
+host process and are not part of the worker runtime-security environment.</p>
+<h2 id="process-security-facade">Process-security facade<a class="headerlink" href="#process-security-facade" title="Permanent link">&para;</a></h2>
+<p><code>invarlock.security</code> exposes a socket guard and secure temporary-directory
+helpers.</p>
 <table>
 <thead>
 <tr>
-<th>File</th>
-<th>Binding</th>
+<th>Export</th>
+<th>Behavior</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>model-artifact.identity.json</code></td>
-<td>Portable authenticated identity for the actual model artifact</td>
+<td><code>NetworkGuard</code></td>
+<td>Installs or restores a process-global outbound socket guard</td>
 </tr>
 <tr>
-<td><code>runtime-scoring.observation.json</code></td>
-<td>Ordered backend facts bound to provider, artifact, and schedule</td>
+<td><code>enforce_network_policy(allow)</code></td>
+<td>Applies the process-global policy under a lock</td>
 </tr>
 <tr>
-<td><code>runtime-provider.receipt.json</code></td>
-<td>Plugin/backend/capability/artifact/settings/device/image provenance bound to the observation</td>
+<td><code>enforce_default_security()</code></td>
+<td>Reads <code>INVARLOCK_ALLOW_NETWORK</code>; default is deny</td>
 </tr>
 <tr>
-<td><code>report.json</code></td>
-<td>Minimal side report binding provider, artifact, observation, schedule, and count</td>
+<td><code>network_policy_allows()</code></td>
+<td>Reports the current process/context policy</td>
 </tr>
 <tr>
-<td><code>run.yaml</code></td>
-<td>Canonical side configuration copied as exact evaluation-emitted bytes</td>
+<td><code>temporarily_allow_network()</code></td>
+<td>Context-local, nested temporary bypass</td>
 </tr>
 <tr>
-<td><code>runtime.manifest.json</code></td>
-<td>Report/config/sidecar digests and strict per-side worker-container facts</td>
+<td><code>secure_tempdir(prefix, base_dir)</code></td>
+<td>Creates mode <code>0700</code> storage and removes it on exit</td>
+</tr>
+<tr>
+<td><code>is_secure_path(path)</code></td>
+<td>Checks that a path exists with exact mode <code>0700</code></td>
 </tr>
 </tbody>
 </table>
-<p>The evidence transaction copies these exact bytes. It does not regenerate
-sidecars in a way that could break their original runtime-manifest bindings.</p>
-<h2 id="publication-and-immutability">Publication and immutability<a class="headerlink" href="#publication-and-immutability" title="Permanent link">&para;</a></h2>
-<p>Evaluation writes a staging directory, flushes files to disk, signs the manifest, and
-atomically renames the directory into place. It never replaces an existing
-destination. Published files are read-only and directories are non-writable.</p>
-<p>Filesystem permissions are a local hardening measure, not the integrity model.
-Any later byte change, missing file, or extra file is detected by strict
-verification. Verification receipts and rendered HTML must remain outside the
-bundle so the bundle can stay byte-identical.</p>
-<h2 id="external-outputs">External outputs<a class="headerlink" href="#external-outputs" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Output</th>
-<th>Produced by</th>
-<th>May be written inside pack?</th>
-<th>Trust meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Signed verification receipt</td>
-<td><code>invarlock verify</code></td>
-<td>No</td>
-<td>Independent verifier assertion over manifest, anchors, and verdict</td>
-</tr>
-<tr>
-<td>Console report</td>
-<td><code>invarlock report</code></td>
-<td>Not a file</td>
-<td>Human rendering of signature-authenticated canonical content</td>
-</tr>
-<tr>
-<td>Self-contained HTML</td>
-<td><code>invarlock report --html</code></td>
-<td>No</td>
-<td>Unsigned presentation; not independent acceptance</td>
-</tr>
-</tbody>
-</table>
-<p>Multiple verifiers can issue separate receipts for the same immutable manifest.
-They can use distinct verifier identities and keys. Each must independently
-supply the expected artifact, schedule, policy, runtime, and evidence-signer
-anchors. The policy bytes must match the policy material already bound by the
-pack; a different policy requires a newly evaluated evidence bundle.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.security</span><span class="w"> </span><span class="kn">import</span> <span class="n">enforce_default_security</span><span class="p">,</span> <span class="n">secure_tempdir</span>
+
+<span class="n">enforce_default_security</span><span class="p">()</span>
+<span class="k">with</span> <span class="n">secure_tempdir</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;invarlock-review-&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">workspace</span><span class="p">:</span>
+    <span class="c1"># Write transient, non-public review material beneath workspace.</span>
+    <span class="o">...</span>
+</code></pre></div>
+
+<p>The network guard replaces Python's socket constructors in the current
+process. It does not constrain subprocesses, native extensions that bypass
+Python sockets, another process in the same container, or the host. Apply
+container or infrastructure egress controls as the authoritative boundary.</p>
+<p><code>temporarily_allow_network()</code> is intended for tightly scoped embedding code.
+Do not use it around provider execution or evidence creation. Context-local
+permission does not authorize a strict evidence path; strict execution observes
+the environment switches independently and requires network disabled.</p>
+<h2 id="failure-and-concurrency-behavior">Failure and concurrency behavior<a class="headerlink" href="#failure-and-concurrency-behavior" title="Permanent link">&para;</a></h2>
+<ul>
+<li>malformed image digests or disagreeing reference/digest inputs raise
+  <code>RuntimeError</code>;</li>
+<li>socket attempts rejected by the guard raise <code>RuntimeError</code>;</li>
+<li>nested temporary network scopes restore the previous context on exit;</li>
+<li>repeated guard installation and restoration are idempotent;</li>
+<li><code>secure_tempdir</code> attempts cleanup even when the body raises; and</li>
+<li>exact <code>0700</code> mode is a local filesystem check, not proof of storage
+  encryption or host isolation.</li>
+</ul>
+<h2 id="container-user-and-resource-boundary">Container user and resource boundary<a class="headerlink" href="#container-user-and-resource-boundary" title="Permanent link">&para;</a></h2>
+<p>Repository runtime images inherit the base image's default user, which may be
+root. The automatic <code>invarlock evaluate</code> launcher overrides that default with
+numeric non-root <code>65532:65532</code>, applies four CPUs and 65536 MiB per worker, and
+accepts validated caller-owned overrides through the CLI or environment. It
+also supplies read-only input mounts, one isolated writable output mount, and
+only the selected device access. Submitted request data cannot choose or relax
+these controls.</p>
+<p>For a manual container invocation, apply equivalent controls explicitly:</p>
+<div class="codehilite"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--network<span class="w"> </span>none<span class="w"> </span>--read-only<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--user<span class="w"> </span><span class="m">10001</span>:10001<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cpus<span class="w"> </span><span class="m">4</span><span class="w"> </span>--memory<span class="w"> </span>65536m<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--mount<span class="w"> </span><span class="nv">type</span><span class="o">=</span>bind,src<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/inputs&quot;</span>,dst<span class="o">=</span>/inputs,readonly<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--mount<span class="w"> </span><span class="nv">type</span><span class="o">=</span>bind,src<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/output&quot;</span>,dst<span class="o">=</span>/output<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>IMAGE_BY_DIGEST<span class="w"> </span>...
+</code></pre></div>
+
+<p>Validate the selected image and mounted paths under that identity before the
+real transaction. The automatic launcher also derives a finite process
+deadline from the validated per-record timeout and schedule length, caps it at
+24 hours, and stops or kills the exact engine-issued container ID on expiry.
+TensorRT-LLM images also inherit NVIDIA's entrypoint and need the target GPU
+device; least privilege must preserve only those required capabilities.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../contracts/">Public contracts</a> defines the manifest schema, canonical JSON,
-  and digest rules.</li>
-<li><a href="../reports/">Reports and receipts</a> defines the report and external receipt
-  carried by or associated with a bundle.</li>
-<li><a href="../lifecycle/">Evaluation lifecycle</a> explains atomic publication and failure
-  boundaries.</li>
-<li><a href="../architecture/">Architecture</a> places the artifact inventory within the
-  evidence-signer-verifier trust model.</li>
+<li><a href="../environment/">Environment variables</a> defines the operator inputs these
+  helpers observe.</li>
+<li><a href="../../security/best-practices/">Security practices</a> places process controls
+  inside the larger deployment boundary.</li>
+<li><a href="../../security/threat-model/">Threat model</a> states the attacks these helpers
+  do and do not address.</li>
 </ul>
 
 

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Official documentation for the InvarLock toolkit">
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
       
       
       
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#invarlock-documentation" class="md-skip">
+        <a href="#evaluate-once-verify-independently-report-clearly" class="md-skip">
           Skip to content
         </a>
       
@@ -145,6 +145,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
       
     </form>
     <div class="md-search__output">
@@ -221,7 +223,7 @@
           
   
   
-  User Guide
+  User guide
 
         </a>
       </li>
@@ -237,47 +239,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="reference/cli/" class="md-tabs__link">
-          
-  
-  
-  CLI Reference
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="reference/" class="md-tabs__link">
-          
-  
-  
-  Reference
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="assurance/00-assurance-case/" class="md-tabs__link">
+        <a href="assurance/assurance-case/" class="md-tabs__link">
           
   
   
@@ -297,7 +259,27 @@
     
     
       <li class="md-tabs__item">
-        <a href="security/best-practices/" class="md-tabs__link">
+        <a href="reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="security/trust-model/" class="md-tabs__link">
           
   
   
@@ -420,22 +402,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#start-here" class="md-nav__link">
+  <a href="#the-primary-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start Here
+        The primary path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Start Here">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-transactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three transactions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The three transactions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#choose-your-path" class="md-nav__link">
+  <a href="#evaluate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choose Your Path
+        evaluate
       
     </span>
   </a>
@@ -443,10 +436,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#verify" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        verify
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report
       
     </span>
   </a>
@@ -459,82 +463,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation-map" class="md-nav__link">
+  <a href="#metrics-and-verdicts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation Map
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Documentation Map">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#user-guide" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User Guide
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#assurance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Assurance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#governance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Governance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#core-concepts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core Concepts
+        Metrics and verdicts
       
     </span>
   </a>
@@ -542,10 +474,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#live-example-verification" class="md-nav__link">
+  <a href="#choose-a-reading-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Live Example Verification
+        Choose a reading path
       
     </span>
   </a>
@@ -553,10 +485,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#building-docs-offline-vs-online" class="md-nav__link">
+  <a href="#what-the-evidence-establishes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Building Docs Offline vs Online
+        What the evidence establishes
       
     </span>
   </a>
@@ -564,154 +496,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#support-matrix" class="md-nav__link">
+  <a href="#runtime-and-integration-choices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Support Matrix
+        Runtime and integration choices
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Support Matrix">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#baseline-fixture-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Baseline Fixture Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#published-smalllocal-decoder-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Published Small/Local Decoder Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#published-7b-9b-decoder-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Published 7B-9B Decoder Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#published-13b-14b-and-reasoning-decoder-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Published 13B-14B And Reasoning Decoder Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multimodal-published-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multimodal Published Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#largemoe-published-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Large/MoE Published Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#seq2seq-published-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Seq2Seq Published Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#common-workflows" class="md-nav__link">
+  <a href="#how-the-documentation-is-organized" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common Workflows
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Workflows">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#research" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Research
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#production-evaluation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production Evaluation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration-snapshot" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Snapshot
+        How the documentation is organized
       
     </span>
   </a>
@@ -738,6 +537,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -756,7 +557,7 @@
   <span class="md-ellipsis">
     
   
-    User Guide
+    User guide
   
 
     
@@ -772,7 +573,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    User Guide
+    User guide
   
 
           </label>
@@ -792,7 +593,7 @@
   <span class="md-ellipsis">
     
   
-    Getting Started
+    Getting started
   
 
     
@@ -813,14 +614,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/quickstart/" class="md-nav__link">
+      <a href="user-guide/change-scenarios/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Quickstart
+    Change scenarios
   
 
     
@@ -841,14 +642,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/primary-metric-smoke/" class="md-nav__link">
+      <a href="user-guide/key-management/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Primary Metric Smoke
+    Key management
   
 
     
@@ -869,14 +670,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/compare-and-evaluate/" class="md-nav__link">
+      <a href="user-guide/runtime-providers/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Compare & Evaluate (BYOE)
+    Runtime providers
   
 
     
@@ -897,14 +698,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+      <a href="user-guide/evaluation-request/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Knowledge & Self-Edit Workflows
+    Evaluation request
   
 
     
@@ -925,14 +726,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/live-examples/" class="md-nav__link">
+      <a href="user-guide/schedule-and-policy/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Live Examples
+    Schedule and policy
   
 
     
@@ -953,14 +754,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/integrations/" class="md-nav__link">
+      <a href="user-guide/evidence-and-verification/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Integration Examples
+    Evidence and verification
   
 
     
@@ -981,14 +782,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/public-evidence-walkthrough/" class="md-nav__link">
+      <a href="user-guide/verification-failure-lab/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Public Evidence Walkthrough
+    Verification failure lab
   
 
     
@@ -1009,14 +810,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/bring-your-own-data/" class="md-nav__link">
+      <a href="user-guide/diagnostics/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Bring Your Own Data
+    Optional diagnostics
   
 
     
@@ -1037,14 +838,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/plugins/" class="md-nav__link">
+      <a href="user-guide/ci-integration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugin Workflow
+    CI integration
   
 
     
@@ -1065,154 +866,14 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/config-gallery/" class="md-nav__link">
+      <a href="user-guide/public-evidence/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Configuration Gallery
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user-guide/example-reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Example Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user-guide/failure-examples/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Failure Examples
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user-guide/reading-report/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reading a Report
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user-guide/evidence-packs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evidence Packs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user-guide/evidence-packs-internals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evidence Pack Internals
+    Publish public evidence
   
 
     
@@ -1273,6 +934,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -1291,7 +954,7 @@
   <span class="md-ellipsis">
     
   
-    CLI Reference
+    Assurance
   
 
     
@@ -1307,7 +970,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    CLI Reference
+    Assurance
   
 
           </label>
@@ -1320,14 +983,154 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/cli/" class="md-nav__link">
+      <a href="assurance/assurance-case/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    CLI Overview
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
   
 
     
@@ -1359,6 +1162,8 @@
     
     
       
+      
+        
       
     
     
@@ -1407,14 +1212,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/" class="md-nav__link">
+      <a href="reference/cli/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Index
+    CLI
   
 
     
@@ -1463,14 +1268,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/one-run-lifecycle/" class="md-nav__link">
+      <a href="reference/contracts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    One Run Lifecycle
+    Contracts
   
 
     
@@ -1498,7 +1303,7 @@
   <span class="md-ellipsis">
     
   
-    API Guide
+    Python API
   
 
     
@@ -1519,42 +1324,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/programmatic-quickstart/" class="md-nav__link">
+      <a href="reference/artifacts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Programmatic Quickstart
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/guards/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guards
+    Artifacts
   
 
     
@@ -1603,14 +1380,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/report-outline/" class="md-nav__link">
+      <a href="reference/runtime-providers/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Report Outline
+    Runtime providers
   
 
     
@@ -1631,14 +1408,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/env-vars/" class="md-nav__link">
+      <a href="reference/runtime-security/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environment Variables
+    Runtime-security API
   
 
     
@@ -1659,14 +1436,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/model-adapters/" class="md-nav__link">
+      <a href="reference/environment/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Model Adapters
+    Environment
   
 
     
@@ -1687,14 +1464,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/model-family-catalog/" class="md-nav__link">
+      <a href="reference/lifecycle/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Model Family Catalog
+    Lifecycle
   
 
     
@@ -1715,14 +1492,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/contracts/" class="md-nav__link">
+      <a href="reference/release-verification/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Public Contracts
+    Release verification
   
 
     
@@ -1743,182 +1520,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/config-schema/" class="md-nav__link">
+      <a href="reference/documentation/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Configuration Schema
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/tier-policy-catalog/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tier Policy Catalog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/datasets/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Datasets
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/artifacts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artifact Layout
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/observability/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Observability
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/calibration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Calibration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/alternatives-comparison/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Alternatives Comparison
+    Documentation development
   
 
     
@@ -1950,6 +1559,8 @@
     
     
       
+      
+        
       
     
     
@@ -1969,7 +1580,7 @@
   <span class="md-ellipsis">
     
   
-    Assurance
+    Security
   
 
     
@@ -1985,597 +1596,6 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Assurance
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/00-assurance-case/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Assurance Case
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/14-trust-model/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Trust Model
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/15-strict-assurance-checklist/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Strict Assurance Checklist
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/glossary/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Glossary
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/01-eval-math-derivation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evaluation Math Derivation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/02-coverage-and-pairing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Coverage & Pairing Plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/03-bca-bootstrap/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    BCa Bootstrap (Paired Δlog)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/04-guard-contracts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guard Contracts & Primer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/05-spectral-fpr-derivation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Spectral False-Positive Control
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/06-rmt-epsilon-rule/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    RMT ε-Rule
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/07-ve-gate-power/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    VE Predictive Gate
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/08-determinism-contracts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Determinism Contracts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/09-tier-v1-calibration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tier Policy v1 Calibration (Pilot)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/10-guard-overhead-method/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guard Overhead Method
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/11-policy-provenance/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Policy Provenance & Digest
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/12-device-drift-bands/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Device Drift Bands
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/13-gpu-mps-first-guards/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GPU/MPS-First Guard Measurement Contracts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/16-guard-validation-smoke/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guard Validation Smoke
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="assurance/17-empirical-guard-evidence/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Empirical Guard Evidence
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Security
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
     Security
   
 
@@ -2589,42 +1609,14 @@
   
   
     <li class="md-nav__item">
-      <a href="security/best-practices/" class="md-nav__link">
+      <a href="security/trust-model/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Best Practices
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="security/release-verification/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Verification
+    Trust model
   
 
     
@@ -2652,7 +1644,7 @@
   <span class="md-ellipsis">
     
   
-    Threat Model
+    Threat model
   
 
     
@@ -2673,14 +1665,14 @@
   
   
     <li class="md-nav__item">
-      <a href="security/architecture/" class="md-nav__link">
+      <a href="security/best-practices/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Architecture
+    Security practices
   
 
     
@@ -2701,42 +1693,14 @@
   
   
     <li class="md-nav__item">
-      <a href="security/runtime-provenance-guide/" class="md-nav__link">
+      <a href="security/dependency-audit/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Runtime Provenance Guide
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="security/pip-audit-allowlist/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip Audit Allowlist
+    Dependency-audit exceptions
   
 
     
@@ -2784,22 +1748,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#start-here" class="md-nav__link">
+  <a href="#the-primary-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start Here
+        The primary path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Start Here">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-transactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three transactions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The three transactions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#choose-your-path" class="md-nav__link">
+  <a href="#evaluate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choose Your Path
+        evaluate
       
     </span>
   </a>
@@ -2807,10 +1782,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#verify" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        verify
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report
       
     </span>
   </a>
@@ -2823,82 +1809,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation-map" class="md-nav__link">
+  <a href="#metrics-and-verdicts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation Map
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Documentation Map">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#user-guide" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User Guide
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#assurance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Assurance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#governance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Governance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#core-concepts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core Concepts
+        Metrics and verdicts
       
     </span>
   </a>
@@ -2906,10 +1820,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#live-example-verification" class="md-nav__link">
+  <a href="#choose-a-reading-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Live Example Verification
+        Choose a reading path
       
     </span>
   </a>
@@ -2917,10 +1831,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#building-docs-offline-vs-online" class="md-nav__link">
+  <a href="#what-the-evidence-establishes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Building Docs Offline vs Online
+        What the evidence establishes
       
     </span>
   </a>
@@ -2928,154 +1842,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#support-matrix" class="md-nav__link">
+  <a href="#runtime-and-integration-choices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Support Matrix
+        Runtime and integration choices
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Support Matrix">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#baseline-fixture-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Baseline Fixture Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#published-smalllocal-decoder-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Published Small/Local Decoder Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#published-7b-9b-decoder-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Published 7B-9B Decoder Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#published-13b-14b-and-reasoning-decoder-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Published 13B-14B And Reasoning Decoder Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multimodal-published-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multimodal Published Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#largemoe-published-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Large/MoE Published Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#seq2seq-published-evidence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Seq2Seq Published Evidence
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#common-workflows" class="md-nav__link">
+  <a href="#how-the-documentation-is-organized" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common Workflows
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Workflows">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#research" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Research
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#production-evaluation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production Evaluation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration-snapshot" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Snapshot
+        How the documentation is organized
       
     </span>
   </a>
@@ -3102,758 +1883,351 @@
   
 
 
-<h1 id="invarlock-documentation">InvarLock Documentation<a class="headerlink" href="#invarlock-documentation" title="Permanent link">&para;</a></h1>
-<p>InvarLock provides auditable strict verification for edited model checkpoints. It
-centers on baseline-vs-subject comparisons for artifacts produced by your own
-edit workflow. A small built-in RTN dequantized weight-edit simulation
-(<code>quant_rtn</code>, 8-bit) exists for advanced smoke and demo workflows; production
-workflows are bring-your-own-edited-checkpoint (BYOE). See <a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate
-(BYOE)</a> and the <a href="user-guide/public-evidence-walkthrough/">Public Evidence
-Walkthrough</a>.</p>
-<p>Welcome to the documentation hub for InvarLock (auditable strict verification for
-edited model checkpoints).
-The material below is organized so new users can ramp quickly while practitioners
-find detailed reference, design rationales, and assurance notes.
-It is aimed at checkpoint editors, CI and assurance owners, and researchers
-running paired evaluation on text workflows plus the included image-text path.</p>
-<hr />
-<h2 id="start-here">Start Here<a class="headerlink" href="#start-here" title="Permanent link">&para;</a></h2>
+<div class="invarlock-hero">
+<p><img
+  class="invarlock-hero__mark"
+  src="assets/invarlock-logo-dark.svg"
+  alt="InvarLock"
+/></p>
+<p class="invarlock-hero__kicker">Paired release-regression assurance</p>
+<h1 id="evaluate-once-verify-independently-report-clearly">Evaluate once. Verify independently. Report clearly<a class="headerlink" href="#evaluate-once-verify-independently-report-clearly" title="Permanent link">&para;</a></h1>
+<p class="invarlock-hero__lead">
+InvarLock runs a pinned baseline and subject over one deterministic paired
+schedule, applies an explicit interval-based regression policy, publishes
+signed evidence, and lets another party replay the decision against
+independently supplied trust anchors.
+</p>
+</div>
+<p><a href="user-guide/getting-started/">Run a paired comparison</a> ·
+<a href="assurance/assurance-case/">Read the assurance case</a></p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml
+invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence/
+</code></pre></div>
+
+<p><img alt="A pinned request runs a paired baseline and subject comparison, publishes signed evidence, is independently verified, and is rendered as a report" src="assets/evaluation-verification-flow.svg" /></p>
+<h2 id="the-primary-path">The primary path<a class="headerlink" href="#the-primary-path" title="Permanent link">&para;</a></h2>
+<p>Run mode is the normal release-regression path:</p>
 <ol>
-<li><strong><a href="user-guide/getting-started/">Getting Started</a></strong> – environment setup and the first <code>evaluate</code> → <code>verify</code> → <code>report html</code> loop.</li>
-<li><strong><a href="user-guide/quickstart/">Quickstart</a></strong> – CLI highlights for common workflows.</li>
-<li><strong><a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a></strong> – baseline ↔ subject paired evaluation with the guard chain.</li>
-<li><strong><a href="user-guide/knowledge-and-self-edit-workflows/">Knowledge &amp; self-edit workflows</a></strong> – use upstream edit systems as BYOE subject generators.</li>
-<li><strong><a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a></strong> – tiny examples for ppl/accuracy kinds.</li>
+<li>Pin local baseline and subject artifacts, a local JSONL source, provider
+   settings, one built-in metric or scorer binding, one policy, and a fresh
+   output path in <code>request.yaml</code>.</li>
+<li>Invoke <code>invarlock evaluate</code> from the host with digest-addressed baseline and
+   subject runtime images, Docker or Podman, CPU/CUDA selections, and an
+   evidence-signing key held by the host.</li>
+<li>The host authenticates the JSONL bytes, prepares the ordered schedule, and
+   launches one constrained worker per side. Each worker sees only its artifact
+   and support resources read-only plus an isolated writable output directory.
+   The host validates both outputs, derives built-in scores or replays the
+   authorized scorer, derives the paired interval, publishes one bundle, and
+   signs it without exposing the private key to either worker.</li>
+<li>A verifier supplies its own policy copy, expected artifact identities,
+   canonical schedule digest, runtime digests, evidence signer, identity, and
+   signing key. <code>verify</code> replays the pack and writes a separately signed receipt.</li>
+<li><code>report</code> renders the signature-authenticated comparison as console text and,
+   optionally, standalone HTML.</li>
 </ol>
-<h3 id="choose-your-path">Choose Your Path<a class="headerlink" href="#choose-your-path" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Wheel user / report reader</strong>: start with <a href="user-guide/quickstart/">Quickstart</a> if you already have an <code>evaluation.report.json</code> bundle and want to verify, explain, or render it.</li>
-<li><strong>Evaluator</strong>: start with <a href="user-guide/getting-started/">Getting Started</a> if you need to run <code>invarlock evaluate</code> and produce a fresh evaluation bundle.</li>
-<li><strong>Repo maintainer</strong>: use the same user guides first, then reach for repo-only smokes, <code>configs/</code>, and local runtime-image flows after the core path is green.</li>
-</ul>
-<h3 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[hf]&quot;</span>
-
-<span class="c1"># Compare &amp; evaluate (BYOE checkpoints)</span>
-<span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline<span class="w"> </span>&lt;BASELINE_MODEL&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject<span class="w">  </span>&lt;SUBJECT_MODEL&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject-adapter<span class="w">  </span>auto<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--profile<span class="w">  </span>ci
-</code></pre></div>
-
-<p>Tip: enable Hub downloads per command when fetching models/datasets:
-<code>invarlock evaluate --allow-network ...</code></p>
-<p>Security-default note: <code>evaluate</code> uses the runtime container by default. Use
-<code>--execution-mode host</code> only for host-side workflows that intentionally bypass that
-boundary. Advanced runtime-heavy workflows live under <code>invarlock advanced</code>.</p>
-<hr />
-<h2 id="documentation-map">Documentation Map<a class="headerlink" href="#documentation-map" title="Permanent link">&para;</a></h2>
-<h3 id="user-guide">User Guide<a class="headerlink" href="#user-guide" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="user-guide/getting-started/">Getting Started</a></li>
-<li><a href="user-guide/quickstart/">Quickstart</a></li>
-<li><a href="user-guide/compare-and-evaluate/">Compare &amp; evaluate (BYOE)</a></li>
-<li><a href="user-guide/knowledge-and-self-edit-workflows/">Knowledge &amp; self-edit workflows</a></li>
-<li><a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a></li>
-<li><a href="user-guide/live-examples/">Live Examples</a></li>
-<li><a href="user-guide/integrations/">Integration Examples</a></li>
-<li><a href="user-guide/public-evidence-walkthrough/">Public Evidence Walkthrough</a></li>
-<li><a href="user-guide/config-gallery/">Configuration Gallery</a></li>
-<li><a href="user-guide/example-reports/">Example Reports</a></li>
-<li><a href="user-guide/reading-report/">Reading a report</a></li>
-<li><a href="user-guide/troubleshooting/">Troubleshooting</a> — Error codes and common fixes</li>
-<li><a href="user-guide/plugins/">Plugins</a> — Extending adapters and guards</li>
-<li><a href="user-guide/bring-your-own-data/">Bring Your Own Data</a> — Custom datasets</li>
-<li><a href="user-guide/evidence-packs/">Evidence Packs</a> — Validation suite bundles</li>
-<li><a href="user-guide/evidence-packs-internals/">Evidence Packs Internals</a> — Suite architecture and preset derivation flow</li>
-</ul>
-<h3 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="reference/">Reference Index</a></li>
-<li><a href="reference/cli/">CLI Reference</a></li>
-<li><a href="reference/contracts/">Public Contracts</a></li>
-<li><a href="reference/calibration/">Tier Policy Tuning CLI (Calibration)</a> — <code>invarlock advanced calibrate</code> for tier policy sweeps</li>
-<li><a href="reference/config-schema/">Configuration Schema</a></li>
-<li><a href="reference/guards/">Guards</a></li>
-<li><a href="reference/model-adapters/">Model Adapters</a></li>
-<li><a href="reference/model-family-catalog/">Model Family Catalog</a></li>
-<li><a href="reference/reports/">reports</a> — Schema, telemetry, and HTML export</li>
-<li><a href="reference/tier-policy-catalog/">Tier Policy Catalog (runtime tiers.yaml)</a></li>
-<li><a href="reference/datasets/">Datasets</a></li>
-<li><a href="reference/artifacts/">Artifact Layout</a></li>
-<li><a href="reference/observability/">Observability</a></li>
-<li><a href="reference/api-guide/">API Guide</a></li>
-<li><a href="reference/programmatic-quickstart/">Programmatic Quickstart</a></li>
-<li><a href="reference/env-vars/">Environment Variables</a></li>
-</ul>
-<p>Maintainer-only runbooks may exist locally and are intentionally omitted from
-this public docs index.</p>
-<!-- Design docs intentionally omitted from this public docs index. -->
-
-<h3 id="assurance">Assurance<a class="headerlink" href="#assurance" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="assurance/00-assurance-case/">Assurance Case</a></li>
-<li><a href="assurance/14-trust-model/">Trust Model</a></li>
-<li><a href="assurance/15-strict-assurance-checklist/">Strict Assurance Checklist</a></li>
-<li><a href="assurance/01-eval-math-derivation/">Evaluation Math Derivation</a></li>
-<li><a href="assurance/02-coverage-and-pairing/">Coverage &amp; Pairing Plan</a></li>
-<li><a href="assurance/03-bca-bootstrap/">BCa Bootstrap (Paired Δlog)</a></li>
-<li><a href="assurance/04-guard-contracts/">Guard Contracts &amp; Primer</a></li>
-<li><a href="assurance/05-spectral-fpr-derivation/">Spectral False-Positive Control</a></li>
-<li><a href="assurance/06-rmt-epsilon-rule/">RMT ε-Rule</a></li>
-<li><a href="assurance/07-ve-gate-power/">VE Predictive Gate</a></li>
-<li><a href="assurance/08-determinism-contracts/">Determinism Contracts</a></li>
-<li><a href="assurance/09-tier-v1-calibration/">Tier Policy v1 Calibration</a></li>
-<li><a href="assurance/10-guard-overhead-method/">Guard Overhead Method</a></li>
-<li><a href="assurance/11-policy-provenance/">Policy Provenance &amp; Digest</a></li>
-<li><a href="assurance/12-device-drift-bands/">Device Drift Bands</a></li>
-<li><a href="assurance/13-gpu-mps-first-guards/">GPU/MPS-First Guard Measurement Contracts</a></li>
-<li><a href="assurance/16-guard-validation-smoke/">Guard Validation Smoke</a></li>
-<li><a href="assurance/17-empirical-guard-evidence/">Empirical Guard Evidence</a></li>
-</ul>
-<p>Note: Every assurance claim is backed by automated tests and cross-referenced in
-the docs. See Guard Contracts → Coverage Reference
-(assurance/04-guard-contracts.md) for the test index.</p>
-<p>Calibration CSVs and evidence reports referenced in these notes are produced by
-local or CI runs (typically under <code>runs/null_sweeps/**</code> and
-<code>reports/calibration/**</code>) and are not committed to the repository. Attach them
-to change proposals or releases when you update calibration.</p>
-<!-- Developer docs intentionally omitted from this public docs index. See project root CHANGELOG.md. -->
-
-<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="security/threat-model/">Threat Model</a> — Assets and adversaries</li>
-<li><a href="security/architecture/">Security Architecture</a> — Components and defaults</li>
-<li><a href="security/best-practices/">Best Practices</a> — Operational recommendations</li>
-<li><a href="security/release-verification/">Release Verification</a> — Verification of published package artifacts and source tags</li>
-<li><a href="security/runtime-provenance-guide/">Runtime Provenance Guide</a> — Manifest requirements for strict assurance</li>
-<li><a href="security/pip-audit-allowlist/">pip-audit Allowlist</a></li>
-</ul>
-<h3 id="governance">Governance<a class="headerlink" href="#governance" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="https://github.com/invarlock/invarlock/blob/v0.12.1/CONTRIBUTING.md">Contribution Guidelines</a></li>
-</ul>
-<hr />
-<h2 id="core-concepts">Core Concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h2>
-<ol>
-<li><strong>Configure</strong> – describe model, dataset, edit, and guard policies in YAML.</li>
-<li><strong>Execute</strong> – run <code>invarlock evaluate</code> under a CI or release profile;
-   model-loading commands use the runtime container by default unless you pass
-   <code>--execution-mode host</code>.</li>
-<li><strong>Validate</strong> – run <code>invarlock verify</code> and render HTML via <code>invarlock report html</code>;
-   container-backed outputs include <code>runtime.manifest.json</code> next to
-   <code>evaluation.report.json</code>.
-   Directory inputs to <code>invarlock report</code> are only accepted when they contain
-   canonical <code>report.json</code> or <code>evaluation.report.json</code>.</li>
-<li><strong>Iterate</strong> – compare runs, adjust edit plans, and reissue reports until gates pass.</li>
-</ol>
-<p>The guard suite (invariants, spectral, variance, and RMT) keeps edits inside
-configured acceptance envelopes even when aggressive compression is attempted.</p>
-<hr />
-<h2 id="live-example-verification">Live Example Verification<a class="headerlink" href="#live-example-verification" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Curated CI-safe live examples are gated by <code>make docs-live-fast</code> and cover
-  <code>README.md</code>, <code>docs/user-guide/getting-started.md</code>,
-  <code>docs/user-guide/quickstart.md</code>,
-  <code>notebooks/invarlock_python_api.ipynb</code>, and
-  <code>notebooks/invarlock_policy_tiers.ipynb</code>.</li>
-<li>Runnable documentation surfaces can be verified locally with
-  <code>make docs-live-fast</code>, <code>python scripts/docs/verify_live_examples.py</code>, or
-  <code>make docs-live</code>.</li>
-<li>The curated fast lane replays concrete Markdown CLI snippets in host
-  mode with seeded demo evidence, then smoke-runs the curated notebook subset.</li>
-<li>For heavyweight notebook cells that would otherwise trigger model downloads or
-  full evaluations, the curated lane reuses seeded demo reports and keeps the
-  later contract-reading and verification steps live.</li>
-<li><code>make docs-live</code> remains the broader local lane that replays runnable
-  Markdown examples and smoke-runs notebooks under <code>notebooks/</code>, using the same
-  host seeded-demo approach for heavyweight model-loading steps.</li>
-<li>Artifacts land under <code>tmp/live_examples/</code>, including per-command JSONL
-  results, notebook stdout/stderr logs, and a machine-readable <code>summary.json</code>.</li>
-<li>Placeholder/template snippets must remain parseable, but only concrete
-  runnable examples should be treated as copy-paste-ready.</li>
-<li>GitHub Actions enforce the curated deterministic subset; the full verifier
-  remains a local or long-gate lane.</li>
-</ul>
-<hr />
-<h2 id="building-docs-offline-vs-online">Building Docs Offline vs Online<a class="headerlink" href="#building-docs-offline-vs-online" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Offline (default): mkdocs builds without contacting the Internet. Mermaid
-  diagrams are disabled by default to keep builds fully local. The generated
-  HTML references MathJax so formulas render in browsers with network access;
-  MathJax is not fetched during the build.</li>
-<li>Command: <code>make docs</code> or <code>mkdocs build --strict</code>.</li>
-<li>Online (enable networked assets explicitly): enable Mermaid diagrams (via CDN)
-  and keep strict checks.</li>
-<li>Command: <code>INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict</code></li>
-</ul>
-<p>Notes</p>
-<ul>
-<li>The configuration references MathJax via <code>extra_javascript</code> in the generated
-  HTML. This is required for Arithmatex formulas to render on the published
-  docs site.</li>
-<li>The mermaid2 plugin pings the CDN; we gate it behind the
-  <code>INVARLOCK_DOCS_MERMAID</code> environment variable to avoid network dependencies by
-  default.</li>
-</ul>
-<hr />
-<h2 id="support-matrix">Support Matrix<a class="headerlink" href="#support-matrix" title="Permanent link">&para;</a></h2>
-<h3 id="baseline-fixture-evidence">Baseline Fixture Evidence<a class="headerlink" href="#baseline-fixture-evidence" title="Permanent link">&para;</a></h3>
+<p>Shared image, device, and entrypoint options act as defaults when both sides use
+the same runtime. Workers sharing a generic or identical CUDA device run
+sequentially; explicitly different CUDA indexes can run in parallel. The host
+owns the no-clobber evidence destination and evidence-signing key.</p>
+<p>Import mode is the secondary path for complete provider sidecars created by
+another controlled execution. It publishes the same bundle format and faces
+the same verifier. Its inputs must include authenticated record-level material;
+aggregate scores alone are insufficient.</p>
+<h2 id="the-three-transactions">The three transactions<a class="headerlink" href="#the-three-transactions" title="Permanent link">&para;</a></h2>
+<div class="invarlock-transaction">
+<div class="invarlock-transaction__step">
+<p><span class="invarlock-transaction__number">Transaction 01</span></p>
+<h3 id="evaluate"><code>evaluate</code><a class="headerlink" href="#evaluate" title="Permanent link">&para;</a></h3>
+<p>Validate one closed baseline-versus-subject request. In run mode, prepare the
+canonical schedule from digest-pinned local JSONL and execute the selected
+providers in the delegated OCI environment. In import mode, authenticate
+complete provider materials. Pair records by schedule identity, compute the
+selected built-in metric or replay the authorized scorer, derive its paired
+interval, apply the policy to the
+conservative interval bound, and atomically publish signed evidence.</p>
+</div>
+<div class="invarlock-transaction__step">
+<p><span class="invarlock-transaction__number">Transaction 02</span></p>
+<h3 id="verify"><code>verify</code><a class="headerlink" href="#verify" title="Permanent link">&para;</a></h3>
+<p>Treat the bundle as untrusted. Verify inventory, checksums, signatures,
+cross-bindings, schedule order, record-level scores, interval arithmetic, and
+the canonical report. Compare the artifact identities, schedule, policy,
+runtime identities, and evidence signer with caller-owned anchors, then record
+the result in a separately signed receipt.</p>
+</div>
+<div class="invarlock-transaction__step">
+<p><span class="invarlock-transaction__number">Transaction 03</span></p>
+<h3 id="report"><code>report</code><a class="headerlink" href="#report" title="Permanent link">&para;</a></h3>
+<p>Authenticate the bundle's embedded evidence signature and integrity, then
+render its canonical report. The view includes the point comparison,
+selected paired interval, threshold, and scoped verdict. Evidence
+remains the source of truth and the signed verification receipt remains the
+independent acceptance record.</p>
+</div>
+</div>
+<h2 id="metrics-and-verdicts">Metrics and verdicts<a class="headerlink" href="#metrics-and-verdicts" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
+<th>Metric</th>
+<th>What is compared</th>
+<th>Passing rule</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>GPT-2 causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td><code>exact_match</code></td>
+<td>Difference between subject and baseline literal accuracy, with paired regression/improvement counts and exact McNemar probability</td>
+<td>Paired Newcombe interval lower bound is at least <code>metrics.exact_match.delta_min_pp</code></td>
 </tr>
 <tr>
-<td>BERT / RoBERTa MLM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td><code>normalized_nll_per_utf8_byte</code></td>
+<td>Ratio of arithmetic means of teacher-forced expected-continuation NLL per UTF-8 byte</td>
+<td>Paired schedule-resampling interval upper bound is at most <code>metrics.normalized_nll_per_utf8_byte.ratio_max</code></td>
+</tr>
+<tr>
+<td>Authorized deterministic text scorer</td>
+<td>Difference between subject and baseline arithmetic-mean <code>[0,1]</code> scores, in percentage points</td>
+<td>Paired schedule-resampling interval lower bound is at least <code>metrics.scorer_extension.delta_min_pp</code></td>
 </tr>
 </tbody>
 </table>
-<h3 id="published-smalllocal-decoder-evidence">Published Small/Local Decoder Evidence<a class="headerlink" href="#published-smalllocal-decoder-evidence" title="Permanent link">&para;</a></h3>
+<p>Exact match uses the continuity-corrected paired Newcombe 95% effect-size
+interval emitted by <code>invarlock/comparison-report-v2</code>. Normalized NLL
+uses the deterministic <code>paired_percentile_bootstrap_sha256_v1</code> method with
+2,048 replicates over the authenticated finite schedule. The selected policy
+reads the conservative bound of the corresponding interval.</p>
+<p>A metric policy may additionally bind <code>minimum_record_count</code> and the matching
+maximum interval-width field. The two fields are supplied together. When they
+are present, the metric bound, record count, and precision width must all pass;
+the canonical report records each result. Preflight can qualify record count
+but leaves interval width pending until execution produces paired outcomes.</p>
+<p>Normalized NLL measures expected-continuation likelihood under teacher forcing,
+not general model quality. If tokenizer contracts and paired token counts are
+comparable, the report also includes a verifier-derived token-weighted
+perplexity ratio as interpretation only; it has no policy, interval, or verdict
+authority.</p>
+<p>A request selects exactly one built-in <code>metric</code> or one complete
+<code>scorer_extension</code> binding. Extension scorers receive only authenticated
+expected-output and output-text facts, run only when explicitly authorized, and
+cannot redefine aggregation or direction. Deterministic F1, extraction, and VQA
+scorers can be supplied as separately installed packages and run only when
+explicitly authorized through the extension contract. Network, external-model,
+human, executable SQL/code, semantic-model, and judge scoring remain outside
+acceptance; judges fit the authenticated-observation path.</p>
+<h2 id="choose-a-reading-path">Choose a reading path<a class="headerlink" href="#choose-a-reading-path" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
+<th>Responsibility</th>
+<th>Start here</th>
+<th>Continue with</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>TinyLlama 1.1B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Run a first comparison</td>
+<td><a href="user-guide/getting-started/">Getting started</a></td>
+<td><a href="user-guide/evaluation-request/">Evaluation request</a> and <a href="user-guide/schedule-and-policy/">schedule and policy</a></td>
 </tr>
 <tr>
-<td>SmolLM3 3B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Run a model-backed example</td>
+<td><a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations">Runnable integrations</a></td>
+<td><a href="user-guide/runtime-providers/">Runtime providers</a> and <a href="user-guide/evidence-and-verification/">evidence and verification</a></td>
 </tr>
 <tr>
-<td>Gemma 4 E2B causal LM (text-only eval)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Apply InvarLock to a model or runtime change</td>
+<td><a href="user-guide/change-scenarios/">Model-change workflows</a></td>
+<td><a href="https://github.com/invarlock/invarlock/tree/main/examples">Runnable examples</a> and <a href="user-guide/runtime-providers/">runtime providers</a></td>
 </tr>
 <tr>
-<td>Ministral 3 3B causal LM (text-only eval)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Review or accept evidence</td>
+<td><a href="user-guide/evidence-and-verification/">Evidence and verification</a></td>
+<td><a href="assurance/acceptance-checklist/">Acceptance checklist</a> and <a href="assurance/decision-semantics/">decision semantics</a></td>
 </tr>
 <tr>
-<td>Phi-4 mini causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Automate a gate</td>
+<td><a href="user-guide/ci-integration/">CI integration</a></td>
+<td><a href="user-guide/key-management/">Key management</a> and <a href="reference/cli/">CLI reference</a></td>
 </tr>
 <tr>
-<td>Granite 4.1 3B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Integrate a runtime</td>
+<td><a href="user-guide/runtime-providers/">Runtime providers</a></td>
+<td><a href="reference/runtime-providers/">Provider reference</a> and <a href="reference/contracts/">contracts</a></td>
+</tr>
+<tr>
+<td>Import existing provider evidence</td>
+<td><a href="user-guide/evaluation-request/#import-mode">Evaluation request</a></td>
+<td><a href="reference/artifacts/">Evidence artifacts</a> and <a href="reference/reports/">reports and receipts</a></td>
+</tr>
+<tr>
+<td>Embed the engine</td>
+<td><a href="reference/api-guide/">Python API</a></td>
+<td><a href="reference/architecture/">Architecture</a> and <a href="reference/runtime-security/">runtime-security API</a></td>
+</tr>
+<tr>
+<td>Assess claims and risk</td>
+<td><a href="assurance/assurance-case/">Assurance case</a></td>
+<td><a href="assurance/pairing-and-replay/">Pairing and replay</a>, <a href="security/trust-model/">trust model</a>, and <a href="security/threat-model/">threat model</a></td>
+</tr>
+<tr>
+<td>Maintain the project</td>
+<td><a href="reference/documentation/">Documentation development</a></td>
+<td><a href="reference/release-verification/">Release verification</a></td>
 </tr>
 </tbody>
 </table>
-<h3 id="published-7b-9b-decoder-evidence">Published 7B-9B Decoder Evidence<a class="headerlink" href="#published-7b-9b-decoder-evidence" title="Permanent link">&para;</a></h3>
+<h2 id="what-the-evidence-establishes">What the evidence establishes<a class="headerlink" href="#what-the-evidence-establishes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
+<th>Bound material</th>
+<th>Why it is present</th>
+<th>Verification consequence</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Mistral 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Baseline and subject identities</td>
+<td>Name the exact artifacts being compared</td>
+<td>Artifact substitution changes the authenticated comparison</td>
 </tr>
 <tr>
-<td>Ministral 3 8B causal LM (text-only eval)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Local JSONL identity and canonical schedule</td>
+<td>Fix the source bytes, field mapping, selected ordered records, inputs, and targets</td>
+<td>Changed source bytes, mapping, order, or schedule fail closed</td>
 </tr>
 <tr>
-<td>Qwen2 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Provider observations</td>
+<td>Preserve record-level outputs or log-likelihood facts and runtime bindings</td>
+<td>The verifier independently re-derives every paired score</td>
 </tr>
 <tr>
-<td>Qwen2.5 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Policy digest and content</td>
+<td>Record the threshold applied at evaluation time</td>
+<td>Verification requires the caller-supplied policy to match exactly</td>
 </tr>
 <tr>
-<td>Qwen3 causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Point comparison and paired interval</td>
+<td>Show the estimate and deterministic finite-schedule resampling bounds</td>
+<td>The conservative interval bound, not the point value alone, controls the verdict</td>
 </tr>
 <tr>
-<td>Qwen3.5 causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Runtime identities</td>
+<td>Bind each side to a declared OCI execution environment</td>
+<td>The verifier compares them with independent expected identities</td>
 </tr>
 <tr>
-<td>DeepSeek-R1-Distill-Qwen causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>DeepSeek-R1-0528-Qwen3 8B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>OLMo 2 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>OpenLLaMA 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Falcon 7B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Granite 4.1 8B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Checksums and evidence signature</td>
+<td>Authenticate the fixed bundle inventory and bytes</td>
+<td>Integrity or signer mismatch rejects the bundle</td>
 </tr>
 </tbody>
 </table>
-<h3 id="published-13b-14b-and-reasoning-decoder-evidence">Published 13B-14B And Reasoning Decoder Evidence<a class="headerlink" href="#published-13b-14b-and-reasoning-decoder-evidence" title="Permanent link">&para;</a></h3>
+<p>These bindings support a precise claim: an authorized evidence signer signed a
+complete comparison for named inputs, and a named verifier accepted or rejected
+that evidence under explicit anchors. Runtime digests identify declared bytes;
+execution attestation requires separate evidence. The schedule fixes the
+evaluated sample; population representativeness, safety, and broad quality
+remain separate assessments.</p>
+<p><img alt="The evidence signer authenticates canonical evidence while a verifier applies external anchors and signs a separate receipt" src="assets/evidence-signer-verifier-trust.svg" /></p>
+<h2 id="runtime-and-integration-choices">Runtime and integration choices<a class="headerlink" href="#runtime-and-integration-choices" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
+<th>Path</th>
+<th>Package</th>
+<th>Metrics</th>
+<th>Intended use</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Ministral 3 14B causal LM (text-only eval)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Hugging Face Transformers</td>
+<td><code>invarlock[hf]</code></td>
+<td>Exact match and byte-normalized expected-continuation NLL</td>
+<td>Built-in reference provider for local PyTorch/SafeTensors snapshots</td>
 </tr>
 <tr>
-<td>OLMo 2 13B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>GGUF / llama.cpp</td>
+<td><code>invarlock-runtime-gguf</code></td>
+<td>Exact match</td>
+<td>Optional first-party provider for authenticated GGUF artifacts</td>
 </tr>
 <tr>
-<td>Qwen2.5 14B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>TensorRT-LLM</td>
+<td><code>invarlock-runtime-tensorrt-llm</code></td>
+<td>Exact match</td>
+<td>Optional first-party provider for authenticated engine bundles</td>
 </tr>
 <tr>
-<td>DeepSeek-R1-Distill-Qwen 14B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Hugging Face vision-text</td>
+<td><code>invarlock-runtime-hf-vision-text</code></td>
+<td>Exact match</td>
+<td>Optional first-party provider for authenticated prompt-and-image schedules</td>
 </tr>
 <tr>
-<td>Phi-4 causal LM (text-only eval)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Imported provider material</td>
+<td>Core plus the provider package needed to validate identities</td>
+<td>Provider-declared metric</td>
+<td>Secondary/offline integration when complete sidecars already exist</td>
+</tr>
+<tr>
+<td>Custom runtime</td>
+<td>Provider package</td>
+<td>Declared by provider</td>
+<td>ABI integration; strict evidence still requires explicit authorization</td>
 </tr>
 </tbody>
 </table>
-<h3 id="multimodal-published-evidence">Multimodal Published Evidence<a class="headerlink" href="#multimodal-published-evidence" title="Permanent link">&para;</a></h3>
+<p>Optional spectral, random-matrix, and variance diagnostics live in
+<code>invarlock-diagnostics</code>. They remain observation-only; the paired metric and
+policy exclusively determine the verdict. Authenticated attachments appear in
+the report's separate authenticated-observations section.</p>
+<h2 id="how-the-documentation-is-organized">How the documentation is organized<a class="headerlink" href="#how-the-documentation-is-organized" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
+<th>Type</th>
+<th>Reader question</th>
+<th>What the page provides</th>
+<th>Start here</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Qwen3.5 2B image-text LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>User guide</td>
+<td>How do I complete this task safely?</td>
+<td>Outcome, prerequisites, procedure, validation, and recovery</td>
+<td><a href="user-guide/getting-started/">Getting started</a></td>
 </tr>
 <tr>
-<td>Qwen3.5 4B image-text LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Assurance note</td>
+<td>Why is this scoped decision justified, and what could defeat it?</td>
+<td>Plain-language interpretation, evidence, assumptions, arithmetic, and limits</td>
+<td><a href="assurance/assurance-case/">Assurance case</a></td>
 </tr>
 <tr>
-<td>Qwen3.5 27B image-text LM (scoped)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Reference</td>
+<td>What exactly does this interface accept, produce, or guarantee?</td>
+<td>Current syntax, fields, outputs, and failure behavior</td>
+<td><a href="reference/cli/">CLI reference</a></td>
 </tr>
 <tr>
-<td>Qwen3.6 27B image-text LM (scoped)</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Gemma 4 E2B image-text LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Gemma 4 E4B image-text LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Gemma 4 12B any-to-any LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Gemma 4 26B-A4B MoE image-text LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Gemma 4 31B image-text LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
+<td>Security guidance</td>
+<td>What must be protected and what risk remains?</td>
+<td>Plain-language boundaries, adversaries, controls, and residual risk</td>
+<td><a href="security/trust-model/">Trust model</a></td>
 </tr>
 </tbody>
 </table>
-<h3 id="largemoe-published-evidence">Large/MoE Published Evidence<a class="headerlink" href="#largemoe-published-evidence" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>OLMoE 1B-active/7B-total causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Mixtral 8x7B MoE causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Qwen3 30B-A3B MoE causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>GPT-OSS 20B causal LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-</tbody>
-</table>
-<h3 id="seq2seq-published-evidence">Seq2Seq Published Evidence<a class="headerlink" href="#seq2seq-published-evidence" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Surface</th>
-<th>Preset included</th>
-<th>Adapter available</th>
-<th>Pilot calibration config present</th>
-<th>Published assurance basis</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>FLAN-T5 base seq2seq LM</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-</tbody>
-</table>
-<p>Published assurance basis covers GPT-2, BERT, Mistral 7B, Ministral 3 3B,
-Ministral 3 8B, Ministral 3 14B, TinyLlama 1.1B, Gemma 4 E2B text-only,
-Gemma 4 E2B image-text, Gemma 4 E4B image-text, Granite 4.1 3B,
-Granite 4.1 8B, OLMo 2 7B, OLMo 2 13B, Qwen2 7B, OpenLLaMA 7B,
-Falcon 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3 8B, Qwen3.5 9B,
-Qwen3.5 2B image-text, DeepSeek-R1-Distill-Qwen 7B,
-DeepSeek-R1-0528-Qwen3 8B,
-DeepSeek-R1-Distill-Qwen 14B, Phi-4 text-only, Qwen3.5 4B image-text,
-scoped Qwen3.5 27B image-text, scoped Qwen3.6 27B image-text,
-Gemma 4 12B image-text, Gemma 4 26B-A4B image-text MoE, Gemma 4 31B
-image-text, OLMoE 1B-active/7B-total MoE, Mixtral 8x7B MoE,
-Qwen3 30B-A3B MoE, GPT-OSS 20B, and FLAN-T5 base
-seq2seq profiles.
-Repo-included presets and pilot calibration configs for prepared practical-pick
-lanes do not become part of the published assurance basis until supporting
-artifacts are attached. OLMoE is the smaller MoE published-basis validation
-lane; Mixtral 8x7B and Qwen3 30B-A3B are larger no-op preservation
-bases. Gemma 4 26B-A4B is a multimodal MoE image-text preservation basis; it is
-scoped to pinned image-text evidence. Audio, exhaustive expert-bank, and MoE
-routing-quality evidence require separate artifacts. The Qwen3 30B-A3B fixture
-requires all-8 80GB-GPU sharding and uses scoped attention/router/shared-expert
-guard scans; exhaustive expert-bank and MoE routing-quality claims require
-separate evidence.
-The empirical guard manifest includes no-op published-basis summaries for the
-modern published-basis families. They are null-behavior evidence and calibration
-inputs, but they do not re-derive the packaged spectral/RMT/variance tier
-constants; transferred attention caps remain budgeted sentinels until a
-family-specific null sweep supports an FPR interpretation.
-Mistral 7B additionally ships the current real guard-value scenario package:
-<code>public_evidence/published_basis/mistral_7b/guard_value_demo/</code> records PM-pass,
-baseline-relative spectral, RMT, and variance/VE evidence from clean
-confirmation reruns.
-Practical-pick families without tuned edit params or public evidence fixtures
-are tracked as <code>community_experimental</code> rows, even when a repo pilot preset and
-calibration config are already present. Access-gated vendor checkpoints are not
-included as repo-shipped presets.
-The Phi-4 public fixture is text-only and skips guard-overhead measurement by
-preset policy; strict release verification accepts that declared skip.
-The FLAN-T5 base public fixture uses pinned CNN/DailyMail validation data via
-<code>hf_seq2seq</code>; strict release verification accepts one advisory guard warning
-while the hard policy gates pass.
-The Qwen3.5 4B image-text lane now includes a public VQAv2 preset, null-sweep
-config, strict public report, runtime manifest, and signed evidence pack after
-the structured JSON-answer prompt fix.
-The scoped Qwen3.5 27B and Qwen3.6 27B image-text lanes cover
-self-attention and MLP guard scans; linear-attention module coverage remains a
-separate strict spectral-cap finding.</p>
-<p><code>published_basis</code> remains the narrow public evidence floor, while
-<code>supported_experimental</code> means the repo ships the preset, calibration config,
-targeted tests, smoke/evidence path, and tuned edit-param coverage for the lane
-without claiming a published-basis fixture set. <code>community_experimental</code> rows
-are candidate entries; some already have repo pilot presets and
-calibration configs, but still need the remaining published-basis artifacts before
-they become release-supported lanes.</p>
-<p>Image-text evaluation uses the built-in
-<code>hf_multimodal</code> adapter and the <code>vision_text</code> provider. Install
-<code>invarlock[multimodal]</code> for this path; Gemma 4 unified checkpoints require
-<code>transformers&gt;=5.12.0</code> and <code>torchvision&gt;=0.26.0</code>. Gemma 4 E2B has separate
-text-only and image-text public bases; Qwen3.5 2B, Qwen3.5 4B, Gemma 4 E4B,
-scoped Qwen3.5/Qwen3.6 27B, Gemma 4 12B, Gemma 4 26B-A4B, and Gemma 4 31B
-also have public image-text bases. Audio evaluation is deferred. Public
-image-text published-basis inclusion requires
-measured accuracy on a pinned public dataset above the repo floor; preservation
-passing alone is not sufficient.</p>
-<p>Machine-readable support metadata lives in <code>contracts/support_matrix.json</code>. It is
-the canonical source of truth for normalized support tiers
-(<code>published_basis</code>, <code>supported_experimental</code>, <code>community_experimental</code>) and for
-published-basis evidence references. Model lifecycle decisions live in
-<code>contracts/model_classification.json</code>: that file records whether a lane or
-family is published, backlog, blocked, smoke-only, usage-only, or out of scope.</p>
-<p>Model evidence automation lives in
-<code>scripts/model_evidence/model_evidence_sweep.py</code>, with tmux-based remote launch support in
-<code>scripts/model_evidence/run_model_evidence_remote.py</code> and a manual runner workflow in
-<code>.github/workflows/model-evidence-sweep.yml</code>.
-For large MoE lanes that do not fit comfortably on one GPU, the remote helper
-supports grouped CUDA visibility, for example
-<code>--gpu-group 0,1,2,3</code> to launch one sweep shard with all four GPUs exposed
-instead of one shard per GPU.
-Repo-prepared candidate lanes are tracked in
-<code>contracts/model_family_catalog.json</code>; published-basis eligibility and blockers are
-tracked in <code>contracts/model_classification.json</code>.
-For the Gemma 4 text lane, the repo-maintained local smoke is the included
-manifest dry-run (<code>scripts/model_evidence/model_evidence_sweep.py --suite repo-mentioned-gpu --slug gemma4_e2b_public --dry-run</code>).
-The image-text path also includes an offline demo preset at
-<code>configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml</code> and a Gemma
-4 12B pilot at <code>configs/presets/multimodal/gemma4_12b_vision_text_256.yaml</code> plus
-<code>tests/fixtures/vision_text/demo_manifest.jsonl</code> for provider/config validation.
-Gemma 4 E2B, Gemma 4 E4B, and Gemma 4 12B use
-<code>configs/presets/multimodal/gemma4_e2b_public_vqav2_256.yaml</code>,
-<code>configs/presets/multimodal/gemma4_e4b_public_vqav2_256.yaml</code>, and
-<code>configs/presets/multimodal/gemma4_12b_public_vqav2_256.yaml</code> and
-matching <code>configs/calibration/null_sweep_gemma4_*.yaml</code> files together with the
-model-evidence materializer for pinned public VQAv2 sample-validation data. Their
-public fixtures live under <code>public_evidence/published_basis/gemma4_e2b_image_text/</code>,
-<code>public_evidence/published_basis/gemma4_e4b/</code>, and
-<code>public_evidence/published_basis/gemma4_12b/</code>, and the local smoke manifest
-remains provider/config validation only. Gemma 4 26B-A4B uses the analogous
-<code>configs/presets/multimodal/gemma4_26b_a4b_public_vqav2_256.yaml</code> and
-<code>configs/calibration/null_sweep_gemma4_26b_a4b.yaml</code> path; its public fixture
-lives under <code>public_evidence/published_basis/gemma4_26b_a4b/</code>. The Qwen3.5 2B
-and Qwen3.5 4B public image-text bases use the same pinned VQAv2
-materialization pattern through
-<code>configs/presets/multimodal/*_public_vqav2_256.yaml</code> and matching
-<code>configs/calibration/null_sweep_*.yaml</code> files.</p>
-<p>For declared support, implemented-but-not-public coverage, usage-only checkpoint
-families, and recommended additions, see
-<a href="reference/model-family-catalog/">Model Family Catalog</a>.</p>
-<hr />
-<h2 id="common-workflows">Common Workflows<a class="headerlink" href="#common-workflows" title="Permanent link">&para;</a></h2>
-<h3 id="research">Research<a class="headerlink" href="#research" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[adapters,guards,eval]&quot;</span>
-invarlock<span class="w"> </span>doctor
-<span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span>--allow-network<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline<span class="w"> </span>gpt2<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject<span class="w"> </span>/path/to/edited<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--profile<span class="w"> </span>ci<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--preset<span class="w"> </span>configs/presets/causal_lm/wikitext2_512.yaml
-</code></pre></div>
-
-<h3 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>advanced<span class="w"> </span>plugins<span class="w"> </span>adapters
-invarlock<span class="w"> </span>advanced<span class="w"> </span>calibrate<span class="w"> </span>--help
-make<span class="w"> </span>ci-matrix
-</code></pre></div>
-
-<h3 id="production-evaluation">Production Evaluation<a class="headerlink" href="#production-evaluation" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_DEDUP_TEXTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>invarlock<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline<span class="w"> </span>/path/to/baseline<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject<span class="w">  </span>/path/to/edited<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline-adapter<span class="w"> </span>auto<span class="w"> </span>--subject-adapter<span class="w"> </span>auto<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--profile<span class="w"> </span>release<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--preset<span class="w"> </span>configs/presets/causal_lm/wikitext2_512.yaml
-invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/evaluation.report.json
-<span class="c1"># expects reports/eval/runtime.manifest.json next to the report</span>
-</code></pre></div>
-
-<hr />
-<h2 id="configuration-snapshot">Configuration Snapshot<a class="headerlink" href="#configuration-snapshot" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="nt">model</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt2</span>
-<span class="w">  </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf_causal</span>
-<span class="w">  </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
-<span class="nt">dataset</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wikitext2</span>
-<span class="w">  </span><span class="nt">seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">768</span>
-<span class="w">  </span><span class="nt">stride</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">768</span>
-<span class="w">  </span><span class="nt">preview_n</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">240</span>
-<span class="w">  </span><span class="nt">final_n</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">240</span>
-<span class="w">  </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
-<span class="nt">edit</span><span class="p">:</span>
-<span class="w">  </span><span class="c1"># No edit by default (Compare &amp; evaluate/BYOE recommended), or use built-in quant demo:</span>
-<span class="w">  </span><span class="c1"># edit:</span>
-<span class="w">  </span><span class="c1">#   name: quant_rtn</span>
-<span class="w">  </span><span class="c1">#   plan:</span>
-<span class="w">  </span><span class="c1">#     bitwidth: 8</span>
-<span class="w">  </span><span class="c1">#     per_channel: true</span>
-<span class="nt">guards</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">spectral</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">kappa</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.2</span>
-<span class="w">  </span><span class="nt">variance</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">tier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">balanced</span>
-<span class="nt">eval</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">pairing</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">enforce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="nt">output</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">runs/</span>
-</code></pre></div>
-
-<hr />
-<!-- Quick CPU demos are intentionally omitted from this public docs index. -->
-
-<div class="codehilite"><pre><span></span><code>bash<span class="w"> </span>scripts/smoke/run_tiny_all_matrix.sh
-</code></pre></div>
-
-<p>Run with <code>RUN=1 NET=1</code> to execute the matrix and allow downloads.</p>
-<hr />
-<p><strong>Quick Links</strong>
-<a href="user-guide/getting-started/">Getting Started</a> ·
-<a href="reference/cli/">CLI Reference</a> ·
-<a href="user-guide/primary-metric-smoke/">Primary Metric Smoke</a> ·
-<a href="user-guide/example-reports/">Example Reports</a> ·
-<a href="https://github.com/invarlock/invarlock/blob/v0.12.1/CONTRIBUTING.md">Contributing</a></p>
+<p>User guides explain complete tasks. Assurance pages state claims and replay
+semantics. Reference pages define exact interfaces. Security pages describe
+assets, threats, controls, and residual risk.</p>
+<p>InvarLock is pre-1.0. Canonical artifact formats carry explicit versions;
+non-contract embedding APIs may evolve between minor releases.</p>
 
 
 
@@ -3873,6 +2247,12 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
           
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
         
       </main>
       
@@ -3903,7 +2283,7 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/eval
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.expand", "navigation.tabs"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="assets/javascripts/bundle.79ae519e.min.js"></script>

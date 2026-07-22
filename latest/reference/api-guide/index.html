@@ -6,17 +6,17 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Official documentation for the InvarLock toolkit">
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
       
       
       
         <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/api-guide/">
       
       
-        <link rel="prev" href="../one-run-lifecycle/">
+        <link rel="prev" href="../contracts/">
       
       
-        <link rel="next" href="../programmatic-quickstart/">
+        <link rel="next" href="../artifacts/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>API Guide - InvarLock Documentation</title>
+        <title>Python API - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-guide" class="md-skip">
+        <a href="#python-api" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              API Guide
+              Python API
             
           </span>
         </div>
@@ -147,6 +147,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
       
     </form>
     <div class="md-search__output">
@@ -221,7 +223,7 @@
           
   
   
-  User Guide
+  User guide
 
         </a>
       </li>
@@ -237,11 +239,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../cli/" class="md-tabs__link">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
           
   
   
-  CLI Reference
+  Assurance
 
         </a>
       </li>
@@ -259,7 +261,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+        <a href="../cli/" class="md-tabs__link">
           
   
   
@@ -279,27 +281,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../assurance/00-assurance-case/" class="md-tabs__link">
-          
-  
-  
-  Assurance
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../security/best-practices/" class="md-tabs__link">
+        <a href="../../security/trust-model/" class="md-tabs__link">
           
   
   
@@ -394,6 +376,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -412,7 +396,7 @@
   <span class="md-ellipsis">
     
   
-    User Guide
+    User guide
   
 
     
@@ -428,7 +412,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    User Guide
+    User guide
   
 
           </label>
@@ -448,7 +432,7 @@
   <span class="md-ellipsis">
     
   
-    Getting Started
+    Getting started
   
 
     
@@ -469,14 +453,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/quickstart/" class="md-nav__link">
+      <a href="../../user-guide/change-scenarios/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Quickstart
+    Change scenarios
   
 
     
@@ -497,14 +481,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/primary-metric-smoke/" class="md-nav__link">
+      <a href="../../user-guide/key-management/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Primary Metric Smoke
+    Key management
   
 
     
@@ -525,14 +509,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/compare-and-evaluate/" class="md-nav__link">
+      <a href="../../user-guide/runtime-providers/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Compare & Evaluate (BYOE)
+    Runtime providers
   
 
     
@@ -553,14 +537,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/knowledge-and-self-edit-workflows/" class="md-nav__link">
+      <a href="../../user-guide/evaluation-request/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Knowledge & Self-Edit Workflows
+    Evaluation request
   
 
     
@@ -581,14 +565,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/live-examples/" class="md-nav__link">
+      <a href="../../user-guide/schedule-and-policy/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Live Examples
+    Schedule and policy
   
 
     
@@ -609,14 +593,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/integrations/" class="md-nav__link">
+      <a href="../../user-guide/evidence-and-verification/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Integration Examples
+    Evidence and verification
   
 
     
@@ -637,14 +621,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/public-evidence-walkthrough/" class="md-nav__link">
+      <a href="../../user-guide/verification-failure-lab/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Public Evidence Walkthrough
+    Verification failure lab
   
 
     
@@ -665,14 +649,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/bring-your-own-data/" class="md-nav__link">
+      <a href="../../user-guide/diagnostics/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Bring Your Own Data
+    Optional diagnostics
   
 
     
@@ -693,14 +677,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/plugins/" class="md-nav__link">
+      <a href="../../user-guide/ci-integration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugin Workflow
+    CI integration
   
 
     
@@ -721,154 +705,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/config-gallery/" class="md-nav__link">
+      <a href="../../user-guide/public-evidence/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Configuration Gallery
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/example-reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Example Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/failure-examples/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Failure Examples
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/reading-report/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reading a Report
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/evidence-packs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evidence Packs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/evidence-packs-internals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evidence Pack Internals
+    Publish public evidence
   
 
     
@@ -929,6 +773,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -947,7 +793,7 @@
   <span class="md-ellipsis">
     
   
-    CLI Reference
+    Assurance
   
 
     
@@ -963,7 +809,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    CLI Reference
+    Assurance
   
 
           </label>
@@ -976,14 +822,154 @@
   
   
     <li class="md-nav__item">
-      <a href="../cli/" class="md-nav__link">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    CLI Overview
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
   
 
     
@@ -1020,6 +1006,8 @@
         
         
       
+      
+        
       
     
     
@@ -1066,14 +1054,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Index
+    CLI
   
 
     
@@ -1122,14 +1110,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../one-run-lifecycle/" class="md-nav__link">
+      <a href="../contracts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    One Run Lifecycle
+    Contracts
   
 
     
@@ -1166,7 +1154,7 @@
   <span class="md-ellipsis">
     
   
-    API Guide
+    Python API
   
 
     
@@ -1184,7 +1172,7 @@
   <span class="md-ellipsis">
     
   
-    API Guide
+    Python API
   
 
     
@@ -1210,10 +1198,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#stable-exports" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Stable exports
       
     </span>
   </a>
@@ -1221,10 +1209,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
+  <a href="#transactions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
+        Transactions
       
     </span>
   </a>
@@ -1232,22 +1220,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#concepts" class="md-nav__link">
+  <a href="#function-signatures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Concepts
+        Function signatures
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Concepts">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request loading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-coordinated-oci-evaluations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host-coordinated OCI evaluations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#direct-executed-evaluations-and-caller-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct executed evaluations and caller resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-abi-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider ABI types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider ABI types">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#responsibility-lanes" class="md-nav__link">
+  <a href="#core-value-constructors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Responsibility lanes
+        Core value constructors
       
     </span>
   </a>
@@ -1260,148 +1292,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
+  <a href="#hugging-face-identity-helpers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#corerunnerexecute" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CoreRunner.execute
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#auto-config-hints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Auto config hints
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runreport-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunReport fields
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failure-outcomes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failure outcomes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#interfaces" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interfaces
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#guardchain-helper" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GuardChain helper
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#calibration-data-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Calibration data format
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#evaluation-window-helpers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Evaluation window helpers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reports-canonical-helpers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        reports (canonical helpers)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#exceptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exceptions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
+        Hugging Face identity helpers
       
     </span>
   </a>
@@ -1409,10 +1303,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
+  <a href="#author-complete-runtime-import-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Observability
+        Author complete runtime-import evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-a-signed-receipt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify a signed receipt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-pack-result-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence pack result types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exception-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exception handling
       
     </span>
   </a>
@@ -1423,7 +1350,7 @@
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Documentation
+        Related documentation
       
     </span>
   </a>
@@ -1446,42 +1373,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../programmatic-quickstart/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Programmatic Quickstart
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guards/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guards
+    Artifacts
   
 
     
@@ -1530,14 +1429,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../report-outline/" class="md-nav__link">
+      <a href="../runtime-providers/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Report Outline
+    Runtime providers
   
 
     
@@ -1558,14 +1457,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../env-vars/" class="md-nav__link">
+      <a href="../runtime-security/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environment Variables
+    Runtime-security API
   
 
     
@@ -1586,14 +1485,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../model-adapters/" class="md-nav__link">
+      <a href="../environment/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Model Adapters
+    Environment
   
 
     
@@ -1614,14 +1513,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../model-family-catalog/" class="md-nav__link">
+      <a href="../lifecycle/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Model Family Catalog
+    Lifecycle
   
 
     
@@ -1642,14 +1541,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../contracts/" class="md-nav__link">
+      <a href="../release-verification/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Public Contracts
+    Release verification
   
 
     
@@ -1670,182 +1569,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../config-schema/" class="md-nav__link">
+      <a href="../documentation/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Configuration Schema
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tier-policy-catalog/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tier Policy Catalog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../datasets/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Datasets
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artifact Layout
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../observability/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Observability
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../calibration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Calibration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../alternatives-comparison/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Alternatives Comparison
+    Documentation development
   
 
     
@@ -1877,6 +1608,8 @@
     
     
       
+      
+        
       
     
     
@@ -1896,7 +1629,7 @@
   <span class="md-ellipsis">
     
   
-    Assurance
+    Security
   
 
     
@@ -1912,597 +1645,6 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Assurance
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/00-assurance-case/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Assurance Case
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/14-trust-model/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Trust Model
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/15-strict-assurance-checklist/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Strict Assurance Checklist
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/glossary/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Glossary
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/01-eval-math-derivation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evaluation Math Derivation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/02-coverage-and-pairing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Coverage & Pairing Plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/03-bca-bootstrap/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    BCa Bootstrap (Paired Δlog)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/04-guard-contracts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guard Contracts & Primer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/05-spectral-fpr-derivation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Spectral False-Positive Control
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/06-rmt-epsilon-rule/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    RMT ε-Rule
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/07-ve-gate-power/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    VE Predictive Gate
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/08-determinism-contracts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Determinism Contracts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/09-tier-v1-calibration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tier Policy v1 Calibration (Pilot)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/10-guard-overhead-method/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guard Overhead Method
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/11-policy-provenance/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Policy Provenance & Digest
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/12-device-drift-bands/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Device Drift Bands
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/13-gpu-mps-first-guards/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GPU/MPS-First Guard Measurement Contracts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/16-guard-validation-smoke/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guard Validation Smoke
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../assurance/17-empirical-guard-evidence/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Empirical Guard Evidence
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Security
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
     Security
   
 
@@ -2516,42 +1658,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../security/best-practices/" class="md-nav__link">
+      <a href="../../security/trust-model/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Best Practices
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../security/release-verification/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Verification
+    Trust model
   
 
     
@@ -2579,7 +1693,7 @@
   <span class="md-ellipsis">
     
   
-    Threat Model
+    Threat model
   
 
     
@@ -2600,14 +1714,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../security/architecture/" class="md-nav__link">
+      <a href="../../security/best-practices/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Architecture
+    Security practices
   
 
     
@@ -2628,42 +1742,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Runtime Provenance Guide
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip Audit Allowlist
+    Dependency-audit exceptions
   
 
     
@@ -2711,10 +1797,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#stable-exports" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Stable exports
       
     </span>
   </a>
@@ -2722,10 +1808,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
+  <a href="#transactions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
+        Transactions
       
     </span>
   </a>
@@ -2733,22 +1819,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#concepts" class="md-nav__link">
+  <a href="#function-signatures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Concepts
+        Function signatures
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Concepts">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request loading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-coordinated-oci-evaluations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host-coordinated OCI evaluations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#direct-executed-evaluations-and-caller-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct executed evaluations and caller resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-abi-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider ABI types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider ABI types">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#responsibility-lanes" class="md-nav__link">
+  <a href="#core-value-constructors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Responsibility lanes
+        Core value constructors
       
     </span>
   </a>
@@ -2761,148 +1891,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
+  <a href="#hugging-face-identity-helpers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#corerunnerexecute" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CoreRunner.execute
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#auto-config-hints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Auto config hints
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runreport-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunReport fields
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failure-outcomes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failure outcomes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#interfaces" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interfaces
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#guardchain-helper" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GuardChain helper
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#calibration-data-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Calibration data format
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#evaluation-window-helpers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Evaluation window helpers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reports-canonical-helpers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        reports (canonical helpers)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#exceptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exceptions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
+        Hugging Face identity helpers
       
     </span>
   </a>
@@ -2910,10 +1902,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
+  <a href="#author-complete-runtime-import-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Observability
+        Author complete runtime-import evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-a-signed-receipt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify a signed receipt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-pack-result-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence pack result types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exception-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exception handling
       
     </span>
   </a>
@@ -2924,7 +1949,7 @@
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Documentation
+        Related documentation
       
     </span>
   </a>
@@ -2951,467 +1976,747 @@
   
 
 
-<h1 id="api-guide">API Guide<a class="headerlink" href="#api-guide" title="Permanent link">&para;</a></h1>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Aspect</th>
-<th>Details</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Purpose</strong></td>
-<td>Programmatic interface for running the InvarLock pipeline and generating reports.</td>
-</tr>
-<tr>
-<td><strong>Audience</strong></td>
-<td>Python callers building scripted workflows or integrations.</td>
-</tr>
-<tr>
-<td><strong>Supported surface</strong></td>
-<td>Stable contract surfaces remain CLI/report/contract-read paths; <code>CoreRunner.execute</code>, <code>RunConfig</code>, <code>ModelAdapter</code>, <code>ModelEdit</code>, <code>Guard</code>, and direct reporting helpers are advanced/non-stable.</td>
-</tr>
-<tr>
-<td><strong>Requires</strong></td>
-<td><code>invarlock[adapters]</code> for HF adapters, <code>invarlock[edits]</code> for built-in edits, <code>invarlock[guards]</code> for guard math, <code>invarlock[eval]</code> for dataset providers.</td>
-</tr>
-<tr>
-<td><strong>Network</strong></td>
-<td>Offline by default; CLI runs use <code>evaluate --allow-network</code>, while Python callers set <code>INVARLOCK_ALLOW_NETWORK=1</code> to download models or datasets.</td>
-</tr>
-<tr>
-<td><strong>Inputs</strong></td>
-<td>Model instance, adapter, edit, guard list, <code>RunConfig</code>, optional calibration data.</td>
-</tr>
-<tr>
-<td><strong>Outputs / Artifacts</strong></td>
-<td><code>RunReport</code> object; optional event logs/checkpoints; evaluation bundles via <code>invarlock.reporting.make_report(...)</code> and <code>report_bundle.save_evaluation_bundle(...)</code>.</td>
-</tr>
-<tr>
-<td><strong>Source of truth</strong></td>
-<td><code>src/invarlock/core/runner.py</code>, <code>src/invarlock/core/api.py</code>, <code>src/invarlock/cli/config_execution.py</code>, <code>src/invarlock/reporting/report_make.py</code>, <code>src/invarlock/reporting/report_make_assembly.py</code>, <code>src/invarlock/reporting/report_bundle.py</code>, <code>src/invarlock/reporting/report_summary.py</code>, <code>src/invarlock/reporting/report_schema.py</code>.</td>
-</tr>
-</tbody>
-</table>
-<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.adapters.auto</span><span class="w"> </span><span class="kn">import</span> <span class="n">HF_Auto_Adapter</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">RunConfig</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.runner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoreRunner</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.edits</span><span class="w"> </span><span class="kn">import</span> <span class="n">RTNQuantEdit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.guards.invariants</span><span class="w"> </span><span class="kn">import</span> <span class="n">InvariantsGuard</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.guards.spectral</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpectralGuard</span>
-
-<span class="n">adapter</span> <span class="o">=</span> <span class="n">HF_Auto_Adapter</span><span class="p">()</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">adapter</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s2">&quot;gpt2&quot;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
-
-<span class="n">edit</span> <span class="o">=</span> <span class="n">RTNQuantEdit</span><span class="p">(</span><span class="n">bitwidth</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">per_channel</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">clamp_ratio</span><span class="o">=</span><span class="mf">0.005</span><span class="p">)</span>
-<span class="n">guards</span> <span class="o">=</span> <span class="p">[</span><span class="n">InvariantsGuard</span><span class="p">(),</span> <span class="n">SpectralGuard</span><span class="p">(</span><span class="n">sigma_quantile</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span> <span class="n">deadband</span><span class="o">=</span><span class="mf">0.10</span><span class="p">)]</span>
-
-<span class="n">config</span> <span class="o">=</span> <span class="n">RunConfig</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
-<span class="n">report</span> <span class="o">=</span> <span class="n">CoreRunner</span><span class="p">()</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">adapter</span><span class="p">,</span> <span class="n">edit</span><span class="p">,</span> <span class="n">guards</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;status:&quot;</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;primary metric:&quot;</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;primary_metric&quot;</span><span class="p">))</span>
-</code></pre></div>
-
-<blockquote>
-<p>For real primary-metric values, pass <code>calibration_data</code> (see Concepts). Without it,
-the runner uses lightweight mock metrics so the pipeline can finish.</p>
-</blockquote>
-<h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">&para;</a></h2>
+<h1 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">&para;</a></h1>
+<p>Applications embed InvarLock through <code>invarlock.engine</code>. This module is the
+stable facade for the paired evaluation engine. Modules that encode or decode
+individual bundle files remain internal unless explicitly documented.</p>
+<div class="admonition info">
+<p class="admonition-title">Reference</p>
 <ul>
-<li><strong>Pipeline phases</strong>: prepare → guard prepare → edit → guard validate → eval → finalize/rollback.</li>
-<li><strong>Calibration data</strong>: indexable batches (list/sequence) with <code>input_ids</code>, optional
-  <code>attention_mask</code>, and optional <code>labels</code>. Preview/final windows are sliced from this sequence.</li>
-<li><strong>Auto configuration</strong>: <code>auto_config</code> controls tier/policy resolution and is recorded
-  under <code>report.meta["auto"]</code> for report generation.</li>
-<li><strong>Snapshots</strong>: retries use snapshot/restore; configure via
-  <code>context.snapshot.*</code> when using YAML configs.</li>
-<li><strong>reports</strong>: generated from <code>RunReport</code> + baseline report via
-  <code>invarlock.reporting.make_report</code>, then persisted as an
-  evaluation bundle with <code>invarlock.reporting.report_bundle.save_evaluation_bundle</code>.</li>
-<li><strong>Verification</strong>: CLI-side <code>invarlock verify</code> enforces
-  <code>runtime.manifest.json</code> runtime provenance for container-backed outputs in
-  addition to schema and pairing checks.</li>
+<li><strong>Surface:</strong> Python facade exported by <code>invarlock.engine</code></li>
+<li><strong>Stability:</strong> Stable public API; undocumented <code>invarlock.*</code> imports remain internal</li>
+<li><strong>Use this page when:</strong> Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python</li>
 </ul>
-<h3 id="responsibility-lanes">Responsibility lanes<a class="headerlink" href="#responsibility-lanes" title="Permanent link">&para;</a></h3>
+</div>
+<h2 id="stable-exports">Stable exports<a class="headerlink" href="#stable-exports" title="Permanent link">&para;</a></h2>
+<p>The facade deliberately groups these stable surfaces:</p>
 <table>
 <thead>
 <tr>
-<th>Lane</th>
-<th>Responsibility</th>
+<th>Surface</th>
+<th>Exports</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>User code</td>
-<td>Build <code>RunConfig</code>, call <code>execute</code>, consume <code>RunReport</code>.</td>
+<td>Transactions</td>
+<td><code>evaluate_request_file</code>, <code>verify_evidence</code>, <code>render_evidence</code>, <code>verify_signed_verification_receipt</code></td>
 </tr>
 <tr>
-<td>CoreRunner</td>
-<td>Orchestrate phases, apply edit, assemble status + metrics.</td>
+<td>Request</td>
+<td><code>load_evaluation_request</code>, <code>EvaluationRequest</code>, <code>EvaluationRequestError</code></td>
 </tr>
 <tr>
-<td>Adapter</td>
-<td>Load/describe model, snapshot/restore.</td>
+<td>Results and errors</td>
+<td>Evaluation, verification, reporting, receipt, and evidence-pack result types</td>
 </tr>
 <tr>
-<td>Guards</td>
-<td><code>prepare</code>/<code>validate</code>, return typed decisions (<code>allow</code>/<code>monitor</code>/<code>rollback</code>/<code>block</code>).</td>
+<td>OCI host execution</td>
+<td>Per-side launch values, host executor, and environment-backed launch resolution</td>
 </tr>
 <tr>
-<td>Eval</td>
-<td>Build windows, compute primary metric + tail metrics.</td>
+<td>Provider ABI</td>
+<td>ABI constant, provider/session protocols, capabilities, runtime specs/resources/context, resolver protocols, batches, identities, receipts, and observations</td>
 </tr>
 <tr>
-<td>report</td>
-<td><code>make_report(report, baseline)</code> + <code>save_evaluation_bundle(...)</code> for evaluation-bundle generation.</td>
+<td>Runtime-import authoring</td>
+<td>Strict JSONL record loading, typed observation and receipt builders, complete side publication/reload, and verifier-derived paired-record publication</td>
+</tr>
+<tr>
+<td>Scorer extension</td>
+<td>ABI constant, descriptor and binding types, replay protocol and request/result types, explicit registry, and binding/result builders</td>
+</tr>
+<tr>
+<td>HF identity</td>
+<td><code>checkpoint_tree_sha256</code>, <code>hf_tokenizer_contract_sha256</code></td>
 </tr>
 </tbody>
 </table>
-<p>Note: CoreRunner coordinates each lane.</p>
-<h2 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h2>
-<h3 id="corerunnerexecute">CoreRunner.execute<a class="headerlink" href="#corerunnerexecute" title="Permanent link">&para;</a></h3>
-<p><code>CoreRunner.execute</code> is the primary entry point for advanced/non-stable
-programmatic runs.</p>
-<div class="codehilite"><pre><span></span><code><span class="n">report</span> <span class="o">=</span> <span class="n">CoreRunner</span><span class="p">()</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span>
-    <span class="n">adapter</span><span class="p">,</span>
-    <span class="n">edit</span><span class="p">,</span>
-    <span class="n">guards</span><span class="p">,</span>
-    <span class="n">config</span><span class="p">,</span>
-    <span class="n">calibration_data</span><span class="o">=</span><span class="n">calibration_data</span><span class="p">,</span>
-    <span class="n">auto_config</span><span class="o">=</span><span class="n">auto_config</span><span class="p">,</span>
-    <span class="n">edit_config</span><span class="o">=</span><span class="n">edit_config</span><span class="p">,</span>
-    <span class="n">preview_n</span><span class="o">=</span><span class="n">preview_n</span><span class="p">,</span>
-    <span class="n">final_n</span><span class="o">=</span><span class="n">final_n</span><span class="p">,</span>
+<p>Imports from other <code>invarlock.*</code> modules are not stable merely because they are
+importable. Use the facade unless implementing the provider protocol documented
+in <a href="../runtime-providers/">Runtime providers</a>.</p>
+<h2 id="transactions">Transactions<a class="headerlink" href="#transactions" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">OciRuntimeExecutor</span><span class="p">,</span>
+    <span class="n">evaluate_request_file</span><span class="p">,</span>
+    <span class="n">launch_from_environment</span><span class="p">,</span>
+    <span class="n">render_evidence</span><span class="p">,</span>
+    <span class="n">verify_evidence</span><span class="p">,</span>
+    <span class="n">verify_signed_verification_receipt</span><span class="p">,</span>
 <span class="p">)</span>
-</code></pre></div>
 
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>model</code></td>
-<td><code>Any</code></td>
-<td>Loaded model instance.</td>
-</tr>
-<tr>
-<td><code>adapter</code></td>
-<td><code>ModelAdapter</code></td>
-<td>Adapter that can describe/snapshot/restore the model.</td>
-</tr>
-<tr>
-<td><code>edit</code></td>
-<td><code>ModelEdit</code> or <code>EditLike</code></td>
-<td>Edit operation to apply.</td>
-</tr>
-<tr>
-<td><code>guards</code></td>
-<td><code>list[Guard]</code></td>
-<td>Guard instances to validate after edit.</td>
-</tr>
-<tr>
-<td><code>config</code></td>
-<td><code>RunConfig</code></td>
-<td>Runtime settings (device, thresholds, event logs).</td>
-</tr>
-<tr>
-<td><code>calibration_data</code></td>
-<td><code>Any</code></td>
-<td>Optional calibration batches for evaluation.</td>
-</tr>
-<tr>
-<td><code>auto_config</code></td>
-<td><code>dict[str, Any]</code></td>
-<td>Optional tier/policy hints (recorded into report meta).</td>
-</tr>
-<tr>
-<td><code>edit_config</code></td>
-<td><code>dict[str, Any]</code></td>
-<td>Overrides passed to <code>edit.apply(...)</code>.</td>
-</tr>
-<tr>
-<td><code>preview_n</code> / <code>final_n</code></td>
-<td><code>int \| None</code></td>
-<td>Override preview/final counts; defaults to slicing calibration data.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="runconfig">RunConfig<a class="headerlink" href="#runconfig" title="Permanent link">&para;</a></h3>
-<p><code>RunConfig</code> controls runtime behavior in the core runner.</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Default</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>device</code></td>
-<td><code>"auto"</code></td>
-<td>Resolves to CUDA → MPS → CPU.</td>
-</tr>
-<tr>
-<td><code>max_pm_ratio</code></td>
-<td><code>1.5</code></td>
-<td>Max acceptable primary-metric ratio before rollback.</td>
-</tr>
-<tr>
-<td><code>spike_threshold</code></td>
-<td><code>2.0</code></td>
-<td>Catastrophic spike ratio for immediate rollback.</td>
-</tr>
-<tr>
-<td><code>event_path</code></td>
-<td><code>None</code></td>
-<td>Path to JSONL event log (optional).</td>
-</tr>
-<tr>
-<td><code>checkpoint_interval</code></td>
-<td><code>0</code></td>
-<td>0 disables checkpoints.</td>
-</tr>
-<tr>
-<td><code>dry_run</code></td>
-<td><code>False</code></td>
-<td>Skip mutations and produce a report.</td>
-</tr>
-<tr>
-<td><code>verbose</code></td>
-<td><code>False</code></td>
-<td>Enables extra logging.</td>
-</tr>
-<tr>
-<td><code>context</code></td>
-<td><code>{}</code></td>
-<td>Free-form context passed to guards/eval.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="auto-config-hints">Auto config hints<a class="headerlink" href="#auto-config-hints" title="Permanent link">&para;</a></h3>
-<p><code>auto_config</code> is recorded in <code>report.meta["auto"]</code> and used for tier resolution.</p>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>enabled</code></td>
-<td>Whether auto mode is enabled.</td>
-</tr>
-<tr>
-<td><code>tier</code></td>
-<td>Tier label (<code>balanced</code>, <code>conservative</code>, <code>aggressive</code>).</td>
-</tr>
-<tr>
-<td><code>probes</code></td>
-<td>Micro-probe count (0–10).</td>
-</tr>
-<tr>
-<td><code>target_pm_ratio</code></td>
-<td>Target ratio for auto tuning (default: 1.0 when unset).</td>
-</tr>
-</tbody>
-</table>
-<h3 id="runreport-fields">RunReport fields<a class="headerlink" href="#runreport-fields" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>meta</code></td>
-<td>Execution metadata (device, seeds, config snapshot).</td>
-</tr>
-<tr>
-<td><code>edit</code></td>
-<td>Edit metadata and deltas.</td>
-</tr>
-<tr>
-<td><code>guards</code></td>
-<td>Guard results keyed by guard name.</td>
-</tr>
-<tr>
-<td><code>metrics</code></td>
-<td>Primary metric + telemetry values.</td>
-</tr>
-<tr>
-<td><code>evaluation_windows</code></td>
-<td>Captured preview/final windows (if enabled).</td>
-</tr>
-<tr>
-<td><code>status</code></td>
-<td><code>pending</code>, <code>running</code>, <code>success</code>, <code>failed</code>, or <code>rollback</code>.</td>
-</tr>
-<tr>
-<td><code>error</code></td>
-<td>Error string when <code>status=failed</code>.</td>
-</tr>
-<tr>
-<td><code>context</code></td>
-<td>Run context propagated to guards/eval.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="failure-outcomes">Failure outcomes<a class="headerlink" href="#failure-outcomes" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Outcome</th>
-<th>Trigger</th>
-<th>RunReport evidence</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Monitor</td>
-<td>Guard returns <code>decision: monitor</code>.</td>
-<td><code>report.guards[].decision = monitor</code>; <code>report.status = success</code>.</td>
-</tr>
-<tr>
-<td>Rollback</td>
-<td>Guard returns <code>decision: rollback</code>, or guard/primary-metric gates fail.</td>
-<td><code>report.status = rollback</code>; <code>report.meta.rollback_reason</code>.</td>
-</tr>
-<tr>
-<td>Failed</td>
-<td>Unrecoverable runner exception.</td>
-<td><code>report.status = failed</code>; <code>report.error</code>.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="interfaces">Interfaces<a class="headerlink" href="#interfaces" title="Permanent link">&para;</a></h3>
-<p><code>ModelAdapter</code>, <code>ModelEdit</code>, and <code>Guard</code> are defined in <code>invarlock.core.api</code>.</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">Guard</span><span class="p">,</span> <span class="n">ModelAdapter</span><span class="p">,</span> <span class="n">ModelEdit</span>
-
-<span class="k">class</span><span class="w"> </span><span class="nc">CustomGuard</span><span class="p">(</span><span class="n">Guard</span><span class="p">):</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;custom_guard&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">adapter</span><span class="p">,</span> <span class="n">calib</span><span class="p">,</span> <span class="n">policy</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;ready&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">adapter</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;passed&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;decision&quot;</span><span class="p">:</span> <span class="s2">&quot;monitor&quot;</span><span class="p">,</span> <span class="s2">&quot;metrics&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;ok&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}}</span>
-</code></pre></div>
-
-<p>Notes:</p>
-<ul>
-<li>The runner calls <code>prepare(...)</code> when the guard implements it (<code>GuardWithPrepare</code>).</li>
-<li><code>validate(...)</code> is always called during the guard phase.</li>
-<li><code>validate(...)</code> should emit the typed decision vocabulary:
-  <code>allow</code>, <code>monitor</code>, <code>rollback</code>, or <code>block</code>.</li>
-<li>Optional lifecycle helpers (<code>before_edit</code>, <code>after_edit</code>, <code>finalize</code>) are only
-  invoked when you manage guards manually (for example via <code>GuardChain</code>).</li>
-</ul>
-<h3 id="guardchain-helper">GuardChain helper<a class="headerlink" href="#guardchain-helper" title="Permanent link">&para;</a></h3>
-<p><code>GuardChain</code> provides lifecycle helpers for manually coordinating guard calls:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">GuardChain</span>
-
-<span class="n">chain</span> <span class="o">=</span> <span class="n">GuardChain</span><span class="p">([</span><span class="n">guard</span><span class="p">])</span>
-<span class="n">chain</span><span class="o">.</span><span class="n">prepare_all</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">adapter</span><span class="p">,</span> <span class="n">calib</span><span class="p">,</span> <span class="n">policy_config</span><span class="p">)</span>
-<span class="n">chain</span><span class="o">.</span><span class="n">before_edit_all</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-<span class="n">chain</span><span class="o">.</span><span class="n">after_edit_all</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-<span class="n">chain</span><span class="o">.</span><span class="n">finalize_all</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-</code></pre></div>
-
-<h3 id="calibration-data-format">Calibration data format<a class="headerlink" href="#calibration-data-format" title="Permanent link">&para;</a></h3>
-<p>Calibration batches should be indexable and yield dict-like objects:</p>
-<div class="codehilite"><pre><span></span><code><span class="n">batch</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;input_ids&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">101</span><span class="p">,</span> <span class="mi">102</span><span class="p">,</span> <span class="mi">103</span><span class="p">]],</span>
-    <span class="s2">&quot;attention_mask&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span>
-    <span class="c1"># optional</span>
-    <span class="s2">&quot;labels&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="mi">101</span><span class="p">,</span> <span class="mi">102</span><span class="p">,</span> <span class="mi">103</span><span class="p">]],</span>
+<span class="c1"># Load both fingerprints from an independently managed trust registry.</span>
+<span class="n">evidence_signer_fingerprint</span> <span class="o">=</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;3&quot;</span> <span class="o">*</span> <span class="mi">64</span>
+<span class="n">verifier_fingerprint</span> <span class="o">=</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;4&quot;</span> <span class="o">*</span> <span class="mi">64</span>
+<span class="n">artifact_digests</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;5&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;6&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
 <span class="p">}</span>
-</code></pre></div>
+<span class="n">schedule_digest</span> <span class="o">=</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;7&quot;</span> <span class="o">*</span> <span class="mi">64</span>
 
-<p>If your calibration data is an iterator without <code>__len__</code>, set
-<code>INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1</code> to allow the runner to materialize it.</p>
-<h3 id="evaluation-window-helpers">Evaluation window helpers<a class="headerlink" href="#evaluation-window-helpers" title="Permanent link">&para;</a></h3>
-<p>You can build calibration batches from dataset providers:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.eval.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_provider</span>
-
-<span class="n">provider</span> <span class="o">=</span> <span class="n">get_provider</span><span class="p">(</span><span class="s2">&quot;wikitext2&quot;</span><span class="p">)</span>
-<span class="n">preview</span><span class="p">,</span> <span class="n">final</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">windows</span><span class="p">(</span>
-    <span class="n">tokenizer</span><span class="p">,</span>
-    <span class="n">preview_n</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
-    <span class="n">final_n</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
-    <span class="n">seq_len</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
-    <span class="n">stride</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+<span class="n">evaluation</span> <span class="o">=</span> <span class="n">evaluate_request_file</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;request.yaml&quot;</span><span class="p">),</span>
+    <span class="n">signing_key_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;keys/evidence-signer.pem&quot;</span><span class="p">),</span>
+    <span class="n">runtime_executor</span><span class="o">=</span><span class="n">OciRuntimeExecutor</span><span class="p">(</span><span class="n">launch_from_environment</span><span class="p">()),</span>
 <span class="p">)</span>
 
-<span class="n">calibration</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="p">{</span><span class="s2">&quot;input_ids&quot;</span><span class="p">:</span> <span class="n">ids</span><span class="p">,</span> <span class="s2">&quot;attention_mask&quot;</span><span class="p">:</span> <span class="n">mask</span><span class="p">}</span>
-    <span class="k">for</span> <span class="n">ids</span><span class="p">,</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
-        <span class="n">preview</span><span class="o">.</span><span class="n">input_ids</span> <span class="o">+</span> <span class="n">final</span><span class="o">.</span><span class="n">input_ids</span><span class="p">,</span>
-        <span class="n">preview</span><span class="o">.</span><span class="n">attention_masks</span> <span class="o">+</span> <span class="n">final</span><span class="o">.</span><span class="n">attention_masks</span><span class="p">,</span>
-        <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="n">verification</span> <span class="o">=</span> <span class="n">verify_evidence</span><span class="p">(</span>
+    <span class="n">evaluation</span><span class="o">.</span><span class="n">evidence_path</span><span class="p">,</span>
+    <span class="n">policy_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;policy/acceptance.json&quot;</span><span class="p">),</span>
+    <span class="n">expected_baseline_artifact</span><span class="o">=</span><span class="n">artifact_digests</span><span class="p">[</span><span class="s2">&quot;baseline&quot;</span><span class="p">],</span>
+    <span class="n">expected_subject_artifact</span><span class="o">=</span><span class="n">artifact_digests</span><span class="p">[</span><span class="s2">&quot;subject&quot;</span><span class="p">],</span>
+    <span class="n">expected_schedule</span><span class="o">=</span><span class="n">schedule_digest</span><span class="p">,</span>
+    <span class="n">expected_baseline_runtime</span><span class="o">=</span><span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="n">expected_subject_runtime</span><span class="o">=</span><span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="n">expected_signer</span><span class="o">=</span><span class="n">evidence_signer_fingerprint</span><span class="p">,</span>
+    <span class="n">receipt_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;verification.receipt.json&quot;</span><span class="p">),</span>
+    <span class="n">verifier_signing_key_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;keys/evidence-verifier.pem&quot;</span><span class="p">),</span>
+    <span class="n">verifier_identity</span><span class="o">=</span><span class="s2">&quot;release-verifier&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">report</span> <span class="o">=</span> <span class="n">render_evidence</span><span class="p">(</span>
+    <span class="n">evaluation</span><span class="o">.</span><span class="n">evidence_path</span><span class="p">,</span>
+    <span class="n">html_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence.html&quot;</span><span class="p">),</span>
+    <span class="n">explain</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">receipt_check</span> <span class="o">=</span> <span class="n">verify_signed_verification_receipt</span><span class="p">(</span>
+    <span class="n">verification</span><span class="o">.</span><span class="n">receipt_path</span><span class="p">,</span>
+    <span class="n">evaluation</span><span class="o">.</span><span class="n">evidence_path</span><span class="p">,</span>
+    <span class="n">policy_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;policy/acceptance.json&quot;</span><span class="p">),</span>
+    <span class="n">expected_artifact_digests</span><span class="o">=</span><span class="n">artifact_digests</span><span class="p">,</span>
+    <span class="n">expected_schedule_digest</span><span class="o">=</span><span class="n">schedule_digest</span><span class="p">,</span>
+    <span class="n">expected_runtime_digests</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+        <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">expected_pack_signer_fingerprint</span><span class="o">=</span><span class="n">evidence_signer_fingerprint</span><span class="p">,</span>
+    <span class="n">expected_verifier_identity</span><span class="o">=</span><span class="s2">&quot;release-verifier&quot;</span><span class="p">,</span>
+    <span class="n">expected_verifier_fingerprint</span><span class="o">=</span><span class="n">verifier_fingerprint</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">assert</span> <span class="n">receipt_check</span><span class="o">.</span><span class="n">ok</span>
+</code></pre></div>
+
+<p>The result types are:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Important fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EvaluationPreflightResult</code></td>
+<td><code>execution_mode</code>, <code>output</code>, input digests, providers, checks, <code>as_json()</code></td>
+</tr>
+<tr>
+<td><code>EvaluationTransactionResult</code></td>
+<td><code>evidence_path</code>, <code>comparison_id</code>, <code>pack_manifest_digest</code>, <code>as_json()</code></td>
+</tr>
+<tr>
+<td><code>EvidenceVerification</code></td>
+<td><code>evidence_path</code>, <code>payload</code>, <code>receipt_path</code>, <code>summary</code>, <code>as_json()</code></td>
+</tr>
+<tr>
+<td><code>EvidenceReport</code></td>
+<td><code>text</code>, <code>html_path</code>, <code>evidence_signer</code></td>
+</tr>
+<tr>
+<td><code>ReceiptVerification</code></td>
+<td><code>ok</code>, <code>signed</code>, <code>statement</code>, <code>verifier_fingerprint</code>, <code>errors</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>EvaluationPreflightError</code>, <code>EvaluationTransactionError</code>,
+<code>EvidenceVerificationError</code>, and <code>EvidenceReportError</code> carry CLI-compatible
+<code>exit_code</code> values. The first three also expose machine-readable JSON behavior.
+Applications should treat every exception or verification payload with
+<code>ok != true</code> as rejection.</p>
+<p><code>EvidenceReceiptError</code> is also exported for failures that prevent safe receipt
+processing. Ordinary receipt authenticity or anchor mismatches are reported in
+<code>ReceiptVerification.errors</code> with <code>ok</code> set to false.</p>
+<p><code>render_evidence</code> authenticates the bundle's internal evidence signature but
+does not take independent artifact, schedule, policy, runtime, or signer
+anchors. Call <code>verify_evidence</code> when an independent acceptance decision is
+required.</p>
+<h2 id="function-signatures">Function signatures<a class="headerlink" href="#function-signatures" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="n">evaluate_request_file</span><span class="p">(</span>
+    <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">signing_key_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">resource_resolver</span><span class="p">:</span> <span class="n">RuntimeResourceResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">runtime_executor</span><span class="p">:</span> <span class="n">OciRuntimeExecutor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">runtime_image_digests</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">scorer_registry</span><span class="p">:</span> <span class="n">ScorerExtensionRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationTransactionResult</span>
+
+<span class="n">preflight_evaluation_request</span><span class="p">(</span>
+    <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">signing_key_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">scorer_registry</span><span class="p">:</span> <span class="n">ScorerExtensionRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">runtime_image_digests</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">resource_resolver</span><span class="p">:</span> <span class="n">RuntimeResourceResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationPreflightResult</span>
+
+<span class="n">load_evaluation_request</span><span class="p">(</span>
+    <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">provider_resolver</span><span class="p">:</span> <span class="n">ProviderResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationRequest</span>
+
+<span class="n">verify_evidence</span><span class="p">(</span>
+    <span class="n">evidence_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">policy_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_baseline_artifact</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_subject_artifact</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_schedule</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_baseline_runtime</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_subject_runtime</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_signer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">receipt_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">verifier_signing_key_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">verifier_identity</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">trust_profile_digest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">scorer_registry</span><span class="p">:</span> <span class="n">ScorerExtensionRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">policy_bytes</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">verifier_signing_key_bytes</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvidenceVerification</span>
+
+<span class="n">render_evidence</span><span class="p">(</span>
+    <span class="n">evidence_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">html_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">explain</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvidenceReport</span>
+</code></pre></div>
+
+<p>The optional annotations on <code>verify_evidence</code> support a uniform Python
+signature; the public evidence-pack v1 transaction requires every artifact,
+schedule, policy, runtime, signer, receipt, verifier-key, and verifier-identity
+input. Missing values raise <code>EvidenceVerificationError</code> rather than reducing
+assurance.</p>
+<p><code>evaluate_request_file</code> always completes the same request, input, schedule,
+policy, runtime, key, and output preflight before it calls a run-mode executor.
+Every programmatic run must supply both independently inspected
+<code>runtime_image_digests</code>; neither an executor nor a resource resolver can
+self-assert those trust inputs. <code>preflight_evaluation_request</code> exposes that gate separately when an
+application wants to inspect the result without executing a runtime or mutating
+the output tree. Embedders must independently confirm that run-mode images are
+local before supplying their digests; the CLI performs that inspection through
+Docker or Podman without starting a container. For a scorer-bound request,
+preflight also loads the explicitly authorized scorer's deterministic
+descriptor and schema and validates the exact binding and task/input/output
+compatibility without calling scorer replay.</p>
+<p><code>EvaluationPreflightResult</code> serializes as
+<code>invarlock/evaluation-preflight-v2</code>. When policy sample qualification is
+enabled, <code>sample_qualification.record_count</code> contains the minimum, observed
+count, and <code>status: pass</code>; <code>sample_qualification.interval_width</code> contains the
+maximum, unit, and <code>status: pending_execution</code>. Applications must not convert
+that pending state into a successful precision claim.</p>
+<p>Applications evaluating a run request that selects a runtime input hook must
+pass a side-aware <code>RuntimeResourceResolver</code> to the public transaction. The hook
+authenticates schedule-bound external resources without loading the model.
+Successful resolution of both sides against their inspected image digests is
+recorded as <code>runtime_resources</code> in <code>EvaluationPreflightResult.checks</code>. The OCI executor implements both execution
+and resource resolution so its frozen per-side image, device, root, and support
+bindings cannot drift between baseline and subject validation.</p>
+<p>When a request selects <code>comparison.scorer_extension</code>, the embedding must pass
+an explicit <code>ScorerExtensionRegistry</code> to both <code>evaluate_request_file</code> and
+<code>verify_evidence</code>. The registry may contain caller-injected authorized scorers
+or may explicitly enable installed <code>invarlock.scorers</code> entry-point discovery.
+Neither an installed package nor a binding inside the submitted evidence
+authorizes scorer code by itself. Strict verification resolves the policy-
+pinned scorer through this registry and replays it deterministically.</p>
+<h2 id="request-loading">Request loading<a class="headerlink" href="#request-loading" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_evaluation_request</span>
+
+<span class="n">request</span> <span class="o">=</span> <span class="n">load_evaluation_request</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;request.yaml&quot;</span><span class="p">))</span>
+</code></pre></div>
+
+<p>The loader returns an immutable <code>EvaluationRequest</code> whose paths are resolved
+beneath the request root. Its default provider resolver exposes only the
+built-in Hugging Face provider. <code>evaluate_request_file</code> uses the core registry,
+which also discovers installed first-party add-ins.</p>
+<p>Loading validates structure and path confinement; the evaluation transaction
+repeats no-follow reads at the point of use to detect later filesystem changes.</p>
+<h2 id="host-coordinated-oci-evaluations">Host-coordinated OCI evaluations<a class="headerlink" href="#host-coordinated-oci-evaluations" title="Permanent link">&para;</a></h2>
+<p>The stable facade exports <code>OciEvaluationLaunch</code>, <code>OciSideLaunch</code>,
+<code>OciRuntimeExecutor</code>, and <code>launch_from_environment</code>. The public CLI constructs
+this executor for every run-mode request. The host prepares the schedule,
+launches one independently pinned worker per side, validates both closed side
+results, and keeps the evidence-signing key outside the workers.</p>
+<p>An embedding can build the same launch explicitly:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">OciEvaluationLaunch</span><span class="p">,</span>
+    <span class="n">OciRuntimeExecutor</span><span class="p">,</span>
+    <span class="n">OciSideLaunch</span><span class="p">,</span>
+    <span class="n">OciWorkerLimits</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">baseline_digest</span> <span class="o">=</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span>
+<span class="n">subject_digest</span> <span class="o">=</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">OciRuntimeExecutor</span><span class="p">(</span>
+    <span class="n">OciEvaluationLaunch</span><span class="p">(</span>
+        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;docker&quot;</span><span class="p">,</span>
+        <span class="n">worker_limits</span><span class="o">=</span><span class="n">OciWorkerLimits</span><span class="p">(</span>
+            <span class="n">cpus</span><span class="o">=</span><span class="s2">&quot;8&quot;</span><span class="p">,</span>
+            <span class="n">memory_mib</span><span class="o">=</span><span class="mi">16384</span><span class="p">,</span>
+            <span class="n">user</span><span class="o">=</span><span class="s2">&quot;12001:12001&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">baseline</span><span class="o">=</span><span class="n">OciSideLaunch</span><span class="p">(</span>
+            <span class="n">image_ref</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;registry.example/invarlock-runtime@</span><span class="si">{</span><span class="n">baseline_digest</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">image_digest</span><span class="o">=</span><span class="n">baseline_digest</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+            <span class="n">entrypoint</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">subject</span><span class="o">=</span><span class="n">OciSideLaunch</span><span class="p">(</span>
+            <span class="n">image_ref</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;registry.example/invarlock-runtime@</span><span class="si">{</span><span class="n">subject_digest</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">image_digest</span><span class="o">=</span><span class="n">subject_digest</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+            <span class="n">entrypoint</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
     <span class="p">)</span>
-<span class="p">]</span>
+<span class="p">)</span>
 </code></pre></div>
 
-<h3 id="reports-canonical-helpers">reports (canonical helpers)<a class="headerlink" href="#reports-canonical-helpers" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.reporting.render_markdown</span><span class="w"> </span><span class="kn">import</span> <span class="n">render_report_markdown</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.reporting.report_make</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_report</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.reporting.report_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_report</span>
-
-<span class="n">evaluation_report</span> <span class="o">=</span> <span class="n">make_report</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">baseline_report</span><span class="p">)</span>
-<span class="n">validate_report</span><span class="p">(</span><span class="n">evaluation_report</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">render_report_markdown</span><span class="p">(</span><span class="n">evaluation_report</span><span class="p">))</span>
+<p>Each worker receives read-only job, schedule, artifact, and support mounts plus
+one isolated writable output mount. <code>OciWorkerLimits</code> applies validated CPU,
+memory, and numeric non-root user controls independently to each worker; its
+defaults are <code>4</code>, 65536 MiB, and <code>65532:65532</code>. The launcher may run two CPU
+workers or two different explicit CUDA indexes concurrently. Generic CUDA
+selection, a shared index, and CPU/CUDA pairs run sequentially. CUDA selection
+exposes a device but does not make a CPU-only image CUDA-capable; use the x86_64
+image built from <code>runtime/Dockerfile.cuda</code> for canonical CUDA Hugging Face
+execution.</p>
+<p><code>launch_from_environment</code> resolves the common and per-side image, digest,
+device, entrypoint, and common worker-limit variables documented in <a href="../environment/">Environment
+variables</a>. Explicit function arguments take precedence over
+environment values.</p>
+<h2 id="direct-executed-evaluations-and-caller-resources">Direct executed evaluations and caller resources<a class="headerlink" href="#direct-executed-evaluations-and-caller-resources" title="Permanent link">&para;</a></h2>
+<p><code>evaluate_request_file</code> accepts an optional <code>resource_resolver</code> implementing
+the runtime resource resolver protocol. This is a lower-level programmatic hook
+for execution that is already inside an authenticated strict runtime context.
+It supplies caller-owned artifact roots, support files, device selection, and
+the selected side-image digest. It is not the host OCI launcher. Passing both a
+<code>resource_resolver</code> and <code>runtime_executor</code> is rejected.</p>
+<p><code>RuntimeResourceResolver</code> is exported from <code>invarlock.engine</code> as a structural
+protocol. Its exact method is:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">resolve</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">request_root</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">role</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;baseline&quot;</span><span class="p">,</span> <span class="s2">&quot;subject&quot;</span><span class="p">],</span>
+    <span class="n">side</span><span class="p">:</span> <span class="n">ComparisonSideRequest</span><span class="p">,</span>
+    <span class="n">provider</span><span class="p">:</span> <span class="n">RuntimeProvider</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeArtifactResources</span><span class="p">:</span> <span class="o">...</span>
 </code></pre></div>
 
-<h3 id="exceptions">Exceptions<a class="headerlink" href="#exceptions" title="Permanent link">&para;</a></h3>
-<p>Core exceptions live in <code>invarlock.core.exceptions</code>:</p>
+<p><code>ComparisonSideRequest</code> is intentionally not a stable construction surface;
+the loader supplies it to the resolver. A custom resolver reads only the
+already validated side and returns caller-authorized resources. The following
+HF-only resolver is complete for a transaction already running inside its
+strict side context because HF needs no executable support files:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RuntimeArtifactResources</span><span class="p">,</span>
+    <span class="n">RuntimeProvider</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">AuthorizedHFResources</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">image_digest</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">image_digest</span> <span class="o">=</span> <span class="n">image_digest</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">request_root</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">role</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;baseline&quot;</span><span class="p">,</span> <span class="s2">&quot;subject&quot;</span><span class="p">],</span>
+        <span class="n">side</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">provider</span><span class="p">:</span> <span class="n">RuntimeProvider</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeArtifactResources</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">provider</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;hf_transformers&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unsupported authorized provider: </span><span class="si">{</span><span class="n">provider</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="n">side</span><span class="o">.</span><span class="n">artifact</span><span class="o">.</span><span class="n">path</span>
+        <span class="k">if</span> <span class="n">artifact</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">role</span><span class="si">}</span><span class="s2"> has no run-mode artifact&quot;</span><span class="p">)</span>
+        <span class="n">relative</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">request_root</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">RuntimeArtifactResources</span><span class="p">(</span>
+            <span class="n">root</span><span class="o">=</span><span class="n">request_root</span><span class="p">,</span>
+            <span class="n">primary_artifact</span><span class="o">=</span><span class="n">relative</span><span class="p">,</span>
+            <span class="n">support_resources</span><span class="o">=</span><span class="p">{},</span>
+            <span class="n">device_kind</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+            <span class="n">container_image_digest</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">image_digest</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+
+<p><code>ProviderResolver</code> is the callable type
+<code>Callable[[str], RuntimeProvider]</code>. It is for controlled request loading; it
+must reject unknown provider names rather than fall back to a default.</p>
+<h2 id="provider-abi-types">Provider ABI types<a class="headerlink" href="#provider-abi-types" title="Permanent link">&para;</a></h2>
+<p>The facade exports runtime-provider ABI version <code>1</code> as
+<code>INVARLOCK_RUNTIME_PROVIDER_ABI</code>, together with these value and protocol types:</p>
 <ul>
-<li><code>ModelLoadError</code>, <code>AdapterError</code>, <code>EditError</code>, <code>GuardError</code>, <code>ConfigError</code></li>
-<li><code>InvarlockError</code> (base class)</li>
+<li><code>RuntimeProvider</code>, <code>RuntimeProviderCapabilities</code>, and <code>RuntimeSession</code>;</li>
+<li><code>ModelRuntimeSpec</code>, <code>ModelArtifactIdentity</code>, and
+  <code>RuntimeArtifactResources</code>;</li>
+<li><code>RuntimeExecutionContext</code>;</li>
+<li><code>EvaluationBatch</code> and <code>EvaluationRecord</code>;</li>
+<li><code>RuntimeProviderReceipt</code>, <code>RuntimeScoringRecord</code>, and
+  <code>ScoringObservation</code>;</li>
+<li><code>RuntimeBehavioralSchedule</code> and the three artifact-identity variants; and</li>
+<li>plugin, backend, execution-settings, and device provenance values.</li>
 </ul>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<p>The two resolver annotations used by the public function signatures are also
+exported: <code>ProviderResolver</code> and <code>RuntimeResourceResolver</code>.</p>
+<h3 id="core-value-constructors">Core value constructors<a class="headerlink" href="#core-value-constructors" title="Permanent link">&para;</a></h3>
+<p>The most commonly embedded ABI values have these stable constructor fields:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Required constructor fields</th>
+<th>Defaults and constraints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelRuntimeSpec</code></td>
+<td><code>provider_name</code>, <code>model_id</code></td>
+<td><code>settings={}</code>; values must be finite JSON scalars and keys canonical names</td>
+</tr>
+<tr>
+<td><code>RuntimeArtifactResources</code></td>
+<td>absolute <code>root</code>, relative <code>primary_artifact</code>, <code>support_resources</code>, <code>device_kind</code>, <code>container_image_digest</code></td>
+<td>Root and every resource are checked without following links; device is <code>cpu</code> or <code>cuda</code>; digest is required</td>
+</tr>
+<tr>
+<td><code>RuntimeExecutionContext</code></td>
+<td><code>strict</code>, <code>allow_network</code>, <code>container_image_digest</code>, <code>device_kind</code></td>
+<td><code>artifact_identity_sha256</code>, opaque <code>provider_state</code>, scorer, and close callback default to <code>None</code></td>
+</tr>
+<tr>
+<td><code>EvaluationInputPart</code></td>
+<td><code>kind</code>, canonical <code>role</code>, bare <code>sha256</code></td>
+<td>Text parts carry <code>text</code>; content parts carry <code>content_id</code>, <code>media_type</code>, and <code>byte_length</code></td>
+</tr>
+<tr>
+<td><code>EvaluationRecord</code></td>
+<td><code>record_id</code>, first <code>input_text</code>, bare <code>input_sha256</code></td>
+<td><code>expected_output=None</code>; <code>input_parts=()</code> retains the provider-construction compatibility path</td>
+</tr>
+<tr>
+<td><code>EvaluationBatch</code></td>
+<td>bare <code>schedule_sha256</code>, nonempty tuple of <code>records</code></td>
+<td><code>metric="exact_match"</code>; <code>task="text_causal"</code>; record IDs must be unique</td>
+</tr>
+<tr>
+<td><code>RuntimeProviderCapabilities</code></td>
+<td>provider, artifacts, tasks, metrics, modes, required extra/image</td>
+<td>Format and ABI fields are fixed by the type</td>
+</tr>
+<tr>
+<td><code>ScoringObservation</code></td>
+<td>provider, artifact digest, schedule digest, nonempty records, aggregate-source digest</td>
+<td>Record IDs must be unique; format is fixed</td>
+</tr>
+</tbody>
+</table>
+<p>Mappings are copied into immutable views during construction. Passing a mutable
+dictionary does not make the resulting ABI object mutable. Digest fields in the
+ABI are generally bare 64-character lowercase SHA-256 values; OCI image fields
+use <code>sha256:&lt;64 hex&gt;</code>. The constructor validation distinguishes them.</p>
+<h2 id="hugging-face-identity-helpers">Hugging Face identity helpers<a class="headerlink" href="#hugging-face-identity-helpers" title="Permanent link">&para;</a></h2>
+<p>The stable facade exposes the exact helpers used by the canonical built-in
+provider:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">checkpoint_tree_sha256</span><span class="p">,</span>
+    <span class="n">hf_tokenizer_contract_sha256</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<p><code>checkpoint_tree_sha256(path)</code> returns a <code>sha256:</code> digest after a no-follow,
+change-detecting tree scan. <code>hf_tokenizer_contract_sha256(tokenizer)</code> returns a
+bare digest of the live tokenizer behavior contract and does not import or load
+Transformers itself. The caller must load the local tokenizer with network and
+remote code disabled. Importing <code>invarlock.engine</code> remains backend-lazy.</p>
+<p>Provider implementations may also use the complete torch-free ABI module,
+<code>invarlock.core.runtime_provider</code>, for canonical schedule construction and
+observation-verification helpers that are outside the embedding facade. Backend
+imports must remain lazy so provider discovery does not import a heavyweight or
+hardware-specific runtime.</p>
+<h2 id="author-complete-runtime-import-evidence">Author complete runtime-import evidence<a class="headerlink" href="#author-complete-runtime-import-evidence" title="Permanent link">&para;</a></h2>
+<p>The stable facade includes a typed authoring path for evaluation records emitted
+outside the native provider transaction. It is deliberately narrower than a
+generic results importer:</p>
 <ul>
-<li><strong><code>DEPENDENCY-MISSING</code> during adapter load</strong>: install the matching extra (e.g.,
-  <code>pip install "invarlock[adapters]"</code>) and retry.</li>
-<li><strong><code>No calibration data provided</code> warnings</strong>: pass <code>calibration_data</code> to
-  <code>CoreRunner.execute</code> (or use the CLI, which handles datasets automatically).</li>
-<li><strong>Calibration data not indexable</strong>: pass a list/sequence or set
-  <code>INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1</code> to allow materialization.</li>
-<li><strong>Guard prepare failures in CI/Release</strong>: adjust guard policies or set
-  <code>context.run.strict_guard_prepare: false</code> for local debugging only.</li>
+<li><code>load_external_scoring_records_jsonl</code> accepts one backend observation per
+  line and rejects unknown or aggregate-summary fields;</li>
+<li><code>build_runtime_import_observation</code> binds those records to the exact schedule
+  and artifact identity;</li>
+<li><code>build_runtime_import_receipt</code> binds provider, backend, execution, device,
+  image, artifact, and canonical observation bytes;</li>
+<li><code>write_runtime_import_side</code> atomically writes all six files needed for one
+  import side, then reloads them through strict runtime-manifest verification;</li>
+<li><code>load_runtime_import_side</code> independently reloads an existing side; and</li>
+<li><code>write_runtime_import_paired_records</code> derives canonical pairs from two
+  verified sides. It never accepts caller-supplied scores.</li>
 </ul>
-<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<p>The high-level signatures are:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">load_external_scoring_records_jsonl</span><span class="p">(</span>
+    <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">schedule</span><span class="p">:</span> <span class="n">RuntimeBehavioralSchedule</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RuntimeScoringRecord</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+<span class="n">write_runtime_import_side</span><span class="p">(</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">role</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;baseline&quot;</span><span class="p">,</span> <span class="s2">&quot;subject&quot;</span><span class="p">],</span>
+    <span class="n">schedule</span><span class="p">:</span> <span class="n">RuntimeBehavioralSchedule</span><span class="p">,</span>
+    <span class="n">policy_digest</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">artifact_identity</span><span class="p">:</span> <span class="n">ModelArtifactIdentity</span><span class="p">,</span>
+    <span class="n">records</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RuntimeScoringRecord</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">plugin</span><span class="p">:</span> <span class="n">RuntimeProviderPluginIdentity</span><span class="p">,</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="n">RuntimeBackendIdentity</span><span class="p">,</span>
+    <span class="n">capabilities</span><span class="p">:</span> <span class="n">RuntimeProviderCapabilities</span><span class="p">,</span>
+    <span class="n">execution_settings</span><span class="p">:</span> <span class="n">RuntimeExecutionSettings</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">RuntimeDeviceFacts</span><span class="p">,</span>
+    <span class="n">runtime_image_ref</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">runtime_image_digest</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">generated_at_utc</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeImportSideEvidence</span>
+
+<span class="n">write_runtime_import_paired_records</span><span class="p">(</span>
+    <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">schedule</span><span class="p">:</span> <span class="n">RuntimeBehavioralSchedule</span><span class="p">,</span>
+    <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">baseline</span><span class="p">:</span> <span class="n">RuntimeImportSideEvidence</span><span class="p">,</span>
+    <span class="n">subject</span><span class="p">:</span> <span class="n">RuntimeImportSideEvidence</span><span class="p">,</span>
+    <span class="n">scorer_binding</span><span class="p">:</span> <span class="n">ScorerExtensionBinding</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">scorer_registry</span><span class="p">:</span> <span class="n">ScorerExtensionRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeImportPairedRecords</span>
+</code></pre></div>
+
+<p>The timestamp is explicit so identical inputs produce identical files. The
+writer records strict container execution, offline operation, disabled remote
+code, and disabled third-party discovery. Those fields describe facts the
+caller is responsible for measuring; serialization does not attest that an
+untrusted host reported them honestly. Independent verification must still pin
+the artifact, schedule, policy, runtime-image, and signer identities.</p>
+<p><code>RuntimeImportAuthoringError</code> is raised before publication when record pairing,
+output digests, provider identities, provenance, side files, or manifest replay
+do not agree. An import request also needs the matching authorized provider
+package so the transaction can reproduce the artifact identity from request
+settings.</p>
+<p>See <a href="../runtime-providers/">Runtime providers</a> for lifecycle and conformance
+obligations.</p>
+<h2 id="verify-a-signed-receipt">Verify a signed receipt<a class="headerlink" href="#verify-a-signed-receipt" title="Permanent link">&para;</a></h2>
+<p><code>load_trust_inputs</code> loads a closed <code>invarlock/trust-inputs-v1</code> profile for
+applications that want the same verifier-owned input grouping as the CLI. It
+returns <code>TrustInputs</code>, including the policy and verifier-key bytes captured
+through descriptor-relative reads, their display paths, normalized anchors,
+scorer authorization, and the formatting-independent profile digest. Unsafe
+paths, symlinks, duplicate JSON members, unknown fields, and missing files
+raise <code>TrustInputsError</code> before verification.</p>
+<p>Pass the captured <code>policy_bytes</code> and <code>verifier_signing_key_bytes</code> to
+<code>verify_evidence</code>; do not reopen the display paths after loading the profile.
+This keeps verification and receipt signing bound to the exact bytes that were
+accepted during the profile read:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">trust</span> <span class="o">=</span> <span class="n">load_trust_inputs</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;trust/trust-inputs.json&quot;</span><span class="p">))</span>
+<span class="n">verification</span> <span class="o">=</span> <span class="n">verify_evidence</span><span class="p">(</span>
+    <span class="n">evidence_path</span><span class="p">,</span>
+    <span class="n">policy_path</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">policy_path</span><span class="p">,</span>
+    <span class="n">policy_bytes</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">policy_bytes</span><span class="p">,</span>
+    <span class="n">expected_baseline_artifact</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_artifact_digests</span><span class="p">[</span><span class="s2">&quot;baseline&quot;</span><span class="p">],</span>
+    <span class="n">expected_subject_artifact</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_artifact_digests</span><span class="p">[</span><span class="s2">&quot;subject&quot;</span><span class="p">],</span>
+    <span class="n">expected_schedule</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_schedule_digest</span><span class="p">,</span>
+    <span class="n">expected_baseline_runtime</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_runtime_digests</span><span class="p">[</span><span class="s2">&quot;baseline&quot;</span><span class="p">],</span>
+    <span class="n">expected_subject_runtime</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_runtime_digests</span><span class="p">[</span><span class="s2">&quot;subject&quot;</span><span class="p">],</span>
+    <span class="n">expected_signer</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_signer_fingerprint</span><span class="p">,</span>
+    <span class="n">expected_request_digest</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">expected_request_digest</span><span class="p">,</span>
+    <span class="n">receipt_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;verification.receipt.json&quot;</span><span class="p">),</span>
+    <span class="n">verifier_signing_key_path</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">verifier_signing_key_path</span><span class="p">,</span>
+    <span class="n">verifier_signing_key_bytes</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">verifier_signing_key_bytes</span><span class="p">,</span>
+    <span class="n">verifier_identity</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">verifier_identity</span><span class="p">,</span>
+    <span class="n">trust_profile_digest</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">profile_digest</span><span class="p">,</span>
+    <span class="n">scorer_registry</span><span class="o">=</span><span class="p">(</span>
+        <span class="n">ScorerExtensionRegistry</span><span class="p">(</span><span class="n">allow_installed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">trust</span><span class="o">.</span><span class="n">allow_installed_scorers</span>
+        <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<p><code>verify_signed_verification_receipt</code> is the stable downstream receipt reader.
+It accepts the receipt and pack paths plus independently supplied policy,
+baseline and subject artifact-identity digests, canonical schedule digest,
+baseline and subject runtime digests, expected evidence signer, expected
+verifier identity, expected verifier fingerprint, and the optional normalized-
+request digest. The request digest is required for GGUF evidence. It verifies the receipt
+signature and embedded public-key fingerprint, then compares every statement
+binding with those caller-owned values and the supplied pack manifest.</p>
+<p>The function returns <code>ReceiptVerification</code>; check <code>ok</code> before using <code>statement</code>.
+<code>signed</code> reports whether a signed envelope was present, while <code>errors</code> contains
+closed failure details. <code>require_signed</code> defaults to true and should remain true
+for evidence-pack v1 acceptance.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">verify_signed_verification_receipt</span><span class="p">(</span>
+    <span class="n">receipt_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">pack_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">policy_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">expected_artifact_digests</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="n">expected_schedule_digest</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">expected_runtime_digests</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="n">expected_pack_signer_fingerprint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">expected_verifier_identity</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">expected_verifier_fingerprint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">expected_trust_profile_digest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">expected_request_digest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">require_signed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ReceiptVerification</span>
+</code></pre></div>
+
+<p>There is no separate receipt-verification CLI command. Applications and
+automation use this Python facade when consuming a receipt issued by another
+verifier.</p>
+<h2 id="evidence-pack-result-types">Evidence pack result types<a class="headerlink" href="#evidence-pack-result-types" title="Permanent link">&para;</a></h2>
+<p><code>EvidencePackResult</code>, <code>EvidencePackStatus</code>, and <code>EvidenceObservation</code> are
+exported for applications that inspect verifier results or attach typed
+observation-only JSON during evidence publication. <code>EvidenceObservation</code>
+contains an ID, <code>baseline</code>/<code>subject</code>/<code>comparison</code> scope, kind, and canonical JSON
+payload bytes. Publication adds the comparison, schedule, policy, and artifact
+bindings. The high-level <code>verify_evidence</code> transaction is preferred because
+evidence-pack v1 requires a separately signed receipt.</p>
+<p>The package contains additional lower-level publication and format readers for
+its own transactions and tests. They are not re-exported by the stable engine
+facade. Do not depend on their import paths when the evaluate, verify, report,
+and signed-receipt functions cover the required workflow.</p>
+<p><code>EvidencePackStatus</code> exposes these lower-level values:</p>
+<table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Value</th>
+<th>Category</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OK</code></td>
+<td><code>0</code></td>
+<td>Complete success</td>
+</tr>
+<tr>
+<td><code>USAGE</code></td>
+<td><code>2</code></td>
+<td>Missing or invalid caller input</td>
+</tr>
+<tr>
+<td><code>MISSING</code></td>
+<td><code>3</code></td>
+<td>Required pack material absent</td>
+</tr>
+<tr>
+<td><code>FORMAT</code></td>
+<td><code>4</code></td>
+<td>Contract, canonical-byte, or structural format rejection</td>
+</tr>
+<tr>
+<td><code>SIGNATURE</code></td>
+<td><code>5</code></td>
+<td>Signature-specific rejection</td>
+</tr>
+<tr>
+<td><code>INTEGRITY</code></td>
+<td><code>6</code></td>
+<td>Digest, inventory, or semantic binding rejection</td>
+</tr>
+<tr>
+<td><code>REPORTS</code></td>
+<td><code>7</code></td>
+<td>Report replay or policy-result rejection</td>
+</tr>
+<tr>
+<td><code>INTEGRITY_ONLY</code></td>
+<td><code>8</code></td>
+<td>Internal category for an integrity-only result</td>
+</tr>
+</tbody>
+</table>
+<p>The high-level transaction may normalize precondition failures and does not
+promise that every enum member is emitted by every public command. Accept only
+<code>OK</code>, never a selected nonzero category.</p>
+<h2 id="exception-handling">Exception handling<a class="headerlink" href="#exception-handling" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Exception</th>
+<th>When raised</th>
+<th>Machine-readable behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EvaluationRequestError</code></td>
+<td>Request parsing, schema, path, provider, or capability failure</td>
+<td>Message only at request-loader boundary</td>
+</tr>
+<tr>
+<td><code>EvaluationPreflightError</code></td>
+<td>Execution-free request, input, runtime-availability, key, or output qualification fails</td>
+<td><code>as_json()</code> uses <code>invarlock/evaluation-preflight-v2</code></td>
+</tr>
+<tr>
+<td><code>EvaluationTransactionError</code></td>
+<td>Execute/import/publication cannot produce evidence</td>
+<td><code>exit_code</code>; <code>as_json()</code> uses <code>invarlock/evaluation-result-v1</code></td>
+</tr>
+<tr>
+<td><code>EvidenceVerificationError</code></td>
+<td>Trust input, pack replay, receipt write, or acceptance failure</td>
+<td><code>exit_code</code>, <code>payload</code>, and <code>as_json()</code></td>
+</tr>
+<tr>
+<td><code>EvidenceReportError</code></td>
+<td>Signature-authenticated report cannot be rendered safely</td>
+<td><code>exit_code</code></td>
+</tr>
+<tr>
+<td><code>EvidenceReceiptError</code></td>
+<td>Receipt parsing or processing cannot complete safely</td>
+<td>Exception; ordinary authenticity mismatches remain in <code>ReceiptVerification.errors</code></td>
+</tr>
+<tr>
+<td><code>TrustInputsError</code></td>
+<td>Trust profile parsing, schema, path, or referenced-file validation fails</td>
+<td>Message only; no verification is attempted</td>
+</tr>
+</tbody>
+</table>
+<p>Do not catch <code>ValueError</code> broadly and continue with partial output. Catch the
+documented transaction exception, log its closed message or payload, and reject
+the transaction. A rejected verification can still have a signed receipt when
+replay completed; inspect the exception payload for <code>signed_receipt</code>.</p>
+<h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>RunReport.meta</code>, <code>RunReport.guards</code>, <code>RunReport.metrics</code>, and
-  <code>RunReport.evaluation_windows</code> are the canonical inspection points (windows can
-  be omitted when <code>INVARLOCK_STORE_EVAL_WINDOWS=0</code>).</li>
-<li>If <code>RunConfig.event_path</code> is set, an event log is written as JSONL.</li>
-<li>reports from <code>make_report</code> can be validated with
-  <code>invarlock.reporting.report_schema.validate_report</code> or the CLI <code>invarlock verify</code>.</li>
-</ul>
-<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="../programmatic-quickstart/">Programmatic Quickstart</a></li>
-<li><a href="../cli/">CLI Reference</a></li>
-<li><a href="../config-schema/">Configuration Schema</a></li>
-<li><a href="../datasets/">Dataset Providers</a></li>
-<li><a href="../guards/">Guards</a></li>
-<li><a href="../reports/">reports</a> — Schema, telemetry, and HTML export</li>
-<li><a href="../../assurance/08-determinism-contracts/">Determinism Contracts</a> — Reproducibility contract</li>
-<li><a href="../observability/">Observability</a> — Monitoring and telemetry</li>
+<li><a href="../cli/">Command-line interface</a> maps the same transactions to shell commands
+  and exit behavior.</li>
+<li><a href="../contracts/">Public contracts</a> defines the versioned JSON objects consumed
+  and produced by the facade.</li>
+<li><a href="../runtime-providers/">Runtime providers</a> specifies the provider protocol and
+  conformance obligations.</li>
+<li><a href="../reports/">Reports and receipts</a> explains the trust meaning of result and
+  receipt objects.</li>
 </ul>
 
 
@@ -3432,6 +2737,12 @@ programmatic runs.</p>
           
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
         
       </main>
       
@@ -3462,7 +2773,7 @@ programmatic runs.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>

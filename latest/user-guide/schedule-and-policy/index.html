@@ -1,0 +1,2435 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/schedule-and-policy/">
+      
+      
+        <link rel="prev" href="../evaluation-request/">
+      
+      
+        <link rel="next" href="../evidence-and-verification/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Schedule and policy - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#schedule-and-policy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Schedule and policy
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#design-the-decision-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design the decision first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#primary-input-pinned-local-jsonl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary input: pinned local JSONL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canonical-prepared-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical prepared schedule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#curate-the-finite-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curate the finite schedule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-specific-paired-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric-specific paired intervals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-match-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact-match policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized-NLL policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-scorer-extension-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic scorer-extension policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derived-perplexity-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived perplexity interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy-provenance-and-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy provenance and handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#design-the-decision-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design the decision first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#primary-input-pinned-local-jsonl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary input: pinned local JSONL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canonical-prepared-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical prepared schedule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#curate-the-finite-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curate the finite schedule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-specific-paired-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric-specific paired intervals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-match-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact-match policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized-NLL policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-scorer-extension-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic scorer-extension policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derived-perplexity-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived perplexity interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy-provenance-and-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy provenance and handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="schedule-and-policy">Schedule and policy<a class="headerlink" href="#schedule-and-policy" title="Permanent link">&para;</a></h1>
+<p>The evaluation source defines which ordered records both sides score. The
+metric defines the paired comparison. The policy defines the conservative
+interval bound that must clear its threshold. Their exact identities are bound
+into the evidence.</p>
+<p>Treat them as one decision specification:</p>
+<ul>
+<li>the pinned JSONL bytes and mapping determine the finite schedule;</li>
+<li>the built-in metric or bound scorer determines each record score;</li>
+<li>the selected comparison's paired interval describes uncertainty or schedule
+  sensitivity; and</li>
+<li>the policy determines where the interval passes or fails.</li>
+</ul>
+<p>InvarLock authenticates, executes, and replays this specification. It does not
+choose a representative sample or a suitable threshold for you.</p>
+<p><img alt="One fixed schedule produces exactly paired baseline and subject records before metric arithmetic and policy evaluation" src="../../assets/user-guide-pairing-contract.svg" /></p>
+<div class="admonition tip">
+<p class="admonition-title">User guide</p>
+<p><strong>Outcome:</strong> Freeze a digest-pinned local JSONL source and one closed
+comparison policy before collecting subject results.</p>
+<p><strong>Audience:</strong> Evaluation owners, dataset curators, policy authors, and
+independent decision owners.</p>
+<p><strong>Prerequisites:</strong> A concrete release-regression claim, fixed source
+material, stable record identities, a supported built-in metric or
+authorized scorer binding, and an independent policy-distribution path.</p>
+</div>
+<h2 id="design-the-decision-first">Design the decision first<a class="headerlink" href="#design-the-decision-first" title="Permanent link">&para;</a></h2>
+<ol>
+<li>State the concrete release-regression claim in one sentence.</li>
+<li>Identify the operational context to which that sentence applies.</li>
+<li>Select prompts and expected outputs without inspecting subject outcomes.</li>
+<li>Choose <code>exact_match</code> for literal closed answers or
+   <code>normalized_nll_per_utf8_byte</code> for teacher-forced expected-continuation
+   likelihood regression, or bind an explicitly authorized deterministic text
+   scorer for a task-specific unit-interval result.</li>
+<li>Select the threshold, unit, conservative interval bound, and failure action.</li>
+<li>Freeze the JSONL bytes, field mapping, optional exact prefix, and SHA-256.</li>
+<li>Freeze the policy bytes and distribute an independent copy to verifiers.</li>
+</ol>
+<p>A reviewable claim is:</p>
+<blockquote>
+<p>Compare the fixed subject with the fixed baseline on these 400 ordered
+release prompts. Reject when the lower bound of the paired exact-match delta
+interval is below minus two percentage points. Any artifact, source,
+expected-output, decoding, metric, resampling, or threshold change creates a
+new transaction.</p>
+</blockquote>
+<p>That is narrower and more reproducible than “the new model is as good as the
+old model.”</p>
+<h2 id="primary-input-pinned-local-jsonl">Primary input: pinned local JSONL<a class="headerlink" href="#primary-input-pinned-local-jsonl" title="Permanent link">&para;</a></h2>
+<p>Run requests identify source bytes and field mapping directly:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">dataset</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inputs/release-regression.jsonl</span>
+<span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4444444444444444444444444444444444444444444444444444444444444444</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jsonl</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-regression</span>
+<span class="w">  </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validation</span>
+<span class="w">  </span><span class="nt">input_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt</span>
+<span class="w">  </span><span class="nt">expected_output_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">expected</span>
+<span class="w">  </span><span class="nt">id_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">case_id</span>
+<span class="w">  </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">400</span>
+</code></pre></div>
+
+<p>Each selected line is one JSON object:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;case_id&quot;</span><span class="p">:</span><span class="s2">&quot;release/001&quot;</span><span class="p">,</span><span class="nt">&quot;prompt&quot;</span><span class="p">:</span><span class="s2">&quot;Return A&quot;</span><span class="p">,</span><span class="nt">&quot;expected&quot;</span><span class="p">:</span><span class="s2">&quot;A&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="nt">&quot;case_id&quot;</span><span class="p">:</span><span class="s2">&quot;release/002&quot;</span><span class="p">,</span><span class="nt">&quot;prompt&quot;</span><span class="p">:</span><span class="s2">&quot;Return B&quot;</span><span class="p">,</span><span class="nt">&quot;expected&quot;</span><span class="p">:</span><span class="s2">&quot;B&quot;</span><span class="p">}</span>
+</code></pre></div>
+
+<p>InvarLock verifies the source SHA-256 before parsing, preserves line order,
+selects exactly the declared prefix, maps the named top-level text fields, and
+builds canonical schedule bytes. The source limit cannot silently shrink: a
+file with fewer selected lines fails.</p>
+<p>If <code>id_field</code> is absent, deterministic position IDs are generated as
+<code>record/00000000</code>, <code>record/00000001</code>, and so on. Prefer durable source IDs when
+they exist; they make a failed record identifiable outside one array position.</p>
+<p>The source may contain additional metadata fields, but only the declared ID,
+input, and expected-output fields enter the schedule. Preserve any separate
+provenance, licenses, or adjudication records needed to justify the selection.</p>
+<h2 id="canonical-prepared-schedule">Canonical prepared schedule<a class="headerlink" href="#canonical-prepared-schedule" title="Permanent link">&para;</a></h2>
+<p>The prepared contract is
+<a href="https://github.com/invarlock/invarlock/blob/main/contracts/runtime_behavioral_schedule.schema.json"><code>invarlock/runtime-behavioral-schedule-v1</code></a>.
+It contains dataset identity and ordered records:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;dataset_identity&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;config_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;evaluation-records-jsonl-v1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;dataset_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;release-regression&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;local&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;revision&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4444444444444444444444444444444444444444444444444444444444444444&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;split&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;validation&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;format_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/runtime-behavioral-schedule-v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;records&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;expected_output&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;A&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;input_parts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;role&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prompt&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;577b00dc694a427d676d63076c8bb19ff06800e09242cf3f078c3c8580c1c367&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;text&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Return A&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;input_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;99997ee448561eff2f1ca7635038e8ca56ec584c1a968b8ca8803bee4551538b&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;record_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;release/001&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;task&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text_causal&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Canonical schedule JSON uses UTF-8, recursively sorted keys, compact separators,
+finite numbers, and no trailing newline. Run mode prepares it inside the
+transaction. Import mode instead requires the canonical file at both
+<code>comparison.dataset</code> and <code>execution.schedule</code>.</p>
+<p>InvarLock recomputes:</p>
+<div class="codehilite"><pre><span></span><code>text_part.sha256 = SHA-256(UTF-8(text_part.text))
+input_sha256 = SHA-256(canonical JSON of ordered input_parts)
+schedule_sha256 = SHA-256(canonical schedule bytes)
+</code></pre></div>
+
+<p>The normalized request preserves the source digest and field mapping. The
+prepared schedule binds the resulting dataset identity, order, inputs, targets,
+IDs, and selection. Both are included in the signed evidence transaction.</p>
+<p>Closed limits include:</p>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th style="text-align: right;">Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local JSONL source or canonical schedule</td>
+<td style="text-align: right;">16 MiB</td>
+</tr>
+<tr>
+<td>Selected records</td>
+<td style="text-align: right;">1 to 10,000</td>
+</tr>
+<tr>
+<td><code>record_id</code></td>
+<td style="text-align: right;">256 characters</td>
+</tr>
+<tr>
+<td>Text in one input part</td>
+<td style="text-align: right;">65,536 characters</td>
+</tr>
+<tr>
+<td>Input parts per record</td>
+<td style="text-align: right;">64</td>
+</tr>
+<tr>
+<td><code>expected_output</code></td>
+<td style="text-align: right;">65,536 characters</td>
+</tr>
+<tr>
+<td>Dataset name</td>
+<td style="text-align: right;">512 characters</td>
+</tr>
+<tr>
+<td>Split</td>
+<td style="text-align: right;">128 characters</td>
+</tr>
+</tbody>
+</table>
+<p>Record order is semantic. Baseline and subject observations must contain the
+same IDs in exactly schedule order and repeat each corresponding input digest.
+Pairing by position under different IDs, dropping errors, or sorting after
+execution is rejected.</p>
+<h2 id="curate-the-finite-schedule">Curate the finite schedule<a class="headerlink" href="#curate-the-finite-schedule" title="Permanent link">&para;</a></h2>
+<p>Review each selected record:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Review question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ID</td>
+<td>Is it stable, unique, and meaningful outside array position?</td>
+</tr>
+<tr>
+<td>Input</td>
+<td>Is this the exact prompt and template both sides should receive?</td>
+</tr>
+<tr>
+<td>Expected output</td>
+<td>Is literal equality or teacher-forced scoring appropriate?</td>
+</tr>
+<tr>
+<td>Source identity</td>
+<td>Can the decision owner explain where the bytes came from?</td>
+</tr>
+<tr>
+<td>Category metadata</td>
+<td>Is coverage of the intended release behavior documented outside the schedule?</td>
+</tr>
+</tbody>
+</table>
+<p>For larger schedules, check:</p>
+<ul>
+<li>duplicates and near-duplicates;</li>
+<li>train/test or benchmark contamination;</li>
+<li>empty, malformed, or trivially predictable records;</li>
+<li>representation across behavior categories in scope;</li>
+<li>expected-output provenance and adjudication;</li>
+<li>prompt templates and hidden prefixes; and</li>
+<li>repeated tuning exposure to the subject developer.</li>
+</ul>
+<p>These are governance and sampling controls outside the schema. A valid but
+biased schedule remains biased.</p>
+<h2 id="metric-specific-paired-intervals">Metric-specific paired intervals<a class="headerlink" href="#metric-specific-paired-intervals" title="Permanent link">&para;</a></h2>
+<p>New <code>invarlock/comparison-report-v2</code> reports use the continuity-corrected
+paired Newcombe hybrid-score 95% interval over the subject-minus-baseline
+binary effect. The report also records baseline-pass to
+subject-fail regressions, baseline-fail to subject-pass improvements, both-pass
+and both-fail counts, and the exact two-sided McNemar probability. The policy
+uses the Newcombe interval's lower bound; the McNemar probability is supporting
+paired evidence rather than an acceptance control.</p>
+<p>Strict verification retains the original
+<code>newcombe_hybrid_score_paired_v1</code> calculation for signed
+<code>invarlock/comparison-report-v1</code> packs. New reports use
+<code>newcombe_hybrid_score_paired_v2</code>; existing evidence is not relabeled or
+reinterpreted.</p>
+<p>Normalized NLL uses the following deterministic schedule-resampling object:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;paired_percentile_bootstrap_sha256_v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scope&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;authenticated_schedule&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;interval_mass&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;replicates&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2048</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;lower&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upper&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.5</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>For each replicate and draw, InvarLock derives an index from SHA-256 of the
+authenticated schedule digest, replicate number, and draw number. It resamples
+schedule positions with replacement and recomputes the complete paired
+comparison. Percentile endpoints are the linearly interpolated 2.5th and 97.5th
+percentiles across 2,048 values. A one-record schedule produces a point
+interval.</p>
+<p>The algorithm never separates one baseline score from its paired subject score.
+Its result is deterministic across verifier replay and does not depend on a
+platform pseudo-random-number generator.</p>
+<p>The normalized-NLL interval measures stability under paired resampling of this finite
+authenticated schedule. Because the selected records are not asserted to be an
+independent random sample from a defined population, the interval is not a
+population confidence interval. It does not establish representativeness,
+statistical power, equivalence, non-inferiority, or production safety.</p>
+<h2 id="exact-match-policy">Exact-match policy<a class="headerlink" href="#exact-match-policy" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:{</span><span class="nt">&quot;metrics&quot;</span><span class="p">:{</span><span class="nt">&quot;exact_match&quot;</span><span class="p">:{</span><span class="nt">&quot;delta_min_pp&quot;</span><span class="p">:</span><span class="mf">-2.0</span><span class="p">,</span><span class="nt">&quot;maximum_interval_width_pp&quot;</span><span class="p">:</span><span class="mf">10.0</span><span class="p">,</span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="mi">400</span><span class="p">}}}}</span>
+</code></pre></div>
+
+<p>For baseline accuracy <code>B</code> and subject accuracy <code>S</code>:</p>
+<div class="codehilite"><pre><span></span><code>point_delta_pp = 100 * (S - B)
+pass when interval.lower &gt;= delta_min_pp
+  and record_count &gt;= minimum_record_count
+  and interval.width &lt;= maximum_interval_width_pp
+</code></pre></div>
+
+<p>A value of <code>-2.0</code> requires even the paired interval's lower bound to remain at
+or above a two-percentage-point drop. The point delta may be above the floor
+while the verdict still fails because its interval crosses the floor.</p>
+<p>The paired-binary section distinguishes regressions (baseline pass, subject
+fail) from improvements (baseline fail, subject pass). It reports their exact
+two-sided McNemar probability and the Newcombe 95% interval for the effect size.
+Only the interval lower bound controls the metric-threshold part of this
+policy; configured count and width controls remain additional requirements.</p>
+<p>The count and precision controls are optional, but they are coupled: provide
+both or neither. <code>minimum_record_count</code> must be an integer from 1 through
+10,000. <code>maximum_interval_width_pp</code> must be positive and no greater than 200.
+When present, both must pass in addition to the lower-bound rule. A 400-record
+schedule satisfies a minimum of 400, but it does not guarantee a 10-point
+interval; precision is known only after execution.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Point delta</th>
+<th style="text-align: right;">Interval</th>
+<th style="text-align: right;">Minimum</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>+1 pp</code></td>
+<td style="text-align: right;"><code>[-1, +3]</code></td>
+<td style="text-align: right;"><code>-2 pp</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0 pp</code></td>
+<td style="text-align: right;"><code>[-2, +2]</code></td>
+<td style="text-align: right;"><code>-2 pp</code></td>
+<td>pass at boundary</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0 pp</code></td>
+<td style="text-align: right;"><code>[-3, +3]</code></td>
+<td style="text-align: right;"><code>-2 pp</code></td>
+<td>fail</td>
+</tr>
+</tbody>
+</table>
+<h2 id="normalized-nll-policy">Normalized-NLL policy<a class="headerlink" href="#normalized-nll-policy" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:{</span><span class="nt">&quot;metrics&quot;</span><span class="p">:{</span><span class="nt">&quot;normalized_nll_per_utf8_byte&quot;</span><span class="p">:{</span><span class="nt">&quot;maximum_interval_width_ratio&quot;</span><span class="p">:</span><span class="mf">0.05</span><span class="p">,</span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="mi">400</span><span class="p">,</span><span class="nt">&quot;ratio_max&quot;</span><span class="p">:</span><span class="mf">1.05</span><span class="p">}}}}</span>
+</code></pre></div>
+
+<p>For each record and side:</p>
+<div class="codehilite"><pre><span></span><code>record_nll = -logprob_sum / utf8_byte_count
+point_ratio = arithmetic_mean(subject_record_nll) / arithmetic_mean(baseline_record_nll)
+pass when interval.upper &lt;= ratio_max
+  and record_count &gt;= minimum_record_count
+  and interval.width &lt;= maximum_interval_width_ratio
+</code></pre></div>
+
+<p>The baseline arithmetic mean must be positive. Each scheduled record has equal
+aggregate weight regardless of target length. This is not pooled NLL, a
+byte-weighted mean, or perplexity.</p>
+<p>This metric is teacher-forced expected-continuation likelihood regression under
+the authenticated prompt, target, provider, and runtime. It is not a measure of
+general model quality, instruction following, factuality, or user preference.</p>
+<p>The count and ratio-width fields are optional but must be supplied together.
+The count uses the same 1-through-10,000 limit; the maximum ratio width must be
+positive. These requirements qualify the authenticated schedule size and
+observed resampling precision. They do not turn the fixed schedule into a
+population sample.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Point ratio</th>
+<th style="text-align: right;">Interval</th>
+<th style="text-align: right;">Maximum</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>0.98</code></td>
+<td style="text-align: right;"><code>[0.96, 1.02]</code></td>
+<td style="text-align: right;"><code>1.05</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>1.01</code></td>
+<td style="text-align: right;"><code>[0.98, 1.05]</code></td>
+<td style="text-align: right;"><code>1.05</code></td>
+<td>pass at boundary</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>1.01</code></td>
+<td style="text-align: right;"><code>[0.98, 1.08]</code></td>
+<td style="text-align: right;"><code>1.05</code></td>
+<td>fail</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deterministic-scorer-extension-policy">Deterministic scorer-extension policy<a class="headerlink" href="#deterministic-scorer-extension-policy" title="Permanent link">&para;</a></h2>
+<p>An extension scorer policy pins the complete algorithm identity selected by the
+request:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;scorer_extension&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;scorer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example.token_f1&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;scorer_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;descriptor_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5555555555555555555555555555555555555555555555555555555555555555&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;configuration_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6666666666666666666666666666666666666666666666666666666666666666&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;delta_min_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">-2.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;maximum_interval_width_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The request binding and policy pins must match exactly. The authorized scorer
+maps each authenticated expected-output/output-text pair to one deterministic
+higher-is-better value in <code>[0,1]</code>. Core owns the remaining arithmetic:</p>
+<div class="codehilite"><pre><span></span><code>baseline_mean = arithmetic_mean(baseline_record_scores)
+subject_mean = arithmetic_mean(subject_record_scores)
+delta_pp = 100 * (subject_mean - baseline_mean)
+pass when interval.lower &gt;= delta_min_pp
+  and record_count &gt;= minimum_record_count
+  and interval.width &lt;= maximum_interval_width_pp
+</code></pre></div>
+
+<p>The interval is the same deterministic 2,048-replicate paired
+schedule-resampling method used for normalized NLL, but it recomputes the
+percentage-point delta and uses its lower bound. Extension code cannot redefine
+aggregation, direction, interval, or verdict semantics.</p>
+<p>As with exact match, scorer count and percentage-point width controls are
+optional but coupled and use the same ranges.</p>
+<p>Separately installed scorer packages may implement deterministic token F1,
+structured-field extraction, and VQA answer normalization and require explicit
+authorization. Executable SQL/code tests, model-based semantic similarity,
+network or human scoring, external-model calls, and LLM judges require separate
+authenticated contracts. Judge results remain observations.</p>
+<h2 id="derived-perplexity-interpretation">Derived perplexity interpretation<a class="headerlink" href="#derived-perplexity-interpretation" title="Permanent link">&para;</a></h2>
+<p>For normalized NLL, the verifier also renders a token-weighted perplexity ratio
+when both artifacts bind the same authenticated tokenizer and every pair has
+the same positive target-token count. It is derived from authenticated target
+log probabilities and records both side perplexities, their ratio, the
+tokenizer digest, and total target-token count.</p>
+<p>This derived measurement is an interpretation of the likelihood facts. It has
+no policy threshold, interval, or verdict authority. If the tokenizer or token
+counts are not comparable, the report records why the interpretation is
+unavailable while the byte-normalized NLL decision remains well-defined.</p>
+<h2 id="policy-provenance-and-handoff">Policy provenance and handoff<a class="headerlink" href="#policy-provenance-and-handoff" title="Permanent link">&para;</a></h2>
+<p>Policy JSON contains exactly one entry matching the request's built-in metric
+or <code>scorer_extension</code> binding. Keep it
+small, reviewed, and immutable. Evaluation binds the exact policy bytes into
+the evidence. Verification reads an independently distributed copy and
+requires the same digest.</p>
+<div class="codehilite"><pre><span></span><code>policy review
+    |
+    +--&gt; approved bytes --&gt; evaluation request
+    |
+    +--&gt; independent copy --&gt; verifier input
+</code></pre></div>
+
+<p>Whitespace changes create different bytes even when parsed values are
+equivalent. Distribute the approved file rather than recreating it. Record:</p>
+<ul>
+<li>policy digest and activation boundary;</li>
+<li>built-in metric or scorer identity, threshold, interval-bound rule, and
+  rationale;</li>
+<li>source digest, mapping, limit, and resulting schedule digest;</li>
+<li>review or change-control record where applicable; and</li>
+<li>action on boundary pass, policy rejection, or integrity failure.</li>
+</ul>
+<p>Threshold selection remains an external decision. InvarLock proves which bytes
+and rule were applied; it cannot prove that the chosen threshold or selected
+schedule is scientifically or operationally sufficient.</p>
+<h2 id="preflight-checklist">Preflight checklist<a class="headerlink" href="#preflight-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] JSONL bytes are frozen and their SHA-256 matches the request.</li>
+<li>[ ] Field mapping is correct; selected IDs are stable and unique.</li>
+<li>[ ] Source order, prefix limit, prompts, and expected outputs were approved
+      before subject results were inspected.</li>
+<li>[ ] Both providers support the selected task and built-in or collection
+      metric.</li>
+<li>[ ] An extension scorer, if selected, is explicitly authorized and its
+      request and policy identity pins match.</li>
+<li>[ ] For normalized NLL, expected continuations are suitable for
+      teacher-forced likelihood comparison and its limits are understood.</li>
+<li>[ ] Any displayed perplexity ratio is treated as a derived interpretation,
+      not as a policy result.</li>
+<li>[ ] The policy contains only the matching metric block and correct threshold
+      unit.</li>
+<li>[ ] If sample qualification is enabled, the minimum-count and matching
+      maximum-width fields are both present, use the correct units, and express
+      requirements justified before subject results are inspected.</li>
+<li>[ ] Everyone using the result understands which interval bound controls the
+      verdict.</li>
+<li>[ ] A preflight count pass is not described as a precision pass; interval
+      width remains pending until execution.</li>
+<li>[ ] The verifier has an independently distributed, byte-identical policy.</li>
+<li>[ ] Representativeness, contamination, repeated-tuning, and operational
+      limitations are recorded outside the bundle.</li>
+</ul>
+<p>Continue with <a href="../../assurance/decision-semantics/">Decision semantics</a> for the
+exact arithmetic and <a href="../../assurance/pairing-and-replay/">Pairing and replay</a>
+for record-level enforcement.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

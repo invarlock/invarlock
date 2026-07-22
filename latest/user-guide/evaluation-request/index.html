@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/getting-started/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/evaluation-request/">
       
       
-        <link rel="prev" href="../..">
+        <link rel="prev" href="../runtime-providers/">
       
       
-        <link rel="next" href="../change-scenarios/">
+        <link rel="next" href="../schedule-and-policy/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Getting started - InvarLock Documentation</title>
+        <title>Evaluation request - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#getting-started" class="md-skip">
+        <a href="#evaluation-request" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Getting started
+              Evaluation request
             
           </span>
         </div>
@@ -221,7 +221,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../getting-started/" class="md-tabs__link">
           
   
   
@@ -425,37 +425,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Getting started
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
         
   
   
@@ -471,186 +444,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-each-command-owns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What each command owns
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#1-install-the-hf-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Install the HF provider
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-prepare-the-request-workspace" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Prepare the request workspace
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. Prepare the request workspace">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pin-the-evaluation-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pin the evaluation source
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pin-both-hf-snapshots" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pin both HF snapshots
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write-a-one-metric-policy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Write a one-metric policy
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-write-the-run-request" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Write the run request
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-evaluate-through-oci" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Evaluate through OCI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-verify-with-independent-anchors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Verify with independent anchors
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-render-the-report" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Render the report
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpret-the-result" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interpret the result
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#secondary-offline-import-smoke" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Secondary offline import smoke
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#apply-the-transaction-to-a-release-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Apply the transaction to a release change
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-and-next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery and next steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -744,10 +537,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../evaluation-request/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -763,6 +583,220 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-execution-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the execution mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-anatomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request anatomy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-run-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete run request
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete run request">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-mode-dataset-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run-mode dataset object
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-and-structured-input-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task and structured-input contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task and structured-input contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparison-sides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison sides
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exact_match" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exact_match
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalized_nll_per_utf8_byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalized_nll_per_utf8_byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derived-perplexity-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived perplexity interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-scorer-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic scorer extension
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authenticated-optional-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authenticated optional observations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interval-and-sample-controlled-verdict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interval and sample-controlled verdict
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oci-delegation-for-run-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCI delegation for run mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paths-validation-and-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paths, validation, and recovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1797,10 +1831,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-each-command-owns" class="md-nav__link">
+  <a href="#choose-the-execution-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What each command owns
+        Choose the execution mode
       
     </span>
   </a>
@@ -1808,10 +1842,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-install-the-hf-provider" class="md-nav__link">
+  <a href="#request-anatomy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Install the HF provider
+        Request anatomy
       
     </span>
   </a>
@@ -1819,44 +1853,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-prepare-the-request-workspace" class="md-nav__link">
+  <a href="#complete-run-request" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Prepare the request workspace
+        Complete run request
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="2. Prepare the request workspace">
+    <nav class="md-nav" aria-label="Complete run request">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pin-the-evaluation-source" class="md-nav__link">
+  <a href="#run-mode-dataset-object" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pin the evaluation source
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pin-both-hf-snapshots" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pin both HF snapshots
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write-a-one-metric-policy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Write a one-metric policy
+        Run-mode dataset object
       
     </span>
   </a>
@@ -1869,10 +1881,88 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-write-the-run-request" class="md-nav__link">
+  <a href="#task-and-structured-input-contract" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Write the run request
+        Task and structured-input contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task and structured-input contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparison-sides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison sides
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exact_match" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exact_match
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalized_nll_per_utf8_byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalized_nll_per_utf8_byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derived-perplexity-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived perplexity interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-scorer-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic scorer extension
       
     </span>
   </a>
@@ -1880,10 +1970,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-evaluate-through-oci" class="md-nav__link">
+  <a href="#authenticated-optional-observations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Evaluate through OCI
+        Authenticated optional observations
       
     </span>
   </a>
@@ -1891,10 +1981,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-verify-with-independent-anchors" class="md-nav__link">
+  <a href="#interval-and-sample-controlled-verdict" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Verify with independent anchors
+        Interval and sample-controlled verdict
       
     </span>
   </a>
@@ -1902,10 +1992,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-render-the-report" class="md-nav__link">
+  <a href="#oci-delegation-for-run-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Render the report
+        OCI delegation for run mode
       
     </span>
   </a>
@@ -1913,10 +2003,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interpret-the-result" class="md-nav__link">
+  <a href="#import-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Interpret the result
+        Import mode
       
     </span>
   </a>
@@ -1924,32 +2014,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#secondary-offline-import-smoke" class="md-nav__link">
+  <a href="#paths-validation-and-recovery" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Secondary offline import smoke
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#apply-the-transaction-to-a-release-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Apply the transaction to a release change
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-and-next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery and next steps
+        Paths, validation, and recovery
       
     </span>
   </a>
@@ -1976,162 +2044,90 @@
   
 
 
-<h1 id="getting-started">Getting started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h1>
-<p>InvarLock evaluates one pinned baseline and one pinned subject on the same
-deterministically prepared schedule, applies a release-regression policy to the
-selected paired interval, publishes signed evidence, and lets a separate
-verifier replay the result.</p>
-<div class="codehilite"><pre><span></span><code>invarlock evaluate request.yaml
-invarlock verify evidence/ ... --receipt verification.receipt.json
-invarlock report evidence/
-</code></pre></div>
-
+<h1 id="evaluation-request">Evaluation request<a class="headerlink" href="#evaluation-request" title="Permanent link">&para;</a></h1>
+<p>An evaluation request closes one baseline-versus-subject release-regression
+transaction over exact artifacts, a pinned evaluation source, one task,
+runtime settings, one built-in metric or bound scorer extension, one policy,
+optional authenticated observations, and a fresh evidence destination. The schema is
+<a href="https://github.com/invarlock/invarlock/blob/main/contracts/evaluation_request.schema.json"><code>contracts/evaluation_request.schema.json</code></a>.</p>
+<p>The request is comparison intent, not host authorization. It does not grant
+network access, choose an OCI engine, select arbitrary executables, inject
+secrets, or authorize its own runtime digest.</p>
 <div class="admonition tip">
 <p class="admonition-title">User guide</p>
-<p><strong>Outcome:</strong> Prepare and run a real paired Hugging Face comparison through
-the OCI-backed <code>evaluate -&gt; verify -&gt; report</code> path.</p>
-<p><strong>Audience:</strong> First-time operators, release decision owners, and engineers
-integrating a model build with an evidence gate.</p>
-<p><strong>Prerequisites:</strong> Python 3.12 or newer; Docker or Podman; a digest-addressed
-local InvarLock runtime image; two local SafeTensors snapshots; a pinned
-JSONL evaluation source; and separate Ed25519 evidence-signer and verifier
-keys.</p>
+<p><strong>Outcome:</strong> Author a closed run request for a real paired comparison, or a
+closed import request for complete provider material produced elsewhere.</p>
+<p><strong>Audience:</strong> Evaluation operators and integration engineers preparing a
+release-regression decision.</p>
+<p><strong>Prerequisites:</strong> Pinned model inputs, a local JSONL source for run mode or
+a canonical schedule for import mode, a reviewed single-scorer policy,
+provider settings, and a new request-relative evidence destination.</p>
 </div>
-<h2 id="what-each-command-owns">What each command owns<a class="headerlink" href="#what-each-command-owns" title="Permanent link">&para;</a></h2>
+<h2 id="choose-the-execution-mode">Choose the execution mode<a class="headerlink" href="#choose-the-execution-mode" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Transaction</th>
-<th>Reads</th>
-<th>Writes</th>
-<th>Result</th>
+<th>Mode</th>
+<th>Use it when</th>
+<th>Dataset form</th>
+<th>Runtime behavior</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>evaluate</code></td>
-<td>Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key</td>
-<td>One no-clobber signed evidence directory</td>
-<td>Paired comparison, interval, optional sample qualification, and evaluation-time policy verdict</td>
+<td><code>run</code></td>
+<td>InvarLock should execute both selected providers now</td>
+<td>Digest-pinned local JSONL object</td>
+<td>Host CLI delegates to a caller-selected Docker/Podman image, prepares the canonical schedule, and scores both sides</td>
 </tr>
 <tr>
-<td><code>verify</code></td>
-<td>Untrusted evidence plus independent artifact, schedule, policy, runtime, and signer anchors; verifier identity; and verifier key</td>
-<td>One no-clobber signed receipt outside the bundle</td>
-<td>Independent replay and acceptance/rejection record</td>
-</tr>
-<tr>
-<td><code>report</code></td>
-<td>Signature-authenticated evidence</td>
-<td>Console text and optional no-clobber HTML</td>
-<td>Human view of the canonical comparison</td>
+<td><code>import</code></td>
+<td>Another controlled execution already produced complete InvarLock provider sidecars</td>
+<td>Safe relative path to canonical schedule JSON</td>
+<td>Local transaction authenticates and replays all imported materials; no OCI delegation is needed</td>
 </tr>
 </tbody>
 </table>
-<p>Run mode is the primary path. Import mode is available when another controlled
-execution already produced the complete provider sidecars; the final section
-uses the repository fixture to exercise that secondary path without model
-inference.</p>
-<h2 id="1-install-the-hf-provider">1. Install the HF provider<a class="headerlink" href="#1-install-the-hf-provider" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[hf]&quot;</span>
-invarlock<span class="w"> </span>--version
-invarlock<span class="w"> </span>evaluate<span class="w"> </span>--help
-</code></pre></div>
-
-<p>Build or obtain the runtime image from the same release you intend to run. It
-must be available locally under a digest-bearing reference or exact image ID.
-The host launcher uses <code>--pull=never</code>, so evaluation never substitutes an image
-download for caller-controlled preparation.</p>
-<p>For a source checkout, choose the image that matches the worker device:</p>
-<p>First create and authenticate the exact Git source archive using the
-<a href="../runtime-providers/#build-or-obtain-the-runtime-image">runtime-image procedure</a>.
-Pass its commit, path, and digest to the build target shown below.</p>
+<p>Run mode is the primary model-comparison path. Import mode is not an aggregate
+score upload: it requires ordered record-level observations, identities,
+runtime bindings, and canonical paired records that InvarLock can re-derive.</p>
+<h2 id="request-anatomy">Request anatomy<a class="headerlink" href="#request-anatomy" title="Permanent link">&para;</a></h2>
+<p>The root object has four required fields and one optional field:</p>
 <table>
 <thead>
 <tr>
-<th>Device</th>
-<th>Dockerfile</th>
-<th>Build and smoke</th>
+<th>Field</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>CPU, including the matching Apple Silicon closure</td>
-<td><code>runtime/Dockerfile</code></td>
-<td><code>make runtime-image &amp;&amp; make runtime-smoke</code></td>
+<td><code>format_version</code></td>
+<td>Selects <code>invarlock/evaluation-request-v1</code></td>
 </tr>
 <tr>
-<td>x86_64 NVIDIA CUDA 12.6</td>
-<td><code>runtime/Dockerfile.cuda</code></td>
-<td><code>make runtime-image-cuda &amp;&amp; make runtime-smoke-cuda</code></td>
+<td><code>comparison</code></td>
+<td>Names baseline, subject, dataset, task, policy, and exactly one built-in metric or scorer-extension binding</td>
+</tr>
+<tr>
+<td><code>execution</code></td>
+<td>Selects the closed <code>run</code> or <code>import</code> shape</td>
+</tr>
+<tr>
+<td><code>observations</code></td>
+<td>Optionally names canonical JSON context to authenticate with the comparison</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td>Names one safe request-relative, no-clobber evidence directory</td>
 </tr>
 </tbody>
 </table>
-<p>The CUDA device flag only exposes a GPU to a CUDA-capable image. It does not
-add CUDA libraries to the CPU image.</p>
-<p>For a complete journey that compares a pinned Qwen3-0.6B checkpoint with an
-explicit behavioral derivative and derives all verifier inputs independently,
-run the checked-in
-<a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/hf-transformers">Hugging Face example</a>.
-The remaining sections
-explain the same transaction field by field for a real release workspace.</p>
-<p>Record the resulting <code>sha256:...</code> identity. A local image ID authenticates
-local bytes but is not a fetchable reference for another operator; use a pinned
-registry-manifest reference when the evidence must be reproduced elsewhere.</p>
-<h2 id="2-prepare-the-request-workspace">2. Prepare the request workspace<a class="headerlink" href="#2-prepare-the-request-workspace" title="Permanent link">&para;</a></h2>
-<p>Use a new directory for one comparison:</p>
-<div class="codehilite"><pre><span></span><code>release-check/
-├── request.yaml
-├── artifacts/
-│   ├── baseline/                 # local HF SafeTensors snapshot
-│   └── subject/                  # candidate snapshot
-├── inputs/
-│   └── release-regression.jsonl
-└── policy/
-    └── acceptance.json
-</code></pre></div>
-
-<p>The evidence destination declared in <code>request.yaml</code> is created beneath this
-directory by the host transaction. Keep the evidence-signing private key
-outside the tree. It remains host-only and is never mounted into a model worker.</p>
-<h3 id="pin-the-evaluation-source">Pin the evaluation source<a class="headerlink" href="#pin-the-evaluation-source" title="Permanent link">&para;</a></h3>
-<p>Each selected JSONL line must be a JSON object. For example:</p>
-<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;case_id&quot;</span><span class="p">:</span><span class="s2">&quot;release/001&quot;</span><span class="p">,</span><span class="nt">&quot;prompt&quot;</span><span class="p">:</span><span class="s2">&quot;Return the capital of France.&quot;</span><span class="p">,</span><span class="nt">&quot;expected&quot;</span><span class="p">:</span><span class="s2">&quot;Paris&quot;</span><span class="p">}</span>
-<span class="p">{</span><span class="nt">&quot;case_id&quot;</span><span class="p">:</span><span class="s2">&quot;release/002&quot;</span><span class="p">,</span><span class="nt">&quot;prompt&quot;</span><span class="p">:</span><span class="s2">&quot;Complete: 2 + 2 =&quot;</span><span class="p">,</span><span class="nt">&quot;expected&quot;</span><span class="p">:</span><span class="s2">&quot;4&quot;</span><span class="p">}</span>
-</code></pre></div>
-
-<p>Hash the exact file bytes:</p>
-<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import hashlib, pathlib; print(hashlib.sha256(pathlib.Path(&quot;release-check/inputs/release-regression.jsonl&quot;).read_bytes()).hexdigest())&#39;</span>
-</code></pre></div>
-
-<p>Do not sort, serialize again, or edit the file after recording the digest. Run mode
-preserves source order, maps the declared top-level fields, and constructs
-canonical <code>invarlock/runtime-behavioral-schedule-v1</code> bytes. If <code>id_field</code> is
-omitted, IDs are deterministically generated as <code>record/00000000</code>,
-<code>record/00000001</code>, and so on. Stable source IDs are preferable for review.</p>
-<h3 id="pin-both-hf-snapshots">Pin both HF snapshots<a class="headerlink" href="#pin-both-hf-snapshots" title="Permanent link">&para;</a></h3>
-<p>Derive <code>checkpoint_tree_sha256</code> and <code>tokenizer_metadata_sha256</code> from each exact
-local snapshot with the public helpers shown in
-<a href="../runtime-providers/#hugging-face-transformers">Runtime providers</a>. The tree
-digest rejects links, special files, and changes during traversal. The
-tokenizer digest binds the tokenizer contract used to interpret target text.</p>
-<p>Normalized NLL remains comparable across authenticated tokenizer contracts
-because the target loss is normalized by expected-output UTF-8 bytes. When the
-two tokenizer digests match and each pair also has the same positive target
-token count, the report can add a verifier-derived token-weighted perplexity
-ratio as a likelihood interpretation.</p>
-<h3 id="write-a-one-metric-policy">Write a one-metric policy<a class="headerlink" href="#write-a-one-metric-policy" title="Permanent link">&para;</a></h3>
-<p>This example permits a normalized expected-continuation NLL ratio up to <code>1.05</code>:</p>
-<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:{</span><span class="nt">&quot;metrics&quot;</span><span class="p">:{</span><span class="nt">&quot;normalized_nll_per_utf8_byte&quot;</span><span class="p">:{</span><span class="nt">&quot;ratio_max&quot;</span><span class="p">:</span><span class="mf">1.05</span><span class="p">}}}}</span>
-</code></pre></div>
-
-<p>The verdict uses the interval upper bound, not only the point ratio. See
-<a href="../schedule-and-policy/">Schedule and policy</a> before selecting a production
-threshold.</p>
-<h2 id="3-write-the-run-request">3. Write the run request<a class="headerlink" href="#3-write-the-run-request" title="Permanent link">&para;</a></h2>
-<p>Replace every illustrative digest with the value derived from the exact input.
-Digest fields inside HF provider settings use the exact form returned by their
-public helper; runtime-image identities always use the <code>sha256:</code> prefix.</p>
+<p>Unknown fields are rejected. A misspelling or unsupported setting is therefore
+a request error rather than an ignored option.</p>
+<h2 id="complete-run-request">Complete run request<a class="headerlink" href="#complete-run-request" title="Permanent link">&para;</a></h2>
+<p>Run mode requires request-relative artifact paths and a pinned local JSONL
+dataset object:</p>
 <div class="codehilite"><pre><span></span><code><span class="nt">format_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock/evaluation-request-v1</span>
 <span class="nt">comparison</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">baseline</span><span class="p">:</span>
@@ -2177,6 +2173,7 @@ public helper; runtime-image identities always use the <code>sha256:</code> pref
 <span class="w">    </span><span class="nt">input_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt</span>
 <span class="w">    </span><span class="nt">expected_output_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">expected</span>
 <span class="w">    </span><span class="nt">id_field</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">case_id</span>
+<span class="w">    </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">400</span>
 <span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy/acceptance.json</span>
 <span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">text_causal</span>
 <span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">normalized_nll_per_utf8_byte</span>
@@ -2186,169 +2183,424 @@ public helper; runtime-image identities always use the <code>sha256:</code> pref
 <span class="w">  </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evidence/release-001</span>
 </code></pre></div>
 
-<p>The request contains comparison intent, not host authorization. It cannot
-select an OCI engine, grant network access, name arbitrary executables, or
-embed private-key bytes.</p>
-<h2 id="4-evaluate-through-oci">4. Evaluate through OCI<a class="headerlink" href="#4-evaluate-through-oci" title="Permanent link">&para;</a></h2>
-<p>From the directory containing <code>release-check/</code>, run:</p>
-<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>release-check/request.yaml<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline-runtime-image<span class="w"> </span>registry.example/invarlock-runtime-cuda@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline-runtime-image-digest<span class="w"> </span>sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject-runtime-image<span class="w"> </span>registry.example/invarlock-runtime-cuda@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject-runtime-image-digest<span class="w"> </span>sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--container-engine<span class="w"> </span>docker<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--baseline-runtime-device<span class="w"> </span>cuda:0<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--subject-runtime-device<span class="w"> </span>cuda:1
-</code></pre></div>
-
-<p><code>evaluate</code> performs preflight before it starts either worker. Append
-<code>--preflight --json</code> when you want to stop at that boundary and inspect the
-result. It validates the request, referenced inputs, schedule, policy, runtime
-capabilities, signing key, output destination, OCI engine, and both local
-pinned images without starting a container or creating output. Rerun the same
-command without <code>--preflight</code> only when you deliberately want to continue into
-the evaluation.</p>
-<p>Use <code>--container-engine podman</code> when appropriate. Device values are <code>cpu</code>,
-<code>cuda</code>, or <code>cuda:&lt;index&gt;</code>. Shared <code>--runtime-image</code>,
-<code>--runtime-image-digest</code>, <code>--runtime-device</code>, and <code>--runtime-entrypoint</code>
-options provide defaults for both sides. Per-side options override those
-defaults. Workers that share a generic or identical CUDA device run
-sequentially; explicitly different CUDA indexes can run in parallel.</p>
-<p>When invoked from the host, <code>evaluate</code> authenticates the source and prepares
-the canonical schedule, then launches a constrained worker for each side. Each
-worker receives only its artifact and support resources read-only, an isolated
-writable output directory, a read-only container root, and the selected
-CPU/CUDA resources. Networking is disabled and capabilities are dropped. The
-host validates both outputs, atomically publishes
-<code>release-check/evidence/release-001</code>, and signs the bundle with its host-only
-key.</p>
-<p>A successful command exits <code>0</code> and reports the evidence directory. The bundle
-contains the prepared canonical schedule, both provider observations, paired
-records, the comparison report, runtime bindings, checksums, manifest, and
-evidence signature.</p>
-<h2 id="5-verify-with-independent-anchors">5. Verify with independent anchors<a class="headerlink" href="#5-verify-with-independent-anchors" title="Permanent link">&para;</a></h2>
-<p>The verifier must obtain these values through its own trusted channel:</p>
+<p>The digest values are illustrative. HF provider-setting digests are bare
+lowercase 64-character values. Replace them with values derived from the exact
+artifacts and tokenizer contracts before evaluation.</p>
+<h3 id="run-mode-dataset-object">Run-mode dataset object<a class="headerlink" href="#run-mode-dataset-object" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td>Yes</td>
+<td>Existing request-relative regular JSONL file</td>
+</tr>
+<tr>
+<td><code>sha256</code></td>
+<td>Yes</td>
+<td>Bare lowercase SHA-256 of the exact source bytes</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td>Yes</td>
+<td>Exactly <code>jsonl</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>Yes</td>
+<td>Logical dataset name recorded in schedule identity</td>
+</tr>
+<tr>
+<td><code>split</code></td>
+<td>Yes</td>
+<td>Logical split recorded in schedule identity</td>
+</tr>
+<tr>
+<td><code>input_field</code></td>
+<td>Yes</td>
+<td>Top-level text field mapped to the <code>prompt</code> input part</td>
+</tr>
+<tr>
+<td><code>expected_output_field</code></td>
+<td>Yes</td>
+<td>Distinct top-level text field mapped to <code>expected_output</code></td>
+</tr>
+<tr>
+<td><code>id_field</code></td>
+<td>No</td>
+<td>Distinct top-level text field mapped to stable <code>record_id</code></td>
+</tr>
+<tr>
+<td><code>content_role</code></td>
+<td>With any content field</td>
+<td>Canonical role assigned to the content part; vision-text uses <code>image</code></td>
+</tr>
+<tr>
+<td><code>content_id_field</code></td>
+<td>No</td>
+<td>Top-level content identifier mapped to a content-addressed input part</td>
+</tr>
+<tr>
+<td><code>content_sha256_field</code></td>
+<td>With any content field</td>
+<td>Bare lowercase SHA-256 of the content bytes</td>
+</tr>
+<tr>
+<td><code>content_byte_length_field</code></td>
+<td>With any content field</td>
+<td>Positive byte length of the content object</td>
+</tr>
+<tr>
+<td><code>content_media_type_field</code></td>
+<td>With any content field</td>
+<td>Canonical media type for the content object</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>No</td>
+<td>Exact prefix length, from 1 through 10,000</td>
+</tr>
+</tbody>
+</table>
+<p>The transaction verifies <code>sha256</code> before parsing. It reads one JSON object per
+line, preserves source order, selects the exact prefix when <code>limit</code> is present,
+and derives each <code>input_sha256</code>. Without <code>id_field</code>, record IDs are
+<code>record/00000000</code>, <code>record/00000001</code>, and so on. The resulting canonical
+schedule identity binds the source digest, name, fixed config
+<code>evaluation-records-jsonl-v1</code>, split, order, and selected records. The normalized
+request separately preserves the exact source path, digest, field mapping, and
+limit; both objects are bound into the evidence.</p>
+<p>Blank lines, non-object rows, missing or non-text mapped fields, duplicate IDs,
+digest mismatch, and a requested limit larger than the file fail closed. Fields
+not named by the mapping may remain in the source, but they are not copied into
+the schedule.</p>
+<p><code>content_role</code> and all four content-field mappings are supplied together or
+omitted together. A text-only record becomes one <code>prompt</code> text part. A record
+with content mappings becomes one content part followed by one <code>prompt</code> text
+part. The content part carries the declared role, content ID, media type, byte
+length, and SHA-256. The schedule contains no host path or URI. The selected
+provider resolves content IDs inside its separately authorized content store
+and authenticates the bytes before use. <code>vision_text_generation</code> requires role
+<code>image</code>; another canonical future task may declare its own role through its
+provider/add-in contract.</p>
+<h2 id="task-and-structured-input-contract">Task and structured-input contract<a class="headerlink" href="#task-and-structured-input-contract" title="Permanent link">&para;</a></h2>
+<p><code>comparison.task</code> is a canonical provider capability identifier. The request,
+canonical schedule, both provider capability declarations, both evaluation
+batches, and both receipts must agree on it. <code>text_causal</code> is the built-in
+Hugging Face task. <code>vision_text_generation</code> is implemented by the optional
+Hugging Face vision-text add-in. The contract also reserves canonical
+<code>masked_language</code> and <code>text_seq2seq</code> identifiers so future providers can share
+the same schedule and evidence boundaries; no built-in execution path is
+assigned to those identifiers.</p>
+<p>Every scheduled record carries ordered <code>input_parts</code>. Text parts include their
+canonical role, text, and text digest. Content parts include a role,
+content-safe identifier, media type, byte length, and digest. <code>input_sha256</code> is
+derived from the entire ordered part list, so changing a prompt, reordering
+parts, or changing a content binding changes the schedule identity.</p>
+<p>The schedule authenticates the declaration, not the host object by itself. In
+run mode, preflight resolves the caller-authorized provider store and proves
+that each selected content ID currently names matching bytes and valid media.
+The worker repeats that validation from the exact parsed schedule before model
+preparation, and the scorer reopens the object before use. No host path or store
+authority enters the portable schedule.</p>
+<h3 id="comparison-sides">Comparison sides<a class="headerlink" href="#comparison-sides" title="Permanent link">&para;</a></h3>
+<p>Each side has the same shape:</p>
 <ul>
-<li>the exact policy file;</li>
-<li>expected baseline and subject artifact-identity digests;</li>
-<li>the expected canonical schedule digest;</li>
-<li>expected baseline and subject runtime-image digests;</li>
-<li>expected evidence-signer fingerprint;</li>
-<li>its verifier identity and private key.</li>
+<li><code>artifact.path</code> identifies local request-owned material in run mode;</li>
+<li><code>artifact.model_id</code> and <code>artifact.locator</code> provide portable logical identity;</li>
+<li><code>runtime.provider</code> selects one installed ABI implementation; and</li>
+<li><code>runtime.settings</code> carries only provider-owned JSON scalar settings.</li>
 </ul>
-<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>release-check/evidence/release-001/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--policy<span class="w"> </span>release-check/policy/acceptance.json<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-baseline-artifact<span class="w"> </span>sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-subject-artifact<span class="w"> </span>sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-schedule<span class="w"> </span>sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-baseline-runtime<span class="w"> </span>sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-subject-runtime<span class="w"> </span>sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-signer<span class="w"> </span>sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--receipt<span class="w"> </span>release-check/verification.receipt.json<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--verifier-signing-key<span class="w"> </span>verifier.pem<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--verifier-identity<span class="w"> </span>release-verifier<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--json
+<p>For local HF snapshots, derive <code>checkpoint_tree_sha256</code> and
+<code>tokenizer_metadata_sha256</code> with the public helpers in
+<a href="../runtime-providers/#hugging-face-transformers">Runtime providers</a>. The
+provider verifies the declared tree and tokenizer contract against the loaded
+artifact before and after scoring where required.</p>
+<p>The baseline and subject may use different providers only when both declare the
+selected task and built-in or collection metric. A cross-runtime comparison records behavior under two
+authenticated runtime configurations; it does not assert that their generation
+semantics are identical beyond the bound inputs and settings.</p>
+<h2 id="supported-metrics">Supported metrics<a class="headerlink" href="#supported-metrics" title="Permanent link">&para;</a></h2>
+<h3 id="exact_match"><code>exact_match</code><a class="headerlink" href="#exact_match" title="Permanent link">&para;</a></h3>
+<p>Each side receives score <code>1</code> when its authenticated <code>output_text</code> is exactly the
+scheduled <code>expected_output</code>, otherwise <code>0</code>. Equality does not trim whitespace,
+case-fold, normalize Unicode, or extract an answer. The point comparison is:</p>
+<div class="codehilite"><pre><span></span><code>delta_pp = 100 * (subject_mean - baseline_mean)
 </code></pre></div>
 
-<p>Acceptance requires exit status <code>0</code>, <code>ok: true</code>, <code>integrity_ok: true</code>, a
-passing policy verdict, the expected signer authenticity, and a valid signed
-receipt. An integrity-valid policy rejection may still produce a signed
-rejection receipt and then exit nonzero.</p>
-<h2 id="6-render-the-report">6. Render the report<a class="headerlink" href="#6-render-the-report" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span>release-check/evidence/release-001/
-invarlock<span class="w"> </span>report<span class="w"> </span>release-check/evidence/release-001/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--html<span class="w"> </span>release-check/evidence.html<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--explain
+<p>The report also records baseline-pass to subject-fail regressions,
+baseline-fail to subject-pass improvements, both-pass and both-fail counts, and
+the exact two-sided McNemar probability. The metric-bound check passes only
+when the current v2 continuity-corrected paired Newcombe 95% effect-size
+interval's lower bound is at least
+<code>policy.metrics.exact_match.delta_min_pp</code>.</p>
+<h3 id="normalized_nll_per_utf8_byte"><code>normalized_nll_per_utf8_byte</code><a class="headerlink" href="#normalized_nll_per_utf8_byte" title="Permanent link">&para;</a></h3>
+<p>For each successful record, the provider teacher-forces the authenticated
+expected continuation and supplies finite <code>logprob_sum</code>, positive <code>token_count</code>,
+and positive <code>utf8_byte_count</code>. InvarLock verifies the byte count against the
+scheduled target and derives:</p>
+<div class="codehilite"><pre><span></span><code>record_nll = -logprob_sum / utf8_byte_count
+ratio = arithmetic_mean(subject_record_nll) / arithmetic_mean(baseline_record_nll)
 </code></pre></div>
 
-<p>The report shows both side means, the point comparison, the selected paired
-interval, threshold, and canonical verdict. <code>report</code> checks the embedded
-evidence signature and bundle integrity before rendering, but it does not use
-the independent verifier anchors or replace the signed receipt.</p>
-<h2 id="interpret-the-result">Interpret the result<a class="headerlink" href="#interpret-the-result" title="Permanent link">&para;</a></h2>
-<p>Every current <code>invarlock/comparison-report-v2</code> report records:</p>
-<ul>
-<li>a point estimate over all authenticated records;</li>
-<li>a paired Newcombe 95% interval plus regression/improvement counts and an
-  exact McNemar probability for exact match, or the fixed 2,048-replicate
-  <code>paired_percentile_bootstrap_sha256_v1</code> interval for normalized NLL;</li>
-<li>the selected policy limit; and</li>
-<li>optional record-count and interval-width qualification when the policy binds
-  those coupled requirements; and</li>
-<li>a verdict controlled by the conservative interval bound and any configured
-  sample qualification.</li>
-</ul>
-<p>For exact match, the lower bound must clear the percentage-point floor. For
-byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its
-interval resamples paired schedule positions, so each baseline observation
-stays coupled to its subject observation.</p>
-<p>Preflight can establish that the authenticated schedule meets a configured
-minimum count, but interval width remains pending until execution. Strict
-verification also preserves exact replay of legacy
-<code>invarlock/comparison-report-v1</code> evidence with its original exact-match method.</p>
-<p>Normalized NLL is teacher-forced expected-continuation likelihood regression,
-not a general model-quality measure. A displayed token-weighted perplexity
-ratio is derived interpretation only; it has no policy, interval, or verdict
+<p>The baseline mean must be positive. The metric-bound check passes only when the interval's
+upper bound is at most
+<code>policy.metrics.normalized_nll_per_utf8_byte.ratio_max</code>.</p>
+<p>This ratio is insensitive to tokenizer token-count differences because target
+UTF-8 bytes are the normalization unit. It is not perplexity and is not a pooled
+byte-weighted loss. It measures expected-continuation likelihood regression
+under the authenticated prompt, target, provider, and runtime; it is not a
+general model-quality measure.</p>
+<h3 id="derived-perplexity-interpretation">Derived perplexity interpretation<a class="headerlink" href="#derived-perplexity-interpretation" title="Permanent link">&para;</a></h3>
+<p>For a normalized-NLL report, InvarLock derives token-normalized NLL when both
+artifacts bind the same authenticated tokenizer and each pair has the same
+positive target-token count:</p>
+<div class="codehilite"><pre><span></span><code>record_nll = -logprob_sum / token_count
+</code></pre></div>
+
+<p>Each side perplexity is the exponential of token-weighted mean NLL. The report
+records both side perplexities, their ratio, the tokenizer digest, and total
+target-token count. If the facts are not comparable, it records a deterministic
+unavailable reason.</p>
+<p>The perplexity ratio is verifier-derived interpretation only. It is not a
+selectable metric and has no policy threshold, confidence interval, or verdict
 authority.</p>
-<p>This describes sensitivity to paired resampling of the fixed schedule. It is
-not a population confidence interval, statistical-power calculation, safety
-claim, or proof that the schedule represents production traffic.</p>
-<h2 id="secondary-offline-import-smoke">Secondary offline import smoke<a class="headerlink" href="#secondary-offline-import-smoke" title="Permanent link">&para;</a></h2>
-<p>The repository's
-<a href="https://github.com/invarlock/invarlock/tree/main/examples"><code>examples/</code></a>
-directory contains complete synthetic provider sidecars. It makes no network
-calls and performs no model inference, but exercises the same evidence,
-signature, interval, verifier, receipt, and rendering contracts:</p>
-<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>examples
-python<span class="w"> </span>generate_keys.py<span class="w"> </span>--output-dir<span class="w"> </span>.keys
-invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>.keys/evidence-signer.pem
-
-<span class="nv">EVIDENCE_SIGNER_FINGERPRINT</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>tr<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;\n&#39;</span><span class="w"> </span>&lt;<span class="w"> </span>.keys/evidence-signer.fingerprint<span class="k">)</span><span class="s2">&quot;</span>
-<span class="nv">BASELINE_ARTIFACT_DIGEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json; print(json.load(open(&quot;trusted-inputs/input-digests.json&quot;))[&quot;baseline_artifact&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
-<span class="nv">SUBJECT_ARTIFACT_DIGEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json; print(json.load(open(&quot;trusted-inputs/input-digests.json&quot;))[&quot;subject_artifact&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
-<span class="nv">SCHEDULE_DIGEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json; print(json.load(open(&quot;trusted-inputs/input-digests.json&quot;))[&quot;canonical_schedule&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
-invarlock<span class="w"> </span>verify<span class="w"> </span>artifacts/evidence/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--policy<span class="w"> </span>policy/acceptance.json<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-baseline-artifact<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASELINE_ARTIFACT_DIGEST</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-subject-artifact<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SUBJECT_ARTIFACT_DIGEST</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-schedule<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SCHEDULE_DIGEST</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-baseline-runtime<span class="w"> </span>sha256:1111111111111111111111111111111111111111111111111111111111111111<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-subject-runtime<span class="w"> </span>sha256:2222222222222222222222222222222222222222222222222222222222222222<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--expected-signer<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$EVIDENCE_SIGNER_FINGERPRINT</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--receipt<span class="w"> </span>verification.receipt.json<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--verifier-signing-key<span class="w"> </span>.keys/verifier.pem<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--verifier-identity<span class="w"> </span>local-example-verifier
-
-invarlock<span class="w"> </span>report<span class="w"> </span>artifacts/evidence/<span class="w"> </span>--html<span class="w"> </span>evidence.html<span class="w"> </span>--explain
+<p>The built-in HF provider supports both built-in metrics for <code>text_causal</code>. The
+first-party GGUF, TensorRT-LLM, and Hugging Face vision-text add-ins currently
+support exact match for their declared tasks. Import execution support remains
+provider-specific: both imported provider receipts must declare the selected
+task and collection metric. A scorer extension collects authenticated text
+outputs through the exact-match provider surface before verifier replay.</p>
+<h2 id="deterministic-scorer-extension">Deterministic scorer extension<a class="headerlink" href="#deterministic-scorer-extension" title="Permanent link">&para;</a></h2>
+<p><code>comparison</code> selects exactly one built-in <code>metric</code> or one complete
+<code>scorer_extension</code> binding. It cannot contain both. A binding has this closed
+shape:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">scorer_extension</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">format_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock/scorer-extension-binding-v1</span>
+<span class="w">  </span><span class="nt">scorer_abi</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
+<span class="w">  </span><span class="nt">scorer_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example.token_f1</span>
+<span class="w">  </span><span class="nt">scorer_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0.0</span>
+<span class="w">  </span><span class="nt">descriptor_sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;5555555555555555555555555555555555555555555555555555555555555555&quot;</span>
+<span class="w">  </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">lowercase</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">configuration_sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;6666666666666666666666666666666666666666666666666666666666666666&quot;</span>
 </code></pre></div>
 
-<p>Use this fixture to test key handling and artifact transport, not as evidence
-that a runtime-backed model comparison works.</p>
-<h2 id="apply-the-transaction-to-a-release-change">Apply the transaction to a release change<a class="headerlink" href="#apply-the-transaction-to-a-release-change" title="Permanent link">&para;</a></h2>
-<p>The <a href="../change-scenarios/">model-change workflow guide</a> maps fine-tuned, pruned,
-quantized, GGUF, TensorRT-LLM, multimodal, harness, endpoint, and evidence
-handoff inputs to the same transaction. The
-<a href="https://github.com/invarlock/invarlock/tree/main/examples">runnable examples</a>
-execute the maintained Hugging Face, PEFT, TorchAO, GGUF/llama.cpp, LM
-Evaluation Harness, and TensorRT-LLM journeys. A separate evidence-handoff
-fixture exercises acceptance, policy rejection, and tamper rejection without a
-model runtime. Artifact creation remains in the system that owns it.</p>
-<h2 id="recovery-and-next-steps">Recovery and next steps<a class="headerlink" href="#recovery-and-next-steps" title="Permanent link">&para;</a></h2>
-<p>Evidence, receipt, and HTML destinations are no-clobber. Do not repair a
-published bundle in place. Retain a failed attempt when review policy requires
-it, fix the source boundary, and use a new output name.</p>
-<p>Continue with:</p>
+<p>The digests are illustrative. The descriptor binds supported tasks, text
+output, configuration schema, replay mode, unit-interval value semantics,
+arithmetic-mean aggregation, higher-is-better direction, and disabled network,
+external-model, and human judgment. The configuration digest covers canonical
+JSON configuration bytes.</p>
+<p>Providers collect ordinary authenticated text outputs. The scorer receives
+exactly <code>expected_output</code>, <code>output_text</code>, and <code>output_sha256</code> for each ordered
+record, even when the underlying schedule also contains authenticated content.
+It returns one deterministic value from <code>0</code> through <code>1</code> per record. InvarLock
+computes both arithmetic means, the subject-minus-baseline percentage-point
+delta, the deterministic paired schedule-resampling interval, and the verdict.</p>
+<p>Strict evaluation and verification require an explicitly authorized scorer.
+The CLI discovers the exact installed entry point only when
+<code>--allow-installed-scorers</code> is supplied to each transaction. The Python API
+accepts an explicit <code>ScorerExtensionRegistry</code> containing an installed or
+caller-injected scorer.
+The scorer ID, version, descriptor digest, configuration digest, task, input
+kinds, output kind, pairing, source facts, and replay result must all agree.
+Replay runs twice and must produce byte-identical canonical results.</p>
+<p>Separately installed and explicitly authorized scorer packages may implement
+deterministic token F1, structured extraction, or VQA answer normalization. SQL
+or code execution, model-based semantic similarity, network and human scoring,
+external models, and LLM judges are excluded until separate authenticated
+contracts exist. Judge outputs remain optional authenticated observations.</p>
+<h2 id="authenticated-optional-observations">Authenticated optional observations<a class="headerlink" href="#authenticated-optional-observations" title="Permanent link">&para;</a></h2>
+<p>The optional root <code>observations</code> array attaches canonical JSON context to the
+same signed evidence transaction:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">observations</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subject-spectral</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">spectral</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subject</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">observations/subject-spectral.json</span>
+</code></pre></div>
+
+<p>Each entry has a unique canonical ID, a canonical kind, a scope of
+<code>comparison</code>, <code>baseline</code>, or <code>subject</code>, and a request-relative path to a
+canonical JSON object. Evaluation reads the bytes without following links,
+requires canonical encoding and a maximum size of 1 MiB, and places the payload
+under <code>observations/&lt;id&gt;.json</code>. The signed manifest binds its digest, kind,
+scope, comparison, schedule, policy, and both artifact identities. Strict
+verification replays those bindings, and the human report renders the payload
+in a separate context section.</p>
+<p>Observations are authenticated context. The selected paired comparison, its
+paired interval, and policy are the complete acceptance calculation. Adding,
+removing, or changing an observation cannot alter the verdict; any byte change
+after publication invalidates bundle integrity. Spectral, random-matrix, and
+variance summaries from <code>invarlock-diagnostics</code> use this path.</p>
+<h2 id="interval-and-sample-controlled-verdict">Interval and sample-controlled verdict<a class="headerlink" href="#interval-and-sample-controlled-verdict" title="Permanent link">&para;</a></h2>
+<p>New exact-match reports use <code>newcombe_hybrid_score_paired_v2</code>, scope
+<code>paired_binary_outcomes</code>, and interval mass <code>0.95</code>. The lower bound controls the
+exact-match policy. Paired regression and improvement counts plus the exact
+McNemar probability provide supporting context but do not override that bound.
+Strict verification continues to reconstruct
+<code>newcombe_hybrid_score_paired_v1</code> for a signed
+<code>invarlock/comparison-report-v1</code> pack.</p>
+<p>Normalized-NLL reports use <code>paired_percentile_bootstrap_sha256_v1</code> with:</p>
 <ul>
-<li><a href="../evaluation-request/">Evaluation request</a> for every request field;</li>
-<li><a href="../schedule-and-policy/">Schedule and policy</a> for source preparation,
-  thresholds, and interval semantics;</li>
-<li><a href="../runtime-providers/">Runtime providers</a> for artifact identity and provider
-  qualification;</li>
-<li><a href="../evidence-and-verification/">Evidence and verification</a> for transfer and
-  independent review; and</li>
-<li><a href="../troubleshooting/">Troubleshooting</a> for fail-closed recovery.</li>
+<li>scope <code>authenticated_schedule</code>;</li>
+<li>interval mass <code>0.95</code>;</li>
+<li>2,048 replicates; and</li>
+<li>index draws derived deterministically from the authenticated schedule digest,
+  replicate number, and draw number.</li>
 </ul>
+<p>Each replicate resamples paired positions, so baseline and subject observations
+for one scheduled record remain coupled. The upper bound controls the
+normalized-NLL policy. A favorable point estimate cannot override an interval
+that crosses the policy limit.</p>
+<p>Each metric policy may optionally add a coupled record-count and interval-width
+requirement. Exact match and scorer extensions pair <code>minimum_record_count</code> with
+<code>maximum_interval_width_pp</code>; normalized NLL pairs it with
+<code>maximum_interval_width_ratio</code>. The final v2 report passes only when the metric
+bound, minimum count, and maximum width all pass. Preflight can validate the
+count but marks interval width pending until execution.</p>
+<p>This is a deterministic resampling interval over the authenticated finite
+schedule. It is not a population confidence interval, proof of dataset
+representativeness, or general model-quality claim.</p>
+<h2 id="oci-delegation-for-run-mode">OCI delegation for run mode<a class="headerlink" href="#oci-delegation-for-run-mode" title="Permanent link">&para;</a></h2>
+<p>When the host CLI sees <code>execution.mode: run</code> and is not already inside a strict
+container boundary, it launches the request in Docker or Podman. Caller-owned
+CLI options or environment variables provide:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>CLI option</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Evidence-signing private key</td>
+<td><code>--signing-key</code></td>
+</tr>
+<tr>
+<td>Shared runtime image default</td>
+<td><code>--runtime-image</code>, <code>--runtime-image-digest</code></td>
+</tr>
+<tr>
+<td>Baseline image override</td>
+<td><code>--baseline-runtime-image</code>, <code>--baseline-runtime-image-digest</code></td>
+</tr>
+<tr>
+<td>Subject image override</td>
+<td><code>--subject-runtime-image</code>, <code>--subject-runtime-image-digest</code></td>
+</tr>
+<tr>
+<td>OCI engine</td>
+<td><code>--container-engine</code> (<code>docker</code> or <code>podman</code>)</td>
+</tr>
+<tr>
+<td>Per-worker CPU ceiling</td>
+<td><code>--runtime-cpus</code> (default <code>4</code>)</td>
+</tr>
+<tr>
+<td>Per-worker memory ceiling</td>
+<td><code>--runtime-memory-mib</code> (default <code>65536</code>)</td>
+</tr>
+<tr>
+<td>Non-root worker identity</td>
+<td><code>--runtime-user</code> (default <code>65532:65532</code>)</td>
+</tr>
+<tr>
+<td>Shared device</td>
+<td><code>--runtime-device</code> (<code>cpu</code>, <code>cuda</code>, or <code>cuda:&lt;index&gt;</code>)</td>
+</tr>
+<tr>
+<td>Per-side override</td>
+<td><code>--baseline-runtime-device</code>, <code>--subject-runtime-device</code></td>
+</tr>
+<tr>
+<td>Shared or per-side worker profile</td>
+<td><code>--runtime-entrypoint</code>, <code>--baseline-runtime-entrypoint</code>, <code>--subject-runtime-entrypoint</code></td>
+</tr>
+</tbody>
+</table>
+<p>The host authenticates the source and prepares the canonical schedule before
+launching one constrained worker per side. The launcher uses <code>--pull=never</code>,
+disables container networking, drops capabilities, and sets a read-only
+container root. It also applies caller-owned CPU and memory ceilings, a numeric
+non-root identity, and a finite deadline derived from the provider timeout and
+authenticated schedule length. Each worker receives only its own artifact and support
+resources read-only plus an isolated writable output directory. The host
+validates both outputs, publishes <code>output.evidence</code>, and signs it; the signing
+key is never mounted into either worker.</p>
+<p>Common image, device, and entrypoint options are defaults. Per-side options
+allow different digest-pinned images or devices. Workers that share a generic
+or identical CUDA selector run sequentially; workers assigned explicitly
+different CUDA indexes can run in parallel.</p>
+<p>The request cannot enable network or remote code. Runtime-image identity,
+device selection, resource ceilings, and worker identity remain
+caller-controlled so submitted YAML cannot grant itself host capabilities.</p>
+<h2 id="import-mode">Import mode<a class="headerlink" href="#import-mode" title="Permanent link">&para;</a></h2>
+<p>Import mode uses a canonical schedule path under <code>comparison.dataset</code> and
+repeats the same path under <code>execution.schedule</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># baseline and subject declarations omitted here</span>
+<span class="w">  </span><span class="nt">dataset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inputs/schedule.json</span>
+<span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy/acceptance.json</span>
+<span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">text_causal</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exact_match</span>
+<span class="nt">execution</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import</span>
+<span class="w">  </span><span class="nt">records</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/paired-records.json</span>
+<span class="w">  </span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inputs/schedule.json</span>
+<span class="w">  </span><span class="nt">baseline</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/baseline/model-artifact.identity.json</span>
+<span class="w">    </span><span class="nt">receipt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/baseline/runtime-provider.receipt.json</span>
+<span class="w">    </span><span class="nt">observation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/baseline/runtime-scoring.observation.json</span>
+<span class="w">    </span><span class="nt">run_report</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/baseline/report.json</span>
+<span class="w">    </span><span class="nt">runtime_manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/baseline/runtime.manifest.json</span>
+<span class="w">    </span><span class="nt">runtime_config</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/baseline/run.yaml</span>
+<span class="w">  </span><span class="nt">subject</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/subject/model-artifact.identity.json</span>
+<span class="w">    </span><span class="nt">receipt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/subject/runtime-provider.receipt.json</span>
+<span class="w">    </span><span class="nt">observation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/subject/runtime-scoring.observation.json</span>
+<span class="w">    </span><span class="nt">run_report</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/subject/report.json</span>
+<span class="w">    </span><span class="nt">runtime_manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/subject/runtime.manifest.json</span>
+<span class="w">    </span><span class="nt">runtime_config</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">import/subject/run.yaml</span>
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evidence/imported-001</span>
+</code></pre></div>
+
+<p>Each side provides a typed artifact identity, provider receipt, scoring
+observation, runtime-side report, runtime manifest, and runtime configuration.
+InvarLock re-derives paired records from the schedule and observations and
+requires canonical equality with <code>execution.records</code>. Do not mix sidecars from
+different executions; their digests and identities cross-bind.</p>
+<h2 id="paths-validation-and-recovery">Paths, validation, and recovery<a class="headerlink" href="#paths-validation-and-recovery" title="Permanent link">&para;</a></h2>
+<p>Request references are relative to the request file. Absolute paths, traversal,
+URLs in path fields, drive prefixes, backslashes, empty components, and symbolic
+link escapes are rejected. Public <code>model_id</code> and <code>locator</code> values are identities,
+not filesystem references.</p>
+<p>Before execution, review:</p>
+<ul>
+<li>exact baseline, subject, tree, tokenizer, and runtime identities;</li>
+<li>JSONL digest, mapping, order, selection limit, and expected outputs;</li>
+<li>provider support for the chosen metric;</li>
+<li>policy block, threshold direction, and interval-bound rule;</li>
+<li>offline settings, deterministic seed, context length, output limit, and
+  timeout;</li>
+<li>a new durable output path; and</li>
+<li>separation between evidence-signer and verifier keys.</li>
+</ul>
+<p><code>output.evidence</code> is no-clobber and publication is atomic. If evaluation fails,
+fix the request, input, provider, OCI, or publication boundary and retry with a
+new destination. Never repair a distributed bundle in place.</p>
+<p>Continue with <a href="../schedule-and-policy/">Schedule and policy</a> for decision design,
+<a href="../evidence-and-verification/">Evidence and verification</a> for the resulting
+artifact lifecycle, and <a href="../troubleshooting/">Troubleshooting</a> for fail-closed
+recovery.</p>
 
 
 

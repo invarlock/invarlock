@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/artifacts/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/release-verification/">
       
       
-        <link rel="prev" href="../api-guide/">
+        <link rel="prev" href="../lifecycle/">
       
       
-        <link rel="next" href="../reports/">
+        <link rel="next" href="../documentation/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Artifacts - InvarLock Documentation</title>
+        <title>Release verification - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#evidence-artifacts" class="md-skip">
+        <a href="#release-and-distribution-verification" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Artifacts
+              Release verification
             
           </span>
         </div>
@@ -1163,37 +1163,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artifacts
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -1209,114 +1182,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#manifest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manifest
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#checksums-and-closed-inventory" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Checksums and closed inventory
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#paired-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Paired records
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#provider-sidecars" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider sidecars
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#publication-and-immutability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Publication and immutability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#external-outputs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        External outputs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1466,10 +1331,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../release-verification/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1485,6 +1377,153 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-release-workflow-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the release workflow checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-preflight-before-a-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local preflight before a tag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-index-and-production-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test index and production publication
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-and-provenance-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation and provenance checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#published-artifact-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published artifact checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Published artifact checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#offline-review-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline review bundle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stop-recover-and-supersede" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop, recover, and supersede
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keep-the-signature-domains-separate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep the signature domains separate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1725,10 +1764,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
+  <a href="#what-the-release-workflow-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Directory layout
+        What the release workflow checks
       
     </span>
   </a>
@@ -1736,10 +1775,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#manifest" class="md-nav__link">
+  <a href="#local-preflight-before-a-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Manifest
+        Local preflight before a tag
       
     </span>
   </a>
@@ -1747,10 +1786,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#checksums-and-closed-inventory" class="md-nav__link">
+  <a href="#test-index-and-production-publication" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Checksums and closed inventory
+        Test index and production publication
       
     </span>
   </a>
@@ -1758,10 +1797,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#paired-records" class="md-nav__link">
+  <a href="#installation-and-provenance-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Paired records
+        Installation and provenance checks
       
     </span>
   </a>
@@ -1769,10 +1808,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#provider-sidecars" class="md-nav__link">
+  <a href="#published-artifact-checklist" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Provider sidecars
+        Published artifact checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Published artifact checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#offline-review-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline review bundle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stop-recover-and-supersede" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop, recover, and supersede
       
     </span>
   </a>
@@ -1780,10 +1847,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#publication-and-immutability" class="md-nav__link">
+  <a href="#keep-the-signature-domains-separate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Publication and immutability
+        Keep the signature domains separate
       
     </span>
   </a>
@@ -1791,10 +1858,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#external-outputs" class="md-nav__link">
+  <a href="#version-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
-        External outputs
+        Version compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility boundaries
       
     </span>
   </a>
@@ -1832,366 +1910,380 @@
   
 
 
-<h1 id="evidence-artifacts">Evidence artifacts<a class="headerlink" href="#evidence-artifacts" title="Permanent link">&para;</a></h1>
-<p>An <code>invarlock/evidence-pack-v1</code> bundle is a closed, signed evidence directory. Its paths
-are fixed by the manifest schema; additional files are rejected in strict
-verification.</p>
+<h1 id="release-and-distribution-verification">Release and distribution verification<a class="headerlink" href="#release-and-distribution-verification" title="Permanent link">&para;</a></h1>
+<p>InvarLock ships five coordinated Python distributions:</p>
 <div class="admonition info">
 <p class="admonition-title">Reference</p>
 <ul>
-<li><strong>Surface:</strong> <code>invarlock/evidence-pack-v1</code> directory, manifest, payload inventory, and external outputs</li>
-<li><strong>Stability:</strong> Versioned public artifact contract; fixed paths and closed inventory are verification requirements</li>
-<li><strong>Use this page when:</strong> Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim</li>
+<li><strong>Surface:</strong> Core and first-party add-in distributions, release checks, provenance, and installation verification</li>
+<li><strong>Stability:</strong> Coordinated version and ABI compatibility rules are public; the release workflow may evolve while preserving those checks</li>
+<li><strong>Use this page when:</strong> Building, publishing, installing, or independently checking an InvarLock release set</li>
 </ul>
 </div>
-<p><img alt="Evidence dependency map" src="../../assets/reference-evidence-dependency.svg" /></p>
-<h2 id="directory-layout">Directory layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>evidence/
-├── manifest.json
-├── manifest.signature.json
-├── checksums.sha256
-├── request.json
-├── inputs/
-│   ├── baseline.json
-│   ├── subject.json
-│   ├── dataset.json
-│   ├── baseline_runtime.json
-│   ├── subject_runtime.json
-│   └── policy.json
-├── schedule/
-│   └── runtime-behavioral-schedule.json
-├── records/
-│   └── paired-records.json
-├── reports/
-│   └── evaluation.report.json
-├── runs/
-│   ├── baseline/report.json
-│   └── subject/report.json
-└── providers/
-    ├── baseline/
-    │   ├── run.yaml
-    │   ├── runtime.manifest.json
-    │   ├── model-artifact.identity.json
-    │   ├── runtime-provider.receipt.json
-    │   └── runtime-scoring.observation.json
-    └── subject/
-        └── ...the same five files...
-</code></pre></div>
-
-<p><code>inputs/*.json</code> are identity records, not copies of model weights, the dataset,
-or the policy. Each carries a material digest and may carry a stable locator or
-media type. The exact normalized request, schedule, provider material, paired
-records, and canonical report are separate payloads referenced by the manifest.</p>
 <table>
 <thead>
 <tr>
-<th>Path or group</th>
-<th>Cardinality</th>
-<th>Authority in replay</th>
+<th>Distribution</th>
+<th>Role</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>request.json</code></td>
-<td>One</td>
-<td>Normalized evaluation intent; never substitutes for independent verifier anchors</td>
+<td><code>invarlock</code></td>
+<td>Core engine, contracts, Hugging Face provider, verifier, renderer</td>
 </tr>
 <tr>
-<td><code>inputs/*.json</code></td>
-<td>Six</td>
-<td>Role-specific identity records and material digests</td>
+<td><code>invarlock-runtime-gguf</code></td>
+<td>Optional GGUF/<code>llama.cpp</code> provider</td>
 </tr>
 <tr>
-<td><code>schedule/*.json</code></td>
-<td>One</td>
-<td>Ordered dataset records and expected outputs</td>
+<td><code>invarlock-runtime-tensorrt-llm</code></td>
+<td>Optional TensorRT-LLM provider</td>
 </tr>
 <tr>
-<td><code>providers/{side}/*</code></td>
-<td>Five per side</td>
-<td>Artifact, observation, provider, configuration, and runtime provenance</td>
+<td><code>invarlock-runtime-hf-vision-text</code></td>
+<td>Optional Hugging Face vision-text provider</td>
 </tr>
 <tr>
-<td><code>runs/{side}/report.json</code></td>
-<td>One per side</td>
-<td>Minimal side-to-observation binding</td>
-</tr>
-<tr>
-<td><code>records/paired-records.json</code></td>
-<td>One</td>
-<td>Verifier-reproducible record scores; not an accepted aggregate</td>
-</tr>
-<tr>
-<td><code>reports/evaluation.report.json</code></td>
-<td>One</td>
-<td>Canonical means, comparison, paired interval, threshold, optional sample qualification, and verdict reproduced by verification</td>
-</tr>
-<tr>
-<td><code>observations/*.json</code></td>
-<td>Zero to 64</td>
-<td>Authenticated typed context; descriptive only and excluded from policy replay</td>
-</tr>
-<tr>
-<td><code>checksums.sha256</code></td>
-<td>One</td>
-<td>Exact payload-byte inventory</td>
-</tr>
-<tr>
-<td><code>manifest.json</code> and signature</td>
-<td>One each</td>
-<td>Closed references and signer authentication</td>
+<td><code>invarlock-diagnostics</code></td>
+<td>Optional observation-only numeric diagnostics</td>
 </tr>
 </tbody>
 </table>
-<h2 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h2>
-<p><code>manifest.json</code> contains exactly:</p>
+<p>All five use the same release version. Provider add-ins declare that exact core
+dependency and must also match runtime-provider ABI <code>1</code> when loaded.</p>
+<table>
+<thead>
+<tr>
+<th>Compatibility dimension</th>
+<th>Required check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Package version</td>
+<td>Core and selected first-party distributions use the same release version</td>
+</tr>
+<tr>
+<td>Dependency metadata</td>
+<td>Add-in's bounded <code>invarlock</code> requirement contains that version</td>
+</tr>
+<tr>
+<td>Provider ABI</td>
+<td>Installed core and provider instance both report ABI <code>1</code></td>
+</tr>
+<tr>
+<td>Entry point</td>
+<td>Exact first-party name resolves to the expected module and class</td>
+</tr>
+<tr>
+<td>Native runtime</td>
+<td>Artifact/backend/image/device identities match the intended deployment</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-the-release-workflow-checks">What the release workflow checks<a class="headerlink" href="#what-the-release-workflow-checks" title="Permanent link">&para;</a></h2>
+<p>For a tagged release commit or an explicitly selected pre-tag candidate, the
+repository workflow:</p>
+<ol>
+<li>binds a pre-tag validation to the workflow event commit and declared package
+   version, or resolves the exact tag commit for a tag build or publication;</li>
+<li>requires a tag build or publication event commit to equal the resolved tag
+   commit;</li>
+<li>runs the complete repository, coverage, documentation, contract, and
+   workflow gates;</li>
+<li>scans the release history range for secrets;</li>
+<li>builds one wheel and source distribution for the core and every first-party
+   add-in;</li>
+<li>validates every archive against the exact checkout and runs the release
+   preflight again from a clean detached checkout;</li>
+<li>runs <code>twine check</code> on every distribution;</li>
+<li>installs the built wheels together in a clean environment;</li>
+<li>exercises the public CLI, all provider conformance commands, diagnostics,
+   and entry-point discovery;</li>
+<li>audits the installed dependency surface and generates an SBOM;</li>
+<li>records all ten archives in one SHA-256 ledger and attaches build-provenance
+    attestations during the tag run; and</li>
+<li>after a complete TestPyPI or PyPI publication, verifies every hosted
+    archive against that tag-run ledger, installs the hosted wheels together,
+    and repeats the conformance smoke.</li>
+</ol>
+<p>These checks authenticate and exercise the package set. They do not qualify a
+specific model artifact, runtime image, accelerator, dataset, or evidence pack.
+Those belong to the evaluate/verify trust model.</p>
+<p>Before tagging, dispatch the release workflow from the candidate branch with
+<code>publish</code> disabled, <code>release_tag</code> empty, and <code>candidate_version</code> set to the
+package version without a leading <code>v</code>. This runs the complete Linux build and
+release gates against the workflow event commit without creating an
+authoritative candidate or publishing anything. The validation job has
+read-only repository permissions. Attestation write access and the OIDC token
+used for provenance are granted only to the short tag-only job that downloads
+the already validated archive set, rechecks its ledger, and creates the
+provenance statement.
+Publication preparation likewise runs without an identity token. Each
+environment-gated publish job downloads only its two previously validated archives,
+rechecks the immutable tag, and invokes the pinned trusted-publishing action;
+it does not check out or execute candidate Python code.</p>
+<p>For a tag build or publication, the workflow resolves and checks out the
+release tag's exact commit before it builds. A tag push validates and builds
+the authoritative candidate but does not publish it. Publication is an
+explicit manual action against an existing tag. The manual workflow must be
+dispatched with that tag as its workflow ref and the successful tag-run ID as
+<code>candidate_run_id</code>, so the event commit, resolved tag commit, workflow-run
+identity, and downloaded artifact agree.
+Manual publication does not rebuild the archives. The tagged distribution and
+provenance artifacts are retained for 14 days, so publication must complete
+within that interval.</p>
+<p>Build provenance uses GitHub's <a href="https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations">artifact-attestation
+mechanism</a>.
+An attestation is useful only when the release verifier validates its subject digest,
+signer/workflow identity, and trusted transparency or provenance policy.</p>
+<h2 id="local-preflight-before-a-tag">Local preflight before a tag<a class="headerlink" href="#local-preflight-before-a-tag" title="Permanent link">&para;</a></h2>
+<p>Run the release checks from a clean checkout whose <code>HEAD</code> is the candidate
+commit. The coordinated install smoke builds the core and all four optional
+packages, installs their pinned base dependency closure and all five wheels in
+a disposable virtual environment, runs <code>pip check</code>, and exercises provider
+discovery and conformance without the checkout or user site on <code>sys.path</code>.
+The smoke selects the maintained Python 3.12 or 3.13 lock for the invoking
+interpreter and fails closed when no matching lock exists.
+The read-only preflight then inspects the core wheel and source distribution
+against a separately generated <code>sha256sum</code>-format manifest, installs the
+candidate wheel in isolation, exercises its runtime surface, and reruns the
+public-evidence audit:</p>
+<div class="codehilite"><pre><span></span><code>make<span class="w"> </span>addins-install-smoke
+
+<span class="nv">HASH_MANIFEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>mktemp<span class="k">)</span><span class="s2">&quot;</span>
+<span class="nb">trap</span><span class="w"> </span><span class="s1">&#39;rm -f -- &quot;$HASH_MANIFEST&quot;&#39;</span><span class="w"> </span>EXIT
+<span class="o">(</span><span class="nb">cd</span><span class="w"> </span>dist<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>shasum<span class="w"> </span>-a<span class="w"> </span><span class="m">256</span><span class="w"> </span>invarlock-*.whl<span class="w"> </span>invarlock-*.tar.gz<span class="o">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$HASH_MANIFEST</span><span class="s2">&quot;</span>
+<span class="nv">RELEASE_SHA</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>HEAD<span class="k">)</span><span class="s2">&quot;</span>
+
+make<span class="w"> </span>release-preflight<span class="w"> </span><span class="nv">RELEASE_PREFLIGHT_ARGS</span><span class="o">=</span><span class="s2">&quot;\</span>
+<span class="s2">  --release-sha </span><span class="si">${</span><span class="nv">RELEASE_SHA</span><span class="si">}</span><span class="s2"> \</span>
+<span class="s2">  --expected-version X.Y.Z \</span>
+<span class="s2">  --dist-dir dist \</span>
+<span class="s2">  --hash-manifest &quot;</span><span class="nv">$HASH_MANIFEST</span><span class="s2">&quot; \</span>
+<span class="s2">  --json&quot;</span>
+</code></pre></div>
+
+<p>Use <code>sha256sum</code> instead of <code>shasum -a 256</code> where that is the platform tool.
+Keep the temporary manifest outside the checkout: preflight rejects untracked
+files as well as modified files. The manifest must contain only the two core
+artifacts by base name. <code>X.Y.Z</code> is
+the candidate version without a leading <code>v</code>; preflight rejects a dirty checkout,
+a different <code>HEAD</code>, unexpected artifacts, metadata/content mismatch, or a hash
+change. A passing result is release-candidate evidence, not authorization to
+tag or publish. Run the non-publishing branch workflow after these local checks
+to exercise the same release surface on the hosted Linux runner before creating
+a release tag.</p>
+<p>The local preflight intentionally validates the core pair in depth while
+<code>make dist-check</code> validates every archive against its checkout source and
+<code>make addins-install-smoke</code> plus the release workflow validate the coordinated
+five-package install. Keep both kinds of gate; do not describe the core-only
+JSON result as proof that every add-in archive was independently inspected by
+preflight.</p>
+<h2 id="test-index-and-production-publication">Test index and production publication<a class="headerlink" href="#test-index-and-production-publication" title="Permanent link">&para;</a></h2>
+<p>TestPyPI is an optional publication and installation smoke, not the source of
+the production candidate. To use it, dispatch the release workflow from the
+release tag, select <code>testpypi</code>, and provide the successful tag workflow run's
+numeric ID as <code>candidate_run_id</code>. The workflow authenticates that the supplied
+run is a successful tag-push execution of the release workflow at the exact tag
+and commit. It then downloads that run's immutable distribution artifact,
+checks the closed ten-file set and its ledger, publishes through the five
+project-scoped TestPyPI identities, verifies all hosted archives, installs the
+five hosted wheels together, and reruns the CLI, diagnostics,
+provider-conformance, and entry-point smoke.</p>
+<p>Production uses the same tagged candidate directly. Once local preflight,
+tag-to-commit checks, release notes, security review, provenance, and the tag
+workflow are complete, dispatch the workflow again from the release tag,
+select <code>pypi</code>, and provide the same tag workflow run ID as <code>candidate_run_id</code>.
+Use the default <code>complete</code> publication phase for an ordinary release.
+The production jobs consume the exact archives built by the tag run; they do
+not rebuild them or depend on TestPyPI state. A stale, incomplete, or
+filename-colliding TestPyPI project therefore cannot silently select or alter a
+production candidate. Before upload, each publication job downloads and checks
+any already hosted files for its exact version against the candidate ledger.
+Absent files may be uploaded and ledger-identical files may be skipped, making
+an interrupted multi-project publication safe to resume. Any conflicting
+filename, metadata digest, or downloaded bytes fail before upload, and the
+post-publication verifier cannot turn a mixed or partially replaced release
+into a successful run.</p>
+<p>PyPI permits only three pending trusted publishers at once. When a coordinated
+release creates four new add-in projects for the first time, use the production
+<code>bootstrap</code> phase to publish the core plus the diagnostics, GGUF, and
+vision-text distributions. After those pending publishers become ordinary
+project publishers, register the TensorRT-LLM publisher and dispatch the
+<code>finish</code> phase with the same release tag and <code>candidate_run_id</code>. The finish run
+first confirms that all eight bootstrap archives are hosted byte-for-byte from
+that ledger, publishes only TensorRT-LLM, then verifies all ten hosted archives
+and installs all five wheels together. The two special phases are rejected for
+TestPyPI; later releases use <code>complete</code> and publish all five projects in one
+dispatch.</p>
+<p>Configure a protected <code>v*</code> tag ruleset that blocks updates and deletion. Protect
+each project-scoped PyPI environment with required reviewers and an appropriate
+deployment policy. These repository controls provide the authorization layer
+around the workflow's commit, tag-run artifact, ledger, and trusted-publisher
+identity.</p>
+<p>After production publication, the workflow downloads all ten archives from
+PyPI, compares their hashes with the tag-run ledger, installs the five hosted
+wheels together in a clean environment, and repeats the conformance smoke.
+Reconcile the published filenames, version, source tag, provenance subjects,
+and release assets before announcing completion.</p>
+<h2 id="installation-and-provenance-checks">Installation and provenance checks<a class="headerlink" href="#installation-and-provenance-checks" title="Permanent link">&para;</a></h2>
+<p>Before installing a release in a controlled environment:</p>
+<ol>
+<li>select one exact version for core and any first-party add-ins;</li>
+<li>obtain hashes from a trusted release record or package index response;</li>
+<li>download artifacts without installing them;</li>
+<li>verify every downloaded SHA-256 digest;</li>
+<li>install with hash enforcement where the package-management workflow supports
+   it; and</li>
+<li>run <code>invarlock --version</code> and the conformance command for each installed
+   runtime add-in.</li>
+</ol>
+<p>Example discovery checks after installation:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>--version
+invarlock-gguf-conformance
+invarlock-tensorrt-llm-conformance
+</code></pre></div>
+
+<p>Each conformance command must report <code>ok: true</code>, its expected provider name,
+and the ABI accepted by the installed core. A conformance pass verifies the
+install surface and lightweight provider contract, not a native runtime model
+run. Before qualification fan-out, produce and strictly verify one signed
+canary through the exact digest-pinned runtime image. Retain its evidence,
+signed receipt, and verifier-owned trust profile for the maintained readiness
+and evidence targets. Reuse is limited to that exact image digest; a canary does
+not establish model-specific load, memory, backend, or execution success.</p>
+<p>An example hash-enforced download/install flow is:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>download<span class="w"> </span>--only-binary<span class="o">=</span>:all:<span class="w"> </span>--dest<span class="w"> </span>wheelhouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s1">&#39;invarlock==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s1">&#39;invarlock-runtime-gguf==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s1">&#39;invarlock-runtime-tensorrt-llm==X.Y.Z&#39;</span>
+
+<span class="c1"># Populate requirements.lock with the independently verified hashes, then:</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--require-hashes<span class="w"> </span>-r<span class="w"> </span>requirements.lock
+</code></pre></div>
+
+<p><code>X.Y.Z</code> and the lockfile are placeholders. Never generate the lockfile from
+unverified local downloads and then treat the same downloads as independently
+verified.</p>
+<h2 id="published-artifact-checklist">Published artifact checklist<a class="headerlink" href="#published-artifact-checklist" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Verify</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Wheel</td>
+<td>Filename/version, index SHA-256, archive integrity, metadata, entry points</td>
+</tr>
+<tr>
+<td>Source distribution</td>
+<td>Filename/version, index SHA-256, archive integrity, expected source surface</td>
+</tr>
+<tr>
+<td>Provenance bundle</td>
+<td>Subject digest matches each distribution and trusted workflow identity</td>
+</tr>
+<tr>
+<td>SBOM</td>
+<td>Generated for the installed release surface and associated with the same build</td>
+</tr>
+<tr>
+<td>First-party set</td>
+<td>Exactly one coordinated version of core and selected add-ins</td>
+</tr>
+</tbody>
+</table>
+<p>PyPI's index responses can supply hosted distribution digests, but the trust
+decision still belongs to the installer's package and provenance policy.</p>
+<h3 id="offline-review-bundle">Offline review bundle<a class="headerlink" href="#offline-review-bundle" title="Permanent link">&para;</a></h3>
+<p>The repository can package already collected distributions, per-artifact
+Sigstore sidecars, the GitHub provenance bundle, and the CycloneDX SBOM for an
+offline release verifier:</p>
+<div class="codehilite"><pre><span></span><code>scripts/release/make_offline_bundle.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--version<span class="w"> </span>X.Y.Z<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tag<span class="w"> </span>vX.Y.Z<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--repo<span class="w"> </span>OWNER/REPO<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dist-dir<span class="w"> </span>release-material/dist<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--sbom<span class="w"> </span>release-material/sbom.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provenance-dir<span class="w"> </span>release-material/provenance<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output-dir<span class="w"> </span>release-material/offline
+</code></pre></div>
+
+<p>This script assembles existing material; it does not fetch or manufacture
+provenance. Every distribution must already have a Sigstore sidecar. Inspect
+the generated <code>release_manifest.json</code>, verify each file digest, then follow the
+bundle's <code>README.txt</code> identity and issuer checks. The current GitHub workflow
+uploads a build-provenance bundle but does not automatically create this
+offline archive, so maintainers must deliberately collect compatible sidecars
+and run the assembler.</p>
+<h2 id="stop-recover-and-supersede">Stop, recover, and supersede<a class="headerlink" href="#stop-recover-and-supersede" title="Permanent link">&para;</a></h2>
+<p>If any pre-publication gate fails, stop publication, preserve the failing
+artifacts and logs privately, fix the source or workflow, and cut a fresh
+candidate. Never replace an artifact while retaining its filename, tag, or
+version.</p>
+<p>If a defect is discovered after publication:</p>
+<ol>
+<li>stop recommending and promoting the affected coordinated version;</li>
+<li>assess whether all five distributions or only selected files require an index
+   yank, and record the user-visible reason;</li>
+<li>preserve the tag, provenance, hashes, and incident record needed to explain
+   existing installations;</li>
+<li>fix forward under a new version rather than overwriting published files;</li>
+<li>rerun the complete local, TestPyPI, provenance, and production checks; and</li>
+<li>reconcile documentation and public-evidence links to the replacement.</li>
+</ol>
+<p>Yanking is a discovery warning, not remote uninstallation or revocation of
+bytes already downloaded. Security-sensitive compromise also requires the key,
+runtime, or dependency response described in the security documentation.</p>
+<h2 id="keep-the-signature-domains-separate">Keep the signature domains separate<a class="headerlink" href="#keep-the-signature-domains-separate" title="Permanent link">&para;</a></h2>
+<p>Three signature or provenance domains can appear in a deployment:</p>
 <ul>
-<li><code>format</code> and deterministic <code>comparison_id</code>;</li>
-<li>six input references: baseline, subject, dataset, both runtimes, and policy;</li>
-<li>fifteen evidence-role references at their fixed paths;</li>
-<li>the paired-record path, digest, and count;</li>
-<li>optional typed observation references with fixed paths, digests, kinds, and scopes;</li>
-<li>the checksum-file path and digest; and</li>
-<li>the evidence-signing key fingerprint.</li>
+<li>package build provenance associates distributions with a release build;</li>
+<li>the evidence signature authenticates one evidence manifest; and</li>
+<li>the verifier signature authenticates one receipt and its independent anchors.</li>
 </ul>
-<p>Every input reference has a digest of the identity file and a distinct
-<code>material_digest</code> for the authenticated input. Every evidence reference has a
-digest of the exact file bytes.</p>
-<p>The manifest structure is equivalent to this abbreviated, non-copyable view:</p>
-<div class="codehilite"><pre><span></span><code>{
-  &quot;format&quot;: &quot;invarlock/evidence-pack-v1&quot;,
-  &quot;comparison_id&quot;: &quot;...&quot;,
-  &quot;inputs&quot;: {
-    &quot;baseline&quot;: {
-      &quot;path&quot;: &quot;inputs/baseline.json&quot;,
-      &quot;digest&quot;: &quot;sha256:...&quot;,
-      &quot;material_digest&quot;: &quot;sha256:...&quot;
-    },
-    &quot;subject&quot;: { ... },
-    &quot;dataset&quot;: { ... },
-    &quot;baseline_runtime&quot;: { ... },
-    &quot;subject_runtime&quot;: { ... },
-    &quot;policy&quot;: { ... }
-  },
-  &quot;evidence&quot;: {
-    &quot;request&quot;: {&quot;path&quot;: &quot;request.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;schedule&quot;: {&quot;path&quot;: &quot;schedule/runtime-behavioral-schedule.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;evaluation_report&quot;: {&quot;path&quot;: &quot;reports/evaluation.report.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;...&quot;: &quot;twelve additional fixed evidence roles&quot;
-  },
-  &quot;paired_records&quot;: {
-    &quot;path&quot;: &quot;records/paired-records.json&quot;,
-    &quot;digest&quot;: &quot;sha256:...&quot;,
-    &quot;count&quot;: 20
-  },
-  &quot;checksums_sha256&quot;: &quot;checksums.sha256&quot;,
-  &quot;checksums_sha256_digest&quot;: &quot;...bare sha256...&quot;,
-  &quot;signing_key_fingerprint&quot;: &quot;sha256:...&quot;
-}
-</code></pre></div>
-
-<p>The real object has no comments, ellipses, or abbreviated roles. It has exactly
-six input references and fifteen evidence references at schema-fixed paths.</p>
-<p><code>manifest.signature.json</code> embeds the Ed25519 public key, its fingerprint, and a
-base64 signature over the exact canonical <code>manifest.json</code> bytes. The public key
-is evidence of who signed only after its fingerprint is matched to an
-independent expected signer.</p>
-<table>
-<thead>
-<tr>
-<th>Signature field</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>format</code></td>
-<td><code>invarlock/evidence-pack-signature-v1</code></td>
-</tr>
-<tr>
-<td><code>algorithm</code></td>
-<td>Ed25519</td>
-</tr>
-<tr>
-<td>Embedded public key</td>
-<td>Verification material, not an independent trust anchor</td>
-</tr>
-<tr>
-<td>Public-key fingerprint</td>
-<td>SHA-256 of the raw Ed25519 public key</td>
-</tr>
-<tr>
-<td>Signature</td>
-<td>Authentication of the exact canonical manifest bytes</td>
-</tr>
-</tbody>
-</table>
-<h2 id="checksums-and-closed-inventory">Checksums and closed inventory<a class="headerlink" href="#checksums-and-closed-inventory" title="Permanent link">&para;</a></h2>
-<p><code>checksums.sha256</code> covers every payload below the manifest, but not the manifest
-or its signature. The manifest separately binds the checksum file. Verification
-checks both directions:</p>
+<p>None substitutes for another. Package provenance does not approve evaluation
+results, an evidence signer does not choose verifier trust anchors, and a
+verification receipt does not attest how a Python wheel was built.</p>
+<h2 id="version-compatibility">Version compatibility<a class="headerlink" href="#version-compatibility" title="Permanent link">&para;</a></h2>
+<p>Do not infer compatibility from package names alone. Confirm all of:</p>
 <ul>
-<li>every manifest payload must be covered; and</li>
-<li>no checksum or directory entry may introduce an undeclared payload.</li>
+<li>coordinated first-party package versions;</li>
+<li>the add-in's declared core version range;</li>
+<li>exact runtime-provider ABI equality;</li>
+<li>conformance-command success; and</li>
+<li>for native providers, compatibility of the authenticated artifact, pinned
+  runtime image, runner/backend, device, and compute capability.</li>
 </ul>
-<p>Regular-file, no-symbolic-link, size, and safe-relative-path rules apply while
-reading. A valid checksum does not make a file semantically valid; cross-file
-replay follows the integrity checks.</p>
-<p>The manifest is outside the checksum payload because it binds the checksum
-file. The signature is outside both because it authenticates the canonical
-manifest. This avoids a self-referential digest while still closing every pack
-byte into one directed dependency graph.</p>
-<h2 id="paired-records">Paired records<a class="headerlink" href="#paired-records" title="Permanent link">&para;</a></h2>
-<p><code>records/paired-records.json</code> has exactly:</p>
-<div class="codehilite"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/paired-records-v1&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;metric&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exact_match&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;schedule_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;records&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;record_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example-1&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;input_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;baseline&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;observation_record_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;subject&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;observation_record_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">]</span>
-<span class="p">}</span>
-</code></pre></div>
-
-<p>The engine derives this file from the canonical schedule and both scoring
-observations. It rejects failed observation records, order changes, input-digest
-mismatches, output-text/digest mismatches, and schedules without expected
-outputs. Import mode must supply byte-canonical paired records equal to that
-fresh derivation; imported scores are never accepted as authority.</p>
-<p>For <code>exact_match</code>, each score is <code>1.0</code> when output text exactly equals expected
-output and <code>0.0</code> otherwise. For <code>normalized_nll_per_utf8_byte</code>, each score is
-<code>-logprob_sum / utf8_byte_count</code>; required counts must be positive and the result
-finite and non-negative.</p>
-<p>When a scorer extension is selected, the paired-record object also binds the
-exact scorer configuration and each side's replay result. The explicitly
-authorized scorer receives only authenticated <code>expected_output</code>, <code>output_text</code>,
-and <code>output_sha256</code> facts and returns one higher-is-better value in <code>[0, 1]</code>
-per record. The core verifies result order and digests, computes the arithmetic
-mean and paired percentage-point delta, and owns the interval and verdict.</p>
-<p>Normalized NLL is teacher-forced expected-continuation likelihood regression,
-not a general model-quality measure. The paired-record object may also carry a
-verifier-derived perplexity interpretation when the authenticated tokenizer
-contracts and every pair's positive target-token counts match. That object has
-no policy, interval, or verdict authority; an unavailable interpretation does
-not invalidate the byte-normalized NLL comparison.</p>
-<p>The canonical report adds the metric-specific paired interval to the two side
-means and point comparison. New reports use
-<code>invarlock/comparison-report-v2</code>; the verifier also replays existing
-<code>invarlock/comparison-report-v1</code> packs under their original arithmetic. Exact
-match records paired regression and improvement counts, an exact two-sided
-McNemar probability, and the paired Newcombe 95% effect-size interval whose
-lower bound controls policy. Normalized NLL uses the upper bound of its
-authenticated-schedule resampling interval. An authorized scorer extension
-uses the lower bound of the same fixed paired-resampling method against
-<code>metrics.scorer_extension.delta_min_pp</code>.</p>
-<p>When the policy supplies the coupled sample controls, the v2 report also
-contains <code>sample_qualification</code>. It records the minimum and observed paired
-count, maximum and observed interval width, units, each check's result, and the
-combined result. The final verdict is the conjunction of that result and the
-metric-bound result.</p>
-<h2 id="provider-sidecars">Provider sidecars<a class="headerlink" href="#provider-sidecars" title="Permanent link">&para;</a></h2>
-<p>Each comparison side includes:</p>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>Binding</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>model-artifact.identity.json</code></td>
-<td>Portable authenticated identity for the actual model artifact</td>
-</tr>
-<tr>
-<td><code>runtime-scoring.observation.json</code></td>
-<td>Ordered backend facts bound to provider, artifact, and schedule</td>
-</tr>
-<tr>
-<td><code>runtime-provider.receipt.json</code></td>
-<td>Plugin/backend/capability/artifact/settings/device/image provenance bound to the observation</td>
-</tr>
-<tr>
-<td><code>report.json</code></td>
-<td>Minimal side report binding provider, artifact, observation, schedule, and count</td>
-</tr>
-<tr>
-<td><code>run.yaml</code></td>
-<td>Canonical side configuration copied as exact evaluation-emitted bytes</td>
-</tr>
-<tr>
-<td><code>runtime.manifest.json</code></td>
-<td>Report/config/sidecar digests and strict per-side worker-container facts</td>
-</tr>
-</tbody>
-</table>
-<p>The evidence transaction copies these exact bytes. It does not regenerate
-sidecars in a way that could break their original runtime-manifest bindings.</p>
-<h2 id="publication-and-immutability">Publication and immutability<a class="headerlink" href="#publication-and-immutability" title="Permanent link">&para;</a></h2>
-<p>Evaluation writes a staging directory, flushes files to disk, signs the manifest, and
-atomically renames the directory into place. It never replaces an existing
-destination. Published files are read-only and directories are non-writable.</p>
-<p>Filesystem permissions are a local hardening measure, not the integrity model.
-Any later byte change, missing file, or extra file is detected by strict
-verification. Verification receipts and rendered HTML must remain outside the
-bundle so the bundle can stay byte-identical.</p>
-<h2 id="external-outputs">External outputs<a class="headerlink" href="#external-outputs" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Output</th>
-<th>Produced by</th>
-<th>May be written inside pack?</th>
-<th>Trust meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Signed verification receipt</td>
-<td><code>invarlock verify</code></td>
-<td>No</td>
-<td>Independent verifier assertion over manifest, anchors, and verdict</td>
-</tr>
-<tr>
-<td>Console report</td>
-<td><code>invarlock report</code></td>
-<td>Not a file</td>
-<td>Human rendering of signature-authenticated canonical content</td>
-</tr>
-<tr>
-<td>Self-contained HTML</td>
-<td><code>invarlock report --html</code></td>
-<td>No</td>
-<td>Unsigned presentation; not independent acceptance</td>
-</tr>
-</tbody>
-</table>
-<p>Multiple verifiers can issue separate receipts for the same immutable manifest.
-They can use distinct verifier identities and keys. Each must independently
-supply the expected artifact, schedule, policy, runtime, and evidence-signer
-anchors. The policy bytes must match the policy material already bound by the
-pack; a different policy requires a newly evaluated evidence bundle.</p>
+<p>Evidence format versions are independent of package versions. A package update
+may preserve an existing format exactly; a breaking artifact interpretation
+requires a new format identifier and explicit reader support.</p>
+<h2 id="reproducibility-boundaries">Reproducibility boundaries<a class="headerlink" href="#reproducibility-boundaries" title="Permanent link">&para;</a></h2>
+<p>The workflow proves that its uploaded distributions came from one selected
+release commit under the recorded build workflow. It does not claim bit-for-bit
+reproducibility across arbitrary builders. Operators needing that stronger
+property must independently rebuild the same source, control the full build
+environment, and compare each wheel and source-distribution digest.</p>
+<p>Likewise, installing a verified wheel does not validate a runtime image. OCI
+image digests, provider/backend identities, model artifacts, schedules, and
+evidence signatures remain separate dependency chains checked by evaluation and
+verification.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../contracts/">Public contracts</a> defines the manifest schema, canonical JSON,
-  and digest rules.</li>
-<li><a href="../reports/">Reports and receipts</a> defines the report and external receipt
-  carried by or associated with a bundle.</li>
-<li><a href="../lifecycle/">Evaluation lifecycle</a> explains atomic publication and failure
-  boundaries.</li>
-<li><a href="../architecture/">Architecture</a> places the artifact inventory within the
-  evidence-signer-verifier trust model.</li>
+<li><a href="../runtime-providers/">Runtime providers</a> defines provider ABI compatibility
+  and first-party add-in conformance.</li>
+<li><a href="../contracts/">Public contracts</a> separates evidence-format versioning from
+  package releases.</li>
+<li><a href="../architecture/">Architecture</a> distinguishes distribution provenance from
+  evidence creation and independent acceptance.</li>
+<li><a href="../environment/">Environment variables</a> lists the runtime-image and native
+  resource inputs checked after installation.</li>
 </ul>
 
 

@@ -168,3 +168,143 @@ mark {
   background-color: rgba(95, 202, 172, 0.32);
   color: var(--invarlock-cream);
 }
+
+.invarlock-hero {
+  border-bottom: 1px solid var(--invarlock-structure);
+  margin: 0 0 2.2rem;
+  padding: 1.2rem 0 2.1rem;
+  text-align: center;
+}
+
+.invarlock-hero__mark {
+  display: block;
+  height: auto;
+  margin: 0 auto 1.2rem;
+  max-width: min(31rem, 82%);
+}
+
+.invarlock-hero h1 {
+  border: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  margin: 0 auto 0.8rem;
+  max-width: 22ch;
+  padding: 0;
+}
+
+.invarlock-hero__kicker {
+  color: var(--invarlock-teal);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.7rem;
+  text-transform: uppercase;
+}
+
+.invarlock-hero__lead {
+  color: var(--md-default-fg-color--light);
+  font-size: 1.05rem;
+  line-height: 1.65;
+  margin: 0 auto 1.35rem;
+  max-width: 50rem;
+}
+
+.invarlock-hero__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  justify-content: center;
+}
+
+.invarlock-path-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1.25rem 0 2rem;
+}
+
+.invarlock-path {
+  background: linear-gradient(145deg, rgba(23, 43, 37, 0.88), rgba(13, 23, 20, 0.9));
+  border: 1px solid var(--invarlock-structure);
+  border-radius: 0.7rem;
+  padding: 1.2rem 1.25rem;
+}
+
+.invarlock-path h3 {
+  color: var(--invarlock-teal);
+  margin: 0 0 0.45rem;
+}
+
+.invarlock-path p {
+  color: var(--md-default-fg-color--light);
+  margin: 0 0 0.75rem;
+}
+
+.invarlock-path a {
+  font-weight: 700;
+}
+
+.invarlock-transaction {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 1.4rem 0 2rem;
+}
+
+.invarlock-transaction__step {
+  border: 1px solid var(--invarlock-structure);
+  min-height: 10rem;
+  padding: 1.1rem;
+  position: relative;
+}
+
+.invarlock-transaction__step:first-child {
+  border-radius: 0.7rem 0 0 0.7rem;
+}
+
+.invarlock-transaction__step:last-child {
+  border-radius: 0 0.7rem 0.7rem 0;
+}
+
+.invarlock-transaction__number {
+  color: var(--invarlock-copper);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.invarlock-transaction__step code {
+  color: var(--invarlock-teal);
+  font-size: 0.85rem;
+}
+
+.invarlock-transaction__step p {
+  color: var(--md-default-fg-color--light);
+  margin-bottom: 0;
+}
+
+.invarlock-doc-map {
+  border-left: 3px solid var(--invarlock-teal-deep);
+  margin: 1.4rem 0;
+  padding: 0.15rem 0 0.15rem 1rem;
+}
+
+@media screen and (max-width: 52rem) {
+  .invarlock-path-grid,
+  .invarlock-transaction {
+    grid-template-columns: 1fr;
+  }
+
+  .invarlock-transaction__step:first-child {
+    border-radius: 0.7rem 0.7rem 0 0;
+  }
+
+  .invarlock-transaction__step:last-child {
+    border-radius: 0 0 0.7rem 0.7rem;
+  }
+}

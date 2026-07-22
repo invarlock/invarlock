@@ -1,0 +1,121 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1600"
+  height="760"
+  viewBox="0 0 1600 760"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">InvarLock evidence dependency map</title>
+  <desc id="desc">
+    Bound request inputs, runtime sidecars, and one ordered schedule
+    feed paired records and the canonical report. Checksums and references feed
+    the signed evidence manifest. Independent trust anchors and the manifest
+    then feed a separately signed verification receipt.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="8.25"
+      refY="5"
+      markerWidth="6.7"
+      markerHeight="6.7"
+      orient="auto-start-reverse"
+    >
+      <path d="M 0.75 1 L 9.5 5 L 0.75 9 z" fill="#1b2b25" />
+    </marker>
+    <style>
+      .box-title {
+        fill: #1b2b25;
+        font: 700 24px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .box-text {
+        fill: #5a675f;
+        font: 17px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .mono {
+        fill: #1b2b25;
+        font: 17px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+      .input {
+        fill: #f3ecde;
+        stroke: #0f7669;
+        stroke-width: 3;
+      }
+      .evidence {
+        fill: #f3ecde;
+        stroke: #2d7a5f;
+        stroke-width: 3;
+      }
+      .trust {
+        fill: #f3ecde;
+        stroke: #b56a3d;
+        stroke-width: 3;
+      }
+      .arrow {
+        fill: none;
+        stroke: #1b2b25;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        marker-end: url(#arrow);
+      }
+      .label {
+        fill: #5a675f;
+        font: 700 18px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+    </style>
+  </defs>
+
+  <rect width="1600" height="760" fill="#f3ecde" />
+
+  <text x="90" y="58" class="label">BOUND INPUTS</text>
+  <rect x="90" y="82" width="390" height="106" rx="14" class="input" />
+  <text x="285" y="122" text-anchor="middle" class="box-title">Request inputs</text>
+  <text x="285" y="153" text-anchor="middle" class="box-text">baseline · subject · dataset · policy</text>
+
+  <rect x="605" y="82" width="390" height="106" rx="14" class="input" />
+  <text x="800" y="122" text-anchor="middle" class="box-title">Runtime sidecars</text>
+  <text x="800" y="153" text-anchor="middle" class="box-text">executed or imported · identity · observation · receipt</text>
+
+  <rect x="1120" y="82" width="390" height="106" rx="14" class="input" />
+  <text x="1315" y="122" text-anchor="middle" class="box-title">Ordered schedule</text>
+  <text x="1315" y="153" text-anchor="middle" class="box-text">record IDs · inputs · expected outputs</text>
+
+  <text x="90" y="280" class="label">DERIVED EVIDENCE</text>
+  <rect x="235" y="305" width="460" height="112" rx="14" class="evidence" />
+  <text x="465" y="347" text-anchor="middle" class="box-title">Paired records</text>
+  <text x="465" y="378" text-anchor="middle" class="box-text">replayable scores in schedule order</text>
+
+  <rect x="905" y="305" width="460" height="112" rx="14" class="evidence" />
+  <text x="1135" y="347" text-anchor="middle" class="box-title">Canonical report</text>
+  <text x="1135" y="378" text-anchor="middle" class="box-text">means · comparison · interval · threshold · verdict</text>
+
+  <path d="M 285 188 C 285 240 350 260 410 305" class="arrow" />
+  <path d="M 800 188 C 800 245 620 255 545 305" class="arrow" />
+  <path d="M 1315 188 C 1315 245 675 245 590 305" class="arrow" />
+  <path d="M 695 361 L 905 361" class="arrow" />
+
+  <text x="90" y="508" class="label">SIGNED BINDINGS</text>
+  <rect x="180" y="535" width="500" height="126" rx="14" class="evidence" />
+  <text x="430" y="577" text-anchor="middle" class="box-title">Signed evidence manifest</text>
+  <text x="430" y="609" text-anchor="middle" class="mono">references + checksums.sha256</text>
+  <text x="430" y="638" text-anchor="middle" class="box-text">binds one closed file inventory</text>
+
+  <rect x="750" y="535" width="340" height="126" rx="14" class="trust" />
+  <text x="920" y="577" text-anchor="middle" class="box-title">Trust anchors</text>
+  <text x="920" y="605" text-anchor="middle" class="box-text">policy bytes · schedule digest</text>
+  <text x="920" y="627" text-anchor="middle" class="box-text">artifact + runtime digests</text>
+  <text x="920" y="649" text-anchor="middle" class="box-text">signer fingerprints</text>
+
+  <rect x="1160" y="535" width="350" height="126" rx="14" class="trust" />
+  <text x="1335" y="577" text-anchor="middle" class="box-title">Signed receipt</text>
+  <text x="1335" y="609" text-anchor="middle" class="box-text">manifest + anchors + verdict</text>
+  <text x="1335" y="638" text-anchor="middle" class="box-text">separate from the immutable bundle</text>
+
+  <path d="M 465 417 C 465 465 430 485 430 535" class="arrow" />
+  <path d="M 1135 417 C 1135 475 635 480 570 535" class="arrow" />
+  <path d="M 680 557 C 845 470 1110 470 1250 535" class="arrow" />
+  <path d="M 1090 598 L 1160 598" class="arrow" />
+</svg>

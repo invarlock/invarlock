@@ -1,0 +1,2412 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/assurance/decision-semantics/">
+      
+      
+        <link rel="prev" href="../assurance-case/">
+      
+      
+        <link rel="next" href="../pairing-and-replay/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Decision semantics - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#decision-semantics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Decision semantics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#notation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-preconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared preconditions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-match-percentage-point-delta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact-match percentage-point delta
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-per-utf-8-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized NLL per UTF-8 byte
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Normalized NLL per UTF-8 byte">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#worked-normalized-nll-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked normalized-NLL example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derived-perplexity-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived perplexity interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-paired-resampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized-NLL paired resampling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorized-deterministic-scorer-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorized deterministic scorer extension
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifier-owned-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifier-owned replay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finite-schedule-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finite-schedule interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#notation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-preconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared preconditions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-match-percentage-point-delta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact-match percentage-point delta
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-per-utf-8-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized NLL per UTF-8 byte
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Normalized NLL per UTF-8 byte">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#worked-normalized-nll-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked normalized-NLL example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derived-perplexity-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived perplexity interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-paired-resampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized-NLL paired resampling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorized-deterministic-scorer-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorized deterministic scorer extension
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifier-owned-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifier-owned replay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finite-schedule-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finite-schedule interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="decision-semantics">Decision semantics<a class="headerlink" href="#decision-semantics" title="Permanent link">&para;</a></h1>
+<div class="admonition abstract">
+<p class="admonition-title">Assurance note</p>
+<p><strong>In plain language:</strong> InvarLock recomputes every score from authenticated
+paired records, derives the metric's paired interval, and applies the policy
+to the conservative bound. When the policy qualifies sample size and
+precision, those checks must pass too. A favorable point value cannot
+override a threshold, count, or width failure.</p>
+<p><strong>Question:</strong> How are a built-in metric or authorized deterministic scorer
+converted into a reproducible policy verdict?</p>
+<p><strong>Decision use:</strong> Use these definitions to review thresholds, reproduce
+canonical report arithmetic, and interpret a pass or fail at the boundary.</p>
+<p><strong>Evidence:</strong> Pinned local source identity, canonical schedule, provider
+observations, verifier-derived paired scores, exact policy bytes,
+independent artifact and schedule anchors, and the metric-specific paired
+interval recorded in the report.</p>
+</div>
+<p>InvarLock makes one decision over one authenticated, ordered, finite schedule.
+It reports a point comparison and a verifier-replayed paired interval. Exact
+match uses a paired Newcombe 95% effect-size interval. Normalized NLL and an
+authorized scorer extension use deterministic paired resampling over the
+authenticated schedule.</p>
+<p>New evaluations emit <code>invarlock/comparison-report-v2</code>. Strict verification
+continues to replay <code>invarlock/comparison-report-v1</code> with its original
+exact-match interval method, so signed legacy evidence keeps its original
+meaning.</p>
+<h2 id="notation">Notation<a class="headerlink" href="#notation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(n\)</span></td>
+<td>Number of scheduled records; <span class="arithmatex">\(1 \le n \le 10{,}000\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(i\)</span></td>
+<td>Schedule position, <span class="arithmatex">\(i \in \{1, \ldots, n\}\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(B\)</span>, <span class="arithmatex">\(S\)</span></td>
+<td>Baseline and subject sides</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(y_i\)</span></td>
+<td>Scheduled expected output for record <span class="arithmatex">\(i\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\hat{y}_{X,i}\)</span></td>
+<td>Authenticated output text for side <span class="arithmatex">\(X\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(L_{X,i}\)</span></td>
+<td>Authenticated sum of target-token log probabilities</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(u_i\)</span></td>
+<td>Positive UTF-8 byte count of <span class="arithmatex">\(y_i\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(w_i\)</span></td>
+<td>Positive target token count used only for a derived perplexity interpretation</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(x_{X,i}\)</span></td>
+<td>Verifier-derived record score for side <span class="arithmatex">\(X\)</span></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\bar{x}_X\)</span></td>
+<td>Arithmetic mean of side <span class="arithmatex">\(X\)</span> record scores</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\tau_{\Delta}\)</span></td>
+<td>Policy floor <code>exact_match.delta_min_pp</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\tau_{N}\)</span></td>
+<td>Policy ceiling <code>normalized_nll_per_utf8_byte.ratio_max</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\tau_{S}\)</span></td>
+<td>Policy floor <code>scorer_extension.delta_min_pp</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\([q_L,q_U]\)</span></td>
+<td>Metric-specific paired interval</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(n_{\min}\)</span></td>
+<td>Optional policy minimum <code>minimum_record_count</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(w_{\max}\)</span></td>
+<td>Optional policy maximum interval width in percentage points or ratio units</td>
+</tr>
+</tbody>
+</table>
+<h2 id="shared-preconditions">Shared preconditions<a class="headerlink" href="#shared-preconditions" title="Permanent link">&para;</a></h2>
+<p>Replay proceeds only when:</p>
+<ol>
+<li>the normalized request, source identity, and canonical schedule are bounded
+   and digest-authenticated;</li>
+<li>record IDs are unique and both observations have exactly the schedule IDs
+   in schedule order;</li>
+<li>each observed <code>input_sha256</code> matches the corresponding scheduled input;</li>
+<li>every selected observation record has <code>status: ok</code>;</li>
+<li>provider, artifact, observation, schedule, runtime, report, and request
+   bindings are internally consistent;</li>
+<li>the schedule and both providers declare the selected task and provider
+   collection metric;</li>
+<li>the verifier's independently supplied baseline artifact, subject artifact,
+   and canonical schedule digests match the identities bound into the signed
+   evidence; and</li>
+<li>the verifier's policy bytes have the same digest as the policy bound into
+   the signed evidence.</li>
+</ol>
+<p>Failure of a precondition is a verification error, not a poor metric score.
+InvarLock does not impute, discard, reorder, or average around an invalid record.</p>
+<h2 id="exact-match-percentage-point-delta">Exact-match percentage-point delta<a class="headerlink" href="#exact-match-percentage-point-delta" title="Permanent link">&para;</a></h2>
+<p>For each side and scheduled record:</p>
+<div class="arithmatex">\[
+x_{X,i} = \mathbf{1}\!\left[\hat{y}_{X,i}=y_i\right].
+\]</div>
+<p>Equality is literal Unicode string equality. It does not trim whitespace,
+case-fold, normalize, parse an answer, or compare token sequences.</p>
+<p>The side means and point comparison are:</p>
+<div class="arithmatex">\[
+\bar{x}_X = \frac{1}{n}\sum_{i=1}^{n}x_{X,i},
+\qquad
+\Delta_{\mathrm{pp}} =
+100\left(\bar{x}_S-\bar{x}_B\right).
+\]</div>
+<p>The report records <code>comparison.value =</code> <span class="arithmatex">\(\Delta_{\mathrm{pp}}\)</span>. The policy is:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;exact_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;delta_min_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">-2.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;maximum_interval_width_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The verdict uses the interval lower bound:</p>
+<div class="arithmatex">\[
+\operatorname{pass}_{\mathrm{EM}}
+\iff q_L \ge \tau_{\Delta}
+\land n \ge n_{\min}
+\land (q_U-q_L) \le w_{\max}.
+\]</div>
+<p>The boundary is inclusive. <code>delta_min_pp</code> is an absolute percentage-point floor,
+not a relative percentage and not a floor applied only to the point estimate.
+The count and width terms apply only when the policy supplies both coupled
+fields; without them, the threshold-only policy remains valid.</p>
+<p>For every pair, InvarLock also classifies the two binary outcomes:</p>
+<ul>
+<li>baseline pass and subject fail: a regression;</li>
+<li>baseline fail and subject pass: an improvement;</li>
+<li>both pass; or</li>
+<li>both fail.</li>
+</ul>
+<p>If <span class="arithmatex">\(r\)</span> is the regression count and <span class="arithmatex">\(g\)</span> is the improvement count, then
+<span class="arithmatex">\(\Delta_{\mathrm{pp}}=100(g-r)/n\)</span>. The report records all four counts, the
+number of discordant pairs <span class="arithmatex">\(r+g\)</span>, and the exact two-sided McNemar probability
+conditional on those discordant pairs. The McNemar result describes evidence
+of asymmetry between regressions and improvements; it does not control the
+acceptance verdict.</p>
+<p>The exact-match interval is a paired Newcombe hybrid-score 95% interval for
+the subject-minus-baseline effect. The current v2 report uses the
+continuity-corrected method:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;newcombe_hybrid_score_paired_v2&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scope&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;paired_binary_outcomes&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;interval_mass&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;lower&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">-1.8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upper&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.7</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The policy reads <code>lower</code>; the point delta and McNemar probability cannot
+override a lower bound below <code>delta_min_pp</code>.</p>
+<p>For a signed v1 report, strict replay instead requires
+<code>newcombe_hybrid_score_paired_v1</code> and reconstructs the legacy result exactly.
+It does not apply the v2 calculation to old evidence.</p>
+<h2 id="normalized-nll-per-utf-8-byte">Normalized NLL per UTF-8 byte<a class="headerlink" href="#normalized-nll-per-utf-8-byte" title="Permanent link">&para;</a></h2>
+<p>For each side and record, the provider performs teacher-forced scoring of the
+authenticated expected continuation and supplies finite <span class="arithmatex">\(L_{X,i}\)</span> and positive
+byte count <span class="arithmatex">\(u_i\)</span>. Prompt tokens are excluded from the target loss. The verifier
+requires the byte count to equal the UTF-8 length of the authenticated scheduled
+target, then derives:</p>
+<div class="arithmatex">\[
+x_{X,i} = -\frac{L_{X,i}}{u_i}.
+\]</div>
+<p>Every derived value must be finite and nonnegative. The side means use equal
+record weight:</p>
+<div class="arithmatex">\[
+\bar{x}_X = \frac{1}{n}\sum_{i=1}^{n}x_{X,i}.
+\]</div>
+<p>The baseline mean must be positive. The point ratio is:</p>
+<div class="arithmatex">\[
+R_{\mathrm{NLL}} = \frac{\bar{x}_S}{\bar{x}_B}.
+\]</div>
+<p>The policy is:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;normalized_nll_per_utf8_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;maximum_interval_width_ratio&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.05</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;ratio_max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.05</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The verdict uses the interval upper bound:</p>
+<div class="arithmatex">\[
+\operatorname{pass}_{\mathrm{NLL}}
+\iff q_U \le \tau_N
+\land n \ge n_{\min}
+\land (q_U-q_L) \le w_{\max}.
+\]</div>
+<p>This statistic is a ratio of arithmetic means of per-record normalized scores.
+It is not pooled NLL, a byte-weighted mean, token-weighted mean, or perplexity.
+Each selected record contributes one score regardless of target length.
+It measures expected-continuation likelihood regression under the authenticated
+prompt, target, provider, and runtime; it is not a general model-quality score.</p>
+<p>The count and ratio-width terms apply only when their coupled policy fields are
+present. Their pass does not establish that the schedule represents a broader
+population.</p>
+<h3 id="worked-normalized-nll-example">Worked normalized-NLL example<a class="headerlink" href="#worked-normalized-nll-example" title="Permanent link">&para;</a></h3>
+<p>Suppose two authenticated records yield:</p>
+<table>
+<thead>
+<tr>
+<th>Record</th>
+<th style="text-align: right;">Baseline <span class="arithmatex">\(x_{B,i}\)</span></th>
+<th style="text-align: right;">Subject <span class="arithmatex">\(x_{S,i}\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td style="text-align: right;"><span class="arithmatex">\(-(-5)/10 = 0.5\)</span></td>
+<td style="text-align: right;"><span class="arithmatex">\(-(-5.5)/10 = 0.55\)</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align: right;"><span class="arithmatex">\(-(-20)/20 = 1.0\)</span></td>
+<td style="text-align: right;"><span class="arithmatex">\(-(-22)/20 = 1.1\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>Then <span class="arithmatex">\(\bar{x}_B=0.75\)</span>, <span class="arithmatex">\(\bar{x}_S=0.825\)</span>, and the point ratio is <span class="arithmatex">\(1.1\)</span>.
+That point fails a <code>ratio_max</code> of <code>1.05</code>; even when a point ratio is below the
+ceiling, the canonical verdict still fails if its interval upper bound exceeds
+<code>1.05</code>.</p>
+<h2 id="derived-perplexity-interpretation">Derived perplexity interpretation<a class="headerlink" href="#derived-perplexity-interpretation" title="Permanent link">&para;</a></h2>
+<p>For a normalized-NLL comparison, the verifier may also derive a token-weighted
+perplexity ratio when both sides bind one matching authenticated tokenizer
+contract and report the same positive target token count <span class="arithmatex">\(w_i\)</span> for every pair.
+It derives token-normalized record NLL:</p>
+<div class="arithmatex">\[
+x_{X,i} = -\frac{L_{X,i}}{w_i}.
+\]</div>
+<p>The token-weighted mean NLL and side perplexity are:</p>
+<div class="arithmatex">\[
+\mu_X^{(w)} =
+\frac{\sum_{i=1}^{n}w_i x_{X,i}}{\sum_{i=1}^{n}w_i},
+\qquad
+P_X = \exp\!\left(\mu_X^{(w)}\right).
+\]</div>
+<p>The derived ratio is:</p>
+<div class="arithmatex">\[
+R_{\mathrm{PPL}} = \frac{P_S}{P_B}
+= \exp\!\left(\mu_S^{(w)}-\mu_B^{(w)}\right).
+\]</div>
+<p>The canonical <code>derived_measurements.perplexity_ratio</code> object records the
+authenticated likelihood basis, method, tokenizer digest, total target-token
+count, both side perplexities, and the ratio. If tokenizer contracts differ,
+token counts are unavailable or unequal, or exponentiation is non-finite, the
+object records a deterministic unavailable reason instead.</p>
+<p>This interpretation is not a selectable metric. It has no policy threshold,
+confidence interval, or verdict authority. Acceptance continues to use the
+normalized-NLL ratio and its schedule-resampling interval.</p>
+<h2 id="normalized-nll-paired-resampling">Normalized-NLL paired resampling<a class="headerlink" href="#normalized-nll-paired-resampling" title="Permanent link">&para;</a></h2>
+<p>The report's uncertainty object is fixed:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;paired_percentile_bootstrap_sha256_v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scope&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;authenticated_schedule&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;interval_mass&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;replicates&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2048</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;lower&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.98</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upper&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.04</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Let <span class="arithmatex">\(d\)</span> be the 32 bytes represented by the canonical schedule's lowercase
+SHA-256. For replicate <span class="arithmatex">\(r \in \{0,\ldots,2047\}\)</span> and draw
+<span class="arithmatex">\(j \in \{0,\ldots,n-1\}\)</span>, InvarLock computes:</p>
+<div class="arithmatex">\[
+h_{r,j} = \operatorname{SHA256}
+\left(d\,\|\,\operatorname{u64be}(r)\,\|\,\operatorname{u64be}(j)\right),
+\]</div>
+<p>and selects index:</p>
+<div class="arithmatex">\[
+k_{r,j} = \operatorname{u64be}\!\left(h_{r,j}[0:8]\right) \bmod n.
+\]</div>
+<p>The baseline and subject normalized-NLL scores at <span class="arithmatex">\(k_{r,j}\)</span> are drawn together.
+InvarLock recomputes the complete ratio for each replicate, sorts the 2,048 values, and
+uses linearly interpolated percentiles at <span class="arithmatex">\(0.025\)</span> and <span class="arithmatex">\(0.975\)</span>. When <span class="arithmatex">\(n=1\)</span>, the
+interval is the point value.</p>
+<p>This construction provides:</p>
+<ul>
+<li>deterministic replay without a platform PRNG;</li>
+<li>pairing preservation under every draw;</li>
+<li>a versioned algorithm and fixed replicate count; and</li>
+<li>a conservative bound that directly controls the policy verdict.</li>
+</ul>
+<p>It does not provide random-sample provenance. The SHA-256-derived index stream
+makes replay deterministic; it does not make the original selected schedule a
+probability sample.</p>
+<h2 id="authorized-deterministic-scorer-extension">Authorized deterministic scorer extension<a class="headerlink" href="#authorized-deterministic-scorer-extension" title="Permanent link">&para;</a></h2>
+<p>A request may select one closed <code>scorer_extension</code> binding instead of a
+built-in metric. For every side and record, the provider authenticates exactly
+the scheduled expected output, output text, and output digest. The explicitly
+authorized scorer replays those facts and returns:</p>
+<div class="arithmatex">\[
+0 \le x_{X,i} \le 1,
+\]</div>
+<p>where larger values are always better. The scorer does not own aggregation or
+policy arithmetic. The core computes:</p>
+<div class="arithmatex">\[
+\bar{x}_X = \frac{1}{n}\sum_{i=1}^{n}x_{X,i},
+\qquad
+\Delta_{S,\mathrm{pp}} =
+100\left(\bar{x}_S-\bar{x}_B\right).
+\]</div>
+<p>The independent policy pins the exact scorer identity and configuration:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;scorer_extension&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;scorer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example.token_f1&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;scorer_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;descriptor_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5555555555555555555555555555555555555555555555555555555555555555&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;configuration_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6666666666666666666666666666666666666666666666666666666666666666&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;delta_min_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">-2.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;maximum_interval_width_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The scorer runs twice during replay and both canonical results must match. The
+core then applies the fixed 2,048-replicate paired schedule-resampling method
+defined above to the paired unit-interval values. The verdict is:</p>
+<div class="arithmatex">\[
+\operatorname{pass}_{S}
+\iff q_L \ge \tau_S
+\land n \ge n_{\min}
+\land (q_U-q_L) \le w_{\max}.
+\]</div>
+<p>Potential separately implemented scorers include deterministic token F1,
+structured-field extraction, and VQA answer normalization. The scorer-extension v1 contract
+does not admit SQL or code execution, model-based semantic similarity, network
+services, human judgment, external models, or LLM judges. Judge outputs may be
+authenticated observations, but observations do not enter acceptance.</p>
+<p>For every metric, the sample controls are optional but indivisible. Exact
+match and scorer extensions use <code>maximum_interval_width_pp</code>, whose value must
+be positive and no greater than 200. Normalized NLL uses positive
+<code>maximum_interval_width_ratio</code>. <code>minimum_record_count</code> is an integer from 1
+through 10,000. The canonical v2 report records the minimum, maximum, observed
+values, units, individual results, and combined <code>sample_qualification.passed</code>.</p>
+<h2 id="verifier-owned-replay">Verifier-owned replay<a class="headerlink" href="#verifier-owned-replay" title="Permanent link">&para;</a></h2>
+<p>The evidence signer cannot supply an accepted aggregate directly. Verification:</p>
+<ul>
+<li>reconstructs the canonical schedule and record order;</li>
+<li>derives exact-match or normalized-NLL record scores from authenticated facts,
+  or requires an explicitly authorized scorer and replays it twice;</li>
+<li>derives paired exact-match counts, exact McNemar probability, and the
+  Newcombe interval, or the normalized-NLL or scorer-extension
+  schedule-resampling interval;</li>
+<li>derives a perplexity interpretation only when tokenizer and token-count facts
+  are comparable;</li>
+<li>reconstructs canonical paired records;</li>
+<li>recomputes side means, point comparison, the selected interval, threshold
+  application, optional count/width qualification, and verdict; and</li>
+<li>requires canonical equality with the stored report.</li>
+</ul>
+<p>The implementation is in
+<a href="https://github.com/invarlock/invarlock/blob/main/src/invarlock/evidence_pack_contract.py"><code>build_comparison_report</code></a>,
+and independent replay is in
+<a href="https://github.com/invarlock/invarlock/blob/main/src/invarlock/evidence_pack_verification.py"><code>verify_comparison_evidence</code></a>.</p>
+<h2 id="finite-schedule-interpretation">Finite-schedule interpretation<a class="headerlink" href="#finite-schedule-interpretation" title="Permanent link">&para;</a></h2>
+<p>A pass means that the policy's conservative bound cleared its threshold and
+any configured count and width requirements passed for the authenticated
+records and runtime configuration. It does not establish:</p>
+<ul>
+<li>equality, equivalence, or non-inferiority in a broader population;</li>
+<li>representativeness of the selected prompts or targets;</li>
+<li>statistical power for a separately defined hypothesis;</li>
+<li>safety, robustness, fairness, or general model quality;</li>
+<li>execution attestation from a runtime-image digest; or</li>
+<li>immunity to repeated tuning or best-run selection bias.</li>
+</ul>
+<p>Where population inference is necessary, define and precommit a sampling and
+statistical protocol outside InvarLock and retain that evidence separately. Do
+not extend either paired interval beyond the authenticated schedule without
+those assumptions.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc3629">RFC 3629: UTF-8, a transformation format of ISO 10646</a>, Internet Standard, 2003.</li>
+<li>McNemar, Q., <a href="https://doi.org/10.1007/BF02295996">Note on the sampling error of the difference between correlated
+  proportions or percentages</a>,
+  <em>Psychometrika</em> 12, 153–157, 1947.</li>
+<li>Newcombe, R. G., <a href="https://pubmed.ncbi.nlm.nih.gov/9839354/">Improved confidence intervals for the difference between
+  binomial proportions based on paired data</a>,
+  <em>Statistics in Medicine</em> 17(22), 2635–2650, 1998.</li>
+<li>National Institute of Standards and Technology,
+  <a href="https://doi.org/10.6028/NIST.AI.100-1">Artificial Intelligence Risk Management Framework 1.0</a>,
+  2023.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

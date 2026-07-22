@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/artifacts/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/lifecycle/">
       
       
-        <link rel="prev" href="../api-guide/">
+        <link rel="prev" href="../environment/">
       
       
-        <link rel="next" href="../reports/">
+        <link rel="next" href="../release-verification/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Artifacts - InvarLock Documentation</title>
+        <title>Lifecycle - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#evidence-artifacts" class="md-skip">
+        <a href="#evaluation-lifecycle-and-failure-boundaries" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Artifacts
+              Lifecycle
             
           </span>
         </div>
@@ -1163,37 +1163,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artifacts
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -1209,114 +1182,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#manifest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manifest
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#checksums-and-closed-inventory" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Checksums and closed inventory
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#paired-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Paired records
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#provider-sidecars" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider sidecars
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#publication-and-immutability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Publication and immutability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#external-outputs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        External outputs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1438,10 +1303,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../lifecycle/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1457,6 +1349,153 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-load-the-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Load the request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-execute-or-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Execute or import
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Execute or import">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-derive-the-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Derive the comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-publish-once" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Publish once
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-verify-independently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Verify independently
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-render-the-authenticated-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Render the authenticated report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure classification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transaction-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction outputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1725,10 +1764,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
+  <a href="#1-load-the-request" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Directory layout
+        1. Load the request
       
     </span>
   </a>
@@ -1736,10 +1775,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#manifest" class="md-nav__link">
+  <a href="#2-execute-or-import" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Manifest
+        2. Execute or import
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Execute or import">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-derive-the-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Derive the comparison
       
     </span>
   </a>
@@ -1747,10 +1825,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#checksums-and-closed-inventory" class="md-nav__link">
+  <a href="#4-publish-once" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Checksums and closed inventory
+        4. Publish once
       
     </span>
   </a>
@@ -1758,10 +1836,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#paired-records" class="md-nav__link">
+  <a href="#5-verify-independently" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Paired records
+        5. Verify independently
       
     </span>
   </a>
@@ -1769,10 +1847,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#provider-sidecars" class="md-nav__link">
+  <a href="#6-render-the-authenticated-report" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Provider sidecars
+        6. Render the authenticated report
       
     </span>
   </a>
@@ -1780,10 +1858,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#publication-and-immutability" class="md-nav__link">
+  <a href="#failure-classification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Publication and immutability
+        Failure classification
       
     </span>
   </a>
@@ -1791,10 +1869,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#external-outputs" class="md-nav__link">
+  <a href="#transaction-outputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        External outputs
+        Transaction outputs
       
     </span>
   </a>
@@ -1832,366 +1910,282 @@
   
 
 
-<h1 id="evidence-artifacts">Evidence artifacts<a class="headerlink" href="#evidence-artifacts" title="Permanent link">&para;</a></h1>
-<p>An <code>invarlock/evidence-pack-v1</code> bundle is a closed, signed evidence directory. Its paths
-are fixed by the manifest schema; additional files are rejected in strict
-verification.</p>
+<h1 id="evaluation-lifecycle-and-failure-boundaries">Evaluation lifecycle and failure boundaries<a class="headerlink" href="#evaluation-lifecycle-and-failure-boundaries" title="Permanent link">&para;</a></h1>
+<p>The evaluate, verify, and report transactions have deliberately separate read
+and write boundaries.</p>
 <div class="admonition info">
 <p class="admonition-title">Reference</p>
 <ul>
-<li><strong>Surface:</strong> <code>invarlock/evidence-pack-v1</code> directory, manifest, payload inventory, and external outputs</li>
-<li><strong>Stability:</strong> Versioned public artifact contract; fixed paths and closed inventory are verification requirements</li>
-<li><strong>Use this page when:</strong> Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim</li>
+<li><strong>Surface:</strong> Transaction stages, write boundaries, failure classification, and outputs</li>
+<li><strong>Stability:</strong> Behavioral contract for public evaluate, verify, and report transactions</li>
+<li><strong>Use this page when:</strong> Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure</li>
 </ul>
 </div>
-<p><img alt="Evidence dependency map" src="../../assets/reference-evidence-dependency.svg" /></p>
-<h2 id="directory-layout">Directory layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>evidence/
-├── manifest.json
-├── manifest.signature.json
-├── checksums.sha256
-├── request.json
-├── inputs/
-│   ├── baseline.json
-│   ├── subject.json
-│   ├── dataset.json
-│   ├── baseline_runtime.json
-│   ├── subject_runtime.json
-│   └── policy.json
-├── schedule/
-│   └── runtime-behavioral-schedule.json
-├── records/
-│   └── paired-records.json
-├── reports/
-│   └── evaluation.report.json
-├── runs/
-│   ├── baseline/report.json
-│   └── subject/report.json
-└── providers/
-    ├── baseline/
-    │   ├── run.yaml
-    │   ├── runtime.manifest.json
-    │   ├── model-artifact.identity.json
-    │   ├── runtime-provider.receipt.json
-    │   └── runtime-scoring.observation.json
-    └── subject/
-        └── ...the same five files...
+<div class="codehilite"><pre><span></span><code>request parsed
+  -&gt; inputs authenticated
+  -&gt; JSONL prepared or canonical schedule imported
+  -&gt; runtime integrations executed or sidecars imported
+  -&gt; pairs, interval, and report re-derived
+  -&gt; candidate pack validated
+  -&gt; manifest signed
+  -&gt; destination published once
+  -&gt; independently verified
+  -&gt; optionally rendered
 </code></pre></div>
 
-<p><code>inputs/*.json</code> are identity records, not copies of model weights, the dataset,
-or the policy. Each carries a material digest and may carry a stable locator or
-media type. The exact normalized request, schedule, provider material, paired
-records, and canonical report are separate payloads referenced by the manifest.</p>
-<table>
-<thead>
-<tr>
-<th>Path or group</th>
-<th>Cardinality</th>
-<th>Authority in replay</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>request.json</code></td>
-<td>One</td>
-<td>Normalized evaluation intent; never substitutes for independent verifier anchors</td>
-</tr>
-<tr>
-<td><code>inputs/*.json</code></td>
-<td>Six</td>
-<td>Role-specific identity records and material digests</td>
-</tr>
-<tr>
-<td><code>schedule/*.json</code></td>
-<td>One</td>
-<td>Ordered dataset records and expected outputs</td>
-</tr>
-<tr>
-<td><code>providers/{side}/*</code></td>
-<td>Five per side</td>
-<td>Artifact, observation, provider, configuration, and runtime provenance</td>
-</tr>
-<tr>
-<td><code>runs/{side}/report.json</code></td>
-<td>One per side</td>
-<td>Minimal side-to-observation binding</td>
-</tr>
-<tr>
-<td><code>records/paired-records.json</code></td>
-<td>One</td>
-<td>Verifier-reproducible record scores; not an accepted aggregate</td>
-</tr>
-<tr>
-<td><code>reports/evaluation.report.json</code></td>
-<td>One</td>
-<td>Canonical means, comparison, paired interval, threshold, optional sample qualification, and verdict reproduced by verification</td>
-</tr>
-<tr>
-<td><code>observations/*.json</code></td>
-<td>Zero to 64</td>
-<td>Authenticated typed context; descriptive only and excluded from policy replay</td>
-</tr>
-<tr>
-<td><code>checksums.sha256</code></td>
-<td>One</td>
-<td>Exact payload-byte inventory</td>
-</tr>
-<tr>
-<td><code>manifest.json</code> and signature</td>
-<td>One each</td>
-<td>Closed references and signer authentication</td>
-</tr>
-</tbody>
-</table>
-<h2 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h2>
-<p><code>manifest.json</code> contains exactly:</p>
+<p>Only the publication transition creates the evidence directory. A failure at
+an earlier transition leaves no partial public destination.</p>
+<h2 id="1-load-the-request">1. Load the request<a class="headerlink" href="#1-load-the-request" title="Permanent link">&para;</a></h2>
+<p>The request loader:</p>
 <ul>
-<li><code>format</code> and deterministic <code>comparison_id</code>;</li>
-<li>six input references: baseline, subject, dataset, both runtimes, and policy;</li>
-<li>fifteen evidence-role references at their fixed paths;</li>
-<li>the paired-record path, digest, and count;</li>
-<li>optional typed observation references with fixed paths, digests, kinds, and scopes;</li>
-<li>the checksum-file path and digest; and</li>
-<li>the evidence-signing key fingerprint.</li>
+<li>accepts one JSON-compatible YAML object no larger than 1 MiB;</li>
+<li>rejects aliases, tags, duplicate keys, merge keys, include-like directives,
+  non-canonical scalars, excessive depth, and excessive node count;</li>
+<li>anchors every file reference beneath the real request directory;</li>
+<li>rejects absolute, URL, traversal, backslash, symbolic-link, and unsafe path
+  components; and</li>
+<li>checks provider availability and metric capability.</li>
 </ul>
-<p>Every input reference has a digest of the identity file and a distinct
-<code>material_digest</code> for the authenticated input. Every evidence reference has a
-digest of the exact file bytes.</p>
-<p>The manifest structure is equivalent to this abbreviated, non-copyable view:</p>
-<div class="codehilite"><pre><span></span><code>{
-  &quot;format&quot;: &quot;invarlock/evidence-pack-v1&quot;,
-  &quot;comparison_id&quot;: &quot;...&quot;,
-  &quot;inputs&quot;: {
-    &quot;baseline&quot;: {
-      &quot;path&quot;: &quot;inputs/baseline.json&quot;,
-      &quot;digest&quot;: &quot;sha256:...&quot;,
-      &quot;material_digest&quot;: &quot;sha256:...&quot;
-    },
-    &quot;subject&quot;: { ... },
-    &quot;dataset&quot;: { ... },
-    &quot;baseline_runtime&quot;: { ... },
-    &quot;subject_runtime&quot;: { ... },
-    &quot;policy&quot;: { ... }
-  },
-  &quot;evidence&quot;: {
-    &quot;request&quot;: {&quot;path&quot;: &quot;request.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;schedule&quot;: {&quot;path&quot;: &quot;schedule/runtime-behavioral-schedule.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;evaluation_report&quot;: {&quot;path&quot;: &quot;reports/evaluation.report.json&quot;, &quot;digest&quot;: &quot;sha256:...&quot;},
-    &quot;...&quot;: &quot;twelve additional fixed evidence roles&quot;
-  },
-  &quot;paired_records&quot;: {
-    &quot;path&quot;: &quot;records/paired-records.json&quot;,
-    &quot;digest&quot;: &quot;sha256:...&quot;,
-    &quot;count&quot;: 20
-  },
-  &quot;checksums_sha256&quot;: &quot;checksums.sha256&quot;,
-  &quot;checksums_sha256_digest&quot;: &quot;...bare sha256...&quot;,
-  &quot;signing_key_fingerprint&quot;: &quot;sha256:...&quot;
-}
-</code></pre></div>
-
-<p>The real object has no comments, ellipses, or abbreviated roles. It has exactly
-six input references and fifteen evidence references at schema-fixed paths.</p>
-<p><code>manifest.signature.json</code> embeds the Ed25519 public key, its fingerprint, and a
-base64 signature over the exact canonical <code>manifest.json</code> bytes. The public key
-is evidence of who signed only after its fingerprint is matched to an
-independent expected signer.</p>
+<p>The transaction repeats no-follow reads later and detects inputs that change
+while being read. Request validation is therefore not the only filesystem
+check.</p>
+<h2 id="2-execute-or-import">2. Execute or import<a class="headerlink" href="#2-execute-or-import" title="Permanent link">&para;</a></h2>
+<h3 id="run-mode">Run mode<a class="headerlink" href="#run-mode" title="Permanent link">&para;</a></h3>
+<p>Run mode requires an artifact <code>path</code> for each side and a digest-pinned local
+JSONL dataset object. InvarLock preserves source order, resolves or derives
+record IDs, authenticates each input, and prepares the canonical schedule. The
+caller supplies runtime resources separately from the request. The host CLI
+launches one independently pinned Docker or Podman worker for each side. Each
+worker receives only its read-only job, canonical schedule, artifact, and
+closed support resources, plus one isolated writable output directory. It emits
+a report, runtime manifest, artifact identity, provider receipt, scoring
+observation, and canonical runtime configuration. The host authenticates those
+six files before deriving or signing the comparison.</p>
+<p>If either side cannot produce complete strict evidence, the overall evidence
+destination is not published.</p>
+<p>For each side, provider execution follows one lifecycle:</p>
+<ol>
+<li>validate the closed runtime spec;</li>
+<li>authenticate the artifact and caller-owned resources;</li>
+<li>open a session inside the strict runtime context;</li>
+<li>score the canonical schedule in order;</li>
+<li>obtain a provider receipt bound to the completed observation;</li>
+<li>write and authenticate the side report and runtime manifest; and</li>
+<li>close the session on success or failure.</li>
+</ol>
+<p>Two CPU workers may run in parallel. Two workers assigned to different explicit
+CUDA indexes may also run in parallel. Generic CUDA selection, the same explicit
+CUDA index, and a CPU/CUDA pair run sequentially to avoid GPU contention.
+Pairing depends on the authenticated schedule and record IDs, not on worker
+concurrency.</p>
+<h3 id="import-mode">Import mode<a class="headerlink" href="#import-mode" title="Permanent link">&para;</a></h3>
+<p>Import mode requires, for both sides, an artifact identity, provider receipt,
+scoring observation, runtime-side report, runtime manifest, and runtime config.
+It also requires the canonical schedule and paired-record file.</p>
+<p>The engine does not trust imported aggregates. It reproduces artifact identity
+from the request/provider, authenticates receipt and runtime bindings, derives
+paired records from observations and the schedule, and requires the imported
+paired file to be canonical and exactly equal to that derivation.</p>
+<p>Run and import therefore converge on the same bundle and verifier semantics.</p>
 <table>
 <thead>
 <tr>
-<th>Signature field</th>
-<th>Meaning</th>
+<th>Required import material</th>
+<th>Fresh verifier/evaluator action</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>format</code></td>
-<td><code>invarlock/evidence-pack-signature-v1</code></td>
+<td>Artifact identity</td>
+<td>Reproduce through the selected provider and request spec</td>
 </tr>
 <tr>
-<td><code>algorithm</code></td>
-<td>Ed25519</td>
+<td>Provider receipt</td>
+<td>Validate capabilities, artifact, settings, device, image, and observation binding</td>
 </tr>
 <tr>
-<td>Embedded public key</td>
-<td>Verification material, not an independent trust anchor</td>
+<td>Scoring observation</td>
+<td>Validate canonical bytes, schedule binding, record order, and facts</td>
 </tr>
 <tr>
-<td>Public-key fingerprint</td>
-<td>SHA-256 of the raw Ed25519 public key</td>
+<td>Side report</td>
+<td>Reconstruct exactly from authenticated sidecars</td>
 </tr>
 <tr>
-<td>Signature</td>
-<td>Authentication of the exact canonical manifest bytes</td>
+<td>Runtime manifest/config</td>
+<td>Recheck strict runtime and sibling digests</td>
+</tr>
+<tr>
+<td>Paired records</td>
+<td>Re-derive from schedule and both observations, then require exact equality</td>
 </tr>
 </tbody>
 </table>
-<h2 id="checksums-and-closed-inventory">Checksums and closed inventory<a class="headerlink" href="#checksums-and-closed-inventory" title="Permanent link">&para;</a></h2>
-<p><code>checksums.sha256</code> covers every payload below the manifest, but not the manifest
-or its signature. The manifest separately binds the checksum file. Verification
-checks both directions:</p>
-<ul>
-<li>every manifest payload must be covered; and</li>
-<li>no checksum or directory entry may introduce an undeclared payload.</li>
-</ul>
-<p>Regular-file, no-symbolic-link, size, and safe-relative-path rules apply while
-reading. A valid checksum does not make a file semantically valid; cross-file
-replay follows the integrity checks.</p>
-<p>The manifest is outside the checksum payload because it binds the checksum
-file. The signature is outside both because it authenticates the canonical
-manifest. This avoids a self-referential digest while still closing every pack
-byte into one directed dependency graph.</p>
-<h2 id="paired-records">Paired records<a class="headerlink" href="#paired-records" title="Permanent link">&para;</a></h2>
-<p><code>records/paired-records.json</code> has exactly:</p>
-<div class="codehilite"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/paired-records-v1&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;metric&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exact_match&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;schedule_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;records&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;record_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example-1&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;input_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;baseline&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;observation_record_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;subject&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;observation_record_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">]</span>
-<span class="p">}</span>
-</code></pre></div>
-
-<p>The engine derives this file from the canonical schedule and both scoring
-observations. It rejects failed observation records, order changes, input-digest
-mismatches, output-text/digest mismatches, and schedules without expected
-outputs. Import mode must supply byte-canonical paired records equal to that
-fresh derivation; imported scores are never accepted as authority.</p>
-<p>For <code>exact_match</code>, each score is <code>1.0</code> when output text exactly equals expected
-output and <code>0.0</code> otherwise. For <code>normalized_nll_per_utf8_byte</code>, each score is
-<code>-logprob_sum / utf8_byte_count</code>; required counts must be positive and the result
-finite and non-negative.</p>
-<p>When a scorer extension is selected, the paired-record object also binds the
-exact scorer configuration and each side's replay result. The explicitly
-authorized scorer receives only authenticated <code>expected_output</code>, <code>output_text</code>,
-and <code>output_sha256</code> facts and returns one higher-is-better value in <code>[0, 1]</code>
-per record. The core verifies result order and digests, computes the arithmetic
-mean and paired percentage-point delta, and owns the interval and verdict.</p>
-<p>Normalized NLL is teacher-forced expected-continuation likelihood regression,
-not a general model-quality measure. The paired-record object may also carry a
-verifier-derived perplexity interpretation when the authenticated tokenizer
-contracts and every pair's positive target-token counts match. That object has
-no policy, interval, or verdict authority; an unavailable interpretation does
-not invalidate the byte-normalized NLL comparison.</p>
-<p>The canonical report adds the metric-specific paired interval to the two side
-means and point comparison. New reports use
-<code>invarlock/comparison-report-v2</code>; the verifier also replays existing
-<code>invarlock/comparison-report-v1</code> packs under their original arithmetic. Exact
-match records paired regression and improvement counts, an exact two-sided
-McNemar probability, and the paired Newcombe 95% effect-size interval whose
-lower bound controls policy. Normalized NLL uses the upper bound of its
-authenticated-schedule resampling interval. An authorized scorer extension
-uses the lower bound of the same fixed paired-resampling method against
-<code>metrics.scorer_extension.delta_min_pp</code>.</p>
-<p>When the policy supplies the coupled sample controls, the v2 report also
-contains <code>sample_qualification</code>. It records the minimum and observed paired
-count, maximum and observed interval width, units, each check's result, and the
-combined result. The final verdict is the conjunction of that result and the
-metric-bound result.</p>
-<h2 id="provider-sidecars">Provider sidecars<a class="headerlink" href="#provider-sidecars" title="Permanent link">&para;</a></h2>
-<p>Each comparison side includes:</p>
+<h2 id="3-derive-the-comparison">3. Derive the comparison<a class="headerlink" href="#3-derive-the-comparison" title="Permanent link">&para;</a></h2>
+<p>The engine requires both observations to have the same ordered record IDs and
+input digests as the schedule. It derives built-in record scores or replays the
+authorized scorer, then derives means, the comparison value, paired interval,
+optional count/interval-width qualification, and policy verdict from the
+relevant lower or upper bound and any configured sample controls. New
+transactions write <code>invarlock/comparison-report-v2</code>; verification preserves
+the report-version-specific arithmetic of signed v1 evidence. The comparison ID is
+deterministically derived from normalized intent, both artifact identities,
+schedule, policy, runtime digests, and paired records.</p>
+<h2 id="4-publish-once">4. Publish once<a class="headerlink" href="#4-publish-once" title="Permanent link">&para;</a></h2>
+<p>Publication validates the complete candidate in a private staging directory,
+writes canonical payloads and checksums, signs the manifest, and atomically
+renames the directory into place. The destination and a sibling publication
+lock are no-clobber. A failed publication removes staging and leaves no partial
+evidence directory.</p>
+<p>Published permissions are read-only, and all later outputs remain external.
+See <a href="../artifacts/">Evidence artifacts</a> for the exact inventory.</p>
+<p>The atomic rename protects visibility, while checksums, the signed manifest,
+and later snapshot verification protect integrity. Read-only permissions are
+defense in depth; they are not accepted as cryptographic proof.</p>
+<h2 id="5-verify-independently">5. Verify independently<a class="headerlink" href="#5-verify-independently" title="Permanent link">&para;</a></h2>
+<p>Verification requires independent baseline and subject artifact digests,
+canonical schedule digest, policy, both runtime digests, evidence signer,
+verifier identity, and verifier-key inputs. It replays the entire comparison
+rather than trusting stored scores or verdicts.</p>
+<p>A completed verification writes a no-clobber, read-only signed receipt outside
+the pack. This includes rejection receipts: integrity or policy failure remains
+a nonzero command result, but the verifier can still authenticate what it
+rejected and under which anchors.</p>
+<p>Structural failure that prevents the verification transaction from reaching a
+completed result may prevent receipt creation. Automation must check both exit
+status and expected receipt presence.</p>
+<p>Verification snapshots the submitted pack before replay so subsequent reads
+refer to the same regular-file inventory. It validates syntax and signatures
+before depending on semantic content, then reconstructs identities, pairings,
+scores, interval, report, and policy decision under the independent anchors.</p>
+<h2 id="6-render-the-authenticated-report">6. Render the authenticated report<a class="headerlink" href="#6-render-the-authenticated-report" title="Permanent link">&para;</a></h2>
+<p>Reporting authenticates signed evidence bundle integrity and renders its closed
+canonical report. It can write one new HTML file outside the pack. Independent
+verification and its signed receipt remain the acceptance record.</p>
+<h2 id="failure-classification">Failure classification<a class="headerlink" href="#failure-classification" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>File</th>
-<th>Binding</th>
+<th>Boundary</th>
+<th>Representative failure</th>
+<th>Result</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>model-artifact.identity.json</code></td>
-<td>Portable authenticated identity for the actual model artifact</td>
+<td>Request</td>
+<td>Unsafe path, unknown field/provider, unsupported metric</td>
+<td>No execution, no bundle</td>
 </tr>
 <tr>
-<td><code>runtime-scoring.observation.json</code></td>
-<td>Ordered backend facts bound to provider, artifact, and schedule</td>
+<td>Runtime</td>
+<td>Missing worker image, unpinned image, network enabled, incomplete side result</td>
+<td>No bundle</td>
 </tr>
 <tr>
-<td><code>runtime-provider.receipt.json</code></td>
-<td>Plugin/backend/capability/artifact/settings/device/image provenance bound to the observation</td>
+<td>Import</td>
+<td>Sidecar mismatch, records not equal to derivation</td>
+<td>No bundle</td>
 </tr>
 <tr>
-<td><code>report.json</code></td>
-<td>Minimal side report binding provider, artifact, observation, schedule, and count</td>
+<td>Publication</td>
+<td>Destination exists, signing failure, parent changes</td>
+<td>No partial destination</td>
 </tr>
 <tr>
-<td><code>run.yaml</code></td>
-<td>Canonical side configuration copied as exact evaluation-emitted bytes</td>
+<td>Verification integrity</td>
+<td>Signature, checksum, inventory, runtime, pairing, or report mismatch</td>
+<td>Nonzero; rejection receipt when verification completed</td>
 </tr>
 <tr>
-<td><code>runtime.manifest.json</code></td>
-<td>Report/config/sidecar digests and strict per-side worker-container facts</td>
+<td>Verification policy</td>
+<td>Replayed report verdict is <code>fail</code></td>
+<td>Integrity may be true, but command is nonzero and receipt records failure</td>
+</tr>
+<tr>
+<td>Reporting</td>
+<td>Unauthenticated or malformed bundle, existing HTML destination</td>
+<td>No rendered output and no bundle mutation</td>
 </tr>
 </tbody>
 </table>
-<p>The evidence transaction copies these exact bytes. It does not regenerate
-sidecars in a way that could break their original runtime-manifest bindings.</p>
-<h2 id="publication-and-immutability">Publication and immutability<a class="headerlink" href="#publication-and-immutability" title="Permanent link">&para;</a></h2>
-<p>Evaluation writes a staging directory, flushes files to disk, signs the manifest, and
-atomically renames the directory into place. It never replaces an existing
-destination. Published files are read-only and directories are non-writable.</p>
-<p>Filesystem permissions are a local hardening measure, not the integrity model.
-Any later byte change, missing file, or extra file is detected by strict
-verification. Verification receipts and rendered HTML must remain outside the
-bundle so the bundle can stay byte-identical.</p>
-<h2 id="external-outputs">External outputs<a class="headerlink" href="#external-outputs" title="Permanent link">&para;</a></h2>
+<p>Retries should use a new output or receipt path after correcting the underlying
+input. InvarLock never treats overwriting an earlier result as a retry.</p>
+<h2 id="transaction-outputs">Transaction outputs<a class="headerlink" href="#transaction-outputs" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Output</th>
-<th>Produced by</th>
-<th>May be written inside pack?</th>
-<th>Trust meaning</th>
+<th>Transaction result</th>
+<th>Evidence directory</th>
+<th>Receipt</th>
+<th>HTML</th>
+<th>Exit</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Signed verification receipt</td>
-<td><code>invarlock verify</code></td>
-<td>No</td>
-<td>Independent verifier assertion over manifest, anchors, and verdict</td>
+<td>Evaluation succeeds</td>
+<td>New immutable directory</td>
+<td>None</td>
+<td>None</td>
+<td><code>0</code></td>
 </tr>
 <tr>
-<td>Console report</td>
-<td><code>invarlock report</code></td>
-<td>Not a file</td>
-<td>Human rendering of signature-authenticated canonical content</td>
+<td>Evaluation fails</td>
+<td>Absent</td>
+<td>None</td>
+<td>None</td>
+<td>Nonzero</td>
 </tr>
 <tr>
-<td>Self-contained HTML</td>
-<td><code>invarlock report --html</code></td>
-<td>No</td>
-<td>Unsigned presentation; not independent acceptance</td>
+<td>Verification accepts</td>
+<td>Unchanged</td>
+<td>Signed success receipt</td>
+<td>None</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>Verification completes rejection</td>
+<td>Unchanged</td>
+<td>Signed rejection receipt</td>
+<td>None</td>
+<td>Nonzero</td>
+</tr>
+<tr>
+<td>Verification cannot complete safely</td>
+<td>Unchanged</td>
+<td>May be absent</td>
+<td>None</td>
+<td>Nonzero</td>
+</tr>
+<tr>
+<td>Reporting succeeds</td>
+<td>Unchanged</td>
+<td>None</td>
+<td>Optional new file</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>Reporting fails</td>
+<td>Unchanged</td>
+<td>None</td>
+<td>Absent or no replacement</td>
+<td>Nonzero</td>
 </tr>
 </tbody>
 </table>
-<p>Multiple verifiers can issue separate receipts for the same immutable manifest.
-They can use distinct verifier identities and keys. Each must independently
-supply the expected artifact, schedule, policy, runtime, and evidence-signer
-anchors. The policy bytes must match the policy material already bound by the
-pack; a different policy requires a newly evaluated evidence bundle.</p>
+<p>For forensic retention, preserve the immutable pack and any external signed
+receipt together. Do not modify either to add annotations; store operator notes
+as separate records that identify their target by manifest or receipt digest.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../contracts/">Public contracts</a> defines the manifest schema, canonical JSON,
-  and digest rules.</li>
-<li><a href="../reports/">Reports and receipts</a> defines the report and external receipt
-  carried by or associated with a bundle.</li>
-<li><a href="../lifecycle/">Evaluation lifecycle</a> explains atomic publication and failure
-  boundaries.</li>
-<li><a href="../architecture/">Architecture</a> places the artifact inventory within the
-  evidence-signer-verifier trust model.</li>
+<li><a href="../architecture/">Architecture</a> defines the component and trust boundaries
+  behind each lifecycle stage.</li>
+<li><a href="../cli/">Command-line interface</a> maps transaction outcomes to public exit and
+  write behavior.</li>
+<li><a href="../artifacts/">Evidence artifacts</a> describes the directory published at the
+  evaluation boundary.</li>
+<li><a href="../reports/">Reports and receipts</a> interprets success and rejection outputs.</li>
 </ul>
 
 
