@@ -1983,10 +1983,13 @@ dependency and must also match runtime-provider ABI <code>1</code> when loaded.<
 </tbody>
 </table>
 <h2 id="what-the-release-workflow-checks">What the release workflow checks<a class="headerlink" href="#what-the-release-workflow-checks" title="Permanent link">&para;</a></h2>
-<p>For a tagged or explicitly selected release commit, the repository workflow:</p>
+<p>For a tagged release commit or an explicitly selected pre-tag candidate, the
+repository workflow:</p>
 <ol>
-<li>resolves the exact tag commit;</li>
-<li>requires the workflow event commit to equal the resolved tag commit;</li>
+<li>binds a pre-tag validation to the workflow event commit and declared package
+   version, or resolves the exact tag commit for a tag build or publication;</li>
+<li>requires a tag build or publication event commit to equal the resolved tag
+   commit;</li>
 <li>runs the complete repository, coverage, documentation, contract, and
    workflow gates;</li>
 <li>scans the release history range for secrets;</li>
@@ -2008,12 +2011,18 @@ dependency and must also match runtime-provider ABI <code>1</code> when loaded.<
 <p>These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
 Those belong to the evaluate/verify trust model.</p>
-<p>The workflow resolves and checks out the release tag's exact commit before it
-builds. A tag push validates and builds the authoritative candidate but does
-not publish it. Publication is an explicit manual action against an existing
-tag. The manual workflow must be dispatched with that tag as its workflow ref
-and the successful tag-run ID as <code>candidate_run_id</code>, so the event commit,
-resolved tag commit, workflow-run identity, and downloaded artifact agree.
+<p>Before tagging, dispatch the release workflow from the candidate branch with
+<code>publish</code> disabled, <code>release_tag</code> empty, and <code>candidate_version</code> set to the
+package version without a leading <code>v</code>. This runs the complete Linux build and
+release gates against the workflow event commit without creating an
+authoritative candidate or publishing anything.</p>
+<p>For a tag build or publication, the workflow resolves and checks out the
+release tag's exact commit before it builds. A tag push validates and builds
+the authoritative candidate but does not publish it. Publication is an
+explicit manual action against an existing tag. The manual workflow must be
+dispatched with that tag as its workflow ref and the successful tag-run ID as
+<code>candidate_run_id</code>, so the event commit, resolved tag commit, workflow-run
+identity, and downloaded artifact agree.
 Manual publication does not rebuild the archives. The tagged distribution and
 provenance artifacts are retained for 14 days, so publication must complete
 within that interval.</p>
@@ -2056,7 +2065,9 @@ artifacts by base name. <code>X.Y.Z</code> is
 the candidate version without a leading <code>v</code>; preflight rejects a dirty checkout,
 a different <code>HEAD</code>, unexpected artifacts, metadata/content mismatch, or a hash
 change. A passing result is release-candidate evidence, not authorization to
-tag or publish.</p>
+tag or publish. Run the non-publishing branch workflow after these local checks
+to exercise the same release surface on the hosted Linux runner before creating
+a release tag.</p>
 <p>The local preflight intentionally validates the core pair in depth while
 <code>make dist-check</code> validates every archive against its checkout source and
 <code>make addins-install-smoke</code> plus the release workflow validate the coordinated
