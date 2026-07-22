@@ -27,7 +27,10 @@ Workflow YAML is linted with `make workflow-lint`.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
 - `secret-history.yml` is the scheduled full-history secret scan.
 - `dependabot-main-guard.yml` keeps dependency updates on `staging/next`.
-- `release.yml` builds, attests, and publishes tagged Python distributions.
+- `release.yml` validates pre-tag candidates and builds, attests, and publishes
+  tagged Python distributions. A manual run with publication disabled and a
+  candidate version exercises the Linux release gates without creating or
+  moving a tag.
 
 The release workflow builds, validates, attests, and publishes five Python
 distributions: `invarlock`, `invarlock-diagnostics`,

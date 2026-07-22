@@ -19,6 +19,10 @@ on:
         description: "Existing release tag to validate/publish (for example v0.5.0)"
         type: string
         default: ""
+      candidate_version:
+        description: "Package version for a non-publishing branch validation (for example 0.13.0)"
+        type: string
+        default: ""
       candidate_run_id:
         description: "Successful tagged release workflow run ID required for publication"
         type: string
@@ -46,6 +50,8 @@ jobs:
         shell: bash
         env:
           INVARLOCK_EVENT_SHA: ${{ github.sha }}
+          INVARLOCK_MANUAL_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          INVARLOCK_MANUAL_PUBLISH: ${{ inputs.publish }}
           INVARLOCK_MANUAL_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
@@ -87,21 +93,39 @@ jobs:
             printf '%s\n' "${sha}"
           }
 
-          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            tag="${GITHUB_REF_NAME}"
-          else
-            tag="${INVARLOCK_MANUAL_RELEASE_TAG}"
-            if [ -z "${tag}" ]; then
-              echo "release_tag is required for manual release dispatch" >&2
-              exit 1
-            fi
-          fi
-
-          sha="$(resolve_sha "${tag}")"
           if [[ ! "${INVARLOCK_EVENT_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "workflow event SHA is malformed" >&2
             exit 1
           fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            tag="${GITHUB_REF_NAME}"
+            sha="$(resolve_sha "${tag}")"
+          elif [ "${INVARLOCK_MANUAL_PUBLISH}" = "true" ]; then
+            if [ -n "${INVARLOCK_MANUAL_CANDIDATE_VERSION}" ]; then
+              echo "candidate_version must be empty during publication" >&2
+              exit 1
+            fi
+            tag="${INVARLOCK_MANUAL_RELEASE_TAG}"
+            if [ -z "${tag}" ]; then
+              echo "release_tag is required for manual publication" >&2
+              exit 1
+            fi
+            sha="$(resolve_sha "${tag}")"
+          else
+            if [ -n "${INVARLOCK_MANUAL_RELEASE_TAG}" ]; then
+              echo "release_tag must be empty during non-publishing validation" >&2
+              exit 1
+            fi
+            version="${INVARLOCK_MANUAL_CANDIDATE_VERSION}"
+            if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+              echo "candidate_version must be a version such as 1.2.3" >&2
+              exit 1
+            fi
+            tag="v${version}"
+            sha="${INVARLOCK_EVENT_SHA}"
+          fi
+
           if [ "${sha}" != "${INVARLOCK_EVENT_SHA}" ]; then
             echo "release tag no longer identifies the workflow event commit" >&2
             exit 1
@@ -150,19 +174,20 @@ jobs:
       - name: Run complete repository gates
         run: make verify
       - name: Audit maintained dependency locks
+        id: dependency_audit
         run: |
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md
       - name: Upload dependency audit report
-        if: ${{ always() }}
+        if: ${{ always() && steps.dependency_audit.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-cve-audit
           path: |
             artifacts/supply-chain/cve-audit.json
             artifacts/supply-chain/cve-audit.md
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
       - name: Enforce release coverage
         run: make coverage-enforce
@@ -240,15 +265,15 @@ jobs:
           fi
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
       - name: Upload gitleaks artifacts
-        if: always()
+        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-gitleaks
           path: artifacts/supply-chain/gitleaks.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
       - name: Fail on secret findings
-        if: always()
+        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
         shell: bash
         run: |
           exit_code="${{ steps.gitleaks_scan.outputs.exit_code }}"
@@ -407,6 +432,7 @@ jobs:
       - name: Run release pip-audit
         run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
       - name: Generate release install-surface SBOM
+        id: generate_sbom
         run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
       - name: Verify distribution digests before artifact upload
         env:
@@ -443,12 +469,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload SBOM artifact
-        if: always()
+        if: ${{ always() && steps.generate_sbom.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-sbom
           path: artifacts/supply-chain/sbom.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
   authorize_candidate:
     needs: resolve_release_ref

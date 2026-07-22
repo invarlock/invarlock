@@ -29,10 +29,13 @@ dependency and must also match runtime-provider ABI `1` when loaded.
 
 ## What the release workflow checks
 
-For a tagged or explicitly selected release commit, the repository workflow:
+For a tagged release commit or an explicitly selected pre-tag candidate, the
+repository workflow:
 
-1. resolves the exact tag commit;
-2. requires the workflow event commit to equal the resolved tag commit;
+1. binds a pre-tag validation to the workflow event commit and declared package
+   version, or resolves the exact tag commit for a tag build or publication;
+2. requires a tag build or publication event commit to equal the resolved tag
+   commit;
 3. runs the complete repository, coverage, documentation, contract, and
    workflow gates;
 4. scans the release history range for secrets;
@@ -55,12 +58,19 @@ These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
 Those belong to the evaluate/verify trust model.
 
-The workflow resolves and checks out the release tag's exact commit before it
-builds. A tag push validates and builds the authoritative candidate but does
-not publish it. Publication is an explicit manual action against an existing
-tag. The manual workflow must be dispatched with that tag as its workflow ref
-and the successful tag-run ID as `candidate_run_id`, so the event commit,
-resolved tag commit, workflow-run identity, and downloaded artifact agree.
+Before tagging, dispatch the release workflow from the candidate branch with
+`publish` disabled, `release_tag` empty, and `candidate_version` set to the
+package version without a leading `v`. This runs the complete Linux build and
+release gates against the workflow event commit without creating an
+authoritative candidate or publishing anything.
+
+For a tag build or publication, the workflow resolves and checks out the
+release tag's exact commit before it builds. A tag push validates and builds
+the authoritative candidate but does not publish it. Publication is an
+explicit manual action against an existing tag. The manual workflow must be
+dispatched with that tag as its workflow ref and the successful tag-run ID as
+`candidate_run_id`, so the event commit, resolved tag commit, workflow-run
+identity, and downloaded artifact agree.
 Manual publication does not rebuild the archives. The tagged distribution and
 provenance artifacts are retained for 14 days, so publication must complete
 within that interval.
@@ -108,7 +118,9 @@ artifacts by base name. `X.Y.Z` is
 the candidate version without a leading `v`; preflight rejects a dirty checkout,
 a different `HEAD`, unexpected artifacts, metadata/content mismatch, or a hash
 change. A passing result is release-candidate evidence, not authorization to
-tag or publish.
+tag or publish. Run the non-publishing branch workflow after these local checks
+to exercise the same release surface on the hosted Linux runner before creating
+a release tag.
 
 The local preflight intentionally validates the core pair in depth while
 `make dist-check` validates every archive against its checkout source and

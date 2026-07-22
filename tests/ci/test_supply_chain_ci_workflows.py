@@ -180,10 +180,15 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "${{ inputs.release_tag }}" not in resolve_step["run"]
     assert "${{ github.sha }}" not in resolve_step["run"]
     assert resolve_step["env"]["INVARLOCK_EVENT_SHA"] == "${{ github.sha }}"
+    assert resolve_step["env"]["INVARLOCK_MANUAL_CANDIDATE_VERSION"] == (
+        "${{ inputs.candidate_version }}"
+    )
+    assert resolve_step["env"]["INVARLOCK_MANUAL_PUBLISH"] == ("${{ inputs.publish }}")
     assert resolve_step["env"]["INVARLOCK_MANUAL_RELEASE_TAG"] == (
         "${{ inputs.release_tag }}"
     )
     inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+    assert inputs["candidate_version"]["default"] == ""
     assert inputs["candidate_run_id"]["default"] == ""
     assert inputs["publication_phase"]["default"] == "complete"
     assert inputs["publication_phase"]["options"] == [
@@ -222,7 +227,10 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     ]
     assert "scripts/security/cve_audit.py" in release_lock_audit
     release_lock_upload = _step(build["steps"], "Upload dependency audit report")
-    assert release_lock_upload["if"] == "${{ always() }}"
+    assert release_lock_upload["if"] == (
+        "${{ always() && steps.dependency_audit.outcome != 'skipped' }}"
+    )
+    assert release_lock_upload["with"]["if-no-files-found"] == "warn"
     assert "cve-audit.json" in release_lock_upload["with"]["path"]
     assert (
         build["steps"].index(release_lock_upload)
@@ -363,8 +371,23 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         if step.get("name") == "Build first-party distributions"
     )
     assert build["steps"].index(gitleaks_scan) < secret_upload_index
+    assert build["steps"][secret_upload_index]["if"] == (
+        "${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}"
+    )
+    assert build["steps"][secret_upload_index]["with"]["if-no-files-found"] == ("warn")
+    assert build["steps"][secret_failure_index]["if"] == (
+        "${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}"
+    )
     assert secret_upload_index + 1 == secret_failure_index
     assert secret_failure_index < distribution_build_index
+
+    sbom = _step(build["steps"], "Generate release install-surface SBOM")
+    assert sbom["id"] == "generate_sbom"
+    sbom_upload = _step(build["steps"], "Upload SBOM artifact")
+    assert sbom_upload["if"] == (
+        "${{ always() && steps.generate_sbom.outcome != 'skipped' }}"
+    )
+    assert sbom_upload["with"]["if-no-files-found"] == "warn"
 
     authorization = jobs["authorize_candidate"]
     assert authorization["needs"] == "resolve_release_ref"
@@ -612,6 +635,81 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "first-party version mismatch" in smoke["run"]
 
     assert "record_testpypi_promotion" not in jobs
+
+
+def test_release_nonpublishing_dispatch_validates_the_event_commit(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    resolve = _step(
+        workflow["jobs"]["resolve_release_ref"]["steps"],
+        "Resolve release ref",
+    )
+    output = tmp_path / "github-output"
+    event_sha = "a" * 40
+    subprocess.run(
+        ["bash", "-c", resolve["run"]],
+        env={
+            **os.environ,
+            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "GITHUB_OUTPUT": str(output),
+            "GITHUB_REPOSITORY": "invarlock/invarlock",
+            "INVARLOCK_EVENT_SHA": event_sha,
+            "INVARLOCK_MANUAL_CANDIDATE_VERSION": "0.13.0",
+            "INVARLOCK_MANUAL_PUBLISH": "false",
+            "INVARLOCK_MANUAL_RELEASE_TAG": "",
+        },
+        check=True,
+    )
+    assert output.read_text(encoding="utf-8").splitlines() == [
+        "release_tag=v0.13.0",
+        f"release_sha={event_sha}",
+    ]
+
+
+def test_release_nonpublishing_dispatch_rejects_tag_or_invalid_version(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    run = _step(
+        workflow["jobs"]["resolve_release_ref"]["steps"],
+        "Resolve release ref",
+    )["run"]
+    common = {
+        **os.environ,
+        "GITHUB_EVENT_NAME": "workflow_dispatch",
+        "GITHUB_OUTPUT": str(tmp_path / "github-output"),
+        "GITHUB_REPOSITORY": "invarlock/invarlock",
+        "INVARLOCK_EVENT_SHA": "a" * 40,
+        "INVARLOCK_MANUAL_PUBLISH": "false",
+    }
+    tagged = subprocess.run(
+        ["bash", "-c", run],
+        env={
+            **common,
+            "INVARLOCK_MANUAL_CANDIDATE_VERSION": "0.13.0",
+            "INVARLOCK_MANUAL_RELEASE_TAG": "v0.13.0",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert tagged.returncode != 0
+    assert "release_tag must be empty" in tagged.stderr
+
+    invalid = subprocess.run(
+        ["bash", "-c", run],
+        env={
+            **common,
+            "INVARLOCK_MANUAL_CANDIDATE_VERSION": "v0.13.0",
+            "INVARLOCK_MANUAL_RELEASE_TAG": "",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert invalid.returncode != 0
+    assert "candidate_version must be a version" in invalid.stderr
 
 
 def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
