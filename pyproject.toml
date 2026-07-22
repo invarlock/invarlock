@@ -51,7 +51,7 @@ hf = [
   "transformers>=5.14.1",
   "safetensors>=0.8.0",
   "protobuf>=4.25",
-  "sentencepiece>=0.2.1",
+  "sentencepiece>=0.2.2",
   "tiktoken>=0.9.0",
 ]
 
