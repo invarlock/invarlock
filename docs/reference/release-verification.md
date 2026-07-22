@@ -62,7 +62,14 @@ Before tagging, dispatch the release workflow from the candidate branch with
 `publish` disabled, `release_tag` empty, and `candidate_version` set to the
 package version without a leading `v`. This runs the complete Linux build and
 release gates against the workflow event commit without creating an
-authoritative candidate or publishing anything.
+authoritative candidate or publishing anything. The validation job has
+read-only repository permissions. OIDC and attestation write permissions are
+granted only to the short tag-only job that downloads the already validated
+archive set, rechecks its ledger, and creates the provenance statement.
+Publication preparation likewise runs without an identity token. Each
+environment-gated publish job downloads only its two previously validated archives,
+rechecks the immutable tag, and invokes the pinned trusted-publishing action;
+it does not check out or execute candidate Python code.
 
 For a tag build or publication, the workflow resolves and checks out the
 release tag's exact commit before it builds. A tag push validates and builds
@@ -150,8 +157,12 @@ Use the default `complete` publication phase for an ordinary release.
 The production jobs consume the exact archives built by the tag run; they do
 not rebuild them or depend on TestPyPI state. A stale, incomplete, or
 filename-colliding TestPyPI project therefore cannot silently select or alter a
-production candidate. Production publication also refuses existing filenames;
-the post-publication verifier cannot turn a mixed or partially replaced release
+production candidate. Before upload, each publication job downloads and checks
+any already hosted files for its exact version against the candidate ledger.
+Absent files may be uploaded and ledger-identical files may be skipped, making
+an interrupted multi-project publication safe to resume. Any conflicting
+filename, metadata digest, or downloaded bytes fail before upload, and the
+post-publication verifier cannot turn a mixed or partially replaced release
 into a successful run.
 
 PyPI permits only three pending trusted publishers at once. When a coordinated

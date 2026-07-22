@@ -145,9 +145,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: default
     permissions:
-      attestations: write
       contents: read
-      id-token: write
     outputs:
       dist_ledger_sha256: ${{ steps.dist_digests.outputs.ledger_sha256 }}
     steps:
@@ -442,12 +440,6 @@ jobs:
           cd dist
           printf '%s  %s\n' "${EXPECTED_DIST_LEDGER_SHA256}" SHA256SUMS | sha256sum --check -
           sha256sum --check SHA256SUMS
-      - name: Attest tagged release candidate
-        id: attest_candidate
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
-        with:
-          subject-checksums: dist/SHA256SUMS
       - name: Upload dist artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -460,14 +452,6 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
-      - name: Upload tagged candidate provenance
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-candidate-provenance
-          path: ${{ steps.attest_candidate.outputs.bundle-path }}
-          if-no-files-found: error
-          retention-days: 14
       - name: Upload SBOM artifact
         if: ${{ always() && steps.generate_sbom.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -476,6 +460,44 @@ jobs:
           path: artifacts/supply-chain/sbom.json
           if-no-files-found: warn
           retention-days: 3
+
+  attest_candidate:
+    needs: [build_check, resolve_release_ref]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Download validated distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dist
+          path: dist
+      - name: Reconfirm validated distribution ledger
+        env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ needs.build_check.outputs.dist_ledger_sha256 }}
+        run: |
+          set -euo pipefail
+          cd dist
+          printf '%s  %s\n' "${EXPECTED_DIST_LEDGER_SHA256}" SHA256SUMS | sha256sum --check -
+          sha256sum --check SHA256SUMS
+      - name: Attest tagged release candidate
+        id: attest_candidate
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - name: Upload tagged candidate provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-candidate-provenance
+          path: ${{ steps.attest_candidate.outputs.bundle-path }}
+          if-no-files-found: error
+          retention-days: 14
+
   authorize_candidate:
     needs: resolve_release_ref
     if: >-
@@ -627,18 +649,16 @@ jobs:
           esac
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
 
-  publish:
+  prepare_publication:
     needs: [authorize_candidate, publication_plan, resolve_release_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.publication_plan.outputs.matrix) }}
-    environment: ${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}
     permissions:
       actions: read
       contents: read
-      id-token: write
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
@@ -709,16 +729,6 @@ jobs:
             exit 1
           fi
           cp "${distributions[@]}" publish-dist/
-      - name: Resolve publish target
-        id: vars
-        run: |
-          if [ "${{ inputs.target }}" = "testpypi" ]; then
-            echo "publish_target=testpypi" >> "$GITHUB_OUTPUT"
-            echo "publish_repository_url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish_target=pypi" >> "$GITHUB_OUTPUT"
-            echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
-          fi
       - name: Verify distribution digests before publish
         env:
           EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
@@ -775,6 +785,33 @@ jobs:
                   raise SystemExit(f"distribution digest mismatch: {name}")
               print(f"{name}: OK")
           PY
+      - name: Reject conflicting hosted distributions
+        env:
+          EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
+          INVARLOCK_PACKAGE: ${{ matrix.package }}
+          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
+          INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          case "${INVARLOCK_PACKAGE}" in
+            core) project="invarlock" ;;
+            diagnostics) project="invarlock-diagnostics" ;;
+            runtime-gguf) project="invarlock-runtime-gguf" ;;
+            runtime-hf-vision-text) project="invarlock-runtime-hf-vision-text" ;;
+            runtime-tensorrt-llm) project="invarlock-runtime-tensorrt-llm" ;;
+            *)
+              echo "unsupported first-party package: ${INVARLOCK_PACKAGE}" >&2
+              exit 1
+              ;;
+          esac
+          python scripts/release/verify_hosted_distributions.py \
+            --ledger _release_dist/SHA256SUMS \
+            --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
+            --target "${INVARLOCK_PUBLISH_TARGET}" \
+            --version "${INVARLOCK_RELEASE_VERSION}" \
+            --attempts 1 \
+            --project "${project}" \
+            --allow-missing
       - name: Reconfirm immutable release tag
         env:
           INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -788,12 +825,65 @@ jobs:
             echo "release tag changed after candidate authorization" >&2
             exit 1
           fi
+      - name: Upload verified publication files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: publish-dist-${{ matrix.package }}
+          path: publish-dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [prepare_publication, publication_plan, resolve_release_ref]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.publication_plan.outputs.matrix) }}
+    environment: ${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}
+    permissions:
+      actions: read
+      id-token: write
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.release_tag != ''
+      }}
+    steps:
+      - name: Download verified publication files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: publish-dist-${{ matrix.package }}
+          path: publish-dist
+      - name: Reconfirm immutable release tag
+        env:
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          remote="https://github.com/${GITHUB_REPOSITORY}.git"
+          annotated="$(git ls-remote --tags "${remote}" "refs/tags/${INVARLOCK_RELEASE_TAG}^{}" | awk 'NR == 1 {print $1}')"
+          direct="$(git ls-remote --tags "${remote}" "refs/tags/${INVARLOCK_RELEASE_TAG}" | awk 'NR == 1 {print $1}')"
+          observed="${annotated:-${direct}}"
+          if [ "${observed}" != "${INVARLOCK_RELEASE_SHA}" ]; then
+            echo "release tag changed after publication preparation" >&2
+            exit 1
+          fi
+      - name: Resolve publish target
+        id: vars
+        run: |
+          if [ "${{ inputs.target }}" = "testpypi" ]; then
+            echo "publish_repository_url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish to TestPyPI/PyPI
         uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247
         with:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
-          skip-existing: ${{ inputs.target == 'testpypi' }}
+          skip-existing: true
 
   verify_hosted_release:
     needs: [authorize_candidate, publish, resolve_release_ref]

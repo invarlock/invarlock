@@ -201,11 +201,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "github.event_name == 'push'" in build["if"]
     assert "inputs.publish != true" in build["if"]
     assert build["timeout-minutes"] >= 120
-    assert build["permissions"] == {
-        "attestations": "write",
-        "contents": "read",
-        "id-token": "write",
-    }
+    assert build["permissions"] == {"contents": "read"}
     checkout = build["steps"][0]
     assert checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -341,11 +337,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         for index, step in enumerate(build["steps"])
         if step.get("name") == "Upload dist artifacts"
     )
-    candidate_attestation = _step(build["steps"], "Attest tagged release candidate")
-    assert candidate_attestation["if"] == "${{ github.event_name == 'push' }}"
-    assert candidate_attestation["with"]["subject-checksums"] == ("dist/SHA256SUMS")
-    assert upload_verify_index + 1 == build["steps"].index(candidate_attestation)
-    assert build["steps"].index(candidate_attestation) + 1 == upload_index
+    assert upload_verify_index + 1 == upload_index
 
     gitleaks_range = _step(build["steps"], "Resolve gitleaks release range")
     assert "previous release tag is not a valid version tag" in gitleaks_range["run"]
@@ -388,6 +380,43 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "${{ always() && steps.generate_sbom.outcome != 'skipped' }}"
     )
     assert sbom_upload["with"]["if-no-files-found"] == "warn"
+
+    attestation = jobs["attest_candidate"]
+    assert set(attestation["needs"]) == {"build_check", "resolve_release_ref"}
+    assert attestation["if"] == "${{ github.event_name == 'push' }}"
+    assert attestation["permissions"] == {
+        "actions": "read",
+        "attestations": "write",
+        "contents": "read",
+        "id-token": "write",
+    }
+    attestation_download = _step(
+        attestation["steps"], "Download validated distributions"
+    )
+    assert attestation_download["with"] == {"name": "dist", "path": "dist"}
+    attestation_ledger = _step(
+        attestation["steps"], "Reconfirm validated distribution ledger"
+    )
+    assert attestation_ledger["env"]["EXPECTED_DIST_LEDGER_SHA256"] == (
+        "${{ needs.build_check.outputs.dist_ledger_sha256 }}"
+    )
+    assert "sha256sum --check SHA256SUMS" in attestation_ledger["run"]
+    candidate_attestation = _step(
+        attestation["steps"], "Attest tagged release candidate"
+    )
+    assert candidate_attestation["with"]["subject-checksums"] == "dist/SHA256SUMS"
+    provenance_upload = _step(
+        attestation["steps"], "Upload tagged candidate provenance"
+    )
+    assert provenance_upload["with"]["path"] == (
+        "${{ steps.attest_candidate.outputs.bundle-path }}"
+    )
+    assert (
+        attestation["steps"].index(attestation_download)
+        < attestation["steps"].index(attestation_ledger)
+        < attestation["steps"].index(candidate_attestation)
+        < attestation["steps"].index(provenance_upload)
+    )
 
     authorization = jobs["authorize_candidate"]
     assert authorization["needs"] == "resolve_release_ref"
@@ -478,42 +507,29 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "bootstrap publication is only valid for production PyPI" in plan_step["run"]
     assert "finish publication is only valid for production PyPI" in plan_step["run"]
 
-    publish = jobs["publish"]
-    assert set(publish["needs"]) == {
+    preparation = jobs["prepare_publication"]
+    assert set(preparation["needs"]) == {
         "authorize_candidate",
         "publication_plan",
         "resolve_release_ref",
     }
-    assert publish["permissions"] == {
+    assert preparation["permissions"] == {
         "actions": "read",
         "contents": "read",
-        "id-token": "write",
     }
-    assert "github.event_name == 'push'" not in publish["if"]
-    assert "github.event_name == 'workflow_dispatch'" in publish["if"]
-    assert publish["strategy"]["fail-fast"] is False
-    assert publish["strategy"]["matrix"] == (
+    assert "environment" not in preparation
+    assert "github.event_name == 'push'" not in preparation["if"]
+    assert "github.event_name == 'workflow_dispatch'" in preparation["if"]
+    assert preparation["strategy"]["fail-fast"] is False
+    assert preparation["strategy"]["matrix"] == (
         "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
     )
-    assert publish["environment"] == (
-        "${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}"
-    )
-    publish_download = _step(publish["steps"], "Download dist artifacts")
-    assert publish_download["with"]["run-id"] == (
+    candidate_download = _step(preparation["steps"], "Download dist artifacts")
+    assert candidate_download["with"]["run-id"] == (
         "${{ needs.authorize_candidate.outputs.artifact_run_id }}"
     )
-    assert publish_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
-    publish_step = next(
-        step
-        for step in publish["steps"]
-        if str(step.get("uses", "")).startswith("pypa/gh-action-pypi-publish@")
-    )
-    assert "user" not in publish_step.get("with", {})
-    assert "password" not in publish_step.get("with", {})
-    assert publish_step["with"]["skip-existing"] == (
-        "${{ inputs.target == 'testpypi' }}"
-    )
-    stage_publish = _step(publish["steps"], "Stage publish distributions")
+    assert candidate_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
+    stage_publish = _step(preparation["steps"], "Stage publish distributions")
     assert stage_publish["env"]["INVARLOCK_PACKAGE"] == "${{ matrix.package }}"
     for package in (
         "core",
@@ -524,8 +540,10 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     ):
         assert f"{package})" in stage_publish["run"]
     assert 'if [ "${#distributions[@]}" -ne 2 ]' in stage_publish["run"]
-    tag_recheck = _step(publish["steps"], "Reconfirm immutable release tag")
-    assert tag_recheck["env"] == {
+    preparation_tag_recheck = _step(
+        preparation["steps"], "Reconfirm immutable release tag"
+    )
+    assert preparation_tag_recheck["env"] == {
         "INVARLOCK_RELEASE_SHA": (
             "${{ needs.resolve_release_ref.outputs.release_sha }}"
         ),
@@ -533,13 +551,13 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
             "${{ needs.resolve_release_ref.outputs.release_tag }}"
         ),
     }
-    assert "git ls-remote --tags" in tag_recheck["run"]
-    assert "release tag changed after candidate authorization" in tag_recheck["run"]
-    assert publish["steps"].index(tag_recheck) + 1 == publish["steps"].index(
-        publish_step
+    assert "git ls-remote --tags" in preparation_tag_recheck["run"]
+    assert (
+        "release tag changed after candidate authorization"
+        in preparation_tag_recheck["run"]
     )
     publish_verify = _step(
-        publish["steps"], "Verify distribution digests before publish"
+        preparation["steps"], "Verify distribution digests before publish"
     )
     assert publish_verify["env"]["EXPECTED_DIST_LEDGER_SHA256"] == (
         "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
@@ -551,13 +569,99 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "len(staged) != 2" in publish_verify
     assert "unknown = set(staged) - set(expected)" in publish_verify
     assert "distribution digest mismatch" in publish_verify
+    conflict_check = _step(
+        preparation["steps"], "Reject conflicting hosted distributions"
+    )
+    assert conflict_check["env"] == {
+        "EXPECTED_DIST_LEDGER_SHA256": (
+            "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
+        ),
+        "INVARLOCK_PACKAGE": "${{ matrix.package }}",
+        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
+        "INVARLOCK_RELEASE_VERSION": (
+            "${{ needs.resolve_release_ref.outputs.release_tag }}"
+        ),
+    }
+    for project in (
+        "invarlock",
+        "invarlock-diagnostics",
+        "invarlock-runtime-gguf",
+        "invarlock-runtime-hf-vision-text",
+        "invarlock-runtime-tensorrt-llm",
+    ):
+        assert project in conflict_check["run"]
+    for required in (
+        "scripts/release/verify_hosted_distributions.py",
+        "--ledger _release_dist/SHA256SUMS",
+        '--expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}"',
+        '--target "${INVARLOCK_PUBLISH_TARGET}"',
+        '--version "${INVARLOCK_RELEASE_VERSION}"',
+        "--attempts 1",
+        '--project "${project}"',
+        "--allow-missing",
+    ):
+        assert required in conflict_check["run"]
     verify_index = next(
         index
-        for index, step in enumerate(publish["steps"])
+        for index, step in enumerate(preparation["steps"])
         if step.get("name") == "Verify distribution digests before publish"
     )
-    tag_index = publish["steps"].index(tag_recheck)
-    assert verify_index < tag_index
+    preparation_tag_index = preparation["steps"].index(preparation_tag_recheck)
+    conflict_index = preparation["steps"].index(conflict_check)
+    prepared_upload = _step(preparation["steps"], "Upload verified publication files")
+    assert prepared_upload["with"] == {
+        "name": "publish-dist-${{ matrix.package }}",
+        "path": "publish-dist/*",
+        "if-no-files-found": "error",
+        "retention-days": 1,
+    }
+    assert (
+        verify_index
+        < conflict_index
+        < preparation_tag_index
+        < preparation["steps"].index(prepared_upload)
+    )
+
+    publish = jobs["publish"]
+    assert set(publish["needs"]) == {
+        "prepare_publication",
+        "publication_plan",
+        "resolve_release_ref",
+    }
+    assert publish["permissions"] == {"actions": "read", "id-token": "write"}
+    assert publish["strategy"]["fail-fast"] is False
+    assert publish["strategy"]["matrix"] == (
+        "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
+    )
+    assert publish["environment"] == (
+        "${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}"
+    )
+    assert not any(
+        str(step.get("uses", "")).startswith("actions/checkout@")
+        or str(step.get("uses", "")).startswith("actions/setup-python@")
+        for step in publish["steps"]
+    )
+    prepared_download = _step(publish["steps"], "Download verified publication files")
+    assert prepared_download["with"] == {
+        "name": "publish-dist-${{ matrix.package }}",
+        "path": "publish-dist",
+    }
+    publish_tag_recheck = _step(publish["steps"], "Reconfirm immutable release tag")
+    assert "scripts/" not in publish_tag_recheck["run"]
+    assert "git ls-remote --tags" in publish_tag_recheck["run"]
+    assert (
+        "release tag changed after publication preparation"
+        in (publish_tag_recheck["run"])
+    )
+    publish_step = _step(publish["steps"], "Publish to TestPyPI/PyPI")
+    assert "user" not in publish_step.get("with", {})
+    assert "password" not in publish_step.get("with", {})
+    assert publish_step["with"]["skip-existing"] is True
+    assert (
+        publish["steps"].index(prepared_download)
+        < publish["steps"].index(publish_tag_recheck)
+        < publish["steps"].index(publish_step)
+    )
 
     hosted_job = jobs["verify_hosted_release"]
     assert set(hosted_job["needs"]) == {
@@ -789,12 +893,12 @@ def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -
     assert "only valid for production PyPI" in rejected.stderr
 
 
-def test_release_stages_each_distribution_in_its_own_publish_job(
+def test_release_stages_each_distribution_before_its_publish_job(
     tmp_path: Path,
 ) -> None:
     workflow = _load(WORKFLOWS / "release.yml")
-    publish = workflow["jobs"]["publish"]
-    stage = _step(publish["steps"], "Stage publish distributions")["run"]
+    preparation = workflow["jobs"]["prepare_publication"]
+    stage = _step(preparation["steps"], "Stage publish distributions")["run"]
     release_dist = tmp_path / "_release_dist"
     addin_dist = release_dist / "addins"
     addin_dist.mkdir(parents=True)
