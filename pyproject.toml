@@ -65,7 +65,7 @@ dev = [
   "mypy==1.20.0",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
-  "pre-commit>=3.0",
+  "pre-commit>=4.6.1",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
   "mkdocs-mermaid2-plugin>=1.2.3",
@@ -103,7 +103,7 @@ docs-ci = [
 ]
 
 precommit-ci = [
-  "pre-commit>=3.0",
+  "pre-commit>=4.6.1",
 ]
 
 release-ci = [
