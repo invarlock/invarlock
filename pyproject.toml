@@ -69,7 +69,7 @@ dev = [
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
   "mkdocs-mermaid2-plugin>=1.2.3",
-  "pymdown-extensions>=10.21.3",
+  "pymdown-extensions>=11.0.0",
   "build>=0.10.0",
   "wheel>=0.47.0",
   "twine>=4.0.0",
@@ -99,7 +99,7 @@ docs-ci = [
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
   "mkdocs-mermaid2-plugin>=1.2.3",
-  "pymdown-extensions>=10.21.3",
+  "pymdown-extensions>=11.0.0",
 ]
 
 precommit-ci = [
