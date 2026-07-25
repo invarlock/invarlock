@@ -123,9 +123,11 @@ required.
 ## Portable acceptance handoff
 
 `write_acceptance_attestation` wraps a signed verification receipt and its
-bound evidence into an in-toto Statement and DSSE envelope.
+bound evidence into an in-toto Statement and DSSE envelope while retaining the
+exact supplied receipt-file bytes.
 `verify_acceptance_attestation` authenticates that envelope, the embedded
-receipt, the exact subject artifact, and one recipient-supplied current policy.
+receipt, the exact subject artifact, separate envelope and receipt-verifier
+trust, and one recipient-supplied current policy.
 It does not replay the complete evidence pack; use `verify_evidence` or
 `invarlock verify` for that authoritative technical replay.
 

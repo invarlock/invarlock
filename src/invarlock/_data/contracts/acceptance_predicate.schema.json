@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://invarlock.dev/contracts/acceptance_predicate.schema.json",
-  "title": "InvarLock Acceptance Predicate v1",
+  "title": "InvarLock Acceptance Predicate v2",
   "type": "object",
   "required": [
     "format",
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "format": {
-      "const": "invarlock/acceptance-predicate-v1"
+      "const": "invarlock/acceptance-predicate-v2"
     },
     "subject": {
       "$ref": "#/$defs/artifact"
@@ -239,7 +239,13 @@
     },
     "receipt": {
       "type": "object",
-      "required": ["representation", "media_type", "digest", "content"],
+      "required": [
+        "representation",
+        "media_type",
+        "digest",
+        "raw_base64",
+        "content"
+      ],
       "properties": {
         "representation": {
           "const": "embedded"
@@ -249,6 +255,11 @@
         },
         "digest": {
           "$ref": "#/$defs/digest"
+        },
+        "raw_base64": {
+          "type": "string",
+          "minLength": 4,
+          "pattern": "^[A-Za-z0-9+/]*={0,2}$"
         },
         "content": {
           "type": "object",

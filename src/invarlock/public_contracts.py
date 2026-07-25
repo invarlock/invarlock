@@ -29,8 +29,8 @@ RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION = "invarlock/runtime-behavioral-sched
 SCORER_EXTENSION_DESCRIPTOR_FORMAT_VERSION = "invarlock/scorer-extension-descriptor-v1"
 SCORER_EXTENSION_BINDING_FORMAT_VERSION = "invarlock/scorer-extension-binding-v1"
 SCORER_EXTENSION_RESULT_FORMAT_VERSION = "invarlock/scorer-extension-result-v1"
-ACCEPTANCE_PREDICATE_FORMAT_VERSION = "invarlock/acceptance-predicate-v1"
-RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION = "invarlock/recipient-acceptance-policy-v1"
+ACCEPTANCE_PREDICATE_FORMAT_VERSION = "invarlock/acceptance-predicate-v2"
+RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION = "invarlock/recipient-acceptance-policy-v2"
 
 
 class ContractLoadError(RuntimeError):

@@ -97,19 +97,35 @@ def _signed_envelope(
     return fingerprint, key.public_key()
 
 
-def _policy(fingerprint: str) -> dict[str, Any]:
+def _policy(
+    fingerprint: str,
+    *,
+    envelope_identity: str = "recipient-tests/envelope",
+) -> dict[str, Any]:
     return {
         "format": target.RECIPIENT_POLICY_FORMAT,
         "expected_predicate_type": target.ACCEPTANCE_PREDICATE_TYPE,
         "trusted_signers": [
             {
-                "identity": "recipient-tests/envelope",
+                "identity": envelope_identity,
                 "fingerprint": fingerprint,
                 "status": "active",
             }
         ],
+        "trusted_receipt_verifiers": [
+            {
+                "identity": "producer.example/technical-verifier",
+                "fingerprint": (
+                    "sha256:"
+                    "74a97c1d8fe8d7d58faac074d3a3a926"
+                    "7d8db501d9e4aed77eaeb9ad4efb32ff"
+                ),
+                "status": "active",
+            }
+        ],
         "freshness": {
-            "max_age_seconds": 3600,
+            "max_envelope_age_seconds": 3600,
+            "max_evidence_age_seconds": None,
             "clock_skew_seconds": 0,
         },
         "allowed_contract_versions": ["0.13.0"],
@@ -637,7 +653,7 @@ def test_receipt_consistency_reports_every_redundant_binding() -> None:
 
     authenticated, errors = target._receipt_consistency_errors(predicate)
 
-    assert authenticated is True
+    assert authenticated is False
     assert len(errors) >= 6
     assert any("receipt digest" in error for error in errors)
     assert any("evaluation source digest" in error for error in errors)
@@ -657,9 +673,9 @@ def test_receipt_consistency_rejects_invalid_anchor_shapes(
         receipt["statement"]["anchors"] = anchor_value
     _resign_receipt(receipt, key)
     predicate["receipt"]["content"] = receipt
-    predicate["receipt"]["digest"] = (
-        "sha256:" + hashlib.sha256(_canonical(receipt)).hexdigest()
-    )
+    receipt_raw = _canonical(receipt)
+    predicate["receipt"]["digest"] = "sha256:" + hashlib.sha256(receipt_raw).hexdigest()
+    predicate["receipt"]["raw_base64"] = base64.b64encode(receipt_raw).decode("ascii")
     predicate["signers"]["receipt"] = {
         "identity": "recipient-tests/verifier",
         "fingerprint": public_key_fingerprint(key.public_key()),
@@ -724,7 +740,10 @@ def test_recipient_policy_errors_cover_identity_time_and_verdict_rules() -> None
     statement = _statement()
     predicate = statement["predicate"]
     keyid = predicate["signers"]["envelope"]["fingerprint"]
-    policy = _object(GOLDEN / "recipient-policy.json")
+    policy = _policy(
+        keyid,
+        envelope_identity=predicate["signers"]["envelope"]["identity"],
+    )
     assert not target._recipient_policy_errors(
         statement,
         predicate,
@@ -761,7 +780,10 @@ def test_recipient_policy_errors_cover_identity_time_and_verdict_rules() -> None
     future = target._recipient_policy_errors(
         _statement(),
         predicate,
-        _object(GOLDEN / "recipient-policy.json"),
+        _policy(
+            predicate["signers"]["envelope"]["fingerprint"],
+            envelope_identity=predicate["signers"]["envelope"]["identity"],
+        ),
         keyid=predicate["signers"]["envelope"]["fingerprint"],
         now=ISSUED_AT,
     )
@@ -771,7 +793,12 @@ def test_recipient_policy_errors_cover_identity_time_and_verdict_rules() -> None
         target._recipient_policy_errors(
             _statement(),
             _statement()["predicate"],
-            _object(GOLDEN / "recipient-policy.json"),
+            _policy(
+                _statement()["predicate"]["signers"]["envelope"]["fingerprint"],
+                envelope_identity=(
+                    _statement()["predicate"]["signers"]["envelope"]["identity"]
+                ),
+            ),
             keyid=_statement()["predicate"]["signers"]["envelope"]["fingerprint"],
             now=datetime(2026, 7, 25, 12, 0),
         )

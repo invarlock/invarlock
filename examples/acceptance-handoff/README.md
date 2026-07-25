@@ -30,7 +30,8 @@ release-blocking compatibility and acceptance tests. It contains:
 
 - the exact subject artifact;
 - the signed evidence pack and v0.13 verification receipt;
-- the in-toto/DSSE acceptance envelope;
+- the standards-shaped in-toto/DSSE acceptance envelope, including the exact
+  supplied receipt bytes;
 - the producer and verifier public keys;
 - the evaluated producer policy, current recipient policy, and independent
   technical anchors; and
@@ -48,15 +49,18 @@ byte-for-byte test diff.
 
 The deterministic private keys used while generating this public fixture are
 test material. They are never copied into the package and must not be used for
-real artifacts. A production recipient supplies its own trust registry,
-freshness rule, supported contract versions, and exact artifact bytes or
-digest.
+real artifacts. A production recipient supplies separate envelope-signer and
+receipt-verifier trust registries, freshness rules, supported contract
+versions, and exact artifact bytes or digest. Because v0.13 receipts have no
+authenticated issuance timestamp, a recipient that requires an evidence-age
+limit rejects them; a new envelope cannot renew that missing history.
 
 Historical technical verification answers whether the signed v0.13 evidence
 still satisfies its recorded contract. Present-day acceptability is a
 separate decision made under the recipient's current policy. A stricter
 recipient can therefore reject an authentic historical pass.
 
-Existing attestation policy engines can authenticate and policy-evaluate an
-InvarLock acceptance attestation without a custom InvarLock service or plugin;
-full semantic replay uses the InvarLock verifier.
+The envelope provides standards-shaped in-toto/DSSE transport. External
+policy-engine interoperability is not claimed; consumers must validate their
+own CUE, Open Policy Agent, or equivalent integration. Full semantic replay uses the
+InvarLock verifier.

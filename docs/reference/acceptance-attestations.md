@@ -7,13 +7,13 @@ quorum, governance action, or deployment decision.
 
 !!! info "Reference"
 
-    - **Surface:** `https://invarlock.dev/attestations/acceptance/v1`
-      in-toto/DSSE transport
-    - **Stability:** Closed v1 predicate and recipient-policy contracts
+    - **Surface:** `https://invarlock.dev/attestations/acceptance/v2`
+      standards-shaped in-toto/DSSE transport
+    - **Stability:** Closed v2 predicate and recipient-policy contracts
     - **Use this page when:** Producing, transporting, or independently
       evaluating a portable acceptance attestation
 
-The predicate format is `invarlock/acceptance-predicate-v1`; the envelope
+The predicate format is `invarlock/acceptance-predicate-v2`; the envelope
 payload type is `application/vnd.in-toto+json`.
 
 ## Handoff model
@@ -30,12 +30,11 @@ DSSE signer from its own trust registry, binds the in-toto subject to the exact
 artifact bytes or an independently obtained digest, authenticates the embedded
 receipt, and applies its current policy.
 
-Existing attestation policy engines can authenticate and policy-evaluate an
-InvarLock acceptance attestation without a custom InvarLock service or plugin;
-full semantic replay uses the InvarLock verifier.
-
-Generic attestation engines do not reproduce InvarLock's paired metric,
-statistics, policy arithmetic, or evidence-pack replay.
+The envelope is standards-shaped in-toto/DSSE transport. External
+policy-engine interoperability is not claimed: this repository does not
+maintain a CUE, Open Policy Agent, or equivalent integration test. Consumers
+must validate any external authentication and policy integration themselves.
+Full semantic replay uses the InvarLock verifier.
 
 ## Statement and predicate
 
@@ -53,7 +52,8 @@ content digest. The predicate repeats that exact binding and carries:
 - evaluation, receipt, and attestation timestamps;
 - receipt and envelope signer identities, key fingerprints, and their
   relationship; and
-- the complete signed InvarLock receipt.
+- the complete parsed signed InvarLock receipt plus the exact supplied receipt
+  bytes as authenticated base64.
 
 The closed source schema is
 `contracts/acceptance_predicate.schema.json`; the byte-identical packaged copy
@@ -61,17 +61,22 @@ ships with the core wheel.
 
 ## Authoritative receipt and v0.13 wrapping
 
-Version 1 uses `receipt.representation: embedded`. The embedded signed
-InvarLock receipt is the authoritative replayable technical result. Its digest
-is SHA-256 over its canonical JSON bytes. The surrounding predicate is a
-portable, policy-friendly projection whose duplicated fields must agree with
-the receipt. A digest reference is not an alternative v1 representation.
+Version 2 uses `receipt.representation: embedded`. The embedded signed
+InvarLock receipt is the authoritative replayable technical result.
+`receipt.raw_base64` preserves the exact supplied receipt-file bytes, and
+`receipt.digest` is SHA-256 over those decoded bytes. `receipt.content` is the
+parsed policy projection and must decode to the same JSON value. The
+surrounding predicate duplicates selected fields, all of which must agree with
+the authenticated receipt.
 
 Existing v0.13 receipt formats are wrapped without modification or relabeling.
-Their original format remains in `contracts.receipt` and in the embedded
-receipt. Because v0.13 receipts did not record an issuance time,
-`timestamps.receipt_issued_at` remains `null`; the wrapper does not manufacture
-historical metadata. The attestation issuance time is new transport metadata.
+Their original bytes are recoverable byte-for-byte from `receipt.raw_base64`,
+and their original format remains in `contracts.receipt` and the parsed
+receipt. Because v0.13 receipts did not authenticate an issuance time,
+`timestamps.receipt_issued_at` remains `null`; the wrapper rejects any attempt
+to manufacture that historical metadata. `evaluation_completed_at` is
+producer-reported context, not an authoritative freshness input.
+`attestation_issued_at` is new envelope-transport metadata.
 
 The verifier authenticates the inner receipt independently and checks its
 technical verdict, artifact anchors, schedule digest, policy digest, contract
@@ -90,13 +95,20 @@ producer or other party transporting that verified result.
 The relationship is descriptive and checked against the two signer objects.
 Recipient policy independently decides whether countersigned receipts are
 allowed. Trust in the DSSE signer does not replace authentication of the
-embedded receipt signer.
+embedded receipt signer. Recipient policy therefore has a separate
+`trusted_receipt_verifiers` registry. An optional
+`expected_receipt_trust_profile_digest` pins the verifier-owned trust profile
+recorded by the receipt. Unknown or revoked receipt verifiers fail closed even
+when the outer producer is trusted.
 
 ## Canonical bytes and signatures
 
-All signed JSON uses UTF-8, lexicographically sorted object keys, no
-insignificant whitespace, no non-finite numbers, unescaped Unicode, and one
-trailing line feed. SHA-256 digests are lowercase and use the `sha256:` prefix.
+The DSSE payload and each receipt statement's signed bytes use UTF-8,
+lexicographically sorted object keys, no insignificant whitespace, no
+non-finite numbers, unescaped Unicode, and one trailing line feed. The supplied
+receipt file itself may use different valid JSON formatting; its exact bytes
+are retained separately. SHA-256 digests are lowercase and use the `sha256:`
+prefix.
 
 The DSSE payload is the canonical in-toto Statement bytes. Ed25519 signs the
 DSSE pre-authentication encoding:
@@ -112,10 +124,16 @@ rejects a non-canonical payload even when it decodes to the same JSON value.
 ## Recipient policy and exact subject binding
 
 The closed recipient-policy schema is
-`contracts/recipient_acceptance_policy.schema.json`. It controls the expected
-predicate TypeURI, trusted envelope signer identity and fingerprint, signer
-status, freshness and clock skew, allowed InvarLock contract versions,
+`contracts/recipient_acceptance_policy.schema.json`. It independently controls
+trusted envelope signers, trusted receipt verifiers, optional receipt
+trust-profile pinning, signer status, allowed InvarLock contract versions,
 required technical verdict, and whether countersigning is allowed.
+
+Freshness has two independent limits. `max_envelope_age_seconds` applies to
+`attestation_issued_at`. `max_evidence_age_seconds`, when non-null, applies
+only to the receipt-authenticated `receipt_issued_at`. A missing authoritative
+evidence timestamp rejects under an evidence-age constraint. A producer cannot
+make old or undated evidence fresh merely by creating a new envelope.
 
 Exact subject binding is a separate, mandatory recipient input: provide either
 the expected `sha256:` digest or the artifact path to hash using the predicate's

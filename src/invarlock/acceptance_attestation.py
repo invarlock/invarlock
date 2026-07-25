@@ -47,7 +47,7 @@ from invarlock.runtime_providers.tensorrt_llm_identity import (
     read_tensorrt_llm_engine_tree_sha256,
 )
 
-ACCEPTANCE_PREDICATE_TYPE = "https://invarlock.dev/attestations/acceptance/v1"
+ACCEPTANCE_PREDICATE_TYPE = "https://invarlock.dev/attestations/acceptance/v2"
 ACCEPTANCE_PREDICATE_FORMAT = ACCEPTANCE_PREDICATE_FORMAT_VERSION
 RECIPIENT_POLICY_FORMAT = RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION
 IN_TOTO_STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
@@ -294,6 +294,12 @@ def _authenticate_receipt(
         verifier.get("signing_key_fingerprint"),
         label="embedded receipt verifier fingerprint",
     )
+    trust_profile_digest = verifier.get("trust_profile_digest")
+    if trust_profile_digest is not None:
+        _normalized_digest(
+            trust_profile_digest,
+            label="embedded receipt trust-profile digest",
+        )
     verdict = statement.get("verdict")
     if not isinstance(verdict, dict) or set(verdict) != {
         "ok",
@@ -489,7 +495,6 @@ def write_acceptance_attestation(
     receipt_raw, receipt = _load_object(
         Path(receipt_path), label="verification receipt"
     )
-    del receipt_raw
     receipt_statement, receipt_identity, receipt_fingerprint = _authenticate_receipt(
         receipt
     )
@@ -583,7 +588,6 @@ def write_acceptance_attestation(
         and envelope_identity == receipt_identity
         else "countersigned"
     )
-    canonical_receipt = _canonical_json_bytes(receipt)
     predicate: dict[str, Any] = {
         "format": ACCEPTANCE_PREDICATE_FORMAT,
         "subject": subject,
@@ -637,7 +641,8 @@ def write_acceptance_attestation(
         "receipt": {
             "representation": "embedded",
             "media_type": RECEIPT_MEDIA_TYPE,
-            "digest": _digest(canonical_receipt),
+            "digest": _digest(receipt_raw),
+            "raw_base64": base64.b64encode(receipt_raw).decode("ascii"),
             "content": receipt,
         },
     }
@@ -808,14 +813,30 @@ def _receipt_consistency_errors(
 ) -> tuple[bool, list[str]]:
     errors: list[str] = []
     receipt_block = predicate["receipt"]
-    canonical_receipt = _canonical_json_bytes(receipt_block["content"])
-    if receipt_block["digest"] != _digest(canonical_receipt):
-        errors.append("embedded receipt digest is invalid")
+    raw_matches_content = False
+    try:
+        receipt_raw = base64.b64decode(
+            receipt_block["raw_base64"],
+            validate=True,
+        )
+        digest_matches = receipt_block["digest"] == _digest(receipt_raw)
+        if not digest_matches:
+            errors.append("embedded receipt digest over raw bytes is invalid")
+        parsed_receipt = parse_json_bytes(
+            receipt_raw,
+            label="embedded receipt raw bytes",
+        )
+        if parsed_receipt != receipt_block["content"]:
+            errors.append("embedded receipt raw bytes disagree with content")
+        else:
+            raw_matches_content = digest_matches
+    except (StrictJsonError, TypeError, ValueError):
+        errors.append("embedded receipt raw bytes are invalid")
     try:
         receipt_statement, receipt_identity, receipt_fingerprint = (
             _authenticate_receipt(receipt_block["content"])
         )
-        authenticated = True
+        authenticated = raw_matches_content
     except AcceptanceAttestationError as exc:
         errors.append(str(exc).replace("embedded ", "", 1))
         receipt_statement = {}
@@ -831,6 +852,14 @@ def _receipt_consistency_errors(
         errors.append("predicate receipt contract disagrees with embedded receipt")
     if predicate["technical_verdict"] != receipt_statement.get("verdict"):
         errors.append("technical verdict disagrees with embedded receipt")
+    if (
+        receipt_statement.get("format") in _SUPPORTED_V013_RECEIPTS
+        and predicate["timestamps"]["receipt_issued_at"] is not None
+    ):
+        errors.append(
+            "receipt issuance timestamp is not authenticated by the embedded "
+            "v0.13 receipt"
+        )
     receipt_anchors = receipt_statement.get("anchors")
     if not isinstance(receipt_anchors, dict):
         return authenticated, errors
@@ -942,6 +971,38 @@ def _recipient_policy_errors(
         errors.append("envelope signer is not trusted by recipient policy")
     elif trusted_signer["status"] == "revoked":
         errors.append("envelope signer is revoked by recipient policy")
+    receipt_signer = predicate["signers"]["receipt"]
+    trusted_receipt_verifier = next(
+        (
+            item
+            for item in policy["trusted_receipt_verifiers"]
+            if item["fingerprint"] == receipt_signer["fingerprint"]
+            and item["identity"] == receipt_signer["identity"]
+        ),
+        None,
+    )
+    if trusted_receipt_verifier is None:
+        errors.append("receipt verifier is not trusted by recipient policy")
+    elif trusted_receipt_verifier["status"] == "revoked":
+        errors.append("receipt verifier is revoked by recipient policy")
+    expected_trust_profile_digest = policy.get("expected_receipt_trust_profile_digest")
+    receipt_content = predicate["receipt"]["content"]
+    receipt_statement = receipt_content.get("statement")
+    receipt_verifier = (
+        receipt_statement.get("verifier")
+        if isinstance(receipt_statement, dict)
+        else None
+    )
+    receipt_trust_profile_digest = (
+        receipt_verifier.get("trust_profile_digest")
+        if isinstance(receipt_verifier, dict)
+        else None
+    )
+    if (
+        expected_trust_profile_digest is not None
+        and receipt_trust_profile_digest != expected_trust_profile_digest
+    ):
+        errors.append("receipt trust-profile digest does not satisfy recipient policy")
     if policy["expected_predicate_type"] != statement.get("predicateType"):
         errors.append("predicate type is not allowed by recipient policy")
     if (
@@ -966,7 +1027,7 @@ def _recipient_policy_errors(
         errors.append("declared signer relationship is inconsistent")
     if relationship == "countersigned" and not policy["allow_countersigned_receipts"]:
         errors.append("countersigned receipts are not allowed by recipient policy")
-    issued_at = _parse_timestamp(
+    envelope_issued_at = _parse_timestamp(
         predicate["timestamps"]["attestation_issued_at"],
         label="attestation issuance timestamp",
     )
@@ -977,11 +1038,28 @@ def _recipient_policy_errors(
         )
     current = current.astimezone(UTC)
     skew = policy["freshness"]["clock_skew_seconds"]
-    age = (current - issued_at).total_seconds()
-    if age < -skew:
+    envelope_age = (current - envelope_issued_at).total_seconds()
+    if envelope_age < -skew:
         errors.append("attestation issuance timestamp is in the future")
-    if age > policy["freshness"]["max_age_seconds"] + skew:
-        errors.append("attestation is stale under recipient policy")
+    if envelope_age > policy["freshness"]["max_envelope_age_seconds"] + skew:
+        errors.append("attestation envelope is stale under recipient policy")
+    max_evidence_age = policy["freshness"]["max_evidence_age_seconds"]
+    if max_evidence_age is not None:
+        receipt_issued_at = predicate["timestamps"]["receipt_issued_at"]
+        if receipt_issued_at is None:
+            errors.append(
+                "authoritative evidence timestamp is unavailable under recipient policy"
+            )
+        else:
+            evidence_issued_at = _parse_timestamp(
+                receipt_issued_at,
+                label="authoritative evidence timestamp",
+            )
+            evidence_age = (current - evidence_issued_at).total_seconds()
+            if evidence_age < -skew:
+                errors.append("authoritative evidence timestamp is in the future")
+            if evidence_age > max_evidence_age + skew:
+                errors.append("technical evidence is stale under recipient policy")
     return errors
 
 

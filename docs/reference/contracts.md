@@ -20,8 +20,8 @@ cannot substitute a different schema.
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
-| `acceptance_predicate.schema.json` | `invarlock/acceptance-predicate-v1` | Portable projection of one technical decision in an in-toto Statement |
-| `recipient_acceptance_policy.schema.json` | `invarlock/recipient-acceptance-policy-v1` | Current recipient trust, freshness, version, signer, and verdict rules |
+| `acceptance_predicate.schema.json` | `invarlock/acceptance-predicate-v2` | Portable projection of one technical decision in an in-toto Statement |
+| `recipient_acceptance_policy.schema.json` | `invarlock/recipient-acceptance-policy-v2` | Current recipient trust, freshness, version, signer, and verdict rules |
 
 The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock

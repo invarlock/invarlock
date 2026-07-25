@@ -27,7 +27,9 @@ The historical result recorded by those authenticated bytes is immutable.
 Later software does not reinterpret, upgrade, or silently relabel a v0.13
 evidence pack, report, or receipt as a newer contract. A new representation may
 embed or reference the historical object, but it must retain the original
-format identifier and bytes.
+format identifier and bytes. Acceptance predicate v2 embeds the exact supplied
+receipt-file bytes in `receipt.raw_base64`; `receipt.digest` authenticates
+those decoded bytes rather than a new serialization.
 
 Future dossier implementations may ingest v0.13 receipts as explicitly
 versioned, first-class inputs. This covenant makes them **ingestible**; it does
@@ -38,9 +40,9 @@ not require a current recipient to accept them.
 A recipient applies its current policy after authenticating the historical
 technical result. That decision may depend on:
 
-- independently configured trust anchors and signer identity;
+- independently configured envelope-signer and receipt-verifier trust anchors;
 - active or revoked signer status;
-- maximum age and clock-skew allowance;
+- separate envelope-age and authoritative evidence-age limits, plus clock skew;
 - supported InvarLock contract versions and signature or digest algorithms;
 - exact binding to the artifact supplied by the recipient; and
 - the technical verdict required by the recipient.
