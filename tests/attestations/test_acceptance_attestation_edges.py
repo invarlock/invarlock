@@ -804,6 +804,29 @@ def test_recipient_policy_errors_cover_identity_time_and_verdict_rules() -> None
         )
 
 
+def test_recipient_policy_errors_require_exactly_one_matching_trust_record() -> None:
+    statement = _statement()
+    predicate = statement["predicate"]
+    keyid = predicate["signers"]["envelope"]["fingerprint"]
+    policy = _policy(
+        keyid,
+        envelope_identity=predicate["signers"]["envelope"]["identity"],
+    )
+    for registry in ("trusted_signers", "trusted_receipt_verifiers"):
+        policy[registry].append({**policy[registry][0], "status": "revoked"})
+
+    errors = target._recipient_policy_errors(
+        statement,
+        predicate,
+        policy,
+        keyid=keyid,
+        now=ISSUED_AT,
+    )
+
+    assert "envelope signer has multiple matching" in " ".join(errors)
+    assert "receipt verifier has multiple matching" in " ".join(errors)
+
+
 def test_public_verifier_rejects_invalid_policy_and_statement_shapes(
     tmp_path: Path,
 ) -> None:

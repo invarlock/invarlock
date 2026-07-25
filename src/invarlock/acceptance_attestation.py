@@ -700,6 +700,18 @@ def _load_policy(
     return dict(policy)
 
 
+def _validate_policy_trust_registries(policy: dict[str, Any]) -> None:
+    for registry_name in ("trusted_signers", "trusted_receipt_verifiers"):
+        seen: set[tuple[str, str]] = set()
+        for record in policy[registry_name]:
+            trust_key = (record["identity"], record["fingerprint"])
+            if trust_key in seen:
+                raise AcceptanceAttestationError(
+                    f"{registry_name} contains a duplicate identity/fingerprint pair"
+                )
+            seen.add(trust_key)
+
+
 def _technical_verdict(predicate: object) -> str | None:
     if not isinstance(predicate, dict):
         return None
@@ -958,32 +970,29 @@ def _recipient_policy_errors(
     outer_signer = predicate["signers"]["envelope"]
     if outer_signer["fingerprint"] != keyid:
         errors.append("predicate envelope signer disagrees with DSSE key ID")
-    trusted_signer = next(
-        (
-            item
-            for item in policy["trusted_signers"]
-            if item["fingerprint"] == keyid
-            and item["identity"] == outer_signer["identity"]
-        ),
-        None,
-    )
-    if trusted_signer is None:
+    trusted_signers = [
+        item
+        for item in policy["trusted_signers"]
+        if item["fingerprint"] == keyid and item["identity"] == outer_signer["identity"]
+    ]
+    if not trusted_signers:
         errors.append("envelope signer is not trusted by recipient policy")
-    elif trusted_signer["status"] == "revoked":
+    elif len(trusted_signers) != 1:
+        errors.append("envelope signer has multiple matching recipient trust records")
+    elif trusted_signers[0]["status"] == "revoked":
         errors.append("envelope signer is revoked by recipient policy")
     receipt_signer = predicate["signers"]["receipt"]
-    trusted_receipt_verifier = next(
-        (
-            item
-            for item in policy["trusted_receipt_verifiers"]
-            if item["fingerprint"] == receipt_signer["fingerprint"]
-            and item["identity"] == receipt_signer["identity"]
-        ),
-        None,
-    )
-    if trusted_receipt_verifier is None:
+    trusted_receipt_verifiers = [
+        item
+        for item in policy["trusted_receipt_verifiers"]
+        if item["fingerprint"] == receipt_signer["fingerprint"]
+        and item["identity"] == receipt_signer["identity"]
+    ]
+    if not trusted_receipt_verifiers:
         errors.append("receipt verifier is not trusted by recipient policy")
-    elif trusted_receipt_verifier["status"] == "revoked":
+    elif len(trusted_receipt_verifiers) != 1:
+        errors.append("receipt verifier has multiple matching recipient trust records")
+    elif trusted_receipt_verifiers[0]["status"] == "revoked":
         errors.append("receipt verifier is revoked by recipient policy")
     expected_trust_profile_digest = policy.get("expected_receipt_trust_profile_digest")
     receipt_content = predicate["receipt"]["content"]
@@ -1089,6 +1098,7 @@ def verify_acceptance_attestation(
         jsonschema.Draft202012Validator(
             load_recipient_acceptance_policy_schema()
         ).validate(policy)
+        _validate_policy_trust_registries(policy)
         if set(statement) != {"_type", "subject", "predicateType", "predicate"}:
             raise AcceptanceAttestationError("in-toto Statement fields are invalid")
         predicate_value = statement.get("predicate")

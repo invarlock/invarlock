@@ -232,6 +232,24 @@ def test_predicate_and_policy_schemas_are_packaged_and_closed(
     assert load_recipient_acceptance_policy_schema()["additionalProperties"] is False
 
 
+@pytest.mark.parametrize(
+    "registry",
+    ["trusted_signers", "trusted_receipt_verifiers"],
+)
+def test_recipient_policy_schema_rejects_exact_duplicate_trust_records(
+    tmp_path: Path,
+    registry: str,
+) -> None:
+    _envelope_path, _public, fingerprint = _envelope(tmp_path)
+    policy = _policy(fingerprint)
+    policy[registry].append(dict(policy[registry][0]))
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.Draft202012Validator(
+            load_recipient_acceptance_policy_schema()
+        ).validate(policy)
+
+
 def test_v013_receipt_wraps_without_relabelling_and_binds_exact_subject(
     tmp_path: Path,
 ) -> None:
@@ -407,6 +425,38 @@ def test_unknown_or_revoked_envelope_signer_is_rejected(
 
     assert decision.accepted is False
     assert message in " ".join(decision.errors)
+
+
+@pytest.mark.parametrize(
+    "registry",
+    ["trusted_signers", "trusted_receipt_verifiers"],
+)
+@pytest.mark.parametrize(
+    "statuses",
+    [("active", "revoked"), ("revoked", "active")],
+)
+def test_duplicate_trust_pair_is_rejected_independent_of_record_order(
+    tmp_path: Path,
+    registry: str,
+    statuses: tuple[str, str],
+) -> None:
+    envelope, public, fingerprint = _envelope(tmp_path)
+    policy = _policy(fingerprint)
+    original = policy[registry][0]
+    original["status"] = statuses[0]
+    policy[registry].append({**original, "status": statuses[1]})
+
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=policy,
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=ISSUED_AT,
+    )
+
+    assert decision.envelope_authenticated is True
+    assert decision.accepted is False
+    assert "duplicate identity/fingerprint pair" in " ".join(decision.errors)
 
 
 def test_trusted_outer_producer_cannot_introduce_unknown_receipt_verifier(
