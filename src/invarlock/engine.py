@@ -2,9 +2,22 @@
 
 Embedding applications should import this module rather than package internals.
 The surface is intentionally limited to the evaluate/verify/report transactions,
-their value types, and the runtime-provider ABI.
+the portable acceptance-attestation transport, their value types, and the
+runtime-provider ABI.
 """
 
+from invarlock.acceptance_attestation import (
+    ACCEPTANCE_PREDICATE_FORMAT,
+    ACCEPTANCE_PREDICATE_TYPE,
+    DSSE_PAYLOAD_TYPE,
+    IN_TOTO_STATEMENT_TYPE,
+    RECIPIENT_POLICY_FORMAT,
+    AcceptanceAttestation,
+    AcceptanceAttestationError,
+    AcceptanceDecision,
+    verify_acceptance_attestation,
+    write_acceptance_attestation,
+)
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.evaluation_request import (
     EvaluationRequest,
@@ -102,7 +115,15 @@ from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sh
 from invarlock.trust_inputs import TrustInputs, TrustInputsError, load_trust_inputs
 
 __all__ = [
+    "ACCEPTANCE_PREDICATE_FORMAT",
+    "ACCEPTANCE_PREDICATE_TYPE",
+    "DSSE_PAYLOAD_TYPE",
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
+    "IN_TOTO_STATEMENT_TYPE",
+    "RECIPIENT_POLICY_FORMAT",
+    "AcceptanceAttestation",
+    "AcceptanceAttestationError",
+    "AcceptanceDecision",
     "EvaluationBatch",
     "EvaluationInputPart",
     "EvaluationRecord",
@@ -177,7 +198,9 @@ __all__ = [
     "preflight_evaluation_request",
     "render_evidence",
     "verify_evidence",
+    "verify_acceptance_attestation",
     "verify_signed_verification_receipt",
+    "write_acceptance_attestation",
     "write_runtime_import_paired_records",
     "write_runtime_import_side",
 ]

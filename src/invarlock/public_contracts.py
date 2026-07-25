@@ -29,6 +29,8 @@ RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION = "invarlock/runtime-behavioral-sched
 SCORER_EXTENSION_DESCRIPTOR_FORMAT_VERSION = "invarlock/scorer-extension-descriptor-v1"
 SCORER_EXTENSION_BINDING_FORMAT_VERSION = "invarlock/scorer-extension-binding-v1"
 SCORER_EXTENSION_RESULT_FORMAT_VERSION = "invarlock/scorer-extension-result-v1"
+ACCEPTANCE_PREDICATE_FORMAT_VERSION = "invarlock/acceptance-predicate-v1"
+RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION = "invarlock/recipient-acceptance-policy-v1"
 
 
 class ContractLoadError(RuntimeError):
@@ -113,8 +115,17 @@ def load_scorer_extension_result_schema() -> dict[str, Any]:
     return _load_object_contract("scorer_extension_result.schema.json")
 
 
+def load_acceptance_predicate_schema() -> dict[str, Any]:
+    return _load_object_contract("acceptance_predicate.schema.json")
+
+
+def load_recipient_acceptance_policy_schema() -> dict[str, Any]:
+    return _load_object_contract("recipient_acceptance_policy.schema.json")
+
+
 __all__ = [
     "ContractLoadError",
+    "ACCEPTANCE_PREDICATE_FORMAT_VERSION",
     "EVALUATION_REQUEST_FORMAT_VERSION",
     "EVIDENCE_PACK_FORMAT_VERSION",
     "EVIDENCE_OBSERVATION_FORMAT_VERSION",
@@ -126,11 +137,13 @@ __all__ = [
     "RUNTIME_PROVIDER_CAPABILITIES_FORMAT_VERSION",
     "RUNTIME_PROVIDER_RECEIPT_FORMAT_VERSION",
     "RUNTIME_SCORING_OBSERVATION_FORMAT_VERSION",
+    "RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION",
     "SCORER_EXTENSION_BINDING_FORMAT_VERSION",
     "SCORER_EXTENSION_DESCRIPTOR_FORMAT_VERSION",
     "SCORER_EXTENSION_RESULT_FORMAT_VERSION",
     "TRUST_INPUTS_FORMAT_VERSION",
     "load_evaluation_request_schema",
+    "load_acceptance_predicate_schema",
     "load_evidence_pack_schema",
     "load_evidence_observation_schema",
     "load_trust_inputs_schema",
@@ -140,6 +153,7 @@ __all__ = [
     "load_runtime_provider_capabilities_schema",
     "load_runtime_provider_receipt_schema",
     "load_runtime_scoring_observation_schema",
+    "load_recipient_acceptance_policy_schema",
     "load_scorer_extension_binding_schema",
     "load_scorer_extension_descriptor_schema",
     "load_scorer_extension_result_schema",
