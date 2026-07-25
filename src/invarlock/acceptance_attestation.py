@@ -139,7 +139,7 @@ def _load_object(path: Path, *, label: str) -> tuple[bytes, dict[str, Any]]:
 def _load_private_key(path: Path) -> ed25519.Ed25519PrivateKey:
     try:
         raw = read_regular_file_bytes(
-            path, label="attestation signing key", max_bytes=64 * 1024
+            path, max_bytes=64 * 1024, label="attestation signing key"
         )
         key = serialization.load_pem_private_key(raw, password=None)
     except (StrictJsonError, TypeError, ValueError) as exc:
@@ -159,7 +159,7 @@ def _load_public_key(
     try:
         raw = (
             read_regular_file_bytes(
-                value, label="recipient public key", max_bytes=64 * 1024
+                value, max_bytes=64 * 1024, label="recipient public key"
             )
             if isinstance(value, Path)
             else value
