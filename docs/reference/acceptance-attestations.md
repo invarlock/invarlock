@@ -128,6 +128,9 @@ The closed recipient-policy schema is
 trusted envelope signers, trusted receipt verifiers, optional receipt
 trust-profile pinning, signer status, allowed InvarLock contract versions,
 required technical verdict, and whether countersigning is allowed.
+Each trust registry requires unique identity/fingerprint pairs. Duplicate pairs
+invalidate the policy regardless of record order or status, and verification
+requires exactly one matching trust record for each authenticated signer.
 
 Freshness has two independent limits. `max_envelope_age_seconds` applies to
 `attestation_issued_at`. `max_evidence_age_seconds`, when non-null, applies
