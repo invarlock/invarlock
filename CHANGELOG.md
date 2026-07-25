@@ -9,8 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a canonical InvarLock acceptance predicate in an in-toto Statement and
+  DSSE envelope, recipient-controlled verification policy, and a deterministic
+  offline producer-to-recipient handoff with a committed golden package.
+- Added the permanent v0.13 verification and dossier-ingestion compatibility
+  covenant plus a release-blocking clean-checkout corpus.
+
 ### Changed
 
+- Documented import mode as the authenticated per-record evaluator boundary:
+  aggregate-only and unsupported external-judge results remain fail-closed.
 - Refreshed the maintained Python, documentation, and GitHub Actions dependency
   baselines together with their hash-pinned workflow locks, and added direct
   declaration-to-lock parity coverage so automation cannot silently exercise
