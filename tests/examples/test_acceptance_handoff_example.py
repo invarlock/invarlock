@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
@@ -143,3 +144,126 @@ def test_handoff_refuses_to_reuse_workspace(tmp_path: Path, kind: str) -> None:
 
     with pytest.raises(RuntimeError, match="must be new"):
         module.run_handoff(workspace)
+
+
+def test_main_runs_handoff_in_explicit_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _module()
+    workspace = tmp_path / "explicit"
+    calls: list[Path] = []
+    monkeypatch.setattr(module, "run_handoff", calls.append)
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--workspace", str(workspace)])
+
+    assert module.main() == 0
+    assert calls == [workspace.resolve()]
+    assert capsys.readouterr().out == (
+        f"PASS offline producer-recipient handoff: {workspace.resolve()}\n"
+    )
+
+
+def test_main_uses_fresh_default_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    calls: list[Path] = []
+    monkeypatch.setattr(module, "run_handoff", calls.append)
+    monkeypatch.setattr(module.tempfile, "mkdtemp", lambda **_kwargs: str(tmp_path))
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT)])
+
+    assert module.main() == 0
+    assert calls == [tmp_path.resolve() / "workspace"]
+
+
+def test_main_writes_golden_package(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _module()
+    calls: list[bool] = []
+    monkeypatch.setattr(module, "write_golden", lambda: calls.append(True))
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--write-golden"])
+
+    assert module.main() == 0
+    assert calls == [True]
+    assert capsys.readouterr().out == (
+        f"PASS generated golden handoff package: {module.GOLDEN_ROOT}\n"
+    )
+
+
+def test_main_rejects_conflicting_output_options(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "--workspace",
+            str(tmp_path / "explicit"),
+            "--write-golden",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        module.main()
+
+
+def test_copy_golden_refuses_existing_destination(tmp_path: Path) -> None:
+    module = _module()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+
+    with pytest.raises(RuntimeError, match="destination must be new"):
+        module._copy_golden(source, destination)
+
+
+def test_contradictory_envelope_rejects_non_ed25519_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    source = tmp_path / "source.dsse.json"
+    destination = tmp_path / "destination.dsse.json"
+    private_key = tmp_path / "private.pem"
+    statement = {
+        "predicate": {"technical_verdict": {"policy_verdict": "pass"}},
+    }
+    source.write_bytes(
+        module._canonical(
+            {
+                "payload": module.base64.b64encode(module._canonical(statement)).decode(
+                    "ascii"
+                ),
+                "payloadType": module.DSSE_PAYLOAD_TYPE,
+                "signatures": [{"keyid": "unused", "sig": "unused"}],
+            }
+        )
+    )
+    private_key.write_bytes(b"not-used")
+    monkeypatch.setattr(
+        module.serialization,
+        "load_pem_private_key",
+        lambda *_args, **_kwargs: object(),
+    )
+
+    with pytest.raises(RuntimeError, match="not Ed25519"):
+        module._contradictory_envelope(source, destination, private_key)
+
+
+def test_handoff_fails_closed_when_any_scenario_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_decision", lambda *_args, **_kwargs: False)
+
+    with pytest.raises(RuntimeError, match="did not satisfy every scenario"):
+        module.run_handoff(tmp_path / "handoff")
