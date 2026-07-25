@@ -52,7 +52,7 @@ MYPY_TYPED_SURFACE := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -281,6 +281,9 @@ trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example tran
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py
 
 example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
+
+example-acceptance-handoff:  ## Run the service-free producer-to-recipient acceptance handoff
+	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
 
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \

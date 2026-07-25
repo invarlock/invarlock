@@ -1,0 +1,1 @@
+{"artifact_format":"hf_snapshot","checkpoint_tree_sha256":"a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb","format_version":"invarlock/model-artifact-identity-v1","immutable_revision":null,"model_id":"producer.example/subject","tokenizer_metadata_sha256":"ddf36208f9949fd7f038920cca8c3135131dfc92903505fa06fac647b7213422"}

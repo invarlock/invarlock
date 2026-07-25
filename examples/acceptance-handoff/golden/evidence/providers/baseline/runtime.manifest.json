@@ -1,0 +1,38 @@
+{
+  "config": {
+    "path": "run.yaml",
+    "sha256": "8d7758a3a1880e4206150dfdac3fcd29d7bcee7d56527d7e76ab30f50dab655b",
+    "source": "file"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-07-16T00:00:00+00:00",
+  "manifest_version": 1,
+  "outer_container": {
+    "allow_network": false,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "image_ref": "ghcr.io/invarlock/runtime@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "report": {
+    "filename": "report.json",
+    "path": "report.json",
+    "sha256": "8284e84dd0d4bec82945499312a34ec5df80570fbb6f62f18db83d51172734da"
+  },
+  "runtime_provider": {
+    "artifact_identity": {
+      "filename": "model-artifact.identity.json",
+      "sha256": "d83128edd268d2396f7762258da1818d25ce5dd8ce4578b3079db0bd6eff7ea9"
+    },
+    "receipt": {
+      "filename": "runtime-provider.receipt.json",
+      "sha256": "4532bd6b9c5de82dcd9ba29167d3c2aa9734f2c4cde412cc5a3e4575f0f692f5"
+    },
+    "scoring_observation": {
+      "filename": "runtime-scoring.observation.json",
+      "sha256": "1d6a677046f97ff9fd6ffed049ba2b1026e38709a31dcd2c068485c86b103403"
+    }
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

@@ -29,15 +29,13 @@ from invarlock.public_contracts import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE = (
-    REPO_ROOT / "examples/artifacts/trust-boundary-demo/evaluation/artifacts/evidence"
-)
-RECEIPT = (
-    REPO_ROOT
-    / "examples/artifacts/trust-boundary-demo/verifier/receipts/accepted.receipt.json"
-)
+GOLDEN = REPO_ROOT / "examples/acceptance-handoff/golden"
+EVIDENCE = GOLDEN / "evidence"
+RECEIPT = GOLDEN / "verification.receipt.json"
 ISSUED_AT = datetime(2026, 7, 25, 12, 0, tzinfo=UTC)
-SUBJECT_DIGEST = "sha256:" + "a" * 64
+SUBJECT_DIGEST = (
+    "sha256:a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb"
+)
 
 
 def _key(tmp_path: Path, name: str, seed: int = 7) -> tuple[Path, Path, str]:
@@ -179,7 +177,14 @@ def test_v013_receipt_wraps_without_relabelling_and_binds_exact_subject(
     assert statement["_type"] == IN_TOTO_STATEMENT_TYPE
     assert statement["predicateType"] == ACCEPTANCE_PREDICATE_TYPE
     assert statement["subject"] == [
-        {"name": "org/subject", "digest": {"sha256": "a" * 64}}
+        {
+            "name": "producer.example/subject",
+            "digest": {
+                "sha256": (
+                    "a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb"
+                )
+            },
+        }
     ]
     assert predicate["format"] == ACCEPTANCE_PREDICATE_FORMAT
     assert predicate["subject"]["artifact_digest"] == SUBJECT_DIGEST
