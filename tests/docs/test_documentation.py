@@ -289,6 +289,25 @@ def test_docs_describe_the_narrow_engine_and_embedding_facade() -> None:
         assert required in text
 
 
+def test_acceptance_docs_do_not_overclaim_external_policy_engine_support() -> None:
+    text = " ".join(
+        "\n".join(
+            _read(path)
+            for path in (
+                "docs/reference/acceptance-attestations.md",
+                "examples/acceptance-handoff/README.md",
+            )
+        )
+        .lower()
+        .split()
+    )
+
+    assert "existing attestation policy engines can authenticate" not in text
+    assert "without a custom invarlock service or plugin" not in text
+    assert "standards-shaped in-toto/dsse transport" in text
+    assert "external policy-engine interoperability is not claimed" in text
+
+
 def test_navigation_contains_only_existing_pages() -> None:
     config = yaml.safe_load(_read("mkdocs.yml"))
     rendered = str(config["nav"])

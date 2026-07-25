@@ -37,8 +37,9 @@ For producer-to-recipient use, the workflow is:
 
 The detailed receipt remains the replayable technical result. An optional
 in-toto/DSSE acceptance attestation transports that result and its exact
-subject binding; the recipient still applies its own current trust, freshness,
-contract-version, signer-status, and verdict policy.
+subject binding; the recipient still applies separate envelope and receipt
+trust, independent envelope and evidence freshness, contract-version,
+signer-status, and verdict policy.
 
 ```bash
 invarlock evaluate request.yaml
