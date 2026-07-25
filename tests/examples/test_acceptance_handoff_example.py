@@ -37,9 +37,11 @@ def test_reference_recipient_policy_is_schema_valid() -> None:
     jsonschema.Draft202012Validator(load_recipient_acceptance_policy_schema()).validate(
         policy
     )
-    assert policy["expected_predicate_type"].endswith("/acceptance/v1")
+    assert policy["expected_predicate_type"].endswith("/acceptance/v2")
     assert policy["required_technical_verdict"] == "pass"
     assert policy["trusted_signers"][0]["status"] == "active"
+    assert policy["trusted_receipt_verifiers"][0]["status"] == "active"
+    assert policy["freshness"]["max_evidence_age_seconds"] is None
 
 
 def test_committed_golden_package_verifies_end_to_end() -> None:
@@ -116,11 +118,13 @@ def test_offline_producer_recipient_handoff_covers_current_policy_failures(
         "scenarios": {
             "accepted": True,
             "contradictory_receipt_envelope_rejected": True,
+            "missing_evidence_timestamp_rejected": True,
             "revoked_signer_rejected": True,
-            "stale_evidence_rejected": True,
+            "stale_envelope_rejected": True,
             "stricter_policy_rejected": True,
             "tampered_envelope_rejected": True,
             "tampered_evidence_rejected": True,
+            "unknown_receipt_verifier_rejected": True,
             "unknown_signer_rejected": True,
             "wrong_artifact_rejected": True,
         },

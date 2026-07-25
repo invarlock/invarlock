@@ -177,10 +177,13 @@ def _write_request(
 
 
 def _recipient_policy(
-    fingerprint: str,
+    envelope_fingerprint: str,
+    receipt_verifier_fingerprint: str,
     *,
     status: str = "active",
-    max_age_seconds: int = 86400,
+    receipt_verifier_status: str = "active",
+    max_envelope_age_seconds: int = 86400,
+    max_evidence_age_seconds: int | None = None,
     versions: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
@@ -189,12 +192,20 @@ def _recipient_policy(
         "trusted_signers": [
             {
                 "identity": ENVELOPE_IDENTITY,
-                "fingerprint": fingerprint,
+                "fingerprint": envelope_fingerprint,
                 "status": status,
             }
         ],
+        "trusted_receipt_verifiers": [
+            {
+                "identity": VERIFIER_IDENTITY,
+                "fingerprint": receipt_verifier_fingerprint,
+                "status": receipt_verifier_status,
+            }
+        ],
         "freshness": {
-            "max_age_seconds": max_age_seconds,
+            "max_envelope_age_seconds": max_envelope_age_seconds,
+            "max_evidence_age_seconds": max_evidence_age_seconds,
             "clock_skew_seconds": 0,
         },
         "allowed_contract_versions": versions or ["0.13.0"],
@@ -396,7 +407,7 @@ def run_handoff(workspace: Path) -> None:
         issued_at=ISSUED_AT,
         evaluation_completed_at=ISSUED_AT - timedelta(minutes=5),
     )
-    policy = _recipient_policy(envelope_fingerprint)
+    policy = _recipient_policy(envelope_fingerprint, verifier_fingerprint)
     (recipient / "policy.json").write_bytes(_canonical(policy))
     anchors["verifier_fingerprint"] = verifier_fingerprint
     anchors["envelope_signer_fingerprint"] = envelope_fingerprint
@@ -419,7 +430,11 @@ def run_handoff(workspace: Path) -> None:
         envelope,
         envelope_public,
         envelope_fingerprint,
-        _recipient_policy(envelope_fingerprint, versions=["0.14.0"]),
+        _recipient_policy(
+            envelope_fingerprint,
+            verifier_fingerprint,
+            versions=["0.14.0"],
+        ),
         subject_artifact,
         now=ISSUED_AT + timedelta(minutes=5),
     )
@@ -449,7 +464,10 @@ def run_handoff(workspace: Path) -> None:
         subject_artifact,
         now=ISSUED_AT + timedelta(minutes=5),
     )
-    unknown_policy = _recipient_policy("sha256:" + "9" * 64)
+    unknown_policy = _recipient_policy(
+        "sha256:" + "9" * 64,
+        verifier_fingerprint,
+    )
     scenarios["unknown_signer_rejected"] = not _decision(
         envelope,
         envelope_public,
@@ -462,17 +480,48 @@ def run_handoff(workspace: Path) -> None:
         envelope,
         envelope_public,
         envelope_fingerprint,
-        _recipient_policy(envelope_fingerprint, status="revoked"),
+        _recipient_policy(
+            envelope_fingerprint,
+            verifier_fingerprint,
+            status="revoked",
+        ),
         subject_artifact,
         now=ISSUED_AT + timedelta(minutes=5),
     )
-    scenarios["stale_evidence_rejected"] = not _decision(
+    scenarios["stale_envelope_rejected"] = not _decision(
         envelope,
         envelope_public,
         envelope_fingerprint,
-        _recipient_policy(envelope_fingerprint, max_age_seconds=60),
+        _recipient_policy(
+            envelope_fingerprint,
+            verifier_fingerprint,
+            max_envelope_age_seconds=60,
+        ),
         subject_artifact,
         now=ISSUED_AT + timedelta(seconds=61),
+    )
+    scenarios["unknown_receipt_verifier_rejected"] = not _decision(
+        envelope,
+        envelope_public,
+        envelope_fingerprint,
+        _recipient_policy(
+            envelope_fingerprint,
+            "sha256:" + "8" * 64,
+        ),
+        subject_artifact,
+        now=ISSUED_AT + timedelta(minutes=5),
+    )
+    scenarios["missing_evidence_timestamp_rejected"] = not _decision(
+        envelope,
+        envelope_public,
+        envelope_fingerprint,
+        _recipient_policy(
+            envelope_fingerprint,
+            verifier_fingerprint,
+            max_evidence_age_seconds=60,
+        ),
+        subject_artifact,
+        now=ISSUED_AT + timedelta(minutes=5),
     )
     contradictory = recipient / "contradictory.dsse.json"
     _contradictory_envelope(envelope, contradictory, envelope_key)

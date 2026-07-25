@@ -36,6 +36,10 @@ ISSUED_AT = datetime(2026, 7, 25, 12, 0, tzinfo=UTC)
 SUBJECT_DIGEST = (
     "sha256:a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb"
 )
+RECEIPT_VERIFIER_IDENTITY = "producer.example/technical-verifier"
+RECEIPT_VERIFIER_FINGERPRINT = (
+    "sha256:74a97c1d8fe8d7d58faac074d3a3a9267d8db501d9e4aed77eaeb9ad4efb32ff"
+)
 
 
 def _key(tmp_path: Path, name: str, seed: int = 7) -> tuple[Path, Path, str]:
@@ -87,10 +91,15 @@ def _policy(
     identity: str = "producer.example/release-assurance",
     status: str = "active",
     max_age_seconds: int = 3600,
+    max_evidence_age_seconds: int | None = None,
     versions: list[str] | None = None,
     allow_countersigned: bool = True,
+    receipt_identity: str = RECEIPT_VERIFIER_IDENTITY,
+    receipt_fingerprint: str = RECEIPT_VERIFIER_FINGERPRINT,
+    receipt_status: str = "active",
+    expected_receipt_trust_profile_digest: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    policy = {
         "format": RECIPIENT_POLICY_FORMAT,
         "expected_predicate_type": ACCEPTANCE_PREDICATE_TYPE,
         "trusted_signers": [
@@ -100,14 +109,27 @@ def _policy(
                 "status": status,
             }
         ],
+        "trusted_receipt_verifiers": [
+            {
+                "identity": receipt_identity,
+                "fingerprint": receipt_fingerprint,
+                "status": receipt_status,
+            }
+        ],
         "freshness": {
-            "max_age_seconds": max_age_seconds,
+            "max_envelope_age_seconds": max_age_seconds,
+            "max_evidence_age_seconds": max_evidence_age_seconds,
             "clock_skew_seconds": 0,
         },
         "allowed_contract_versions": versions or ["0.13.0"],
         "required_technical_verdict": "pass",
         "allow_countersigned_receipts": allow_countersigned,
     }
+    if expected_receipt_trust_profile_digest is not None:
+        policy["expected_receipt_trust_profile_digest"] = (
+            expected_receipt_trust_profile_digest
+        )
+    return policy
 
 
 def _payload(envelope: Path) -> dict[str, Any]:
@@ -115,11 +137,10 @@ def _payload(envelope: Path) -> dict[str, Any]:
     return json.loads(base64.b64decode(outer["payload"], validate=True))
 
 
-def _resign(envelope: Path, private: Path, statement: dict[str, Any]) -> None:
-    outer = json.loads(envelope.read_bytes())
-    payload = (
+def _canonical(value: object) -> bytes:
+    return (
         json.dumps(
-            statement,
+            value,
             allow_nan=False,
             ensure_ascii=False,
             separators=(",", ":"),
@@ -127,6 +148,53 @@ def _resign(envelope: Path, private: Path, statement: dict[str, Any]) -> None:
         )
         + "\n"
     ).encode()
+
+
+def _resign_embedded_receipt(
+    receipt: dict[str, Any],
+    key: ed25519.Ed25519PrivateKey,
+    *,
+    identity: str,
+    trust_profile_digest: str | None = None,
+) -> None:
+    fingerprint = public_key_fingerprint(key.public_key())
+    receipt["statement"]["verifier"] = {
+        "identity": identity,
+        "signing_key_fingerprint": fingerprint,
+        "trust_profile_digest": trust_profile_digest,
+    }
+    receipt["signature"] = {
+        "format": "invarlock/evidence-verification-receipt-signature-v1",
+        "algorithm": "ed25519",
+        "public_key": {
+            "encoding": "pem",
+            "value": key.public_key()
+            .public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("ascii"),
+        },
+        "value": base64.b64encode(key.sign(_canonical(receipt["statement"]))).decode(
+            "ascii"
+        ),
+    }
+
+
+def _replace_embedded_receipt(
+    block: dict[str, Any],
+    receipt: dict[str, Any],
+) -> None:
+    raw = _canonical(receipt)
+    block["content"] = receipt
+    block["digest"] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    if "raw_base64" in block:
+        block["raw_base64"] = base64.b64encode(raw).decode("ascii")
+
+
+def _resign(envelope: Path, private: Path, statement: dict[str, Any]) -> None:
+    outer = json.loads(envelope.read_bytes())
+    payload = _canonical(statement)
     payload_type = outer["payloadType"].encode()
     pae = (
         b"DSSEv1 "
@@ -341,6 +409,89 @@ def test_unknown_or_revoked_envelope_signer_is_rejected(
     assert message in " ".join(decision.errors)
 
 
+def test_trusted_outer_producer_cannot_introduce_unknown_receipt_verifier(
+    tmp_path: Path,
+) -> None:
+    private, public, fingerprint = _key(tmp_path, "producer")
+    envelope = tmp_path / "acceptance.dsse.json"
+    write_acceptance_attestation(
+        RECEIPT,
+        EVIDENCE,
+        envelope,
+        signing_key_path=private,
+        signer_identity="producer.example/release-assurance",
+        policy_identity="producer.example/policies/release-regression-v3",
+        issued_at=ISSUED_AT,
+    )
+    statement = _payload(envelope)
+    receipt_block = statement["predicate"]["receipt"]
+    receipt = receipt_block["content"]
+    unknown_key = ed25519.Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    _resign_embedded_receipt(
+        receipt,
+        unknown_key,
+        identity="unknown.example/technical-verifier",
+    )
+    unknown_fingerprint = public_key_fingerprint(unknown_key.public_key())
+    _replace_embedded_receipt(receipt_block, receipt)
+    statement["predicate"]["signers"]["receipt"] = {
+        "identity": "unknown.example/technical-verifier",
+        "fingerprint": unknown_fingerprint,
+    }
+    statement["predicate"]["signers"]["relationship"] = "countersigned"
+    _resign(envelope, private, statement)
+
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=_policy(fingerprint),
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=ISSUED_AT,
+    )
+
+    assert decision.envelope_authenticated is True
+    assert decision.receipt_authenticated is True
+    assert decision.accepted is False
+    assert "receipt verifier is not trusted" in " ".join(decision.errors)
+
+
+def test_recipient_can_pin_receipt_trust_profile_digest(tmp_path: Path) -> None:
+    envelope, public, fingerprint = _envelope(tmp_path)
+
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=_policy(
+            fingerprint,
+            expected_receipt_trust_profile_digest="sha256:" + "8" * 64,
+        ),
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=ISSUED_AT,
+    )
+
+    assert decision.envelope_authenticated is True
+    assert decision.receipt_authenticated is True
+    assert decision.accepted is False
+    assert "trust-profile digest" in " ".join(decision.errors)
+
+
+def test_recipient_rejects_revoked_receipt_verifier(tmp_path: Path) -> None:
+    envelope, public, fingerprint = _envelope(tmp_path)
+
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=_policy(fingerprint, receipt_status="revoked"),
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=ISSUED_AT,
+    )
+
+    assert decision.envelope_authenticated is True
+    assert decision.receipt_authenticated is True
+    assert decision.accepted is False
+    assert "receipt verifier is revoked" in " ".join(decision.errors)
+
+
 def test_stale_attestation_is_rejected_by_configured_freshness(
     tmp_path: Path,
 ) -> None:
@@ -357,6 +508,83 @@ def test_stale_attestation_is_rejected_by_configured_freshness(
     assert decision.envelope_authenticated is True
     assert decision.accepted is False
     assert "stale" in " ".join(decision.errors)
+
+
+def test_fresh_rewrap_cannot_renew_receipt_without_authoritative_evidence_time(
+    tmp_path: Path,
+) -> None:
+    fresh_issue = ISSUED_AT + timedelta(days=365)
+    private, public, fingerprint = _key(tmp_path, "producer")
+    envelope = tmp_path / "rewrapped.dsse.json"
+    write_acceptance_attestation(
+        RECEIPT,
+        EVIDENCE,
+        envelope,
+        signing_key_path=private,
+        signer_identity="producer.example/release-assurance",
+        policy_identity="producer.example/policies/release-regression-v3",
+        issued_at=fresh_issue,
+        evaluation_completed_at=ISSUED_AT,
+    )
+    policy = _policy(
+        fingerprint,
+        max_age_seconds=3600,
+        max_evidence_age_seconds=86400,
+    )
+
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=policy,
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=fresh_issue + timedelta(minutes=5),
+    )
+
+    assert decision.envelope_authenticated is True
+    assert decision.receipt_authenticated is True
+    assert decision.accepted is False
+    assert "authoritative evidence timestamp is unavailable" in " ".join(
+        decision.errors
+    )
+
+
+def test_noncanonical_v013_receipt_bytes_are_preserved_in_wrapper(
+    tmp_path: Path,
+) -> None:
+    receipt = json.loads(RECEIPT.read_bytes())
+    noncanonical = json.dumps(receipt, indent=2, sort_keys=False).encode("utf-8")
+    receipt_path = tmp_path / "noncanonical.receipt.json"
+    receipt_path.write_bytes(noncanonical)
+    envelope, public, fingerprint = _envelope(
+        tmp_path,
+        signer_identity="producer.example/release-assurance",
+        seed=17,
+    )
+    envelope.unlink()
+    private = tmp_path / "producer.private.pem"
+    write_acceptance_attestation(
+        receipt_path,
+        EVIDENCE,
+        envelope,
+        signing_key_path=private,
+        signer_identity="producer.example/release-assurance",
+        policy_identity="producer.example/policies/release-regression-v3",
+        issued_at=ISSUED_AT,
+    )
+    receipt_block = _payload(envelope)["predicate"]["receipt"]
+
+    assert base64.b64decode(receipt_block["raw_base64"], validate=True) == noncanonical
+    assert receipt_block["digest"] == (
+        "sha256:" + hashlib.sha256(noncanonical).hexdigest()
+    )
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=_policy(fingerprint),
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=ISSUED_AT,
+    )
+    assert decision.accepted is True
 
 
 def test_contradictory_receipt_and_predicate_is_rejected_even_when_resigned(
@@ -408,17 +636,7 @@ def test_inner_receipt_tampering_is_rejected_even_when_outer_envelope_is_resigne
     statement = _payload(envelope)
     statement["predicate"]["receipt"]["content"]["statement"]["verdict"]["ok"] = False
     receipt = statement["predicate"]["receipt"]
-    canonical_receipt = (
-        json.dumps(
-            receipt["content"],
-            allow_nan=False,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        + "\n"
-    ).encode()
-    receipt["digest"] = "sha256:" + hashlib.sha256(canonical_receipt).hexdigest()
+    _replace_embedded_receipt(receipt, receipt["content"])
     _resign(envelope, private, statement)
 
     decision = verify_acceptance_attestation(

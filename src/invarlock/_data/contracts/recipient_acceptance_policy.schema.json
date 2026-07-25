@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://invarlock.dev/contracts/recipient_acceptance_policy.schema.json",
-  "title": "InvarLock Recipient Acceptance Policy v1",
+  "title": "InvarLock Recipient Acceptance Policy v2",
   "type": "object",
   "required": [
     "format",
     "expected_predicate_type",
     "trusted_signers",
+    "trusted_receipt_verifiers",
     "freshness",
     "allowed_contract_versions",
     "required_technical_verdict",
@@ -14,7 +15,7 @@
   ],
   "properties": {
     "format": {
-      "const": "invarlock/recipient-acceptance-policy-v1"
+      "const": "invarlock/recipient-acceptance-policy-v2"
     },
     "expected_predicate_type": {
       "type": "string",
@@ -41,14 +42,54 @@
         "additionalProperties": false
       }
     },
+    "trusted_receipt_verifiers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": ["identity", "fingerprint", "status"],
+        "properties": {
+          "identity": {
+            "$ref": "#/$defs/identity"
+          },
+          "fingerprint": {
+            "$ref": "#/$defs/digest"
+          },
+          "status": {
+            "enum": ["active", "revoked"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "expected_receipt_trust_profile_digest": {
+      "$ref": "#/$defs/digest"
+    },
     "freshness": {
       "type": "object",
-      "required": ["max_age_seconds", "clock_skew_seconds"],
+      "required": [
+        "max_envelope_age_seconds",
+        "max_evidence_age_seconds",
+        "clock_skew_seconds"
+      ],
       "properties": {
-        "max_age_seconds": {
+        "max_envelope_age_seconds": {
           "type": "integer",
           "minimum": 0,
           "maximum": 315360000
+        },
+        "max_evidence_age_seconds": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 315360000
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "clock_skew_seconds": {
           "type": "integer",
