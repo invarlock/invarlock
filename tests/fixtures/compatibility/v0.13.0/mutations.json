@@ -1,0 +1,26 @@
+{
+  "format": "invarlock/compatibility-mutations-v1",
+  "cases": [
+    {
+      "name": "tampered-technical-verdict",
+      "target": "receipt",
+      "path": ["statement", "verdict", "ok"],
+      "value": false,
+      "expected_error": "signature verification failed"
+    },
+    {
+      "name": "silent-contract-relabel",
+      "target": "receipt",
+      "path": ["statement", "format"],
+      "value": "invarlock/evidence-verification-receipt-v2",
+      "expected_error": "signature verification failed"
+    },
+    {
+      "name": "report-verdict-drift",
+      "target": "report",
+      "path": ["verdict"],
+      "value": "fail",
+      "expected_error": "checksum"
+    }
+  ]
+}

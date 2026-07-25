@@ -8,6 +8,7 @@ description = "Authenticated tokenizer digest fields contain public hashes, not 
 condition = "AND"
 regexTarget = "match"
 paths = [
+  '''examples/acceptance-handoff/golden/.*\.json$''',
   '''public_evidence/(?:catalog_evidence|published_basis)/.*/(?:evaluation\.report\.json|evidence_pack/reports/report-[0-9]+/evaluation\.report\.json)$''',
   '''public_evidence/evidence/.*\.json$''',
   '''docs/reference/qualification-suites\.manifest\.json$''',
@@ -28,4 +29,15 @@ paths = [
 ]
 regexes = [
   '''(?:signing_key|private_key|key):\s*ed25519''',
+]
+
+[[allowlists]]
+description = "Acceptance key-file size bounds are public limits, not credentials."
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''src/invarlock/acceptance_attestation\.py$''',
+]
+regexes = [
+  '''key",\s*max_bytes=64\s''',
 ]

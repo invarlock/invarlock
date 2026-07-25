@@ -30,6 +30,8 @@ nav:
       - CLI: reference/cli.md
       - Architecture: reference/architecture.md
       - Contracts: reference/contracts.md
+      - Compatibility covenant: reference/compatibility.md
+      - Acceptance attestations: reference/acceptance-attestations.md
       - Python API: reference/api-guide.md
       - Artifacts: reference/artifacts.md
       - Reports: reference/reports.md

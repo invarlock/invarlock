@@ -30,6 +30,16 @@ records whether the selected paired interval satisfies the policy. A separate
 verifier replays the
 bundle against independently supplied trust anchors.
 
+For producer-to-recipient use, the workflow is:
+
+> producer evaluation → portable signed evidence → independent recipient
+> verification → recipient-controlled acceptance
+
+The detailed receipt remains the replayable technical result. An optional
+in-toto/DSSE acceptance attestation transports that result and its exact
+subject binding; the recipient still applies its own current trust, freshness,
+contract-version, signer-status, and verdict policy.
+
 ```bash
 invarlock evaluate request.yaml
 invarlock verify evidence/
@@ -277,6 +287,12 @@ fine-tuning, pruning, quantization, GGUF, TensorRT-LLM, multimodal, harness, and
 endpoint outputs to the appropriate built-in, optional-runtime, or import
 boundary.
 
+External evaluator output is admissible only when InvarLock can authenticate
+the per-record inputs and deterministically recompute the decision-contract
+metric. Aggregate-only results and unsupported external-judge outputs fail
+closed. The LM Evaluation Harness journey tests this boundary; it does not make
+InvarLock a general evaluator.
+
 ## Providers and diagnostics
 
 Hugging Face Transformers is the built-in reference provider and supports both
@@ -304,6 +320,8 @@ section without changing the verdict. See
   [trust model](https://github.com/invarlock/invarlock/blob/main/docs/security/trust-model.md).
 - **Integrate:** [CLI](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md),
   [contracts](https://github.com/invarlock/invarlock/blob/main/docs/reference/contracts.md),
+  [acceptance attestations](https://github.com/invarlock/invarlock/blob/main/docs/reference/acceptance-attestations.md),
+  [compatibility covenant](https://github.com/invarlock/invarlock/blob/main/docs/reference/compatibility.md),
   [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/reference/runtime-providers.md), and
   [Python API](https://github.com/invarlock/invarlock/blob/main/docs/reference/api-guide.md).
 

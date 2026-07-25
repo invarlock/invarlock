@@ -1,0 +1,20 @@
+{
+  "allow_countersigned_receipts": true,
+  "allowed_contract_versions": [
+    "0.13.0"
+  ],
+  "expected_predicate_type": "https://invarlock.dev/attestations/acceptance/v1",
+  "format": "invarlock/recipient-acceptance-policy-v1",
+  "freshness": {
+    "clock_skew_seconds": 30,
+    "max_age_seconds": 86400
+  },
+  "required_technical_verdict": "pass",
+  "trusted_signers": [
+    {
+      "fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "identity": "producer.example/release-assurance",
+      "status": "active"
+    }
+  ]
+}

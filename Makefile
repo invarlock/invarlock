@@ -38,6 +38,7 @@ VERIFY_TARGET_JOBS ?= 3
 
 MYPY_TYPED_SURFACE := \
 	src/invarlock/engine.py \
+	src/invarlock/acceptance_attestation.py \
 	src/invarlock/cli/app.py \
 	src/invarlock/core/evaluation_request.py \
 	src/invarlock/core/runtime_provider \
@@ -51,7 +52,7 @@ MYPY_TYPED_SURFACE := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -80,14 +81,16 @@ lock-sync:  ## Check that uv.lock matches pyproject.toml
 	UV_NO_CACHE=1 uv lock --check
 
 ##@ Test
-test:  ## Run the complete test suite
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q tests
-
-test-fast:  ## Run tests that need no network, GPU, or long-lived runtime
+test: compatibility-test  ## Run the complete test suite
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		-m "not integration and not slow and not manual and not gpu" tests
+		--ignore=tests/compatibility tests
+
+test-fast: compatibility-test  ## Run tests that need no network, GPU, or long-lived runtime
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		-m "not integration and not slow and not manual and not gpu" \
+		--ignore=tests/compatibility tests
 
 test-parallel: PYTEST_WORKERS = auto
 test-parallel:  ## Run the fast suite with pytest-xdist
@@ -269,12 +272,18 @@ coverage-enforce-parallel:  ## Enforce coverage with pytest-xdist
 trust-smoke:  ## Exercise pack tamper rejection and signed receipt verification
 	PYTHONPATH=src $(PYTEST) -q tests/evidence_packs
 
+compatibility-test:  ## Replay the permanent v0.13 compatibility corpus
+	PYTHONPATH=src $(PYTEST) -q tests/compatibility
+
 mutation-smoke: trust-smoke  ## CI alias for the trust-critical adversarial smoke
 
 trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example transaction
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py
 
 example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
+
+example-acceptance-handoff:  ## Run the service-free producer-to-recipient acceptance handoff
+	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
 
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \

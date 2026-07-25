@@ -16,7 +16,15 @@ from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sh
 
 def test_engine_exports_only_supported_transactions_and_provider_contracts() -> None:
     assert set(engine.__all__) == {
+        "ACCEPTANCE_PREDICATE_FORMAT",
+        "ACCEPTANCE_PREDICATE_TYPE",
+        "DSSE_PAYLOAD_TYPE",
         "INVARLOCK_RUNTIME_PROVIDER_ABI",
+        "IN_TOTO_STATEMENT_TYPE",
+        "RECIPIENT_POLICY_FORMAT",
+        "AcceptanceAttestation",
+        "AcceptanceAttestationError",
+        "AcceptanceDecision",
         "EvaluationBatch",
         "EvaluationInputPart",
         "EvaluationRecord",
@@ -91,7 +99,9 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "preflight_evaluation_request",
         "render_evidence",
         "verify_evidence",
+        "verify_acceptance_attestation",
         "verify_signed_verification_receipt",
+        "write_acceptance_attestation",
         "write_runtime_import_paired_records",
         "write_runtime_import_side",
     }

@@ -16,7 +16,7 @@ The facade deliberately groups these stable surfaces:
 
 | Surface | Exports |
 | --- | --- |
-| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt` |
+| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt`, `write_acceptance_attestation`, `verify_acceptance_attestation` |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
 | Results and errors | Evaluation, verification, reporting, receipt, and evidence-pack result types |
 | OCI host execution | Per-side launch values, host executor, and environment-backed launch resolution |
@@ -119,6 +119,21 @@ processing. Ordinary receipt authenticity or anchor mismatches are reported in
 does not take independent artifact, schedule, policy, runtime, or signer
 anchors. Call `verify_evidence` when an independent acceptance decision is
 required.
+
+## Portable acceptance handoff
+
+`write_acceptance_attestation` wraps a signed verification receipt and its
+bound evidence into an in-toto Statement and DSSE envelope.
+`verify_acceptance_attestation` authenticates that envelope, the embedded
+receipt, the exact subject artifact, and one recipient-supplied current policy.
+It does not replay the complete evidence pack; use `verify_evidence` or
+`invarlock verify` for that authoritative technical replay.
+
+The result separates `historical_technical_verdict` from `accepted`, and also
+reports envelope authentication, receipt authentication, subject binding, and
+closed errors. See [Acceptance attestations](acceptance-attestations.md) for
+the TypeURI, canonical serialization, signer relationship, and reference
+policy.
 
 ## Function signatures
 

@@ -1,0 +1,40 @@
+{
+  "format": "invarlock/compatibility-corpus-v1",
+  "contract_release": "0.13.0",
+  "cases": [
+    {
+      "name": "acceptance-handoff-accepted-v013",
+      "evidence": "examples/acceptance-handoff/golden/evidence",
+      "receipt": "examples/acceptance-handoff/golden/verification.receipt.json",
+      "policy": "examples/acceptance-handoff/golden/evaluated-policy.json",
+      "sha256": {
+        "manifest": "354a93bce073d023b2cb3f08003a7c51b555fe437e6b5fa47290feea1c982bec",
+        "receipt": "3385edcca2c43a27fb9e694261d407fa7a6f7b60854807f40d609c84a6cb1ac7",
+        "report": "71acc9dc92fab09233d1e83298521ed8de385dc46af87c4d2f962e80cf66bb7a",
+        "schedule": "adf6af826b0a72ee32a9d5a156144d716afe93bb280a763a56076f1554e223bf"
+      },
+      "anchors": {
+        "artifact_digests": {
+          "baseline": "sha256:d83128edd268d2396f7762258da1818d25ce5dd8ce4578b3079db0bd6eff7ea9",
+          "subject": "sha256:9ed6e63e1e2624865468c2a62823788e62b723a105999f15943db028457724ad"
+        },
+        "runtime_digests": {
+          "baseline": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "subject": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "schedule_digest": "sha256:adf6af826b0a72ee32a9d5a156144d716afe93bb280a763a56076f1554e223bf",
+        "evidence_signer_fingerprint": "sha256:fe2b99fd9afaa999241faf924364da249f769fd984813db0d42f389f30c65005",
+        "verifier_identity": "producer.example/technical-verifier",
+        "verifier_fingerprint": "sha256:74a97c1d8fe8d7d58faac074d3a3a9267d8db501d9e4aed77eaeb9ad4efb32ff"
+      },
+      "expected": {
+        "pack_format": "invarlock/evidence-pack-v1",
+        "receipt_format": "invarlock/evidence-verification-receipt-v1",
+        "report_format": "invarlock/comparison-report-v2",
+        "metric": "exact_match",
+        "record_count": 50,
+        "technical_verdict": "pass"
+      }
+    }
+  ]
+}
