@@ -1,9 +1,9 @@
 # Threat model
 
-This threat model covers the `evaluate`, `verify`, and `report`
-transactions and the public provider contracts. It distinguishes attacks that
-the evidence verifier can detect from claims that require controls outside
-InvarLock.
+This threat model covers the `evaluate`, `verify`, and `report` transactions,
+the portable acceptance-attestation handoff, and the public provider
+contracts. It distinguishes attacks that the evidence verifier or acceptance
+verifier can detect from claims that require controls outside InvarLock.
 
 !!! warning "Security guidance"
 
@@ -14,9 +14,10 @@ InvarLock.
     **Objective:** Identify threats to one evidence transaction and distinguish
     verifier-enforced properties from risks that require deployment controls.
 
-    **Assets or boundary:** The `evaluate`, `verify`, and `report` data flow,
-    provider-contract inputs, signing identities, independent anchors, and
-    signed outputs; host and accelerator security remain external boundaries.
+    **Assets or boundary:** The `evaluate`, `verify`, `report`, and portable
+    acceptance data flows, provider-contract inputs, signing identities,
+    recipient policy, independent anchors, and signed outputs; host and
+    accelerator security remain external boundaries.
 
     **Use this page when:** Performing architecture review, assigning controls,
     interpreting a verifier failure, or deciding whether a deployment needs
@@ -32,6 +33,7 @@ InvarLock.
 | Replay correctness | Pairing, built-in scores or explicitly authorized scorer results, comparison arithmetic, paired interval, optional count/width qualification, and policy verdict are reconstructed from lower-level facts. |
 | Independent acceptance | Policy, artifact, schedule, runtime, and evidence-signer anchors are controlled outside the submitted evidence path. |
 | Receipt accountability | The verdict and exact anchors are bound to a separately recorded verifier identity and key. |
+| Recipient-controlled transport acceptance | The recipient independently authorizes both the DSSE envelope signer and technical receipt verifier, binds the exact subject, and applies current freshness and contract policy. |
 | Fail-closed handling | Missing, malformed, unknown, partial, extra, or inconsistent material cannot become accepted evidence. |
 
 Availability and confidentiality are not primary bundle-verification
@@ -47,6 +49,9 @@ deployment controls must protect sensitive model, dataset, and key material.
 - scorer binding, configuration, implementation, and independent authorization
   when an extension is selected;
 - canonical evidence pack and signed verification receipt;
+- the acceptance predicate, DSSE envelope, and exact embedded receipt bytes;
+- recipient-controlled envelope-signer and receipt-verifier registries,
+  freshness rules, contract-version rules, and expected subject binding;
 - evidence signer and verifier private keys; and
 - the authorization mapping from actor identities to public-key fingerprints.
 
@@ -72,6 +77,8 @@ can only reason about the facts in that bundle.
 | Selection attacker | Chooses favorable schedule, baseline, subject build, seed, retry, or stopping rule | Not detectable from one internally valid pack; prevented or exposed by advance commitment and attempt retention |
 | Verifier attacker | Controls verifier host/key or anchor source | Can issue misleading receipts; requires independent verifier authorization, key custody, and audit |
 | Receipt-verification error | Trusts embedded keys, HTML, or copied summaries without independent checks | Prevented only by independent receipt verification and authorization discipline |
+| Authorized malicious envelope signer | Controls an authorized DSSE key and can wrap or rewrap arbitrary material | Cannot authorize an unknown technical receipt verifier, renew receipt-authenticated evidence freshness, or change the exact subject without recipient-policy rejection |
+| Recipient-policy configuration attacker | Adds contradictory, duplicate, revoked, or attacker-controlled trust records | Duplicate identity/fingerprint pairs and zero-or-multiple signer matches fail closed; policy authorization and distribution remain deployment responsibilities |
 
 ## Threats, controls, and residual risk
 
@@ -93,6 +100,10 @@ can only reason about the facts in that bundle.
 | Malicious model or provider code executes during evaluation | Built-in strict HF path uses local safetensors, disables remote code and network access, and authenticates checkpoint/tokenizer material | Native libraries, container runtime, kernel, driver, add-ins, and optional backends can contain vulnerabilities. InvarLock is not a sandbox. |
 | Human report differs from machine evidence | Renderer authenticates the bundle and reads the canonical bound report | Screenshots, copied text, or externally modified HTML are not acceptance records. Verify the bundle and receipt. |
 | Evidence signer or verifier private key is stolen | Ed25519 signatures expose stable fingerprints suitable for pinning and rotation | Key storage, compromise detection, revocation, and incident response are external. |
+| Trusted envelope signer substitutes a self-signed technical receipt | Acceptance verification authenticates the embedded receipt and requires exactly one independently trusted receipt-verifier identity/fingerprint record | The recipient must maintain and securely distribute the receipt-verifier registry and its revocation state. |
+| Old evidence is placed in a newly issued envelope | Envelope age and receipt-authenticated evidence age are evaluated separately; missing authoritative evidence time rejects when an evidence-age limit is configured | v0.13 receipts have no authenticated issuance time and cannot satisfy a recipient policy that requires bounded evidence age. |
+| Recipient policy contains contradictory duplicate trust records | Both trust registries reject repeated identity/fingerprint pairs regardless of array order or status, and signer lookup requires exactly one match | The engine cannot decide which identities or keys the recipient should authorize. |
+| A historical receipt is reformatted during wrapping | The predicate authenticates `receipt.raw_base64` and its digest while requiring parsed content to agree with those exact supplied bytes | Byte preservation does not make the historical receipt current or change its original contract semantics. |
 
 ## Trust-boundary data flow
 
@@ -101,6 +112,7 @@ The critical transitions are:
 ```text
 host CLI -> separately pinned per-side OCI workers -> paired records -> host-signed pack
 signed pack + independent anchors -> verifier replay -> signed receipt
+signed receipt + bound evidence -> DSSE envelope -> recipient verifier + exact subject + current policy
 signed pack -> authenticated renderer -> console/HTML
 ```
 
@@ -114,7 +126,10 @@ on distinct explicit CUDA indexes may run in parallel. Model and
 runtime-integration code can still affect reported facts. At the second, the
 verifier treats every pack byte as hostile and must keep policy, artifact,
 schedule, runtime, and signer anchor sources outside the pack. At the third,
-presentation is read-only and carries no acceptance authority. The
+the recipient authenticates both signer roles from separate registries, checks
+the exact subject, applies independent envelope and evidence freshness, and
+evaluates its current policy. At the fourth, presentation is read-only and
+carries no acceptance authority. The
 [evidence signer/verifier diagram](../assets/evidence-signer-verifier-trust.svg) shows the
 separate signing boundaries.
 
@@ -186,6 +201,28 @@ a newly selected verifier key where appropriate. Re-signing fabricated
 evidence does not repair it; obtain new evidence from a trusted evaluation
 environment.
 
+### Trusted transport signer substitutes technical authority
+
+An authorized envelope signer wraps a receipt issued by an attacker-controlled
+technical verifier and supplies that verifier's embedded public key. The outer
+DSSE signature is valid, but it does not authorize the inner technical
+decision.
+
+**Mitigation:** maintain separate recipient-controlled envelope-signer and
+receipt-verifier registries. Acceptance verification authenticates the inner
+receipt and requires exactly one active receipt-verifier record matching both
+identity and fingerprint. Embedded key material alone is not a trust anchor.
+
+### Rewrapping renews old evidence
+
+A producer places an old or undated receipt in a newly issued envelope and
+attempts to satisfy a current freshness policy using only the envelope time.
+
+**Mitigation:** constrain envelope age and receipt-authenticated evidence age
+independently. A missing receipt issuance time rejects whenever evidence age is
+bounded. Producer-reported evaluation context cannot substitute for an
+authenticated receipt timestamp.
+
 ### Denial of service through hostile evidence
 
 A submitter provides oversized, deeply nested, symlinked, sparse, or malformed
@@ -207,11 +244,18 @@ processing adversarial input; parser checks do not replace process isolation.
 - exact provider, artifact, schedule, runtime, and record cross-bindings;
 - verifier-owned deterministic metric or explicitly authorized scorer replay
   and policy arithmetic; and
-- an external Ed25519 receipt binding independent anchors and verdict.
+- an external Ed25519 receipt binding independent anchors and verdict;
+- an authenticated DSSE acceptance envelope that independently verifies the
+  embedded receipt, exact subject, both signer roles, and current recipient
+  policy; and
+- exact historical receipt-byte preservation plus separate envelope and
+  receipt-authenticated evidence freshness.
 
 ### Required from the deployment
 
 - protected and separately authorized evidence-signing and verifier keys;
+- independently maintained, duplicate-free envelope-signer and
+  receipt-verifier registries for portable acceptance;
 - independently distributed policy, artifact, schedule, runtime,
   evidence-signer, and verifier anchors;
 - immutable artifact and runtime acquisition;
@@ -220,6 +264,11 @@ processing adversarial input; parser checks do not replace process isolation.
 - representative schedule and run-selection governance;
 - external execution attestation or independent rerun when required; and
 - retention, revocation, and incident-response procedures.
+
+The acceptance envelope is standards-shaped in-toto/DSSE transport. InvarLock
+does not claim that an external CUE, Open Policy Agent, or other policy engine
+authenticates or evaluates this predicate without a separately validated
+integration.
 
 ## Verification-failure handling
 
@@ -250,12 +299,15 @@ InvarLock does not claim to:
 - validate model safety, alignment, fairness, privacy, robustness, or content;
 - authorize deployment or replace domain-specific review;
 - secure a host, container engine, kernel, accelerator, or multi-tenant system;
-- issue or revoke identities and keys; or
+- issue or revoke identities and keys;
+- demonstrate external CUE, Open Policy Agent, or other policy-engine
+  authentication or evaluation of the acceptance envelope; or
 - establish the baseline as correct or trustworthy.
 
 See [Security practices](best-practices.md) for operating guidance and the
 [acceptance checklist](../assurance/acceptance-checklist.md) for one evidence
-decision.
+decision. Portable recipient verification is specified in
+[Acceptance attestations](../reference/acceptance-attestations.md).
 
 ## References
 

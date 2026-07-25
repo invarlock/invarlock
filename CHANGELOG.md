@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Described acceptance envelopes as standards-shaped in-toto/DSSE transport
+  without claiming untested interoperability with an external policy engine.
 - Documented import mode as the authenticated per-record evaluator boundary:
   aggregate-only and unsupported external-judge results remain fail-closed.
 - Refreshed the maintained Python, documentation, and GitHub Actions dependency
@@ -27,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- Hardened recipient acceptance policy so the envelope signer and technical
+  receipt verifier require separate recipient-controlled trust records,
+  duplicate identity/fingerprint pairs are invalid regardless of order or
+  status, and each authenticated signer must match exactly one record.
+- Separated envelope freshness from receipt-authenticated evidence freshness,
+  preventing a new envelope from renewing old evidence and rejecting missing
+  authoritative evidence timestamps when an evidence-age limit is required.
+- Preserved and authenticated the exact supplied v0.13 receipt bytes, including
+  valid non-canonical JSON formatting, without manufacturing a historical
+  receipt timestamp during wrapping.
 
 ## [0.13.0] - 2026-07-21
 

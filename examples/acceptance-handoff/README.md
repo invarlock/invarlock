@@ -20,8 +20,9 @@ make example-acceptance-handoff
 The command uses a new temporary workspace and needs no network or running
 InvarLock service. It demonstrates acceptance plus fail-closed behavior for a
 stricter current policy, a wrong artifact, tampered evidence, a tampered
-envelope, an unknown signer, a revoked signer, stale evidence, and a
-contradiction between the receipt and envelope.
+envelope, an unknown envelope signer, a revoked envelope signer, an unknown
+receipt verifier, a stale envelope, a missing authoritative evidence timestamp,
+and a contradiction between the receipt and envelope.
 
 ## Committed package
 
@@ -51,9 +52,12 @@ The deterministic private keys used while generating this public fixture are
 test material. They are never copied into the package and must not be used for
 real artifacts. A production recipient supplies separate envelope-signer and
 receipt-verifier trust registries, freshness rules, supported contract
-versions, and exact artifact bytes or digest. Because v0.13 receipts have no
-authenticated issuance timestamp, a recipient that requires an evidence-age
-limit rejects them; a new envelope cannot renew that missing history.
+versions, and exact artifact bytes or digest. Within each registry, every
+identity/fingerprint pair must be unique: duplicate pairs invalidate the policy
+regardless of order or status, and each authenticated signer must match exactly
+one trust record. Because v0.13 receipts have no authenticated issuance
+timestamp, a recipient that requires an evidence-age limit rejects them; a new
+envelope cannot renew that missing history.
 
 Historical technical verification answers whether the signed v0.13 evidence
 still satisfies its recorded contract. Present-day acceptability is a
