@@ -548,6 +548,50 @@ def test_fresh_rewrap_cannot_renew_receipt_without_authoritative_evidence_time(
     )
 
 
+@pytest.mark.parametrize(
+    ("receipt_issued_at", "expected_error"),
+    [
+        (
+            ISSUED_AT + timedelta(seconds=1),
+            "authoritative evidence timestamp is in the future",
+        ),
+        (
+            ISSUED_AT - timedelta(days=2),
+            "technical evidence is stale under recipient policy",
+        ),
+    ],
+)
+def test_v013_wrapper_cannot_manufacture_an_evidence_timestamp(
+    tmp_path: Path,
+    receipt_issued_at: datetime,
+    expected_error: str,
+) -> None:
+    envelope, public, fingerprint = _envelope(tmp_path)
+    statement = _payload(envelope)
+    statement["predicate"]["timestamps"]["receipt_issued_at"] = (
+        receipt_issued_at.isoformat().replace("+00:00", "Z")
+    )
+    _resign(envelope, tmp_path / "producer.private.pem", statement)
+
+    decision = verify_acceptance_attestation(
+        envelope,
+        trusted_public_keys={fingerprint: public},
+        recipient_policy=_policy(
+            fingerprint,
+            max_evidence_age_seconds=86400,
+        ),
+        expected_subject_digest=SUBJECT_DIGEST,
+        now=ISSUED_AT,
+    )
+
+    assert decision.envelope_authenticated is True
+    assert decision.receipt_authenticated is True
+    assert decision.accepted is False
+    errors = " ".join(decision.errors)
+    assert "timestamp is not authenticated by the embedded v0.13 receipt" in errors
+    assert expected_error in errors
+
+
 def test_noncanonical_v013_receipt_bytes_are_preserved_in_wrapper(
     tmp_path: Path,
 ) -> None:
