@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and verify one service-free producer-to-recipient handoff."""
+"""Generate and verify one service-free acceptance handoff."""
 
 from __future__ import annotations
 
@@ -44,10 +44,10 @@ ROOT = Path(__file__).resolve().parent
 POLICY_SOURCE = ROOT / "policy/acceptance.json"
 GOLDEN_ROOT = ROOT / "acceptance-handoff/golden"
 ISSUED_AT = datetime(2026, 7, 25, 12, 0, tzinfo=UTC)
-VERIFIER_IDENTITY = "producer.example/technical-verifier"
-ENVELOPE_IDENTITY = "producer.example/release-assurance"
-POLICY_IDENTITY = "producer.example/policies/release-regression-v1"
-HANDOFF_FORMAT = "invarlock/producer-recipient-handoff-v1"
+VERIFIER_IDENTITY = "verifier.example/release-qualification"
+ENVELOPE_IDENTITY = "envelope-signer.example/release-assurance"
+POLICY_IDENTITY = "evaluation.example/policies/release-regression-v1"
+HANDOFF_FORMAT = "invarlock/acceptance-handoff-v1"
 
 
 def _canonical(value: object) -> bytes:
@@ -108,7 +108,7 @@ def _prepare_artifact(path: Path, *, role: str) -> HFSnapshotArtifactIdentity:
     tokenizer = b'{"model":{"type":"WordLevel","vocab":{"fixture":0}}}\n'
     (path / "tokenizer.json").write_bytes(tokenizer)
     return HFSnapshotArtifactIdentity(
-        model_id=f"producer.example/{role}",
+        model_id=f"artifact.example/{role}",
         immutable_revision=None,
         checkpoint_tree_sha256=checkpoint_tree_sha256(path).removeprefix("sha256:"),
         tokenizer_metadata_sha256=hashlib.sha256(tokenizer).hexdigest(),
@@ -149,7 +149,7 @@ def _import_side(role: str) -> dict[str, str]:
 
 
 def _write_request(
-    producer: Path,
+    handoff: Path,
     identities: dict[str, HFSnapshotArtifactIdentity],
 ) -> Path:
     request = {
@@ -171,7 +171,7 @@ def _write_request(
         },
         "output": {"evidence": "evidence"},
     }
-    path = producer / "request.yaml"
+    path = handoff / "request.yaml"
     path.write_text(yaml.safe_dump(request, sort_keys=False), encoding="utf-8")
     return path
 
@@ -214,13 +214,13 @@ def _recipient_policy(
     }
 
 
-def _anchors(producer: Path, evidence_signer: str) -> dict[str, Any]:
+def _anchors(handoff: Path, evidence_signer: str) -> dict[str, Any]:
     return {
         "artifact_digests": {
-            role: _digest(producer / f"import/{role}/model-artifact.identity.json")
+            role: _digest(handoff / f"import/{role}/model-artifact.identity.json")
             for role in ("baseline", "subject")
         },
-        "schedule_digest": _digest(producer / "inputs/schedule.json"),
+        "schedule_digest": _digest(handoff / "inputs/schedule.json"),
         "runtime_digests": {
             "baseline": BASELINE_RUNTIME,
             "subject": SUBJECT_RUNTIME,
@@ -231,15 +231,15 @@ def _anchors(producer: Path, evidence_signer: str) -> dict[str, Any]:
 
 
 def _verify_historical_receipt(
-    producer: Path,
+    handoff: Path,
     anchors: dict[str, Any],
     *,
     verifier_fingerprint: str,
 ) -> bool:
     verified = verify_signed_verification_receipt(
-        producer / "verification.receipt.json",
-        producer / "evidence",
-        policy_path=producer / "policy/acceptance.json",
+        handoff / "verification.receipt.json",
+        handoff / "evidence",
+        policy_path=handoff / "policy/acceptance.json",
         expected_artifact_digests=anchors["artifact_digests"],
         expected_schedule_digest=anchors["schedule_digest"],
         expected_runtime_digests=anchors["runtime_digests"],
@@ -308,18 +308,18 @@ def _contradictory_envelope(
 
 
 def _tampered_evidence_rejected(
-    producer: Path,
+    handoff: Path,
     recipient: Path,
     anchors: dict[str, Any],
 ) -> bool:
     tampered = recipient / "tampered-evidence"
-    shutil.copytree(producer / "evidence", tampered)
+    shutil.copytree(handoff / "evidence", tampered)
     report = tampered / "reports/evaluation.report.json"
     report.chmod(stat.S_IMODE(report.stat().st_mode) | stat.S_IWUSR)
     report.write_bytes(report.read_bytes() + b"\n")
     result = verify_comparison_evidence(
         tampered,
-        policy_path=producer / "policy/acceptance.json",
+        policy_path=handoff / "policy/acceptance.json",
         expected_artifact_digests=anchors["artifact_digests"],
         expected_schedule_digest=anchors["schedule_digest"],
         expected_runtime_digests=anchors["runtime_digests"],
@@ -329,42 +329,42 @@ def _tampered_evidence_rejected(
 
 
 def run_handoff(workspace: Path) -> None:
-    """Run the deterministic offline producer/recipient transaction."""
+    """Run the deterministic offline acceptance transaction."""
 
     if workspace.exists() or workspace.is_symlink():
         raise RuntimeError("handoff workspace must be new")
-    producer = workspace / "producer"
+    handoff = workspace / "handoff"
     recipient = workspace / "recipient"
-    producer.mkdir(parents=True)
+    handoff.mkdir(parents=True)
     recipient.mkdir()
-    (producer / "policy").mkdir()
-    (producer / "inputs").mkdir()
-    (producer / "trusted-inputs").mkdir()
-    shutil.copy2(POLICY_SOURCE, producer / "policy/acceptance.json")
+    (handoff / "policy").mkdir()
+    (handoff / "inputs").mkdir()
+    (handoff / "trusted-inputs").mkdir()
+    shutil.copy2(POLICY_SOURCE, handoff / "policy/acceptance.json")
 
     identities = {
         role: _prepare_artifact(
-            producer / f"artifacts/{role}",
+            handoff / f"artifacts/{role}",
             role=role,
         )
         for role in ("baseline", "subject")
     }
-    regenerate(producer, identities=identities)
-    request_path = _write_request(producer, identities)
+    regenerate(handoff, identities=identities)
+    request_path = _write_request(handoff, identities)
 
     evidence_key, _evidence_public, evidence_fingerprint = _write_key(
-        producer / "private/evidence.private.pem",
-        producer / "private/evidence.public.pem",
+        handoff / "private/evidence.private.pem",
+        handoff / "private/evidence.public.pem",
         seed=11,
     )
     verifier_key, verifier_public, verifier_fingerprint = _write_key(
-        producer / "private/verifier.private.pem",
-        producer / "private/verifier.public.pem",
+        handoff / "private/verifier.private.pem",
+        handoff / "private/verifier.public.pem",
         seed=53,
     )
     envelope_key, envelope_public, envelope_fingerprint = _write_key(
-        producer / "private/envelope.private.pem",
-        recipient / "trust/producer.public.pem",
+        handoff / "private/envelope.private.pem",
+        recipient / "trust/envelope-signer.public.pem",
         seed=97,
     )
     loaded_request = load_evaluation_request(
@@ -376,31 +376,31 @@ def run_handoff(workspace: Path) -> None:
         signing_key_path=evidence_key,
         registry=CoreRegistry(),
     )
-    if evaluation.evidence_path != (producer / "evidence").resolve():
+    if evaluation.evidence_path != (handoff / "evidence").resolve():
         raise RuntimeError("evaluation published to an unexpected destination")
-    anchors = _anchors(producer, evidence_fingerprint)
+    anchors = _anchors(handoff, evidence_fingerprint)
     verify_evidence(
-        producer / "evidence",
-        policy_path=producer / "policy/acceptance.json",
+        handoff / "evidence",
+        policy_path=handoff / "policy/acceptance.json",
         expected_baseline_artifact=anchors["artifact_digests"]["baseline"],
         expected_subject_artifact=anchors["artifact_digests"]["subject"],
         expected_schedule=anchors["schedule_digest"],
         expected_baseline_runtime=BASELINE_RUNTIME,
         expected_subject_runtime=SUBJECT_RUNTIME,
         expected_signer=evidence_fingerprint,
-        receipt_path=producer / "verification.receipt.json",
+        receipt_path=handoff / "verification.receipt.json",
         verifier_signing_key_path=verifier_key,
         verifier_identity=VERIFIER_IDENTITY,
     )
     historical_verified = _verify_historical_receipt(
-        producer,
+        handoff,
         anchors,
         verifier_fingerprint=verifier_fingerprint,
     )
     write_acceptance_attestation(
-        producer / "verification.receipt.json",
-        producer / "evidence",
-        producer / "acceptance.dsse.json",
+        handoff / "verification.receipt.json",
+        handoff / "evidence",
+        handoff / "acceptance.dsse.json",
         signing_key_path=envelope_key,
         signer_identity=ENVELOPE_IDENTITY,
         policy_identity=POLICY_IDENTITY,
@@ -415,8 +415,8 @@ def run_handoff(workspace: Path) -> None:
     (recipient / "trust/technical-anchors.json").write_bytes(_canonical(anchors))
     shutil.copy2(verifier_public, recipient / "trust/verifier.public.pem")
 
-    subject_artifact = producer / "artifacts/subject"
-    envelope = producer / "acceptance.dsse.json"
+    subject_artifact = handoff / "artifacts/subject"
+    envelope = handoff / "acceptance.dsse.json"
     scenarios: dict[str, bool] = {}
     scenarios["accepted"] = _decision(
         envelope,
@@ -450,7 +450,7 @@ def run_handoff(workspace: Path) -> None:
         now=ISSUED_AT + timedelta(minutes=5),
     )
     scenarios["tampered_evidence_rejected"] = _tampered_evidence_rejected(
-        producer,
+        handoff,
         recipient,
         anchors,
     )
@@ -539,7 +539,7 @@ def run_handoff(workspace: Path) -> None:
         "scenarios": scenarios,
     }
     if not historical_verified or not all(scenarios.values()):
-        raise RuntimeError("producer-recipient handoff did not satisfy every scenario")
+        raise RuntimeError("acceptance handoff did not satisfy every scenario")
     (workspace / "results.json").write_bytes(_canonical(results))
 
 
@@ -548,13 +548,15 @@ def _copy_golden(source: Path, destination: Path) -> None:
         raise RuntimeError("golden package destination must be new")
     destination.mkdir(parents=True)
     selected = {
-        "artifact": source / "producer/artifacts/subject",
-        "evidence": source / "producer/evidence",
-        "verification.receipt.json": source / "producer/verification.receipt.json",
-        "acceptance.dsse.json": source / "producer/acceptance.dsse.json",
-        "evaluated-policy.json": source / "producer/policy/acceptance.json",
+        "artifact": source / "handoff/artifacts/subject",
+        "evidence": source / "handoff/evidence",
+        "verification.receipt.json": source / "handoff/verification.receipt.json",
+        "acceptance.dsse.json": source / "handoff/acceptance.dsse.json",
+        "evaluated-policy.json": source / "handoff/policy/acceptance.json",
         "recipient-policy.json": source / "recipient/policy.json",
-        "producer.public.pem": source / "recipient/trust/producer.public.pem",
+        "envelope-signer.public.pem": (
+            source / "recipient/trust/envelope-signer.public.pem"
+        ),
         "verifier.public.pem": source / "recipient/trust/verifier.public.pem",
         "technical-anchors.json": (source / "recipient/trust/technical-anchors.json"),
         "results.json": source / "results.json",
@@ -579,9 +581,7 @@ def write_golden(destination: Path = GOLDEN_ROOT) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="run the offline producer-to-recipient acceptance handoff"
-    )
+    parser = argparse.ArgumentParser(description="run the offline acceptance handoff")
     parser.add_argument("--workspace", type=Path)
     parser.add_argument(
         "--write-golden",
@@ -602,7 +602,7 @@ def main() -> int:
         / "workspace"
     )
     run_handoff(workspace)
-    print(f"PASS offline producer-recipient handoff: {workspace}")
+    print(f"PASS offline acceptance handoff: {workspace}")
     return 0
 
 

@@ -259,7 +259,7 @@ receipt without an external fingerprint check only proves self-consistency.
 
 Acceptance predicate v2 transports the signed receipt inside an in-toto
 Statement and DSSE envelope. The receipt signer is the technical verifier; the
-envelope signer is the producer or another transport authority. They may be the
+envelope signer is the party transporting the result. They may be the
 same identity and key, but recipient policy evaluates the roles independently.
 A countersigned relationship does not allow either registry to substitute for
 the other.

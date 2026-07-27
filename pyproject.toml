@@ -135,6 +135,7 @@ hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersPro
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
+invarlock-qualify-evaluator = "invarlock.evaluator_qualification_cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]

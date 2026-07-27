@@ -215,12 +215,13 @@ identity and fingerprint. Embedded key material alone is not a trust anchor.
 
 ### Rewrapping renews old evidence
 
-A producer places an old or undated receipt in a newly issued envelope and
-attempts to satisfy a current freshness policy using only the envelope time.
+An envelope signer places an old or undated receipt in a newly issued envelope
+and attempts to satisfy a current freshness policy using only the envelope
+time.
 
 **Mitigation:** constrain envelope age and receipt-authenticated evidence age
 independently. A missing receipt issuance time rejects whenever evidence age is
-bounded. Producer-reported evaluation context cannot substitute for an
+bounded. Wrapper-supplied evaluation context cannot substitute for an
 authenticated receipt timestamp.
 
 ### Denial of service through hostile evidence
@@ -265,10 +266,12 @@ processing adversarial input; parser checks do not replace process isolation.
 - external execution attestation or independent rerun when required; and
 - retention, revocation, and incident-response procedures.
 
-The acceptance envelope is standards-shaped in-toto/DSSE transport. InvarLock
-does not claim that an external CUE, Open Policy Agent, or other policy engine
-authenticates or evaluates this predicate without a separately validated
-integration.
+The acceptance envelope is standards-shaped in-toto/DSSE transport. The
+maintained interoperability example separately authenticates the envelope and
+embedded receipt before OPA/Rego or CUE evaluates recipient policy over the
+authenticated projection. It does not imply that arbitrary policy-engine
+configurations perform signature verification, full evidence replay, or safe
+acceptance without equivalent validation.
 
 ## Verification-failure handling
 

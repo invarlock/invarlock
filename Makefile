@@ -8,6 +8,8 @@ RUFF := $(PYTHON) -m ruff
 MYPY := $(PYTHON) -m mypy
 MKDOCS := $(PYTHON) -m mkdocs
 PYTEST_WORKERS ?= 0
+OPA ?= opa
+CUE ?= cue
 PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS),)
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
@@ -42,6 +44,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/app.py \
 	src/invarlock/core/evaluation_request.py \
 	src/invarlock/core/runtime_provider \
+	src/invarlock/evaluator_qualification.py \
 	src/invarlock/evaluation_run.py \
 	src/invarlock/evaluation_runtime.py \
 	src/invarlock/evaluation_transaction.py \
@@ -53,6 +56,8 @@ MYPY_TYPED_SURFACE := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus evaluator-docs-matrix-check
+.PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -228,8 +233,11 @@ coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
+			if grep -Fqx "$$source" examples/coverage-exemptions.txt; then continue; fi; \
 			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
 
 coverage-maintenance:  ## Measure maintained repository checks and security tooling
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
@@ -282,8 +290,29 @@ trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example tran
 
 example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
 
-example-acceptance-handoff:  ## Run the service-free producer-to-recipient acceptance handoff
+example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
+
+evaluator-qualification:  ## Requalify the retained evaluator matrix offline
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
+	$(MAKE) evaluator-authoritative-imports
+
+evaluator-authoritative-imports:  ## Replay authoritative 102-record imports offline
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
+
+evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-authoritative
+	$(MAKE) evaluator-qualification
+
+evaluator-authoritative-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
+	PYTHONPATH=src:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+		uv run --isolated --locked --extra hf python \
+		examples/evaluator-qualification/authoritative/generate_cases.py --check
+
+acceptance-policy-interop:  ## Run standalone OPA and CUE acceptance-policy fixtures
+	$(PYTHON) examples/policy-engine-interop/build_fixtures.py --check
+	$(PYTHON) examples/policy-engine-interop/run.py --opa "$(OPA)" --cue "$(CUE)"
 
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \
@@ -506,8 +535,11 @@ docs-live-fast: cli-smoke-core docs-check-build  ## Check documented command sur
 
 docs-live: docs-live-fast  ## Run the maintained documentation checks
 
-docs-check-build: docs-lint-strict  ## Lint and build documentation
+docs-check-build: evaluator-docs-matrix-check docs-lint-strict  ## Lint and build documentation
 	$(MKDOCS) build --strict
+
+evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
+	$(PYTHON) examples/evaluator-qualification/render_docs_matrix.py --check
 
 docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
 

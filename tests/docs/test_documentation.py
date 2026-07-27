@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -50,10 +52,12 @@ EXPECTED_DOC_PAGES = {
     "reference/cli.md",
     "reference/compatibility.md",
     "reference/contracts.md",
+    "reference/evaluator-qualification.md",
     "reference/environment.md",
     "reference/lifecycle.md",
     "reference/release-verification.md",
     "reference/reports.md",
+    "reference/policy-engine-interop.md",
     "reference/runtime-security.md",
     "reference/runtime-providers.md",
     "reference/documentation.md",
@@ -133,6 +137,85 @@ def test_core_docs_present_the_three_transaction_journey() -> None:
         text = _read(relative)
         missing = [command for command in JOURNEY_COMMANDS if command not in text]
         assert missing == [], f"{relative} misses {missing}"
+
+
+def test_readme_resources_use_absolute_urls_for_pypi() -> None:
+    readme = _read("README.md")
+    embedded_urls = re.findall(r'\b(?:href|src|srcset)="([^"]+)"', readme)
+    markdown_urls = re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme)
+    resource_urls = embedded_urls + markdown_urls
+
+    assert resource_urls
+    assert all(url.startswith(("https://", "mailto:")) for url in resource_urls)
+
+
+def test_readme_links_to_the_schema_valid_public_request() -> None:
+    readme = _read("README.md")
+    request_url = (
+        "https://github.com/invarlock/invarlock/blob/main/examples/request.yaml"
+    )
+
+    assert request_url in readme
+    assert "omits `--runtime-image` and `--runtime-image-digest`" in readme
+    request = yaml.safe_load(_read("examples/request.yaml"))
+    schema = json.loads(_read("contracts/evaluation_request.schema.json"))
+    jsonschema.Draft202012Validator(schema).validate(request)
+
+
+def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
+    readme = _read("README.md")
+    headings = (
+        "## Evidence paths",
+        "## Try the signed handoff locally",
+        "## Inspect published evidence",
+        "## Run, verify, and report",
+        "## The release-regression decision",
+        "## Import and qualify evaluator results",
+        "## Hand off acceptance",
+        "## Providers and diagnostics",
+        "## Documentation",
+    )
+    positions = [readme.index(heading) for heading in headings]
+
+    assert positions == sorted(positions)
+    evidence_paths = readme[
+        positions[0] : readme.index("## Try the signed handoff locally")
+    ]
+    for phrase in (
+        "Native execution",
+        "Qualified import",
+        "Authenticated observation",
+        "core exposes evaluator-neutral contracts",
+    ):
+        assert phrase in evidence_paths
+    assert evidence_paths.index("evaluation-verification-flow.svg") < (
+        evidence_paths.index("| Path |")
+    )
+
+    introduction = readme[: positions[0]]
+    assert "in-toto/DSSE" not in introduction
+    acceptance = readme[positions[6] : positions[7]]
+    assert "in-toto/DSSE" in acceptance
+    assert "**Compatibility note:**" in acceptance
+
+
+def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
+    readme = _read("README.md")
+    makefile = _read("Makefile")
+    evidence_root = REPO_ROOT / "public_evidence/evidence/mistral-7b-weight-scale-hf"
+
+    assert "make example-acceptance-handoff" in readme
+    assert "\nexample-acceptance-handoff:" in makefile
+    assert REPO_ROOT.joinpath("examples/run_acceptance_handoff.py").is_file()
+
+    report_path = "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence"
+    receipt_path = (
+        "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json"
+    )
+    assert report_path in readme
+    assert receipt_path in readme
+    assert evidence_root.joinpath("evidence/manifest.json").is_file()
+    assert evidence_root.joinpath("verification.receipt.json").is_file()
 
 
 def test_public_docs_describe_the_release_assurance_surface() -> None:
@@ -289,12 +372,13 @@ def test_docs_describe_the_narrow_engine_and_embedding_facade() -> None:
         assert required in text
 
 
-def test_acceptance_docs_do_not_overclaim_external_policy_engine_support() -> None:
+def test_acceptance_docs_state_the_external_policy_engine_boundary() -> None:
     text = " ".join(
         "\n".join(
             _read(path)
             for path in (
                 "docs/reference/acceptance-attestations.md",
+                "docs/reference/policy-engine-interop.md",
                 "examples/acceptance-handoff/README.md",
             )
         )
@@ -302,10 +386,11 @@ def test_acceptance_docs_do_not_overclaim_external_policy_engine_support() -> No
         .split()
     )
 
-    assert "existing attestation policy engines can authenticate" not in text
-    assert "without a custom invarlock service or plugin" not in text
-    assert "standards-shaped in-toto/dsse transport" in text
-    assert "external policy-engine interoperability is not claimed" in text
+    assert "open policy agent" in text
+    assert "cue" in text
+    assert "without an invarlock service or policy-engine plugin" in text
+    assert "standalone verifier" in text
+    assert "do not themselves perform raw ed25519 verification" in text
 
 
 def test_navigation_contains_only_existing_pages() -> None:
@@ -334,6 +419,8 @@ def test_navigation_contains_only_existing_pages() -> None:
         "reference/contracts.md",
         "reference/compatibility.md",
         "reference/acceptance-attestations.md",
+        "reference/policy-engine-interop.md",
+        "reference/evaluator-qualification.md",
         "reference/api-guide.md",
         "reference/artifacts.md",
         "reference/reports.md",
@@ -433,7 +520,10 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
 
     readme = _read("README.md")
     architecture = _read("docs/reference/architecture.md")
-    assert 'src="docs/assets/evaluation-verification-flow.svg"' in readme
+    assert (
+        'src="https://raw.githubusercontent.com/invarlock/invarlock/main/'
+        'docs/assets/evaluation-verification-flow.svg"'
+    ) in readme
     assert "../assets/evaluation-verification-flow.svg" in architecture
 
 
@@ -629,3 +719,46 @@ def test_latest_release_changelog_is_a_product_synthesis() -> None:
     for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
         assert heading in unreleased
         assert heading in release
+
+
+def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
+    text = _read("docs/reference/evaluator-qualification.md")
+    normalized = " ".join(text.split())
+
+    assert "Qualification profile" in text
+    assert "Authoritative import adapter" in text
+    assert "End-to-end release-assurance journey" in text
+    assert "LM Evaluation Harness" in text
+    assert "every retained authoritative import" in normalized
+    assert "102-record" in text
+    assert "cumulative claims" in text
+    assert "not permanent evaluator classes" in text
+    assert "Profiles can advance" in text
+    assert "Benchmark harnesses" in text
+    assert "Application evaluation SDKs" in text
+    assert "Evaluation and observability platforms" in text
+    assert "Microsoft PromptFlow" in text
+    assert "Azure AI Evaluation" in text
+    assert "Only LM Evaluation Harness" not in text
+    assert "remains the only evaluator example" not in text
+
+
+def test_evaluator_documentation_matrix_matches_retained_manifests() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(
+                REPO_ROOT
+                / "examples"
+                / "evaluator-qualification"
+                / "render_docs_matrix.py"
+            ),
+            "--check",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr

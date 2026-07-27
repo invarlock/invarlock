@@ -1,1 +1,1 @@
-{"digest":"sha256:9ed6e63e1e2624865468c2a62823788e62b723a105999f15943db028457724ad","format":"invarlock/evidence-input-identity-v1","locator":"artifact://producer.example/subject","media_type":"application/json","role":"subject"}
+{"digest":"sha256:3028c4d2bd723a42aa88630b212996dde2ac62f6f25374b421a86066c600c930","format":"invarlock/evidence-input-identity-v1","locator":"artifact://artifact.example/subject","media_type":"application/json","role":"subject"}

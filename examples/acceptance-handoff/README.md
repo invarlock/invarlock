@@ -2,12 +2,13 @@
 
 This example executes one complete, service-free handoff:
 
-1. a producer creates exact baseline and subject artifacts;
-2. the producer imports authenticated per-record results, recomputes the
+1. an evaluation operator identifies the exact baseline and subject artifacts;
+2. the evaluation operator imports authenticated per-record results, recomputes the
    paired metric, and signs the evidence pack;
 3. an independent technical verifier checks the pack and signs a v0.13
    receipt;
-4. the producer wraps that receipt in an in-toto Statement and DSSE envelope;
+4. an envelope signer wraps that receipt in an in-toto Statement and DSSE
+   envelope;
 5. a recipient authenticates the envelope, binds it to the artifact bytes,
    and applies its current acceptance policy.
 
@@ -26,15 +27,15 @@ and a contradiction between the receipt and envelope.
 
 ## Committed package
 
-[`golden/`](golden/) is the compact producer-generated package used by the
+[`golden/`](golden/) is the compact generated package used by the
 release-blocking compatibility and acceptance tests. It contains:
 
 - the exact subject artifact;
 - the signed evidence pack and v0.13 verification receipt;
 - the standards-shaped in-toto/DSSE acceptance envelope, including the exact
   supplied receipt bytes;
-- the producer and verifier public keys;
-- the evaluated producer policy, current recipient policy, and independent
+- the envelope-signer and verifier public keys;
+- the evaluated release policy, current recipient policy, and independent
   technical anchors; and
 - the expected scenario results.
 
@@ -64,7 +65,8 @@ still satisfies its recorded contract. Present-day acceptability is a
 separate decision made under the recipient's current policy. A stricter
 recipient can therefore reject an authentic historical pass.
 
-The envelope provides standards-shaped in-toto/DSSE transport. External
-policy-engine interoperability is not claimed; consumers must validate their
-own CUE, Open Policy Agent, or equivalent integration. Full semantic replay uses the
-InvarLock verifier.
+The envelope provides standards-shaped in-toto/DSSE transport. The sibling
+[`policy-engine-interop`](../policy-engine-interop/) example authenticates this
+exact envelope with a standalone verifier, then demonstrates current recipient
+policy in Open Policy Agent and CUE without an InvarLock service or import.
+Full evidence-pack semantic replay still uses the InvarLock verifier.

@@ -7,7 +7,9 @@ repos:
       - id: end-of-file-fixer
         # Evidence-pack integrity authenticates exact file bytes. Keep structural
         # validation active below, but never rewrite an already signed pack.
-        exclude: '^(public_evidence/evidence/|examples/(acceptance-handoff/golden/.*|inputs/schedule\.json|import/(baseline|subject|rejected-subject)/(model-artifact\.identity|runtime-provider\.receipt|runtime-scoring\.observation)\.json)$)'
+        # The authoritative runtime schedule likewise retains the generator's
+        # exact canonical bytes and is covered by a byte-for-byte parity check.
+        exclude: '^(public_evidence/evidence/|examples/(acceptance-handoff/golden/.*|evaluator-qualification/authoritative/runtime-schedule\.json|inputs/schedule\.json|import/(baseline|subject|rejected-subject)/(model-artifact\.identity|runtime-provider\.receipt|runtime-scoring\.observation)\.json)$)'
       - id: trailing-whitespace
       - id: check-yaml
         exclude: ^mkdocs\.yml$

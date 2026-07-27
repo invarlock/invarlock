@@ -114,7 +114,7 @@ def _policy(
         ],
         "trusted_receipt_verifiers": [
             {
-                "identity": "producer.example/technical-verifier",
+                "identity": "verifier.example/release-qualification",
                 "fingerprint": (
                     "sha256:"
                     "74a97c1d8fe8d7d58faac074d3a3a926"
@@ -242,7 +242,7 @@ def test_no_clobber_and_invalid_evidence_are_rejected(tmp_path: Path) -> None:
     with pytest.raises(AcceptanceAttestationError, match="already exists"):
         target._write_no_clobber(existing, b"replacement")
 
-    private = tmp_path / "producer.pem"
+    private = tmp_path / "envelope-signer.pem"
     _write_private_key(private, _private_key())
     with pytest.raises(AcceptanceAttestationError, match="real directory"):
         target.write_acceptance_attestation(
@@ -873,7 +873,7 @@ def test_public_verifier_rejects_invalid_policy_and_statement_shapes(
 def test_writer_rejects_naive_time_bad_identity_and_existing_output(
     tmp_path: Path,
 ) -> None:
-    private = tmp_path / "producer.pem"
+    private = tmp_path / "envelope-signer.pem"
     _write_private_key(private, _private_key())
 
     for kwargs, message in (

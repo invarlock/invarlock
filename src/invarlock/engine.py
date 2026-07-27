@@ -83,6 +83,15 @@ from invarlock.evaluation_transaction import (
     evaluate_request_file,
     preflight_evaluation_request,
 )
+from invarlock.evaluator_qualification import (
+    EVALUATOR_EXPORT_FORMAT,
+    EVALUATOR_PROFILE_FORMAT,
+    EVALUATOR_QUALIFICATION_FORMAT,
+    EVALUATOR_SCHEDULE_FORMAT,
+    EvaluatorQualificationError,
+    EvaluatorQualificationResult,
+    qualify_evaluator_export,
+)
 from invarlock.evidence_pack_contract import EvidenceObservation
 from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
 from invarlock.evidence_receipt import (
@@ -141,6 +150,12 @@ __all__ = [
     "EvidenceReportError",
     "EvidenceVerification",
     "EvidenceVerificationError",
+    "EVALUATOR_EXPORT_FORMAT",
+    "EVALUATOR_PROFILE_FORMAT",
+    "EVALUATOR_QUALIFICATION_FORMAT",
+    "EVALUATOR_SCHEDULE_FORMAT",
+    "EvaluatorQualificationError",
+    "EvaluatorQualificationResult",
     "GGUFArtifactIdentity",
     "HFSnapshotArtifactIdentity",
     "LocalDatasetRequest",
@@ -196,6 +211,7 @@ __all__ = [
     "launch_from_environment",
     "prepare_local_evaluation_schedule",
     "preflight_evaluation_request",
+    "qualify_evaluator_export",
     "render_evidence",
     "verify_evidence",
     "verify_acceptance_attestation",

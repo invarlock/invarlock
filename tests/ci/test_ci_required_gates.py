@@ -22,6 +22,7 @@ def test_ci_runs_the_repository_gates() -> None:
     jobs = workflow["jobs"]
 
     assert set(jobs) == {
+        "policy-engine-interop",
         "verify-fast",
         "minimum-python",
         "coverage",
@@ -33,6 +34,19 @@ def test_ci_runs_the_repository_gates() -> None:
         "staging/next",
         "release/v*",
     ]
+
+    interop = jobs["policy-engine-interop"]
+    assert _step(interop, "Set up Python")["with"]["python-version"] == "3.12"
+    install = _step(interop, "Install pinned policy engines")["run"]
+    assert "github.com/open-policy-agent/opa@v1.17.0" in install
+    assert "cuelang.org/go/cmd/cue@v0.16.1" in install
+    assert (
+        "make acceptance-policy-interop"
+        in _step(
+            interop,
+            "Run policy-engine interoperability matrix",
+        )["run"]
+    )
 
     fast = jobs["verify-fast"]
     assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
