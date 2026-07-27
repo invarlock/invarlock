@@ -192,12 +192,12 @@ The maintained [evaluator qualification
 matrix](evaluator-qualification.md) executes representative upstream tools
 through example-owned runners. Every deterministic profile also scores and
 replays the complete 102-record output of a pinned real model evaluation
-through the runtime-import boundary. LM Evaluation Harness currently also
-demonstrates the deeper model-running, signed transaction journey. The matrix
-records current evidence maturity rather than a permanent support hierarchy:
-other profiles can advance without changing the generic boundary. Evaluator
-names and native parsers remain outside the engine; a private evaluator crosses
-the same JSON, CLI, or Python SDK boundary.
+through the runtime-import boundary. The matrix separately records profiles
+that demonstrate the deeper model-running, signed transaction journey. These
+levels record evidence maturity rather than a permanent support hierarchy and
+can advance without changing the generic boundary. Evaluator names and native
+parsers remain outside the engine; a private evaluator crosses the same JSON,
+CLI, or Python SDK boundary.
 
 ### Run request
 

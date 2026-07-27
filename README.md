@@ -296,11 +296,10 @@ closed to verdict authority and remain observation-only. The maintained
 demonstrates this boundary across maintained upstream qualification profiles,
 grouped by evaluator role. Every deterministic per-record profile also replays
 complete 102-record results from a pinned real model evaluation through the
-runtime-import boundary; MLflow and Garak remain observation-only.
-LM Evaluation Harness currently also demonstrates a model-running, signed
-`evaluate` → `verify` → `report` journey. This is the maturity demonstrated in
-this revision, not a level reserved for LM Harness: other profiles can add
-equivalent journeys through the same evaluator-neutral boundary. These are
+runtime-import boundary; profiles without replayable per-record semantics remain
+observation-only. The matrix separately records which profiles also demonstrate
+a model-running, signed `evaluate` → `verify` → `report` journey. These maturity
+levels can advance through the same evaluator-neutral boundary. They are
 example-owned adapters and profiles outside the core, not evaluator-specific
 engine plugins or a permanent catalog ceiling.
 

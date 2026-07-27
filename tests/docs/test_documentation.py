@@ -649,7 +649,7 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     assert "102-record" in text
     assert "cumulative claims" in text
     assert "not permanent evaluator classes" in text
-    assert "Other evaluator profiles can advance" in text
+    assert "Profiles can advance" in text
     assert "Benchmark harnesses" in text
     assert "Application evaluation SDKs" in text
     assert "Evaluation and observability platforms" in text

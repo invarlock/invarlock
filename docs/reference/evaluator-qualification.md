@@ -19,22 +19,21 @@ that evaluator a built-in InvarLock plugin.
 
 ## Demonstration levels
 
-The repository keeps three cumulative claims separate. They describe the
-evidence maintained in the current revision, not permanent evaluator classes or
-an architectural support ceiling. Any profile can advance to a deeper level by
-adding the corresponding retained evidence.
+The repository keeps three cumulative claims separate. They describe retained
+evidence, not permanent evaluator classes or an architectural support ceiling.
+Any profile can advance to a deeper level by adding the corresponding retained
+evidence.
 
 | Level | What it proves | Coverage |
 | --- | --- | --- |
 | Qualification profile | The named upstream entry point executes and its output crosses the generic qualification contract | All maintained profiles |
 | Authoritative import adapter | A complete real evaluation is retained per record, independently recomputed, and replayed through the strict runtime-import loader | Every deterministic per-record profile |
-| End-to-end release-assurance journey | The evaluator participates in a model-running, signed `evaluate` → `verify` → `report` transaction | Currently demonstrated for LM Evaluation Harness |
+| End-to-end release-assurance journey | The evaluator participates in a model-running, signed `evaluate` → `verify` → `report` transaction | Profiles marked `Demonstrated` in the matrix |
 
 An authoritative import adapter is not described as an end-to-end journey.
-LM Evaluation Harness currently adds that deeper signed transaction evidence.
-Other evaluator profiles can advance to the same level through the existing
-evaluator-neutral boundary; doing so requires maintained model-running and
-signed-transaction fixtures, not a new evaluator-specific engine plugin.
+Profiles can advance to that deeper level through the existing evaluator-neutral
+boundary by adding maintained model-running and signed-transaction fixtures,
+not a new evaluator-specific engine plugin.
 
 ## Qualification matrix
 
@@ -51,16 +50,15 @@ runtime-import authoring boundary.
 
 The catalog is reviewed rather than quota-driven. A row must represent a
 recognizable current evaluator or a maintained successor, add a distinct
-ecosystem or workflow, and support retained real upstream execution. The
-maintenance review uses a twelve-month activity window and was last performed
-on 2026-07-27. The resulting catalog is the reviewed coverage in this revision,
-not a hard cap.
+ecosystem or workflow, and support retained real upstream execution. Review
+timing and activity-window metadata live in `matrix.json`; the resulting catalog
+is reviewed coverage, not a hard cap.
 
-Microsoft PromptFlow is represented by its maintained successor,
-Azure AI Evaluation, rather than preserving the deprecated
-`promptflow-evals` package as a second legacy row. OpenAI Evals is installed
-from the immutable source revision in its dependency declaration because the
-active repository has moved beyond its older published wheel.
+The matrix represents the Microsoft PromptFlow lineage with Azure AI Evaluation
+rather than preserving the deprecated `promptflow-evals` package as a second
+legacy row. OpenAI Evals is installed from the immutable source revision in its
+dependency declaration, so qualification binds the executed source rather than
+only a distribution label.
 
 ### Benchmark harnesses
 
@@ -161,11 +159,11 @@ imports for one real, pinned model evaluation. They do not demonstrate every
 metric, task type, hosted mode, or model-judge feature offered by those
 evaluators. They also do not turn example runners into engine plugins.
 
-LM Evaluation Harness is currently the integration that demonstrates the deeper
-model execution and signed release-assurance transaction. The remaining
-authoritative rows begin with the already authenticated model-output corpus
-and demonstrate evaluator execution, normalization, qualification, and strict
-runtime-import replay.
+Profiles marked `Demonstrated` in the matrix add the deeper model execution and
+signed release-assurance transaction. An authoritative row without that mark
+begins with the already authenticated model-output corpus and demonstrates
+evaluator execution, normalization, qualification, and strict runtime-import
+replay.
 
 ## Authority rules
 
