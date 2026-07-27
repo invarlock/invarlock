@@ -1135,6 +1135,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/api-guide/" class="md-nav__link">
         
   
@@ -1666,6 +1778,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#portable-acceptance-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable acceptance boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#non-goals" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1969,6 +2092,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#portable-acceptance-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable acceptance boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#non-goals" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2011,24 +2145,26 @@
 
 
 <h1 id="trust-model">Trust model<a class="headerlink" href="#trust-model" title="Permanent link">&para;</a></h1>
-<p>InvarLock separates evidence creation, acceptance, and presentation into
-three transactions. The separation matters only when their inputs and keys are
-controlled independently.</p>
+<p>InvarLock separates evidence creation, technical verification, portable
+recipient acceptance, and presentation into four transactions. The separation
+matters only when their inputs and keys are controlled independently.</p>
 <div class="admonition warning">
 <p class="admonition-title">Security guidance</p>
 <p><strong>In plain language:</strong> A valid signature identifies a key; trust comes from
 independently deciding that the key, policy, artifacts, schedule, runtimes,
 and scoped result are the ones you intended to rely on.</p>
-<p><strong>Objective:</strong> Define what evidence-signer and verifier signatures establish,
-which anchors must remain independent, and the exact scope of a trusted
-receipt.</p>
-<p><strong>Assets or boundary:</strong> Canonical evidence, evidence-signer and verifier signing
-identities, policy, artifact, schedule, and runtime anchors, authorized
-scorer code when selected, receipt statements, and the authorization
-sources that are intentionally outside submitted evidence.</p>
-<p><strong>Use this page when:</strong> Assigning evidence signer, verifier, or receipt verifier
-roles; designing trust-anchor distribution; or evaluating whether a signed
-result supports a proposed reliance decision.</p>
+<p><strong>Objective:</strong> Define what evidence-signer, technical-verifier, and envelope
+signatures establish, which anchors must remain independent, and the exact
+scope of a trusted receipt or portable acceptance envelope.</p>
+<p><strong>Assets or boundary:</strong> Canonical evidence, evidence-signer, verifier, and
+envelope-signing identities, technical and recipient policy, artifact,
+schedule, subject, and runtime anchors, authorized scorer code when
+selected, receipt and acceptance statements, and the authorization sources
+that are intentionally outside submitted evidence.</p>
+<p><strong>Use this page when:</strong> Assigning evidence signer, technical verifier,
+envelope signer, recipient, or receipt-verifier roles; designing
+trust-anchor distribution; or evaluating whether a signed result supports
+a proposed reliance decision.</p>
 </div>
 <h2 id="trust-statement">Trust statement<a class="headerlink" href="#trust-statement" title="Permanent link">&para;</a></h2>
 <p>Let <span class="arithmatex">\(M\)</span> be the canonical pack manifest, <span class="arithmatex">\(\sigma_E\)</span> its evidence signature,
@@ -2053,7 +2189,12 @@ exact agreement with <span class="arithmatex">\(A_V\)</span>, and this replay co
 <div class="arithmatex">\[
 V(E,A_V)=\texttt{pass}.
 \]</div>
-<p>Cryptographic validity alone is therefore necessary but not sufficient.</p>
+<p>Cryptographic validity alone is therefore necessary but not sufficient.
+Portable recipient acceptance adds a second authorization decision: the
+recipient authenticates the DSSE envelope signer and the technical receipt
+verifier against separate current trust registries, binds the exact subject,
+and applies current freshness, contract-version, signer-status, and verdict
+policy. A valid outer signature cannot authorize the inner receipt signer.</p>
 <h2 id="roles-and-trust-roots">Roles and trust roots<a class="headerlink" href="#roles-and-trust-roots" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2076,6 +2217,18 @@ V(E,A_V)=\texttt{pass}.
 <td>Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, explicitly authorized scorer registry when selected, verifier identity, and verifier key</td>
 <td>External signed verification receipt</td>
 <td>Authorized to make the scoped acceptance statement under independently managed anchors and scorer authorization</td>
+</tr>
+<tr>
+<td>Envelope signer</td>
+<td>Signed receipt, bound evidence metadata, exact subject, and envelope-signing key</td>
+<td>in-toto Statement in a DSSE envelope</td>
+<td>Authorized to transport a technical result; not automatically authorized as the technical receipt verifier or recipient decision owner</td>
+</tr>
+<tr>
+<td>Recipient</td>
+<td>Current recipient policy, envelope-signer and receipt-verifier registries, expected subject bytes or digest, and evaluation time</td>
+<td>Accepted or rejected portable handoff</td>
+<td>Authorizes both signer roles and decides present-day acceptability without changing the historical technical verdict</td>
 </tr>
 <tr>
 <td>Renderer</td>
@@ -2125,6 +2278,12 @@ bundle makes the check circular.</p>
 <td>The artifact executed or is suitable for deployment</td>
 </tr>
 <tr>
+<td>Acceptance subject content digest</td>
+<td>Recipient-owned artifact bytes or approved content digest</td>
+<td>The portable attestation names the exact derived artifact the recipient is evaluating</td>
+<td>The artifact is safe or suitable for deployment</td>
+</tr>
+<tr>
 <td>Canonical schedule digest</td>
 <td>Approved schedule record</td>
 <td>The evidence covers the exact expected ordered inputs and outputs</td>
@@ -2147,6 +2306,12 @@ bundle makes the check circular.</p>
 <td>Independently maintained verifier-identity record</td>
 <td>The receipt was signed by the expected verifier key</td>
 <td>The verifier host and process were free of compromise</td>
+</tr>
+<tr>
+<td>Envelope-signer identity/fingerprint</td>
+<td>Recipient-maintained envelope-signer registry</td>
+<td>The DSSE envelope was signed by the expected transport key</td>
+<td>The embedded technical receipt is authentic or authorized</td>
 </tr>
 <tr>
 <td>Trust-profile digest</td>
@@ -2212,6 +2377,13 @@ source, review, authorization, rotation, and revocation are operational
 controls.
 InvarLock records them; it does not operate a public-key infrastructure or
 policy distribution service.</p>
+<p>For portable acceptance, the recipient additionally supplies current policy,
+separate envelope-signer and receipt-verifier registries, optional expected
+receipt trust-profile digest, and either expected subject bytes or an approved
+subject digest. These inputs must not be copied from the submitted envelope.
+Each registry permits only one record for an identity/fingerprint pair;
+duplicates invalidate the policy regardless of record order or status, and
+each authenticated signer must match exactly one record.</p>
 <p>When a scorer extension is selected, the verifier also supplies an explicit
 <code>ScorerExtensionRegistry</code> from outside the evidence path. The independent
 policy pins the scorer ID, version, descriptor digest, and configuration
@@ -2223,7 +2395,8 @@ judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
 operational restrictions.</p>
 <h3 id="authorization-lifecycle">Authorization lifecycle<a class="headerlink" href="#authorization-lifecycle" title="Permanent link">&para;</a></h3>
-<p>For each evidence signer and verifier identity, the deployment should maintain:</p>
+<p>For each evidence signer, technical verifier, and envelope-signer identity, the
+deployment should maintain:</p>
 <ul>
 <li>fingerprint and role;</li>
 <li>owner and approving authority;</li>
@@ -2232,9 +2405,9 @@ operational restrictions.</p>
 <li>rotation predecessor/successor links; and</li>
 <li>compromise and re-verification procedure.</li>
 </ul>
-<p>The evidence pack and receipt do not query this lifecycle. A receipt verifier must
-check that the relevant keys were authorized for their roles at the decision
-time.</p>
+<p>The evidence pack, receipt, and acceptance envelope do not query this
+lifecycle. A receipt verifier or recipient must check that the relevant keys
+were authorized for their distinct roles at the decision time.</p>
 <h3 id="runtime-and-provider">Runtime and provider<a class="headerlink" href="#runtime-and-provider" title="Permanent link">&para;</a></h3>
 <p>Runtime receipts bind an integration implementation, artifact identity, scoring
 observation, execution settings, device facts, and outer image digest. The host
@@ -2278,6 +2451,36 @@ already signed bundle.</p>
 verifier identity and fingerprint, then confirm that its statement binds the
 expected pack manifest and anchors. Trusting the public key embedded in the
 receipt without an external fingerprint check only proves self-consistency.</p>
+<h2 id="portable-acceptance-boundary">Portable acceptance boundary<a class="headerlink" href="#portable-acceptance-boundary" title="Permanent link">&para;</a></h2>
+<p>Acceptance predicate v2 transports the signed receipt inside an in-toto
+Statement and DSSE envelope. The receipt signer is the technical verifier; the
+envelope signer is the party transporting the result. They may be the
+same identity and key, but recipient policy evaluates the roles independently.
+A countersigned relationship does not allow either registry to substitute for
+the other.</p>
+<p>The recipient verifier:</p>
+<ul>
+<li>authenticates the DSSE signer against exactly one active envelope-signer
+  trust record;</li>
+<li>authenticates the embedded receipt signer against exactly one active
+  receipt-verifier trust record;</li>
+<li>optionally pins the receipt's independently maintained trust-profile digest;</li>
+<li>binds the statement to exact recipient-supplied subject bytes or digest;</li>
+<li>requires the outer predicate and inner receipt to agree on the technical
+  verdict, artifacts, schedule, policy, contract version, and signer;</li>
+<li>evaluates envelope age from <code>attestation_issued_at</code> separately from evidence
+  age derived only from the receipt-authenticated <code>receipt_issued_at</code>; and</li>
+<li>retains the exact supplied receipt bytes in <code>receipt.raw_base64</code>, with a
+  digest over those decoded bytes and parsed-content equality.</li>
+</ul>
+<p>A v0.13 receipt has no authenticated issuance time. Wrapping it cannot invent
+one, so it cannot satisfy a recipient policy that requires bounded evidence
+age. Creating a fresh envelope changes transport metadata only.</p>
+<p>This boundary authenticates and policy-evaluates the portable projection; it
+does not replace full evidence replay with <code>invarlock verify</code>. The envelope is
+standards-shaped in-toto/DSSE transport, but interoperability with an external
+CUE, Open Policy Agent, or other policy engine requires a separately validated
+integration.</p>
 <h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <p>The trust model does not provide:</p>
 <ul>
@@ -2286,13 +2489,16 @@ receipt without an external fingerprint check only proves self-consistency.</p>
   custody;</li>
 <li>representative sampling or population-level statistical assurance;</li>
 <li>correctness, safety, alignment, or provenance of the baseline itself;</li>
-<li>model-content safety, prompt-attack defense, or deployment authorization; or</li>
+<li>model-content safety, prompt-attack defense, or deployment authorization;</li>
+<li>external policy-engine authentication or policy-evaluation interoperability
+  for the acceptance envelope; or</li>
 <li>host hardening, container-engine security, GPU isolation, or secret
   management.</li>
 </ul>
 <p>See the <a href="../../assurance/assurance-case/">assurance case</a>,
 <a href="../../assurance/reproducibility/">reproducibility limits</a>, and
-<a href="../threat-model/">Threat model</a>.</p>
+<a href="../threat-model/">Threat model</a>. The portable recipient contract is specified
+in <a href="../../reference/acceptance-attestations/">Acceptance attestations</a>.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="https://www.rfc-editor.org/rfc/rfc8032">RFC 8032: Edwards-Curve Digital Signature Algorithm</a>,

@@ -16,7 +16,7 @@
         <link rel="prev" href="../architecture/">
       
       
-        <link rel="next" href="../api-guide/">
+        <link rel="next" href="../compatibility/">
       
       
         
@@ -1226,6 +1226,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#evaluator-input-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluator input boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#run-request" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1344,6 +1355,118 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1864,6 +1987,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#evaluator-input-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluator input boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#run-request" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2042,8 +2176,41 @@ cannot substitute a different schema.</p>
 <td><code>invarlock/trust-inputs-v1</code></td>
 <td>Independent policy, anchors, verifier identity/key path, and scorer authorization</td>
 </tr>
+<tr>
+<td><code>acceptance_predicate.schema.json</code></td>
+<td><code>invarlock/acceptance-predicate-v2</code></td>
+<td>Portable projection of one technical decision in an in-toto Statement</td>
+</tr>
+<tr>
+<td><code>recipient_acceptance_policy.schema.json</code></td>
+<td><code>invarlock/recipient-acceptance-policy-v2</code></td>
+<td>Current recipient trust, freshness, version, signer, and verdict rules</td>
+</tr>
+<tr>
+<td><code>evaluator_qualification_profile.schema.json</code></td>
+<td><code>invarlock/evaluator-qualification-profile-v1</code></td>
+<td>Evaluator identity, execution provenance, and authority classification</td>
+</tr>
+<tr>
+<td><code>evaluator_qualification_schedule.schema.json</code></td>
+<td><code>invarlock/evaluator-qualification-schedule-v1</code></td>
+<td>Independent ordered record and reference identities</td>
+</tr>
+<tr>
+<td><code>evaluator_qualification_export.schema.json</code></td>
+<td><code>invarlock/evaluator-qualification-export-v1</code></td>
+<td>Normalized per-record facts or an observation-only summary</td>
+</tr>
+<tr>
+<td><code>evaluator_qualification_result.schema.json</code></td>
+<td><code>invarlock/evaluator-qualification-result-v1</code></td>
+<td>Digest-bound qualification outcome and import authority</td>
+</tr>
 </tbody>
 </table>
+<p>The acceptance predicate and recipient policy are described in
+<a href="../acceptance-attestations/">Acceptance attestations</a>. The detailed InvarLock
+receipt remains the authoritative replayable result.</p>
 <h2 id="provider-contracts">Provider contracts<a class="headerlink" href="#provider-contracts" title="Permanent link">&para;</a></h2>
 <p>The provider ABI uses these schema-backed documents:</p>
 <table>
@@ -2095,6 +2262,8 @@ not validate semantic cross-bindings by themselves.</p>
     <span class="n">load_evidence_observation_schema</span><span class="p">,</span>
     <span class="n">load_evidence_pack_schema</span><span class="p">,</span>
     <span class="n">load_trust_inputs_schema</span><span class="p">,</span>
+    <span class="n">load_acceptance_predicate_schema</span><span class="p">,</span>
+    <span class="n">load_recipient_acceptance_policy_schema</span><span class="p">,</span>
     <span class="n">load_model_artifact_identity_schema</span><span class="p">,</span>
     <span class="n">load_runtime_behavioral_schedule_schema</span><span class="p">,</span>
     <span class="n">load_runtime_manifest_schema</span><span class="p">,</span>
@@ -2259,6 +2428,31 @@ require explicit authorization. SQL or code execution, model-based semantic
 similarity, network services,
 human review, and LLM judges require different trust contracts; judge outputs
 can be attached as authenticated observations without acceptance authority.</p>
+<h3 id="evaluator-input-boundary">Evaluator input boundary<a class="headerlink" href="#evaluator-input-boundary" title="Permanent link">&para;</a></h3>
+<p>Import mode is the general extension boundary for measurements produced by an
+external evaluator. An evaluator's output is admissible for an acceptance
+decision only when InvarLock can authenticate the ordered per-record inputs
+and outputs, bind them to the exact schedule, artifacts, runtime, and source,
+and deterministically recompute the decision-contract metric or authorized
+scorer.</p>
+<p>An adapter alone does not establish evaluator neutrality. The generic
+qualification boundary binds the profile, independent schedule, normalized
+export, retained upstream output, runner bundle, and dependency declaration.
+For a deterministic exact-match profile, every ordered input and output must be
+present and InvarLock independently recomputes every score. Aggregate-only
+results, missing or reordered record facts, and external-judge outputs whose
+scores cannot be deterministically replayed remain observation-only and expose
+no runtime-import records.</p>
+<p>The maintained <a href="../evaluator-qualification/">evaluator qualification
+matrix</a> executes representative upstream tools
+through example-owned runners. Every deterministic profile also scores and
+replays the complete 102-record output of a pinned real model evaluation
+through the runtime-import boundary. The matrix separately records profiles
+that demonstrate the deeper model-running, signed transaction journey. These
+levels record evidence maturity rather than a permanent support hierarchy and
+can advance without changing the generic boundary. Evaluator names and native
+parsers remain outside the engine; a private evaluator crosses the same JSON,
+CLI, or Python SDK boundary.</p>
 <h3 id="run-request">Run request<a class="headerlink" href="#run-request" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="nt">format_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock/evaluation-request-v1</span>
 <span class="nt">comparison</span><span class="p">:</span>

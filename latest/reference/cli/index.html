@@ -1262,6 +1262,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api-guide/" class="md-nav__link">
         
   
@@ -1828,6 +1940,16 @@ invarlock report evidence/
 <p>Use <code>invarlock --version</code> for the installed version and <code>invarlock --help</code> for
 the authoritative option list. The commands have the same transaction
 boundaries as the <a href="../api-guide/">Python facade</a>.</p>
+<p>External evaluator qualification uses a separate companion executable so the
+three-command release transaction remains unchanged:</p>
+<div class="codehilite"><pre><span></span><code>invarlock-qualify-evaluator qualify PROFILE SCHEDULE EXPORT RAW_OUTPUT \
+  [--output RESULT] [--require-verdict-authority] [--json]
+</code></pre></div>
+
+<p>This command is evaluator-neutral: it never executes or dispatches to a named
+evaluator. It authenticates one already-normalized export and independently
+recomputes deterministic exact-match records. See <a href="../evaluator-qualification/">Evaluator
+qualification</a>.</p>
 <h2 id="root-command">Root command<a class="headerlink" href="#root-command" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/api-guide/">
       
       
-        <link rel="prev" href="../contracts/">
+        <link rel="prev" href="../evaluator-qualification/">
       
       
         <link rel="next" href="../artifacts/">
@@ -1135,6 +1135,118 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1213,6 +1325,28 @@
     <span class="md-ellipsis">
       
         Transactions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-evaluator-qualification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External evaluator qualification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#portable-acceptance-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable acceptance handoff
       
     </span>
   </a>
@@ -1819,6 +1953,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#external-evaluator-qualification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External evaluator qualification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#portable-acceptance-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable acceptance handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#function-signatures" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2000,7 +2156,7 @@ individual bundle files remain internal unless explicitly documented.</p>
 <tbody>
 <tr>
 <td>Transactions</td>
-<td><code>evaluate_request_file</code>, <code>verify_evidence</code>, <code>render_evidence</code>, <code>verify_signed_verification_receipt</code></td>
+<td><code>evaluate_request_file</code>, <code>verify_evidence</code>, <code>render_evidence</code>, <code>verify_signed_verification_receipt</code>, <code>write_acceptance_attestation</code>, <code>verify_acceptance_attestation</code></td>
 </tr>
 <tr>
 <td>Request</td>
@@ -2025,6 +2181,10 @@ individual bundle files remain internal unless explicitly documented.</p>
 <tr>
 <td>Scorer extension</td>
 <td>ABI constant, descriptor and binding types, replay protocol and request/result types, explicit registry, and binding/result builders</td>
+</tr>
+<tr>
+<td>Evaluator qualification</td>
+<td><code>qualify_evaluator_export</code>, <code>EvaluatorQualificationResult</code>, <code>EvaluatorQualificationError</code>, and four format constants</td>
 </tr>
 <tr>
 <td>HF identity</td>
@@ -2142,6 +2302,46 @@ processing. Ordinary receipt authenticity or anchor mismatches are reported in
 does not take independent artifact, schedule, policy, runtime, or signer
 anchors. Call <code>verify_evidence</code> when an independent acceptance decision is
 required.</p>
+<h2 id="external-evaluator-qualification">External evaluator qualification<a class="headerlink" href="#external-evaluator-qualification" title="Permanent link">&para;</a></h2>
+<p>The stable SDK accepts a normalized export from any open or proprietary
+evaluator. The caller owns evaluator execution and native-output parsing;
+InvarLock owns closed-contract validation, digest binding, schedule matching,
+and deterministic exact-match replay.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">qualify_evaluator_export</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">qualify_evaluator_export</span><span class="p">(</span>
+    <span class="n">profile_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;profile.json&quot;</span><span class="p">),</span>
+    <span class="n">schedule_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;schedule.json&quot;</span><span class="p">),</span>
+    <span class="n">export_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;export.json&quot;</span><span class="p">),</span>
+    <span class="n">raw_output_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;upstream-output.json&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">authority</span> <span class="o">==</span> <span class="s2">&quot;verdict_authority&quot;</span><span class="p">:</span>
+    <span class="n">import_records</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">runtime_records</span><span class="p">()</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">runtime_records</span><span class="p">()</span> <span class="o">==</span> <span class="p">()</span>
+</code></pre></div>
+
+<p><code>runtime_records()</code> never exposes records for aggregate-only, human-review,
+nondeterministic-judge, or unsupported-replay profiles. See <a href="../evaluator-qualification/">Evaluator
+qualification</a> for the contracts, private
+evaluator path, and maintained matrix.</p>
+<h2 id="portable-acceptance-handoff">Portable acceptance handoff<a class="headerlink" href="#portable-acceptance-handoff" title="Permanent link">&para;</a></h2>
+<p><code>write_acceptance_attestation</code> wraps a signed verification receipt and its
+bound evidence into an in-toto Statement and DSSE envelope while retaining the
+exact supplied receipt-file bytes.
+<code>verify_acceptance_attestation</code> authenticates that envelope, the embedded
+receipt, the exact subject artifact, separate envelope and receipt-verifier
+trust, and one recipient-supplied current policy.
+It does not replay the complete evidence pack; use <code>verify_evidence</code> or
+<code>invarlock verify</code> for that authoritative technical replay.</p>
+<p>The result separates <code>historical_technical_verdict</code> from <code>accepted</code>, and also
+reports envelope authentication, receipt authentication, subject binding, and
+closed errors. See <a href="../acceptance-attestations/">Acceptance attestations</a> for
+the TypeURI, canonical serialization, signer relationship, and reference
+policy.</p>
 <h2 id="function-signatures">Function signatures<a class="headerlink" href="#function-signatures" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="n">evaluate_request_file</span><span class="p">(</span>
     <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>

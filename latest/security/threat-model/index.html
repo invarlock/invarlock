@@ -1135,6 +1135,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/api-guide/" class="md-nav__link">
         
   
@@ -1672,6 +1784,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#trusted-transport-signer-substitutes-technical-authority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted transport signer substitutes technical authority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rewrapping-renews-old-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rewrapping renews old evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#denial-of-service-through-hostile-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1991,6 +2125,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#trusted-transport-signer-substitutes-technical-authority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted transport signer substitutes technical authority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rewrapping-renews-old-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rewrapping renews old evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#denial-of-service-through-hostile-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2099,10 +2255,10 @@
 
 
 <h1 id="threat-model">Threat model<a class="headerlink" href="#threat-model" title="Permanent link">&para;</a></h1>
-<p>This threat model covers the <code>evaluate</code>, <code>verify</code>, and <code>report</code>
-transactions and the public provider contracts. It distinguishes attacks that
-the evidence verifier can detect from claims that require controls outside
-InvarLock.</p>
+<p>This threat model covers the <code>evaluate</code>, <code>verify</code>, and <code>report</code> transactions,
+the portable acceptance-attestation handoff, and the public provider
+contracts. It distinguishes attacks that the evidence verifier or acceptance
+verifier can detect from claims that require controls outside InvarLock.</p>
 <div class="admonition warning">
 <p class="admonition-title">Security guidance</p>
 <p><strong>In plain language:</strong> InvarLock can detect tampering and inconsistent
@@ -2110,9 +2266,10 @@ evidence, but it cannot prove that an honest runtime executed or that the
 chosen test and threshold are sufficient.</p>
 <p><strong>Objective:</strong> Identify threats to one evidence transaction and distinguish
 verifier-enforced properties from risks that require deployment controls.</p>
-<p><strong>Assets or boundary:</strong> The <code>evaluate</code>, <code>verify</code>, and <code>report</code> data flow,
-provider-contract inputs, signing identities, independent anchors, and
-signed outputs; host and accelerator security remain external boundaries.</p>
+<p><strong>Assets or boundary:</strong> The <code>evaluate</code>, <code>verify</code>, <code>report</code>, and portable
+acceptance data flows, provider-contract inputs, signing identities,
+recipient policy, independent anchors, and signed outputs; host and
+accelerator security remain external boundaries.</p>
 <p><strong>Use this page when:</strong> Performing architecture review, assigning controls,
 interpreting a verifier failure, or deciding whether a deployment needs
 attestation or safeguards beyond InvarLock.</p>
@@ -2151,6 +2308,10 @@ attestation or safeguards beyond InvarLock.</p>
 <td>The verdict and exact anchors are bound to a separately recorded verifier identity and key.</td>
 </tr>
 <tr>
+<td>Recipient-controlled transport acceptance</td>
+<td>The recipient independently authorizes both the DSSE envelope signer and technical receipt verifier, binds the exact subject, and applies current freshness and contract policy.</td>
+</tr>
+<tr>
 <td>Fail-closed handling</td>
 <td>Missing, malformed, unknown, partial, extra, or inconsistent material cannot become accepted evidence.</td>
 </tr>
@@ -2168,6 +2329,9 @@ deployment controls must protect sensitive model, dataset, and key material.</p>
 <li>scorer binding, configuration, implementation, and independent authorization
   when an extension is selected;</li>
 <li>canonical evidence pack and signed verification receipt;</li>
+<li>the acceptance predicate, DSSE envelope, and exact embedded receipt bytes;</li>
+<li>recipient-controlled envelope-signer and receipt-verifier registries,
+  freshness rules, contract-version rules, and expected subject binding;</li>
 <li>evidence signer and verifier private keys; and</li>
 <li>the authorization mapping from actor identities to public-key fingerprints.</li>
 </ul>
@@ -2223,6 +2387,16 @@ can only reason about the facts in that bundle.</p>
 <td>Receipt-verification error</td>
 <td>Trusts embedded keys, HTML, or copied summaries without independent checks</td>
 <td>Prevented only by independent receipt verification and authorization discipline</td>
+</tr>
+<tr>
+<td>Authorized malicious envelope signer</td>
+<td>Controls an authorized DSSE key and can wrap or rewrap arbitrary material</td>
+<td>Cannot authorize an unknown technical receipt verifier, renew receipt-authenticated evidence freshness, or change the exact subject without recipient-policy rejection</td>
+</tr>
+<tr>
+<td>Recipient-policy configuration attacker</td>
+<td>Adds contradictory, duplicate, revoked, or attacker-controlled trust records</td>
+<td>Duplicate identity/fingerprint pairs and zero-or-multiple signer matches fail closed; policy authorization and distribution remain deployment responsibilities</td>
 </tr>
 </tbody>
 </table>
@@ -2316,12 +2490,33 @@ can only reason about the facts in that bundle.</p>
 <td>Ed25519 signatures expose stable fingerprints suitable for pinning and rotation</td>
 <td>Key storage, compromise detection, revocation, and incident response are external.</td>
 </tr>
+<tr>
+<td>Trusted envelope signer substitutes a self-signed technical receipt</td>
+<td>Acceptance verification authenticates the embedded receipt and requires exactly one independently trusted receipt-verifier identity/fingerprint record</td>
+<td>The recipient must maintain and securely distribute the receipt-verifier registry and its revocation state.</td>
+</tr>
+<tr>
+<td>Old evidence is placed in a newly issued envelope</td>
+<td>Envelope age and receipt-authenticated evidence age are evaluated separately; missing authoritative evidence time rejects when an evidence-age limit is configured</td>
+<td>v0.13 receipts have no authenticated issuance time and cannot satisfy a recipient policy that requires bounded evidence age.</td>
+</tr>
+<tr>
+<td>Recipient policy contains contradictory duplicate trust records</td>
+<td>Both trust registries reject repeated identity/fingerprint pairs regardless of array order or status, and signer lookup requires exactly one match</td>
+<td>The engine cannot decide which identities or keys the recipient should authorize.</td>
+</tr>
+<tr>
+<td>A historical receipt is reformatted during wrapping</td>
+<td>The predicate authenticates <code>receipt.raw_base64</code> and its digest while requiring parsed content to agree with those exact supplied bytes</td>
+<td>Byte preservation does not make the historical receipt current or change its original contract semantics.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="trust-boundary-data-flow">Trust-boundary data flow<a class="headerlink" href="#trust-boundary-data-flow" title="Permanent link">&para;</a></h2>
 <p>The critical transitions are:</p>
 <div class="codehilite"><pre><span></span><code>host CLI -&gt; separately pinned per-side OCI workers -&gt; paired records -&gt; host-signed pack
 signed pack + independent anchors -&gt; verifier replay -&gt; signed receipt
+signed receipt + bound evidence -&gt; DSSE envelope -&gt; recipient verifier + exact subject + current policy
 signed pack -&gt; authenticated renderer -&gt; console/HTML
 </code></pre></div>
 
@@ -2335,7 +2530,10 @@ on distinct explicit CUDA indexes may run in parallel. Model and
 runtime-integration code can still affect reported facts. At the second, the
 verifier treats every pack byte as hostile and must keep policy, artifact,
 schedule, runtime, and signer anchor sources outside the pack. At the third,
-presentation is read-only and carries no acceptance authority. The
+the recipient authenticates both signer roles from separate registries, checks
+the exact subject, applies independent envelope and evidence freshness, and
+evaluates its current policy. At the fourth, presentation is read-only and
+carries no acceptance authority. The
 <a href="../../assets/evidence-signer-verifier-trust.svg">evidence signer/verifier diagram</a> shows the
 separate signing boundaries.</p>
 <h2 id="key-attack-scenarios">Key attack scenarios<a class="headerlink" href="#key-attack-scenarios" title="Permanent link">&para;</a></h2>
@@ -2388,6 +2586,23 @@ window, suspend reliance, re-verify source evidence, and reissue receipts under
 a newly selected verifier key where appropriate. Re-signing fabricated
 evidence does not repair it; obtain new evidence from a trusted evaluation
 environment.</p>
+<h3 id="trusted-transport-signer-substitutes-technical-authority">Trusted transport signer substitutes technical authority<a class="headerlink" href="#trusted-transport-signer-substitutes-technical-authority" title="Permanent link">&para;</a></h3>
+<p>An authorized envelope signer wraps a receipt issued by an attacker-controlled
+technical verifier and supplies that verifier's embedded public key. The outer
+DSSE signature is valid, but it does not authorize the inner technical
+decision.</p>
+<p><strong>Mitigation:</strong> maintain separate recipient-controlled envelope-signer and
+receipt-verifier registries. Acceptance verification authenticates the inner
+receipt and requires exactly one active receipt-verifier record matching both
+identity and fingerprint. Embedded key material alone is not a trust anchor.</p>
+<h3 id="rewrapping-renews-old-evidence">Rewrapping renews old evidence<a class="headerlink" href="#rewrapping-renews-old-evidence" title="Permanent link">&para;</a></h3>
+<p>An envelope signer places an old or undated receipt in a newly issued envelope
+and attempts to satisfy a current freshness policy using only the envelope
+time.</p>
+<p><strong>Mitigation:</strong> constrain envelope age and receipt-authenticated evidence age
+independently. A missing receipt issuance time rejects whenever evidence age is
+bounded. Wrapper-supplied evaluation context cannot substitute for an
+authenticated receipt timestamp.</p>
 <h3 id="denial-of-service-through-hostile-evidence">Denial of service through hostile evidence<a class="headerlink" href="#denial-of-service-through-hostile-evidence" title="Permanent link">&para;</a></h3>
 <p>A submitter provides oversized, deeply nested, symlinked, sparse, or malformed
 material to consume verifier resources or escape the pack boundary.</p>
@@ -2405,11 +2620,18 @@ processing adversarial input; parser checks do not replace process isolation.</p
 <li>exact provider, artifact, schedule, runtime, and record cross-bindings;</li>
 <li>verifier-owned deterministic metric or explicitly authorized scorer replay
   and policy arithmetic; and</li>
-<li>an external Ed25519 receipt binding independent anchors and verdict.</li>
+<li>an external Ed25519 receipt binding independent anchors and verdict;</li>
+<li>an authenticated DSSE acceptance envelope that independently verifies the
+  embedded receipt, exact subject, both signer roles, and current recipient
+  policy; and</li>
+<li>exact historical receipt-byte preservation plus separate envelope and
+  receipt-authenticated evidence freshness.</li>
 </ul>
 <h3 id="required-from-the-deployment">Required from the deployment<a class="headerlink" href="#required-from-the-deployment" title="Permanent link">&para;</a></h3>
 <ul>
 <li>protected and separately authorized evidence-signing and verifier keys;</li>
+<li>independently maintained, duplicate-free envelope-signer and
+  receipt-verifier registries for portable acceptance;</li>
 <li>independently distributed policy, artifact, schedule, runtime,
   evidence-signer, and verifier anchors;</li>
 <li>immutable artifact and runtime acquisition;</li>
@@ -2419,6 +2641,12 @@ processing adversarial input; parser checks do not replace process isolation.</p
 <li>external execution attestation or independent rerun when required; and</li>
 <li>retention, revocation, and incident-response procedures.</li>
 </ul>
+<p>The acceptance envelope is standards-shaped in-toto/DSSE transport. The
+maintained interoperability example separately authenticates the envelope and
+embedded receipt before OPA/Rego or CUE evaluates recipient policy over the
+authenticated projection. It does not imply that arbitrary policy-engine
+configurations perform signature verification, full evidence replay, or safe
+acceptance without equivalent validation.</p>
 <h2 id="verification-failure-handling">Verification-failure handling<a class="headerlink" href="#verification-failure-handling" title="Permanent link">&para;</a></h2>
 <p>Do not make a verifier error disappear by deleting files, relaxing signer
 pins, substituting the embedded policy, or changing runtime expectations. Use
@@ -2445,12 +2673,15 @@ failed the metric.</p>
 <li>validate model safety, alignment, fairness, privacy, robustness, or content;</li>
 <li>authorize deployment or replace domain-specific review;</li>
 <li>secure a host, container engine, kernel, accelerator, or multi-tenant system;</li>
-<li>issue or revoke identities and keys; or</li>
+<li>issue or revoke identities and keys;</li>
+<li>demonstrate external CUE, Open Policy Agent, or other policy-engine
+  authentication or evaluation of the acceptance envelope; or</li>
 <li>establish the baseline as correct or trustworthy.</li>
 </ul>
 <p>See <a href="../best-practices/">Security practices</a> for operating guidance and the
 <a href="../../assurance/acceptance-checklist/">acceptance checklist</a> for one evidence
-decision.</p>
+decision. Portable recipient verification is specified in
+<a href="../../reference/acceptance-attestations/">Acceptance attestations</a>.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>National Institute of Standards and Technology,

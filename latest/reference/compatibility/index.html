@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/change-scenarios/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/compatibility/">
       
       
-        <link rel="prev" href="../getting-started/">
+        <link rel="prev" href="../contracts/">
       
       
-        <link rel="next" href="../key-management/">
+        <link rel="next" href="../acceptance-attestations/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Change scenarios - InvarLock Documentation</title>
+        <title>Compatibility covenant - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#model-change-workflows" class="md-skip">
+        <a href="#compatibility-covenant" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Change scenarios
+              Compatibility covenant
             
           </span>
         </div>
@@ -215,13 +215,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../getting-started/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
           
   
   
@@ -257,11 +255,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../reference/cli/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cli/" class="md-tabs__link">
           
   
   
@@ -368,31 +368,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -410,7 +407,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -428,7 +425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/" class="md-nav__link">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
         
   
   
@@ -453,37 +450,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Change scenarios
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../user-guide/change-scenarios/" class="md-nav__link">
         
   
   
@@ -499,103 +469,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#choose-the-execution-boundary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Choose the execution boundary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#keep-the-change-boundary-explicit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Keep the change boundary explicit
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#select-a-metric-that-matches-the-task" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Select a metric that matches the task
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prepare-a-meaningful-paired-schedule" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prepare a meaningful paired schedule
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execute-verify-and-report" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execute, verify, and report
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpret-the-outcome" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interpret the outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-the-maintained-journeys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run the maintained journeys
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -608,7 +481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../key-management/" class="md-nav__link">
+      <a href="../../user-guide/key-management/" class="md-nav__link">
         
   
   
@@ -636,7 +509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../runtime-providers/" class="md-nav__link">
+      <a href="../../user-guide/runtime-providers/" class="md-nav__link">
         
   
   
@@ -664,7 +537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../evaluation-request/" class="md-nav__link">
+      <a href="../../user-guide/evaluation-request/" class="md-nav__link">
         
   
   
@@ -692,7 +565,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../schedule-and-policy/" class="md-nav__link">
+      <a href="../../user-guide/schedule-and-policy/" class="md-nav__link">
         
   
   
@@ -720,7 +593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../evidence-and-verification/" class="md-nav__link">
+      <a href="../../user-guide/evidence-and-verification/" class="md-nav__link">
         
   
   
@@ -748,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../verification-failure-lab/" class="md-nav__link">
+      <a href="../../user-guide/verification-failure-lab/" class="md-nav__link">
         
   
   
@@ -776,7 +649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../diagnostics/" class="md-nav__link">
+      <a href="../../user-guide/diagnostics/" class="md-nav__link">
         
   
   
@@ -804,7 +677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ci-integration/" class="md-nav__link">
+      <a href="../../user-guide/ci-integration/" class="md-nav__link">
         
   
   
@@ -832,7 +705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../public-evidence/" class="md-nav__link">
+      <a href="../../user-guide/public-evidence/" class="md-nav__link">
         
   
   
@@ -860,7 +733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../troubleshooting/" class="md-nav__link">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
         
   
   
@@ -1121,28 +994,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -1160,7 +1036,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1178,7 +1054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -1206,7 +1082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/architecture/" class="md-nav__link">
+      <a href="../architecture/" class="md-nav__link">
         
   
   
@@ -1234,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/contracts/" class="md-nav__link">
+      <a href="../contracts/" class="md-nav__link">
         
   
   
@@ -1259,10 +1135,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../reference/compatibility/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1278,6 +1181,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-remains-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What remains stable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-remains-a-current-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What remains a current decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#release-blocking-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release-blocking evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1290,7 +1246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+      <a href="../acceptance-attestations/" class="md-nav__link">
         
   
   
@@ -1318,7 +1274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+      <a href="../policy-engine-interop/" class="md-nav__link">
         
   
   
@@ -1346,7 +1302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+      <a href="../evaluator-qualification/" class="md-nav__link">
         
   
   
@@ -1374,7 +1330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/api-guide/" class="md-nav__link">
+      <a href="../api-guide/" class="md-nav__link">
         
   
   
@@ -1402,7 +1358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/artifacts/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -1430,7 +1386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/reports/" class="md-nav__link">
+      <a href="../reports/" class="md-nav__link">
         
   
   
@@ -1458,7 +1414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/runtime-providers/" class="md-nav__link">
+      <a href="../runtime-providers/" class="md-nav__link">
         
   
   
@@ -1486,7 +1442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/runtime-security/" class="md-nav__link">
+      <a href="../runtime-security/" class="md-nav__link">
         
   
   
@@ -1514,7 +1470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/environment/" class="md-nav__link">
+      <a href="../environment/" class="md-nav__link">
         
   
   
@@ -1542,7 +1498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/lifecycle/" class="md-nav__link">
+      <a href="../lifecycle/" class="md-nav__link">
         
   
   
@@ -1570,7 +1526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/release-verification/" class="md-nav__link">
+      <a href="../release-verification/" class="md-nav__link">
         
   
   
@@ -1598,7 +1554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/documentation/" class="md-nav__link">
+      <a href="../documentation/" class="md-nav__link">
         
   
   
@@ -1826,10 +1782,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#choose-the-execution-boundary" class="md-nav__link">
+  <a href="#what-remains-stable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choose the execution boundary
+        What remains stable
       
     </span>
   </a>
@@ -1837,10 +1793,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#keep-the-change-boundary-explicit" class="md-nav__link">
+  <a href="#what-remains-a-current-decision" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Keep the change boundary explicit
+        What remains a current decision
       
     </span>
   </a>
@@ -1848,54 +1804,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#select-a-metric-that-matches-the-task" class="md-nav__link">
+  <a href="#release-blocking-evidence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Select a metric that matches the task
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prepare-a-meaningful-paired-schedule" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prepare a meaningful paired schedule
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execute-verify-and-report" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execute, verify, and report
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpret-the-outcome" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interpret the outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-the-maintained-journeys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run the maintained journeys
+        Release-blocking evidence
       
     </span>
   </a>
@@ -1922,171 +1834,64 @@
   
 
 
-<h1 id="model-change-workflows">Model-change workflows<a class="headerlink" href="#model-change-workflows" title="Permanent link">&para;</a></h1>
-<p>InvarLock compares an authenticated baseline with an authenticated subject on
-the same paired schedule, applies a named policy, and creates evidence another
-party can verify independently. The system that trained, pruned, quantized,
-converted, or compiled the subject remains responsible for creating that
-artifact.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
-<p><strong>In plain language:</strong> Create the candidate with the tool you already use,
-then give InvarLock the immutable before-and-after artifacts or complete
-per-record results.</p>
-<p><strong>Outcome:</strong> A signed comparison bundle, an independently signed
-verification receipt, and a human-readable report.</p>
-<p><strong>Audience:</strong> Model adaptation, runtime, evaluation, and release teams.</p>
-<p><strong>Prerequisites:</strong> Stable record IDs, a representative paired schedule, a
-policy, and independently managed artifact, runtime, signer, and policy
-identities.</p>
-</div>
-<h2 id="choose-the-execution-boundary">Choose the execution boundary<a class="headerlink" href="#choose-the-execution-boundary" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Candidate form</th>
-<th>InvarLock path</th>
-<th>Maintained implementation</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Hugging Face causal checkpoint</td>
-<td>Run mode</td>
-<td>Built-in <code>hf_transformers</code> provider</td>
-</tr>
-<tr>
-<td>PEFT adapter merged into a checkpoint</td>
-<td>Run mode</td>
-<td>Built-in provider; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/peft-lora">runnable PEFT journey</a></td>
-</tr>
-<tr>
-<td>TorchAO weight-only quantization materialized as a checkpoint</td>
-<td>Run mode</td>
-<td>Built-in provider; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/torchao-int8">runnable TorchAO journey</a></td>
-</tr>
-<tr>
-<td>GGUF artifact</td>
-<td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/gguf"><code>invarlock-runtime-gguf</code></a> package; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp">runnable llama.cpp journey</a></td>
-</tr>
-<tr>
-<td>Vision-text checkpoint</td>
-<td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/multimodal"><code>invarlock-runtime-hf-vision-text</code></a> package</td>
-</tr>
-<tr>
-<td>TensorRT-LLM engine</td>
-<td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm"><code>invarlock-runtime-tensorrt-llm</code></a> package</td>
-</tr>
-<tr>
-<td>Complete per-record results from a harness or endpoint</td>
-<td>Import mode</td>
-<td>Runtime-import authoring API and closed request contract; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness">runnable LM Evaluation Harness journey</a></td>
-</tr>
-</tbody>
-</table>
-<p>The runtime must match the artifact that will be released. A quantized model
-loaded by llama.cpp should be evaluated through the GGUF provider rather than a
-different Hugging Face representation. A compiled TensorRT-LLM engine remains
-the subject; InvarLock does not rebuild it from its source checkpoint.</p>
-<h2 id="keep-the-change-boundary-explicit">Keep the change boundary explicit<a class="headerlink" href="#keep-the-change-boundary-explicit" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>training · pruning · quantization · conversion · compilation
-                             |
-                             v
-              immutable candidate or paired records
-                             |
-                             v
-                invarlock evaluate request.yaml
-                             |
-                             v
-                 signed canonical evidence bundle
-                             |
-                             v
-                independent verify → report
-</code></pre></div>
-
-<p>Configuration, lineage, throughput, memory, sparsity, and similar facts can be
-attached as authenticated observations. They do not influence acceptance
-unless a versioned policy and replayable scorer explicitly authorize them.</p>
-<h2 id="select-a-metric-that-matches-the-task">Select a metric that matches the task<a class="headerlink" href="#select-a-metric-that-matches-the-task" title="Permanent link">&para;</a></h2>
+<h1 id="compatibility-covenant">Compatibility covenant<a class="headerlink" href="#compatibility-covenant" title="Permanent link">&para;</a></h1>
+<p>InvarLock treats the v0.13 technical decision contract as a permanent
+verification boundary:</p>
 <ul>
-<li>Use exact match for closed-answer tasks. InvarLock reports paired regressions,
-  paired improvements, effect size, an interval, and McNemar's exact test.</li>
-<li>Use normalized NLL for expected-continuation likelihood. It does not measure
-  general model quality. When tokenizers and target-token accounting are
-  comparable, the report renders perplexity ratio as a derived interpretation,
-  not a second acceptance metric.</li>
-<li>Use a verifier-replayable scorer extension for task-specific F1, structured
-  extraction, VQA normalization, or another deterministic text score computed
-  only from authenticated record facts.</li>
-<li>Keep model-judge results as authenticated observations until the judge,
-  prompt, references, and calibration have an independently verifiable
-  acceptance contract.</li>
+<li><strong>Verification support: permanent.</strong></li>
+<li><strong>Dossier ingestion support: permanent.</strong></li>
+<li><strong>Acceptance outcome: current recipient policy.</strong></li>
 </ul>
-<h2 id="prepare-a-meaningful-paired-schedule">Prepare a meaningful paired schedule<a class="headerlink" href="#prepare-a-meaningful-paired-schedule" title="Permanent link">&para;</a></h2>
-<p>Every conclusion is limited by its schedule. Baseline and subject must use the
-same stable IDs in the same order. Select records from the real task
-distribution, record the source revision and selection method, and include
-important subgroups.</p>
-<p>A small tutorial can prove that integration code works; it cannot support a
-release conclusion. The maintained public qualification suites use 400
-balanced records. Production policies should set both a minimum record count
-and a maximum interval width, then increase the sample when the observed
-precision or subgroup coverage is inadequate.</p>
-<h2 id="execute-verify-and-report">Execute, verify, and report<a class="headerlink" href="#execute-verify-and-report" title="Permanent link">&para;</a></h2>
-<p>Run execution-free preflight before allocating model compute:</p>
-<div class="codehilite"><pre><span></span><code><span class="go">invarlock evaluate request.yaml --signing-key evidence-signer.pem \</span>
-<span class="go">  --runtime-image &quot;$RUNTIME_IMAGE&quot; --runtime-image-digest &quot;$RUNTIME_DIGEST&quot; \</span>
-<span class="go">  --preflight</span>
-</code></pre></div>
-
-<p>Resolve each artifact, provider, schedule, policy, runtime, and destination
-error. Preflight validates deterministic prerequisites; it cannot predict model
-behavior.</p>
-<p>Run the same request without <code>--preflight</code>, deliver the immutable evidence pack
-to the verifier, and provide expected identities through a separate channel:</p>
-<div class="codehilite"><pre><span></span><code><span class="go">invarlock evaluate request.yaml --signing-key evidence-signer.pem \</span>
-<span class="go">  --runtime-image &quot;$RUNTIME_IMAGE&quot; --runtime-image-digest &quot;$RUNTIME_DIGEST&quot;</span>
-<span class="go">invarlock verify evidence/ --trust-profile verifier/trust-inputs.json \</span>
-<span class="go">  --receipt verifier/verification.receipt.json</span>
-<span class="go">invarlock report evidence/ --html verifier/report.html --explain</span>
-</code></pre></div>
-
-<p>Import mode uses the same public transaction without runtime-image arguments.
-It accepts complete per-record results with stable IDs, not aggregate scores.
-The verifier recomputes the named built-in or extension score from those
-records.</p>
-<h2 id="interpret-the-outcome">Interpret the outcome<a class="headerlink" href="#interpret-the-outcome" title="Permanent link">&para;</a></h2>
-<p>A passing receipt says that the named subject met the named policy relative to
-the named baseline on the authenticated paired schedule under the recorded
-runtime identities. A policy failure can still be intact evidence. An integrity
-or trust mismatch means the submitted comparison is not independently
-acceptable.</p>
-<p>Read every result together with the schedule composition, paired effect and
-interval, metric semantics, artifact and runtime identities, policy thresholds,
-and separately authenticated operational observations.</p>
-<h2 id="run-the-maintained-journeys">Run the maintained journeys<a class="headerlink" href="#run-the-maintained-journeys" title="Permanent link">&para;</a></h2>
-<p>The repository examples exercise real public commands:</p>
-<div class="codehilite"><pre><span></span><code><span class="go">make example-hf-transformers</span>
-<span class="go">make example-hf-vision-text</span>
-<span class="go">make example-peft-lora</span>
-<span class="go">make example-torchao-int8</span>
-<span class="go">make example-gguf-llama-cpp</span>
-<span class="go">make example-lm-evaluation-harness</span>
-<span class="go">make example-tensorrt-llm</span>
-<span class="go">make example-evidence-handoff</span>
-</code></pre></div>
-
-<p>The TensorRT-LLM showcase downloads one pinned Qwen3-0.6B revision and builds
-BF16 and ModelOpt-calibrated FP8 engines on separate H100 GPUs before
-completing the signed transaction.
-Its README also documents the lower-level command for qualified,
-caller-prepared engines. Both paths bind the observed engine identities rather
-than assuming independently compiled engine bytes will be identical. Optional
-runtime packages also expose conformance and evidence-qualification targets
-beside their implementations.</p>
+<div class="admonition info">
+<p class="admonition-title">Reference</p>
+<ul>
+<li><strong>Surface:</strong> v0.13 evidence packs and signed verification receipts</li>
+<li><strong>Stability:</strong> Original parsing, binding, replay, and decision semantics</li>
+<li><strong>Use this page when:</strong> Retaining historical receipts or deciding whether
+  an older result is acceptable now</li>
+</ul>
+</div>
+<h2 id="what-remains-stable">What remains stable<a class="headerlink" href="#what-remains-stable" title="Permanent link">&para;</a></h2>
+<p>A v0.13 receipt remains parseable and independently verifiable under its
+original semantics. Verification continues to bind the exact baseline and
+subject artifact identities, canonical paired schedule, per-record evidence,
+metric or authorized scorer, evaluated policy, runtime identities, evidence
+signer, and verifier signer. The verifier recomputes the recorded comparison
+and rejects tampering or semantic contradictions.</p>
+<p>The historical result recorded by those authenticated bytes is immutable.
+Later software does not reinterpret, upgrade, or silently relabel a v0.13
+evidence pack, report, or receipt as a newer contract. A new representation may
+embed or reference the historical object, but it must retain the original
+format identifier and bytes. Acceptance predicate v2 embeds the exact supplied
+receipt-file bytes in <code>receipt.raw_base64</code>; <code>receipt.digest</code> authenticates
+those decoded bytes rather than a new serialization.</p>
+<p>Future dossier implementations may ingest v0.13 receipts as explicitly
+versioned, first-class inputs. This covenant makes them <strong>ingestible</strong>; it does
+not require a current recipient to accept them.</p>
+<h2 id="what-remains-a-current-decision">What remains a current decision<a class="headerlink" href="#what-remains-a-current-decision" title="Permanent link">&para;</a></h2>
+<p>A recipient applies its current policy after authenticating the historical
+technical result. That decision may depend on:</p>
+<ul>
+<li>independently configured envelope-signer and receipt-verifier trust anchors;</li>
+<li>active or revoked signer status;</li>
+<li>separate envelope-age and authoritative evidence-age limits, plus clock skew;</li>
+<li>supported InvarLock contract versions and signature or digest algorithms;</li>
+<li>exact binding to the artifact supplied by the recipient; and</li>
+<li>the technical verdict required by the recipient.</li>
+</ul>
+<p>An authentic historical pass can therefore be rejected today. This does not
+change the recorded result; it distinguishes historical technical verification
+from present-day acceptability.</p>
+<h2 id="release-blocking-evidence">Release-blocking evidence<a class="headerlink" href="#release-blocking-evidence" title="Permanent link">&para;</a></h2>
+<p>The committed v0.13 corpus lives at
+<code>tests/fixtures/compatibility/v0.13.0/corpus.json</code> and points only to tracked
+files under <code>examples/acceptance-handoff/golden/</code>. <code>make compatibility-test</code>
+checks immutable fixture digests, original-semantic replay, signed-receipt
+verification, tamper rejection, semantic inconsistency rejection, and
+protection against contract relabeling.</p>
+<p>This covenant is deliberately limited to the tested v0.13 atomic
+baseline-versus-subject contract. It does not promise that every historical
+algorithm or artifact will satisfy every future recipient policy.</p>
 
 
 

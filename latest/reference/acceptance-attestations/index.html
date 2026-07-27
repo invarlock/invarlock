@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/change-scenarios/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/acceptance-attestations/">
       
       
-        <link rel="prev" href="../getting-started/">
+        <link rel="prev" href="../compatibility/">
       
       
-        <link rel="next" href="../key-management/">
+        <link rel="next" href="../policy-engine-interop/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Change scenarios - InvarLock Documentation</title>
+        <title>Acceptance attestations - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#model-change-workflows" class="md-skip">
+        <a href="#acceptance-attestations" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Change scenarios
+              Acceptance attestations
             
           </span>
         </div>
@@ -215,13 +215,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../getting-started/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
           
   
   
@@ -257,11 +255,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../reference/cli/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cli/" class="md-tabs__link">
           
   
   
@@ -368,31 +368,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -410,7 +407,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -428,7 +425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/" class="md-nav__link">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
         
   
   
@@ -453,37 +450,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Change scenarios
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../user-guide/change-scenarios/" class="md-nav__link">
         
   
   
@@ -499,103 +469,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#choose-the-execution-boundary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Choose the execution boundary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#keep-the-change-boundary-explicit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Keep the change boundary explicit
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#select-a-metric-that-matches-the-task" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Select a metric that matches the task
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prepare-a-meaningful-paired-schedule" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prepare a meaningful paired schedule
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execute-verify-and-report" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execute, verify, and report
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpret-the-outcome" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interpret the outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-the-maintained-journeys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run the maintained journeys
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -608,7 +481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../key-management/" class="md-nav__link">
+      <a href="../../user-guide/key-management/" class="md-nav__link">
         
   
   
@@ -636,7 +509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../runtime-providers/" class="md-nav__link">
+      <a href="../../user-guide/runtime-providers/" class="md-nav__link">
         
   
   
@@ -664,7 +537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../evaluation-request/" class="md-nav__link">
+      <a href="../../user-guide/evaluation-request/" class="md-nav__link">
         
   
   
@@ -692,7 +565,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../schedule-and-policy/" class="md-nav__link">
+      <a href="../../user-guide/schedule-and-policy/" class="md-nav__link">
         
   
   
@@ -720,7 +593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../evidence-and-verification/" class="md-nav__link">
+      <a href="../../user-guide/evidence-and-verification/" class="md-nav__link">
         
   
   
@@ -748,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../verification-failure-lab/" class="md-nav__link">
+      <a href="../../user-guide/verification-failure-lab/" class="md-nav__link">
         
   
   
@@ -776,7 +649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../diagnostics/" class="md-nav__link">
+      <a href="../../user-guide/diagnostics/" class="md-nav__link">
         
   
   
@@ -804,7 +677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ci-integration/" class="md-nav__link">
+      <a href="../../user-guide/ci-integration/" class="md-nav__link">
         
   
   
@@ -832,7 +705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../public-evidence/" class="md-nav__link">
+      <a href="../../user-guide/public-evidence/" class="md-nav__link">
         
   
   
@@ -860,7 +733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../troubleshooting/" class="md-nav__link">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
         
   
   
@@ -1121,28 +994,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -1160,7 +1036,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1178,7 +1054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -1206,7 +1082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/architecture/" class="md-nav__link">
+      <a href="../architecture/" class="md-nav__link">
         
   
   
@@ -1234,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/contracts/" class="md-nav__link">
+      <a href="../contracts/" class="md-nav__link">
         
   
   
@@ -1262,7 +1138,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/compatibility/" class="md-nav__link">
+      <a href="../compatibility/" class="md-nav__link">
         
   
   
@@ -1287,10 +1163,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1306,6 +1209,92 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#handoff-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handoff model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statement-and-predicate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statement and predicate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authoritative-receipt-and-v013-wrapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authoritative receipt and v0.13 wrapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signer-relationship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signer relationship
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canonical-bytes-and-signatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical bytes and signatures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recipient-policy-and-exact-subject-binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipient policy and exact subject binding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1318,7 +1307,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+      <a href="../policy-engine-interop/" class="md-nav__link">
         
   
   
@@ -1346,7 +1335,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+      <a href="../evaluator-qualification/" class="md-nav__link">
         
   
   
@@ -1374,7 +1363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/api-guide/" class="md-nav__link">
+      <a href="../api-guide/" class="md-nav__link">
         
   
   
@@ -1402,7 +1391,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/artifacts/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
         
   
   
@@ -1430,7 +1419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/reports/" class="md-nav__link">
+      <a href="../reports/" class="md-nav__link">
         
   
   
@@ -1458,7 +1447,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/runtime-providers/" class="md-nav__link">
+      <a href="../runtime-providers/" class="md-nav__link">
         
   
   
@@ -1486,7 +1475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/runtime-security/" class="md-nav__link">
+      <a href="../runtime-security/" class="md-nav__link">
         
   
   
@@ -1514,7 +1503,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/environment/" class="md-nav__link">
+      <a href="../environment/" class="md-nav__link">
         
   
   
@@ -1542,7 +1531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/lifecycle/" class="md-nav__link">
+      <a href="../lifecycle/" class="md-nav__link">
         
   
   
@@ -1570,7 +1559,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/release-verification/" class="md-nav__link">
+      <a href="../release-verification/" class="md-nav__link">
         
   
   
@@ -1598,7 +1587,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/documentation/" class="md-nav__link">
+      <a href="../documentation/" class="md-nav__link">
         
   
   
@@ -1826,10 +1815,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#choose-the-execution-boundary" class="md-nav__link">
+  <a href="#handoff-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choose the execution boundary
+        Handoff model
       
     </span>
   </a>
@@ -1837,10 +1826,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#keep-the-change-boundary-explicit" class="md-nav__link">
+  <a href="#statement-and-predicate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Keep the change boundary explicit
+        Statement and predicate
       
     </span>
   </a>
@@ -1848,10 +1837,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#select-a-metric-that-matches-the-task" class="md-nav__link">
+  <a href="#authoritative-receipt-and-v013-wrapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Select a metric that matches the task
+        Authoritative receipt and v0.13 wrapping
       
     </span>
   </a>
@@ -1859,10 +1848,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#prepare-a-meaningful-paired-schedule" class="md-nav__link">
+  <a href="#signer-relationship" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prepare a meaningful paired schedule
+        Signer relationship
       
     </span>
   </a>
@@ -1870,10 +1859,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#execute-verify-and-report" class="md-nav__link">
+  <a href="#canonical-bytes-and-signatures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execute, verify, and report
+        Canonical bytes and signatures
       
     </span>
   </a>
@@ -1881,21 +1870,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interpret-the-outcome" class="md-nav__link">
+  <a href="#recipient-policy-and-exact-subject-binding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Interpret the outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-the-maintained-journeys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run the maintained journeys
+        Recipient policy and exact subject binding
       
     </span>
   </a>
@@ -1922,171 +1900,160 @@
   
 
 
-<h1 id="model-change-workflows">Model-change workflows<a class="headerlink" href="#model-change-workflows" title="Permanent link">&para;</a></h1>
-<p>InvarLock compares an authenticated baseline with an authenticated subject on
-the same paired schedule, applies a named policy, and creates evidence another
-party can verify independently. The system that trained, pruned, quantized,
-converted, or compiled the subject remains responsible for creating that
-artifact.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
-<p><strong>In plain language:</strong> Create the candidate with the tool you already use,
-then give InvarLock the immutable before-and-after artifacts or complete
-per-record results.</p>
-<p><strong>Outcome:</strong> A signed comparison bundle, an independently signed
-verification receipt, and a human-readable report.</p>
-<p><strong>Audience:</strong> Model adaptation, runtime, evaluation, and release teams.</p>
-<p><strong>Prerequisites:</strong> Stable record IDs, a representative paired schedule, a
-policy, and independently managed artifact, runtime, signer, and policy
-identities.</p>
-</div>
-<h2 id="choose-the-execution-boundary">Choose the execution boundary<a class="headerlink" href="#choose-the-execution-boundary" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Candidate form</th>
-<th>InvarLock path</th>
-<th>Maintained implementation</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Hugging Face causal checkpoint</td>
-<td>Run mode</td>
-<td>Built-in <code>hf_transformers</code> provider</td>
-</tr>
-<tr>
-<td>PEFT adapter merged into a checkpoint</td>
-<td>Run mode</td>
-<td>Built-in provider; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/peft-lora">runnable PEFT journey</a></td>
-</tr>
-<tr>
-<td>TorchAO weight-only quantization materialized as a checkpoint</td>
-<td>Run mode</td>
-<td>Built-in provider; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/torchao-int8">runnable TorchAO journey</a></td>
-</tr>
-<tr>
-<td>GGUF artifact</td>
-<td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/gguf"><code>invarlock-runtime-gguf</code></a> package; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp">runnable llama.cpp journey</a></td>
-</tr>
-<tr>
-<td>Vision-text checkpoint</td>
-<td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/multimodal"><code>invarlock-runtime-hf-vision-text</code></a> package</td>
-</tr>
-<tr>
-<td>TensorRT-LLM engine</td>
-<td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm"><code>invarlock-runtime-tensorrt-llm</code></a> package</td>
-</tr>
-<tr>
-<td>Complete per-record results from a harness or endpoint</td>
-<td>Import mode</td>
-<td>Runtime-import authoring API and closed request contract; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness">runnable LM Evaluation Harness journey</a></td>
-</tr>
-</tbody>
-</table>
-<p>The runtime must match the artifact that will be released. A quantized model
-loaded by llama.cpp should be evaluated through the GGUF provider rather than a
-different Hugging Face representation. A compiled TensorRT-LLM engine remains
-the subject; InvarLock does not rebuild it from its source checkpoint.</p>
-<h2 id="keep-the-change-boundary-explicit">Keep the change boundary explicit<a class="headerlink" href="#keep-the-change-boundary-explicit" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>training · pruning · quantization · conversion · compilation
-                             |
-                             v
-              immutable candidate or paired records
-                             |
-                             v
-                invarlock evaluate request.yaml
-                             |
-                             v
-                 signed canonical evidence bundle
-                             |
-                             v
-                independent verify → report
-</code></pre></div>
-
-<p>Configuration, lineage, throughput, memory, sparsity, and similar facts can be
-attached as authenticated observations. They do not influence acceptance
-unless a versioned policy and replayable scorer explicitly authorize them.</p>
-<h2 id="select-a-metric-that-matches-the-task">Select a metric that matches the task<a class="headerlink" href="#select-a-metric-that-matches-the-task" title="Permanent link">&para;</a></h2>
+<h1 id="acceptance-attestations">Acceptance attestations<a class="headerlink" href="#acceptance-attestations" title="Permanent link">&para;</a></h1>
+<p>An acceptance attestation transports one InvarLock technical decision about
+one exact derived artifact. It is an in-toto Statement v1 inside a DSSE
+envelope. It does not represent a recipient's final approval, exception,
+quorum, governance action, or deployment decision.</p>
+<div class="admonition info">
+<p class="admonition-title">Reference</p>
 <ul>
-<li>Use exact match for closed-answer tasks. InvarLock reports paired regressions,
-  paired improvements, effect size, an interval, and McNemar's exact test.</li>
-<li>Use normalized NLL for expected-continuation likelihood. It does not measure
-  general model quality. When tokenizers and target-token accounting are
-  comparable, the report renders perplexity ratio as a derived interpretation,
-  not a second acceptance metric.</li>
-<li>Use a verifier-replayable scorer extension for task-specific F1, structured
-  extraction, VQA normalization, or another deterministic text score computed
-  only from authenticated record facts.</li>
-<li>Keep model-judge results as authenticated observations until the judge,
-  prompt, references, and calibration have an independently verifiable
-  acceptance contract.</li>
+<li><strong>Surface:</strong> <code>https://invarlock.dev/attestations/acceptance/v2</code>
+  standards-shaped in-toto/DSSE transport</li>
+<li><strong>Stability:</strong> Closed v2 predicate and recipient-policy contracts</li>
+<li><strong>Use this page when:</strong> Producing, transporting, or independently
+  evaluating a portable acceptance attestation</li>
 </ul>
-<h2 id="prepare-a-meaningful-paired-schedule">Prepare a meaningful paired schedule<a class="headerlink" href="#prepare-a-meaningful-paired-schedule" title="Permanent link">&para;</a></h2>
-<p>Every conclusion is limited by its schedule. Baseline and subject must use the
-same stable IDs in the same order. Select records from the real task
-distribution, record the source revision and selection method, and include
-important subgroups.</p>
-<p>A small tutorial can prove that integration code works; it cannot support a
-release conclusion. The maintained public qualification suites use 400
-balanced records. Production policies should set both a minimum record count
-and a maximum interval width, then increase the sample when the observed
-precision or subgroup coverage is inadequate.</p>
-<h2 id="execute-verify-and-report">Execute, verify, and report<a class="headerlink" href="#execute-verify-and-report" title="Permanent link">&para;</a></h2>
-<p>Run execution-free preflight before allocating model compute:</p>
-<div class="codehilite"><pre><span></span><code><span class="go">invarlock evaluate request.yaml --signing-key evidence-signer.pem \</span>
-<span class="go">  --runtime-image &quot;$RUNTIME_IMAGE&quot; --runtime-image-digest &quot;$RUNTIME_DIGEST&quot; \</span>
-<span class="go">  --preflight</span>
+</div>
+<p>The predicate format is <code>invarlock/acceptance-predicate-v2</code>; the envelope
+payload type is <code>application/vnd.in-toto+json</code>.</p>
+<h2 id="handoff-model">Handoff model<a class="headerlink" href="#handoff-model" title="Permanent link">&para;</a></h2>
+<p>The primary workflow is:</p>
+<blockquote>
+<p>authenticated evaluation → portable signed evidence → independent technical
+verification → recipient-controlled acceptance</p>
+</blockquote>
+<p>The evaluation operator evaluates a baseline and subject on the same
+authenticated schedule and exports the detailed signed evidence. An independent
+technical verifier checks that evidence and signs the receipt. The envelope
+signer wraps the receipt for standard attestation transport. The recipient
+authenticates the DSSE signer from its own trust registry, binds the in-toto
+subject to the exact artifact bytes or an independently obtained digest,
+authenticates the embedded receipt, and applies its current policy.</p>
+<p>The envelope is standards-shaped in-toto/DSSE transport. The repository
+maintains a standalone conformance example that authenticates the envelope and
+embedded receipt, then applies recipient policy with OPA/Rego and CUE without an
+InvarLock service or policy-engine plugin. The policy engines consume an
+authenticated projection; they do not perform raw signature verification or
+full evidence replay themselves. See
+<a href="../policy-engine-interop/">Policy-engine interoperability</a>. Full semantic replay
+uses the InvarLock verifier.</p>
+<h2 id="statement-and-predicate">Statement and predicate<a class="headerlink" href="#statement-and-predicate" title="Permanent link">&para;</a></h2>
+<p>The in-toto <code>subject</code> contains exactly the derived artifact name and SHA-256
+content digest. The predicate repeats that exact binding and carries:</p>
+<ul>
+<li>exact subject and baseline artifact identities, identity digests, content
+  digests, and digest kinds;</li>
+<li>the InvarLock release, evidence-pack, comparison-report, and receipt
+  versions;</li>
+<li>the schedule format, digest, and evaluation-source identity;</li>
+<li>the built-in metric identity or complete scorer-extension identity;</li>
+<li>the evaluated policy identity and digest;</li>
+<li>the technical verdict copied from the signed receipt;</li>
+<li>evaluation, receipt, and attestation timestamps;</li>
+<li>receipt and envelope signer identities, key fingerprints, and their
+  relationship; and</li>
+<li>the complete parsed signed InvarLock receipt plus the exact supplied receipt
+  bytes as authenticated base64.</li>
+</ul>
+<p>The closed source schema is
+<code>contracts/acceptance_predicate.schema.json</code>; the byte-identical packaged copy
+ships with the core wheel.</p>
+<h2 id="authoritative-receipt-and-v013-wrapping">Authoritative receipt and v0.13 wrapping<a class="headerlink" href="#authoritative-receipt-and-v013-wrapping" title="Permanent link">&para;</a></h2>
+<p>Version 2 uses <code>receipt.representation: embedded</code>. The embedded signed
+InvarLock receipt is the authoritative replayable technical result.
+<code>receipt.raw_base64</code> preserves the exact supplied receipt-file bytes, and
+<code>receipt.digest</code> is SHA-256 over those decoded bytes. <code>receipt.content</code> is the
+parsed policy projection and must decode to the same JSON value. The
+surrounding predicate duplicates selected fields, all of which must agree with
+the authenticated receipt.</p>
+<p>Existing v0.13 receipt formats are wrapped without modification or relabeling.
+Their original bytes are recoverable byte-for-byte from <code>receipt.raw_base64</code>,
+and their original format remains in <code>contracts.receipt</code> and the parsed
+receipt. Because v0.13 receipts did not authenticate an issuance time,
+<code>timestamps.receipt_issued_at</code> remains <code>null</code>; the wrapper rejects any attempt
+to manufacture that historical metadata. <code>evaluation_completed_at</code> is
+wrapper-supplied context, not an authoritative freshness input.
+<code>attestation_issued_at</code> is new envelope-transport metadata.</p>
+<p>The verifier authenticates the inner receipt independently and checks its
+technical verdict, artifact anchors, schedule digest, policy digest, contract
+version, and signer against the outer predicate. Any contradiction rejects the
+attestation, even if the modified envelope has a valid outer signature.</p>
+<h2 id="signer-relationship">Signer relationship<a class="headerlink" href="#signer-relationship" title="Permanent link">&para;</a></h2>
+<p>The receipt signer is the technical verifier. The envelope signer is the party
+transporting that verified result.</p>
+<ul>
+<li><code>same_signer</code> means both the identity and Ed25519 public-key fingerprint are
+  identical.</li>
+<li><code>countersigned</code> means either differs.</li>
+</ul>
+<p>The relationship is descriptive and checked against the two signer objects.
+Recipient policy independently decides whether countersigned receipts are
+allowed. Trust in the DSSE signer does not replace authentication of the
+embedded receipt signer. Recipient policy therefore has a separate
+<code>trusted_receipt_verifiers</code> registry. An optional
+<code>expected_receipt_trust_profile_digest</code> pins the verifier-owned trust profile
+recorded by the receipt. Unknown or revoked receipt verifiers fail closed even
+when the outer envelope signer is trusted.</p>
+<h2 id="canonical-bytes-and-signatures">Canonical bytes and signatures<a class="headerlink" href="#canonical-bytes-and-signatures" title="Permanent link">&para;</a></h2>
+<p>The DSSE payload and each receipt statement's signed bytes use UTF-8,
+lexicographically sorted object keys, no insignificant whitespace, no
+non-finite numbers, unescaped Unicode, and one trailing line feed. The supplied
+receipt file itself may use different valid JSON formatting; its exact bytes
+are retained separately. SHA-256 digests are lowercase and use the <code>sha256:</code>
+prefix.</p>
+<p>The DSSE payload is the canonical in-toto Statement bytes. Ed25519 signs the
+DSSE pre-authentication encoding:</p>
+<div class="codehilite"><pre><span></span><code>DSSEv1 &lt;type-byte-length&gt; &lt;payloadType&gt; &lt;payload-byte-length&gt; &lt;payload&gt;
 </code></pre></div>
 
-<p>Resolve each artifact, provider, schedule, policy, runtime, and destination
-error. Preflight validates deterministic prerequisites; it cannot predict model
-behavior.</p>
-<p>Run the same request without <code>--preflight</code>, deliver the immutable evidence pack
-to the verifier, and provide expected identities through a separate channel:</p>
-<div class="codehilite"><pre><span></span><code><span class="go">invarlock evaluate request.yaml --signing-key evidence-signer.pem \</span>
-<span class="go">  --runtime-image &quot;$RUNTIME_IMAGE&quot; --runtime-image-digest &quot;$RUNTIME_DIGEST&quot;</span>
-<span class="go">invarlock verify evidence/ --trust-profile verifier/trust-inputs.json \</span>
-<span class="go">  --receipt verifier/verification.receipt.json</span>
-<span class="go">invarlock report evidence/ --html verifier/report.html --explain</span>
+<p>Lengths count bytes, not characters. The envelope contains one signature whose
+<code>keyid</code> is the SHA-256 fingerprint of the raw Ed25519 public key. Verification
+rejects a non-canonical payload even when it decodes to the same JSON value.</p>
+<h2 id="recipient-policy-and-exact-subject-binding">Recipient policy and exact subject binding<a class="headerlink" href="#recipient-policy-and-exact-subject-binding" title="Permanent link">&para;</a></h2>
+<p>The closed recipient-policy schema is
+<code>contracts/recipient_acceptance_policy.schema.json</code>. It independently controls
+trusted envelope signers, trusted receipt verifiers, optional receipt
+trust-profile pinning, signer status, allowed InvarLock contract versions,
+required technical verdict, and whether countersigning is allowed.
+Each trust registry requires unique identity/fingerprint pairs. Duplicate pairs
+invalidate the policy regardless of record order or status, and verification
+requires exactly one matching trust record for each authenticated signer.</p>
+<p>Freshness has two independent limits. <code>max_envelope_age_seconds</code> applies to
+<code>attestation_issued_at</code>. <code>max_evidence_age_seconds</code>, when non-null, applies
+only to the receipt-authenticated <code>receipt_issued_at</code>. A missing authoritative
+evidence timestamp rejects under an evidence-age constraint. An envelope signer
+cannot make old or undated evidence fresh merely by creating a new envelope.</p>
+<p>Exact subject binding is a separate, mandatory recipient input: provide either
+the expected <code>sha256:</code> digest or the artifact path to hash using the predicate's
+declared artifact digest kind. Providing neither or both fails closed.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">verify_acceptance_attestation</span>
+
+<span class="n">decision</span> <span class="o">=</span> <span class="n">verify_acceptance_attestation</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;acceptance.dsse.json&quot;</span><span class="p">),</span>
+    <span class="n">trusted_public_keys</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;sha256:&lt;envelope-signer-fingerprint&gt;&quot;</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;envelope-signer.public.pem&quot;</span><span class="p">)</span>
+    <span class="p">},</span>
+    <span class="n">recipient_policy</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;recipient-policy.json&quot;</span><span class="p">),</span>
+    <span class="n">subject_artifact_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;artifact&quot;</span><span class="p">),</span>
+    <span class="n">now</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">tz</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">decision</span><span class="o">.</span><span class="n">accepted</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">&quot;; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decision</span><span class="o">.</span><span class="n">errors</span><span class="p">))</span>
 </code></pre></div>
 
-<p>Import mode uses the same public transaction without runtime-image arguments.
-It accepts complete per-record results with stable IDs, not aggregate scores.
-The verifier recomputes the named built-in or extension score from those
-records.</p>
-<h2 id="interpret-the-outcome">Interpret the outcome<a class="headerlink" href="#interpret-the-outcome" title="Permanent link">&para;</a></h2>
-<p>A passing receipt says that the named subject met the named policy relative to
-the named baseline on the authenticated paired schedule under the recorded
-runtime identities. A policy failure can still be intact evidence. An integrity
-or trust mismatch means the submitted comparison is not independently
-acceptable.</p>
-<p>Read every result together with the schedule composition, paired effect and
-interval, metric semantics, artifact and runtime identities, policy thresholds,
-and separately authenticated operational observations.</p>
-<h2 id="run-the-maintained-journeys">Run the maintained journeys<a class="headerlink" href="#run-the-maintained-journeys" title="Permanent link">&para;</a></h2>
-<p>The repository examples exercise real public commands:</p>
-<div class="codehilite"><pre><span></span><code><span class="go">make example-hf-transformers</span>
-<span class="go">make example-hf-vision-text</span>
-<span class="go">make example-peft-lora</span>
-<span class="go">make example-torchao-int8</span>
-<span class="go">make example-gguf-llama-cpp</span>
-<span class="go">make example-lm-evaluation-harness</span>
-<span class="go">make example-tensorrt-llm</span>
-<span class="go">make example-evidence-handoff</span>
-</code></pre></div>
-
-<p>The TensorRT-LLM showcase downloads one pinned Qwen3-0.6B revision and builds
-BF16 and ModelOpt-calibrated FP8 engines on separate H100 GPUs before
-completing the signed transaction.
-Its README also documents the lower-level command for qualified,
-caller-prepared engines. Both paths bind the observed engine identities rather
-than assuming independently compiled engine bytes will be identical. Optional
-runtime packages also expose conformance and evidence-qualification targets
-beside their implementations.</p>
+<p>The reference policy is
+<code>examples/acceptance-handoff/recipient-policy.example.json</code>. Replace its
+placeholder fingerprint and policy values with recipient-controlled inputs.
+The complete offline journey and committed package are documented in
+<code>examples/acceptance-handoff/README.md</code>.</p>
+<p><code>verify_acceptance_attestation</code> authenticates and policy-evaluates the portable
+envelope. The authoritative full replay entry point remains
+<code>invarlock verify EVIDENCE --trust-profile PROFILE</code>; the equivalent Python
+surface is <code>invarlock.engine.verify_evidence</code>.</p>
 
 
 
