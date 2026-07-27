@@ -291,8 +291,11 @@ boundary.
 External evaluator output is admissible only when InvarLock can authenticate
 the per-record inputs and deterministically recompute the decision-contract
 metric. Aggregate-only results and unsupported external-judge outputs fail
-closed. The LM Evaluation Harness journey tests this boundary; it does not make
-InvarLock a general evaluator.
+closed to verdict authority and remain observation-only. The maintained
+[evaluator qualification matrix](docs/reference/evaluator-qualification.md)
+demonstrates this boundary with ten per-record evaluator executions and two
+observation-only executions. These are conformance profiles outside the core,
+not twelve evaluator-specific engine plugins.
 
 ## Providers and diagnostics
 

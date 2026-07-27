@@ -22,6 +22,10 @@ cannot substitute a different schema.
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
 | `acceptance_predicate.schema.json` | `invarlock/acceptance-predicate-v2` | Portable projection of one technical decision in an in-toto Statement |
 | `recipient_acceptance_policy.schema.json` | `invarlock/recipient-acceptance-policy-v2` | Current recipient trust, freshness, version, signer, and verdict rules |
+| `evaluator_qualification_profile.schema.json` | `invarlock/evaluator-qualification-profile-v1` | Evaluator identity, execution provenance, and authority classification |
+| `evaluator_qualification_schedule.schema.json` | `invarlock/evaluator-qualification-schedule-v1` | Independent ordered record and reference identities |
+| `evaluator_qualification_export.schema.json` | `invarlock/evaluator-qualification-export-v1` | Normalized per-record facts or an observation-only summary |
+| `evaluator_qualification_result.schema.json` | `invarlock/evaluator-qualification-result-v1` | Digest-bound qualification outcome and import authority |
 
 The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
@@ -175,16 +179,20 @@ and outputs, bind them to the exact schedule, artifacts, runtime, and source,
 and deterministically recompute the decision-contract metric or authorized
 scorer.
 
-An adapter does not make InvarLock evaluator-neutral. Aggregate-only results,
-missing or reordered record facts, and external-judge outputs whose scores
-cannot be deterministically replayed remain fail-closed. They may be attached
-as authenticated observations without verdict authority.
+An adapter alone does not establish evaluator neutrality. The generic
+qualification boundary binds the profile, independent schedule, normalized
+export, retained upstream output, runner bundle, and dependency declaration.
+For a deterministic exact-match profile, every ordered input and output must be
+present and InvarLock independently recomputes every score. Aggregate-only
+results, missing or reordered record facts, and external-judge outputs whose
+scores cannot be deterministically replayed remain observation-only and expose
+no runtime-import records.
 
-The maintained LM Evaluation Harness integration demonstrates this boundary:
-it validates one upstream sample per schedule record and source hashes, rejects
-aggregate-only files, and lets InvarLock recompute exact match from the
-authenticated raw responses. Its aggregate score is never accepted as the
-technical result.
+The maintained [evaluator qualification
+matrix](evaluator-qualification.md) executes twelve representative upstream
+tools through example-owned runners. Evaluator names and native parsers remain
+outside the engine; a private evaluator crosses the same JSON, CLI, or Python
+SDK boundary.
 
 ### Run request
 

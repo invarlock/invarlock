@@ -1,0 +1,131 @@
+{
+  "$id": "https://invarlock.dev/contracts/evaluator_qualification_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authority": {
+      "enum": [
+        "observation_only",
+        "verdict_authority"
+      ]
+    },
+    "bindings": {
+      "additionalProperties": false,
+      "properties": {
+        "dependency_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "export_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runner_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schedule_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "dependency_lock_sha256",
+        "export_sha256",
+        "profile_sha256",
+        "raw_output_sha256",
+        "runner_sha256",
+        "schedule_sha256"
+      ],
+      "type": "object"
+    },
+    "format": {
+      "const": "invarlock/evaluator-qualification-result-v1"
+    },
+    "mean_score": {
+      "oneOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "observation_only",
+        "qualified_for_import"
+      ]
+    },
+    "profile_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "reason_codes": {
+      "items": {
+        "enum": [
+          "aggregate_only",
+          "human_judgment",
+          "nondeterministic_judge",
+          "unsupported_replay_semantics"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "record_count": {
+      "maximum": 10000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "records_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scores": {
+      "items": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "maxItems": 10000,
+      "type": "array"
+    }
+  },
+  "required": [
+    "authority",
+    "bindings",
+    "format",
+    "mean_score",
+    "outcome",
+    "profile_id",
+    "reason_codes",
+    "record_count",
+    "records_sha256",
+    "scores"
+  ],
+  "title": "InvarLock evaluator qualification result",
+  "type": "object",
+  "$defs": {
+    "identifier": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  }
+}
