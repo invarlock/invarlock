@@ -17,25 +17,52 @@ upstream tools and normalize their results into the same four contracts.
 A matrix row demonstrates the named version and entry point; it does not make
 that evaluator a built-in InvarLock plugin.
 
+## Demonstration levels
+
+The repository keeps three cumulative claims separate. They describe the
+evidence maintained in the current revision, not permanent evaluator classes or
+an architectural support ceiling. Any profile can advance to a deeper level by
+adding the corresponding retained evidence.
+
+| Level | What it proves | Coverage |
+| --- | --- | --- |
+| Qualification profile | The named upstream entry point executes and its output crosses the generic qualification contract | All twelve profiles |
+| Authoritative import adapter | A complete real evaluation is retained per record, independently recomputed, and replayed through the strict runtime-import loader | All ten deterministic profiles |
+| End-to-end release-assurance journey | The evaluator participates in a model-running, signed `evaluate` → `verify` → `report` transaction | Currently demonstrated for LM Evaluation Harness |
+
+An authoritative import adapter is not described as an end-to-end journey.
+LM Evaluation Harness currently adds that deeper signed transaction evidence.
+Other evaluator profiles can advance to the same level through the existing
+evaluator-neutral boundary; doing so requires maintained model-running and
+signed-transaction fixtures, not a new evaluator-specific engine plugin.
+
 ## Qualification matrix
 
-The retained matrix uses two local records: one exact match and one mismatch.
-No model, dataset, API key, or hosted evaluator service is used.
+The small conformance corpus uses two local records: one exact match and one
+mismatch. It proves all twelve upstream entry points and both authority modes
+without downloading a model or calling a hosted evaluator.
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Qualification |
-| --- | --- | --- | --- |
-| LM Evaluation Harness | `lm-eval==0.4.12` | `exact_match_hf_evaluate` | Per-record verdict authority |
-| Inspect AI | `inspect-ai==0.3.249` | `scorer.match` | Per-record verdict authority |
-| Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` with the local echo provider | Per-record verdict authority |
-| DeepEval | `deepeval==4.1.3` | `ExactMatchMetric.measure` | Per-record verdict authority |
-| Ragas | `ragas==0.4.3` | `ExactMatch.ascore` | Per-record verdict authority |
-| LightEval | `lighteval==0.13.0` | `ExactMatches.compute` | Per-record verdict authority |
-| Hugging Face Evaluate | `evaluate==0.4.6` | `exact_match.compute` | Per-record verdict authority |
-| Pydantic Evals | `pydantic-evals==2.18.0` | `Dataset.evaluate_sync` with `EqualsExpected` | Per-record verdict authority |
-| Braintrust AutoEvals | `autoevals==0.3.0` | `ExactMatch` | Per-record verdict authority |
-| OpenEvals | `openevals==0.2.0` | `exact_match` | Per-record verdict authority |
-| MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Observation-only: aggregate result |
-| Garak | `garak==0.15.1` | Garak CLI with its offline repeat generator | Observation-only: unsupported replay semantics |
+The ten authoritative rows also execute against a retained 102-record
+evaluation produced by the immutable `Qwen/Qwen3-0.6B` revision recorded in the
+corpus. The model produced 52 exact matches and 50 mismatches. Each evaluator
+scores all 102 model outputs through its real upstream entry point. InvarLock
+then recomputes every score and replays all 102 normalized records through the
+runtime-import authoring boundary.
+
+| Upstream evaluator | Pinned version | Executed upstream entry point | Qualification profile | Authoritative import | End-to-end transaction |
+| --- | --- | --- | --- | --- | --- |
+| LM Evaluation Harness | `lm-eval==0.4.12` | `exact_match_hf_evaluate` | Per-record | 102 records | Demonstrated |
+| Inspect AI | `inspect-ai==0.3.249` | `scorer.match` | Per-record | 102 records | Not yet demonstrated |
+| Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` with the local echo provider | Per-record | 102 records | Not yet demonstrated |
+| DeepEval | `deepeval==4.1.3` | `ExactMatchMetric.measure` | Per-record | 102 records | Not yet demonstrated |
+| Ragas | `ragas==0.4.3` | `ExactMatch.ascore` | Per-record | 102 records | Not yet demonstrated |
+| LightEval | `lighteval==0.13.0` | `ExactMatches.compute` | Per-record | 102 records | Not yet demonstrated |
+| Hugging Face Evaluate | `evaluate==0.4.6` | `exact_match.compute` | Per-record | 102 records | Not yet demonstrated |
+| Pydantic Evals | `pydantic-evals==2.18.0` | `Dataset.evaluate_sync` with `EqualsExpected` | Per-record | 102 records | Not yet demonstrated |
+| Braintrust AutoEvals | `autoevals==0.3.0` | `ExactMatch` | Per-record | 102 records | Not yet demonstrated |
+| OpenEvals | `openevals==0.2.0` | `exact_match` | Per-record | 102 records | Not yet demonstrated |
+| MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Observation-only: aggregate result | No | Not yet demonstrated |
+| Garak | `garak==0.15.1` | Garak CLI with its offline repeat generator | Observation-only: unsupported replay semantics | No | Not yet demonstrated |
 
 Each row under
 [`examples/evaluator-qualification/artifacts/`](https://github.com/invarlock/invarlock/tree/main/examples/evaluator-qualification/artifacts)
@@ -60,16 +87,43 @@ Run the retained, network-free verification:
 make evaluator-qualification
 ```
 
-Re-execute all twelve pinned upstream tools and then requalify the resulting
-artifacts:
+This verifies the twelve qualification profiles and replays the ten
+authoritative imports. To re-execute all pinned upstream tools over both
+corpora and refresh the retained artifacts:
 
 ```bash
 make evaluator-upstream-qualification
 ```
 
 The upstream command requires `uv`, Node.js with `npx`, and network access on a
-cold cache. It downloads evaluator packages only; it does not download or call
-a model.
+cold cache. The retained model outputs do not require a model during evaluator
+execution.
+
+To independently regenerate and compare the 102 model outputs, make the pinned
+model snapshot available locally and run the repository's locked Hugging Face
+environment:
+
+```bash
+make evaluator-authoritative-corpus
+```
+
+The model corpus binds the immutable model revision, curated snapshot-tree
+digest, exact generation settings, dataset digest, producer package versions,
+and every output. This command performs model execution; ordinary offline
+qualification does not.
+
+## Claim boundary
+
+The ten authoritative import demonstrations prove full per-record exact-match
+imports for one real, pinned model evaluation. They do not demonstrate every
+metric, task type, hosted mode, or model-judge feature offered by those
+evaluators. They also do not turn ten example runners into ten engine plugins.
+
+Only the LM Evaluation Harness integration currently demonstrates the deeper
+model execution and signed release-assurance transaction. The other nine
+authoritative rows begin with the already authenticated model-output corpus and
+demonstrate evaluator execution, normalization, qualification, and strict
+runtime-import replay.
 
 ## Authority rules
 

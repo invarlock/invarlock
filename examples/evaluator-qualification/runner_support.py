@@ -72,9 +72,13 @@ def load_inputs(
         if any(not isinstance(case.get(field), str) for field in required):
             raise ValueError(f"case {position} has an invalid field")
         normalized_case = {field: case[field] for field in required}
+        input_sha256 = case.get("input_sha256", sha256_text(normalized_case["input"]))
+        if not isinstance(input_sha256, str):
+            raise ValueError(f"case {position} has an invalid input_sha256")
+        normalized_case["input_sha256"] = input_sha256
         if (
             scheduled.get("record_id") != normalized_case["record_id"]
-            or scheduled.get("input_sha256") != sha256_text(normalized_case["input"])
+            or scheduled.get("input_sha256") != normalized_case["input_sha256"]
             or scheduled.get("reference_output_sha256")
             != sha256_text(normalized_case["reference"])
         ):
@@ -167,9 +171,14 @@ def finish_deterministic(
         "records": raw_records,
         "upstream": package,
     }
+    source_evaluation = load_json(args.cases).get("producer")
+    if source_evaluation is not None:
+        if not isinstance(source_evaluation, dict):
+            raise ValueError("cases producer must be an object")
+        raw["source_evaluation"] = source_evaluation
     export_records = [
         {
-            "input_sha256": sha256_text(case["input"]),
+            "input_sha256": case["input_sha256"],
             "output_sha256": sha256_text(case["output"]),
             "output_text": case["output"],
             "record_id": case["record_id"],

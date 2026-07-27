@@ -39,10 +39,37 @@ def main() -> None:
         "dist.shasum"
     ) != lock.get("shasum"):
         raise ValueError("Promptfoo registry integrity does not match the declaration")
-    config = Path(__file__).resolve().parent.parent / "promptfoo.yaml"
     environment = os.environ.copy()
     environment["PROMPTFOO_DISABLE_TELEMETRY"] = "1"
     with tempfile.TemporaryDirectory(prefix="invarlock-promptfoo-") as temporary:
+        config = Path(temporary) / "promptfoo.json"
+        config.write_text(
+            json.dumps(
+                {
+                    "description": "InvarLock evaluator qualification",
+                    "prompts": ["{{output}}"],
+                    "providers": ["echo"],
+                    "tests": [
+                        {
+                            "assert": [
+                                {
+                                    "type": "equals",
+                                    "value": case["reference"],
+                                }
+                            ],
+                            "description": case["record_id"],
+                            "vars": {"output": case["output"]},
+                        }
+                        for case in cases
+                    ],
+                },
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         native = Path(temporary) / "result.json"
         command = [
             "npx",
