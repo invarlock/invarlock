@@ -156,6 +156,7 @@ def test_readme_links_to_the_schema_valid_public_request() -> None:
     )
 
     assert request_url in readme
+    assert "omits `--runtime-image` and `--runtime-image-digest`" in readme
     request = yaml.safe_load(_read("examples/request.yaml"))
     schema = json.loads(_read("contracts/evaluation_request.schema.json"))
     jsonschema.Draft202012Validator(schema).validate(request)

@@ -119,11 +119,13 @@ Install the built-in Hugging Face provider for a native text comparison:
 python -m pip install "invarlock[hf]"
 ```
 
-Start from the
+For the native command below, start from the
 [complete run request](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evaluation-request.md#complete-run-request)
-or the repository's
-[schema-valid import request](https://github.com/invarlock/invarlock/blob/main/examples/request.yaml).
-Replace every illustrative digest with one derived from the exact input.
+and replace every illustrative digest with one derived from the exact input.
+Import mode instead starts from the repository's
+[schema-valid import request](https://github.com/invarlock/invarlock/blob/main/examples/request.yaml)
+and omits `--runtime-image` and `--runtime-image-digest`; the request binds the
+complete imported provider sidecars.
 
 ```bash
 invarlock evaluate request.yaml \
