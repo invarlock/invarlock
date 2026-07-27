@@ -149,6 +149,22 @@ def test_readme_resources_use_absolute_urls_for_pypi() -> None:
     assert all(url.startswith(("https://", "mailto:")) for url in resource_urls)
 
 
+def test_readme_evaluation_request_matches_the_public_schema() -> None:
+    readme = _read("README.md")
+    match = re.search(
+        r"```yaml\n"
+        r"(?P<request>format_version: invarlock/evaluation-request-v1\n.*?)"
+        r"\n```",
+        readme,
+        re.DOTALL,
+    )
+
+    assert match is not None
+    request = yaml.safe_load(match.group("request"))
+    schema = json.loads(_read("contracts/evaluation_request.schema.json"))
+    jsonschema.Draft202012Validator(schema).validate(request)
+
+
 def test_public_docs_describe_the_release_assurance_surface() -> None:
     text = "\n".join(_read(relative) for relative in CORE_DOCS).lower()
     for phrase in (
