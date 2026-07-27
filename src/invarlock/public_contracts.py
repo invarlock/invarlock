@@ -31,6 +31,18 @@ SCORER_EXTENSION_BINDING_FORMAT_VERSION = "invarlock/scorer-extension-binding-v1
 SCORER_EXTENSION_RESULT_FORMAT_VERSION = "invarlock/scorer-extension-result-v1"
 ACCEPTANCE_PREDICATE_FORMAT_VERSION = "invarlock/acceptance-predicate-v2"
 RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION = "invarlock/recipient-acceptance-policy-v2"
+EVALUATOR_QUALIFICATION_PROFILE_FORMAT_VERSION = (
+    "invarlock/evaluator-qualification-profile-v1"
+)
+EVALUATOR_QUALIFICATION_SCHEDULE_FORMAT_VERSION = (
+    "invarlock/evaluator-qualification-schedule-v1"
+)
+EVALUATOR_QUALIFICATION_EXPORT_FORMAT_VERSION = (
+    "invarlock/evaluator-qualification-export-v1"
+)
+EVALUATOR_QUALIFICATION_RESULT_FORMAT_VERSION = (
+    "invarlock/evaluator-qualification-result-v1"
+)
 
 
 class ContractLoadError(RuntimeError):
@@ -123,12 +135,32 @@ def load_recipient_acceptance_policy_schema() -> dict[str, Any]:
     return _load_object_contract("recipient_acceptance_policy.schema.json")
 
 
+def load_evaluator_qualification_profile_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluator_qualification_profile.schema.json")
+
+
+def load_evaluator_qualification_schedule_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluator_qualification_schedule.schema.json")
+
+
+def load_evaluator_qualification_export_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluator_qualification_export.schema.json")
+
+
+def load_evaluator_qualification_result_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluator_qualification_result.schema.json")
+
+
 __all__ = [
     "ContractLoadError",
     "ACCEPTANCE_PREDICATE_FORMAT_VERSION",
     "EVALUATION_REQUEST_FORMAT_VERSION",
     "EVIDENCE_PACK_FORMAT_VERSION",
     "EVIDENCE_OBSERVATION_FORMAT_VERSION",
+    "EVALUATOR_QUALIFICATION_EXPORT_FORMAT_VERSION",
+    "EVALUATOR_QUALIFICATION_PROFILE_FORMAT_VERSION",
+    "EVALUATOR_QUALIFICATION_RESULT_FORMAT_VERSION",
+    "EVALUATOR_QUALIFICATION_SCHEDULE_FORMAT_VERSION",
     "MODEL_ARTIFACT_IDENTITY_FORMAT_VERSION",
     "PACKAGE_CONTRACTS_ROOT",
     "RUNTIME_BEHAVIORAL_SCHEDULE_FORMAT_VERSION",
@@ -146,6 +178,10 @@ __all__ = [
     "load_acceptance_predicate_schema",
     "load_evidence_pack_schema",
     "load_evidence_observation_schema",
+    "load_evaluator_qualification_export_schema",
+    "load_evaluator_qualification_profile_schema",
+    "load_evaluator_qualification_result_schema",
+    "load_evaluator_qualification_schedule_schema",
     "load_trust_inputs_schema",
     "load_model_artifact_identity_schema",
     "load_runtime_behavioral_schedule_schema",

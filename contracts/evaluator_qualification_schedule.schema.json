@@ -1,0 +1,58 @@
+{
+  "$id": "https://invarlock.dev/contracts/evaluator_qualification_schedule.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/evaluator-qualification-schedule-v1"
+    },
+    "records": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "input_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "record_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "reference_output_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "required": [
+          "input_sha256",
+          "record_id",
+          "reference_output_sha256"
+        ],
+        "type": "object"
+      },
+      "maxItems": 10000,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schedule_id": {
+      "$ref": "#/$defs/identifier"
+    }
+  },
+  "required": [
+    "format",
+    "records",
+    "schedule_id"
+  ],
+  "title": "InvarLock evaluator qualification schedule",
+  "type": "object",
+  "$defs": {
+    "identifier": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  }
+}
