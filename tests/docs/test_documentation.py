@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -657,3 +659,24 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     assert "Azure AI Evaluation" in text
     assert "Only LM Evaluation Harness" not in text
     assert "remains the only evaluator example" not in text
+
+
+def test_evaluator_documentation_matrix_matches_retained_manifests() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(
+                REPO_ROOT
+                / "examples"
+                / "evaluator-qualification"
+                / "render_docs_matrix.py"
+            ),
+            "--check",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr

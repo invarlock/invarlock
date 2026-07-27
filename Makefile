@@ -56,7 +56,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus
+.PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
@@ -532,8 +532,11 @@ docs-live-fast: cli-smoke-core docs-check-build  ## Check documented command sur
 
 docs-live: docs-live-fast  ## Run the maintained documentation checks
 
-docs-check-build: docs-lint-strict  ## Lint and build documentation
+docs-check-build: evaluator-docs-matrix-check docs-lint-strict  ## Lint and build documentation
 	$(MKDOCS) build --strict
+
+evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
+	$(PYTHON) examples/evaluator-qualification/render_docs_matrix.py --check
 
 docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
 
