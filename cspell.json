@@ -193,6 +193,7 @@
     "Pydantic",
     "Braintrust",
     "Garak",
+    "Opik",
     "Rego",
     "requalify",
     "sentencepiece",

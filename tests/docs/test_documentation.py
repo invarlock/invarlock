@@ -644,10 +644,15 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     assert "Authoritative import adapter" in text
     assert "End-to-end release-assurance journey" in text
     assert "LM Evaluation Harness" in text
-    assert "ten authoritative" in text.lower()
+    assert "seventeen authoritative" in text.lower()
     assert "102-record" in text
     assert "cumulative claims" in text
     assert "not permanent evaluator classes" in text
     assert "Other evaluator profiles can advance" in text
+    assert "Benchmark harnesses" in text
+    assert "Application evaluation SDKs" in text
+    assert "Evaluation and observability platforms" in text
+    assert "Microsoft PromptFlow" in text
+    assert "Azure AI Evaluation" in text
     assert "Only LM Evaluation Harness" not in text
     assert "remains the only evaluator example" not in text

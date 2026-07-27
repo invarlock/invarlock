@@ -1,7 +1,17 @@
 {
   "format": "invarlock/evaluator-demonstration-levels-v1",
   "profiles": {
+    "arize-phoenix-evals": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
     "autoevals": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
+    "azure-ai-evaluation": {
       "authoritative_import": true,
       "end_to_end_transaction": false,
       "qualification_profile": true
@@ -11,12 +21,32 @@
       "end_to_end_transaction": false,
       "qualification_profile": true
     },
+    "evidently": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
     "garak": {
       "authoritative_import": false,
       "end_to_end_transaction": false,
       "qualification_profile": true
     },
+    "langfuse": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
     "hugging-face-evaluate": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
+    "openai-evals": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
+    "opik": {
       "authoritative_import": true,
       "end_to_end_transaction": false,
       "qualification_profile": true
@@ -57,6 +87,11 @@
       "qualification_profile": true
     },
     "ragas": {
+      "authoritative_import": true,
+      "end_to_end_transaction": false,
+      "qualification_profile": true
+    },
+    "trulens": {
       "authoritative_import": true,
       "end_to_end_transaction": false,
       "qualification_profile": true

@@ -71,14 +71,37 @@ def qualification_profile(profile: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def matrix_document() -> dict[str, Any]:
+    return load(ROOT / "matrix.json")
+
+
 def profiles() -> list[dict[str, Any]]:
-    matrix = load(ROOT / "matrix.json")
+    matrix = matrix_document()
     values = matrix.get("profiles")
     if not isinstance(values, list) or any(
         not isinstance(value, dict) for value in values
     ):
         raise ValueError("matrix profiles must be an array of objects")
     return values
+
+
+def categories() -> dict[str, dict[str, str]]:
+    values = matrix_document().get("categories")
+    if not isinstance(values, dict) or any(
+        not isinstance(key, str)
+        or not isinstance(value, dict)
+        or not isinstance(value.get("display_name"), str)
+        for key, value in values.items()
+    ):
+        raise ValueError("matrix categories must map identifiers to display names")
+    return values
+
+
+def selection_policy() -> dict[str, Any]:
+    value = matrix_document().get("selection")
+    if not isinstance(value, dict):
+        raise ValueError("matrix selection must be an object")
+    return value
 
 
 def demonstration_levels() -> dict[str, dict[str, bool]]:
@@ -236,8 +259,23 @@ def qualify(
 def verify() -> None:
     matrix_profiles = profiles()
     identifiers = [profile["profile_id"] for profile in matrix_profiles]
-    if len(identifiers) != 12 or len(set(identifiers)) != 12:
-        raise ValueError("the representative matrix must contain exactly 12 profiles")
+    if len(identifiers) < 12 or len(set(identifiers)) != len(identifiers):
+        raise ValueError(
+            "the representative matrix must contain at least 12 unique "
+            "profile identifiers"
+        )
+    category_ids = categories()
+    for profile in matrix_profiles:
+        category = profile.get("category")
+        if not isinstance(category, str) or category not in category_ids:
+            raise ValueError(f"{profile['profile_id']}: category is invalid")
+    selection = selection_policy()
+    if (
+        not isinstance(selection.get("reviewed_on"), str)
+        or not isinstance(selection.get("minimum_activity_window_months"), int)
+        or selection["minimum_activity_window_months"] < 1
+    ):
+        raise ValueError("matrix selection review metadata is invalid")
     verdict_count = sum(
         profile["authority"]["mode"] == "deterministic_per_record"
         for profile in matrix_profiles
@@ -282,8 +320,8 @@ def verify_authoritative() -> None:
             "authoritative corpus must bind one 102-record model execution"
         )
     matrix_profiles = authoritative_profiles()
-    if len(matrix_profiles) != 10:
-        raise ValueError("exactly ten profiles must demonstrate authoritative import")
+    if len(matrix_profiles) < 10:
+        raise ValueError("at least ten profiles must demonstrate authoritative import")
     for profile in matrix_profiles:
         artifact = AUTHORITATIVE_ARTIFACTS / profile["profile_id"]
         expected_profile = canonical_json_bytes(qualification_profile(profile))
