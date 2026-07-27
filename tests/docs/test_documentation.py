@@ -704,21 +704,31 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
 
 def test_latest_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
-    unreleased, remainder = changelog.split("## [0.13.0]", maxsplit=1)
-    release = remainder.split("## [0.12.1]", maxsplit=1)[0]
+    unreleased, remainder = changelog.split("## [0.14.0]", maxsplit=1)
+    release, remainder = remainder.split("## [0.13.0]", maxsplit=1)
+    previous_release = remainder.split("## [0.12.1]", maxsplit=1)[0]
     normalized = " ".join(release.split())
+    previous_normalized = " ".join(previous_release.split())
+    assert "evaluator-neutral qualification" not in unreleased
+    assert "evaluator-neutral qualification" in normalized
+    assert "recipient-controlled acceptance handoff" in normalized
+    assert "observation-only" in normalized
+    assert "canonical in-toto/DSSE acceptance envelope" in normalized
+    assert "OPA/Rego and CUE" in normalized
+    assert "clean-checkout v0.13 compatibility corpus" in normalized
     assert "paired model release-regression evaluation" not in unreleased
-    assert "paired model release-regression evaluation" in normalized
-    assert "exact two-sided McNemar" in normalized
-    assert "perplexity ratio as a verifier-derived likelihood" in normalized
-    assert "paired schedule-resampling interval" in release
-    assert "host-to-OCI" in release
-    assert "canonical evidence bundles" in release
-    assert "invarlock.engine" in release
-    assert "invarlock-diagnostics" in release
+    assert "paired model release-regression evaluation" in previous_normalized
+    assert "exact two-sided McNemar" in previous_normalized
+    assert "perplexity ratio as a verifier-derived likelihood" in previous_normalized
+    assert "paired schedule-resampling interval" in previous_release
+    assert "host-to-OCI" in previous_release
+    assert "canonical evidence bundles" in previous_release
+    assert "invarlock.engine" in previous_release
+    assert "invarlock-diagnostics" in previous_release
     for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
         assert heading in unreleased
         assert heading in release
+        assert heading in previous_release
 
 
 def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
