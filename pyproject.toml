@@ -178,6 +178,9 @@ max-complexity = 30
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # imported but unused
 
+[tool.ruff.format]
+exclude = ["*.md"]
+
 [tool.mypy]
 python_version = "3.13"
 warn_return_any = true

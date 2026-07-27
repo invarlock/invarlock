@@ -31,9 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented import mode as the authenticated per-record evaluator boundary:
   aggregate-only and unsupported external-judge results remain fail-closed.
 - Refreshed the maintained Python, documentation, and GitHub Actions dependency
-  baselines together with their hash-pinned workflow locks, and added direct
-  declaration-to-lock parity coverage so automation cannot silently exercise
-  versions outside the repository's declared constraints.
+  baselines, including Ruff 0.16.0, mypy 2.3.0, GitHub CodeQL Action 4.37.3,
+  and OpenSSF Scorecard Action 2.4.4, together with their hash-pinned workflow
+  locks. Direct declaration-to-lock parity coverage prevents automation from
+  silently exercising versions outside the repository's declared constraints.
 
 ### Removed
 
