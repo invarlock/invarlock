@@ -1,7 +1,5 @@
 .keys/
 artifacts/
-!evaluator-qualification/artifacts/
-!evaluator-qualification/artifacts/**
 evidence.html
 verification.receipt.json
 *.receipt.json

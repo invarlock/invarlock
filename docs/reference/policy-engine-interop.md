@@ -6,11 +6,12 @@ an InvarLock service or policy-engine plugin.
 
 !!! info "Reference"
 
-    - **Envelope:** DSSE with an in-toto Statement v1 payload
-    - **Predicate:** `https://invarlock.dev/attestations/acceptance/v2`
-    - **Engines:** Open Policy Agent v1.17.0 and CUE v0.16.1
-    - **Boundary:** Standalone Ed25519 verifier to authenticated JSON policy
-      input; no `invarlock` import or network call
+    - **Surface:** Standalone DSSE verification followed by OPA/Rego or CUE
+      recipient-policy evaluation
+    - **Stability:** Maintained example over the acceptance v2 predicate and
+      `invarlock/acceptance-policy-input-v1`
+    - **Use this page when:** Consuming an acceptance attestation without an
+      InvarLock service or policy-engine plugin
 
 ## Data flow
 

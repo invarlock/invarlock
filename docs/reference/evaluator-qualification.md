@@ -11,8 +11,11 @@ upstream tools and normalize their results into the same four contracts.
       `invarlock-qualify-evaluator` companion CLI, and
       `invarlock.engine.qualify_evaluator_export`
     - **Stability:** Closed v1 qualification formats
-    - **Non-claim:** A matrix row demonstrates the named version and entry
-      point; it does not make that evaluator a built-in InvarLock plugin
+    - **Use this page when:** Integrating an open or proprietary evaluator, or
+      reviewing the maintained upstream-execution matrix
+
+A matrix row demonstrates the named version and entry point; it does not make
+that evaluator a built-in InvarLock plugin.
 
 ## Qualification matrix
 

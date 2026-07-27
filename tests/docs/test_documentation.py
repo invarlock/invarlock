@@ -50,10 +50,12 @@ EXPECTED_DOC_PAGES = {
     "reference/cli.md",
     "reference/compatibility.md",
     "reference/contracts.md",
+    "reference/evaluator-qualification.md",
     "reference/environment.md",
     "reference/lifecycle.md",
     "reference/release-verification.md",
     "reference/reports.md",
+    "reference/policy-engine-interop.md",
     "reference/runtime-security.md",
     "reference/runtime-providers.md",
     "reference/documentation.md",
@@ -289,12 +291,13 @@ def test_docs_describe_the_narrow_engine_and_embedding_facade() -> None:
         assert required in text
 
 
-def test_acceptance_docs_do_not_overclaim_external_policy_engine_support() -> None:
+def test_acceptance_docs_state_the_external_policy_engine_boundary() -> None:
     text = " ".join(
         "\n".join(
             _read(path)
             for path in (
                 "docs/reference/acceptance-attestations.md",
+                "docs/reference/policy-engine-interop.md",
                 "examples/acceptance-handoff/README.md",
             )
         )
@@ -302,10 +305,11 @@ def test_acceptance_docs_do_not_overclaim_external_policy_engine_support() -> No
         .split()
     )
 
-    assert "existing attestation policy engines can authenticate" not in text
-    assert "without a custom invarlock service or plugin" not in text
-    assert "standards-shaped in-toto/dsse transport" in text
-    assert "external policy-engine interoperability is not claimed" in text
+    assert "open policy agent" in text
+    assert "cue" in text
+    assert "without an invarlock service or policy-engine plugin" in text
+    assert "standalone verifier" in text
+    assert "do not themselves perform raw ed25519 verification" in text
 
 
 def test_navigation_contains_only_existing_pages() -> None:
@@ -334,6 +338,8 @@ def test_navigation_contains_only_existing_pages() -> None:
         "reference/contracts.md",
         "reference/compatibility.md",
         "reference/acceptance-attestations.md",
+        "reference/policy-engine-interop.md",
+        "reference/evaluator-qualification.md",
         "reference/api-guide.md",
         "reference/artifacts.md",
         "reference/reports.md",
