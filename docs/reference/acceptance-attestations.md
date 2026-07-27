@@ -20,15 +20,16 @@ payload type is `application/vnd.in-toto+json`.
 
 The primary workflow is:
 
-> producer evaluation → portable signed evidence → independent recipient
+> authenticated evaluation → portable signed evidence → independent technical
 > verification → recipient-controlled acceptance
 
-The producer evaluates a baseline and subject on the same authenticated
-schedule, exports the detailed evidence and signed receipt, then wraps that
-receipt for standard attestation transport. The recipient authenticates the
-DSSE signer from its own trust registry, binds the in-toto subject to the exact
-artifact bytes or an independently obtained digest, authenticates the embedded
-receipt, and applies its current policy.
+The evaluation operator evaluates a baseline and subject on the same
+authenticated schedule and exports the detailed signed evidence. An independent
+technical verifier checks that evidence and signs the receipt. The envelope
+signer wraps the receipt for standard attestation transport. The recipient
+authenticates the DSSE signer from its own trust registry, binds the in-toto
+subject to the exact artifact bytes or an independently obtained digest,
+authenticates the embedded receipt, and applies its current policy.
 
 The envelope is standards-shaped in-toto/DSSE transport. The repository
 maintains a standalone conformance example that authenticates the envelope and
@@ -78,7 +79,7 @@ and their original format remains in `contracts.receipt` and the parsed
 receipt. Because v0.13 receipts did not authenticate an issuance time,
 `timestamps.receipt_issued_at` remains `null`; the wrapper rejects any attempt
 to manufacture that historical metadata. `evaluation_completed_at` is
-producer-reported context, not an authoritative freshness input.
+wrapper-supplied context, not an authoritative freshness input.
 `attestation_issued_at` is new envelope-transport metadata.
 
 The verifier authenticates the inner receipt independently and checks its
@@ -88,8 +89,8 @@ attestation, even if the modified envelope has a valid outer signature.
 
 ## Signer relationship
 
-The receipt signer is the technical verifier. The envelope signer is the
-producer or other party transporting that verified result.
+The receipt signer is the technical verifier. The envelope signer is the party
+transporting that verified result.
 
 - `same_signer` means both the identity and Ed25519 public-key fingerprint are
   identical.
@@ -102,7 +103,7 @@ embedded receipt signer. Recipient policy therefore has a separate
 `trusted_receipt_verifiers` registry. An optional
 `expected_receipt_trust_profile_digest` pins the verifier-owned trust profile
 recorded by the receipt. Unknown or revoked receipt verifiers fail closed even
-when the outer producer is trusted.
+when the outer envelope signer is trusted.
 
 ## Canonical bytes and signatures
 
@@ -138,8 +139,8 @@ requires exactly one matching trust record for each authenticated signer.
 Freshness has two independent limits. `max_envelope_age_seconds` applies to
 `attestation_issued_at`. `max_evidence_age_seconds`, when non-null, applies
 only to the receipt-authenticated `receipt_issued_at`. A missing authoritative
-evidence timestamp rejects under an evidence-age constraint. A producer cannot
-make old or undated evidence fresh merely by creating a new envelope.
+evidence timestamp rejects under an evidence-age constraint. An envelope signer
+cannot make old or undated evidence fresh merely by creating a new envelope.
 
 Exact subject binding is a separate, mandatory recipient input: provide either
 the expected `sha256:` digest or the artifact path to hash using the predicate's
@@ -154,7 +155,7 @@ from invarlock.engine import verify_acceptance_attestation
 decision = verify_acceptance_attestation(
     Path("acceptance.dsse.json"),
     trusted_public_keys={
-        "sha256:<producer-key-fingerprint>": Path("producer.public.pem")
+        "sha256:<envelope-signer-fingerprint>": Path("envelope-signer.public.pem")
     },
     recipient_policy=Path("recipient-policy.json"),
     subject_artifact_path=Path("artifact"),
