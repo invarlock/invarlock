@@ -14,11 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offline producer-to-recipient handoff with a committed golden package.
 - Added the permanent v0.13 verification and dossier-ingestion compatibility
   covenant plus a release-blocking clean-checkout corpus.
+- Added evaluator-neutral JSON qualification contracts, a companion CLI and
+  Python API, maintained upstream qualification profiles, authoritative
+  per-record import replays, and an observation-only boundary for evidence that
+  cannot support deterministic verdict recomputation.
+- Added standalone OPA/Rego and CUE acceptance-policy interoperability with
+  positive, policy-rejected, tampered-subject, untrusted-signer, stale-evidence,
+  and unsupported-contract conformance fixtures.
 
 ### Changed
 
 - Described acceptance envelopes as standards-shaped in-toto/DSSE transport
-  without claiming untested interoperability with an external policy engine.
+  that existing policy engines can consume through an authenticated projection
+  without a custom InvarLock service or plugin; full evidence replay remains a
+  separate verifier responsibility.
 - Documented import mode as the authenticated per-record evaluator boundary:
   aggregate-only and unsupported external-judge results remain fail-closed.
 - Refreshed the maintained Python, documentation, and GitHub Actions dependency
