@@ -48,10 +48,6 @@ subject binding; the recipient still applies separate envelope and receipt
 trust, independent envelope and evidence freshness, contract-version,
 signer-status, and verdict policy.
 
-Compatibility is explicit: v0.13 evidence and receipts remain permanently
-verifiable and permanently ingestible as first-class dossier inputs, while
-every acceptance outcome remains controlled by the recipient's current policy.
-
 ```bash
 invarlock evaluate request.yaml
 invarlock verify evidence/
@@ -334,6 +330,10 @@ This is acceptance-policy interoperability, not complete evidence replay.
 Recipients use `invarlock verify` when they need to replay every evidence-pack
 invariant. See the
 [policy-engine interoperability reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md).
+
+> **Compatibility note:** v0.13 evidence and receipts remain permanently
+> verifiable and permanently ingestible as first-class dossier inputs. Every
+> acceptance outcome remains controlled by the recipient's current policy.
 
 ## Import and qualify existing evaluator results
 
