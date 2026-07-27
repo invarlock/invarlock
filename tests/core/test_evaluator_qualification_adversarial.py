@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.evaluator_qualification as qualification
 from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
@@ -124,6 +125,79 @@ def test_unknown_contract_and_noncanonical_json_fail_closed(tmp_path: Path) -> N
     paths[1].write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
     with pytest.raises(EvaluatorQualificationError, match="canonical JSON"):
         _qualify(paths)
+
+
+@pytest.mark.parametrize(
+    ("function", "value", "message"),
+    [
+        (qualification._object, [], "must be an object"),
+        (qualification._objects, [None], "must be an array of objects"),
+        (qualification._string, 1, "must be a string"),
+        (qualification._number, True, "must be a number"),
+    ],
+)
+def test_internal_type_guards_fail_closed(
+    function,
+    value: object,
+    message: str,
+) -> None:
+    with pytest.raises(EvaluatorQualificationError, match=message):
+        function(value, field="test")
+
+
+def test_non_object_profile_and_missing_raw_output_fail_closed(tmp_path: Path) -> None:
+    paths = qualification_fixture(tmp_path)
+    paths[0].write_bytes(b"[]\n")
+    with pytest.raises(EvaluatorQualificationError, match="must be a JSON object"):
+        _qualify(paths)
+
+    paths = qualification_fixture(tmp_path / "missing-raw")
+    paths[3].unlink()
+    with pytest.raises(EvaluatorQualificationError, match="is unavailable"):
+        _qualify(paths)
+
+
+def test_profile_id_mismatch_fails_closed(tmp_path: Path) -> None:
+    paths = qualification_fixture(tmp_path)
+    export = _load(paths[2])
+    export["profile_id"] = "different-profile"
+    _write_json(paths[2], export)
+
+    with pytest.raises(
+        EvaluatorQualificationError,
+        match="export profile_id does not match profile",
+    ):
+        _qualify(paths)
+
+
+@pytest.mark.parametrize(
+    "summary", [None, {"kind": "judge_scores", "sha256": "sha256:" + "0" * 64}]
+)
+def test_observation_summary_must_exist_and_bind_raw_output(
+    tmp_path: Path,
+    summary: object,
+) -> None:
+    paths = qualification_fixture(tmp_path, mode="observation_only")
+    export = _load(paths[2])
+    export["summary"] = summary
+    _write_json(paths[2], export)
+
+    message = (
+        "must bind one upstream summary"
+        if summary is None
+        else "summary digest does not match"
+    )
+    with pytest.raises(EvaluatorQualificationError, match=message):
+        _qualify(paths)
+
+
+def test_result_write_refuses_to_replace_existing_file(tmp_path: Path) -> None:
+    result = _qualify(qualification_fixture(tmp_path / "inputs"))
+    destination = tmp_path / "result.json"
+    result.write(destination)
+
+    with pytest.raises(EvaluatorQualificationError, match="already exists"):
+        result.write(destination)
 
 
 def test_core_qualification_module_has_no_evaluator_name_dispatch() -> None:
