@@ -110,11 +110,12 @@ python -m json.tool \
 
 Start with the
 [public evidence index](https://github.com/invarlock/invarlock/tree/main/public_evidence)
-for the maintained inventory and interpretation limits. Rendering authenticates
-and explains the signed bundle; it is not an independent acceptance decision.
-Actual verification also requires artifact, schedule, policy, runtime, evidence
-signer, and verifier anchors obtained through channels independent of the
-submitted pack.
+for the maintained inventory and interpretation limits. Reporting authenticates
+and explains the signed bundle. Acceptance remains a separate,
+recipient-controlled decision under current policy. Technical verification
+obtains the expected artifact, schedule, evaluated policy, runtime, evidence
+signer, and verifier anchors through channels independent of the submitted
+pack.
 
 ## Run, verify, and report
 
