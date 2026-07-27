@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a canonical InvarLock acceptance predicate in an in-toto Statement and
   DSSE envelope, recipient-controlled verification policy, and a deterministic
-  offline producer-to-recipient handoff with a committed golden package.
+  offline artifact-delivery handoff with a committed golden package.
 - Added the permanent v0.13 verification and dossier-ingestion compatibility
   covenant plus a release-blocking clean-checkout corpus.
 - Added evaluator-neutral JSON qualification contracts, a companion CLI and

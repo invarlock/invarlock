@@ -152,7 +152,7 @@ make evaluator-authoritative-corpus
 ```
 
 The model corpus binds the immutable model revision, curated snapshot-tree
-digest, exact generation settings, dataset digest, producer package versions,
+digest, exact generation settings, dataset digest, generation package versions,
 and every output. This command performs model execution; ordinary offline
 qualification does not.
 

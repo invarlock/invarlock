@@ -215,12 +215,13 @@ identity and fingerprint. Embedded key material alone is not a trust anchor.
 
 ### Rewrapping renews old evidence
 
-A producer places an old or undated receipt in a newly issued envelope and
-attempts to satisfy a current freshness policy using only the envelope time.
+An envelope signer places an old or undated receipt in a newly issued envelope
+and attempts to satisfy a current freshness policy using only the envelope
+time.
 
 **Mitigation:** constrain envelope age and receipt-authenticated evidence age
 independently. A missing receipt issuance time rejects whenever evidence age is
-bounded. Producer-reported evaluation context cannot substitute for an
+bounded. Wrapper-supplied evaluation context cannot substitute for an
 authenticated receipt timestamp.
 
 ### Denial of service through hostile evidence

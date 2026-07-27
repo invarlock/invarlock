@@ -16,7 +16,7 @@ an InvarLock service or policy-engine plugin.
 ## Data flow
 
 ```text
-acceptance.dsse.json + producer public key
+acceptance.dsse.json + envelope-signer public key
                   |
                   v
 standalone DSSE and receipt verification

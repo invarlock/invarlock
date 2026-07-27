@@ -23,7 +23,7 @@
 
 An artifact recipient can independently check whether one exact model
 derivative satisfies an agreed release-regression policy without trusting the
-producer's dashboard or service.
+delivery dashboard or service.
 
 InvarLock is an open-source assurance engine for one paired
 baseline-versus-subject release-regression decision. A closed request pins the
@@ -34,9 +34,9 @@ records whether the selected paired interval satisfies the policy. A separate
 verifier replays the
 bundle against independently supplied trust anchors.
 
-For producer-to-recipient use, the workflow is:
+For artifact delivery, the workflow is:
 
-> producer evaluation → portable signed evidence → independent recipient
+> authenticated evaluation → portable signed evidence → independent technical
 > verification → recipient-controlled acceptance
 
 The detailed receipt remains the replayable technical result. An optional
@@ -65,8 +65,8 @@ invarlock report evidence/
 
 ## Try it without a model runtime
 
-The service-free acceptance example runs a complete signed producer,
-independent-verifier, and recipient-policy handoff. It also demonstrates
+The service-free acceptance example runs a complete signed evaluation,
+independent technical verification, and recipient-policy handoff. It also demonstrates
 fail-closed rejection for changed artifacts, tampered evidence, untrusted or
 revoked signers, stale evidence, and contradictory envelope content.
 
