@@ -1,0 +1,1 @@
+{"format":"invarlock/evaluator-qualification-cases-v1","records":[{"input":"What is the capital of France?","output":"Paris","record_id":"record-1","reference":"Paris"},{"input":"Return the release label.","output":"candidate","record_id":"record-2","reference":"approved"}]}

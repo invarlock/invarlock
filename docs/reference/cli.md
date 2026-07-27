@@ -18,6 +18,19 @@ Use `invarlock --version` for the installed version and `invarlock --help` for
 the authoritative option list. The commands have the same transaction
 boundaries as the [Python facade](api-guide.md).
 
+External evaluator qualification uses a separate companion executable so the
+three-command release transaction remains unchanged:
+
+```text
+invarlock-qualify-evaluator qualify PROFILE SCHEDULE EXPORT RAW_OUTPUT \
+  [--output RESULT] [--require-verdict-authority] [--json]
+```
+
+This command is evaluator-neutral: it never executes or dispatches to a named
+evaluator. It authenticates one already-normalized export and independently
+recomputes deterministic exact-match records. See [Evaluator
+qualification](evaluator-qualification.md).
+
 ## Root command
 
 | Form | Result |
