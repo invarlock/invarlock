@@ -187,7 +187,7 @@ def test_runner_support_rejects_malformed_inputs_and_scores(
         support.load_inputs(bad_args)
 
 
-def test_runner_support_inventory_arguments_and_invalid_producer(
+def test_runner_support_inventory_arguments_and_invalid_source_evaluation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -225,8 +225,8 @@ def test_runner_support_inventory_arguments_and_invalid_producer(
     assert parsed.profile == args.profile
 
     document = json.loads(args.cases.read_bytes())
-    document["producer"] = "invalid"
-    args.cases = tmp_path / "invalid-producer.json"
+    document["source_evaluation"] = "invalid"
+    args.cases = tmp_path / "invalid-source-evaluation.json"
     args.cases.write_bytes(canonical_json_bytes(document))
     profile = json.loads(args.profile.read_bytes())
     monkeypatch.setattr(
@@ -234,7 +234,7 @@ def test_runner_support_inventory_arguments_and_invalid_producer(
         "version",
         lambda _name: profile["upstream"]["package"]["version"],
     )
-    with pytest.raises(ValueError, match="producer must be an object"):
+    with pytest.raises(ValueError, match="source_evaluation must be an object"):
         support.finish_deterministic(
             args=args,
             entrypoint="entrypoint",
@@ -357,7 +357,7 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         "load",
         lambda _path: {
             "format": "wrong",
-            "producer": {},
+            "source_evaluation": {},
             "records": [],
         },
     )
@@ -381,6 +381,13 @@ def test_matrix_rejects_invalid_control_documents(
     with pytest.raises(ValueError, match="demonstration levels"):
         matrix.demonstration_levels()
 
+    monkeypatch.setattr(matrix, "matrix_document", lambda: {"categories": []})
+    with pytest.raises(ValueError, match="matrix categories"):
+        matrix.categories()
+    monkeypatch.setattr(matrix, "matrix_document", lambda: {"selection": []})
+    with pytest.raises(ValueError, match="matrix selection"):
+        matrix.selection_policy()
+
     duplicate = matrix.load = lambda _path: {
         "profiles": [{"profile_id": "same", "authority": {"mode": "observation_only"}}]
         * 12
@@ -388,6 +395,111 @@ def test_matrix_rejects_invalid_control_documents(
     assert duplicate is not None
     monkeypatch.setattr(matrix, "profiles", lambda: matrix.load(Path())["profiles"])
     with pytest.raises(ValueError, match="unique profile identifiers"):
+        matrix.verify()
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("category", "category is invalid"),
+        ("selection", "selection review metadata is invalid"),
+        ("profile", "profile is stale"),
+        ("result", "qualification result is stale"),
+        ("format", "raw output format is invalid"),
+        ("upstream", "upstream identity is invalid"),
+    ],
+)
+def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
+    failure: str,
+    message: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matrix = _module(
+        f"qualification_matrix_validation_{failure}_test",
+        EXAMPLE / "matrix.py",
+    )
+    profiles = matrix.profiles()[:12]
+    categories = matrix.categories()
+    selection = matrix.selection_policy()
+    levels = {
+        profile["profile_id"]: {
+            "authoritative_import": True,
+            "end_to_end_transaction": False,
+            "qualification_profile": True,
+        }
+        for profile in profiles
+    }
+
+    class Result:
+        def __init__(self, profile_id: str) -> None:
+            self.profile_id = profile_id
+            self.outcome = "qualified_for_import"
+
+        def as_dict(self) -> dict[str, object]:
+            return {"profile_id": self.profile_id}
+
+    results = {
+        profile["profile_id"]: Result(profile["profile_id"]) for profile in profiles
+    }
+    artifacts = tmp_path / "artifacts"
+    for profile in profiles:
+        artifact = artifacts / profile["profile_id"]
+        artifact.mkdir(parents=True)
+        artifact.joinpath("profile.json").write_bytes(
+            canonical_json_bytes(matrix.qualification_profile(profile))
+        )
+        artifact.joinpath("qualification-result.json").write_bytes(
+            canonical_json_bytes(results[profile["profile_id"]].as_dict())
+        )
+        artifact.joinpath("upstream-output.json").write_bytes(
+            canonical_json_bytes(
+                {
+                    "format": "invarlock/upstream-evaluator-execution-v1",
+                    "upstream": profile["upstream"],
+                }
+            )
+        )
+
+    monkeypatch.setattr(matrix, "ARTIFACTS", artifacts)
+    monkeypatch.setattr(matrix, "profiles", lambda: profiles)
+    monkeypatch.setattr(matrix, "categories", lambda: categories)
+    monkeypatch.setattr(matrix, "selection_policy", lambda: selection)
+    monkeypatch.setattr(matrix, "demonstration_levels", lambda: levels)
+    monkeypatch.setattr(
+        matrix,
+        "qualify",
+        lambda profile, **_kwargs: results[profile["profile_id"]],
+    )
+
+    first = profiles[0]
+    first_artifact = artifacts / first["profile_id"]
+    if failure == "category":
+        profiles[0] = {**first, "category": "missing"}
+    elif failure == "selection":
+        monkeypatch.setattr(matrix, "selection_policy", lambda: {})
+    elif failure == "profile":
+        first_artifact.joinpath("profile.json").write_bytes(b"{}\n")
+    elif failure == "result":
+        first_artifact.joinpath("qualification-result.json").write_bytes(b"{}\n")
+    elif failure == "format":
+        document = json.loads(
+            first_artifact.joinpath("upstream-output.json").read_bytes()
+        )
+        document["format"] = "wrong"
+        first_artifact.joinpath("upstream-output.json").write_bytes(
+            canonical_json_bytes(document)
+        )
+    else:
+        document = json.loads(
+            first_artifact.joinpath("upstream-output.json").read_bytes()
+        )
+        document["upstream"] = {}
+        first_artifact.joinpath("upstream-output.json").write_bytes(
+            canonical_json_bytes(document)
+        )
+
+    with pytest.raises(ValueError, match=message):
         matrix.verify()
 
 

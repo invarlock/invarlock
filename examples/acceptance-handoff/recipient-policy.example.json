@@ -14,14 +14,14 @@
   "trusted_signers": [
     {
       "fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "identity": "producer.example/release-assurance",
+      "identity": "envelope-signer.example/release-assurance",
       "status": "active"
     }
   ],
   "trusted_receipt_verifiers": [
     {
       "fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "identity": "producer.example/technical-verifier",
+      "identity": "verifier.example/release-qualification",
       "status": "active"
     }
   ]

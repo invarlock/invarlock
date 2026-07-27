@@ -154,18 +154,42 @@ def test_matrix_preserves_three_distinct_demonstration_levels() -> None:
     assert end_to_end == ["lm-evaluation-harness"]
 
 
+def test_line_coverage_exemptions_are_exactly_the_isolated_execution_surface() -> None:
+    matrix = _load(EXAMPLE / "matrix.json")
+    expected = {
+        f"examples/evaluator-qualification/{profile['runner']}"
+        for profile in matrix["profiles"]
+    }
+    expected.update(
+        f"examples/evaluator-qualification/{asset}"
+        for profile in matrix["profiles"]
+        for asset in profile["runner_assets"]
+        if asset.endswith(".py")
+    )
+    expected.add("examples/evaluator-qualification/authoritative/generate_cases.py")
+    exemptions = {
+        line
+        for line in (ROOT / "examples/coverage-exemptions.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line and not line.startswith("#")
+    }
+
+    assert exemptions == expected
+
+
 def test_authoritative_corpus_is_real_pinned_model_execution() -> None:
     cases = _load(AUTHORITATIVE / "cases.json")
-    producer = cases["producer"]
-    model = producer["model"]
+    source_evaluation = cases["source_evaluation"]
+    model = source_evaluation["model"]
     records = cases["records"]
 
     assert cases["format"] == "invarlock/evaluator-authoritative-cases-v1"
-    assert producer["kind"] == "model_execution"
+    assert source_evaluation["kind"] == "model_execution"
     assert model["model_id"] == "Qwen/Qwen3-0.6B"
     assert re.fullmatch("[0-9a-f]{40}", model["immutable_revision"])
     assert re.fullmatch("sha256:[0-9a-f]{64}", model["snapshot_tree_sha256"])
-    assert producer["generation"] == {
+    assert source_evaluation["generation"] == {
         "backend": "transformers",
         "do_sample": False,
         "dtype": "float32",

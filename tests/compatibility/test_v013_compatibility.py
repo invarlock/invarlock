@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import stat
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,16 @@ def _object(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_bytes())
     assert isinstance(value, dict)
     return value
+
+
+def _generator():
+    path = FIXTURE_ROOT / "generate_corpus.py"
+    spec = importlib.util.spec_from_file_location("v013_compatibility_generator", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _case() -> dict[str, Any]:
@@ -88,6 +100,10 @@ def test_v013_corpus_inventory_is_immutable() -> None:
         name: hashlib.sha256(path.read_bytes()).hexdigest()
         for name, path in files.items()
     } == case["sha256"]
+
+
+def test_v013_corpus_inventory_matches_its_canonical_generator() -> None:
+    assert (FIXTURE_ROOT / "corpus.json").read_bytes() == _generator().generate()
 
 
 def test_v013_pack_replays_under_its_original_semantics() -> None:

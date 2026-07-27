@@ -67,9 +67,12 @@ def replay(profile_id: str, *, write: bool) -> dict[str, object]:
             f"{profile_id}: authoritative replay requires verdict authority"
         )
     cases = _load(ROOT / "cases.json")
-    producer = cases.get("producer")
+    source_evaluation = cases.get("source_evaluation")
     raw = _load(artifact / "upstream-output.json")
-    if not isinstance(producer, dict) or raw.get("source_evaluation") != producer:
+    if (
+        not isinstance(source_evaluation, dict)
+        or raw.get("source_evaluation") != source_evaluation
+    ):
         raise ValueError(f"{profile_id}: source model execution is not bound")
     records_bytes = _record_bytes(result)
     records_path = artifact / "runtime-import-records.jsonl"
@@ -92,14 +95,16 @@ def replay(profile_id: str, *, write: bool) -> dict[str, object]:
                 (ROOT / "runtime-schedule.json").read_bytes()
             ),
             "replay_runner_sha256": _digest(Path(__file__).read_bytes()),
-            "source_evaluation_sha256": _digest(canonical_json_bytes(producer)),
+            "source_evaluation_sha256": _digest(
+                canonical_json_bytes(source_evaluation)
+            ),
         },
         "format": "invarlock/evaluator-authoritative-import-replay-v1",
         "mean_score": result.mean_score,
         "profile_id": profile_id,
         "record_count": len(replayed),
         "records_sha256": result.records_sha256,
-        "source_kind": producer["kind"],
+        "source_kind": source_evaluation["kind"],
     }
     replay_bytes = canonical_json_bytes(replay_document)
     replay_path = artifact / "import-replay.json"

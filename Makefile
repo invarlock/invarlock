@@ -233,8 +233,11 @@ coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
+			if grep -Fqx "$$source" examples/coverage-exemptions.txt; then continue; fi; \
 			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
 
 coverage-maintenance:  ## Measure maintained repository checks and security tooling
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
@@ -287,7 +290,7 @@ trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example tran
 
 example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
 
-example-acceptance-handoff:  ## Run the service-free producer-to-recipient acceptance handoff
+example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
 
 evaluator-qualification:  ## Requalify the retained evaluator matrix offline

@@ -69,7 +69,9 @@ def test_committed_golden_package_verifies_end_to_end() -> None:
     acceptance = verify_acceptance_attestation(
         GOLDEN / "acceptance.dsse.json",
         trusted_public_keys={
-            anchors["envelope_signer_fingerprint"]: (GOLDEN / "producer.public.pem")
+            anchors["envelope_signer_fingerprint"]: (
+                GOLDEN / "envelope-signer.public.pem"
+            )
         },
         recipient_policy=recipient_policy,
         subject_artifact_path=GOLDEN / "artifact",
@@ -103,7 +105,7 @@ def test_committed_golden_package_is_exact_generator_output(
     assert generated_files == committed_files
 
 
-def test_offline_producer_recipient_handoff_covers_current_policy_failures(
+def test_offline_acceptance_handoff_covers_current_policy_failures(
     tmp_path: Path,
 ) -> None:
     module = _module()
@@ -113,7 +115,7 @@ def test_offline_producer_recipient_handoff_covers_current_policy_failures(
 
     results = json.loads((workspace / "results.json").read_bytes())
     assert results == {
-        "format": "invarlock/producer-recipient-handoff-v1",
+        "format": "invarlock/acceptance-handoff-v1",
         "historical_technical_verification": True,
         "scenarios": {
             "accepted": True,
@@ -129,12 +131,12 @@ def test_offline_producer_recipient_handoff_covers_current_policy_failures(
             "wrong_artifact_rejected": True,
         },
     }
-    assert (workspace / "producer/artifacts/subject/model.safetensors").is_file()
-    assert (workspace / "producer/evidence/manifest.json").is_file()
-    assert (workspace / "producer/verification.receipt.json").is_file()
-    assert (workspace / "producer/acceptance.dsse.json").is_file()
+    assert (workspace / "handoff/artifacts/subject/model.safetensors").is_file()
+    assert (workspace / "handoff/evidence/manifest.json").is_file()
+    assert (workspace / "handoff/verification.receipt.json").is_file()
+    assert (workspace / "handoff/acceptance.dsse.json").is_file()
     assert (workspace / "recipient/policy.json").is_file()
-    assert (workspace / "recipient/trust/producer.public.pem").is_file()
+    assert (workspace / "recipient/trust/envelope-signer.public.pem").is_file()
 
 
 @pytest.mark.parametrize("kind", ["directory", "symlink"])
@@ -164,7 +166,7 @@ def test_main_runs_handoff_in_explicit_workspace(
     assert module.main() == 0
     assert calls == [workspace.resolve()]
     assert capsys.readouterr().out == (
-        f"PASS offline producer-recipient handoff: {workspace.resolve()}\n"
+        f"PASS offline acceptance handoff: {workspace.resolve()}\n"
     )
 
 

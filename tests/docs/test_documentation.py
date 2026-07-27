@@ -165,6 +165,25 @@ def test_readme_evaluation_request_matches_the_public_schema() -> None:
     jsonschema.Draft202012Validator(schema).validate(request)
 
 
+def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
+    readme = _read("README.md")
+    makefile = _read("Makefile")
+    evidence_root = REPO_ROOT / "public_evidence/evidence/mistral-7b-weight-scale-hf"
+
+    assert "make example-acceptance-handoff" in readme
+    assert "\nexample-acceptance-handoff:" in makefile
+    assert REPO_ROOT.joinpath("examples/run_acceptance_handoff.py").is_file()
+
+    report_path = "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence"
+    receipt_path = (
+        "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json"
+    )
+    assert report_path in readme
+    assert receipt_path in readme
+    assert evidence_root.joinpath("evidence/manifest.json").is_file()
+    assert evidence_root.joinpath("verification.receipt.json").is_file()
+
+
 def test_public_docs_describe_the_release_assurance_surface() -> None:
     text = "\n".join(_read(relative) for relative in CORE_DOCS).lower()
     for phrase in (

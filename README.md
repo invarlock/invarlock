@@ -23,7 +23,7 @@
 
 An artifact recipient can independently check whether one exact model
 derivative satisfies an agreed release-regression policy without trusting the
-delivery dashboard or service.
+system that delivered it.
 
 InvarLock is an open-source assurance engine for one paired
 baseline-versus-subject release-regression decision. A closed request pins the
@@ -38,6 +38,9 @@ For artifact delivery, the workflow is:
 
 > authenticated evaluation → portable signed evidence → independent technical
 > verification → recipient-controlled acceptance
+
+An evaluation operator publishes the evidence; the artifact recipient controls
+the acceptance policy and decision.
 
 The detailed receipt remains the replayable technical result. An optional
 in-toto/DSSE acceptance attestation transports that result and its exact
@@ -65,8 +68,9 @@ invarlock report evidence/
 
 ## Try it without a model runtime
 
-The service-free acceptance example runs a complete signed evaluation,
-independent technical verification, and recipient-policy handoff. It also demonstrates
+The service-free acceptance example runs a complete signed evaluation
+transaction over fixture artifacts and imported per-record results, independent
+technical verification, and recipient-policy handoff. It also demonstrates
 fail-closed rejection for changed artifacts, tampered evidence, untrusted or
 revoked signers, stale evidence, and contradictory envelope content.
 
@@ -92,6 +96,8 @@ signed verification receipt.
 make public-evidence-audit
 invarlock report \
   public_evidence/evidence/mistral-7b-weight-scale-hf/evidence
+python -m json.tool \
+  public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json
 ```
 
 Start with the

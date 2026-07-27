@@ -196,7 +196,7 @@ def generate(*, local_files_only: bool) -> dict[str, bytes]:
             raise RuntimeError("model execution did not produce one output per record")
         cases = {
             "format": "invarlock/evaluator-authoritative-cases-v1",
-            "producer": {
+            "source_evaluation": {
                 "dataset_sha256": _sha256(dataset),
                 "generation": GENERATION,
                 "generator_sha256": _sha256(Path(__file__).read_bytes()),

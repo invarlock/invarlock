@@ -171,10 +171,10 @@ def finish_deterministic(
         "records": raw_records,
         "upstream": package,
     }
-    source_evaluation = load_json(args.cases).get("producer")
+    source_evaluation = load_json(args.cases).get("source_evaluation")
     if source_evaluation is not None:
         if not isinstance(source_evaluation, dict):
-            raise ValueError("cases producer must be an object")
+            raise ValueError("cases source_evaluation must be an object")
         raw["source_evaluation"] = source_evaluation
     export_records = [
         {

@@ -36,7 +36,7 @@ ISSUED_AT = datetime(2026, 7, 25, 12, 0, tzinfo=UTC)
 SUBJECT_DIGEST = (
     "sha256:a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb"
 )
-RECEIPT_VERIFIER_IDENTITY = "producer.example/technical-verifier"
+RECEIPT_VERIFIER_IDENTITY = "verifier.example/release-qualification"
 RECEIPT_VERIFIER_FINGERPRINT = (
     "sha256:74a97c1d8fe8d7d58faac074d3a3a9267d8db501d9e4aed77eaeb9ad4efb32ff"
 )
@@ -67,10 +67,10 @@ def _key(tmp_path: Path, name: str, seed: int = 7) -> tuple[Path, Path, str]:
 def _envelope(
     tmp_path: Path,
     *,
-    signer_identity: str = "producer.example/release-assurance",
+    signer_identity: str = "envelope-signer.example/release-assurance",
     seed: int = 7,
 ) -> tuple[Path, Path, str]:
-    private, public, fingerprint = _key(tmp_path, "producer", seed)
+    private, public, fingerprint = _key(tmp_path, "envelope-signer", seed)
     envelope = tmp_path / "acceptance.dsse.json"
     write_acceptance_attestation(
         RECEIPT,
@@ -78,7 +78,7 @@ def _envelope(
         envelope,
         signing_key_path=private,
         signer_identity=signer_identity,
-        policy_identity="producer.example/policies/release-regression-v3",
+        policy_identity="evaluation.example/policies/release-regression-v3",
         issued_at=ISSUED_AT,
         evaluation_completed_at=datetime(2026, 7, 25, 11, 55, tzinfo=UTC),
     )
@@ -88,7 +88,7 @@ def _envelope(
 def _policy(
     fingerprint: str,
     *,
-    identity: str = "producer.example/release-assurance",
+    identity: str = "envelope-signer.example/release-assurance",
     status: str = "active",
     max_age_seconds: int = 3600,
     max_evidence_age_seconds: int | None = None,
@@ -264,7 +264,7 @@ def test_v013_receipt_wraps_without_relabelling_and_binds_exact_subject(
     assert statement["predicateType"] == ACCEPTANCE_PREDICATE_TYPE
     assert statement["subject"] == [
         {
-            "name": "producer.example/subject",
+            "name": "artifact.example/subject",
             "digest": {
                 "sha256": (
                     "a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb"
@@ -459,18 +459,18 @@ def test_duplicate_trust_pair_is_rejected_independent_of_record_order(
     assert "duplicate identity/fingerprint pair" in " ".join(decision.errors)
 
 
-def test_trusted_outer_producer_cannot_introduce_unknown_receipt_verifier(
+def test_trusted_envelope_signer_cannot_introduce_unknown_receipt_verifier(
     tmp_path: Path,
 ) -> None:
-    private, public, fingerprint = _key(tmp_path, "producer")
+    private, public, fingerprint = _key(tmp_path, "envelope-signer")
     envelope = tmp_path / "acceptance.dsse.json"
     write_acceptance_attestation(
         RECEIPT,
         EVIDENCE,
         envelope,
         signing_key_path=private,
-        signer_identity="producer.example/release-assurance",
-        policy_identity="producer.example/policies/release-regression-v3",
+        signer_identity="envelope-signer.example/release-assurance",
+        policy_identity="evaluation.example/policies/release-regression-v3",
         issued_at=ISSUED_AT,
     )
     statement = _payload(envelope)
@@ -564,15 +564,15 @@ def test_fresh_rewrap_cannot_renew_receipt_without_authoritative_evidence_time(
     tmp_path: Path,
 ) -> None:
     fresh_issue = ISSUED_AT + timedelta(days=365)
-    private, public, fingerprint = _key(tmp_path, "producer")
+    private, public, fingerprint = _key(tmp_path, "envelope-signer")
     envelope = tmp_path / "rewrapped.dsse.json"
     write_acceptance_attestation(
         RECEIPT,
         EVIDENCE,
         envelope,
         signing_key_path=private,
-        signer_identity="producer.example/release-assurance",
-        policy_identity="producer.example/policies/release-regression-v3",
+        signer_identity="envelope-signer.example/release-assurance",
+        policy_identity="evaluation.example/policies/release-regression-v3",
         issued_at=fresh_issue,
         evaluation_completed_at=ISSUED_AT,
     )
@@ -621,7 +621,7 @@ def test_v013_wrapper_cannot_manufacture_an_evidence_timestamp(
     statement["predicate"]["timestamps"]["receipt_issued_at"] = (
         receipt_issued_at.isoformat().replace("+00:00", "Z")
     )
-    _resign(envelope, tmp_path / "producer.private.pem", statement)
+    _resign(envelope, tmp_path / "envelope-signer.private.pem", statement)
 
     decision = verify_acceptance_attestation(
         envelope,
@@ -651,18 +651,18 @@ def test_noncanonical_v013_receipt_bytes_are_preserved_in_wrapper(
     receipt_path.write_bytes(noncanonical)
     envelope, public, fingerprint = _envelope(
         tmp_path,
-        signer_identity="producer.example/release-assurance",
+        signer_identity="envelope-signer.example/release-assurance",
         seed=17,
     )
     envelope.unlink()
-    private = tmp_path / "producer.private.pem"
+    private = tmp_path / "envelope-signer.private.pem"
     write_acceptance_attestation(
         receipt_path,
         EVIDENCE,
         envelope,
         signing_key_path=private,
-        signer_identity="producer.example/release-assurance",
-        policy_identity="producer.example/policies/release-regression-v3",
+        signer_identity="envelope-signer.example/release-assurance",
+        policy_identity="evaluation.example/policies/release-regression-v3",
         issued_at=ISSUED_AT,
     )
     receipt_block = _payload(envelope)["predicate"]["receipt"]
@@ -684,15 +684,15 @@ def test_noncanonical_v013_receipt_bytes_are_preserved_in_wrapper(
 def test_contradictory_receipt_and_predicate_is_rejected_even_when_resigned(
     tmp_path: Path,
 ) -> None:
-    private, public, fingerprint = _key(tmp_path, "producer")
+    private, public, fingerprint = _key(tmp_path, "envelope-signer")
     envelope = tmp_path / "acceptance.dsse.json"
     write_acceptance_attestation(
         RECEIPT,
         EVIDENCE,
         envelope,
         signing_key_path=private,
-        signer_identity="producer.example/release-assurance",
-        policy_identity="producer.example/policies/release-regression-v3",
+        signer_identity="envelope-signer.example/release-assurance",
+        policy_identity="evaluation.example/policies/release-regression-v3",
         issued_at=ISSUED_AT,
     )
     statement = _payload(envelope)
@@ -716,15 +716,15 @@ def test_contradictory_receipt_and_predicate_is_rejected_even_when_resigned(
 def test_inner_receipt_tampering_is_rejected_even_when_outer_envelope_is_resigned(
     tmp_path: Path,
 ) -> None:
-    private, public, fingerprint = _key(tmp_path, "producer")
+    private, public, fingerprint = _key(tmp_path, "envelope-signer")
     envelope = tmp_path / "acceptance.dsse.json"
     write_acceptance_attestation(
         RECEIPT,
         EVIDENCE,
         envelope,
         signing_key_path=private,
-        signer_identity="producer.example/release-assurance",
-        policy_identity="producer.example/policies/release-regression-v3",
+        signer_identity="envelope-signer.example/release-assurance",
+        policy_identity="evaluation.example/policies/release-regression-v3",
         issued_at=ISSUED_AT,
     )
     statement = _payload(envelope)

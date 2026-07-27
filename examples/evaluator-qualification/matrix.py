@@ -308,13 +308,13 @@ def verify() -> None:
 def verify_authoritative() -> None:
     cases = load(AUTHORITATIVE / "cases.json")
     records = cases.get("records")
-    producer = cases.get("producer")
+    source_evaluation = cases.get("source_evaluation")
     if (
         cases.get("format") != "invarlock/evaluator-authoritative-cases-v1"
         or not isinstance(records, list)
         or len(records) != 102
-        or not isinstance(producer, dict)
-        or producer.get("kind") != "model_execution"
+        or not isinstance(source_evaluation, dict)
+        or source_evaluation.get("kind") != "model_execution"
     ):
         raise ValueError(
             "authoritative corpus must bind one 102-record model execution"
@@ -328,7 +328,7 @@ def verify_authoritative() -> None:
         if (artifact / "profile.json").read_bytes() != expected_profile:
             raise ValueError(f"{profile['profile_id']}: authoritative profile is stale")
         raw = load(artifact / "upstream-output.json")
-        if raw.get("source_evaluation") != producer:
+        if raw.get("source_evaluation") != source_evaluation:
             raise ValueError(
                 f"{profile['profile_id']}: model execution provenance is stale"
             )

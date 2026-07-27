@@ -12,7 +12,7 @@ from verify_envelope import build_policy_input, canonical_bytes
 ROOT = Path(__file__).resolve().parent
 GOLDEN = ROOT.parent / "acceptance-handoff" / "golden"
 FIXTURES = ROOT / "fixtures"
-SUBJECT_NAME = "producer.example/subject"
+SUBJECT_NAME = "artifact.example/subject"
 SUBJECT_SHA256 = "a9fcf5a7cb042b0f4db67dead3d64fad8c3775d7ea25c91ee6759b019b5603cb"
 
 
@@ -26,7 +26,7 @@ def main() -> None:
     args = parse_args()
     positive = build_policy_input(
         envelope_path=GOLDEN / "acceptance.dsse.json",
-        envelope_key_path=GOLDEN / "producer.public.pem",
+        envelope_key_path=GOLDEN / "envelope-signer.public.pem",
         recipient_policy_path=GOLDEN / "recipient-policy.json",
         expected_subject_name=SUBJECT_NAME,
         expected_subject_sha256=SUBJECT_SHA256,

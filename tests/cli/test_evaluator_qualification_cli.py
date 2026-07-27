@@ -58,6 +58,18 @@ def test_cli_can_require_verdict_authority(tmp_path: Path) -> None:
     assert "observation-only" in result.stdout
 
 
+def test_cli_prints_verdict_authority_summary(tmp_path: Path) -> None:
+    profile, schedule, export, raw = qualification_fixture(tmp_path)
+
+    result = RUNNER.invoke(
+        app,
+        ["qualify", str(profile), str(schedule), str(export), str(raw)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "qualified for runtime import" in " ".join(result.stdout.split())
+
+
 def test_cli_reports_digest_failure_without_traceback(tmp_path: Path) -> None:
     profile, schedule, export, raw = qualification_fixture(tmp_path)
     raw.write_bytes(b"tampered\n")
