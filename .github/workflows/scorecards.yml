@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
       # scorecard-action publish mode rejects extra steps in this job.
       - name: Run OpenSSF Scorecard analysis
-        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
         with:
           # Prefer a dedicated PAT when configured so classic branch protection
           # remains visible to Scorecard; public repos fall back to github.token.
