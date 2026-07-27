@@ -26,8 +26,8 @@ adding the corresponding retained evidence.
 
 | Level | What it proves | Coverage |
 | --- | --- | --- |
-| Qualification profile | The named upstream entry point executes and its output crosses the generic qualification contract | All nineteen profiles |
-| Authoritative import adapter | A complete real evaluation is retained per record, independently recomputed, and replayed through the strict runtime-import loader | All seventeen deterministic profiles |
+| Qualification profile | The named upstream entry point executes and its output crosses the generic qualification contract | All maintained profiles |
+| Authoritative import adapter | A complete real evaluation is retained per record, independently recomputed, and replayed through the strict runtime-import loader | Every deterministic per-record profile |
 | End-to-end release-assurance journey | The evaluator participates in a model-running, signed `evaluate` → `verify` → `report` transaction | Currently demonstrated for LM Evaluation Harness |
 
 An authoritative import adapter is not described as an end-to-end journey.
@@ -39,10 +39,10 @@ signed-transaction fixtures, not a new evaluator-specific engine plugin.
 ## Qualification matrix
 
 The small conformance corpus uses two local records: one exact match and one
-mismatch. It proves all nineteen upstream entry points and both authority modes
-without downloading a model or calling a hosted evaluator.
+mismatch. It proves every maintained upstream entry point and both authority
+modes without downloading a model or calling a hosted evaluator.
 
-The seventeen authoritative rows also execute against a retained 102-record
+The authoritative rows also execute against a retained 102-record
 evaluation produced by the immutable `Qwen/Qwen3-0.6B` revision recorded in the
 corpus. The model produced 52 exact matches and 50 mismatches. Each evaluator
 scores all 102 model outputs through its real upstream entry point. InvarLock
@@ -53,8 +53,8 @@ The catalog is reviewed rather than quota-driven. A row must represent a
 recognizable current evaluator or a maintained successor, add a distinct
 ecosystem or workflow, and support retained real upstream execution. The
 maintenance review uses a twelve-month activity window and was last performed
-on 2026-07-27. Nineteen is the resulting coverage in this revision, not a hard
-cap.
+on 2026-07-27. The resulting catalog is the reviewed coverage in this revision,
+not a hard cap.
 
 Microsoft PromptFlow is represented by its maintained successor,
 Azure AI Evaluation, rather than preserving the deprecated
@@ -129,9 +129,9 @@ Run the retained, network-free verification:
 make evaluator-qualification
 ```
 
-This verifies the nineteen qualification profiles and replays the seventeen
-authoritative imports. To re-execute all pinned upstream tools over both
-corpora and refresh the retained artifacts:
+This verifies every maintained qualification profile and replays every retained
+authoritative import. To re-execute all pinned upstream tools over both corpora
+and refresh the retained artifacts:
 
 ```bash
 make evaluator-upstream-qualification
@@ -156,16 +156,15 @@ qualification does not.
 
 ## Claim boundary
 
-The seventeen authoritative import demonstrations prove full per-record exact-match
+The authoritative import demonstrations prove full per-record exact-match
 imports for one real, pinned model evaluation. They do not demonstrate every
 metric, task type, hosted mode, or model-judge feature offered by those
-evaluators. They also do not turn seventeen example runners into seventeen
-engine plugins.
+evaluators. They also do not turn example runners into engine plugins.
 
 LM Evaluation Harness is currently the integration that demonstrates the deeper
-model execution and signed release-assurance transaction. The other sixteen
-authoritative rows begin with the already authenticated model-output corpus and
-demonstrate evaluator execution, normalization, qualification, and strict
+model execution and signed release-assurance transaction. The remaining
+authoritative rows begin with the already authenticated model-output corpus
+and demonstrate evaluator execution, normalization, qualification, and strict
 runtime-import replay.
 
 ## Authority rules
