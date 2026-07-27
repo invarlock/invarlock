@@ -149,20 +149,50 @@ def test_readme_resources_use_absolute_urls_for_pypi() -> None:
     assert all(url.startswith(("https://", "mailto:")) for url in resource_urls)
 
 
-def test_readme_evaluation_request_matches_the_public_schema() -> None:
+def test_readme_links_to_the_schema_valid_public_request() -> None:
     readme = _read("README.md")
-    match = re.search(
-        r"```yaml\n"
-        r"(?P<request>format_version: invarlock/evaluation-request-v1\n.*?)"
-        r"\n```",
-        readme,
-        re.DOTALL,
+    request_url = (
+        "https://github.com/invarlock/invarlock/blob/main/examples/request.yaml"
     )
 
-    assert match is not None
-    request = yaml.safe_load(match.group("request"))
+    assert request_url in readme
+    request = yaml.safe_load(_read("examples/request.yaml"))
     schema = json.loads(_read("contracts/evaluation_request.schema.json"))
     jsonschema.Draft202012Validator(schema).validate(request)
+
+
+def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
+    readme = _read("README.md")
+    headings = (
+        "## Evidence paths",
+        "## Try the signed handoff locally",
+        "## Inspect published evidence",
+        "## Run, verify, and report",
+        "## The release-regression decision",
+        "## Import and qualify evaluator results",
+        "## Hand off acceptance",
+        "## Providers and diagnostics",
+        "## Documentation",
+    )
+    positions = [readme.index(heading) for heading in headings]
+
+    assert positions == sorted(positions)
+    evidence_paths = readme[
+        positions[0] : readme.index("## Try the signed handoff locally")
+    ]
+    for phrase in (
+        "Native execution",
+        "Qualified import",
+        "Authenticated observation",
+        "evaluator-specific engine plugins",
+    ):
+        assert phrase in evidence_paths
+
+    introduction = readme[: positions[0]]
+    assert "in-toto/DSSE" not in introduction
+    acceptance = readme[positions[6] : positions[7]]
+    assert "in-toto/DSSE" in acceptance
+    assert "**Compatibility note:**" in acceptance
 
 
 def test_readme_first_run_commands_track_checked_in_surfaces() -> None:

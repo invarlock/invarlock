@@ -11,7 +11,7 @@
   </picture>
 </p>
 
-<p align="center"><em>Run paired release-regression checks. Verify the evidence independently. Render one clear report.</em></p>
+<p align="center"><em>Run or import paired release-regression evidence. Verify it independently. Hand off a recipient-controlled decision.</em></p>
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" /></a>
@@ -26,13 +26,26 @@ derivative satisfies an agreed release-regression policy without trusting the
 system that delivered it.
 
 InvarLock is an open-source assurance engine for one paired
-baseline-versus-subject release-regression decision. A closed request pins the
-two model artifacts, a local JSONL evaluation source, runtime settings, one
-built-in metric or scorer binding, and policy. `evaluate` runs both sides on
-the same deterministic schedule, publishes a signed evidence bundle, and
-records whether the selected paired interval satisfies the policy. A separate
-verifier replays the
-bundle against independently supplied trust anchors.
+baseline-versus-subject decision. It can execute both sides on the same
+deterministic schedule or import complete authenticated per-record material
+from another controlled evaluation. A closed request binds the artifacts,
+evaluation source or schedule, runtime and evaluator identities, scoring
+contract, and policy. InvarLock recomputes the permitted comparison and
+publishes a signed evidence bundle; a separate verifier replays that bundle
+against independently supplied trust anchors.
+
+## Evidence paths
+
+| Path | What enters InvarLock | Decision authority |
+| --- | --- | --- |
+| Native execution | Pinned artifacts, evaluation source, runtime, metric or deterministic scorer, and policy | InvarLock runs both sides and derives the paired result |
+| Qualified import | Complete ordered per-record results, provenance, identities, schedule, and runtime bindings | InvarLock authenticates the import and recomputes the supported result |
+| Authenticated observation | Aggregate-only results, external judges, or other non-replayable context | Preserved as signed context; never allowed to determine the verdict |
+
+External evaluator adapters normalize source exports through the same
+versioned JSON, CLI, and Python qualification contracts. They live in the
+example and integration layer rather than becoming
+evaluator-specific engine plugins.
 
 For artifact delivery, the workflow is:
 
@@ -41,12 +54,6 @@ For artifact delivery, the workflow is:
 
 An evaluation operator publishes the evidence; the artifact recipient controls
 the acceptance policy and decision.
-
-The detailed receipt remains the replayable technical result. An optional
-in-toto/DSSE acceptance attestation transports that result and its exact
-subject binding; the recipient still applies separate envelope and receipt
-trust, independent envelope and evidence freshness, contract-version,
-signer-status, and verdict policy.
 
 ```bash
 invarlock evaluate request.yaml
@@ -62,7 +69,7 @@ invarlock report evidence/
   />
 </p>
 
-## Try it without a model runtime
+## Try the signed handoff locally
 
 The service-free acceptance example runs a complete signed evaluation
 transaction over fixture artifacts and imported per-record results, independent
@@ -104,204 +111,26 @@ Actual verification also requires artifact, schedule, policy, runtime, evidence
 signer, and verifier anchors obtained through channels independent of the
 submitted pack.
 
-## The release-regression decision
+## Run, verify, and report
 
-Both sides score the same authenticated records in the same order. InvarLock
-derives one of two built-in paired comparisons:
-
-| Metric | Point comparison | Policy verdict |
-| --- | --- | --- |
-| `exact_match` | Subject accuracy minus baseline accuracy, with paired regression/improvement counts and an exact McNemar test | Lower bound of the paired Newcombe 95% interval is at least `delta_min_pp` |
-| `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of per-record byte-normalized expected-continuation NLL | Upper bound of the paired schedule-resampling interval is at most `ratio_max` |
-
-For exact match, InvarLock reports baseline-pass to subject-fail regressions,
-baseline-fail to subject-pass improvements, the exact two-sided McNemar
-probability, and a continuity-corrected paired Newcombe 95% effect-size
-interval. For normalized
-NLL, it uses 2,048 paired percentile-bootstrap replicates whose index draws are
-derived from the authenticated schedule digest. In both cases the policy reads
-the conservative interval bound, not the point value alone.
-
-A policy may also require a minimum paired-record count and a maximum interval
-width. Those controls are supplied together. When present, the report passes
-only when the metric bound, record-count minimum, and precision ceiling all
-pass. Preflight can prove the schedule count before execution; it reports the
-interval-width check as pending until paired results exist.
-
-Normalized NLL is teacher-forced expected-continuation likelihood regression.
-It does not measure general model quality. When both artifacts bind the same
-authenticated tokenizer and every pair has the same positive target-token
-count, the verifier also renders a token-weighted perplexity ratio as a derived
-likelihood interpretation. That derived value has no threshold, interval, or
-verdict authority.
-
-For a task-specific deterministic text scorer, `comparison` can select one
-fully bound `scorer_extension` instead of a built-in `metric`. The runtime still
-collects authenticated expected output, output text, and output digest facts.
-An explicitly authorized scorer replays those facts into one `[0,1]`
-higher-is-better value per record; core owns the arithmetic means, paired
-percentage-point delta, deterministic interval, and policy decision. Separately
-installed scorer packages can implement deterministic F1, structured
-extraction, or VQA answer normalization and require explicit authorization
-through this extension contract. The public CLI loads the exact installed
-scorer bound by the request only when `--allow-installed-scorers` is supplied to
-both `evaluate` and `verify`.
-
-Executable SQL or code scoring, model-based semantic similarity, network or
-human scoring, external models, and LLM judges are outside this acceptance
-contract. Judge results can be attached as authenticated observations until a
-separate deterministic replay contract and calibration justify more.
-
-## Run a comparison
-
-Install the built-in Hugging Face provider and prepare:
-
-- local baseline and subject snapshots;
-- a digest-pinned JSONL file with prompt, expected-output, and optional stable
-  ID fields;
-- a one-metric policy file;
-- a digest-addressed InvarLock runtime image available to Docker or Podman; and
-- an Ed25519 evidence-signing key available only to the host transaction.
+Install the built-in Hugging Face provider for a native text comparison:
 
 ```bash
 python -m pip install "invarlock[hf]"
 ```
 
-Run requests bind a dataset object. `evaluate` authenticates the JSONL bytes
-and deterministically prepares the canonical paired schedule inside the
-transaction:
-
-```yaml
-format_version: invarlock/evaluation-request-v1
-comparison:
-  baseline:
-    artifact:
-      path: artifacts/baseline
-      model_id: acme/baseline
-      locator: hf://acme/baseline@0123456789abcdef0123456789abcdef01234567
-    runtime:
-      provider: hf_transformers
-      settings:
-        batch_size: 1
-        checkpoint_tree_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
-        context_length: 2048
-        immutable_revision: 0123456789abcdef0123456789abcdef01234567
-        max_output_tokens: 64
-        offline: true
-        seed: 7
-        timeout_seconds: 300
-        tokenizer_metadata_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
-  subject:
-    artifact:
-      path: artifacts/subject
-      model_id: acme/subject
-      locator: hf://acme/subject@fedcba9876543210fedcba9876543210fedcba98
-    runtime:
-      provider: hf_transformers
-      settings:
-        batch_size: 1
-        checkpoint_tree_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
-        context_length: 2048
-        immutable_revision: fedcba9876543210fedcba9876543210fedcba98
-        max_output_tokens: 64
-        offline: true
-        seed: 7
-        timeout_seconds: 300
-        tokenizer_metadata_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
-  dataset:
-    path: inputs/release-regression.jsonl
-    sha256: "4444444444444444444444444444444444444444444444444444444444444444"
-    format: jsonl
-    name: release-regression
-    split: validation
-    input_field: prompt
-    expected_output_field: expected
-    id_field: case_id
-  policy: policy/acceptance.json
-  task: text_causal
-  metric: normalized_nll_per_utf8_byte
-execution:
-  mode: run
-output:
-  evidence: artifacts/evidence-001
-```
-
-`evaluate` always performs the complete execution-free validation before it
-starts model runtimes. Use `--preflight` to stop after that validation and
-inspect its machine-readable result without creating output:
-
-```bash
-invarlock evaluate request.yaml --signing-key evidence-signer.pem \
-  --runtime-image registry.example/invarlock-runtime@sha256:... \
-  --preflight --json
-```
-
-Preflight emits `invarlock/evaluation-preflight-v2` and checks configuration
-and local availability. When the policy includes sample qualification, it also
-reports the observed record count and leaves interval width explicitly
-`pending_execution`. Continuing with the real evaluation is still required to
-establish runtime execution, interval precision, and the policy result.
-
-Replace the illustrative digests with values derived from the exact inputs.
-Then invoke the host CLI. In run mode, the host prepares the authenticated
-schedule and launches a separately pinned worker for each side; Docker is the
-default engine and Podman is supported.
-
-Build the authenticated Git source bundle as shown in the
-[runtime-provider guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md#build-or-obtain-the-runtime-image),
-then build and smoke-test the image that matches the intended device:
-
-```bash
-mkdir -p artifacts
-
-# CPU, including Apple Silicon through the matching multi-architecture lock
-make runtime-image \
-  RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
-  RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
-  RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
-  RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cpu.json"
-make runtime-smoke
-
-# x86_64 NVIDIA CUDA 12.6
-make runtime-image-cuda \
-  RUNTIME_SOURCE_COMMIT="$SOURCE_COMMIT" \
-  RUNTIME_SOURCE_BUNDLE="$SOURCE_BUNDLE" \
-  RUNTIME_SOURCE_BUNDLE_SHA256="$SOURCE_BUNDLE_SHA256" \
-  RUNTIME_BUILD_STATEMENT="$PWD/artifacts/runtime-build-cuda.json"
-make runtime-smoke-cuda
-```
+Start from the
+[complete run request](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evaluation-request.md#complete-run-request)
+or the repository's
+[schema-valid import request](https://github.com/invarlock/invarlock/blob/main/examples/request.yaml).
+Replace every illustrative digest with one derived from the exact input.
 
 ```bash
 invarlock evaluate request.yaml \
   --signing-key evidence-signer.pem \
-  --baseline-runtime-image registry.example/invarlock-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  --baseline-runtime-image-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  --subject-runtime-image registry.example/invarlock-runtime@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
-  --subject-runtime-image-digest sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
-  --container-engine docker \
-  --baseline-runtime-device cuda:0 \
-  --subject-runtime-device cuda:1
-```
+  --runtime-image registry.example/invarlock-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --runtime-image-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-Shared `--runtime-image`, `--runtime-image-digest`, `--runtime-device`, and
-`--runtime-entrypoint` options remain convenient defaults when both sides use
-the same settings. `--runtime-device cuda` exposes a GPU only to an image that
-already contains the CUDA runtime; it does not turn the CPU image into a CUDA
-image.
-
-Each worker receives its own artifact and support resources read-only plus an
-isolated writable output directory. The host validates both outputs, publishes
-the no-clobber evidence bundle, and signs it without exposing the private key to
-either worker. Workers sharing a generic or identical CUDA device run
-sequentially; explicitly different CUDA indexes can run in parallel.
-
-## Verify and report
-
-Verification supplies the expected artifact identities, canonical schedule,
-policy, runtime identities, and evidence signer independently of the bundle.
-Keep those inputs in one closed verifier-owned profile:
-
-```bash
 invarlock verify artifacts/evidence-001/ \
   --trust-profile trust/trust-inputs.json \
   --receipt verification.receipt.json
@@ -309,22 +138,85 @@ invarlock verify artifacts/evidence-001/ \
 invarlock report artifacts/evidence-001/ --html evidence.html --explain
 ```
 
-The evidence signer authenticates the comparison bytes. The verifier decides
-whether those bytes satisfy the independently maintained anchors and signs a
-separate receipt that binds the profile digest. `report` renders the
-signature-authenticated comparison; independent verification remains the
-acceptance record. The [CLI reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md#verify) defines
-the closed profile and the equivalent explicit options.
+`evaluate --preflight --json` performs the complete execution-free validation
+without starting a runtime or creating evidence. Native run mode delegates to a
+caller-authorized, digest-addressed Docker or Podman image. Import mode requires
+complete provider sidecars and ordered per-record evidence but no model runtime.
+The [getting-started guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md)
+and [runtime-provider guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md)
+cover request construction, image preparation, device selection, host-only
+signing keys, and independently derived verifier inputs.
+
+## The release-regression decision
+
+Both sides score the same authenticated records in the same order. InvarLock
+derives one of two built-in paired comparisons:
+
+| Metric | Point comparison | Policy verdict |
+| --- | --- | --- |
+| `exact_match` | Subject accuracy minus baseline accuracy, with paired regression and improvement counts | Lower bound of the paired Newcombe 95% interval is at least `delta_min_pp` |
+| `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of per-record byte-normalized expected-continuation NLL | Upper bound of the paired schedule-resampling interval is at most `ratio_max` |
+
+The policy reads the conservative interval bound, not the point value alone. It
+may also require a minimum paired-record count and maximum interval width.
+Exact match includes an exact two-sided McNemar test; normalized NLL uses 2,048
+deterministic paired schedule-resampling replicates. Normalized NLL measures
+expected-continuation likelihood regression, not general model quality.
+
+For task-specific deterministic scoring, a request may bind one authorized
+scorer extension. The extension derives one replayable value per record while
+the core retains ownership of pairing, aggregation, intervals, and policy.
+See [schedule and policy](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/schedule-and-policy.md)
+for the full statistical contract and threshold guidance.
+
+## Import and qualify evaluator results
+
+The core exposes one evaluator-neutral qualification contract as versioned
+JSON, the `invarlock-qualify-evaluator` companion CLI, and
+`invarlock.engine.qualify_evaluator_export` for Python callers. Open-source or
+proprietary evaluators reached through an SDK, CLI, or API normalize into that
+same boundary outside the core.
+
+Complete ordered per-record evidence may receive verdict authority only when
+identity, provenance, schedule, and deterministic recomputation requirements
+pass. Aggregate-only outputs and unsupported judge results fail closed to
+verdict authority and remain observation-only. A signed observation proves
+what was supplied; it does not make that source replayable.
+
+The maintained
+[evaluator qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
+groups recognizable upstream evaluators by role and records their source
+version, evidence granularity, identity and provenance binding, replay status,
+and authority boundary. Each authoritative import demonstration starts with
+retained output from a pinned real model evaluation, passes through a
+source-shaped adapter, and completes the closed import replay. The matrix
+separately records model-running signed journeys. These are example-owned
+adapters and profiles, not evaluator-specific engine plugins or a permanent
+catalog ceiling.
+
+The
+[`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
+directory contains maintained artifact-producing journeys for Hugging Face,
+PEFT, TorchAO, GGUF/llama.cpp, TensorRT-LLM, Hugging Face vision-text, and LM
+Evaluation Harness. The
+[model-change workflow guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md)
+maps common model and runtime changes to native execution, optional-runtime, or
+import boundaries.
 
 ## Hand off acceptance
 
-Recipients can consume the optional in-toto/DSSE acceptance envelope without
-an InvarLock service or policy-engine plugin. The maintained interoperability
-example authenticates the envelope and embedded receipt with a standalone
-reference verifier, then applies current recipient policy in both OPA/Rego and
-CUE. Its conformance fixtures cover an accepted delivery, policy rejection,
-subject tampering, an untrusted signer, stale evidence, and an unsupported
-contract.
+The detailed signed verification receipt remains the replayable technical
+result. An optional in-toto/DSSE acceptance attestation transports that result
+and its exact subject binding. The artifact recipient still applies separate
+envelope and receipt trust, independent envelope and evidence freshness,
+contract-version, signer-status, and verdict policy.
+
+Recipients can consume the acceptance envelope without an InvarLock service or
+policy-engine plugin. The maintained example authenticates the envelope and
+embedded receipt with a standalone reference verifier, then applies current
+recipient policy in both OPA/Rego and CUE. Its conformance fixtures cover an
+accepted delivery, policy rejection, subject tampering, an untrusted signer,
+stale evidence, and an unsupported contract.
 
 This is acceptance-policy interoperability, not complete evidence replay.
 Recipients use `invarlock verify` when they need to replay every evidence-pack
@@ -335,64 +227,20 @@ invariant. See the
 > verifiable and permanently ingestible as first-class dossier inputs. Every
 > acceptance outcome remains controlled by the recipient's current policy.
 
-## Import and qualify existing evaluator results
-
-The repository's
-[`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
-directory contains maintained Hugging Face, PEFT, TorchAO, GGUF/llama.cpp,
-TensorRT-LLM, Hugging Face vision-text, and LM Evaluation Harness journeys.
-They create or obtain real artifacts and complete the source-bound `evaluate`,
-`verify`, and `report` transaction. The TensorRT-LLM journey builds BF16 and
-calibrated FP8 Qwen3-0.6B engines concurrently on the target H100 GPUs before
-authenticating their resulting identities. The vision-text journey compares
-two pinned Qwen2-VL checkpoints on authenticated image content. The repository
-also includes an offline evidence-handoff journey for complete per-record
-results produced elsewhere. Import mode requires the canonical schedule, typed
-observations, runtime bindings, and paired records; InvarLock re-derives the
-comparison before publication.
-
-The [model-change workflow guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md) maps
-fine-tuning, pruning, quantization, GGUF, TensorRT-LLM, multimodal, harness, and
-endpoint outputs to the appropriate built-in, optional-runtime, or import
-boundary.
-
-The core exposes one evaluator-neutral qualification contract as versioned JSON,
-the `invarlock-qualify-evaluator` companion CLI, and
-`invarlock.engine.qualify_evaluator_export` for Python callers. Open-source or
-proprietary evaluators reached through an SDK, CLI, or API normalize into that
-same contract outside the core. Complete ordered per-record evidence may receive
-verdict authority when identity, provenance, schedule, and deterministic replay
-requirements pass; aggregate-only and unsupported judge results cannot.
-
-External evaluator output is admissible only when InvarLock can authenticate
-the per-record inputs and deterministically recompute the decision-contract
-metric. Aggregate-only results and unsupported external-judge outputs fail
-closed to verdict authority and remain observation-only. The maintained
-[evaluator qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
-demonstrates this boundary across maintained upstream qualification profiles,
-grouped by evaluator role. Every deterministic per-record profile also replays
-complete retained results from a pinned real model evaluation through the
-runtime-import boundary; profiles without replayable per-record semantics
-remain observation-only. The matrix separately records which profiles also
-demonstrate a model-running, signed `evaluate` → `verify` → `report` journey.
-These maturity levels can advance through the same evaluator-neutral boundary.
-They are example-owned adapters and profiles outside the core, not
-evaluator-specific engine plugins or a permanent catalog ceiling.
-
 ## Providers and diagnostics
 
 Hugging Face Transformers is the built-in reference provider and supports both
 built-in metrics. First-party optional GGUF/llama.cpp, TensorRT-LLM, and Hugging
 Face vision-text packages are independently installable runtime integrations
 with their own dependency sets. The vision-text add-in supports exact-match
-comparisons over authenticated prompt and image parts.
-See [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md).
+comparisons over authenticated prompt and image parts. See
+[runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md).
 
 Spectral, random-matrix, and variance summaries live in the optional
 `invarlock-diagnostics` package. They are observation-only diagnostics; the
 selected paired comparison and policy exclusively determine acceptance. Their
-canonical JSON can be attached to the signed bundle and appears in a separate report
-section without changing the verdict. See
+canonical JSON can be attached to the signed bundle and appears in a separate
+report section without changing the verdict. See
 [diagnostics](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/diagnostics.md).
 
 ## Documentation
@@ -419,7 +267,8 @@ the Python embedding facade may evolve between minor releases.
 Questions and design discussions belong in
 [GitHub Discussions](https://github.com/invarlock/invarlock/discussions). Report
 bugs through [GitHub Issues](https://github.com/invarlock/invarlock/issues) and
-security concerns through [SECURITY.md](https://github.com/invarlock/invarlock/blob/main/SECURITY.md).
+security concerns through
+[SECURITY.md](https://github.com/invarlock/invarlock/blob/main/SECURITY.md).
 
 If you ship or receive derived model artifacts and want to co-publish a real
 evidence-and-receipt handoff using the open engine, start a
