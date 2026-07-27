@@ -20,6 +20,16 @@ cannot substitute a different schema.
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
+| `acceptance_predicate.schema.json` | `invarlock/acceptance-predicate-v2` | Portable projection of one technical decision in an in-toto Statement |
+| `recipient_acceptance_policy.schema.json` | `invarlock/recipient-acceptance-policy-v2` | Current recipient trust, freshness, version, signer, and verdict rules |
+| `evaluator_qualification_profile.schema.json` | `invarlock/evaluator-qualification-profile-v1` | Evaluator identity, execution provenance, and authority classification |
+| `evaluator_qualification_schedule.schema.json` | `invarlock/evaluator-qualification-schedule-v1` | Independent ordered record and reference identities |
+| `evaluator_qualification_export.schema.json` | `invarlock/evaluator-qualification-export-v1` | Normalized per-record facts or an observation-only summary |
+| `evaluator_qualification_result.schema.json` | `invarlock/evaluator-qualification-result-v1` | Digest-bound qualification outcome and import authority |
+
+The acceptance predicate and recipient policy are described in
+[Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
+receipt remains the authoritative replayable result.
 
 ## Provider contracts
 
@@ -44,6 +54,8 @@ from invarlock.public_contracts import (
     load_evidence_observation_schema,
     load_evidence_pack_schema,
     load_trust_inputs_schema,
+    load_acceptance_predicate_schema,
+    load_recipient_acceptance_policy_schema,
     load_model_artifact_identity_schema,
     load_runtime_behavioral_schedule_schema,
     load_runtime_manifest_schema,
@@ -157,6 +169,35 @@ require explicit authorization. SQL or code execution, model-based semantic
 similarity, network services,
 human review, and LLM judges require different trust contracts; judge outputs
 can be attached as authenticated observations without acceptance authority.
+
+### Evaluator input boundary
+
+Import mode is the general extension boundary for measurements produced by an
+external evaluator. An evaluator's output is admissible for an acceptance
+decision only when InvarLock can authenticate the ordered per-record inputs
+and outputs, bind them to the exact schedule, artifacts, runtime, and source,
+and deterministically recompute the decision-contract metric or authorized
+scorer.
+
+An adapter alone does not establish evaluator neutrality. The generic
+qualification boundary binds the profile, independent schedule, normalized
+export, retained upstream output, runner bundle, and dependency declaration.
+For a deterministic exact-match profile, every ordered input and output must be
+present and InvarLock independently recomputes every score. Aggregate-only
+results, missing or reordered record facts, and external-judge outputs whose
+scores cannot be deterministically replayed remain observation-only and expose
+no runtime-import records.
+
+The maintained [evaluator qualification
+matrix](evaluator-qualification.md) executes representative upstream tools
+through example-owned runners. Every deterministic profile also scores and
+replays the complete 102-record output of a pinned real model evaluation
+through the runtime-import boundary. The matrix separately records profiles
+that demonstrate the deeper model-running, signed transaction journey. These
+levels record evidence maturity rather than a permanent support hierarchy and
+can advance without changing the generic boundary. Evaluator names and native
+parsers remain outside the engine; a private evaluator crosses the same JSON,
+CLI, or Python SDK boundary.
 
 ### Run request
 

@@ -8,7 +8,7 @@ import hashlib
 import json
 import shutil
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -68,7 +68,11 @@ def _copy_generated(source: Path, destination: Path) -> None:
     destination.chmod(0o644)
 
 
-def regenerate(root: Path) -> None:
+def regenerate(
+    root: Path,
+    *,
+    identities: Mapping[str, HFSnapshotArtifactIdentity] | None = None,
+) -> None:
     policy_bytes = (root / "policy/acceptance.json").read_bytes()
     policy_digest = sha256_digest(policy_bytes)
     example_records = [
@@ -123,6 +127,14 @@ def regenerate(root: Path) -> None:
         allow_network=False,
     )
     device = RuntimeDeviceFacts(device_kind="cpu", device_name="fixture-cpu")
+    resolved_identities = {
+        "baseline": _identity("org/baseline"),
+        "subject": _identity("org/subject"),
+    }
+    if identities is not None:
+        if set(identities) != {"baseline", "subject"}:
+            raise ValueError("identity overrides require baseline and subject")
+        resolved_identities = dict(identities)
 
     with tempfile.TemporaryDirectory(prefix="invarlock-example-fixtures-") as temporary:
         generated = Path(temporary)
@@ -131,7 +143,7 @@ def regenerate(root: Path) -> None:
             name: str,
             *,
             role: Literal["baseline", "subject"],
-            model_id: str,
+            artifact_identity: HFSnapshotArtifactIdentity,
             outputs: Sequence[str],
             runtime_digest: str,
         ):
@@ -140,7 +152,7 @@ def regenerate(root: Path) -> None:
                 role=role,
                 schedule=schedule,
                 policy_digest=policy_digest,
-                artifact_identity=_identity(model_id),
+                artifact_identity=artifact_identity,
                 records=_records(schedule, outputs),
                 plugin=plugin,
                 backend=backend,
@@ -155,21 +167,21 @@ def regenerate(root: Path) -> None:
         baseline = side(
             "baseline",
             role="baseline",
-            model_id="org/baseline",
+            artifact_identity=resolved_identities["baseline"],
             outputs=expected_outputs,
             runtime_digest=BASELINE_RUNTIME,
         )
         subject = side(
             "subject",
             role="subject",
-            model_id="org/subject",
+            artifact_identity=resolved_identities["subject"],
             outputs=expected_outputs,
             runtime_digest=SUBJECT_RUNTIME,
         )
         rejected = side(
             "rejected-subject",
             role="subject",
-            model_id="org/subject",
+            artifact_identity=resolved_identities["subject"],
             outputs=(*expected_outputs[:-1], "wrong"),
             runtime_digest=SUBJECT_RUNTIME,
         )
@@ -215,10 +227,10 @@ def regenerate(root: Path) -> None:
             json.dumps(
                 {
                     "baseline_artifact": "sha256:"
-                    + artifact_identity_sha256(_identity("org/baseline")),
+                    + artifact_identity_sha256(resolved_identities["baseline"]),
                     "canonical_schedule": sha256_digest(schedule_bytes),
                     "subject_artifact": "sha256:"
-                    + artifact_identity_sha256(_identity("org/subject")),
+                    + artifact_identity_sha256(resolved_identities["subject"]),
                 },
                 indent=2,
                 sort_keys=True,

@@ -16,13 +16,14 @@ The facade deliberately groups these stable surfaces:
 
 | Surface | Exports |
 | --- | --- |
-| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt` |
+| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt`, `write_acceptance_attestation`, `verify_acceptance_attestation` |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
 | Results and errors | Evaluation, verification, reporting, receipt, and evidence-pack result types |
 | OCI host execution | Per-side launch values, host executor, and environment-backed launch resolution |
 | Provider ABI | ABI constant, provider/session protocols, capabilities, runtime specs/resources/context, resolver protocols, batches, identities, receipts, and observations |
 | Runtime-import authoring | Strict JSONL record loading, typed observation and receipt builders, complete side publication/reload, and verifier-derived paired-record publication |
 | Scorer extension | ABI constant, descriptor and binding types, replay protocol and request/result types, explicit registry, and binding/result builders |
+| Evaluator qualification | `qualify_evaluator_export`, `EvaluatorQualificationResult`, `EvaluatorQualificationError`, and four format constants |
 | HF identity | `checkpoint_tree_sha256`, `hf_tokenizer_contract_sha256` |
 
 Imports from other `invarlock.*` modules are not stable merely because they are
@@ -119,6 +120,53 @@ processing. Ordinary receipt authenticity or anchor mismatches are reported in
 does not take independent artifact, schedule, policy, runtime, or signer
 anchors. Call `verify_evidence` when an independent acceptance decision is
 required.
+
+## External evaluator qualification
+
+The stable SDK accepts a normalized export from any open or proprietary
+evaluator. The caller owns evaluator execution and native-output parsing;
+InvarLock owns closed-contract validation, digest binding, schedule matching,
+and deterministic exact-match replay.
+
+```python
+from pathlib import Path
+
+from invarlock.engine import qualify_evaluator_export
+
+result = qualify_evaluator_export(
+    profile_path=Path("profile.json"),
+    schedule_path=Path("schedule.json"),
+    export_path=Path("export.json"),
+    raw_output_path=Path("upstream-output.json"),
+)
+
+if result.authority == "verdict_authority":
+    import_records = result.runtime_records()
+else:
+    assert result.runtime_records() == ()
+```
+
+`runtime_records()` never exposes records for aggregate-only, human-review,
+nondeterministic-judge, or unsupported-replay profiles. See [Evaluator
+qualification](evaluator-qualification.md) for the contracts, private
+evaluator path, and maintained matrix.
+
+## Portable acceptance handoff
+
+`write_acceptance_attestation` wraps a signed verification receipt and its
+bound evidence into an in-toto Statement and DSSE envelope while retaining the
+exact supplied receipt-file bytes.
+`verify_acceptance_attestation` authenticates that envelope, the embedded
+receipt, the exact subject artifact, separate envelope and receipt-verifier
+trust, and one recipient-supplied current policy.
+It does not replay the complete evidence pack; use `verify_evidence` or
+`invarlock verify` for that authoritative technical replay.
+
+The result separates `historical_technical_verdict` from `accepted`, and also
+reports envelope authentication, receipt authentication, subject binding, and
+closed errors. See [Acceptance attestations](acceptance-attestations.md) for
+the TypeURI, canonical serialization, signer relationship, and reference
+policy.
 
 ## Function signatures
 

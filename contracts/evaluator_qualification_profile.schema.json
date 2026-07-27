@@ -1,0 +1,155 @@
+{
+  "$id": "https://invarlock.dev/contracts/evaluator_qualification_profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authority": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "metric": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "exact_match"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            "mode": {
+              "const": "deterministic_per_record"
+            },
+            "reason": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "metric",
+            "mode",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "metric": {
+              "type": "null"
+            },
+            "mode": {
+              "const": "observation_only"
+            },
+            "reason": {
+              "enum": [
+                "aggregate_only",
+                "human_judgment",
+                "nondeterministic_judge",
+                "unsupported_replay_semantics"
+              ]
+            }
+          },
+          "required": [
+            "metric",
+            "mode",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "execution": {
+      "additionalProperties": false,
+      "properties": {
+        "dependency_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runner_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "dependency_lock_sha256",
+        "runner_sha256"
+      ],
+      "type": "object"
+    },
+    "format": {
+      "const": "invarlock/evaluator-qualification-profile-v1"
+    },
+    "profile_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "upstream": {
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "$ref": "#/$defs/package"
+        },
+        "project_url": {
+          "format": "uri",
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "required": [
+        "package",
+        "project_url"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "authority",
+    "execution",
+    "format",
+    "profile_id",
+    "upstream"
+  ],
+  "title": "InvarLock evaluator qualification profile",
+  "type": "object",
+  "$defs": {
+    "identifier": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "type": "string"
+    },
+    "package": {
+      "additionalProperties": false,
+      "properties": {
+        "ecosystem": {
+          "enum": [
+            "go",
+            "npm",
+            "private",
+            "pypi"
+          ]
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ecosystem",
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  }
+}

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.13.0"
+version = "0.14.0"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -32,15 +32,15 @@ dependencies = [
     "click>=8.3.3",
     "cryptography>=48.0.1",
     "rich>=13.0",
-    "pyyaml>=6.0",
+    "pyyaml>=6.0.3",
     "jsonschema>=4.0",
 ]
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.13.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.14.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.13.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.14.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate
@@ -51,25 +51,25 @@ hf = [
   "transformers>=5.14.1",
   "safetensors>=0.8.0",
   "protobuf>=4.25",
-  "sentencepiece>=0.2.1",
+  "sentencepiece>=0.2.2",
   "tiktoken>=0.9.0",
 ]
 
 # Development dependencies
 dev = [
-  "pytest>=7.0",
+  "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
-  "ruff==0.15.22",
-  "mypy==1.20.0",
+  "ruff==0.16.0",
+  "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
-  "pre-commit>=3.0",
+  "pre-commit>=4.6.1",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
   "mkdocs-mermaid2-plugin>=1.2.3",
-  "pymdown-extensions>=10.21.3",
+  "pymdown-extensions>=11.0.0",
   "build>=0.10.0",
   "wheel>=0.47.0",
   "twine>=4.0.0",
@@ -79,13 +79,13 @@ dev = [
 
 ci = [
   "setuptools>=83.0.0",
-  "pytest>=7.0",
+  "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
   "hypothesis>=6.98",
-  "ruff==0.15.22",
-  "mypy==1.20.0",
+  "ruff==0.16.0",
+  "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
   "wheel>=0.47.0",
@@ -95,15 +95,15 @@ ci = [
 ]
 
 docs-ci = [
-  "linkchecker>=10.5",
+  "linkchecker>=10.6.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.6",
   "mkdocs-mermaid2-plugin>=1.2.3",
-  "pymdown-extensions>=10.21.3",
+  "pymdown-extensions>=11.0.0",
 ]
 
 precommit-ci = [
-  "pre-commit>=3.0",
+  "pre-commit>=4.6.1",
 ]
 
 release-ci = [
@@ -135,6 +135,7 @@ hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersPro
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
+invarlock-qualify-evaluator = "invarlock.evaluator_qualification_cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -176,6 +177,9 @@ max-complexity = 30
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # imported but unused
+
+[tool.ruff.format]
+exclude = ["*.md"]
 
 [tool.mypy]
 python_version = "3.13"

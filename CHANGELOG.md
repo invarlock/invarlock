@@ -15,6 +15,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.14.0] - 2026-07-27
+
+This release extends the v0.13 signed evaluation engine with evaluator-neutral
+qualification and recipient-controlled acceptance handoff. JSON, CLI, and
+Python adapter contracts retain authenticated per-record evidence from
+open-source or proprietary evaluators; unsupported judge or aggregate-only
+inputs remain observation-only and cannot drive a recomputed verdict. A
+canonical in-toto/DSSE acceptance envelope, OPA/Rego and CUE conformance
+fixtures, and a clean-checkout v0.13 compatibility corpus make the handoff
+independently consumable while preserving verifier-owned evidence replay.
+
+### Added
+
+- Added a canonical InvarLock acceptance predicate in an in-toto Statement and
+  DSSE envelope, recipient-controlled verification policy, and a deterministic
+  offline artifact-delivery handoff with a committed golden package.
+- Added the permanent v0.13 verification and dossier-ingestion compatibility
+  covenant plus a release-blocking clean-checkout corpus.
+- Added evaluator-neutral JSON qualification contracts, a companion CLI and
+  Python API for open-source or proprietary adapters, maintained source-pinned
+  upstream profiles with retained executions, authoritative per-record import
+  replays from a pinned model evaluation, and an observation-only boundary for
+  evidence that cannot support deterministic verdict recomputation.
+- Added standalone OPA/Rego and CUE acceptance-policy interoperability with
+  positive, policy-rejected, tampered-subject, untrusted-signer, stale-evidence,
+  and unsupported-contract conformance fixtures.
+
+### Changed
+
+- Described acceptance envelopes as standards-shaped in-toto/DSSE transport
+  that standalone policy engines can consume through an authenticated
+  projection; the dedicated verifier continues to own full evidence replay.
+- Documented import mode as the authenticated per-record evaluator boundary:
+  aggregate-only and unsupported external-judge results remain fail-closed.
+- Refreshed the maintained Python, documentation, and GitHub Actions dependency
+  baselines, including Ruff 0.16.0, mypy 2.3.0, GitHub CodeQL Action 4.37.3,
+  and OpenSSF Scorecard Action 2.4.4, together with their hash-pinned workflow
+  locks. Direct declaration-to-lock parity coverage prevents automation from
+  silently exercising versions outside the repository's declared constraints.
+
+### Removed
+
+- Removed the ambiguous handoff role label from examples and fixtures; explicit
+  evaluation operator, evidence signer, technical verifier, envelope signer,
+  and artifact recipient roles now identify each responsibility.
+
+### Fixed
+
+- Hardened recipient acceptance policy so the envelope signer and technical
+  receipt verifier require separate recipient-controlled trust records,
+  duplicate identity/fingerprint pairs are invalid regardless of order or
+  status, and each authenticated signer must match exactly one record.
+- Separated envelope freshness from receipt-authenticated evidence freshness,
+  preventing a new envelope from renewing old evidence and rejecting missing
+  authoritative evidence timestamps when an evidence-age limit is required.
+- Preserved and authenticated the exact supplied v0.13 receipt bytes, including
+  valid non-canonical JSON formatting, without manufacturing a historical
+  receipt timestamp during wrapping.
+
 ## [0.13.0] - 2026-07-21
 
 This release provides one paired model release-regression evaluation. A closed

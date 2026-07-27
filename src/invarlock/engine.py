@@ -2,9 +2,22 @@
 
 Embedding applications should import this module rather than package internals.
 The surface is intentionally limited to the evaluate/verify/report transactions,
-their value types, and the runtime-provider ABI.
+the portable acceptance-attestation transport, their value types, and the
+runtime-provider ABI.
 """
 
+from invarlock.acceptance_attestation import (
+    ACCEPTANCE_PREDICATE_FORMAT,
+    ACCEPTANCE_PREDICATE_TYPE,
+    DSSE_PAYLOAD_TYPE,
+    IN_TOTO_STATEMENT_TYPE,
+    RECIPIENT_POLICY_FORMAT,
+    AcceptanceAttestation,
+    AcceptanceAttestationError,
+    AcceptanceDecision,
+    verify_acceptance_attestation,
+    write_acceptance_attestation,
+)
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.evaluation_request import (
     EvaluationRequest,
@@ -70,6 +83,15 @@ from invarlock.evaluation_transaction import (
     evaluate_request_file,
     preflight_evaluation_request,
 )
+from invarlock.evaluator_qualification import (
+    EVALUATOR_EXPORT_FORMAT,
+    EVALUATOR_PROFILE_FORMAT,
+    EVALUATOR_QUALIFICATION_FORMAT,
+    EVALUATOR_SCHEDULE_FORMAT,
+    EvaluatorQualificationError,
+    EvaluatorQualificationResult,
+    qualify_evaluator_export,
+)
 from invarlock.evidence_pack_contract import EvidenceObservation
 from invarlock.evidence_pack_support import EvidencePackResult, EvidencePackStatus
 from invarlock.evidence_receipt import (
@@ -102,7 +124,15 @@ from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sh
 from invarlock.trust_inputs import TrustInputs, TrustInputsError, load_trust_inputs
 
 __all__ = [
+    "ACCEPTANCE_PREDICATE_FORMAT",
+    "ACCEPTANCE_PREDICATE_TYPE",
+    "DSSE_PAYLOAD_TYPE",
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
+    "IN_TOTO_STATEMENT_TYPE",
+    "RECIPIENT_POLICY_FORMAT",
+    "AcceptanceAttestation",
+    "AcceptanceAttestationError",
+    "AcceptanceDecision",
     "EvaluationBatch",
     "EvaluationInputPart",
     "EvaluationRecord",
@@ -120,6 +150,12 @@ __all__ = [
     "EvidenceReportError",
     "EvidenceVerification",
     "EvidenceVerificationError",
+    "EVALUATOR_EXPORT_FORMAT",
+    "EVALUATOR_PROFILE_FORMAT",
+    "EVALUATOR_QUALIFICATION_FORMAT",
+    "EVALUATOR_SCHEDULE_FORMAT",
+    "EvaluatorQualificationError",
+    "EvaluatorQualificationResult",
     "GGUFArtifactIdentity",
     "HFSnapshotArtifactIdentity",
     "LocalDatasetRequest",
@@ -175,9 +211,12 @@ __all__ = [
     "launch_from_environment",
     "prepare_local_evaluation_schedule",
     "preflight_evaluation_request",
+    "qualify_evaluator_export",
     "render_evidence",
     "verify_evidence",
+    "verify_acceptance_attestation",
     "verify_signed_verification_receipt",
+    "write_acceptance_attestation",
     "write_runtime_import_paired_records",
     "write_runtime_import_side",
 ]

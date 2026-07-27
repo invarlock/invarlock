@@ -1,8 +1,8 @@
 # Trust model
 
-InvarLock separates evidence creation, acceptance, and presentation into
-three transactions. The separation matters only when their inputs and keys are
-controlled independently.
+InvarLock separates evidence creation, technical verification, portable
+recipient acceptance, and presentation into four transactions. The separation
+matters only when their inputs and keys are controlled independently.
 
 !!! warning "Security guidance"
 
@@ -10,18 +10,20 @@ controlled independently.
     independently deciding that the key, policy, artifacts, schedule, runtimes,
     and scoped result are the ones you intended to rely on.
 
-    **Objective:** Define what evidence-signer and verifier signatures establish,
-    which anchors must remain independent, and the exact scope of a trusted
-    receipt.
+    **Objective:** Define what evidence-signer, technical-verifier, and envelope
+    signatures establish, which anchors must remain independent, and the exact
+    scope of a trusted receipt or portable acceptance envelope.
 
-    **Assets or boundary:** Canonical evidence, evidence-signer and verifier signing
-    identities, policy, artifact, schedule, and runtime anchors, authorized
-    scorer code when selected, receipt statements, and the authorization
-    sources that are intentionally outside submitted evidence.
+    **Assets or boundary:** Canonical evidence, evidence-signer, verifier, and
+    envelope-signing identities, technical and recipient policy, artifact,
+    schedule, subject, and runtime anchors, authorized scorer code when
+    selected, receipt and acceptance statements, and the authorization sources
+    that are intentionally outside submitted evidence.
 
-    **Use this page when:** Assigning evidence signer, verifier, or receipt verifier
-    roles; designing trust-anchor distribution; or evaluating whether a signed
-    result supports a proposed reliance decision.
+    **Use this page when:** Assigning evidence signer, technical verifier,
+    envelope signer, recipient, or receipt-verifier roles; designing
+    trust-anchor distribution; or evaluating whether a signed result supports
+    a proposed reliance decision.
 
 ## Trust statement
 
@@ -56,6 +58,11 @@ V(E,A_V)=\texttt{pass}.
 $$
 
 Cryptographic validity alone is therefore necessary but not sufficient.
+Portable recipient acceptance adds a second authorization decision: the
+recipient authenticates the DSSE envelope signer and the technical receipt
+verifier against separate current trust registries, binds the exact subject,
+and applies current freshness, contract-version, signer-status, and verdict
+policy. A valid outer signature cannot authorize the inner receipt signer.
 
 ## Roles and trust roots
 
@@ -63,6 +70,8 @@ Cryptographic validity alone is therefore necessary but not sufficient.
 | --- | --- | --- | --- |
 | Evidence signer | Closed request, model artifacts, provider execution or imported records, and evidence-signing key | Immutable `invarlock/evidence-pack-v1` | Authorized to state what evidence it produced; not automatically trusted to choose acceptance anchors or report truthful execution |
 | Verifier | Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, explicitly authorized scorer registry when selected, verifier identity, and verifier key | External signed verification receipt | Authorized to make the scoped acceptance statement under independently managed anchors and scorer authorization |
+| Envelope signer | Signed receipt, bound evidence metadata, exact subject, and envelope-signing key | in-toto Statement in a DSSE envelope | Authorized to transport a technical result; not automatically authorized as the technical receipt verifier or recipient decision owner |
+| Recipient | Current recipient policy, envelope-signer and receipt-verifier registries, expected subject bytes or digest, and evaluation time | Accepted or rejected portable handoff | Authorizes both signer roles and decides present-day acceptability without changing the historical technical verdict |
 | Renderer | Submitted evidence pack and presentation destination | Console or HTML view | Presents the authenticated canonical report; acceptance authority remains with independent verification and its receipt |
 
 The verifier must not derive an expected value from the evidence field that the
@@ -78,10 +87,12 @@ bundle makes the check circular.
 | Policy bytes | Authorized policy repository or signed approval record | The pack used the exact approved policy bytes | The threshold is scientifically sufficient |
 | Baseline artifact-identity digest | Pinned artifact record | The baseline evidence names the expected authenticated artifact identity | The artifact executed or is an appropriate baseline |
 | Subject artifact-identity digest | Pinned artifact record | The subject evidence names the expected authenticated artifact identity | The artifact executed or is suitable for deployment |
+| Acceptance subject content digest | Recipient-owned artifact bytes or approved content digest | The portable attestation names the exact derived artifact the recipient is evaluating | The artifact is safe or suitable for deployment |
 | Canonical schedule digest | Approved schedule record | The evidence covers the exact expected ordered inputs and outputs | The schedule is representative or sufficiently powered |
 | Baseline runtime digest | Pinned image/build record | The baseline evidence declares the expected image identity | The image executed |
 | Subject runtime digest | Pinned image/build record | The subject evidence declares the expected image identity | The image executed |
 | Verifier identity/fingerprint | Independently maintained verifier-identity record | The receipt was signed by the expected verifier key | The verifier host and process were free of compromise |
+| Envelope-signer identity/fingerprint | Recipient-maintained envelope-signer registry | The DSSE envelope was signed by the expected transport key | The embedded technical receipt is authentic or authorized |
 | Trust-profile digest | Canonical digest of an independently maintained `invarlock/trust-inputs-v1` profile | The receipt records the exact closed profile used for verification | The profile's anchors were authorized or scientifically sufficient |
 
 An anchor source must be protected from the evidence submitter for the threat
@@ -157,6 +168,14 @@ controls.
 InvarLock records them; it does not operate a public-key infrastructure or
 policy distribution service.
 
+For portable acceptance, the recipient additionally supplies current policy,
+separate envelope-signer and receipt-verifier registries, optional expected
+receipt trust-profile digest, and either expected subject bytes or an approved
+subject digest. These inputs must not be copied from the submitted envelope.
+Each registry permits only one record for an identity/fingerprint pair;
+duplicates invalidate the policy regardless of record order or status, and
+each authenticated signer must match exactly one record.
+
 When a scorer extension is selected, the verifier also supplies an explicit
 `ScorerExtensionRegistry` from outside the evidence path. The independent
 policy pins the scorer ID, version, descriptor digest, and configuration
@@ -170,7 +189,8 @@ operational restrictions.
 
 ### Authorization lifecycle
 
-For each evidence signer and verifier identity, the deployment should maintain:
+For each evidence signer, technical verifier, and envelope-signer identity, the
+deployment should maintain:
 
 - fingerprint and role;
 - owner and approving authority;
@@ -179,9 +199,9 @@ For each evidence signer and verifier identity, the deployment should maintain:
 - rotation predecessor/successor links; and
 - compromise and re-verification procedure.
 
-The evidence pack and receipt do not query this lifecycle. A receipt verifier must
-check that the relevant keys were authorized for their roles at the decision
-time.
+The evidence pack, receipt, and acceptance envelope do not query this
+lifecycle. A receipt verifier or recipient must check that the relevant keys
+were authorized for their distinct roles at the decision time.
 
 ### Runtime and provider
 
@@ -235,6 +255,40 @@ verifier identity and fingerprint, then confirm that its statement binds the
 expected pack manifest and anchors. Trusting the public key embedded in the
 receipt without an external fingerprint check only proves self-consistency.
 
+## Portable acceptance boundary
+
+Acceptance predicate v2 transports the signed receipt inside an in-toto
+Statement and DSSE envelope. The receipt signer is the technical verifier; the
+envelope signer is the party transporting the result. They may be the
+same identity and key, but recipient policy evaluates the roles independently.
+A countersigned relationship does not allow either registry to substitute for
+the other.
+
+The recipient verifier:
+
+- authenticates the DSSE signer against exactly one active envelope-signer
+  trust record;
+- authenticates the embedded receipt signer against exactly one active
+  receipt-verifier trust record;
+- optionally pins the receipt's independently maintained trust-profile digest;
+- binds the statement to exact recipient-supplied subject bytes or digest;
+- requires the outer predicate and inner receipt to agree on the technical
+  verdict, artifacts, schedule, policy, contract version, and signer;
+- evaluates envelope age from `attestation_issued_at` separately from evidence
+  age derived only from the receipt-authenticated `receipt_issued_at`; and
+- retains the exact supplied receipt bytes in `receipt.raw_base64`, with a
+  digest over those decoded bytes and parsed-content equality.
+
+A v0.13 receipt has no authenticated issuance time. Wrapping it cannot invent
+one, so it cannot satisfy a recipient policy that requires bounded evidence
+age. Creating a fresh envelope changes transport metadata only.
+
+This boundary authenticates and policy-evaluates the portable projection; it
+does not replace full evidence replay with `invarlock verify`. The envelope is
+standards-shaped in-toto/DSSE transport, but interoperability with an external
+CUE, Open Policy Agent, or other policy engine requires a separately validated
+integration.
+
 ## Non-goals
 
 The trust model does not provide:
@@ -244,13 +298,16 @@ The trust model does not provide:
   custody;
 - representative sampling or population-level statistical assurance;
 - correctness, safety, alignment, or provenance of the baseline itself;
-- model-content safety, prompt-attack defense, or deployment authorization; or
+- model-content safety, prompt-attack defense, or deployment authorization;
+- external policy-engine authentication or policy-evaluation interoperability
+  for the acceptance envelope; or
 - host hardening, container-engine security, GPU isolation, or secret
   management.
 
 See the [assurance case](../assurance/assurance-case.md),
 [reproducibility limits](../assurance/reproducibility.md), and
-[Threat model](threat-model.md).
+[Threat model](threat-model.md). The portable recipient contract is specified
+in [Acceptance attestations](../reference/acceptance-attestations.md).
 
 ## References
 

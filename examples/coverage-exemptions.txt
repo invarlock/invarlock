@@ -1,0 +1,27 @@
+# These files execute in pinned dependency-isolated environments and are gated
+# by real upstream execution, retained runner/dependency digests, and offline
+# qualification replay instead of in-process line coverage.
+examples/evaluator-qualification/runners/arize_phoenix_evals.py
+examples/evaluator-qualification/runners/autoevals.py
+examples/evaluator-qualification/runners/azure_ai_evaluation.py
+examples/evaluator-qualification/runners/deepeval.py
+examples/evaluator-qualification/runners/evidently.py
+examples/evaluator-qualification/runners/garak.py
+examples/evaluator-qualification/runners/hugging_face_evaluate.py
+examples/evaluator-qualification/runners/inspect_ai.py
+examples/evaluator-qualification/runners/langfuse.py
+examples/evaluator-qualification/runners/lighteval.py
+examples/evaluator-qualification/runners/lm_evaluation_harness.py
+examples/evaluator-qualification/runners/mlflow.py
+examples/evaluator-qualification/runners/openai_evals.py
+examples/evaluator-qualification/runners/openevals.py
+examples/evaluator-qualification/runners/opik.py
+examples/evaluator-qualification/runners/promptfoo.py
+examples/evaluator-qualification/runners/pydantic_evals.py
+examples/evaluator-qualification/runners/ragas.py
+examples/evaluator-qualification/runners/trulens.py
+examples/evaluator-qualification/runners/trulens_metric.py
+
+# This generator loads and executes the pinned 1.5 GB Qwen checkpoint. Its
+# release gate is deterministic corpus re-execution with exact byte comparison.
+examples/evaluator-qualification/authoritative/generate_cases.py

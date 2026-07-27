@@ -15,6 +15,13 @@ def test_test_directories_use_one_pattern_target() -> None:
     assert "TEST_DIR_TARGETS" not in MAKEFILE
 
 
+def test_v013_compatibility_corpus_is_release_blocking() -> None:
+    assert "compatibility-test:" in MAKEFILE
+    assert "tests/compatibility" in MAKEFILE
+    assert "test: compatibility-test" in MAKEFILE
+    assert "test-fast: compatibility-test" in MAKEFILE
+
+
 def test_root_tooling_has_no_legacy_product_workflows() -> None:
     forbidden = (
         "evidence-pack-v1",

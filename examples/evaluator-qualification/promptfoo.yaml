@@ -1,0 +1,18 @@
+description: InvarLock offline evaluator qualification
+prompts:
+  - "{{output}}"
+providers:
+  - echo
+tests:
+  - description: record-1
+    vars:
+      output: Paris
+    assert:
+      - type: equals
+        value: Paris
+  - description: record-2
+    vars:
+      output: candidate
+    assert:
+      - type: equals
+        value: approved

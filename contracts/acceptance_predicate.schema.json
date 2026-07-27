@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/acceptance_predicate.schema.json",
+  "title": "InvarLock Acceptance Predicate v2",
+  "type": "object",
+  "required": [
+    "format",
+    "subject",
+    "baseline",
+    "contracts",
+    "evaluation_source",
+    "metric",
+    "policy",
+    "technical_verdict",
+    "timestamps",
+    "signers",
+    "receipt"
+  ],
+  "properties": {
+    "format": {
+      "const": "invarlock/acceptance-predicate-v2"
+    },
+    "subject": {
+      "$ref": "#/$defs/artifact"
+    },
+    "baseline": {
+      "$ref": "#/$defs/artifact"
+    },
+    "contracts": {
+      "type": "object",
+      "required": [
+        "invarlock_release",
+        "evidence_pack",
+        "comparison_report",
+        "receipt"
+      ],
+      "properties": {
+        "invarlock_release": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "evidence_pack": {
+          "type": "string",
+          "pattern": "^invarlock/evidence-pack-v[1-9][0-9]*$"
+        },
+        "comparison_report": {
+          "type": "string",
+          "pattern": "^invarlock/comparison-report-v[1-9][0-9]*$"
+        },
+        "receipt": {
+          "type": "string",
+          "pattern": "^invarlock/evidence-verification-receipt-v[1-9][0-9]*$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluation_source": {
+      "type": "object",
+      "required": [
+        "schedule_format",
+        "schedule_digest",
+        "identity_digest",
+        "identity"
+      ],
+      "properties": {
+        "schedule_format": {
+          "type": "string",
+          "pattern": "^invarlock/runtime-behavioral-schedule-v[1-9][0-9]*$"
+        },
+        "schedule_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "identity_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "identity": {
+          "type": "object",
+          "minProperties": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "metric": {
+      "type": "object",
+      "required": ["kind", "name", "scorer"],
+      "properties": {
+        "kind": {
+          "enum": ["built_in_metric", "scorer_extension"]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,127}$"
+        },
+        "scorer": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "scorer_id",
+                "scorer_version",
+                "descriptor_sha256",
+                "configuration_sha256"
+              ],
+              "properties": {
+                "scorer_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "scorer_version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "descriptor_sha256": {
+                  "$ref": "#/$defs/digest"
+                },
+                "configuration_sha256": {
+                  "$ref": "#/$defs/digest"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "built_in_metric"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "scorer": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "scorer_extension"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "scorer": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "required": ["identity", "digest"],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "technical_verdict": {
+      "type": "object",
+      "required": [
+        "ok",
+        "integrity_ok",
+        "policy_verdict",
+        "verification_status"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "integrity_ok": {
+          "type": "boolean"
+        },
+        "policy_verdict": {
+          "enum": ["pass", "fail"]
+        },
+        "verification_status": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "timestamps": {
+      "type": "object",
+      "required": [
+        "evaluation_completed_at",
+        "receipt_issued_at",
+        "attestation_issued_at"
+      ],
+      "properties": {
+        "evaluation_completed_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "receipt_issued_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "attestation_issued_at": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signers": {
+      "type": "object",
+      "required": ["receipt", "envelope", "relationship"],
+      "properties": {
+        "receipt": {
+          "$ref": "#/$defs/signer"
+        },
+        "envelope": {
+          "$ref": "#/$defs/signer"
+        },
+        "relationship": {
+          "enum": ["same_signer", "countersigned"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "receipt": {
+      "type": "object",
+      "required": [
+        "representation",
+        "media_type",
+        "digest",
+        "raw_base64",
+        "content"
+      ],
+      "properties": {
+        "representation": {
+          "const": "embedded"
+        },
+        "media_type": {
+          "const": "application/vnd.invarlock.verification-receipt+json"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_base64": {
+          "type": "string",
+          "minLength": 4,
+          "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+        },
+        "content": {
+          "type": "object",
+          "required": ["statement", "signature"],
+          "additionalProperties": false,
+          "properties": {
+            "statement": {
+              "type": "object"
+            },
+            "signature": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableTimestamp": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "signer": {
+      "type": "object",
+      "required": ["identity", "fingerprint"],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "name",
+        "artifact_format",
+        "artifact_digest",
+        "digest_kind",
+        "artifact_identity_digest",
+        "artifact_identity",
+        "artifact_identity_payload"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "artifact_format": {
+          "enum": ["hf_snapshot", "gguf", "tensorrt_llm_engine"]
+        },
+        "artifact_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "digest_kind": {
+          "enum": [
+            "hf_snapshot_tree_sha256",
+            "file_sha256",
+            "tensorrt_llm_engine_tree_sha256"
+          ]
+        },
+        "artifact_identity_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_identity": {
+          "type": "object"
+        },
+        "artifact_identity_payload": {
+          "type": "string",
+          "minLength": 4,
+          "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
