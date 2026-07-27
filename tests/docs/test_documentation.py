@@ -188,6 +188,9 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
         "evaluator-specific engine plugins",
     ):
         assert phrase in evidence_paths
+    assert evidence_paths.index("evaluation-verification-flow.svg") < (
+        evidence_paths.index("| Path |")
+    )
 
     introduction = readme[: positions[0]]
     assert "in-toto/DSSE" not in introduction

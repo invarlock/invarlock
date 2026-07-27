@@ -36,18 +36,19 @@ against independently supplied trust anchors.
 
 ## Evidence paths
 
-| Path | What enters InvarLock | Decision authority |
-| --- | --- | --- |
-| Native execution | Pinned artifacts, evaluation source, runtime, metric or deterministic scorer, and policy | InvarLock runs both sides and derives the paired result |
-| Qualified import | Complete ordered per-record results, provenance, identities, schedule, and runtime bindings | InvarLock authenticates the import and recomputes the supported result |
-| Authenticated observation | Aggregate-only results, external judges, or other non-replayable context | Preserved as signed context; never allowed to determine the verdict |
+Native execution and qualified import converge on the same signed evidence,
+independent verification, and reporting transaction:
 
-External evaluator adapters normalize source exports through the same
-versioned JSON, CLI, and Python qualification contracts. They live in the
-example and integration layer rather than becoming
-evaluator-specific engine plugins.
+<p align="center">
+  <img
+    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
+    alt="A pinned paired evaluation request runs baseline and subject providers, publishes signed evidence, is independently verified, and is rendered as a report"
+    width="100%"
+  />
+</p>
 
-For artifact delivery, the workflow is:
+For artifact delivery, the workflow continues from technical verification to a
+recipient-controlled decision:
 
 > authenticated evaluation → portable signed evidence → independent technical
 > verification → recipient-controlled acceptance
@@ -61,13 +62,17 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-<p align="center">
-  <img
-    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
-    alt="A pinned paired evaluation request runs baseline and subject providers, publishes signed evidence, is independently verified, and is rendered as a report"
-    width="100%"
-  />
-</p>
+External evaluator adapters normalize source exports through the same
+versioned JSON, CLI, and Python qualification contracts. They live in the
+example and integration layer rather than becoming
+evaluator-specific engine plugins. The engine distinguishes three evidence
+paths:
+
+| Path | What enters InvarLock | Decision authority |
+| --- | --- | --- |
+| Native execution | Pinned artifacts, evaluation source, runtime, metric or deterministic scorer, and policy | InvarLock runs both sides and derives the paired result |
+| Qualified import | Complete ordered per-record results, provenance, identities, schedule, and runtime bindings | InvarLock authenticates the import and recomputes the supported result |
+| Authenticated observation | Aggregate-only results, external judges, or other non-replayable context | Preserved as signed context; never allowed to determine the verdict |
 
 ## Try the signed handoff locally
 
