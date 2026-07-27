@@ -32,6 +32,7 @@ nav:
       - Contracts: reference/contracts.md
       - Compatibility covenant: reference/compatibility.md
       - Acceptance attestations: reference/acceptance-attestations.md
+      - Policy-engine interoperability: reference/policy-engine-interop.md
       - Evaluator qualification: reference/evaluator-qualification.md
       - Python API: reference/api-guide.md
       - Artifacts: reference/artifacts.md

@@ -64,7 +64,8 @@ still satisfies its recorded contract. Present-day acceptability is a
 separate decision made under the recipient's current policy. A stricter
 recipient can therefore reject an authentic historical pass.
 
-The envelope provides standards-shaped in-toto/DSSE transport. External
-policy-engine interoperability is not claimed; consumers must validate their
-own CUE, Open Policy Agent, or equivalent integration. Full semantic replay uses the
-InvarLock verifier.
+The envelope provides standards-shaped in-toto/DSSE transport. The sibling
+[`policy-engine-interop`](../policy-engine-interop/) example authenticates this
+exact envelope with a standalone verifier, then demonstrates current recipient
+policy in Open Policy Agent and CUE without an InvarLock service or import.
+Full evidence-pack semantic replay still uses the InvarLock verifier.

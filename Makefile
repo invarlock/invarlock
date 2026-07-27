@@ -8,6 +8,8 @@ RUFF := $(PYTHON) -m ruff
 MYPY := $(PYTHON) -m mypy
 MKDOCS := $(PYTHON) -m mkdocs
 PYTEST_WORKERS ?= 0
+OPA ?= opa
+CUE ?= cue
 PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS),)
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
@@ -55,6 +57,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-upstream-qualification
+.PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
@@ -293,6 +296,10 @@ evaluator-qualification:  ## Requalify the retained 12-tool evaluator matrix off
 evaluator-upstream-qualification:  ## Execute and retain all 12 pinned upstream evaluator examples
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
 	$(MAKE) evaluator-qualification
+
+acceptance-policy-interop:  ## Run standalone OPA and CUE acceptance-policy fixtures
+	$(PYTHON) examples/policy-engine-interop/build_fixtures.py --check
+	$(PYTHON) examples/policy-engine-interop/run.py --opa "$(OPA)" --cue "$(CUE)"
 
 example-hf-transformers:  ## Run a real one-command Hugging Face comparison
 	PYTHONPATH=src uv run --isolated --locked --extra hf python \

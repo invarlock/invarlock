@@ -193,6 +193,7 @@
     "Pydantic",
     "Braintrust",
     "Garak",
+    "Rego",
     "requalify",
     "sentencepiece",
     "Textualize",
