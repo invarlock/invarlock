@@ -61,8 +61,8 @@ dev = [
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
-  "ruff==0.15.22",
-  "mypy==1.20.0",
+  "ruff==0.16.0",
+  "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
   "pre-commit>=4.6.1",
@@ -84,8 +84,8 @@ ci = [
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
   "hypothesis>=6.98",
-  "ruff==0.15.22",
-  "mypy==1.20.0",
+  "ruff==0.16.0",
+  "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
   "wheel>=0.47.0",
@@ -177,6 +177,9 @@ max-complexity = 30
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # imported but unused
+
+[tool.ruff.format]
+exclude = ["*.md"]
 
 [tool.mypy]
 python_version = "3.13"
