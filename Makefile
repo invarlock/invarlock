@@ -56,7 +56,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-upstream-qualification
+.PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
@@ -292,10 +292,20 @@ example-acceptance-handoff:  ## Run the service-free producer-to-recipient accep
 
 evaluator-qualification:  ## Requalify the retained 12-tool evaluator matrix offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
+	$(MAKE) evaluator-authoritative-imports
+
+evaluator-authoritative-imports:  ## Replay the 10 authoritative 102-record imports offline
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
 
 evaluator-upstream-qualification:  ## Execute and retain all 12 pinned upstream evaluator examples
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-authoritative
 	$(MAKE) evaluator-qualification
+
+evaluator-authoritative-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
+	PYTHONPATH=src:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+		uv run --isolated --locked --extra hf python \
+		examples/evaluator-qualification/authoritative/generate_cases.py --check
 
 acceptance-policy-interop:  ## Run standalone OPA and CUE acceptance-policy fixtures
 	$(PYTHON) examples/policy-engine-interop/build_fixtures.py --check

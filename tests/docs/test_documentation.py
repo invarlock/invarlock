@@ -635,3 +635,19 @@ def test_latest_release_changelog_is_a_product_synthesis() -> None:
     for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
         assert heading in unreleased
         assert heading in release
+
+
+def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
+    text = _read("docs/reference/evaluator-qualification.md")
+
+    assert "Qualification profile" in text
+    assert "Authoritative import adapter" in text
+    assert "End-to-end release-assurance journey" in text
+    assert "LM Evaluation Harness" in text
+    assert "ten authoritative" in text.lower()
+    assert "102-record" in text
+    assert "cumulative claims" in text
+    assert "not permanent evaluator classes" in text
+    assert "Other evaluator profiles can advance" in text
+    assert "Only LM Evaluation Harness" not in text
+    assert "remains the only evaluator example" not in text

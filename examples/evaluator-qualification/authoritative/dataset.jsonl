@@ -1,0 +1,102 @@
+{"expected":" Paris","id":"causal-cloze-000","prompt":"The capital of France is"}
+{"expected":" Rome","id":"causal-cloze-001","prompt":"The capital of Italy is"}
+{"expected":" Tokyo","id":"causal-cloze-002","prompt":"The capital of Japan is"}
+{"expected":" Berlin","id":"causal-cloze-003","prompt":"The capital of Germany is"}
+{"expected":" Madrid","id":"causal-cloze-004","prompt":"The capital of Spain is"}
+{"expected":" east","id":"causal-cloze-006","prompt":"The sun rises in the"}
+{"expected":" west","id":"causal-cloze-007","prompt":"The sun sets in the"}
+{"expected":" blue","id":"causal-cloze-008","prompt":"The sky is usually"}
+{"expected":" white","id":"causal-cloze-009","prompt":"Fresh snow is usually"}
+{"expected":" green","id":"causal-cloze-010","prompt":"Healthy grass is usually"}
+{"expected":" black","id":"causal-cloze-011","prompt":"Coal is usually"}
+{"expected":" two","id":"causal-cloze-012","prompt":"One plus one equals"}
+{"expected":" four","id":"causal-cloze-013","prompt":"Two plus two equals"}
+{"expected":" six","id":"causal-cloze-014","prompt":"Three plus three equals"}
+{"expected":" ten","id":"causal-cloze-015","prompt":"Five plus five equals"}
+{"expected":" sides","id":"causal-cloze-016","prompt":"A triangle has three"}
+{"expected":" sides","id":"causal-cloze-017","prompt":"A square has four"}
+{"expected":" days","id":"causal-cloze-018","prompt":"A week has seven"}
+{"expected":" months","id":"causal-cloze-019","prompt":"A year has twelve"}
+{"expected":" hours","id":"causal-cloze-020","prompt":"A day has twenty-four"}
+{"expected":" minutes","id":"causal-cloze-021","prompt":"An hour has sixty"}
+{"expected":" seconds","id":"causal-cloze-022","prompt":"A minute has sixty"}
+{"expected":" cold","id":"causal-cloze-023","prompt":"The opposite of hot is"}
+{"expected":" down","id":"causal-cloze-024","prompt":"The opposite of up is"}
+{"expected":" right","id":"causal-cloze-025","prompt":"The opposite of left is"}
+{"expected":" night","id":"causal-cloze-026","prompt":"The opposite of day is"}
+{"expected":" new","id":"causal-cloze-027","prompt":"The opposite of old is"}
+{"expected":" slow","id":"causal-cloze-028","prompt":"The opposite of fast is"}
+{"expected":" water","id":"causal-cloze-029","prompt":"Fish live in"}
+{"expected":" fly","id":"causal-cloze-030","prompt":"Birds can"}
+{"expected":" air","id":"causal-cloze-031","prompt":"People breathe"}
+{"expected":" milk","id":"causal-cloze-033","prompt":"Cows produce"}
+{"expected":" mat","id":"causal-cloze-036","prompt":"The cat sat on the"}
+{"expected":" door","id":"causal-cloze-037","prompt":"She opened the front"}
+{"expected":" book","id":"causal-cloze-038","prompt":"He read the entire"}
+{"expected":" road","id":"causal-cloze-039","prompt":"They drove down the"}
+{"expected":" ball","id":"causal-cloze-040","prompt":"The child kicked the"}
+{"expected":" food","id":"causal-cloze-041","prompt":"The chef cooked the"}
+{"expected":" land","id":"causal-cloze-042","prompt":"The farmer worked the"}
+{"expected":" plane","id":"causal-cloze-044","prompt":"The pilot flew the"}
+{"expected":" ocean","id":"causal-cloze-045","prompt":"The sailor crossed the"}
+{"expected":" patient","id":"causal-cloze-046","prompt":"The doctor helped the"}
+{"expected":" piano","id":"causal-cloze-047","prompt":"The musician played the"}
+{"expected":" story","id":"causal-cloze-049","prompt":"The writer finished the"}
+{"expected":" line","id":"causal-cloze-050","prompt":"The runner crossed the finish"}
+{"expected":" station","id":"causal-cloze-051","prompt":"The train arrived at the"}
+{"expected":" sea","id":"causal-cloze-052","prompt":"The ship sailed across the"}
+{"expected":" light","id":"causal-cloze-053","prompt":"The car stopped at the red"}
+{"expected":" glass","id":"causal-cloze-054","prompt":"She poured water into the"}
+{"expected":" lock","id":"causal-cloze-055","prompt":"He put the key in the"}
+{"expected":" table","id":"causal-cloze-056","prompt":"They sat around the dinner"}
+{"expected":" wall","id":"causal-cloze-057","prompt":"The clock hung on the"}
+{"expected":" bed","id":"causal-cloze-058","prompt":"The lamp stood beside the"}
+{"expected":" door","id":"causal-cloze-059","prompt":"The shoes were by the"}
+{"expected":" frame","id":"causal-cloze-061","prompt":"The picture hung in a"}
+{"expected":" sky","id":"causal-cloze-062","prompt":"The rain fell from the"}
+{"expected":" sea","id":"causal-cloze-063","prompt":"The river flows toward the"}
+{"expected":" night","id":"causal-cloze-064","prompt":"The moon shines at"}
+{"expected":" sky","id":"causal-cloze-065","prompt":"Stars appear in the night"}
+{"expected":" water","id":"causal-cloze-066","prompt":"Ice melts into"}
+{"expected":" light","id":"causal-cloze-068","prompt":"Fire produces heat and"}
+{"expected":" water","id":"causal-cloze-069","prompt":"Plants need sunlight and"}
+{"expected":" seed","id":"causal-cloze-070","prompt":"A tree grows from a"}
+{"expected":" tree","id":"causal-cloze-071","prompt":"An apple grows on a"}
+{"expected":" cup","id":"causal-cloze-073","prompt":"Coffee is served in a"}
+{"expected":" hello","id":"causal-cloze-077","prompt":"A phone call begins with"}
+{"expected":" mark","id":"causal-cloze-078","prompt":"A question ends with a question"}
+{"expected":" letter","id":"causal-cloze-079","prompt":"A sentence begins with a capital"}
+{"expected":" colors","id":"causal-cloze-080","prompt":"Red and blue are"}
+{"expected":" animals","id":"causal-cloze-081","prompt":"Cats and dogs are"}
+{"expected":" trees","id":"causal-cloze-082","prompt":"Oak and pine are"}
+{"expected":" February","id":"causal-cloze-083","prompt":"January comes before"}
+{"expected":" summer","id":"causal-cloze-085","prompt":"Spring comes before"}
+{"expected":" winter","id":"causal-cloze-087","prompt":"Autumn comes before"}
+{"expected":" morning","id":"causal-cloze-088","prompt":"Breakfast is eaten in the"}
+{"expected":" evening","id":"causal-cloze-089","prompt":"Dinner is eaten in the"}
+{"expected":" night","id":"causal-cloze-090","prompt":"People sleep at"}
+{"expected":" morning","id":"causal-cloze-091","prompt":"The alarm rang in the"}
+{"expected":" cry","id":"causal-cloze-093","prompt":"The baby began to"}
+{"expected":" sing","id":"causal-cloze-096","prompt":"The bird began to"}
+{"expected":" ring","id":"causal-cloze-097","prompt":"The phone began to"}
+{"expected":" blow","id":"causal-cloze-098","prompt":"The wind began to"}
+{"expected":" fall","id":"causal-cloze-099","prompt":"The snow began to"}
+{"expected":" door","id":"causal-cloze-100","prompt":"Please close the"}
+{"expected":" light","id":"causal-cloze-101","prompt":"Please turn on the"}
+{"expected":" seat","id":"causal-cloze-102","prompt":"Please take a"}
+{"expected":" name","id":"causal-cloze-103","prompt":"Please write your"}
+{"expected":" instructions","id":"causal-cloze-104","prompt":"Please read the"}
+{"expected":" hello","id":"causal-cloze-105","prompt":"She smiled and said"}
+{"expected":" hand","id":"causal-cloze-106","prompt":"He waved his"}
+{"expected":" game","id":"causal-cloze-108","prompt":"The team won the"}
+{"expected":" decision","id":"causal-cloze-109","prompt":"The judge made a"}
+{"expected":" uniform","id":"causal-cloze-110","prompt":"The police officer wore a"}
+{"expected":" fire","id":"causal-cloze-111","prompt":"The firefighter put out the"}
+{"expected":" plants","id":"causal-cloze-112","prompt":"The gardener watered the"}
+{"expected":" bread","id":"causal-cloze-113","prompt":"The baker made fresh"}
+{"expected":" books","id":"causal-cloze-114","prompt":"The library contains many"}
+{"expected":" art","id":"causal-cloze-115","prompt":"The museum displays works of"}
+{"expected":" people","id":"causal-cloze-116","prompt":"The hospital treats sick"}
+{"expected":" students","id":"causal-cloze-117","prompt":"The school teaches young"}
+{"expected":" north","id":"causal-cloze-118","prompt":"A compass points"}
+{"expected":" temperature","id":"causal-cloze-119","prompt":"A thermometer measures"}

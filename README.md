@@ -293,9 +293,15 @@ the per-record inputs and deterministically recompute the decision-contract
 metric. Aggregate-only results and unsupported external-judge outputs fail
 closed to verdict authority and remain observation-only. The maintained
 [evaluator qualification matrix](docs/reference/evaluator-qualification.md)
-demonstrates this boundary with ten per-record evaluator executions and two
-observation-only executions. These are conformance profiles outside the core,
-not twelve evaluator-specific engine plugins.
+demonstrates this boundary with twelve upstream qualification profiles. Ten
+also replay complete 102-record results from a pinned real model evaluation
+through the runtime-import boundary; MLflow and Garak remain observation-only.
+LM Evaluation Harness currently also demonstrates a model-running, signed
+`evaluate` → `verify` → `report` journey. This is the maturity demonstrated in
+this revision, not a level reserved for LM Harness: other profiles can add
+equivalent journeys through the same evaluator-neutral boundary. These are
+example-owned adapters and profiles outside the core, not twelve
+evaluator-specific engine plugins.
 
 ## Providers and diagnostics
 

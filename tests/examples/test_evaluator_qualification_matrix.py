@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from invarlock.core.runtime_provider import load_runtime_behavioral_schedule
+from invarlock.runtime_import_authoring import (
+    RuntimeImportAuthoringError,
+    load_external_scoring_records_jsonl,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples" / "evaluator-qualification"
+AUTHORITATIVE = EXAMPLE / "authoritative"
 
 
 def _load(path: Path) -> dict[str, object]:
@@ -104,7 +114,108 @@ def test_public_retained_artifacts_do_not_contain_local_paths_or_secrets() -> No
         b"api_key",
         b"bearer ",
     )
-    for path in (EXAMPLE / "artifacts").rglob("*.json"):
-        payload = path.read_bytes().lower()
-        for marker in forbidden:
-            assert marker not in payload, path
+    for root in (EXAMPLE / "artifacts", AUTHORITATIVE / "artifacts"):
+        for path in root.rglob("*.json"):
+            payload = path.read_bytes().lower()
+            for marker in forbidden:
+                assert marker not in payload, path
+
+
+def test_matrix_preserves_three_distinct_demonstration_levels() -> None:
+    demonstrations = _load(EXAMPLE / "demonstrations.json")["profiles"]
+    authoritative = []
+    end_to_end = []
+    for profile_id, levels in demonstrations.items():
+        assert levels["qualification_profile"] is True
+        if levels["authoritative_import"]:
+            authoritative.append(profile_id)
+        if levels["end_to_end_transaction"]:
+            end_to_end.append(profile_id)
+
+    assert len(authoritative) == 10
+    assert end_to_end == ["lm-evaluation-harness"]
+
+
+def test_authoritative_corpus_is_real_pinned_model_execution() -> None:
+    cases = _load(AUTHORITATIVE / "cases.json")
+    producer = cases["producer"]
+    model = producer["model"]
+    records = cases["records"]
+
+    assert cases["format"] == "invarlock/evaluator-authoritative-cases-v1"
+    assert producer["kind"] == "model_execution"
+    assert model["model_id"] == "Qwen/Qwen3-0.6B"
+    assert re.fullmatch("[0-9a-f]{40}", model["immutable_revision"])
+    assert re.fullmatch("sha256:[0-9a-f]{64}", model["snapshot_tree_sha256"])
+    assert producer["generation"] == {
+        "backend": "transformers",
+        "do_sample": False,
+        "dtype": "float32",
+        "max_new_tokens": 1,
+        "seed": 0,
+    }
+    assert len(records) == 102
+    assert all(record["output"] for record in records)
+    scores = [record["output"] == record["reference"] for record in records]
+    assert any(scores)
+    assert not all(scores)
+
+
+def test_ten_authoritative_imports_replay_offline() -> None:
+    completed = subprocess.run(
+        [sys.executable, str(EXAMPLE / "matrix.py"), "verify-authoritative"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.count("verified authoritative import ") == 10
+
+    demonstrations = _load(EXAMPLE / "demonstrations.json")["profiles"]
+    authoritative = [
+        profile
+        for profile, levels in demonstrations.items()
+        if levels["authoritative_import"]
+    ]
+    for profile_id in authoritative:
+        artifact = AUTHORITATIVE / "artifacts" / profile_id
+        result = _load(artifact / "qualification-result.json")
+        replay = _load(artifact / "import-replay.json")
+        records = (artifact / "runtime-import-records.jsonl").read_bytes().splitlines()
+        raw = _load(artifact / "upstream-output.json")
+
+        assert result["outcome"] == "qualified_for_import"
+        assert result["authority"] == "verdict_authority"
+        assert result["record_count"] == 102
+        assert result["scores"].count(1.0) == 52
+        assert result["scores"].count(0.0) == 50
+        assert len(records) == 102
+        assert replay["record_count"] == 102
+        assert replay["profile_id"] == profile_id
+        assert replay["source_kind"] == "model_execution"
+        assert raw["source_evaluation"]["model"]["model_id"] == "Qwen/Qwen3-0.6B"
+        assert len(raw["records"]) == 102
+        assert raw["entrypoint"] != "precomputed"
+
+
+def test_authoritative_import_rejects_post_qualification_record_tampering(
+    tmp_path: Path,
+) -> None:
+    source = AUTHORITATIVE / "artifacts" / "inspect-ai" / "runtime-import-records.jsonl"
+    records = source.read_bytes().splitlines()
+    first = json.loads(records[0])
+    first["output_text"] = "tampered"
+    records[0] = json.dumps(
+        first,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    tampered = tmp_path / "records.jsonl"
+    tampered.write_bytes(b"\n".join(records) + b"\n")
+    schedule = load_runtime_behavioral_schedule(AUTHORITATIVE / "runtime-schedule.json")
+
+    with pytest.raises(RuntimeImportAuthoringError, match="output digest is invalid"):
+        load_external_scoring_records_jsonl(tampered, schedule=schedule)
