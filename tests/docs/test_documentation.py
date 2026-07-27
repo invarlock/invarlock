@@ -639,12 +639,13 @@ def test_latest_release_changelog_is_a_product_synthesis() -> None:
 
 def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     text = _read("docs/reference/evaluator-qualification.md")
+    normalized = " ".join(text.split())
 
     assert "Qualification profile" in text
     assert "Authoritative import adapter" in text
     assert "End-to-end release-assurance journey" in text
     assert "LM Evaluation Harness" in text
-    assert "seventeen authoritative" in text.lower()
+    assert "every retained authoritative import" in normalized
     assert "102-record" in text
     assert "cumulative claims" in text
     assert "not permanent evaluator classes" in text
