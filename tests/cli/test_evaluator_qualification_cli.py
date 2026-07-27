@@ -70,4 +70,3 @@ def test_cli_reports_digest_failure_without_traceback(tmp_path: Path) -> None:
     assert result.exit_code == 2
     assert "raw upstream output digest does not match" in result.stdout
     assert "Traceback" not in result.stdout
-

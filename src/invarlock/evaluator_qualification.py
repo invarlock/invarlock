@@ -388,9 +388,7 @@ def _deterministic_result(
                 f"export record {record_id!r} output digest is invalid"
             )
         expected_score = (
-            1.0
-            if output_sha256 == expected_record["reference_output_sha256"]
-            else 0.0
+            1.0 if output_sha256 == expected_record["reference_output_sha256"] else 0.0
         )
         reported_score = _number(
             observed_record["reported_score"],
@@ -438,9 +436,7 @@ def _deterministic_result(
         schema=load_evaluator_qualification_result_schema(),
     )
     if error is not None:  # pragma: no cover - internal construction invariant
-        raise EvaluatorQualificationError(
-            f"qualification result is invalid: {error}"
-        )
+        raise EvaluatorQualificationError(f"qualification result is invalid: {error}")
     return result
 
 
