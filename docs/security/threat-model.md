@@ -265,10 +265,12 @@ processing adversarial input; parser checks do not replace process isolation.
 - external execution attestation or independent rerun when required; and
 - retention, revocation, and incident-response procedures.
 
-The acceptance envelope is standards-shaped in-toto/DSSE transport. InvarLock
-does not claim that an external CUE, Open Policy Agent, or other policy engine
-authenticates or evaluates this predicate without a separately validated
-integration.
+The acceptance envelope is standards-shaped in-toto/DSSE transport. The
+maintained interoperability example separately authenticates the envelope and
+embedded receipt before OPA/Rego or CUE evaluates recipient policy over the
+authenticated projection. It does not imply that arbitrary policy-engine
+configurations perform signature verification, full evidence replay, or safe
+acceptance without equivalent validation.
 
 ## Verification-failure handling
 

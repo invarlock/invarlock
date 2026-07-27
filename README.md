@@ -41,6 +41,10 @@ subject binding; the recipient still applies separate envelope and receipt
 trust, independent envelope and evidence freshness, contract-version,
 signer-status, and verdict policy.
 
+Compatibility is explicit: v0.13 evidence and receipts remain permanently
+verifiable and permanently ingestible as first-class dossier inputs, while
+every acceptance outcome remains controlled by the recipient's current policy.
+
 ```bash
 invarlock evaluate request.yaml
 invarlock verify evidence/
@@ -49,7 +53,7 @@ invarlock report evidence/
 
 <p align="center">
   <img
-    src="docs/assets/evaluation-verification-flow.svg"
+    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
     alt="A pinned paired evaluation request runs baseline and subject providers, publishes signed evidence, is independently verified, and is rendered as a report"
     width="100%"
   />
@@ -199,7 +203,7 @@ schedule and launches a separately pinned worker for each side; Docker is the
 default engine and Podman is supported.
 
 Build the authenticated Git source bundle as shown in the
-[runtime-provider guide](docs/user-guide/runtime-providers.md#build-or-obtain-the-runtime-image),
+[runtime-provider guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md#build-or-obtain-the-runtime-image),
 then build and smoke-test the image that matches the intended device:
 
 ```bash
@@ -264,10 +268,25 @@ The evidence signer authenticates the comparison bytes. The verifier decides
 whether those bytes satisfy the independently maintained anchors and signs a
 separate receipt that binds the profile digest. `report` renders the
 signature-authenticated comparison; independent verification remains the
-acceptance record. The [CLI reference](docs/reference/cli.md#verify) defines
+acceptance record. The [CLI reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md#verify) defines
 the closed profile and the equivalent explicit options.
 
-## Import existing measurements
+## Hand off acceptance
+
+Recipients can consume the optional in-toto/DSSE acceptance envelope without
+an InvarLock service or policy-engine plugin. The maintained interoperability
+example authenticates the envelope and embedded receipt with a standalone
+reference verifier, then applies current recipient policy in both OPA/Rego and
+CUE. Its conformance fixtures cover an accepted delivery, policy rejection,
+subject tampering, an untrusted signer, stale evidence, and an unsupported
+contract.
+
+This is acceptance-policy interoperability, not complete evidence replay.
+Recipients use `invarlock verify` when they need to replay every evidence-pack
+invariant. See the
+[policy-engine interoperability reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md).
+
+## Import and qualify existing evaluator results
 
 The repository's
 [`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
@@ -283,25 +302,33 @@ results produced elsewhere. Import mode requires the canonical schedule, typed
 observations, runtime bindings, and paired records; InvarLock re-derives the
 comparison before publication.
 
-The [model-change workflow guide](docs/user-guide/change-scenarios.md) maps
+The [model-change workflow guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md) maps
 fine-tuning, pruning, quantization, GGUF, TensorRT-LLM, multimodal, harness, and
 endpoint outputs to the appropriate built-in, optional-runtime, or import
 boundary.
+
+The core exposes one evaluator-neutral qualification contract as versioned JSON,
+the `invarlock-qualify-evaluator` companion CLI, and
+`invarlock.engine.qualify_evaluator_export` for Python callers. Open-source or
+proprietary evaluators reached through an SDK, CLI, or API normalize into that
+same contract outside the core. Complete ordered per-record evidence may receive
+verdict authority when identity, provenance, schedule, and deterministic replay
+requirements pass; aggregate-only and unsupported judge results cannot.
 
 External evaluator output is admissible only when InvarLock can authenticate
 the per-record inputs and deterministically recompute the decision-contract
 metric. Aggregate-only results and unsupported external-judge outputs fail
 closed to verdict authority and remain observation-only. The maintained
-[evaluator qualification matrix](docs/reference/evaluator-qualification.md)
+[evaluator qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
 demonstrates this boundary across maintained upstream qualification profiles,
 grouped by evaluator role. Every deterministic per-record profile also replays
-complete 102-record results from a pinned real model evaluation through the
-runtime-import boundary; profiles without replayable per-record semantics remain
-observation-only. The matrix separately records which profiles also demonstrate
-a model-running, signed `evaluate` → `verify` → `report` journey. These maturity
-levels can advance through the same evaluator-neutral boundary. They are
-example-owned adapters and profiles outside the core, not evaluator-specific
-engine plugins or a permanent catalog ceiling.
+complete retained results from a pinned real model evaluation through the
+runtime-import boundary; profiles without replayable per-record semantics
+remain observation-only. The matrix separately records which profiles also
+demonstrate a model-running, signed `evaluate` → `verify` → `report` journey.
+These maturity levels can advance through the same evaluator-neutral boundary.
+They are example-owned adapters and profiles outside the core, not
+evaluator-specific engine plugins or a permanent catalog ceiling.
 
 ## Providers and diagnostics
 
@@ -332,6 +359,8 @@ section without changing the verdict. See
   [contracts](https://github.com/invarlock/invarlock/blob/main/docs/reference/contracts.md),
   [acceptance attestations](https://github.com/invarlock/invarlock/blob/main/docs/reference/acceptance-attestations.md),
   [compatibility covenant](https://github.com/invarlock/invarlock/blob/main/docs/reference/compatibility.md),
+  [evaluator qualification](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md),
+  [policy-engine interoperability](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md),
   [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/reference/runtime-providers.md), and
   [Python API](https://github.com/invarlock/invarlock/blob/main/docs/reference/api-guide.md).
 

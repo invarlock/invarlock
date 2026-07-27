@@ -139,6 +139,16 @@ def test_core_docs_present_the_three_transaction_journey() -> None:
         assert missing == [], f"{relative} misses {missing}"
 
 
+def test_readme_resources_use_absolute_urls_for_pypi() -> None:
+    readme = _read("README.md")
+    embedded_urls = re.findall(r'\b(?:href|src|srcset)="([^"]+)"', readme)
+    markdown_urls = re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme)
+    resource_urls = embedded_urls + markdown_urls
+
+    assert resource_urls
+    assert all(url.startswith(("https://", "mailto:")) for url in resource_urls)
+
+
 def test_public_docs_describe_the_release_assurance_surface() -> None:
     text = "\n".join(_read(relative) for relative in CORE_DOCS).lower()
     for phrase in (
@@ -441,7 +451,10 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
 
     readme = _read("README.md")
     architecture = _read("docs/reference/architecture.md")
-    assert 'src="docs/assets/evaluation-verification-flow.svg"' in readme
+    assert (
+        'src="https://raw.githubusercontent.com/invarlock/invarlock/main/'
+        'docs/assets/evaluation-verification-flow.svg"'
+    ) in readme
     assert "../assets/evaluation-verification-flow.svg" in architecture
 
 

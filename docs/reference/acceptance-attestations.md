@@ -30,11 +30,14 @@ DSSE signer from its own trust registry, binds the in-toto subject to the exact
 artifact bytes or an independently obtained digest, authenticates the embedded
 receipt, and applies its current policy.
 
-The envelope is standards-shaped in-toto/DSSE transport. External
-policy-engine interoperability is not claimed: this repository does not
-maintain a CUE, Open Policy Agent, or equivalent integration test. Consumers
-must validate any external authentication and policy integration themselves.
-Full semantic replay uses the InvarLock verifier.
+The envelope is standards-shaped in-toto/DSSE transport. The repository
+maintains a standalone conformance example that authenticates the envelope and
+embedded receipt, then applies recipient policy with OPA/Rego and CUE without an
+InvarLock service or policy-engine plugin. The policy engines consume an
+authenticated projection; they do not perform raw signature verification or
+full evidence replay themselves. See
+[Policy-engine interoperability](policy-engine-interop.md). Full semantic replay
+uses the InvarLock verifier.
 
 ## Statement and predicate
 
