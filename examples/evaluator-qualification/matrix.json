@@ -1,1 +1,431 @@
-{"format":"invarlock/evaluator-qualification-matrix-v1","profiles":[{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"LM Evaluation Harness","lock":"locks/lm-evaluation-harness.txt","profile_id":"lm-evaluation-harness","project_url":"https://github.com/EleutherAI/lm-evaluation-harness","runner":"runners/lm_evaluation_harness.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"lm-eval","version":"0.4.12"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"Inspect AI","lock":"locks/inspect-ai.txt","profile_id":"inspect-ai","project_url":"https://inspect.aisi.org.uk/","runner":"runners/inspect_ai.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"inspect-ai","version":"0.3.249"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"Promptfoo","lock":"locks/promptfoo.txt","profile_id":"promptfoo","project_url":"https://www.promptfoo.dev/","runner":"runners/promptfoo.py","runner_assets":["promptfoo.yaml"],"upstream":{"ecosystem":"npm","name":"promptfoo","version":"0.121.19"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"DeepEval","lock":"locks/deepeval.txt","profile_id":"deepeval","project_url":"https://deepeval.com/","runner":"runners/deepeval.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"deepeval","version":"4.1.3"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"Ragas","lock":"locks/ragas.txt","profile_id":"ragas","project_url":"https://docs.ragas.io/","runner":"runners/ragas.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"ragas","version":"0.4.3"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"LightEval","lock":"locks/lighteval.txt","profile_id":"lighteval","project_url":"https://huggingface.co/docs/lighteval/","runner":"runners/lighteval.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"lighteval","version":"0.13.0"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"Hugging Face Evaluate","lock":"locks/hugging-face-evaluate.txt","profile_id":"hugging-face-evaluate","project_url":"https://huggingface.co/docs/evaluate/","runner":"runners/hugging_face_evaluate.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"evaluate","version":"0.4.6"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"Pydantic Evals","lock":"locks/pydantic-evals.txt","profile_id":"pydantic-evals","project_url":"https://ai.pydantic.dev/evals/","runner":"runners/pydantic_evals.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"pydantic-evals","version":"2.18.0"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"Braintrust AutoEvals","lock":"locks/autoevals.txt","profile_id":"autoevals","project_url":"https://github.com/braintrustdata/autoevals-python","runner":"runners/autoevals.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"autoevals","version":"0.3.0"}},{"authority":{"metric":{"kind":"exact_match"},"mode":"deterministic_per_record","reason":null},"display_name":"OpenEvals","lock":"locks/openevals.txt","profile_id":"openevals","project_url":"https://github.com/langchain-ai/openevals","runner":"runners/openevals.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"openevals","version":"0.2.0"}},{"authority":{"metric":null,"mode":"observation_only","reason":"aggregate_only"},"display_name":"MLflow Model Evaluation","lock":"locks/mlflow.txt","profile_id":"mlflow","project_url":"https://mlflow.org/docs/latest/ml/evaluation/","runner":"runners/mlflow.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"mlflow","version":"3.14.0"}},{"authority":{"metric":null,"mode":"observation_only","reason":"unsupported_replay_semantics"},"display_name":"Garak","lock":"locks/garak.txt","profile_id":"garak","project_url":"https://github.com/NVIDIA/garak","runner":"runners/garak.py","runner_assets":[],"upstream":{"ecosystem":"pypi","name":"garak","version":"0.15.1"}}]}
+{
+  "categories": {
+    "application-evaluation-sdk": {
+      "display_name": "Application evaluation SDKs"
+    },
+    "benchmark-harness": {
+      "display_name": "Benchmark harnesses"
+    },
+    "evaluation-observability-platform": {
+      "display_name": "Evaluation and observability platforms"
+    },
+    "general-metric-library": {
+      "display_name": "General metric libraries"
+    },
+    "security-red-team": {
+      "display_name": "Security and red-team evaluators"
+    }
+  },
+  "format": "invarlock/evaluator-qualification-matrix-v1",
+  "selection": {
+    "criteria": [
+      "recognizable current evaluator or evaluation platform",
+      "maintained project or maintained successor",
+      "distinct ecosystem or workflow represented",
+      "real upstream execution can be retained and independently qualified"
+    ],
+    "minimum_activity_window_months": 12,
+    "reviewed_on": "2026-07-27"
+  },
+  "profiles": [
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "benchmark-harness",
+      "display_name": "LM Evaluation Harness",
+      "lock": "locks/lm-evaluation-harness.txt",
+      "profile_id": "lm-evaluation-harness",
+      "project_url": "https://github.com/EleutherAI/lm-evaluation-harness",
+      "runner": "runners/lm_evaluation_harness.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "lm-eval",
+        "version": "0.4.12"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "benchmark-harness",
+      "display_name": "Inspect AI",
+      "lock": "locks/inspect-ai.txt",
+      "profile_id": "inspect-ai",
+      "project_url": "https://inspect.aisi.org.uk/",
+      "runner": "runners/inspect_ai.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "inspect-ai",
+        "version": "0.3.249"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "Promptfoo",
+      "lock": "locks/promptfoo.txt",
+      "profile_id": "promptfoo",
+      "project_url": "https://www.promptfoo.dev/",
+      "runner": "runners/promptfoo.py",
+      "runner_assets": [
+        "promptfoo.yaml"
+      ],
+      "upstream": {
+        "ecosystem": "npm",
+        "name": "promptfoo",
+        "version": "0.121.19"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "DeepEval",
+      "lock": "locks/deepeval.txt",
+      "profile_id": "deepeval",
+      "project_url": "https://deepeval.com/",
+      "runner": "runners/deepeval.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "deepeval",
+        "version": "4.1.3"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "Ragas",
+      "lock": "locks/ragas.txt",
+      "profile_id": "ragas",
+      "project_url": "https://docs.ragas.io/",
+      "runner": "runners/ragas.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "ragas",
+        "version": "0.4.3"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "benchmark-harness",
+      "display_name": "LightEval",
+      "lock": "locks/lighteval.txt",
+      "profile_id": "lighteval",
+      "project_url": "https://huggingface.co/docs/lighteval/",
+      "runner": "runners/lighteval.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "lighteval",
+        "version": "0.13.0"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "general-metric-library",
+      "display_name": "Hugging Face Evaluate",
+      "lock": "locks/hugging-face-evaluate.txt",
+      "profile_id": "hugging-face-evaluate",
+      "project_url": "https://huggingface.co/docs/evaluate/",
+      "runner": "runners/hugging_face_evaluate.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "evaluate",
+        "version": "0.4.6"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "Pydantic Evals",
+      "lock": "locks/pydantic-evals.txt",
+      "profile_id": "pydantic-evals",
+      "project_url": "https://ai.pydantic.dev/evals/",
+      "runner": "runners/pydantic_evals.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "pydantic-evals",
+        "version": "2.18.0"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "Braintrust AutoEvals",
+      "lock": "locks/autoevals.txt",
+      "profile_id": "autoevals",
+      "project_url": "https://github.com/braintrustdata/autoevals",
+      "runner": "runners/autoevals.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "autoevals",
+        "version": "0.3.0"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "OpenEvals",
+      "lock": "locks/openevals.txt",
+      "profile_id": "openevals",
+      "project_url": "https://github.com/langchain-ai/openevals",
+      "runner": "runners/openevals.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "openevals",
+        "version": "0.2.0"
+      }
+    },
+    {
+      "authority": {
+        "metric": null,
+        "mode": "observation_only",
+        "reason": "aggregate_only"
+      },
+      "category": "evaluation-observability-platform",
+      "display_name": "MLflow Model Evaluation",
+      "lock": "locks/mlflow.txt",
+      "profile_id": "mlflow",
+      "project_url": "https://mlflow.org/docs/latest/ml/evaluation/",
+      "runner": "runners/mlflow.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "mlflow",
+        "version": "3.14.0"
+      }
+    },
+    {
+      "authority": {
+        "metric": null,
+        "mode": "observation_only",
+        "reason": "unsupported_replay_semantics"
+      },
+      "category": "security-red-team",
+      "display_name": "Garak",
+      "lock": "locks/garak.txt",
+      "profile_id": "garak",
+      "project_url": "https://github.com/NVIDIA/garak",
+      "runner": "runners/garak.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "garak",
+        "version": "0.15.1"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "benchmark-harness",
+      "display_name": "OpenAI Evals",
+      "lock": "locks/openai-evals.txt",
+      "profile_id": "openai-evals",
+      "project_url": "https://github.com/openai/evals",
+      "runner": "runners/openai_evals.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "evals",
+        "version": "3.0.1.post1"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "evaluation-observability-platform",
+      "display_name": "Arize Phoenix Evals",
+      "lock": "locks/arize-phoenix-evals.txt",
+      "profile_id": "arize-phoenix-evals",
+      "project_url": "https://github.com/Arize-ai/phoenix",
+      "runner": "runners/arize_phoenix_evals.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "arize-phoenix-evals",
+        "version": "3.3.0"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "evaluation-observability-platform",
+      "display_name": "Langfuse",
+      "lock": "locks/langfuse.txt",
+      "profile_id": "langfuse",
+      "project_url": "https://github.com/langfuse/langfuse",
+      "runner": "runners/langfuse.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "langfuse",
+        "version": "4.14.1"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "evaluation-observability-platform",
+      "display_name": "Opik",
+      "lock": "locks/opik.txt",
+      "profile_id": "opik",
+      "project_url": "https://github.com/comet-ml/opik",
+      "runner": "runners/opik.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "opik",
+        "version": "2.2.7"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "application-evaluation-sdk",
+      "display_name": "Azure AI Evaluation",
+      "lock": "locks/azure-ai-evaluation.txt",
+      "profile_id": "azure-ai-evaluation",
+      "project_url": "https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/evaluation/azure-ai-evaluation",
+      "runner": "runners/azure_ai_evaluation.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "azure-ai-evaluation",
+        "version": "1.18.1"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "evaluation-observability-platform",
+      "display_name": "Evidently",
+      "lock": "locks/evidently.txt",
+      "profile_id": "evidently",
+      "project_url": "https://github.com/evidentlyai/evidently",
+      "runner": "runners/evidently.py",
+      "runner_assets": [],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "evidently",
+        "version": "0.7.21"
+      }
+    },
+    {
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "category": "evaluation-observability-platform",
+      "display_name": "TruLens",
+      "lock": "locks/trulens.txt",
+      "profile_id": "trulens",
+      "project_url": "https://github.com/truera/trulens",
+      "runner": "runners/trulens.py",
+      "runner_assets": [
+        "runners/trulens_metric.py"
+      ],
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "trulens",
+        "version": "2.9.0"
+      }
+    }
+  ]
+}

@@ -387,7 +387,7 @@ def test_matrix_rejects_invalid_control_documents(
     }
     assert duplicate is not None
     monkeypatch.setattr(matrix, "profiles", lambda: matrix.load(Path())["profiles"])
-    with pytest.raises(ValueError, match="exactly 12"):
+    with pytest.raises(ValueError, match="unique profile identifiers"):
         matrix.verify()
 
 

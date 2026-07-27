@@ -35,29 +35,47 @@ def test_retained_matrix_requalifies_offline() -> None:
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert completed.stdout.count("verified ") == 12
+    assert completed.stdout.count("verified ") == 19
 
 
-def test_matrix_is_twelve_real_upstream_execution_profiles() -> None:
+def test_matrix_is_expansible_real_upstream_execution_catalog() -> None:
     matrix = _load(EXAMPLE / "matrix.json")
     profiles = matrix["profiles"]
     assert isinstance(profiles, list)
-    assert len(profiles) == 12
+    assert len(profiles) == 19
     expected = {
+        "arize-phoenix-evals",
         "autoevals",
+        "azure-ai-evaluation",
         "deepeval",
+        "evidently",
         "garak",
         "hugging-face-evaluate",
         "inspect-ai",
+        "langfuse",
         "lighteval",
         "lm-evaluation-harness",
         "mlflow",
+        "openai-evals",
+        "opik",
         "openevals",
         "promptfoo",
         "pydantic-evals",
         "ragas",
+        "trulens",
     }
     assert {profile["profile_id"] for profile in profiles} == expected
+    categories = matrix["categories"]
+    assert set(categories) == {
+        "application-evaluation-sdk",
+        "benchmark-harness",
+        "evaluation-observability-platform",
+        "general-metric-library",
+        "security-red-team",
+    }
+    assert all(profile["category"] in categories for profile in profiles)
+    assert matrix["selection"]["reviewed_on"] == "2026-07-27"
+    assert matrix["selection"]["minimum_activity_window_months"] == 12
 
     for profile in profiles:
         artifact = EXAMPLE / "artifacts" / profile["profile_id"]
@@ -132,7 +150,7 @@ def test_matrix_preserves_three_distinct_demonstration_levels() -> None:
         if levels["end_to_end_transaction"]:
             end_to_end.append(profile_id)
 
-    assert len(authoritative) == 10
+    assert len(authoritative) == 17
     assert end_to_end == ["lm-evaluation-harness"]
 
 
@@ -161,7 +179,7 @@ def test_authoritative_corpus_is_real_pinned_model_execution() -> None:
     assert not all(scores)
 
 
-def test_ten_authoritative_imports_replay_offline() -> None:
+def test_seventeen_authoritative_imports_replay_offline() -> None:
     completed = subprocess.run(
         [sys.executable, str(EXAMPLE / "matrix.py"), "verify-authoritative"],
         cwd=ROOT,
@@ -171,7 +189,7 @@ def test_ten_authoritative_imports_replay_offline() -> None:
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert completed.stdout.count("verified authoritative import ") == 10
+    assert completed.stdout.count("verified authoritative import ") == 17
 
     demonstrations = _load(EXAMPLE / "demonstrations.json")["profiles"]
     authoritative = [

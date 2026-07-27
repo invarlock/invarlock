@@ -26,8 +26,8 @@ adding the corresponding retained evidence.
 
 | Level | What it proves | Coverage |
 | --- | --- | --- |
-| Qualification profile | The named upstream entry point executes and its output crosses the generic qualification contract | All twelve profiles |
-| Authoritative import adapter | A complete real evaluation is retained per record, independently recomputed, and replayed through the strict runtime-import loader | All ten deterministic profiles |
+| Qualification profile | The named upstream entry point executes and its output crosses the generic qualification contract | All nineteen profiles |
+| Authoritative import adapter | A complete real evaluation is retained per record, independently recomputed, and replayed through the strict runtime-import loader | All seventeen deterministic profiles |
 | End-to-end release-assurance journey | The evaluator participates in a model-running, signed `evaluate` → `verify` → `report` transaction | Currently demonstrated for LM Evaluation Harness |
 
 An authoritative import adapter is not described as an end-to-end journey.
@@ -39,29 +39,71 @@ signed-transaction fixtures, not a new evaluator-specific engine plugin.
 ## Qualification matrix
 
 The small conformance corpus uses two local records: one exact match and one
-mismatch. It proves all twelve upstream entry points and both authority modes
+mismatch. It proves all nineteen upstream entry points and both authority modes
 without downloading a model or calling a hosted evaluator.
 
-The ten authoritative rows also execute against a retained 102-record
+The seventeen authoritative rows also execute against a retained 102-record
 evaluation produced by the immutable `Qwen/Qwen3-0.6B` revision recorded in the
 corpus. The model produced 52 exact matches and 50 mismatches. Each evaluator
 scores all 102 model outputs through its real upstream entry point. InvarLock
 then recomputes every score and replays all 102 normalized records through the
 runtime-import authoring boundary.
 
+The catalog is reviewed rather than quota-driven. A row must represent a
+recognizable current evaluator or a maintained successor, add a distinct
+ecosystem or workflow, and support retained real upstream execution. The
+maintenance review uses a twelve-month activity window and was last performed
+on 2026-07-27. Nineteen is the resulting coverage in this revision, not a hard
+cap.
+
+Microsoft PromptFlow is represented by its maintained successor,
+Azure AI Evaluation, rather than preserving the deprecated
+`promptflow-evals` package as a second legacy row. OpenAI Evals is installed
+from the immutable source revision in its dependency declaration because the
+active repository has moved beyond its older published wheel.
+
+### Benchmark harnesses
+
 | Upstream evaluator | Pinned version | Executed upstream entry point | Qualification profile | Authoritative import | End-to-end transaction |
 | --- | --- | --- | --- | --- | --- |
 | LM Evaluation Harness | `lm-eval==0.4.12` | `exact_match_hf_evaluate` | Per-record | 102 records | Demonstrated |
 | Inspect AI | `inspect-ai==0.3.249` | `scorer.match` | Per-record | 102 records | Not yet demonstrated |
+| LightEval | `lighteval==0.13.0` | `ExactMatches.compute` | Per-record | 102 records | Not yet demonstrated |
+| OpenAI Evals | source revision `8eac7a7` (`3.0.1.post1`) | `MATCH_FNS['exact']` | Per-record | 102 records | Not yet demonstrated |
+
+### Application evaluation SDKs
+
+| Upstream evaluator | Pinned version | Executed upstream entry point | Qualification profile | Authoritative import | End-to-end transaction |
+| --- | --- | --- | --- | --- | --- |
 | Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` with the local echo provider | Per-record | 102 records | Not yet demonstrated |
 | DeepEval | `deepeval==4.1.3` | `ExactMatchMetric.measure` | Per-record | 102 records | Not yet demonstrated |
 | Ragas | `ragas==0.4.3` | `ExactMatch.ascore` | Per-record | 102 records | Not yet demonstrated |
-| LightEval | `lighteval==0.13.0` | `ExactMatches.compute` | Per-record | 102 records | Not yet demonstrated |
-| Hugging Face Evaluate | `evaluate==0.4.6` | `exact_match.compute` | Per-record | 102 records | Not yet demonstrated |
 | Pydantic Evals | `pydantic-evals==2.18.0` | `Dataset.evaluate_sync` with `EqualsExpected` | Per-record | 102 records | Not yet demonstrated |
 | Braintrust AutoEvals | `autoevals==0.3.0` | `ExactMatch` | Per-record | 102 records | Not yet demonstrated |
 | OpenEvals | `openevals==0.2.0` | `exact_match` | Per-record | 102 records | Not yet demonstrated |
+| Azure AI Evaluation | `azure-ai-evaluation==1.18.1` | `azure.ai.evaluation.evaluate` | Per-record | 102 records | Not yet demonstrated |
+
+### Evaluation and observability platforms
+
+| Upstream evaluator | Pinned version | Executed upstream entry point | Qualification profile | Authoritative import | End-to-end transaction |
+| --- | --- | --- | --- | --- | --- |
+| Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Per-record | 102 records | Not yet demonstrated |
+| Langfuse | `langfuse==4.14.1` | `Langfuse.run_experiment` | Per-record | 102 records | Not yet demonstrated |
+| Opik | `opik==2.2.7` | `Equals.score` | Per-record | 102 records | Not yet demonstrated |
 | MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Observation-only: aggregate result | No | Not yet demonstrated |
+| Evidently | `evidently==0.7.21` | `Dataset.from_pandas` with `ExactMatch` | Per-record | 102 records | Not yet demonstrated |
+| TruLens | `trulens==2.9.0` | `Metric.__call__` | Per-record | 102 records | Not yet demonstrated |
+
+### General metric libraries
+
+| Upstream evaluator | Pinned version | Executed upstream entry point | Qualification profile | Authoritative import | End-to-end transaction |
+| --- | --- | --- | --- | --- | --- |
+| Hugging Face Evaluate | `evaluate==0.4.6` | `exact_match.compute` | Per-record | 102 records | Not yet demonstrated |
+
+### Security and red-team evaluators
+
+| Upstream evaluator | Pinned version | Executed upstream entry point | Qualification profile | Authoritative import | End-to-end transaction |
+| --- | --- | --- | --- | --- | --- |
 | Garak | `garak==0.15.1` | Garak CLI with its offline repeat generator | Observation-only: unsupported replay semantics | No | Not yet demonstrated |
 
 Each row under
@@ -87,7 +129,7 @@ Run the retained, network-free verification:
 make evaluator-qualification
 ```
 
-This verifies the twelve qualification profiles and replays the ten
+This verifies the nineteen qualification profiles and replays the seventeen
 authoritative imports. To re-execute all pinned upstream tools over both
 corpora and refresh the retained artifacts:
 
@@ -114,13 +156,14 @@ qualification does not.
 
 ## Claim boundary
 
-The ten authoritative import demonstrations prove full per-record exact-match
+The seventeen authoritative import demonstrations prove full per-record exact-match
 imports for one real, pinned model evaluation. They do not demonstrate every
 metric, task type, hosted mode, or model-judge feature offered by those
-evaluators. They also do not turn ten example runners into ten engine plugins.
+evaluators. They also do not turn seventeen example runners into seventeen
+engine plugins.
 
-Only the LM Evaluation Harness integration currently demonstrates the deeper
-model execution and signed release-assurance transaction. The other nine
+LM Evaluation Harness is currently the integration that demonstrates the deeper
+model execution and signed release-assurance transaction. The other sixteen
 authoritative rows begin with the already authenticated model-output corpus and
 demonstrate evaluator execution, normalization, qualification, and strict
 runtime-import replay.

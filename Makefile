@@ -290,14 +290,14 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 example-acceptance-handoff:  ## Run the service-free producer-to-recipient acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
 
-evaluator-qualification:  ## Requalify the retained 12-tool evaluator matrix offline
+evaluator-qualification:  ## Requalify the retained 19-tool evaluator matrix offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
 	$(MAKE) evaluator-authoritative-imports
 
-evaluator-authoritative-imports:  ## Replay the 10 authoritative 102-record imports offline
+evaluator-authoritative-imports:  ## Replay the 17 authoritative 102-record imports offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
 
-evaluator-upstream-qualification:  ## Execute and retain all 12 pinned upstream evaluator examples
+evaluator-upstream-qualification:  ## Execute and retain all 19 pinned upstream evaluator examples
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-authoritative
 	$(MAKE) evaluator-qualification
