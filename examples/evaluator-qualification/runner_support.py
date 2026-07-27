@@ -41,6 +41,7 @@ def load_json(path: Path) -> dict[str, Any]:
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cases", type=Path, required=True)
+    parser.add_argument("--dependency-lock", type=Path, required=True)
     parser.add_argument("--export", type=Path, required=True)
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--raw-output", type=Path, required=True)
@@ -52,6 +53,11 @@ def load_inputs(
     args: argparse.Namespace,
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]]]:
     profile = load_json(args.profile)
+    if (
+        sha256_bytes(args.dependency_lock.read_bytes())
+        != profile["execution"]["dependency_lock_sha256"]
+    ):
+        raise ValueError("dependency declaration does not match the profile")
     schedule = load_json(args.schedule)
     case_document = load_json(args.cases)
     cases = case_document.get("records")

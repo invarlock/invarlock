@@ -13,6 +13,32 @@ def main() -> None:
     args = arguments()
     profile, _, cases = load_inputs(args)
     version = profile["upstream"]["package"]["version"]
+    lock = dict(
+        line.split("=", 1)
+        for line in args.dependency_lock.read_text(encoding="utf-8").splitlines()
+    )
+    expected_spec = f"promptfoo@{version}"
+    if lock.get("package") != expected_spec:
+        raise ValueError("Promptfoo dependency declaration does not match the profile")
+    metadata = json.loads(
+        subprocess.run(
+            [
+                "npm",
+                "view",
+                expected_spec,
+                "dist.integrity",
+                "dist.shasum",
+                "--json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
+    if metadata.get("dist.integrity") != lock.get("integrity") or metadata.get(
+        "dist.shasum"
+    ) != lock.get("shasum"):
+        raise ValueError("Promptfoo registry integrity does not match the declaration")
     config = Path(__file__).resolve().parent.parent / "promptfoo.yaml"
     environment = os.environ.copy()
     environment["PROMPTFOO_DISABLE_TELEMETRY"] = "1"
@@ -59,7 +85,14 @@ def main() -> None:
         entrypoint="promptfoo eval",
         scores=scores,
         details=details,
-        environment=[{"name": "promptfoo", "version": version}],
+        environment=[
+            {
+                "integrity": metadata["dist.integrity"],
+                "name": "promptfoo",
+                "shasum": metadata["dist.shasum"],
+                "version": version,
+            }
+        ],
     )
 
 

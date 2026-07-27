@@ -80,6 +80,21 @@ def test_python_execution_evidence_names_the_pinned_upstream_package() -> None:
         assert inventory[package_name] == profile["upstream"]["version"]
 
 
+def test_promptfoo_execution_binds_registry_integrity() -> None:
+    raw = _load(EXAMPLE / "artifacts" / "promptfoo" / "upstream-output.json")
+    package = raw["environment"][0]
+    declaration = dict(
+        line.split("=", 1)
+        for line in (EXAMPLE / "locks" / "promptfoo.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+
+    assert declaration["package"] == f"promptfoo@{package['version']}"
+    assert declaration["integrity"] == package["integrity"]
+    assert declaration["shasum"] == package["shasum"]
+
+
 def test_public_retained_artifacts_do_not_contain_local_paths_or_secrets() -> None:
     forbidden = (
         b"/users/",

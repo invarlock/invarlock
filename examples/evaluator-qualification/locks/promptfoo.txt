@@ -1,1 +1,3 @@
-promptfoo==0.121.19
+package=promptfoo@0.121.19
+integrity=sha512-5YebsCED/bmR9JktH9YNU62Tr1m3ncFMlM2tKrguI8vFFUfvqxhNzUBa3Z6huG7OvDKbi69UpamU4CLtYLDezQ==
+shasum=544bf866ac349ea51566186bf8f272d041a30431

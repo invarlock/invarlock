@@ -89,6 +89,8 @@ def runner_command(profile: dict[str, Any], profile_path: Path) -> list[str]:
     common = [
         "--cases",
         str(ROOT / "cases.json"),
+        "--dependency-lock",
+        str(ROOT / profile["lock"]),
         "--export",
         str(artifact / "export.json"),
         "--profile",
