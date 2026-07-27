@@ -21,6 +21,10 @@
   <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
 </p>
 
+An artifact recipient can independently check whether one exact model
+derivative satisfies an agreed release-regression policy without trusting the
+producer's dashboard or service.
+
 InvarLock is an open-source assurance engine for one paired
 baseline-versus-subject release-regression decision. A closed request pins the
 two model artifacts, a local JSONL evaluation source, runtime settings, one
@@ -58,6 +62,45 @@ invarlock report evidence/
     width="100%"
   />
 </p>
+
+## Try it without a model runtime
+
+The service-free acceptance example runs a complete signed producer,
+independent-verifier, and recipient-policy handoff. It also demonstrates
+fail-closed rejection for changed artifacts, tampered evidence, untrusted or
+revoked signers, stale evidence, and contradictory envelope content.
+
+```bash
+git clone https://github.com/invarlock/invarlock.git
+cd invarlock
+python -m pip install -e .
+make example-acceptance-handoff
+```
+
+The command uses a temporary workspace and needs no model download, GPU, OCI
+engine, or running InvarLock service after installation. See the
+[offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff).
+
+## Inspect published evidence
+
+The repository carries strictly verified signed evidence packs across the
+built-in text runtime and first-party vision-text and TensorRT-LLM runtimes.
+Each uses a pinned public qualification suite and includes an independently
+signed verification receipt.
+
+```bash
+make public-evidence-audit
+invarlock report \
+  public_evidence/evidence/mistral-7b-weight-scale-hf/evidence
+```
+
+Start with the
+[public evidence index](https://github.com/invarlock/invarlock/tree/main/public_evidence)
+for the maintained inventory and interpretation limits. Rendering authenticates
+and explains the signed bundle; it is not an independent acceptance decision.
+Actual verification also requires artifact, schedule, policy, runtime, evidence
+signer, and verifier anchors obtained through channels independent of the
+submitted pack.
 
 ## The release-regression decision
 
@@ -371,6 +414,10 @@ Questions and design discussions belong in
 [GitHub Discussions](https://github.com/invarlock/invarlock/discussions). Report
 bugs through [GitHub Issues](https://github.com/invarlock/invarlock/issues) and
 security concerns through [SECURITY.md](https://github.com/invarlock/invarlock/blob/main/SECURITY.md).
+
+If you ship or receive derived model artifacts and want to co-publish a real
+evidence-and-receipt handoff using the open engine, start a
+[design-partner discussion](https://github.com/invarlock/invarlock/discussions/new?category=ideas).
 
 Apache-2.0 — see the
 [license](https://github.com/invarlock/invarlock/blob/main/LICENSE).
