@@ -2,9 +2,9 @@
 
 This directory retains one real 102-record model evaluation and complete
 per-record imports for every maintained deterministic evaluator profile. It
-demonstrates a deeper evidence level than the small qualification corpus. LM
-Evaluation Harness currently adds an end-to-end signed transaction over the
-same evaluator-neutral boundary.
+demonstrates a deeper evidence level than the small qualification corpus. The
+demonstration-level manifest identifies profiles that also maintain an
+end-to-end signed transaction over the same evaluator-neutral boundary.
 
 The corpus was produced by the immutable `Qwen/Qwen3-0.6B` revision and fixed
 one-token, greedy CPU generation settings recorded in `cases.json`. The source
@@ -41,8 +41,7 @@ make evaluator-authoritative-corpus
 ```
 
 This layer demonstrates complete replayable exact-match imports. It does not
-claim coverage of every evaluator capability, and it does not claim that every
-authoritative-import profile currently completes a signed InvarLock transaction.
-LM Evaluation Harness is the maintained example at that level in this revision;
-this is a maturity status, not an architectural limitation on the other
+claim coverage of every evaluator capability or imply that authoritative import
+alone completes a signed InvarLock transaction. End-to-end status is recorded
+separately as evidence maturity, not an architectural limitation on other
 profiles.
