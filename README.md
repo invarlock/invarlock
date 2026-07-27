@@ -21,9 +21,9 @@
   <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
 </p>
 
-An artifact recipient can independently check whether one exact model
-derivative satisfies an agreed release-regression policy without trusting the
-system that delivered it.
+Using independently supplied trust inputs, an artifact recipient can check
+whether one exact model derivative satisfies an agreed release-regression
+policy.
 
 InvarLock is an open-source assurance engine for one paired
 baseline-versus-subject decision. It can execute both sides on the same
@@ -63,16 +63,15 @@ invarlock report evidence/
 ```
 
 External evaluator adapters normalize source exports through the same
-versioned JSON, CLI, and Python qualification contracts. They live in the
-example and integration layer rather than becoming
-evaluator-specific engine plugins. The engine distinguishes three evidence
-paths:
+versioned JSON, CLI, and Python qualification contracts. They remain in the
+example and integration layer; the core exposes evaluator-neutral contracts.
+The engine distinguishes three evidence paths:
 
 | Path | What enters InvarLock | Decision authority |
 | --- | --- | --- |
 | Native execution | Pinned artifacts, evaluation source, runtime, metric or deterministic scorer, and policy | InvarLock runs both sides and derives the paired result |
 | Qualified import | Complete ordered per-record results, provenance, identities, schedule, and runtime bindings | InvarLock authenticates the import and recomputes the supported result |
-| Authenticated observation | Aggregate-only results, external judges, or other non-replayable context | Preserved as signed context; never allowed to determine the verdict |
+| Authenticated observation | Aggregate-only results, external judges, or other non-replayable context | Preserved as signed context; replayable evidence retains verdict authority |
 
 ## Try the signed handoff locally
 
@@ -89,8 +88,8 @@ python -m pip install -e .
 make example-acceptance-handoff
 ```
 
-The command uses a temporary workspace and needs no model download, GPU, OCI
-engine, or running InvarLock service after installation. See the
+The command runs from checked-in fixtures in a temporary workspace using the
+installed package on a regular CPU. See the
 [offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff).
 
 ## Inspect published evidence
@@ -146,10 +145,10 @@ invarlock verify artifacts/evidence-001/ \
 invarlock report artifacts/evidence-001/ --html evidence.html --explain
 ```
 
-`evaluate --preflight --json` performs the complete execution-free validation
-without starting a runtime or creating evidence. Native run mode delegates to a
-caller-authorized, digest-addressed Docker or Podman image. Import mode requires
-complete provider sidecars and ordered per-record evidence but no model runtime.
+`evaluate --preflight --json` returns the machine-readable result of complete
+execution-free validation. Native run mode delegates to a caller-authorized,
+digest-addressed Docker or Podman image. Import mode authenticates and replays
+complete provider sidecars and ordered per-record evidence locally.
 The [getting-started guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md)
 and [runtime-provider guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md)
 cover request construction, image preparation, device selection, host-only
@@ -165,11 +164,12 @@ derives one of two built-in paired comparisons:
 | `exact_match` | Subject accuracy minus baseline accuracy, with paired regression and improvement counts | Lower bound of the paired Newcombe 95% interval is at least `delta_min_pp` |
 | `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of per-record byte-normalized expected-continuation NLL | Upper bound of the paired schedule-resampling interval is at most `ratio_max` |
 
-The policy reads the conservative interval bound, not the point value alone. It
-may also require a minimum paired-record count and maximum interval width.
-Exact match includes an exact two-sided McNemar test; normalized NLL uses 2,048
-deterministic paired schedule-resampling replicates. Normalized NLL measures
-expected-continuation likelihood regression, not general model quality.
+The conservative interval bound controls the policy; the point value remains
+descriptive. A policy may also require a minimum paired-record count and
+maximum interval width. Exact match includes an exact two-sided McNemar test;
+normalized NLL uses 2,048 deterministic paired schedule-resampling replicates.
+Normalized NLL specifically measures expected-continuation likelihood
+regression; broader model-quality claims require other evidence.
 
 For task-specific deterministic scoring, a request may bind one authorized
 scorer extension. The extension derives one replayable value per record while
@@ -185,11 +185,11 @@ JSON, the `invarlock-qualify-evaluator` companion CLI, and
 proprietary evaluators reached through an SDK, CLI, or API normalize into that
 same boundary outside the core.
 
-Complete ordered per-record evidence may receive verdict authority only when
-identity, provenance, schedule, and deterministic recomputation requirements
-pass. Aggregate-only outputs and unsupported judge results fail closed to
-verdict authority and remain observation-only. A signed observation proves
-what was supplied; it does not make that source replayable.
+Verdict authority requires complete ordered per-record evidence that passes
+identity, provenance, schedule, and deterministic recomputation requirements.
+Aggregate-only outputs and unsupported judge results remain observation-only.
+A signed observation proves what was supplied; a replayable source additionally
+requires the identity, schedule, and recomputation guarantees above.
 
 The maintained
 [evaluator qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
@@ -199,8 +199,8 @@ and authority boundary. Each authoritative import demonstration starts with
 retained output from a pinned real model evaluation, passes through a
 source-shaped adapter, and completes the closed import replay. The matrix
 separately records model-running signed journeys. These are example-owned
-adapters and profiles, not evaluator-specific engine plugins or a permanent
-catalog ceiling.
+adapters and profiles; new profiles extend the same evaluator-neutral engine
+contract.
 
 The
 [`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
@@ -219,16 +219,16 @@ and its exact subject binding. The artifact recipient still applies separate
 envelope and receipt trust, independent envelope and evidence freshness,
 contract-version, signer-status, and verdict policy.
 
-Recipients can consume the acceptance envelope without an InvarLock service or
-policy-engine plugin. The maintained example authenticates the envelope and
-embedded receipt with a standalone reference verifier, then applies current
-recipient policy in both OPA/Rego and CUE. Its conformance fixtures cover an
-accepted delivery, policy rejection, subject tampering, an untrusted signer,
-stale evidence, and an unsupported contract.
+Recipients can consume the acceptance envelope with a standalone reference
+verifier and maintained OPA/Rego or CUE policy configuration. The example
+authenticates the envelope and embedded receipt, then applies current recipient
+policy. Its conformance fixtures cover an accepted delivery, policy rejection,
+subject tampering, an untrusted signer, stale evidence, and an unsupported
+contract.
 
-This is acceptance-policy interoperability, not complete evidence replay.
-Recipients use `invarlock verify` when they need to replay every evidence-pack
-invariant. See the
+Acceptance-policy interoperability applies current recipient policy to the
+authenticated projection. `invarlock verify` performs complete evidence-pack
+replay. See the
 [policy-engine interoperability reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md).
 
 > **Compatibility note:** v0.13 evidence and receipts remain permanently
@@ -245,10 +245,10 @@ comparisons over authenticated prompt and image parts. See
 [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md).
 
 Spectral, random-matrix, and variance summaries live in the optional
-`invarlock-diagnostics` package. They are observation-only diagnostics; the
-selected paired comparison and policy exclusively determine acceptance. Their
+`invarlock-diagnostics` package. They are observation-only diagnostics. Their
 canonical JSON can be attached to the signed bundle and appears in a separate
-report section without changing the verdict. See
+report section. The selected paired comparison and policy remain the sole
+technical-verdict inputs. See
 [diagnostics](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/diagnostics.md).
 
 ## Documentation

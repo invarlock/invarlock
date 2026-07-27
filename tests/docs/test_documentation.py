@@ -185,7 +185,7 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
         "Native execution",
         "Qualified import",
         "Authenticated observation",
-        "evaluator-specific engine plugins",
+        "core exposes evaluator-neutral contracts",
     ):
         assert phrase in evidence_paths
     assert evidence_paths.index("evaluation-verification-flow.svg") < (
