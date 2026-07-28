@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.14.0] - 2026-07-27
+
+This release extends the v0.13 signed evaluation engine with evaluator-neutral
+qualification and recipient-controlled acceptance handoff. JSON, CLI, and
+Python adapter contracts retain authenticated per-record evidence from
+open-source or proprietary evaluators; unsupported judge or aggregate-only
+inputs remain observation-only and cannot drive a recomputed verdict. A
+canonical in-toto/DSSE acceptance envelope, OPA/Rego and CUE conformance
+fixtures, and a clean-checkout v0.13 compatibility corpus make the handoff
+independently consumable while preserving verifier-owned evidence replay.
+
+### Added
+
 - Added a canonical InvarLock acceptance predicate in an in-toto Statement and
   DSSE envelope, recipient-controlled verification policy, and a deterministic
   offline artifact-delivery handoff with a committed golden package.
