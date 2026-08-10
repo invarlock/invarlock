@@ -58,7 +58,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
-.PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
+.PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
@@ -338,6 +338,14 @@ example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
 	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
 		examples/integrations/lm-evaluation-harness/launch.py $(EXAMPLE_ARGS)
+
+example-inspect-ai:  ## Run Inspect AI through the signed Level 3 transaction
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/inspect-ai/launch.py $(EXAMPLE_ARGS)
+
+example-openai-evals:  ## Run OpenAI Evals through the signed Level 3 transaction
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/openai-evals/launch.py $(EXAMPLE_ARGS)
 
 example-tensorrt-llm:  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
 	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --extra hf \

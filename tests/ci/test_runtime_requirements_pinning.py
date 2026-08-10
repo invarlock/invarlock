@@ -54,7 +54,7 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
         '"${WORKFLOW_DIR}/runtime-image-cu126.in" \\\n'
         '    "${WORKFLOW_DIR}/runtime-image-py312-cu126.txt"'
     ) in text
-    assert text.count("--torch-backend cpu") == 3
+    assert text.count("--torch-backend cpu") == 5
     assert text.count("--torch-backend cu126") == 2
     assert (
         '"${WORKFLOW_DIR}/multimodal-runtime.in" \\\n'
