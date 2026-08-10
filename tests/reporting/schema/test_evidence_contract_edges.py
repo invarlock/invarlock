@@ -256,6 +256,9 @@ def test_sample_qualification_fails_closed_on_count_or_precision() -> None:
         ("minimum_record_count", 10_001, "minimum_record_count"),
         ("maximum_interval_width_pp", 0.0, "maximum_interval_width_pp"),
         ("maximum_interval_width_pp", 201.0, "maximum_interval_width_pp"),
+        ("minimum_side_accuracy", True, "minimum_side_accuracy"),
+        ("minimum_side_accuracy", -0.1, "minimum_side_accuracy"),
+        ("minimum_side_accuracy", 1.1, "minimum_side_accuracy"),
     ],
 )
 def test_sample_qualification_policy_rejects_invalid_limits(
@@ -269,6 +272,32 @@ def test_sample_qualification_policy_rejects_invalid_limits(
             policy={"resolved_policy": {"metrics": {"exact_match": selected}}},
             policy_digest=_digest(),
         )
+
+
+def test_signed_side_accuracy_policy_controls_verdict_and_report() -> None:
+    policy = {
+        "resolved_policy": {
+            "metrics": {
+                "exact_match": {
+                    "delta_min_pp": -100.0,
+                    "minimum_side_accuracy": 0.75,
+                }
+            }
+        }
+    }
+    report = build_comparison_report(
+        comparison_id="comparison-1",
+        paired_records=_pairs(baseline=1.0, subject=0.0),
+        policy=policy,
+        policy_digest=_digest(),
+    )
+    assert report["verdict"] == "fail"
+    assert report["side_accuracy"] == {
+        "minimum": 0.75,
+        "baseline": {"observed": 1.0, "passed": True},
+        "subject": {"observed": 0.5, "passed": False},
+        "passed": False,
+    }
 
 
 def test_paired_interval_is_deterministic_and_controls_the_verdict() -> None:
