@@ -18,6 +18,11 @@ import yaml
 
 from examples.integrations import launch
 from examples.integrations.run import ExamplePaths, _paths, _write_private_key
+from examples.integrations.trust_material import (
+    create_trust_material,
+    load_external_key,
+    validate_new_trust_root,
+)
 from invarlock.core.runtime_provider import artifact_identity_sha256
 from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
@@ -299,7 +304,20 @@ def _build_runtime_image(
         ],
         cwd=repository,
     )
-    return _inspect_image_id(repository, container_engine=container_engine, image=image)
+    image_id = launch._load_runtime_build_statement(
+        build_root / "runtime-build.json",
+        image=image,
+        source_commit=commit,
+        source_bundle_sha256=source_digest,
+    )
+    launch._verify_runtime_image_identity(
+        repository=repository,
+        container_engine=container_engine,
+        runtime_image_id=image_id,
+        source_commit=commit,
+        source_bundle_sha256=source_digest,
+    )
+    return image_id
 
 
 def _stage_backend(
@@ -420,12 +438,67 @@ def _prepare_transaction(
     models: Mapping[str, Path],
     specs: Mapping[str, Mapping[str, object]],
     image_id: str,
+    evidence_signing_key: Path | None = None,
+    verifier_signing_key: Path | None = None,
+    trust_root: Path | None = None,
+    ephemeral_trust_root: bool = True,
 ) -> ExamplePaths:
-    paths = _paths(root)
+    external_trust = any(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    )
+    if external_trust and not all(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    ):
+        raise ValueError(
+            "evidence key, verifier key, and trust root must be supplied together"
+        )
+    if external_trust and ephemeral_trust_root:
+        raise ValueError("external trust material cannot use ephemeral mode")
+    if not external_trust and not ephemeral_trust_root:
+        raise ValueError(
+            "caller-owned evidence/verifier keys and trust root are required"
+        )
+    paths = _paths(
+        root,
+        evidence_key=(
+            evidence_signing_key.expanduser().absolute() if external_trust else None
+        ),
+        trust_root=(trust_root.expanduser().absolute() if external_trust else None),
+    )
     (paths.evaluation / "inputs").mkdir(parents=True)
-    paths.independent_policy.parent.mkdir(parents=True)
-    paths.evidence_key.parent.mkdir(parents=True)
-    paths.verifier_key.parent.mkdir(parents=True)
+    evidence_key_bytes: bytes | None = None
+    verifier_key_bytes: bytes | None = None
+    if external_trust:
+        assert evidence_signing_key is not None
+        assert verifier_signing_key is not None
+        assert trust_root is not None
+        trust_root = validate_new_trust_root(trust_root, transaction_root=root)
+        evidence_key_path, evidence_key_bytes, evidence_signer = load_external_key(
+            evidence_signing_key,
+            transaction_root=root,
+            label="evidence signing key",
+        )
+        _verifier_key_path, verifier_key_bytes, verifier = load_external_key(
+            verifier_signing_key,
+            transaction_root=root,
+            label="verifier signing key",
+        )
+        if evidence_signer == verifier:
+            raise ValueError("evidence and verifier signing keys must be distinct")
+        paths = _paths(
+            root,
+            evidence_key=evidence_key_path,
+            trust_root=trust_root.expanduser().absolute()
+            if trust_root is not None
+            else None,
+        )
+    else:
+        paths.independent_policy.parent.mkdir(parents=True)
+        paths.evidence_key.parent.mkdir(parents=True)
+        paths.verifier_key.parent.mkdir(parents=True)
+    paths.receipt.parent.mkdir(parents=True, exist_ok=True)
 
     records = _load_records()
     dataset_bytes = b"".join(canonical_json_bytes(record) for record in records)
@@ -453,6 +526,7 @@ def _prepare_transaction(
                         "delta_min_pp": -15.0,
                         "maximum_interval_width_pp": 20.0,
                         "minimum_record_count": 50,
+                        "minimum_side_accuracy": _MINIMUM_SIDE_ACCURACY,
                     }
                 }
             }
@@ -460,7 +534,8 @@ def _prepare_transaction(
     )
     request_policy = paths.evaluation / "inputs" / "acceptance.json"
     request_policy.write_bytes(policy_bytes)
-    paths.independent_policy.write_bytes(policy_bytes)
+    if not external_trust:
+        paths.independent_policy.write_bytes(policy_bytes)
 
     def side(role: str) -> dict[str, object]:
         spec = specs[role]
@@ -542,39 +617,60 @@ def _prepare_transaction(
     )
     paths.request.write_text(yaml.safe_dump(request, sort_keys=False), encoding="utf-8")
 
-    evidence_signer = _write_private_key(paths.evidence_key)
-    verifier = _write_private_key(paths.verifier_key)
-    paths.evidence_key.with_suffix(".fingerprint").write_text(
-        evidence_signer + "\n", encoding="ascii"
-    )
-    paths.verifier_key.with_suffix(".fingerprint").write_text(
-        verifier + "\n", encoding="ascii"
-    )
+    if external_trust:
+        assert evidence_key_bytes is not None
+        assert verifier_key_bytes is not None
+    else:
+        evidence_signer = _write_private_key(paths.evidence_key)
+        verifier = _write_private_key(paths.verifier_key)
+        paths.evidence_key.with_suffix(".fingerprint").write_text(
+            evidence_signer + "\n", encoding="ascii"
+        )
+        paths.verifier_key.with_suffix(".fingerprint").write_text(
+            verifier + "\n", encoding="ascii"
+        )
     artifact_anchors = {
         role: "sha256:" + artifact_identity_sha256(read_gguf_artifact_identity(model))
         for role, model in models.items()
     }
-    paths.trusted_inputs.write_bytes(
-        canonical_json_bytes(
-            {
-                "format": "invarlock/trust-inputs-v1",
-                "policy": {"path": "policy/acceptance.json"},
-                "anchors": {
-                    "baseline_artifact_digest": artifact_anchors["baseline"],
-                    "subject_artifact_digest": artifact_anchors["subject"],
-                    "schedule_digest": f"sha256:{schedule.schedule_sha256}",
-                    "baseline_runtime_digest": image_id,
-                    "subject_runtime_digest": image_id,
-                    "evidence_signer_fingerprint": evidence_signer,
-                },
-                "verifier": {
-                    "identity": "invarlock-example/gguf-llama-cpp-verifier",
-                    "signing_key_path": "keys/verifier.pem",
-                },
-                "allow_installed_scorers": False,
-            }
+    anchors = {
+        "baseline_artifact_digest": artifact_anchors["baseline"],
+        "subject_artifact_digest": artifact_anchors["subject"],
+        "schedule_digest": f"sha256:{schedule.schedule_sha256}",
+        "baseline_runtime_digest": image_id,
+        "subject_runtime_digest": image_id,
+        "evidence_signer_fingerprint": evidence_signer,
+    }
+    if external_trust:
+        assert trust_root is not None
+        material = create_trust_material(
+            transaction_root=root,
+            evidence_key=paths.evidence_key,
+            verifier_key_bytes=verifier_key_bytes,
+            evidence_fingerprint=evidence_signer,
+            verifier_fingerprint=verifier,
+            trust_root=trust_root,
+            policy_bytes=policy_bytes,
+            verifier_identity="invarlock-example/gguf-llama-cpp-verifier",
+            anchors=anchors,
         )
-    )
+        if material.trusted_inputs != paths.trusted_inputs:
+            raise ValueError("external trust material resolved to an unexpected root")
+    else:
+        paths.trusted_inputs.write_bytes(
+            canonical_json_bytes(
+                {
+                    "format": "invarlock/trust-inputs-v1",
+                    "policy": {"path": "policy/acceptance.json"},
+                    "anchors": anchors,
+                    "verifier": {
+                        "identity": "invarlock-example/gguf-llama-cpp-verifier",
+                        "signing_key_path": "keys/verifier.pem",
+                    },
+                    "allow_installed_scorers": False,
+                }
+            )
+        )
     if runtime_root != models["baseline"].parents[1]:
         raise RuntimeError("GGUF runtime resources do not share one closed root")
     return paths
@@ -634,7 +730,14 @@ def _execute(
     if not isinstance(anchors, dict):
         raise RuntimeError("GGUF trust profile anchors are invalid")
     anchors["request_digest"] = request_digest
-    paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
+    try:
+        paths.trusted_inputs.relative_to(paths.root)
+    except ValueError:
+        # Caller-owned trust profiles are immutable; their static anchors are
+        # sufficient for verification and must not receive transaction output.
+        pass
+    else:
+        paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
     launch._run(evaluation, cwd=repository, environment=environment)
     launch._run(
         [
@@ -717,11 +820,47 @@ def _parser() -> argparse.ArgumentParser:
         "--runtime-image",
         help="Reuse a locally available GGUF runtime image; default builds current source.",
     )
+    parser.add_argument("--evidence-signing-key", type=Path)
+    parser.add_argument("--verifier-signing-key", type=Path)
+    parser.add_argument("--trust-root", type=Path)
+    parser.add_argument(
+        "--ephemeral-trust-root",
+        action="store_true",
+        help="Use disposable generated keys; never use this mode for acceptance.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    trust_values = (
+        arguments.evidence_signing_key,
+        arguments.verifier_signing_key,
+        arguments.trust_root,
+    )
+    provided_trust = any(value is not None for value in trust_values)
+    external_trust = all(value is not None for value in trust_values)
+    if provided_trust and not external_trust:
+        print(
+            "FAIL --evidence-signing-key, --verifier-signing-key, and "
+            "--trust-root must be supplied together",
+            file=sys.stderr,
+        )
+        return 2
+    if not external_trust and not arguments.ephemeral_trust_root:
+        print(
+            "FAIL caller-owned --evidence-signing-key, --verifier-signing-key, "
+            "and --trust-root are required; use --ephemeral-trust-root only for "
+            "a disposable non-acceptance demo",
+            file=sys.stderr,
+        )
+        return 2
+    if external_trust and arguments.ephemeral_trust_root:
+        print(
+            "FAIL --ephemeral-trust-root cannot be combined with caller-owned trust",
+            file=sys.stderr,
+        )
+        return 2
     repository = Path(__file__).resolve().parents[2]
     if arguments.workspace is None:
         workspace = Path(tempfile.mkdtemp(prefix="invarlock-gguf-")).resolve(
@@ -780,6 +919,10 @@ def main(argv: list[str] | None = None) -> int:
             models=models,
             specs=specs,
             image_id=image_id,
+            evidence_signing_key=arguments.evidence_signing_key,
+            verifier_signing_key=arguments.verifier_signing_key,
+            trust_root=arguments.trust_root,
+            ephemeral_trust_root=arguments.ephemeral_trust_root,
         )
         _execute(
             repository,

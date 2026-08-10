@@ -12,16 +12,17 @@ checkpoints. The report also derives a token-weighted perplexity ratio when the
 authenticated tokenizer and target-token counts are comparable; that derived
 value does not control acceptance.
 
-The generated workspace keeps the closed evaluation request in `evaluation/`,
-separate verifier inputs and its signing key in `verifier/`, and the evidence
-signing key in `keys/`. The script refuses to reuse an existing workspace or
-evidence output. For a real acceptance decision, the verifier owner should
-choose and retain its own trust anchors and signing key.
+The closed evaluation request remains in the disposable workspace, while the
+caller-owned evidence key and independent trust root stay outside it. The
+script refuses to reuse an existing workspace or evidence output.
 
 Run the complete journey from the repository root:
 
 ```bash
-make example-hf-transformers
+make example-hf-transformers \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/hf-transformers"
 ```
 
 That one command creates an exact Git source bundle, builds the source-bound
@@ -38,7 +39,10 @@ time, use a new workspace with `--prepare-only`:
 
 ```bash
 make example-hf-transformers \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-hf-inputs"
+  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-hf-inputs \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/hf-transformers"
 ```
 
 Preparation uses an explicit placeholder runtime digest because no image is

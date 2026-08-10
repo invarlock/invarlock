@@ -54,7 +54,7 @@ def inputs(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (root / "policy.json").write_text(
-        '{"resolved_policy":{"metrics":{"exact_match":{"delta_min_pp":-1}}}}',
+        '{"resolved_policy":{"metrics":{"exact_match":{"delta_min_pp":-1,"minimum_side_accuracy":0.40}}}}',
         encoding="utf-8",
     )
     return root
@@ -276,10 +276,15 @@ def test_inspect_runs_real_offline_gpu_probe_and_validates_output(
 
     def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         seen.extend(command)
-        assert kwargs == {"check": False, "capture_output": True, "text": True}
+        assert kwargs == {
+            "check": False,
+            "capture_output": True,
+            "timeout_seconds": 1200,
+            "label": "TensorRT-LLM engine inspection",
+        }
         return subprocess.CompletedProcess(command, 0, json.dumps(_inspection()), "")
 
-    monkeypatch.setattr(example.subprocess, "run", run)
+    monkeypatch.setattr(example, "run_bounded_command", run)
     digest = "sha256:" + "a" * 64
     assert example._inspect(inputs, digest, digest, "cuda:1") == _inspection()
     assert seen[seen.index("--network") + 1] == "none"
@@ -304,8 +309,8 @@ def test_inspect_surfaces_runtime_diagnostic(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        example.subprocess,
-        "run",
+        example,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 1, "", "unsupported tokenizer contract"
         ),
@@ -323,8 +328,8 @@ def test_inspect_rejects_same_engine_identity(
         "artifact_identity_sha256"
     ]
     monkeypatch.setattr(
-        example.subprocess,
-        "run",
+        example,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 0, json.dumps(payload), ""
         ),
@@ -349,8 +354,8 @@ def test_inspect_rejects_malformed_probe_output(
     payload: str,
 ) -> None:
     monkeypatch.setattr(
-        example.subprocess,
-        "run",
+        example,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, payload, ""),
     )
     digest = "sha256:" + "a" * 64
@@ -381,6 +386,37 @@ def test_prepare_closes_request_keys_and_independent_trust(
     assert stat.S_IMODE(paths["verifier"].stat().st_mode) == 0o600
 
 
+def test_prepare_uses_external_keys_and_copies_the_signed_policy(
+    example: Any, inputs: Path, tmp_path: Path
+) -> None:
+    evidence_key = tmp_path / "evidence.pem"
+    verifier_key = tmp_path / "verifier.pem"
+    example._key(evidence_key)
+    example._key(verifier_key)
+    trust_root = tmp_path / "trust" / "tensorrt"
+    trust_root.parent.mkdir()
+    output = tmp_path / "output"
+    policy = (inputs / "policy.json").read_bytes()
+
+    paths = example._prepare(
+        inputs,
+        output,
+        _inspection(),
+        "sha256:" + "a" * 64,
+        ("hf://owner/baseline@rev", "hf://owner/subject@rev"),
+        evidence_signing_key=evidence_key,
+        verifier_signing_key=verifier_key,
+        trust_root=trust_root,
+        ephemeral_trust_root=False,
+    )
+
+    assert paths["signer"] == evidence_key.resolve()
+    assert paths["verifier"] == trust_root / "verifier.pem"
+    assert paths["trust"] == trust_root / "trusted-inputs.json"
+    assert (trust_root / "policy/acceptance.json").read_bytes() == policy
+    assert not (output / "keys").exists()
+
+
 def test_prepare_refuses_existing_output_and_non_object_policy(
     example: Any, inputs: Path, tmp_path: Path
 ) -> None:
@@ -400,6 +436,27 @@ def test_prepare_refuses_existing_output_and_non_object_policy(
         example._prepare(
             inputs,
             tmp_path / "output",
+            _inspection(),
+            "sha256:" + "a" * 64,
+            ("baseline", "subject"),
+        )
+
+
+@pytest.mark.parametrize(
+    "policy",
+    (
+        '{"resolved_policy":{"metrics":{"exact_match":{}}}}',
+        '{"resolved_policy":{"metrics":{"exact_match":{"minimum_side_accuracy":0.39}}}}',
+    ),
+)
+def test_prepare_requires_signed_side_floor(
+    example: Any, inputs: Path, tmp_path: Path, policy: str
+) -> None:
+    (inputs / "policy.json").write_text(policy, encoding="utf-8")
+    with pytest.raises(ValueError, match="minimum_side_accuracy"):
+        example._prepare(
+            inputs,
+            tmp_path / "output-floor",
             _inspection(),
             "sha256:" + "a" * 64,
             ("baseline", "subject"),
@@ -452,13 +509,13 @@ def test_execute_runs_preflight_evaluate_verify_report_with_provider_resources(
     calls: list[tuple[list[str], dict[str, str]]] = []
 
     def run(
-        command: list[str], *, check: bool, env: dict[str, str]
+        command: list[str], *, check: bool, environment: dict[str, str], **_options: Any
     ) -> subprocess.CompletedProcess[str]:
         assert check
-        calls.append((command, env))
+        calls.append((command, environment))
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr(example.subprocess, "run", run)
+    monkeypatch.setattr(example, "run_bounded_command", run)
     digest = "sha256:" + "a" * 64
     example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
     assert len(calls) == 4
@@ -555,7 +612,7 @@ def test_execute_rejects_false_green_transaction_outputs(
     report_path.write_text(json.dumps(report), encoding="utf-8")
     paths["receipt"].write_text(json.dumps(receipt), encoding="utf-8")
     paths["report"].write_text("<html></html>", encoding="utf-8")
-    monkeypatch.setattr(example.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(example, "run_bounded_command", lambda *args, **kwargs: None)
     digest = "sha256:" + "a" * 64
     with pytest.raises(ValueError, match=message):
         example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
@@ -575,7 +632,7 @@ def test_main_is_one_inspect_prepare_execute_transaction(
     monkeypatch.setattr(
         example,
         "_prepare",
-        lambda *_args: observed.append("prepare") or paths,
+        lambda *_args, **_kwargs: observed.append("prepare") or paths,
     )
     monkeypatch.setattr(example, "_execute", lambda *_args: observed.append("execute"))
     assert (
@@ -589,6 +646,7 @@ def test_main_is_one_inspect_prepare_execute_transaction(
                 "hf://baseline@rev",
                 "--subject-locator",
                 "hf://subject@rev",
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -743,6 +801,7 @@ def test_showcase_workspace_download_and_input_materialization(
         "delta_min_pp": -10.0,
         "maximum_interval_width_pp": 20.0,
         "minimum_record_count": 102,
+        "minimum_side_accuracy": 0.40,
     }
     (paths.work / "subject/subject.tokenizer-contract.json").write_bytes(b"other")
     with pytest.raises(RuntimeError, match="share one tokenizer"):
@@ -827,7 +886,7 @@ def test_showcase_container_build_and_transaction_commands(
         calls.append((command, options))
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr(showcase.subprocess, "run", run)
+    monkeypatch.setattr(showcase, "run_bounded_command", run)
     monkeypatch.setattr(showcase.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(showcase.os, "getegid", lambda: 1000)
     digest = "sha256:" + "a" * 64
@@ -878,7 +937,7 @@ def test_showcase_container_build_and_transaction_commands(
     assert transaction[1].endswith("tensorrt-llm/run.py")
     assert transaction[transaction.index("--baseline-device") + 1] == "cuda:0"
     assert transaction[transaction.index("--subject-device") + 1] == "cuda:1"
-    assert options["env"]["INVARLOCK_CONTAINER_ENGINE"] == "docker"
+    assert options["environment"]["INVARLOCK_CONTAINER_ENGINE"] == "docker"
 
 
 def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
@@ -896,8 +955,8 @@ def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
         lambda path, uid, gid: ownership.append((Path(path), uid, gid)),
     )
     monkeypatch.setattr(
-        showcase.subprocess,
-        "run",
+        showcase,
+        "run_bounded_command",
         lambda command, **_options: commands.append(command),
     )
 
@@ -1043,7 +1102,7 @@ def test_prepare_helper_contract_conversion_and_build(
     engine = tmp_path / "engine"
     monkeypatch.setattr(prepare.shutil, "which", lambda _name: "/trtllm-build")
 
-    def build(command: list[str], *, check: bool) -> None:
+    def build(command: list[str], *, check: bool, **_options: Any) -> None:
         assert check and "--max_input_len" in command
         assert command[command.index("--output_timing_cache") + 1] == str(
             checkpoint.parent / "model.cache"
@@ -1053,19 +1112,19 @@ def test_prepare_helper_contract_conversion_and_build(
         (engine / "config.json").write_text("{}", encoding="utf-8")
         (engine / "rank0.engine").write_bytes(b"engine")
 
-    monkeypatch.setattr(prepare.subprocess, "run", build)
+    monkeypatch.setattr(prepare, "run_bounded_command", build)
     prepare._build(checkpoint, engine, quantization="none")
 
     fp8_engine = tmp_path / "fp8-engine"
 
-    def build_fp8(command: list[str], *, check: bool) -> None:
+    def build_fp8(command: list[str], *, check: bool, **_options: Any) -> None:
         assert check
         assert command[command.index("--gemm_plugin") + 1] == "disable"
         fp8_engine.mkdir()
         (fp8_engine / "config.json").write_text("{}", encoding="utf-8")
         (fp8_engine / "rank0.engine").write_bytes(b"engine")
 
-    monkeypatch.setattr(prepare.subprocess, "run", build_fp8)
+    monkeypatch.setattr(prepare, "run_bounded_command", build_fp8)
     prepare._build(fp8_checkpoint, fp8_engine, quantization="fp8")
     monkeypatch.setattr(prepare.shutil, "which", lambda _name: None)
     with pytest.raises(RuntimeError, match="unavailable"):
@@ -1101,12 +1160,12 @@ def test_prepare_helper_rejects_invalid_contract_calibration_and_outputs(
     monkeypatch.setattr(prepare.shutil, "which", lambda _name: "/trtllm-build")
     engine = tmp_path / "bad-engine"
 
-    def build_bad(_command: list[str], *, check: bool) -> None:
+    def build_bad(_command: list[str], *, check: bool, **_options: Any) -> None:
         assert check
         engine.mkdir()
         (engine / "config.json").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setattr(prepare.subprocess, "run", build_bad)
+    monkeypatch.setattr(prepare, "run_bounded_command", build_bad)
     with pytest.raises(RuntimeError, match="unexpected engine layout"):
         prepare._build(tmp_path, engine, quantization="none")
 

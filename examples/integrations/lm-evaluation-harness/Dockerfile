@@ -2,8 +2,16 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 ARG BASE_IMAGE_ID
+ARG SOURCE_COMMIT
+ARG SOURCE_BUNDLE_SHA256
+ARG EVALUATOR_LOCK_SHA256
 
 LABEL org.invarlock.example.base-image-id="${BASE_IMAGE_ID}"
+LABEL org.invarlock.example.source-commit="${SOURCE_COMMIT}"
+LABEL org.invarlock.example.source-bundle-sha256="${SOURCE_BUNDLE_SHA256}"
+LABEL org.invarlock.example.evaluator="lm-evaluation-harness"
+LABEL org.invarlock.example.evaluator-version="0.4.12+invarlock.nocache.1"
+LABEL org.invarlock.example.evaluator-lock-sha256="sha256:${EVALUATOR_LOCK_SHA256}"
 
 # LM Evaluation Harness is deliberately scoped to this integration image. The
 # resulting image is inspected after this layer is built and that immutable
@@ -37,5 +45,19 @@ RUN python -m pip download \
 
 COPY examples/integrations/lm-evaluation-harness/example.py \
     /opt/invarlock/examples/lm-evaluation-harness-example.py
+# The worker is copied as a flat script into the image. Keep the example-owned
+# trust, image-inspection, attestation, and result-transfer helpers beside it.
+COPY examples/integrations/trust_material.py \
+    /opt/invarlock/examples/trust_material.py
+COPY examples/integrations/local_registry.py \
+    /opt/invarlock/examples/local_registry.py
+COPY examples/integrations/launch.py \
+    /opt/invarlock/examples/launch.py
+COPY examples/integrations/bounded_command.py \
+    /opt/invarlock/examples/bounded_command.py
+COPY examples/integrations/evaluator_transaction/build_attestation.py \
+    /opt/invarlock/examples/evaluator_transaction.py
+COPY examples/integrations/evaluator_transaction/worker.py \
+    /opt/invarlock/examples/evaluator_transaction_worker.py
 
 ENTRYPOINT ["python", "/opt/invarlock/examples/lm-evaluation-harness-example.py", "worker"]

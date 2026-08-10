@@ -6,7 +6,10 @@ transformation with InvarLock's standard Hugging Face runtime.
 From the repository root:
 
 ```bash
-make example-torchao-int8
+make example-torchao-int8 \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/torchao-int8"
 ```
 
 The command:
@@ -20,7 +23,7 @@ The command:
    subject checkpoint and confirms that save/reload preserves every transformed
    dense tensor;
 5. evaluates 50 paired records in the authenticated InvarLock runtime;
-6. verifies the signed evidence with a separately generated verifier key; and
+6. verifies the signed evidence with the caller-owned verifier key; and
 7. renders an HTML comparison report.
 
 The acceptance policy allows at most a 1% normalized-NLL increase for this
@@ -46,10 +49,13 @@ engine:
 
 ```bash
 make example-torchao-int8 \
-  EXAMPLE_ARGS="--workspace /tmp/torchao-evidence --container-engine podman"
+  EXAMPLE_ARGS="--workspace /tmp/torchao-evidence --container-engine podman \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/torchao-int8"
 ```
 
-The workspace must not already exist. Generated signing keys remain inside that
-disposable workspace and are intended only for the example transaction.
+The workspace and trust root must not already exist. The signing keys remain
+under caller control outside the disposable workspace.
 CUDA is selected when available and CPU remains supported. The first run needs
 several gigabytes of download, cache, and workspace capacity.

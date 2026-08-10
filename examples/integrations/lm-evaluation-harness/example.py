@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -16,7 +17,39 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 import yaml
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
+try:
+    from examples.integrations.bounded_command import run_bounded_command
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    from bounded_command import run_bounded_command  # type: ignore[no-redef]
+
+try:
+    from examples.integrations.trust_material import (
+        create_trust_material,
+        read_external_file,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    script_directory = Path(__file__).resolve().parent
+    integration_directory = script_directory.parent
+    for candidate in (script_directory, integration_directory):
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+    from trust_material import (  # type: ignore[no-redef]
+        create_trust_material,
+        read_external_file,
+    )
+try:
+    from examples.integrations.launch import inspect_level3_image
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    from launch import inspect_level3_image  # type: ignore[no-redef]
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
@@ -32,7 +65,10 @@ from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
 )
+from invarlock.evaluation_oci import OciEvaluationError
 from invarlock.evidence_pack_contract import canonical_json_bytes, sha256_digest
+from invarlock.evidence_pack_integrity import public_key_fingerprint
+from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
 from invarlock.runtime_import_authoring import (
     load_external_scoring_records_jsonl,
     write_runtime_import_paired_records,
@@ -40,14 +76,57 @@ from invarlock.runtime_import_authoring import (
 )
 from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
+try:
+    from examples.integrations.evaluator_transaction.worker import (
+        run_evaluator_worker,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    try:
+        from evaluator_transaction.worker import run_evaluator_worker
+    except (
+        ModuleNotFoundError
+    ) as nested_exc:  # pragma: no cover - flat-script compatibility
+        if nested_exc.name not in {
+            "evaluator_transaction",
+            "evaluator_transaction.worker",
+        }:
+            raise
+        from evaluator_transaction_worker import (  # type: ignore[no-redef]
+            run_evaluator_worker,
+        )
+
 VERSION = "0.4.12+invarlock.nocache.1"
 MAX_GENERATION_TOKENS = 1
 HARNESS_BATCH_SIZE = 8
 HARNESS_SEED = 20_260_716
+RECORD_COUNT = 102
+MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
+PER_RECORD_TIMEOUT_SECONDS = 300
+WORKER_TIMEOUT_SECONDS = min(
+    PER_RECORD_TIMEOUT_SECONDS * (RECORD_COUNT + 2), 24 * 60 * 60
+)
+CLI_TIMEOUT_SECONDS = 10 * 60
 MINIMUM_SIDE_ACCURACY = 0.20
 TASK = "invarlock_exact_match"
 DATASET_NAME = "qwen3-0.6b-base-to-post-trained"
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
+SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+DATASET_SHA256 = "d80e81ba17fb93b9b8a46f9817f9841f5f9c2858c9d703b3ce28847b2eaeb57c"
+HARNESS_LOCK_PATH = Path("requirements/workflows/lm-evaluation-harness-py312.txt")
+EXPECTED_MODEL_ARTIFACTS = {
+    "baseline": {
+        "path": "models/baseline",
+        "model_id": "Qwen/Qwen3-0.6B-Base",
+        "locator": "hf://Qwen/Qwen3-0.6B-Base@da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
+    },
+    "subject": {
+        "path": "models/subject",
+        "model_id": "Qwen/Qwen3-0.6B",
+        "locator": "hf://Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca",
+    },
+}
 RUN_FIELDS = {
     "format",
     "role",
@@ -60,6 +139,7 @@ RUN_FIELDS = {
     "samples_sha256",
     "model_tree_sha256",
     "dataset_sha256",
+    "runtime_image_digest",
     "record_count",
     "stable_id_field",
 }
@@ -81,6 +161,215 @@ class BridgeError(ValueError):
 
 def digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _run_bounded_command(
+    command: list[str], *, timeout_seconds: int, label: str
+) -> subprocess.CompletedProcess[str]:
+    """Run one evaluator-side command with bounded diagnostics and a deadline."""
+    try:
+        completed = run_bounded_command(
+            command,
+            capture_output=True,
+            check=False,
+            timeout_seconds=timeout_seconds,
+            stdout_limit=4 * 1024 * 1024,
+            stderr_limit=256 * 1024,
+            label=label,
+        )
+    except RuntimeError as exc:
+        raise BridgeError(str(exc)) from exc
+    return subprocess.CompletedProcess(
+        command,
+        completed.returncode,
+        completed.stdout or "",
+        completed.stderr or "",
+    )
+
+
+def _read_regular_file(
+    path: Path,
+    *,
+    label: str,
+    max_bytes: int = MAX_WORKER_ARTIFACT_BYTES,
+) -> bytes:
+    try:
+        return read_regular_file_bytes(path, label=label, max_bytes=max_bytes)
+    except StrictJsonError as exc:
+        raise BridgeError(str(exc)) from exc
+
+
+def _runtime_image_from_environment() -> str:
+    # Direct unit/demo worker calls may omit the container binding; completion
+    # always supplies and verifies the real image digest before accepting runs.
+    value = os.environ.get("INVARLOCK_RUNTIME_IMAGE_ID", "sha256:" + "0" * 64)
+    if IMAGE_ID.fullmatch(value) is None:
+        raise BridgeError("the worker must receive the inspected runtime image digest")
+    return value
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _inspect_runtime_image(
+    engine: str,
+    image: str,
+    source_commit: str,
+    base_image_id: str,
+    build_attestation: Path,
+    builder_public_key: ed25519.Ed25519PublicKey,
+) -> None:
+    if engine not in {"docker", "podman"}:
+        raise BridgeError("container engine must be docker or podman")
+    if SOURCE_COMMIT.fullmatch(source_commit) is None:
+        raise BridgeError("source commit must be a full lowercase Git commit")
+    if IMAGE_ID.fullmatch(base_image_id) is None:
+        raise BridgeError("base image identity must be an immutable image digest")
+    lock_digest = (
+        "sha256:"
+        + hashlib.sha256((REPOSITORY_ROOT / HARNESS_LOCK_PATH).read_bytes()).hexdigest()
+    )
+    try:
+        inspect_level3_image(
+            engine=engine,
+            image=image,
+            repository=REPOSITORY_ROOT,
+            attestation_path=build_attestation,
+            evaluator="lm-evaluation-harness",
+            evaluator_version=VERSION,
+            lock_sha256=lock_digest,
+            expected_entrypoint=(
+                "python",
+                "/opt/invarlock/examples/lm-evaluation-harness-example.py",
+                "worker",
+            ),
+            source_commit=source_commit,
+            base_image_id=base_image_id,
+            builder_public_key=builder_public_key,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise BridgeError(
+            "Level 3 build attestation did not authenticate the image"
+        ) from exc
+
+
+def _external_ed25519_key(path: Path, *, label: str) -> ed25519.Ed25519PrivateKey:
+    try:
+        payload = read_external_file(path, label=label)
+        key = serialization.load_pem_private_key(payload, password=None)
+    except (OSError, TypeError, ValueError) as exc:
+        raise BridgeError(f"{label} is not an Ed25519 private key") from exc
+    if not isinstance(key, ed25519.Ed25519PrivateKey):
+        raise BridgeError(f"{label} is not an Ed25519 private key")
+    return key
+
+
+def _external_ed25519_public_key(path: Path, *, label: str) -> ed25519.Ed25519PublicKey:
+    try:
+        payload = read_external_file(path, label=label)
+        key = serialization.load_pem_public_key(payload)
+    except (OSError, TypeError, ValueError) as exc:
+        raise BridgeError(f"{label} is not an Ed25519 public key") from exc
+    if not isinstance(key, ed25519.Ed25519PublicKey):
+        raise BridgeError(f"{label} is not an Ed25519 public key")
+    return key
+
+
+def _require_distinct_signers(
+    evidence_key: ed25519.Ed25519PrivateKey,
+    verifier_key: ed25519.Ed25519PrivateKey,
+    builder_key: ed25519.Ed25519PublicKey | None = None,
+) -> None:
+    fingerprints = [
+        public_key_fingerprint(evidence_key.public_key()),
+        public_key_fingerprint(verifier_key.public_key()),
+    ]
+    if builder_key is not None:
+        fingerprints.append(public_key_fingerprint(builder_key))
+    if len(fingerprints) != len(set(fingerprints)):
+        raise BridgeError(
+            "evidence, verifier, and builder signing keys must be distinct"
+        )
+
+
+def mount_source(path: Path, *, label: str) -> str:
+    if path.is_symlink():
+        raise BridgeError(f"{label} must not be a symlink")
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise BridgeError(f"{label} could not be resolved") from exc
+    rendered = str(resolved)
+    if any(character in rendered for character in (",", "\n", "\r", "\x00")):
+        raise BridgeError(f"{label} cannot be represented in an OCI mount")
+    return rendered
+
+
+def _tokenizer_metadata_digest(checkpoint: Path) -> str:
+    try:
+        from transformers import AutoTokenizer
+
+        from invarlock.runtime_providers.hf_transformers import (
+            hf_tokenizer_contract_sha256,
+        )
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            checkpoint, local_files_only=True, trust_remote_code=False
+        )
+        return hf_tokenizer_contract_sha256(tokenizer)
+    except (ImportError, KeyError, OSError, RuntimeError, ValueError) as exc:
+        raise BridgeError("tokenizer identity could not be authenticated") from exc
+
+
+def _run_verified_worker(
+    *,
+    engine: str,
+    image: str,
+    role: str,
+    prepared: Path,
+    output: Path,
+) -> None:
+    model = prepared / f"evaluation/models/{role}"
+    dataset = prepared / "evaluation/inputs/records.jsonl"
+    if not model.is_dir() or model.is_symlink() or not dataset.is_file():
+        raise BridgeError("prepared evaluator inputs are missing or unsafe")
+    if dataset.is_symlink() or output.exists() or output.is_symlink():
+        raise BridgeError("transaction evaluator output must be new")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output_name = output.name
+    if output_name in {"", ".", ".."} or "/" in output_name:
+        raise BridgeError("transaction evaluator output name is invalid")
+    try:
+        completed = run_evaluator_worker(
+            engine=engine,
+            image=image,
+            entrypoint=(
+                "python",
+                "/opt/invarlock/examples/lm-evaluation-harness-example.py",
+                "worker",
+            ),
+            worker_arguments=(
+                "--role",
+                role,
+                "--model",
+                "/model",
+                "--dataset",
+                "/records.jsonl",
+                "--output",
+                f"/outputs/{output_name}",
+            ),
+            model_source=model,
+            dataset_source=dataset,
+            output=output,
+            environment={"INVARLOCK_RUNTIME_IMAGE_ID": image},
+            timeout_seconds=WORKER_TIMEOUT_SECONDS,
+        )
+    except OciEvaluationError as exc:
+        raise BridgeError(f"Harness worker control failed for {role}: {exc}") from exc
+    if completed.returncode:
+        raise BridgeError(
+            completed.stderr or completed.stdout or "Harness worker failed"
+        )
 
 
 def task_config(dataset: str) -> dict[str, Any]:
@@ -125,6 +414,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
 
     if importlib.metadata.version("lm-eval") != VERSION:
         raise BridgeError(f"the runtime must contain lm-eval {VERSION}")
+    runtime_image_digest = _runtime_image_from_environment()
     if (
         output.exists()
         or output.is_symlink()
@@ -139,11 +429,11 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         )
     output.mkdir(parents=True)
     model_tree_sha256 = checkpoint_tree_sha256(model)
-    dataset_sha256 = digest(dataset.read_bytes())
+    dataset_sha256 = digest(_read_regular_file(dataset, label="Harness dataset"))
     config = task_config(str(dataset))
     config_path = output / "task.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-    config_sha256 = digest(config_path.read_bytes())
+    config_sha256 = digest(_read_regular_file(config_path, label="Harness task config"))
     raw = output / "upstream"
     execution = execution_config()
     command = [
@@ -171,13 +461,19 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         "--output_path",
         str(raw),
     ]
-    completed = subprocess.run(command, check=False, text=True)
+    completed = _run_bounded_command(
+        command,
+        timeout_seconds=WORKER_TIMEOUT_SECONDS,
+        label="LM Evaluation Harness execution",
+    )
     if completed.returncode:
         raise BridgeError("LM Evaluation Harness execution failed")
     if (
         checkpoint_tree_sha256(model) != model_tree_sha256
-        or digest(dataset.read_bytes()) != dataset_sha256
-        or digest(config_path.read_bytes()) != config_sha256
+        or digest(_read_regular_file(dataset, label="Harness dataset"))
+        != dataset_sha256
+        or digest(_read_regular_file(config_path, label="Harness task config"))
+        != config_sha256
     ):
         raise BridgeError("LM Evaluation Harness inputs changed during execution")
     samples = list(raw.rglob("samples_*.jsonl"))
@@ -186,7 +482,8 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     destination = output / "samples.jsonl"
     shutil.copy2(samples[0], destination)
     bound = config
-    lines = destination.read_bytes().splitlines()
+    sample_bytes = _read_regular_file(destination, label="Harness samples")
+    lines = sample_bytes.splitlines()
     manifest = {
         "format": "invarlock/lm-evaluation-harness-run-v1",
         "role": role,
@@ -196,21 +493,25 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         "execution_config": execution,
         "execution_config_sha256": digest(canonical_json_bytes(execution)),
         "samples": destination.name,
-        "samples_sha256": digest(destination.read_bytes()),
+        "samples_sha256": digest(sample_bytes),
         "model_tree_sha256": model_tree_sha256,
         "dataset_sha256": dataset_sha256,
+        "runtime_image_digest": runtime_image_digest,
         "record_count": len(lines),
         "stable_id_field": "id",
     }
     (output / "run-manifest.json").write_bytes(canonical_json_bytes(manifest))
 
 
-def load_run(path: Path, role: str) -> tuple[dict[str, Any], Path]:
+def load_run(
+    path: Path, role: str, image: str | None = None
+) -> tuple[dict[str, Any], Path]:
     try:
-        run = json.loads(path.read_bytes())
-    except (OSError, json.JSONDecodeError) as exc:
+        run = json.loads(_read_regular_file(path, label=f"{role} run provenance"))
+    except (BridgeError, OSError, json.JSONDecodeError) as exc:
         raise BridgeError(f"{role} run provenance is missing") from exc
-    if not isinstance(run, dict) or set(run) != RUN_FIELDS:
+    legacy_fields = RUN_FIELDS - {"runtime_image_digest"}
+    if not isinstance(run, dict) or set(run) not in (RUN_FIELDS, legacy_fields):
         raise BridgeError(f"{role} run provenance is incomplete")
     if (
         run["format"] != "invarlock/lm-evaluation-harness-run-v1"
@@ -219,6 +520,7 @@ def load_run(path: Path, role: str) -> tuple[dict[str, Any], Path]:
         or run["stable_id_field"] != "id"
         or IMAGE_ID.fullmatch(run["model_tree_sha256"]) is None
         or IMAGE_ID.fullmatch(f"sha256:{run['dataset_sha256']}") is None
+        or (image is not None and run.get("runtime_image_digest") != image)
         or run["task_config"] != task_config("/records.jsonl")
         or run["task_config_sha256"] != digest(canonical_json_bytes(run["task_config"]))
         or run["execution_config"] != execution_config()
@@ -231,17 +533,36 @@ def load_run(path: Path, role: str) -> tuple[dict[str, Any], Path]:
         run["samples"] != "samples.jsonl"
         or not samples.is_file()
         or samples.is_symlink()
-        or digest(samples.read_bytes()) != run["samples_sha256"]
-        or len(samples.read_bytes().splitlines()) != run["record_count"]
+        or digest(_read_regular_file(samples, label=f"{role} Harness samples"))
+        != run["samples_sha256"]
+        or len(
+            _read_regular_file(samples, label=f"{role} Harness samples").splitlines()
+        )
+        != run["record_count"]
     ):
         raise BridgeError(f"{role} per-record output was tampered")
     return cast(dict[str, Any], run), samples
 
 
+def load_upstream_samples(path: Path, *, role: str) -> list[dict[str, Any]]:
+    values: list[dict[str, Any]] = []
+    for index, raw in enumerate(
+        _read_regular_file(path, label=f"{role} Harness samples").splitlines(), 1
+    ):
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise BridgeError(f"{role} Harness sample {index} is not JSON") from exc
+        if not isinstance(value, dict):
+            raise BridgeError(f"{role} Harness sample {index} is not an object")
+        values.append(value)
+    return values
+
+
 def adapt(samples: Path, schedule: Any, destination: Path) -> None:
     """Map upstream records to the strict ABI; never import aggregate scores."""
 
-    lines = samples.read_bytes().splitlines()
+    lines = _read_regular_file(samples, label="Harness samples").splitlines()
     if len(lines) != len(schedule.records):
         raise BridgeError("one Harness sample is required for every schedule record")
     output: list[dict[str, object]] = []
@@ -318,10 +639,15 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
 
     try:
         evaluation_report = json.loads(
-            (evidence / "reports/evaluation.report.json").read_bytes()
+            _read_regular_file(
+                evidence / "reports/evaluation.report.json",
+                label="evaluation report",
+            )
         )
-        verification_receipt = json.loads(receipt.read_bytes())
-    except (OSError, json.JSONDecodeError) as exc:
+        verification_receipt = json.loads(
+            _read_regular_file(receipt, label="verification receipt")
+        )
+    except (BridgeError, OSError, json.JSONDecodeError) as exc:
         raise BridgeError(
             "the completed transaction is missing verified outputs"
         ) from exc
@@ -346,8 +672,6 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
         or not isinstance(baseline.get("mean_score"), (int, float))
         or isinstance(subject.get("mean_score"), bool)
         or not isinstance(subject.get("mean_score"), (int, float))
-        or baseline["mean_score"] < MINIMUM_SIDE_ACCURACY
-        or subject["mean_score"] < MINIMUM_SIDE_ACCURACY
         or not isinstance(receipt_verdict, dict)
         or receipt_verdict.get("ok") is not True
         or receipt_verdict.get("integrity_ok") is not True
@@ -357,43 +681,143 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
         raise BridgeError("the completed transaction did not verify a passing result")
 
 
-def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
-    """Author strict import inputs and execute evaluate, verify, and report."""
+def _validated_comparison(request: object) -> dict[str, Any]:
+    comparison = request.get("comparison") if isinstance(request, dict) else None
+    if not isinstance(comparison, dict) or comparison.get("metric") != "exact_match":
+        raise BridgeError("prepared request is not the fixed exact-match transaction")
+    if comparison.get("policy") != "inputs/acceptance.json":
+        raise BridgeError("prepared request has an unexpected policy path")
+    expected_settings = {
+        "batch_size": HARNESS_BATCH_SIZE,
+        "context_length": 64,
+        "max_output_tokens": MAX_GENERATION_TOKENS,
+        "offline": True,
+        "seed": HARNESS_SEED,
+        "timeout_seconds": PER_RECORD_TIMEOUT_SECONDS,
+    }
+    for role in ("baseline", "subject"):
+        side = comparison.get(role)
+        if (
+            not isinstance(side, dict)
+            or set(side) != {"artifact", "runtime"}
+            or side.get("artifact") != EXPECTED_MODEL_ARTIFACTS[role]
+            or not isinstance(side.get("runtime"), dict)
+            or set(side["runtime"]) != {"provider", "settings"}
+            or side["runtime"].get("provider") != "hf_transformers"
+            or not isinstance(side["runtime"].get("settings"), dict)
+        ):
+            raise BridgeError(f"{role} is not the canonical pinned Qwen3 model")
+        settings = side["runtime"]["settings"]
+        checkpoint_digest = settings.get("checkpoint_tree_sha256")
+        tokenizer_digest = settings.get("tokenizer_metadata_sha256")
+        if (
+            set(settings)
+            != set(expected_settings)
+            | {"checkpoint_tree_sha256", "tokenizer_metadata_sha256"}
+            or any(
+                settings.get(key) != value for key, value in expected_settings.items()
+            )
+            or not isinstance(checkpoint_digest, str)
+            or IMAGE_ID.fullmatch(checkpoint_digest) is None
+            or not isinstance(tokenizer_digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", tokenizer_digest) is None
+        ):
+            raise BridgeError(f"{role} runtime settings are not canonical")
+    return cast(dict[str, Any], comparison)
 
-    from examples.integrations.run import _write_private_key
+
+def complete(
+    root: Path,
+    prepared: Path,
+    image: str,
+    *,
+    container_engine: str = "docker",
+    evidence_signing_key: Path | None = None,
+    verifier_signing_key: Path | None = None,
+    trust_root: Path | None = None,
+    source_commit: str | None = None,
+    base_image_id: str | None = None,
+    build_attestation: Path | None = None,
+    builder_public_key: Path | None = None,
+) -> tuple[Path, Path, Path]:
+    """Author strict import inputs and execute evaluate, verify, and report."""
 
     if IMAGE_ID.fullmatch(image) is None:
         raise BridgeError("runtime image must be an immutable local sha256 ID")
     if root.exists() or root.is_symlink():
         raise BridgeError("transaction workspace must be new")
-    (root / "inputs").mkdir(parents=True)
-    (root / "imports").mkdir()
-    (root / "verifier/policy").mkdir(parents=True)
-    runs = {
-        role: load_run(prepared / f"harness/{role}/run-manifest.json", role)
-        for role in ("baseline", "subject")
-    }
     if (
-        runs["baseline"][0]["task_config_sha256"]
-        != runs["subject"][0]["task_config_sha256"]
-        or runs["baseline"][0]["execution_config_sha256"]
-        != runs["subject"][0]["execution_config_sha256"]
+        evidence_signing_key is None
+        or verifier_signing_key is None
+        or trust_root is None
+        or source_commit is None
+        or base_image_id is None
+        or build_attestation is None
+        or builder_public_key is None
     ):
-        raise BridgeError("baseline and subject used different Harness configurations")
-    request0 = yaml.safe_load((prepared / "evaluation/request.yaml").read_text())
-    comparison0 = request0.get("comparison") if isinstance(request0, dict) else None
-    if not isinstance(comparison0, dict) or comparison0.get("metric") != "exact_match":
-        raise BridgeError("prepared request is not the fixed exact-match transaction")
-    if comparison0.get("policy") != "inputs/acceptance.json":
-        raise BridgeError("prepared request has an unexpected policy path")
+        raise BridgeError(
+            "an inspected image and caller-owned evidence, verifier, and trust roots "
+            "builder public key, and build attestation are required"
+        )
+    if build_attestation.is_symlink():
+        raise BridgeError("build attestation must not be a symlink")
+    try:
+        build_attestation.relative_to(root)
+    except ValueError:
+        pass
+    else:
+        raise BridgeError("build attestation must remain outside the transaction")
+    if trust_root.exists() or trust_root.is_symlink():
+        raise BridgeError("trust root must be new and outside the transaction")
+    try:
+        trust_root.relative_to(root)
+    except ValueError:
+        pass
+    else:
+        raise BridgeError("trust root must remain outside the transaction")
+    for key_path, label in (
+        (evidence_signing_key, "evidence signing key"),
+        (verifier_signing_key, "verifier signing key"),
+        (builder_public_key, "builder public key"),
+    ):
+        try:
+            key_path.relative_to(root)
+        except ValueError:
+            pass
+        else:
+            raise BridgeError(f"{label} must remain outside the transaction")
+    evidence_key = _external_ed25519_key(
+        evidence_signing_key, label="evidence signing key"
+    )
+    verifier_key = _external_ed25519_key(
+        verifier_signing_key, label="verifier signing key"
+    )
+    builder_key = _external_ed25519_public_key(
+        builder_public_key, label="builder public key"
+    )
+    _require_distinct_signers(evidence_key, verifier_key, builder_key)
+    _inspect_runtime_image(
+        container_engine,
+        image,
+        source_commit,
+        base_image_id,
+        build_attestation,
+        builder_public_key=builder_key,
+    )
+    request0 = yaml.safe_load(
+        _read_regular_file(
+            prepared / "evaluation/request.yaml", label="prepared request"
+        )
+    )
+    comparison0 = _validated_comparison(request0)
     dataset0 = prepared / "evaluation/inputs/records.jsonl"
     dataset = comparison0.get("dataset")
     if not isinstance(dataset, dict):
         raise BridgeError("prepared request lacks the authenticated dataset")
-    raw_dataset = dataset0.read_bytes()
+    raw_dataset = _read_regular_file(dataset0, label="prepared dataset")
     expected_dataset = {
         "path": "inputs/records.jsonl",
-        "sha256": dataset.get("sha256"),
+        "sha256": DATASET_SHA256,
         "format": "jsonl",
         "name": DATASET_NAME,
         "split": "validation",
@@ -405,9 +829,6 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
         raise BridgeError("prepared request has an unexpected dataset descriptor")
     if dataset["sha256"] != digest(raw_dataset):
         raise BridgeError("prepared dataset does not match the request digest")
-    for role in ("baseline", "subject"):
-        if runs[role][0]["dataset_sha256"] != dataset["sha256"]:
-            raise BridgeError(f"{role} run used a different authenticated dataset")
     schedule = prepare_local_evaluation_schedule_bytes(
         LocalDatasetRequest(
             path=dataset0,
@@ -421,13 +842,18 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
         ),
         raw_dataset,
     )
+    root.mkdir(parents=True)
+    (root / "inputs").mkdir()
+    (root / "imports").mkdir()
+    (root / "upstream").mkdir()
+    (root / "verifier").mkdir()
     schedule_path = root / "inputs/schedule.json"
     schedule_path.write_bytes(canonical_runtime_behavioral_schedule_json(schedule))
     schedule = load_runtime_behavioral_schedule(schedule_path)
     if any(not record.expected_output for record in schedule.records):
         raise BridgeError("prepared exact-match targets must be non-empty")
     prepared_policy = prepared / "evaluation/inputs/acceptance.json"
-    policy = prepared_policy.read_bytes()
+    policy = _read_regular_file(prepared_policy, label="prepared policy")
     expected_policy = {
         "resolved_policy": {
             "metrics": {
@@ -435,23 +861,57 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
                     "delta_min_pp": -20.0,
                     "maximum_interval_width_pp": 20.0,
                     "minimum_record_count": 102,
+                    "minimum_side_accuracy": MINIMUM_SIDE_ACCURACY,
                 }
             }
         }
     }
     if json.loads(policy) != expected_policy:
         raise BridgeError("prepared exact-match policy is not the fixed example policy")
+    for role in ("baseline", "subject"):
+        output = root / f"upstream/{role}/result"
+        _run_verified_worker(
+            engine=container_engine,
+            image=image,
+            role=role,
+            prepared=prepared,
+            output=output,
+        )
+    runs = {
+        role: load_run(root / f"upstream/{role}/result/run-manifest.json", role, image)
+        for role in ("baseline", "subject")
+    }
+    if (
+        runs["baseline"][0]["task_config_sha256"]
+        != runs["subject"][0]["task_config_sha256"]
+        or runs["baseline"][0]["execution_config_sha256"]
+        != runs["subject"][0]["execution_config_sha256"]
+        or any(
+            run["dataset_sha256"] != dataset["sha256"]
+            for run, _samples in runs.values()
+        )
+    ):
+        raise BridgeError(
+            "fresh worker runs used different Harness configurations or dataset"
+        )
     (root / "inputs/acceptance.json").write_bytes(policy)
-    (root / "verifier/policy/acceptance.json").write_bytes(policy)
     provenance = canonical_json_bytes(
         {
-            "format": "invarlock/lm-evaluation-harness-provenance-v1",
+            "format": "invarlock/lm-evaluation-harness-provenance-v2",
             "runtime_image_digest": image,
+            "source_commit": source_commit,
+            "base_image_id": base_image_id,
             "task_config": runs["baseline"][0]["task_config"],
             "task_config_sha256": runs["baseline"][0]["task_config_sha256"],
             "execution_config": runs["baseline"][0]["execution_config"],
             "execution_config_sha256": runs["baseline"][0]["execution_config_sha256"],
-            "samples_sha256": {role: runs[role][0]["samples_sha256"] for role in runs},
+            "runs": {
+                role: {
+                    "manifest": runs[role][0],
+                    "samples": load_upstream_samples(runs[role][1], role=role),
+                }
+                for role in ("baseline", "subject")
+            },
         }
     )
     (root / "inputs/harness-provenance.json").write_bytes(provenance)
@@ -473,9 +933,20 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
             raise BridgeError(
                 f"{role} snapshot does not leave generation defaults to the task"
             )
+        try:
+            observed_checkpoint_digest = checkpoint_tree_sha256(checkpoint)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise BridgeError(f"{role} checkpoint could not be authenticated") from exc
+        if observed_checkpoint_digest != settings["checkpoint_tree_sha256"]:
+            raise BridgeError(f"{role} checkpoint tree digest does not match")
         identity = provider.authenticate_artifact(spec, checkpoint)
         if runs[role][0]["model_tree_sha256"] != settings.get("checkpoint_tree_sha256"):
             raise BridgeError(f"{role} run used a different authenticated checkpoint")
+        observed_tokenizer_digest = _tokenizer_metadata_digest(checkpoint)
+        if settings["tokenizer_metadata_sha256"] != observed_tokenizer_digest:
+            raise BridgeError(
+                f"{role} tokenizer identity does not match the checkpoint"
+            )
         execution = runs[role][0]["execution_config"]
         if (
             settings.get("seed") != execution["seed"]
@@ -566,16 +1037,19 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
     }
     request_path = root / "request.yaml"
     request_path.write_text(yaml.safe_dump(request, sort_keys=False))
-    evidence_key = root / "keys/evidence.pem"
-    verifier_key = root / "verifier/keys/verifier.pem"
-    evidence_key.parent.mkdir()
-    verifier_key.parent.mkdir()
-    evidence_fingerprint = _write_private_key(evidence_key)
-    _write_private_key(verifier_key)
-    trust = {
-        "format": "invarlock/trust-inputs-v1",
-        "policy": {"path": "policy/acceptance.json"},
-        "anchors": {
+    evidence_fingerprint = public_key_fingerprint(evidence_key.public_key())
+    trust = create_trust_material(
+        transaction_root=root,
+        evidence_key=evidence_signing_key,
+        verifier_key_bytes=read_external_file(
+            verifier_signing_key, label="verifier signing key"
+        ),
+        evidence_fingerprint=evidence_fingerprint,
+        verifier_fingerprint=public_key_fingerprint(verifier_key.public_key()),
+        trust_root=trust_root,
+        policy_bytes=policy,
+        verifier_identity="invarlock-example/lm-evaluation-harness-verifier",
+        anchors={
             "baseline_artifact_digest": anchors["baseline"],
             "subject_artifact_digest": anchors["subject"],
             "schedule_digest": f"sha256:{schedule.schedule_sha256}",
@@ -583,21 +1057,21 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
             "subject_runtime_digest": image,
             "evidence_signer_fingerprint": evidence_fingerprint,
         },
-        "verifier": {
-            "identity": "invarlock-example/lm-evaluation-harness-verifier",
-            "signing_key_path": "keys/verifier.pem",
-        },
-        "allow_installed_scorers": False,
-    }
-    trust_path = root / "verifier/trusted-inputs.json"
-    trust_path.write_bytes(canonical_json_bytes(trust))
+    )
+    trust_path = trust.trusted_inputs
     evidence, receipt, report = (
         root / "evidence",
         root / "verifier/verification.receipt.json",
         root / "comparison-report.html",
     )
     commands = [
-        ["evaluate", str(request_path), "--signing-key", str(evidence_key), "--json"],
+        [
+            "evaluate",
+            str(request_path),
+            "--signing-key",
+            str(evidence_signing_key),
+            "--json",
+        ],
         [
             "verify",
             str(evidence),
@@ -610,11 +1084,10 @@ def complete(root: Path, prepared: Path, image: str) -> tuple[Path, Path, Path]:
         ["report", str(evidence), "--html", str(report)],
     ]
     for arguments in commands:
-        completed = subprocess.run(
+        completed = _run_bounded_command(
             [sys.executable, "-m", "invarlock", *arguments],
-            check=False,
-            capture_output=True,
-            text=True,
+            timeout_seconds=CLI_TIMEOUT_SECONDS,
+            label="InvarLock transaction command",
         )
         if completed.returncode:
             raise BridgeError(completed.stderr or completed.stdout)
@@ -634,13 +1107,53 @@ def main(argv: list[str] | None = None) -> int:
     bridge_parser.add_argument("--workspace", type=Path, required=True)
     bridge_parser.add_argument("--prepared", type=Path, required=True)
     bridge_parser.add_argument("--runtime-image", required=True)
+    bridge_parser.add_argument(
+        "--container-engine", choices=("docker", "podman"), default="docker"
+    )
+    bridge_parser.add_argument("--evidence-signing-key", type=Path, required=True)
+    bridge_parser.add_argument("--verifier-signing-key", type=Path, required=True)
+    bridge_parser.add_argument("--trust-root", type=Path, required=True)
+    bridge_parser.add_argument("--builder-public-key", type=Path, required=True)
+    bridge_parser.add_argument("--source-commit", required=True)
+    bridge_parser.add_argument("--base-image-id", required=True)
+    bridge_parser.add_argument("--build-attestation", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "worker":
             worker(args.role, args.model, args.dataset, args.output)
         else:
             evidence, receipt, report = complete(
-                args.workspace.resolve(), args.prepared.resolve(), args.runtime_image
+                args.workspace.resolve(),
+                args.prepared.resolve(),
+                args.runtime_image,
+                container_engine=args.container_engine,
+                evidence_signing_key=(
+                    args.evidence_signing_key.resolve()
+                    if args.evidence_signing_key is not None
+                    else None
+                ),
+                verifier_signing_key=(
+                    args.verifier_signing_key.resolve()
+                    if args.verifier_signing_key is not None
+                    else None
+                ),
+                trust_root=(
+                    args.trust_root.expanduser().absolute()
+                    if args.trust_root is not None
+                    else None
+                ),
+                source_commit=args.source_commit,
+                base_image_id=args.base_image_id,
+                builder_public_key=(
+                    args.builder_public_key.resolve()
+                    if args.builder_public_key is not None
+                    else None
+                ),
+                build_attestation=(
+                    args.build_attestation.resolve()
+                    if args.build_attestation is not None
+                    else None
+                ),
             )
             print(f"Evidence: {evidence}\nReceipt: {receipt}\nReport: {report}")
     except (BridgeError, OSError, RuntimeError, TypeError, ValueError) as exc:

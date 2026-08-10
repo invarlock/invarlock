@@ -27,9 +27,19 @@ From a clean committed checkout with Docker or Podman available:
 make example-lm-evaluation-harness
 ```
 
+Supply caller-owned signing keys and a new trust root when running the signed
+journey, for example:
+
+```bash
+make example-lm-evaluation-harness EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+```
+
 Pass `--workspace PATH` when you want to retain the transaction at a specific
 new path. Otherwise the launcher creates a temporary workspace and prints its
 location.
+
+The launcher removes the exact temporary base and Harness image tags it creates
+after the journey, including when the workspace is retained.
 
 The command builds the repository's source-authenticated CPU runtime and adds
 a deterministic cache-free package derived from the hash-pinned upstream
@@ -45,10 +55,12 @@ The adapter requires one upstream sample for each schedule record, stable
 dataset IDs, matching prompt and target hashes, the exact task configuration,
 and a digest-bound run manifest. Aggregate-only result files, missing IDs,
 reordered records, source-input changes, and post-run sample changes fail
-closed. The harness provenance is also attached as an authenticated
-observation, while acceptance is replayed from the raw responses. Every target
-fits the authenticated one-token generation bound, and the completed journey
-requires each model to solve at least 20% of the fixed records.
+closed. Completion reruns both workers in the inspected image; prepared worker
+output is not authoritative. The full upstream per-record snapshots and
+manifests are attached as authenticated provenance, while acceptance is
+replayed from the raw responses. Every target fits the authenticated one-token
+generation bound, and the signed policy requires each model to solve at least
+20% of the fixed records.
 
 The schedule covers factual, numeric, temporal, spatial, scientific, and
 common-language completions. Its fixed policy requires all 102 records, limits

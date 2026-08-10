@@ -206,6 +206,7 @@ def prepare(root: Path, image_id: str) -> None:
                     "delta_min_pp": -20.0,
                     "maximum_interval_width_pp": 20.0,
                     "minimum_record_count": 102,
+                    "minimum_side_accuracy": 0.20,
                 }
             }
         }

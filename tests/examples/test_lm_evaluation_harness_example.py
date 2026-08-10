@@ -3,13 +3,16 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import shutil
 import sys
 import threading
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 import yaml
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
@@ -50,6 +53,82 @@ def _model_inputs_module() -> ModuleType:
 
 def _digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _complete_kwargs(tmp_path: Path, module: ModuleType) -> dict[str, object]:
+    evidence_key = tmp_path / "evidence.pem"
+    verifier_key = tmp_path / "verifier.pem"
+    builder_key = tmp_path / "builder.pem"
+    for path in (evidence_key, verifier_key, builder_key):
+        key = ed25519.Ed25519PrivateKey.generate()
+        path.write_bytes(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+    builder_public = tmp_path / "builder-public.pem"
+    builder = serialization.load_pem_private_key(
+        builder_key.read_bytes(), password=None
+    )
+    assert isinstance(builder, ed25519.Ed25519PrivateKey)
+    builder_public.write_bytes(
+        builder.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    attestation = tmp_path / "build-attestation.json"
+    attestation.write_text("{}\n", encoding="utf-8")
+    return {
+        "container_engine": "docker",
+        "evidence_signing_key": evidence_key,
+        "verifier_signing_key": verifier_key,
+        "trust_root": tmp_path / "trust-root",
+        "source_commit": "c" * 40,
+        "base_image_id": "sha256:" + "a" * 64,
+        "build_attestation": attestation,
+        "builder_public_key": builder_public,
+    }
+
+
+def _launcher_args(tmp_path: Path, module: ModuleType) -> list[str]:
+    values: list[str] = []
+    for name in ("evidence", "verifier", "builder"):
+        path = tmp_path / f"launcher-{name}.pem"
+        key = ed25519.Ed25519PrivateKey.generate()
+        path.write_bytes(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+        values.extend((f"--{name}-signing-key", str(path)))
+        if name == "builder":
+            public = path.with_name("launcher-builder-public.pem")
+            public.write_bytes(
+                key.public_key().public_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PublicFormat.SubjectPublicKeyInfo,
+                )
+            )
+            values.extend(("--builder-public-key", str(public)))
+    trust_root = tmp_path / "launcher-trust-root"
+    values.extend(("--trust-root", str(trust_root)))
+    return values
+
+
+def _stub_completion_workers(
+    monkeypatch: pytest.MonkeyPatch, module: ModuleType, prepared: Path
+) -> None:
+    monkeypatch.setattr(module, "_inspect_runtime_image", lambda *_a, **_k: None)
+
+    def copy_worker(*, role: str, output: Path, **_kwargs: object) -> None:
+        shutil.copytree(prepared / "harness" / role, output)
+
+    monkeypatch.setattr(module, "_run_verified_worker", copy_worker)
 
 
 def _schedule():
@@ -191,6 +270,9 @@ def _write_full_run(
         "dataset_sha256": _digest(
             (prepared / "evaluation/inputs/records.jsonl").read_bytes()
         ),
+        "runtime_image_digest": prepared.joinpath("runtime-image-id.txt")
+        .read_text(encoding="ascii")
+        .strip(),
         "record_count": len(records),
         "stable_id_field": "id",
     }
@@ -237,6 +319,15 @@ def _prepare_test_transaction(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
+    module.DATASET_SHA256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
+    module.EXPECTED_MODEL_ARTIFACTS = {
+        role: {
+            "path": f"models/{role}",
+            "model_id": f"test/{role}",
+            "locator": f"generated://test/{role}",
+        }
+        for role in ("baseline", "subject")
+    }
     policy = {
         "resolved_policy": {
             "metrics": {
@@ -244,6 +335,7 @@ def _prepare_test_transaction(
                     "delta_min_pp": -20.0,
                     "maximum_interval_width_pp": 20.0,
                     "minimum_record_count": 102,
+                    "minimum_side_accuracy": module.MINIMUM_SIDE_ACCURACY,
                 }
             }
         }
@@ -318,15 +410,20 @@ def test_worker_runs_the_pinned_harness_and_binds_official_samples(
         module.importlib.metadata, "version", lambda _name: module.VERSION
     )
 
-    def run(command: list[str], *, check: bool, text: bool) -> object:
-        assert check is False and text is True
+    def run_bounded(command: list[str], *, timeout_seconds: int, label: str) -> object:
+        assert timeout_seconds == module.WORKER_TIMEOUT_SECONDS
+        assert label == "LM Evaluation Harness execution"
         commands.append(command)
         raw = Path(command[command.index("--output_path") + 1])
         raw.mkdir(parents=True)
         (raw / "samples_task.jsonl").write_text('{"sample":1}\n', encoding="utf-8")
-        return type("Result", (), {"returncode": 0})()
+        return type(
+            "Result",
+            (),
+            {"returncode": 0, "stdout": "", "stderr": ""},
+        )()
 
-    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module, "_run_bounded_command", run_bounded)
     module.worker("baseline", model, dataset, output)
 
     command = commands[0]
@@ -365,17 +462,21 @@ def test_worker_runs_the_pinned_harness_and_binds_official_samples(
         module.worker("baseline", model, dataset, output)
 
     monkeypatch.setattr(
-        module.subprocess,
-        "run",
-        lambda *_args, **_kwargs: type("Result", (), {"returncode": 3})(),
+        module,
+        "_run_bounded_command",
+        lambda *_args, **_kwargs: type(
+            "Result", (), {"returncode": 3, "stdout": "", "stderr": "failed"}
+        )(),
     )
     with pytest.raises(module.BridgeError, match="execution failed"):
         module.worker("baseline", model, dataset, tmp_path / "failed-run")
 
     monkeypatch.setattr(
-        module.subprocess,
-        "run",
-        lambda *_args, **_kwargs: type("Result", (), {"returncode": 0})(),
+        module,
+        "_run_bounded_command",
+        lambda *_args, **_kwargs: type(
+            "Result", (), {"returncode": 0, "stdout": "", "stderr": ""}
+        )(),
     )
     with pytest.raises(module.BridgeError, match="one per-record file"):
         module.worker("baseline", model, dataset, tmp_path / "missing-samples")
@@ -395,8 +496,9 @@ def test_worker_rejects_inputs_changed_during_harness_execution(
         module.importlib.metadata, "version", lambda _name: module.VERSION
     )
 
-    def run(command: list[str], *, check: bool, text: bool) -> object:
-        assert check is False and text is True
+    def run_bounded(command: list[str], *, timeout_seconds: int, label: str) -> object:
+        assert timeout_seconds == module.WORKER_TIMEOUT_SECONDS
+        assert label == "LM Evaluation Harness execution"
         if target == "model":
             (model / "config.json").write_text('{"changed":true}\n', encoding="utf-8")
         elif target == "dataset":
@@ -405,9 +507,9 @@ def test_worker_rejects_inputs_changed_during_harness_execution(
             Path(command[command.index("--tasks") + 1]).write_text(
                 "task: changed\n", encoding="utf-8"
             )
-        return type("Result", (), {"returncode": 0})()
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
-    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module, "_run_bounded_command", run_bounded)
     with pytest.raises(module.BridgeError, match="inputs changed during execution"):
         module.worker("baseline", model, dataset, tmp_path / "output")
 
@@ -601,11 +703,12 @@ def test_complete_rejects_existing_workspace_and_mismatched_harness_runs(
     existing.mkdir()
     with pytest.raises(module.BridgeError, match="workspace must be new"):
         module.complete(existing, tmp_path / "prepared", image)
+    _prepare_test_transaction(tmp_path / "prepared", module, image)
 
     monkeypatch.setattr(
         module,
         "load_run",
-        lambda _path, role: (
+        lambda _path, role, _image: (
             {
                 "execution_config_sha256": "shared-execution",
                 "task_config_sha256": f"different-{role}",
@@ -613,8 +716,13 @@ def test_complete_rejects_existing_workspace_and_mismatched_harness_runs(
             tmp_path / f"{role}-samples.jsonl",
         ),
     )
+    _stub_completion_workers(monkeypatch, module, tmp_path / "prepared")
+    monkeypatch.setattr(module, "_run_verified_worker", lambda **_kwargs: None)
+    kwargs = _complete_kwargs(tmp_path, module)
     with pytest.raises(module.BridgeError, match="different Harness configurations"):
-        module.complete(tmp_path / "new-transaction", tmp_path / "prepared", image)
+        module.complete(
+            tmp_path / "new-transaction", tmp_path / "prepared", image, **kwargs
+        )
 
 
 def test_bridge_main_dispatches_worker_complete_and_reports_failures(
@@ -648,12 +756,13 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
     monkeypatch.setattr(
         module,
         "complete",
-        lambda *_args: (
+        lambda *_args, **_kwargs: (
             tmp_path / "evidence",
             tmp_path / "receipt.json",
             tmp_path / "report.html",
         ),
     )
+    completion_keys = _complete_kwargs(tmp_path, module)
     assert (
         module.main(
             [
@@ -664,6 +773,20 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
                 str(tmp_path / "prepared"),
                 "--runtime-image",
                 "sha256:" + "a" * 64,
+                "--evidence-signing-key",
+                str(completion_keys["evidence_signing_key"]),
+                "--verifier-signing-key",
+                str(completion_keys["verifier_signing_key"]),
+                "--trust-root",
+                str(completion_keys["trust_root"]),
+                "--builder-public-key",
+                str(completion_keys["builder_public_key"]),
+                "--source-commit",
+                "c" * 40,
+                "--base-image-id",
+                "sha256:" + "b" * 64,
+                "--build-attestation",
+                str(completion_keys["build_attestation"]),
             ]
         )
         == 0
@@ -714,8 +837,11 @@ def test_complete_replays_real_import_transaction(
     for role in ("baseline", "subject"):
         _write_full_run(prepared, module, role, records)
 
+    _stub_completion_workers(monkeypatch, module, prepared)
+    monkeypatch.setattr(module, "_tokenizer_metadata_digest", lambda _path: "b" * 64)
+    kwargs = _complete_kwargs(tmp_path, module)
     evidence, receipt, report = module.complete(
-        tmp_path / "transaction", prepared, image
+        tmp_path / "transaction", prepared, image, **kwargs
     )
 
     assert evidence.is_dir()
@@ -770,7 +896,7 @@ def test_complete_replays_real_import_transaction(
 
 @pytest.mark.parametrize("tamper", ["dataset", "policy"])
 def test_complete_rejects_tampered_prepared_acceptance_inputs(
-    tmp_path: Path, tamper: str
+    tmp_path: Path, tamper: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
     prepared = tmp_path / "prepared"
@@ -791,13 +917,21 @@ def test_complete_rejects_tampered_prepared_acceptance_inputs(
         policy_path.write_text(json.dumps(policy), encoding="utf-8")
         error = "policy is not the fixed"
 
+    _stub_completion_workers(monkeypatch, module, prepared)
     with pytest.raises(module.BridgeError, match=error):
-        module.complete(tmp_path / f"transaction-{tamper}", prepared, image)
+        module.complete(
+            tmp_path / f"transaction-{tamper}",
+            prepared,
+            image,
+            **_complete_kwargs(tmp_path, module),
+        )
 
 
-@pytest.mark.parametrize("tamper", ["checkpoint", "policy-pointer", "dataset-name"])
+@pytest.mark.parametrize(
+    "tamper", ["checkpoint", "policy-pointer", "dataset-name", "timeout"]
+)
 def test_complete_rejects_changed_prepared_identity(
-    tmp_path: Path, tamper: str
+    tmp_path: Path, tamper: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
     prepared = tmp_path / "prepared"
@@ -816,13 +950,25 @@ def test_complete_rejects_changed_prepared_identity(
         if tamper == "policy-pointer":
             request["comparison"]["policy"] = "inputs/other.json"
             error = "policy path"
-        else:
+        elif tamper == "dataset-name":
             request["comparison"]["dataset"]["name"] = "other"
             error = "dataset descriptor"
+        else:
+            request["comparison"]["baseline"]["runtime"]["settings"][
+                "timeout_seconds"
+            ] = 1
+            error = "runtime settings"
         request_path.write_text(yaml.safe_dump(request), encoding="utf-8")
 
+    _stub_completion_workers(monkeypatch, module, prepared)
+    monkeypatch.setattr(module, "_tokenizer_metadata_digest", lambda _path: "b" * 64)
     with pytest.raises((module.BridgeError, ValueError), match=error):
-        module.complete(tmp_path / f"transaction-{tamper}", prepared, image)
+        module.complete(
+            tmp_path / f"transaction-{tamper}",
+            prepared,
+            image,
+            **_complete_kwargs(tmp_path, module),
+        )
 
 
 def test_launcher_runs_workers_in_restricted_inspected_image(
@@ -833,6 +979,41 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
 
     base_id = "sha256:" + ("a" * 64)
     final_id = "sha256:" + ("b" * 64)
+    base_config = {
+        "ArgsEscaped": False,
+        "Cmd": ["/bin/sh"],
+        "Entrypoint": None,
+        "Env": ["BASE_SETTING=preserved"],
+        "Labels": {"base-setting": "preserved"},
+        "OnBuild": None,
+        "Shell": ["/bin/sh"],
+        "StopSignal": "SIGTERM",
+        "User": "",
+        "WorkingDir": "/",
+    }
+    child_config = {
+        **base_config,
+        "Entrypoint": [
+            "python",
+            "/opt/invarlock/examples/lm-evaluation-harness-example.py",
+            "worker",
+        ],
+        "Labels": {
+            "base-setting": "preserved",
+            "org.invarlock.example.base-image-id": base_id,
+            "org.invarlock.example.source-commit": "c" * 40,
+            "org.invarlock.example.source-bundle-sha256": "sha256:"
+            + hashlib.sha256(b"test-source").hexdigest(),
+            "org.invarlock.example.evaluator": "lm-evaluation-harness",
+            "org.invarlock.example.evaluator-version": "0.4.12+invarlock.nocache.1",
+            "org.invarlock.example.evaluator-lock-sha256": "sha256:"
+            + hashlib.sha256(
+                (
+                    ROOT / "requirements/workflows/lm-evaluation-harness-py312.txt"
+                ).read_bytes()
+            ).hexdigest(),
+        },
+    }
     commands: list[list[str]] = []
     monkeypatch.setattr(
         shared_launch, "_require_committed_checkout", lambda _root: "c" * 40
@@ -847,14 +1028,43 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
         command: list[str], *, cwd: Path, stdin_path: Path | None = None
     ) -> str:
         commands.append(command)
+        if "archive" in command:
+            output = next(
+                Path(value.removeprefix("--output="))
+                for value in command
+                if value.startswith("--output=")
+            )
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"test-source")
         if command[:3] == ["docker", "image", "inspect"]:
+            if "RootFS.Layers" in command[4]:
+                return json.dumps(
+                    ["sha256:" + "1" * 64]
+                    if command[-1] == base_id
+                    else [
+                        "sha256:" + "1" * 64,
+                        "sha256:" + "2" * 64,
+                        "sha256:" + "3" * 64,
+                        "sha256:" + "4" * 64,
+                        "sha256:" + "5" * 64,
+                        "sha256:" + "6" * 64,
+                        "sha256:" + "7" * 64,
+                        "sha256:" + "8" * 64,
+                        "sha256:" + "9" * 64,
+                        "sha256:" + "a" * 64,
+                        "sha256:" + "b" * 64,
+                        "sha256:" + "c" * 64,
+                    ]
+                )
+            if command[4] == "{{json .Config}}":
+                return json.dumps(
+                    base_config if command[-1] == base_id else child_config
+                )
+            if command[4] == "{{.Id}}" and not command[-1].startswith("sha256:"):
+                raise RuntimeError("No such image")
             if "org.invarlock.example.base-image-id" in " ".join(command):
                 return base_id
-            return (
-                base_id
-                if command[-1].startswith("invarlock-example-runtime:")
-                else final_id
-            )
+            return final_id
         if "model_inputs.py" in " ".join(command):
             prepared = tmp_path / "journey/prepared"
             for role in ("baseline", "subject"):
@@ -866,35 +1076,49 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
         if command[:2] == ["docker", "build"]:
             assert stdin_path == tmp_path / "journey/build/harness-source.tar"
             assert command[-1] == "-"
+            Path(command[command.index("--iidfile") + 1]).write_text(
+                final_id + "\n", encoding="ascii"
+            )
         return ""
 
     monkeypatch.setattr(module, "run", fake_run)
-    assert module.main(["--workspace", str(tmp_path / "journey")]) == 0
+    assert (
+        module.main(
+            [
+                "--workspace",
+                str(tmp_path / "journey"),
+                *_launcher_args(tmp_path, module),
+            ]
+        )
+        == 0
+    )
     workers = [
         command for command in commands if command[:3] == ["docker", "run", "--rm"]
     ]
-    assert len(workers) == 2
-    for command in workers:
-        assert command[command.index("--network") + 1] == "none"
-        assert "--pull=never" in command
-        assert "--read-only" in command
-        assert "--cap-drop=ALL" in command
-        assert "no-new-privileges" in command
-        assert command[command.index("--user") + 1]
-        assert command[command.index("--tmpfs") + 1].startswith("/tmp:rw,noexec")
-        assert command[command.index("--mount") + 1].endswith("dst=/model,readonly")
-        assert final_id in command
+    assert workers == []
+    completion = next(
+        command for command in commands if "example.py" in " ".join(command)
+    )
+    assert "--source-commit" in completion
+    assert "--base-image-id" in completion
     build = next(command for command in commands if command[:2] == ["docker", "build"])
     assert "BASE_IMAGE=invarlock-example-runtime:cccccccccccc" in build
+    assert "--iidfile" in build
+    assert any(
+        command[-1] == "invarlock-lm-eval-example:cccccccccccc"
+        for command in commands
+        if command[:3] == ["docker", "image", "inspect"]
+    )
     assert f"BASE_IMAGE_ID={base_id}" in build
     assert f"BASE_IMAGE={base_id}" not in build
-    base_inspections = [
+    base_layer_inspections = [
         command
         for command in commands
         if command[:3] == ["docker", "image", "inspect"]
-        and command[-1] == "invarlock-example-runtime:cccccccccccc"
+        and command[-1] == base_id
+        and "RootFS.Layers" in command[4]
     ]
-    assert len(base_inspections) == 2
+    assert len(base_layer_inspections) == 1
     assert any(
         "org.invarlock.example.base-image-id" in " ".join(command)
         for command in commands
@@ -903,6 +1127,92 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
         command for command in commands if "model_inputs.py" in " ".join(command)
     )
     assert preparation[preparation.index("--runtime-image") + 1] == final_id
+
+
+def test_lm_launcher_bounds_command_output_and_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    launcher = _launcher_module()
+    monkeypatch.setattr(launcher, "_COMMAND_STDOUT_LIMIT", 8)
+    with pytest.raises(RuntimeError, match="stdout limit exceeded"):
+        launcher.run(
+            [sys.executable, "-c", "print('x' * 100)"],
+            cwd=tmp_path,
+        )
+    monkeypatch.setattr(launcher, "_COMMAND_TIMEOUT_SECONDS", 1)
+    with pytest.raises(RuntimeError, match="timed out"):
+        launcher.run(
+            [sys.executable, "-c", "import time; time.sleep(2)"],
+            cwd=tmp_path,
+        )
+
+
+def test_harness_bounded_command_captures_failures_and_start_errors(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    completed = module._run_bounded_command(
+        [sys.executable, "-c", "print('ok')"],
+        timeout_seconds=10,
+        label="test command",
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == "ok\n"
+    failed = module._run_bounded_command(
+        [
+            sys.executable,
+            "-c",
+            "import sys; print('failed', file=sys.stderr); sys.exit(3)",
+        ],
+        timeout_seconds=10,
+        label="test command",
+    )
+    assert failed.returncode == 3
+    assert "failed" in failed.stderr
+    with pytest.raises(module.BridgeError, match="could not start"):
+        module._run_bounded_command(
+            [str(tmp_path / "missing-command")],
+            timeout_seconds=10,
+            label="test command",
+        )
+
+
+def test_harness_workers_mount_role_private_output_parents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    prepared = tmp_path / "prepared"
+    for role in ("baseline", "subject"):
+        (prepared / f"evaluation/models/{role}").mkdir(parents=True)
+    (prepared / "evaluation/inputs").mkdir(parents=True)
+    (prepared / "evaluation/inputs/records.jsonl").write_text("{}\n", encoding="utf-8")
+    commands: list[dict[str, object]] = []
+
+    def fake_worker(**kwargs: object) -> SimpleNamespace:
+        commands.append(kwargs)
+        assert kwargs["timeout_seconds"] == module.WORKER_TIMEOUT_SECONDS
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    monkeypatch.setattr(
+        module,
+        "run_evaluator_worker",
+        fake_worker,
+    )
+
+    for role in ("baseline", "subject"):
+        module._run_verified_worker(
+            engine="docker",
+            image="sha256:" + "a" * 64,
+            role=role,
+            prepared=prepared,
+            output=tmp_path / f"upstream/{role}/result",
+        )
+
+    assert [call["worker_arguments"][1] for call in commands] == [
+        "baseline",
+        "subject",
+    ]
+    assert all(call["output"].name == "result" for call in commands)
 
 
 def test_model_inputs_pin_public_qwen3_snapshots_and_closed_records() -> None:
@@ -1164,6 +1474,7 @@ def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
         "delta_min_pp": -20.0,
         "maximum_interval_width_pp": 20.0,
         "minimum_record_count": 102,
+        "minimum_side_accuracy": 0.20,
     }
 
 
@@ -1279,8 +1590,7 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
     (reports / "evaluation.report.json").write_text(
         json.dumps(evaluation), encoding="utf-8"
     )
-    with pytest.raises(module.BridgeError, match="did not verify a passing"):
-        module.validate_completed_outputs(evidence, receipt, rendered)
+    module.validate_completed_outputs(evidence, receipt, rendered)
 
     evaluation["baseline"]["mean_score"] = 0.8
     evaluation["comparison"]["value"] = True
@@ -1344,7 +1654,10 @@ def test_launcher_command_runner_and_existing_workspace_fail_closed(
         )
     existing = tmp_path / "existing"
     existing.mkdir()
-    assert module.main(["--workspace", str(existing)]) == 2
+    assert (
+        module.main(["--workspace", str(existing), *_launcher_args(tmp_path, module)])
+        == 2
+    )
 
 
 def test_launcher_canonicalizes_default_workspace_before_source_build(
@@ -1368,17 +1681,18 @@ def test_launcher_canonicalizes_default_workspace_before_source_build(
         raise RuntimeError("stop after canonical workspace check")
 
     monkeypatch.setattr(shared_launch, "_runtime_image", stop)
-    assert module.main([]) == 2
+    monkeypatch.setattr(module, "require_image_tag_available", lambda *_args: None)
+    assert module.main(_launcher_args(tmp_path, module)) == 2
     assert observed == [real.resolve() / "build"]
 
 
 @pytest.mark.parametrize(
     ("failure", "message"),
     [
-        ("after-build", "changed after source-bound build"),
-        ("during-build", "changed during Harness image build"),
         ("mutable-image", "did not return an immutable ID"),
         ("wrong-base-label", "does not bind the inspected base image ID"),
+        ("wrong-base-layers", "does not derive from the authenticated base"),
+        ("extra-base-layer", "does not derive from the authenticated base"),
     ],
 )
 def test_launcher_rejects_image_identity_drift(
@@ -1398,27 +1712,55 @@ def test_launcher_rejects_image_identity_drift(
     monkeypatch.setattr(
         shared_launch, "_runtime_image", lambda **_kwargs: (base_id, base_id)
     )
-    base_inspections = 0
 
     def run(command: list[str], *, cwd: Path, stdin_path: Path | None = None) -> str:
-        nonlocal base_inspections
         if command[:3] != ["docker", "image", "inspect"]:
             return ""
+        if "RootFS.Layers" in command[4]:
+            if failure == "wrong-base-layers" and command[-1] != base_id:
+                return json.dumps(["sha256:" + "d" * 64])
+            if failure == "extra-base-layer" and command[-1] != base_id:
+                return json.dumps(
+                    [
+                        "sha256:" + "a" * 64,
+                        "sha256:" + "x" * 64,
+                        "sha256:" + "b" * 64,
+                        "sha256:" + "c" * 64,
+                        "sha256:" + "d" * 64,
+                        "sha256:" + "e" * 64,
+                        "sha256:" + "f" * 64,
+                        "sha256:" + "g" * 64,
+                    ]
+                )
+            return json.dumps(
+                ["sha256:" + "a" * 64]
+                if command[-1] == base_id
+                else [
+                    "sha256:" + "a" * 64,
+                    "sha256:" + "b" * 64,
+                    "sha256:" + "c" * 64,
+                    "sha256:" + "d" * 64,
+                    "sha256:" + "e" * 64,
+                    "sha256:" + "f" * 64,
+                ]
+            )
         if "org.invarlock.example.base-image-id" in " ".join(command):
             return "sha256:" + "d" * 64 if failure == "wrong-base-label" else base_id
-        if command[-1].startswith("invarlock-example-runtime:"):
-            base_inspections += 1
-            if failure == "after-build" and base_inspections == 1:
-                return "sha256:" + "d" * 64
-            if failure == "during-build" and base_inspections == 2:
-                return "sha256:" + "d" * 64
-            return base_id
         if failure == "mutable-image":
             return "mutable-tag"
         return final_id
 
     monkeypatch.setattr(module, "run", run)
-    assert module.main(["--workspace", str(tmp_path / failure)]) == 2
+    assert (
+        module.main(
+            [
+                "--workspace",
+                str(tmp_path / failure),
+                *_launcher_args(tmp_path, module),
+            ]
+        )
+        == 2
+    )
 
 
 def test_container_recipe_pins_the_harness_and_real_worker() -> None:
