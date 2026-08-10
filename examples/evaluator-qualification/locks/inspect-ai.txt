@@ -1,1 +1,1 @@
-inspect-ai==0.3.249
+inspect-ai==0.3.254
