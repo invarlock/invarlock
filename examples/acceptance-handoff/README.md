@@ -24,6 +24,9 @@ stricter current policy, a wrong artifact, tampered evidence, a tampered
 envelope, an unknown envelope signer, a revoked envelope signer, an unknown
 receipt verifier, a stale envelope, a missing authoritative evidence timestamp,
 and a contradiction between the receipt and envelope.
+On success it prints the fixture decision, the rejected-scenario count, and
+the exact paths to the signed evidence, verifier receipt, acceptance envelope,
+scenario results, and retained workspace.
 
 ## Committed package
 

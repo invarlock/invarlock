@@ -149,6 +149,38 @@ full commit pin makes action-source substitution visible in review.
 `INVARLOCK_POLICY_SHA256` must likewise be a protected verifier-owned digest,
 not a value read from the submitted checkout.
 
+## Protected deployment approval
+
+A successful verification job is necessary but is not, by itself, a portable
+deployment authorization. The deployment job must consume the uploaded signed
+receipt, reauthenticate it against production-owned verifier and policy
+anchors, and deploy only the exact candidate bound by that receipt.
+
+The maintained
+[`deployment-approval.yml`](https://github.com/invarlock/invarlock/blob/main/examples/ci/github-actions/deployment-approval.yml)
+example implements that separation:
+
+1. `verify-evidence` runs in the protected `release-review` environment and
+   uploads the evidence plus its signed verifier receipt.
+2. `deploy-candidate` depends on that successful job and enters a separate
+   protected `production` environment.
+3. The deployment job downloads the artifact and runs
+   `examples/ci/verify_deployment_receipt.py` against production-owned approval
+   inputs. The helper authenticates the receipt signature, verifier identity
+   and fingerprint, evidence signer, artifact identities, schedule, runtimes,
+   and policy digest.
+4. The production-owned deployment adapter resolves or recomputes the candidate
+   identity and requires it to equal `artifact_digests.subject` in the emitted
+   `invarlock/deployment-approval-v1` record. Only then does the workflow invoke
+   the deployment command with that same record.
+
+The complete approval-input JSON is materialized from protected production
+configuration. It must not be generated from the downloaded evidence, receipt,
+or verification job outputs. The checked-in test exercises the accepted path
+and rejects changed verifier and policy anchors. A mutable candidate path or
+tag is not enough: the deployment adapter must enforce the approved InvarLock
+artifact identity to close the time-of-check/time-of-use boundary.
+
 ## Outputs and status
 
 The default action outputs are:
@@ -194,6 +226,9 @@ receipt through the
   report paths for a retry.
 - Validate a received receipt against the expected verifier identity and
   fingerprint before another system relies on it.
+- Reauthenticate the signed receipt in the deployment environment; do not
+  treat job dependency, artifact presence, HTML, or unsigned verification JSON
+  as deployment authority.
 
 Continue with [Evidence and verification](evidence-and-verification.md) for the
 handoff and receipt verifier rules and [Key management](key-management.md) for

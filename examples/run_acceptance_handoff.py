@@ -580,6 +580,34 @@ def write_golden(destination: Path = GOLDEN_ROOT) -> None:
         _copy_golden(workspace, destination)
 
 
+def print_handoff_summary(workspace: Path) -> None:
+    """Print the useful decision and signed outputs from a successful handoff."""
+
+    results = json.loads((workspace / "results.json").read_bytes())
+    scenarios = results.get("scenarios")
+    if not isinstance(scenarios, dict) or scenarios.get("accepted") is not True:
+        raise RuntimeError("acceptance handoff summary is invalid")
+    rejection_results = {
+        name: passed for name, passed in scenarios.items() if name != "accepted"
+    }
+    if not rejection_results or any(
+        passed is not True for passed in rejection_results.values()
+    ):
+        raise RuntimeError("acceptance handoff rejection summary is invalid")
+
+    print("PASS offline acceptance handoff")
+    print("Fixture decision: accepted")
+    print(
+        "Fail-closed scenarios rejected: "
+        f"{len(rejection_results)}/{len(rejection_results)}"
+    )
+    print(f"Signed evidence: {workspace / 'handoff/evidence'}")
+    print(f"Signed verifier receipt: {workspace / 'handoff/verification.receipt.json'}")
+    print(f"Acceptance envelope: {workspace / 'handoff/acceptance.dsse.json'}")
+    print(f"Scenario results: {workspace / 'results.json'}")
+    print(f"Workspace: {workspace}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="run the offline acceptance handoff")
     parser.add_argument("--workspace", type=Path)
@@ -602,7 +630,7 @@ def main() -> int:
         / "workspace"
     )
     run_handoff(workspace)
-    print(f"PASS offline acceptance handoff: {workspace}")
+    print_handoff_summary(workspace)
     return 0
 
 

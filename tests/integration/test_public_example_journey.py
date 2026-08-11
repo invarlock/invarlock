@@ -186,6 +186,7 @@ def test_hf_integration_prepares_from_committed_export(tmp_path: Path) -> None:
             str(workspace),
             "--runtime-image-digest",
             "sha256:" + ("0" * 64),
+            "--ephemeral-trust-root",
             "--prepare-only",
         ],
         cwd=exported,

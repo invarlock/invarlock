@@ -160,13 +160,30 @@ def test_main_runs_handoff_in_explicit_workspace(
     module = _module()
     workspace = tmp_path / "explicit"
     calls: list[Path] = []
-    monkeypatch.setattr(module, "run_handoff", calls.append)
+
+    def run(path: Path) -> None:
+        calls.append(path)
+        path.mkdir(parents=True)
+        path.joinpath("results.json").write_bytes(
+            GOLDEN.joinpath("results.json").read_bytes()
+        )
+
+    monkeypatch.setattr(module, "run_handoff", run)
     monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--workspace", str(workspace)])
 
     assert module.main() == 0
     assert calls == [workspace.resolve()]
     assert capsys.readouterr().out == (
-        f"PASS offline acceptance handoff: {workspace.resolve()}\n"
+        "PASS offline acceptance handoff\n"
+        "Fixture decision: accepted\n"
+        "Fail-closed scenarios rejected: 10/10\n"
+        f"Signed evidence: {workspace.resolve() / 'handoff/evidence'}\n"
+        "Signed verifier receipt: "
+        f"{workspace.resolve() / 'handoff/verification.receipt.json'}\n"
+        "Acceptance envelope: "
+        f"{workspace.resolve() / 'handoff/acceptance.dsse.json'}\n"
+        f"Scenario results: {workspace.resolve() / 'results.json'}\n"
+        f"Workspace: {workspace.resolve()}\n"
     )
 
 
@@ -176,7 +193,15 @@ def test_main_uses_fresh_default_workspace(
 ) -> None:
     module = _module()
     calls: list[Path] = []
-    monkeypatch.setattr(module, "run_handoff", calls.append)
+
+    def run(path: Path) -> None:
+        calls.append(path)
+        path.mkdir(parents=True)
+        path.joinpath("results.json").write_bytes(
+            GOLDEN.joinpath("results.json").read_bytes()
+        )
+
+    monkeypatch.setattr(module, "run_handoff", run)
     monkeypatch.setattr(module.tempfile, "mkdtemp", lambda **_kwargs: str(tmp_path))
     monkeypatch.setattr(sys, "argv", [str(SCRIPT)])
 
