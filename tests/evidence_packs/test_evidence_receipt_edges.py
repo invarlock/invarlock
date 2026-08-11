@@ -79,7 +79,7 @@ def test_receipt_no_clobber_race_never_removes_the_other_writer_file(
     assert receipt.read_bytes() == b"other writer"
 
 
-def test_receipt_writer_rejects_the_evidence_signer_key(
+def test_receipt_writer_allows_caller_managed_signer_roles(
     tmp_path: Path,
 ) -> None:
     pack, policy, runtimes, _pack_signer = _inputs(tmp_path)
@@ -87,23 +87,20 @@ def test_receipt_writer_rejects_the_evidence_signer_key(
     receipt = tmp_path / "receipt.json"
     result = _result(pack, policy, runtimes, verifier_fingerprint)
 
-    with pytest.raises(
-        EvidenceReceiptError,
-        match="distinct from the evidence signer",
-    ):
-        write_signed_verification_receipt(
-            pack,
-            result,
-            receipt,
-            policy_path=policy,
-            **_input_anchor_kwargs(),
-            expected_runtime_digests=runtimes,
-            expected_pack_signer_fingerprint=verifier_fingerprint,
-            verifier_identity="invarlock-verifier/release",
-            verifier_signing_key_path=verifier_key,
-        )
+    written = write_signed_verification_receipt(
+        pack,
+        result,
+        receipt,
+        policy_path=policy,
+        **_input_anchor_kwargs(),
+        expected_runtime_digests=runtimes,
+        expected_pack_signer_fingerprint=verifier_fingerprint,
+        verifier_identity="invarlock-verifier/release",
+        verifier_signing_key_path=verifier_key,
+    )
 
-    assert not receipt.exists()
+    assert written == verifier_fingerprint
+    assert receipt.is_file()
 
 
 def test_receipt_writer_removes_partial_file_after_durable_write_failure(

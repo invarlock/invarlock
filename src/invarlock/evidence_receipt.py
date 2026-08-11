@@ -322,17 +322,6 @@ def write_signed_verification_receipt(
         private_key = _load_private_key_bytes(verifier_signing_key_bytes)
     public_key = private_key.public_key()
     fingerprint = public_key_fingerprint(public_key)
-    expected_pack_signer = normalize_expected_fingerprint(
-        expected_pack_signer_fingerprint
-    )
-    if expected_pack_signer is None:
-        raise EvidenceReceiptError(
-            "pack signer anchor must be a sha256:... fingerprint"
-        )
-    if fingerprint == expected_pack_signer:
-        raise EvidenceReceiptError(
-            "verification receipt signer must be distinct from the evidence signer"
-        )
     statement = _statement(
         result,
         pack_manifest_digest=manifest_digest,
@@ -639,11 +628,6 @@ def verify_signed_verification_receipt(
         errors.append("receipt verifier fingerprint does not match its public key")
     if derived_fingerprint != external_verifier:
         errors.append("receipt verifier key does not match caller expectation")
-    expected_pack_signer = normalize_expected_fingerprint(
-        expected_pack_signer_fingerprint
-    )
-    if expected_pack_signer is not None and derived_fingerprint == expected_pack_signer:
-        errors.append("receipt verifier key must be distinct from the evidence signer")
     if public_key is not None:
         encoded_signature = signature.get("value")
         try:

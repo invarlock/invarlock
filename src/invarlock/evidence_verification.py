@@ -145,8 +145,9 @@ def verify_evidence(
     """Verify one pack with roots that cannot be selected by that pack.
 
     The canonical evidence pack requires independent per-side runtime roots,
-    an evidence signer root, and a distinct verifier key/identity that signs a
-    receipt outside the immutable pack.
+    an evidence signer root, and a caller-controlled verifier key/identity that
+    signs a receipt outside the immutable pack. Workflows that require role
+    separation must enforce it at their transaction boundary.
     """
 
     evidence = Path(evidence_path)

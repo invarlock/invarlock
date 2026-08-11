@@ -304,7 +304,7 @@ def prepare_workspace(
         raise ValueError(
             "caller-owned evidence/verifier keys and trust root are required"
         )
-    root = root.expanduser().resolve()
+    root = Path(os.path.abspath(root.expanduser()))
     if root.exists() or root.is_symlink():
         raise FileExistsError(
             f"workspace already exists: {root}; choose a new disposable path"
@@ -314,9 +314,13 @@ def prepare_workspace(
     paths = _paths(
         root,
         evidence_key=(
-            evidence_signing_key.expanduser().absolute() if external_trust else None
+            Path(os.path.abspath(evidence_signing_key.expanduser()))
+            if external_trust
+            else None
         ),
-        trust_root=(trust_root.expanduser().absolute() if external_trust else None),
+        trust_root=(
+            Path(os.path.abspath(trust_root.expanduser())) if external_trust else None
+        ),
     )
     try:
         paths.content.mkdir(parents=True)
@@ -342,7 +346,7 @@ def prepare_workspace(
             paths = _paths(
                 root,
                 evidence_key=evidence_key_path,
-                trust_root=trust_root.expanduser().absolute()
+                trust_root=Path(os.path.abspath(trust_root.expanduser()))
                 if trust_root is not None
                 else None,
             )

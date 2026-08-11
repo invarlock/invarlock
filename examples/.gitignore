@@ -3,6 +3,8 @@ artifacts/
 evidence.html
 verification.receipt.json
 *.receipt.json
+!evaluator-qualification/signed-transactions/*/verification.receipt.json
+!evaluator-qualification/signed-transactions/*/evidence/providers/*/runtime-provider.receipt.json
 !import/baseline/runtime-provider.receipt.json
 !import/subject/runtime-provider.receipt.json
 !import/rejected-subject/runtime-provider.receipt.json

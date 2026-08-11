@@ -9,6 +9,7 @@ from invarlock import evidence_pack_contract as contract
 from invarlock.core.runtime_provider import RuntimeScoringRecord
 from invarlock.evidence_pack_contract import (
     COMPARISON_REPORT_FORMAT,
+    COMPARISON_REPORT_FORMAT_V2,
     EVIDENCE_INPUT_IDENTITY_FORMAT,
     PAIRED_RECORDS_FORMAT,
     EvidenceObservation,
@@ -298,6 +299,15 @@ def test_signed_side_accuracy_policy_controls_verdict_and_report() -> None:
         "subject": {"observed": 0.5, "passed": False},
         "passed": False,
     }
+
+    with pytest.raises(EvidencePackError, match="comparison-report-v3"):
+        build_comparison_report(
+            comparison_id="comparison-1",
+            paired_records=_pairs(baseline=1.0, subject=0.0),
+            policy=policy,
+            policy_digest=_digest(),
+            report_format=COMPARISON_REPORT_FORMAT_V2,
+        )
 
 
 def test_paired_interval_is_deterministic_and_controls_the_verdict() -> None:

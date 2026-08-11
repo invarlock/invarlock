@@ -203,8 +203,8 @@ not invalidate the byte-normalized NLL comparison.
 
 The canonical report adds the metric-specific paired interval to the two side
 means and point comparison. New reports use
-`invarlock/comparison-report-v2`; the verifier also replays existing
-`invarlock/comparison-report-v1` packs under their original arithmetic. Exact
+`invarlock/comparison-report-v3`; the verifier also replays existing v2 and
+`invarlock/comparison-report-v1` packs under their original semantics. Exact
 match records paired regression and improvement counts, an exact two-sided
 McNemar probability, and the paired Newcombe 95% effect-size interval whose
 lower bound controls policy. Normalized NLL uses the upper bound of its

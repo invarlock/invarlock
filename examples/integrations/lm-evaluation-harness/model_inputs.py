@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -288,7 +289,10 @@ def main() -> int:
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--runtime-image", required=True)
     arguments = parser.parse_args()
-    prepare(arguments.workspace.expanduser().resolve(), arguments.runtime_image)
+    prepare(
+        Path(os.path.abspath(arguments.workspace.expanduser())),
+        arguments.runtime_image,
+    )
     return 0
 
 

@@ -191,6 +191,17 @@ def test_preparation_materializes_models_and_removes_partial_output_on_failure(
         )
     assert not failed.exists()
 
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    with pytest.raises(FileExistsError, match="workspace already exists"):
+        hf_vision_text.prepare_workspace(
+            linked,
+            runtime_image_digest=ZERO_DIGEST,
+            materialize_models=False,
+        )
+    assert not missing.exists()
+
 
 def test_execute_uses_public_commands_and_vision_resource_bindings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

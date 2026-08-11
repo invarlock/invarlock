@@ -55,9 +55,7 @@ COPY examples/integrations/launch.py \
     /opt/invarlock/examples/launch.py
 COPY examples/integrations/bounded_command.py \
     /opt/invarlock/examples/bounded_command.py
-COPY examples/integrations/evaluator_transaction/build_attestation.py \
-    /opt/invarlock/examples/evaluator_transaction.py
-COPY examples/integrations/evaluator_transaction/worker.py \
-    /opt/invarlock/examples/evaluator_transaction_worker.py
+COPY examples/integrations/evaluator_transaction \
+    /opt/invarlock/examples/evaluator_transaction
 
 ENTRYPOINT ["python", "/opt/invarlock/examples/lm-evaluation-harness-example.py", "worker"]

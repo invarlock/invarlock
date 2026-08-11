@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one pinned evaluator over two Qwen3 sides and sign the result."""
+"""Execute one pinned evaluator transaction over two Qwen3 sides."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ import re
 import stat
 import subprocess
 import sys
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -34,11 +33,11 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         read_external_file,
     )
 try:
-    from examples.integrations.launch import inspect_level3_image
+    from examples.integrations.launch import inspect_evaluator_image
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
-    from launch import inspect_level3_image  # type: ignore[no-redef]
+    from launch import inspect_evaluator_image  # type: ignore[no-redef]
 from invarlock import __version__ as INVARLOCK_VERSION
 
 try:
@@ -71,6 +70,29 @@ from invarlock.runtime_import_authoring import (
 )
 from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
+from . import adapters
+from .config import (
+    BATCH_SIZE,
+    DATASET_NAME,
+    DATASET_SHA256,
+    EVALUATORS,
+    EXPECTED_MODEL_ARTIFACTS,
+    EXPECTED_MODEL_TREE_DIGESTS,
+    EXPECTED_TOKENIZER_DIGESTS,
+    MAX_GENERATION_TOKENS,
+    MAX_WORKER_ARTIFACT_BYTES,
+    MINIMUM_SIDE_ACCURACY,
+    PER_RECORD_TIMEOUT_SECONDS,
+    RUN_FIELDS,
+    SAMPLE_FIELDS,
+    SEED,
+    WORKER_TIMEOUT_SECONDS,
+    BridgeError,
+    evaluator_id,
+    execution_config,
+    task_config,
+)
+
 try:
     from examples.integrations.evaluator_transaction.worker import (
         run_evaluator_worker,
@@ -90,101 +112,9 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
             run_evaluator_worker,
         )
 
-MAX_GENERATION_TOKENS = 1
-BATCH_SIZE = 8
-SEED = 20_260_716
-MINIMUM_SIDE_ACCURACY = 0.20
-DATASET_NAME = "qwen3-0.6b-base-to-post-trained"
-DATASET_SHA256 = "d80e81ba17fb93b9b8a46f9817f9841f5f9c2858c9d703b3ce28847b2eaeb57c"
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-TOKENIZER_PADDING_SIDE = "left"
-TOKENIZER_ADD_SPECIAL_TOKENS = True
-TOKENIZER_CLEAN_UP_SPACES = False
-PAD_TOKEN_POLICY = "eos_if_missing"
-MODEL_USE_CACHE = False
-TORCH_NUM_THREADS = 1
-INSPECT_RAW_CHAT_TEMPLATE = '{{ messages[0]["content"] }}'
-RECORD_COUNT = 102
-MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
-PER_RECORD_TIMEOUT_SECONDS = 300
-WORKER_TIMEOUT_SECONDS = min(
-    PER_RECORD_TIMEOUT_SECONDS * (RECORD_COUNT + 2), 24 * 60 * 60
-)
-
-EVALUATORS: dict[str, dict[str, str]] = {
-    "inspect-ai": {
-        "distribution": "inspect-ai",
-        "version": "0.3.254",
-        "entrypoint": "inspect_ai.eval -> inspect_ai.scorer.match",
-        "lock": "requirements/workflows/inspect-ai-level3-py312.txt",
-        "container_lock": "/opt/invarlock/evaluator-locks/inspect-ai-level3-requirements.txt",
-    },
-    "openai-evals": {
-        "distribution": "evals",
-        "version": "3.0.1.post1",
-        "entrypoint": "evals.elsuite.basic.match.Match",
-        "lock": "requirements/workflows/openai-evals-level3-py312.txt",
-        "container_lock": "/opt/invarlock/evaluator-locks/openai-evals-level3-requirements.txt",
-    },
-}
-
-EXPECTED_MODEL_ARTIFACTS = {
-    "baseline": {
-        "path": "models/baseline",
-        "model_id": "Qwen/Qwen3-0.6B-Base",
-        "locator": "hf://Qwen/Qwen3-0.6B-Base@da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
-    },
-    "subject": {
-        "path": "models/subject",
-        "model_id": "Qwen/Qwen3-0.6B",
-        "locator": "hf://Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca",
-    },
-}
-EXPECTED_MODEL_TREE_DIGESTS = {
-    "baseline": "sha256:eddb974cecb32ecf6bfaec2a19ecfbb32c73be9f7c38c7b54d551cd8ef66bd75",
-    "subject": "sha256:f97b7ac0717847938aed654bf671a93a28cf13413e37d29040ebad85564f6346",
-}
-EXPECTED_TOKENIZER_DIGESTS = {
-    "baseline": "c5f0898f912c7d953302779f61c86026b3cea05561a9520b6209e82b9d650581",
-    "subject": "ddf5fc73d604adf713f3d2fa98a9229c9dc05abb0881b33e636d15a5616dcd02",
-}
-
-RUN_FIELDS = {
-    "format",
-    "role",
-    "evaluator",
-    "evaluator_version",
-    "task_config",
-    "task_config_sha256",
-    "execution_config",
-    "execution_config_sha256",
-    "samples",
-    "samples_sha256",
-    "model_tree_sha256",
-    "dataset_sha256",
-    "evaluator_lock_sha256",
-    "runtime_image_digest",
-    "record_count",
-    "stable_id_field",
-}
-SAMPLE_FIELDS = {
-    "record_id",
-    "prompt",
-    "target",
-    "output",
-    "input_sha256",
-    "target_sha256",
-    "output_sha256",
-    "reported_score",
-    "score_detail",
-    "status",
-}
-
-
-class BridgeError(ValueError):
-    """The upstream output cannot support verifier replay."""
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 def digest(payload: bytes) -> str:
@@ -313,7 +243,7 @@ def _inspect_runtime_image(
     if IMAGE_ID.fullmatch(base_image_id) is None:
         raise BridgeError("base image identity must be an immutable image digest")
     try:
-        inspect_level3_image(
+        inspect_evaluator_image(
             engine=engine,
             image=image,
             repository=REPOSITORY_ROOT,
@@ -323,7 +253,8 @@ def _inspect_runtime_image(
             lock_sha256=lock_digest,
             expected_entrypoint=(
                 "python",
-                "/opt/invarlock/examples/evaluator-level3.py",
+                "-m",
+                "evaluator_transaction.cli",
                 "worker",
             ),
             source_commit=source_commit,
@@ -332,436 +263,8 @@ def _inspect_runtime_image(
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise BridgeError(
-            "Level 3 build attestation did not authenticate the image"
+            "evaluator build attestation did not authenticate the image"
         ) from exc
-
-
-def evaluator_id() -> str:
-    value = os.environ.get("INVARLOCK_EVALUATOR")
-    if value not in EVALUATORS:
-        raise BridgeError("INVARLOCK_EVALUATOR is not a maintained Level 3 evaluator")
-    return value
-
-
-def task_config(dataset: str, selected: str | None = None) -> dict[str, Any]:
-    name = selected or evaluator_id()
-    if name not in EVALUATORS:
-        raise BridgeError(f"unsupported evaluator: {name}")
-    return {
-        "evaluator": name,
-        "dataset": dataset,
-        "metric": "exact_match",
-        "scorer": (
-            {
-                "location": "exact",
-                "ignore_case": False,
-                "ignore_punctuation": True,
-            }
-            if name == "inspect-ai"
-            else {"native": "prefix", "transaction": "exact"}
-        ),
-        "completion_boundary": (
-            "target_leading_whitespace" if name == "inspect-ai" else "native"
-        ),
-        "generation": {
-            "do_sample": False,
-            "max_new_tokens": MAX_GENERATION_TOKENS,
-            "stop": ["\n"],
-        },
-    }
-
-
-def execution_config(selected: str | None = None) -> dict[str, Any]:
-    name = selected or evaluator_id()
-    package = EVALUATORS[name]
-    return {
-        "batch_size": BATCH_SIZE,
-        "device": "cpu",
-        "do_sample": False,
-        "dtype": "float32",
-        "evaluator": name,
-        "evaluator_distribution": package["distribution"],
-        "evaluator_entrypoint": package["entrypoint"],
-        "evaluator_version": package["version"],
-        "max_generation_tokens": MAX_GENERATION_TOKENS,
-        "model_use_cache": MODEL_USE_CACHE,
-        "pad_token_policy": PAD_TOKEN_POLICY,
-        "prompt_rendering": (
-            {
-                "mode": "custom_chat_template",
-                "template": INSPECT_RAW_CHAT_TEMPLATE,
-            }
-            if name == "inspect-ai"
-            else {"mode": "completion_function_raw_text"}
-        ),
-        "seed": SEED,
-        "tokenizer_add_special_tokens": TOKENIZER_ADD_SPECIAL_TOKENS,
-        "tokenizer_clean_up_tokenization_spaces": TOKENIZER_CLEAN_UP_SPACES,
-        "tokenizer_padding_side": TOKENIZER_PADDING_SIDE,
-        "torch_num_threads": TORCH_NUM_THREADS,
-        "trust_remote_code": False,
-    }
-
-
-def _restore_inspect_causal_boundary(completion: str, target: str) -> str:
-    """Restore the causal token boundary removed by Inspect's HF decoder.
-
-    Inspect AI 0.3.254 uses ``tokenizer.batch_decode`` for HF completions;
-    that path removes the leading whitespace carried by the first causal BPE
-    token.  The fixed corpus makes that boundary part of the target and the
-    core exact-match contract is byte-exact, so the bridge restores only the
-    authenticated target's leading whitespace.  The native Inspect score is
-    still checked against the restored output during adaptation.
-    """
-
-    prefix_length = len(target) - len(target.lstrip())
-    prefix = target[:prefix_length]
-    if prefix and not completion.startswith(prefix):
-        return prefix + completion
-    return completion
-
-
-def _records(dataset_bytes: bytes) -> list[dict[str, str]]:
-    values = [json.loads(line) for line in dataset_bytes.splitlines()]
-    if len(values) != 102 or any(
-        not isinstance(value, dict)
-        or set(value) != {"expected", "id", "prompt"}
-        or any(not isinstance(value[key], str) or not value[key] for key in value)
-        for value in values
-    ):
-        raise BridgeError("the Level 3 corpus must contain 102 complete records")
-    if len({value["id"] for value in values}) != len(values):
-        raise BridgeError("the Level 3 corpus IDs are not unique")
-    return cast(list[dict[str, str]], values)
-
-
-class _HfGreedyGenerator:
-    """The pinned local model adapter used by both native evaluator runners."""
-
-    def __init__(self, model_path: Path) -> None:
-        try:
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-        except ImportError as exc:
-            raise BridgeError(
-                "the Level 3 image lacks the Hugging Face runtime"
-            ) from exc
-
-        self._torch = torch
-        execution = execution_config()
-        if (model_path / "generation_config.json").exists() or (
-            model_path / "generation_config.json"
-        ).is_symlink():
-            raise BridgeError("model snapshot must not provide generation defaults")
-        torch.manual_seed(execution["seed"])
-        torch.set_num_threads(execution["torch_num_threads"])
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_path, local_files_only=True, trust_remote_code=False
-        )
-        if tokenizer.pad_token_id is None:
-            if tokenizer.eos_token_id is None:
-                raise BridgeError("the tokenizer has neither a pad nor EOS token")
-            if execution["pad_token_policy"] != PAD_TOKEN_POLICY:
-                raise BridgeError("unsupported pad-token policy")
-            tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.padding_side = execution["tokenizer_padding_side"]
-        self._tokenizer = tokenizer
-        self._model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            local_files_only=True,
-            dtype=torch.float32,
-            trust_remote_code=False,
-        ).eval()
-
-    def generate(self, prompts: list[str]) -> list[str]:
-        execution = execution_config()
-        output: list[str] = []
-        with self._torch.inference_mode():
-            for offset in range(0, len(prompts), BATCH_SIZE):
-                batch = prompts[offset : offset + BATCH_SIZE]
-                encoded = self._tokenizer(
-                    batch,
-                    add_special_tokens=execution["tokenizer_add_special_tokens"],
-                    padding=True,
-                    return_tensors="pt",
-                )
-                generated = self._model.generate(
-                    **encoded,
-                    do_sample=execution["do_sample"],
-                    max_new_tokens=execution["max_generation_tokens"],
-                    pad_token_id=self._tokenizer.pad_token_id,
-                    use_cache=execution["model_use_cache"],
-                )
-                continuation = generated[:, encoded["input_ids"].shape[1] :]
-                output.extend(
-                    self._tokenizer.decode(
-                        tokens,
-                        skip_special_tokens=True,
-                        clean_up_tokenization_spaces=execution[
-                            "tokenizer_clean_up_tokenization_spaces"
-                        ],
-                    ).split("\n", 1)[0]
-                    for tokens in continuation
-                )
-        return output
-
-    def close(self) -> None:
-        del self._model
-
-
-def _generate(model_path: Path, dataset_bytes: bytes) -> list[dict[str, str]]:
-    """Generate one greedy token per record for compatibility and diagnostics."""
-
-    records = _records(dataset_bytes)
-    generator = _HfGreedyGenerator(model_path)
-    outputs = generator.generate([record["prompt"] for record in records])
-    generator.close()
-    if len(outputs) != len(records):
-        raise BridgeError("the model adapter returned an incomplete result")
-    output = [
-        {**record, "output": text}
-        for record, text in zip(records, outputs, strict=True)
-    ]
-    return output
-
-
-def _run_inspect_ai(
-    model_path: Path, dataset_bytes: bytes
-) -> tuple[list[dict[str, str]], list[tuple[float, dict[str, Any]]]]:
-    """Run an Inspect Task, including its model adapter and scorer."""
-
-    from inspect_ai import Task
-    from inspect_ai import eval as inspect_eval
-    from inspect_ai.dataset import MemoryDataset, Sample
-    from inspect_ai.scorer import match
-    from inspect_ai.solver import generate
-
-    records = _records(dataset_bytes)
-    task = Task(
-        dataset=MemoryDataset(
-            [
-                Sample(input=item["prompt"], target=item["expected"], id=item["id"])
-                for item in records
-            ]
-        ),
-        solver=generate(),
-        scorer=match(location="exact", ignore_case=False),
-        name="invarlock-level3",
-    )
-    logs = inspect_eval(
-        task,
-        model="hf/invarlock",
-        model_args={
-            "model_path": str(model_path),
-            "device": "cpu",
-            "batch_size": BATCH_SIZE,
-            "do_sample": False,
-            "chat_template": INSPECT_RAW_CHAT_TEMPLATE,
-            "trust_remote_code": False,
-            "enable_thinking": False,
-            "tokenizer_call_args": {"add_special_tokens": True},
-        },
-        display="none",
-        log_dir="/tmp/invarlock-inspect-logs",
-        log_samples=True,
-        log_realtime=False,
-        log_model_api=False,
-        score=True,
-        run_samples=True,
-        sample_shuffle=False,
-        epochs=1,
-        fail_on_error=True,
-        continue_on_fail=False,
-        max_connections=BATCH_SIZE,
-        max_samples=BATCH_SIZE,
-        max_tokens=MAX_GENERATION_TOKENS,
-        stop_seqs=["\n"],
-        seed=SEED,
-        log_level="error",
-    )
-    if len(logs) != 1 or logs[0].status != "success" or logs[0].samples is None:
-        raise BridgeError("Inspect AI did not produce one successful sample log")
-    by_id = {str(sample.id): sample for sample in logs[0].samples}
-    generated: list[dict[str, str]] = []
-    scored: list[tuple[float, dict[str, Any]]] = []
-    for record in records:
-        sample = by_id.get(record["id"])
-        if (
-            sample is None
-            or sample.input != record["prompt"]
-            or str(sample.target) != record["expected"]
-        ):
-            raise BridgeError(
-                "Inspect AI changed the Level 3 sample identity or target"
-            )
-        native_completion = sample.output.completion
-        if not isinstance(native_completion, str):
-            raise BridgeError("Inspect AI returned a non-text completion")
-        score = sample.scores.get("match")
-        if score is None:
-            raise BridgeError("Inspect AI did not return its match score")
-        value = str(score.value)
-        generated.append(
-            {
-                **record,
-                "output": _restore_inspect_causal_boundary(
-                    native_completion, record["expected"]
-                ),
-            }
-        )
-        scored.append(
-            (
-                1.0 if value == "C" else 0.0,
-                {
-                    "answer": score.answer,
-                    "explanation": score.explanation,
-                    "value": value,
-                },
-            )
-        )
-    return generated, scored
-
-
-class _OpenAICompletionResult:
-    def __init__(self, completion: str) -> None:
-        self._completion = completion
-
-    def get_completions(self) -> list[str]:
-        return [self._completion]
-
-
-class _OpenAIHfCompletionFn:
-    def __init__(self, generator: _HfGreedyGenerator) -> None:
-        self._generator = generator
-
-    def __call__(self, *, prompt: str, **_: Any) -> _OpenAICompletionResult:
-        if not isinstance(prompt, str):
-            raise BridgeError("OpenAI Evals supplied a non-text prompt")
-        completions = self._generator.generate([prompt])
-        if len(completions) != 1:
-            raise BridgeError(
-                "the OpenAI Evals model adapter returned an invalid result"
-            )
-        return _OpenAICompletionResult(completions[0])
-
-
-def _openai_event_to_sample(
-    record: dict[str, str], data: Any
-) -> tuple[str, float, dict[str, Any]]:
-    if not isinstance(data, dict) or data.get("expected") != record["expected"]:
-        raise BridgeError("OpenAI Evals changed the Level 3 sample identity or target")
-    completion = data.get("sampled")
-    if not isinstance(completion, str):
-        raise BridgeError("OpenAI Evals returned a non-text completion")
-    correct = data.get("correct")
-    if not isinstance(correct, bool):
-        raise BridgeError("OpenAI Evals returned an invalid match result")
-    native_correct = completion.startswith(record["expected"])
-    if correct != native_correct:
-        raise BridgeError("OpenAI Evals returned an inconsistent native match result")
-    transaction_correct = completion == record["expected"]
-    return (
-        completion,
-        1.0 if transaction_correct else 0.0,
-        {
-            "picked": data.get("picked"),
-            "native_correct": correct,
-            "transaction_correct": transaction_correct,
-        },
-    )
-
-
-def _run_openai_evals(
-    model_path: Path, dataset_bytes: bytes
-) -> tuple[list[dict[str, str]], list[tuple[float, dict[str, Any]]]]:
-    """Run the upstream OpenAI Evals basic.Match evaluator."""
-
-    os.environ.setdefault("OPENAI_API_KEY", "unused")
-    from evals.elsuite.basic.match import Match
-    from evals.record import DummyRecorder, RunSpec
-
-    records = _records(dataset_bytes)
-    previous = {
-        name: os.environ.get(name)
-        for name in ("EVALS_SEQUENTIAL", "EVALS_THREADS", "EVALS_SHOW_EVAL_PROGRESS")
-    }
-    generator = _HfGreedyGenerator(model_path)
-    try:
-        with tempfile.TemporaryDirectory(prefix="invarlock-openai-evals-") as temp_dir:
-            dataset_path = Path(temp_dir) / "samples.jsonl"
-            dataset_path.write_bytes(
-                b"".join(
-                    canonical_json_bytes(
-                        {"input": item["prompt"], "ideal": item["expected"]}
-                    )
-                    for item in records
-                )
-            )
-            os.environ["EVALS_SEQUENTIAL"] = "1"
-            os.environ["EVALS_THREADS"] = "1"
-            os.environ["EVALS_SHOW_EVAL_PROGRESS"] = "0"
-            evaluation = Match(
-                completion_fns=[_OpenAIHfCompletionFn(generator)],
-                samples_jsonl=str(dataset_path),
-                eval_registry_path=temp_dir,
-                name="invarlock-level3.default",
-                seed=SEED,
-                max_tokens=MAX_GENERATION_TOKENS,
-                num_few_shot=0,
-            )
-            recorder = DummyRecorder(
-                RunSpec(
-                    completion_fns=["invarlock/hf"],
-                    eval_name="invarlock-level3.default",
-                    base_eval="basic.match",
-                    split="default",
-                    run_config={},
-                    created_by="invarlock",
-                ),
-                log=False,
-            )
-            evaluation.eval_all_samples(
-                recorder, evaluation.get_samples(), show_progress=False
-            )
-            events = recorder.get_events("match")
-            if len(events) != len(records):
-                raise BridgeError(
-                    "OpenAI Evals did not return one match event per record"
-                )
-            by_index: dict[int, Any] = {}
-            for event in events:
-                sample_id = str(event.data.get("sample_id", event.sample_id))
-                suffix = sample_id.rsplit(".", 1)[-1]
-                if not suffix.isdigit() or int(suffix) in by_index:
-                    raise BridgeError(
-                        "OpenAI Evals returned ambiguous sample identities"
-                    )
-                by_index[int(suffix)] = event.data
-            generated = []
-            scored = []
-            for index, record in enumerate(records):
-                data = by_index.get(index)
-                completion, score, detail = _openai_event_to_sample(record, data)
-                generated.append({**record, "output": completion})
-                scored.append((score, detail))
-            return generated, scored
-    finally:
-        generator.close()
-        for name, value in previous.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
-
-
-def _run_upstream_evaluator(
-    model_path: Path, dataset_bytes: bytes, selected: str
-) -> tuple[list[dict[str, str]], list[tuple[float, dict[str, Any]]]]:
-    if selected == "inspect-ai":
-        return _run_inspect_ai(model_path, dataset_bytes)
-    if selected == "openai-evals":
-        return _run_openai_evals(model_path, dataset_bytes)
-    raise BridgeError(f"unsupported evaluator: {selected}")
 
 
 def _run_local_cli(command: list[str]) -> str:
@@ -774,7 +277,7 @@ def _run_local_cli(command: list[str]) -> str:
             timeout_seconds=WORKER_TIMEOUT_SECONDS,
             stdout_limit=4 * 1024 * 1024,
             stderr_limit=256 * 1024,
-            label="Level 3 completion command",
+            label="evaluator completion command",
         )
     except subprocess.CalledProcessError as exc:
         diagnostic = (exc.stderr or exc.output or "").strip()
@@ -814,7 +317,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     config_path = output / "task.json"
     config_path.write_bytes(canonical_json_bytes(config))
     config_digest = digest(_read_regular_file(config_path, label="task configuration"))
-    generated, scored = _run_upstream_evaluator(model, dataset_bytes, selected)
+    generated, scored = adapters._run_upstream_evaluator(model, dataset_bytes, selected)
     if len(generated) != len(scored):
         raise BridgeError("upstream scorer did not return one result per record")
     samples: list[dict[str, Any]] = []
@@ -842,7 +345,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         raise BridgeError("model or dataset changed during evaluator execution")
     execution = execution_config(selected)
     manifest = {
-        "format": "invarlock/evaluator-level3-run-v1",
+        "format": "invarlock/evaluator-run-v1",
         "role": role,
         "evaluator": selected,
         "evaluator_version": package["version"],
@@ -916,7 +419,8 @@ def _run_verified_worker(
             image=image,
             entrypoint=(
                 "python",
-                "/opt/invarlock/examples/evaluator-level3.py",
+                "-m",
+                "evaluator_transaction.cli",
                 "worker",
             ),
             worker_arguments=(
@@ -958,7 +462,7 @@ def load_run(path: Path, role: str, selected: str) -> tuple[dict[str, Any], byte
     if not isinstance(run, dict) or set(run) != RUN_FIELDS:
         raise BridgeError(f"{role} run provenance is incomplete")
     if (
-        run["format"] != "invarlock/evaluator-level3-run-v1"
+        run["format"] != "invarlock/evaluator-run-v1"
         or run["role"] != role
         or run["evaluator"] != selected
         or run["evaluator_version"] != EVALUATORS[selected]["version"]
@@ -1177,6 +681,8 @@ def complete(
         )
     if root.exists() or root.is_symlink():
         raise BridgeError("transaction workspace must be new")
+    if not prepared.is_dir() or prepared.is_symlink():
+        raise BridgeError("prepared workspace must be a real directory")
     _validate_completion_paths(
         root,
         build_attestation=build_attestation,
@@ -1328,7 +834,7 @@ def complete(
     (root / "inputs/acceptance.json").write_bytes(policy)
     provenance = canonical_json_bytes(
         {
-            "format": "invarlock/evaluator-level3-provenance-v2",
+            "format": "invarlock/evaluator-provenance-v1",
             "evaluator": selected,
             "evaluator_lock_sha256": lock_digest,
             "runtime_image_digest": image,
@@ -1587,19 +1093,25 @@ def main(argv: list[str] | None = None) -> int:
             worker(args.role, args.model, args.dataset, args.output)
         else:
             evidence, receipt, report = complete(
-                args.workspace.resolve(),
-                args.prepared.resolve(),
+                Path(os.path.abspath(args.workspace.expanduser())),
+                Path(os.path.abspath(args.prepared.expanduser())),
                 args.runtime_image,
                 args.evaluator,
                 container_engine=args.container_engine,
-                evidence_signing_key=args.evidence_signing_key.resolve(),
-                verifier_signing_key=args.verifier_signing_key.resolve(),
-                trust_root=args.trust_root.expanduser().absolute(),
+                evidence_signing_key=Path(
+                    os.path.abspath(args.evidence_signing_key.expanduser())
+                ),
+                verifier_signing_key=Path(
+                    os.path.abspath(args.verifier_signing_key.expanduser())
+                ),
+                trust_root=Path(os.path.abspath(args.trust_root.expanduser())),
                 source_commit=args.source_commit,
                 base_image_id=args.base_image_id,
-                builder_public_key=args.builder_public_key.resolve(),
+                builder_public_key=Path(
+                    os.path.abspath(args.builder_public_key.expanduser())
+                ),
                 build_attestation=(
-                    args.build_attestation.resolve()
+                    Path(os.path.abspath(args.build_attestation.expanduser()))
                     if args.build_attestation is not None
                     else None
                 ),

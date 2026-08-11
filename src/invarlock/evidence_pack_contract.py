@@ -56,9 +56,14 @@ EVIDENCE_PACK_VERIFY_FORMAT = "invarlock/evidence-pack-verify-v1"
 EVIDENCE_INPUT_IDENTITY_FORMAT = "invarlock/evidence-input-identity-v1"
 PAIRED_RECORDS_FORMAT = "invarlock/paired-records-v1"
 LEGACY_COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v1"
-COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v2"
+COMPARISON_REPORT_FORMAT_V2 = "invarlock/comparison-report-v2"
+COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v3"
 COMPARISON_REPORT_FORMATS = frozenset(
-    {LEGACY_COMPARISON_REPORT_FORMAT, COMPARISON_REPORT_FORMAT}
+    {
+        LEGACY_COMPARISON_REPORT_FORMAT,
+        COMPARISON_REPORT_FORMAT_V2,
+        COMPARISON_REPORT_FORMAT,
+    }
 )
 RUNTIME_SIDE_REPORT_FORMAT = "invarlock/runtime-side-report-v1"
 RUNTIME_SIDE_CONFIG_FORMAT = "invarlock/runtime-side-config-v1"
@@ -1284,6 +1289,13 @@ def build_comparison_report(
     selected_policy = _resolved_metric_policy(
         policy, metric=metric, scorer_binding=scorer_binding
     )
+    if (
+        "minimum_side_accuracy" in selected_policy
+        and report_format != COMPARISON_REPORT_FORMAT
+    ):
+        raise EvidencePackError(
+            "minimum_side_accuracy requires invarlock/comparison-report-v3"
+        )
     paired_binary: dict[str, object] | None = None
     if metric == "exact_match":
         try:
@@ -1458,6 +1470,7 @@ def schedule_bytes(schedule: RuntimeBehavioralSchedule) -> bytes:
 
 __all__ = [
     "COMPARISON_REPORT_FORMAT",
+    "COMPARISON_REPORT_FORMAT_V2",
     "COMPARISON_REPORT_FORMATS",
     "DERIVED_PERPLEXITY_METHOD",
     "EVIDENCE_PACK_FORMAT",

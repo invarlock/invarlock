@@ -121,7 +121,7 @@ def _policy(
             "max_evidence_age_seconds": max_evidence_age_seconds,
             "clock_skew_seconds": 0,
         },
-        "allowed_contract_versions": versions or ["0.13.0"],
+        "allowed_contract_versions": versions or ["0.15.0"],
         "required_technical_verdict": "pass",
         "allow_countersigned_receipts": allow_countersigned,
     }
@@ -250,7 +250,7 @@ def test_recipient_policy_schema_rejects_exact_duplicate_trust_records(
         ).validate(policy)
 
 
-def test_v013_receipt_wraps_without_relabelling_and_binds_exact_subject(
+def test_current_receipt_wraps_without_relabelling_and_binds_exact_subject(
     tmp_path: Path,
 ) -> None:
     envelope, _public, fingerprint = _envelope(tmp_path)
@@ -275,9 +275,9 @@ def test_v013_receipt_wraps_without_relabelling_and_binds_exact_subject(
     assert predicate["format"] == ACCEPTANCE_PREDICATE_FORMAT
     assert predicate["subject"]["artifact_digest"] == SUBJECT_DIGEST
     assert predicate["contracts"] == {
-        "invarlock_release": "0.13.0",
+        "invarlock_release": "0.15.0",
         "evidence_pack": "invarlock/evidence-pack-v1",
-        "comparison_report": "invarlock/comparison-report-v2",
+        "comparison_report": "invarlock/comparison-report-v3",
         "receipt": "invarlock/evidence-verification-receipt-v1",
     }
     assert (

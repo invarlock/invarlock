@@ -63,7 +63,7 @@ The closed source schema is
 `contracts/acceptance_predicate.schema.json`; the byte-identical packaged copy
 ships with the core wheel.
 
-## Authoritative receipt and v0.13 wrapping
+## Authoritative receipt and contract-set labeling
 
 Version 2 uses `receipt.representation: embedded`. The embedded signed
 InvarLock receipt is the authoritative replayable technical result.
@@ -76,7 +76,10 @@ the authenticated receipt.
 Existing v0.13 receipt formats are wrapped without modification or relabeling.
 Their original bytes are recoverable byte-for-byte from `receipt.raw_base64`,
 and their original format remains in `contracts.receipt` and the parsed
-receipt. Because v0.13 receipts did not authenticate an issuance time,
+receipt. The envelope labels the complete supported contract tuple: evidence
+pack v1 with comparison-report v1 or v2 remains contract release `0.13.0`,
+while comparison-report v3 is contract release `0.15.0`. Because these receipt
+formats did not authenticate an issuance time,
 `timestamps.receipt_issued_at` remains `null`; the wrapper rejects any attempt
 to manufacture that historical metadata. `evaluation_completed_at` is
 wrapper-supplied context, not an authoritative freshness input.

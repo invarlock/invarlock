@@ -30,8 +30,8 @@ sys.path.insert(0, str(REPLAYABLE_CORPUS))
 from replay import replay as replay_import  # noqa: E402
 
 from examples.integrations.evaluator_transaction.build_attestation import (  # noqa: E402
-    load_level3_build_attestation,
-    verify_level3_build_attestation,
+    load_evaluator_build_attestation,
+    verify_evaluator_build_attestation,
 )
 from invarlock.evaluator_qualification import (  # noqa: E402
     qualify_evaluator_export,
@@ -305,8 +305,8 @@ def verify_signed_transaction(profile_id: str) -> None:
     )
     if not isinstance(public_key, ed25519.Ed25519PublicKey):
         raise ValueError(f"{profile_id}: builder public key is not Ed25519")
-    build = verify_level3_build_attestation(
-        load_level3_build_attestation(root / "build-attestation.json"),
+    build = verify_evaluator_build_attestation(
+        load_evaluator_build_attestation(root / "build-attestation.json"),
         builder_public_key=public_key,
         evaluator=profile_id,
         evaluator_version=transaction["evaluator_version"],

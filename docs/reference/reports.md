@@ -36,10 +36,11 @@ reconstructs the runtime-side object exactly.
 ## Canonical comparison report
 
 New evaluations write `reports/evaluation.report.json` as an
-`invarlock/comparison-report-v2` object. Strict verification also accepts a
-signed `invarlock/comparison-report-v1` object and reconstructs it with the
-legacy v1 exact-match interval method. A verifier never silently upgrades the
-arithmetic of an existing pack.
+`invarlock/comparison-report-v3` object. Strict verification also accepts
+signed `invarlock/comparison-report-v2` and `invarlock/comparison-report-v1`
+objects. Version 2 omits side-accuracy qualification; version 1 additionally
+uses the legacy exact-match interval method. A verifier never silently upgrades
+the arithmetic or policy meaning of an existing pack.
 
 The current report contains:
 
@@ -51,7 +52,9 @@ The current report contains:
   or `scorer_extension` and `scorer_replay` for an authorized extension;
 - `policy_digest`;
 - optional `sample_qualification` when the policy binds count and precision
-  requirements; and
+  requirements;
+- optional `side_accuracy` when exact-match policy binds a minimum accuracy for
+  both sides; and
 - `verdict`, either `pass` or `fail`.
 
 A complete exact-match report has this shape:
@@ -65,7 +68,7 @@ A complete exact-match report has this shape:
     "value": 5.0
   },
   "comparison_id": "cmp-example",
-  "format": "invarlock/comparison-report-v2",
+  "format": "invarlock/comparison-report-v3",
   "metric": "exact_match",
   "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "record_count": 20,

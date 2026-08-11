@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -118,6 +120,19 @@ def test_bounded_command_supports_file_stdin_and_bounded_stdout_transfer(
         )
     assert not failed_destination.exists()
 
+    nonzero_destination = tmp_path / "nonzero-output.txt"
+    with pytest.raises(subprocess.CalledProcessError, match="returned non-zero"):
+        run_bounded_command(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.write('partial'); sys.exit(7)",
+            ],
+            stdout_path=nonzero_destination,
+            check=True,
+        )
+    assert not nonzero_destination.exists()
+
 
 def test_bounded_command_termination_handles_exited_and_hung_processes() -> None:
     class ExitedProcess:
@@ -131,6 +146,7 @@ def test_bounded_command_termination_handles_exited_and_hung_processes() -> None
             self.killed = False
             self.terminated = False
             self.wait_count = 0
+            self.pid = 2_147_483_647
 
         def poll(self) -> None:
             return None
@@ -150,3 +166,31 @@ def test_bounded_command_termination_handles_exited_and_hung_processes() -> None
     process = HungProcess()
     bounded_command._terminate(process)  # type: ignore[arg-type]  # noqa: SLF001
     assert process.terminated and process.killed and process.wait_count == 2
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group cleanup")
+def test_bounded_command_timeout_terminates_descendants(tmp_path: Path) -> None:
+    child_pid = tmp_path / "child.pid"
+    script = (
+        "import pathlib, subprocess, sys, time; "
+        "child = subprocess.Popen([sys.executable, '-c', "
+        "'import time; time.sleep(60)']); "
+        f"pathlib.Path({str(child_pid)!r}).write_text(str(child.pid)); "
+        "time.sleep(60)"
+    )
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        run_bounded_command(
+            [sys.executable, "-c", script],
+            timeout_seconds=1,
+        )
+
+    pid = int(child_pid.read_text(encoding="ascii"))
+    for _attempt in range(40):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("bounded command left a descendant process running")

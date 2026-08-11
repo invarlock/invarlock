@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -19,14 +20,46 @@ _STOP_SECONDS = 5
 def _terminate(process: subprocess.Popen[bytes]) -> None:
     """Stop one example subprocess and escalate if it ignores termination."""
 
-    if process.poll() is not None:
+    running = process.poll() is None
+    process_id = getattr(process, "pid", None)
+    if not running and not isinstance(process_id, int):
         return
-    process.terminate()
+    group_signaled = False
+    if os.name == "posix" and isinstance(process_id, int) and process_id > 0:
+        try:
+            os.killpg(process_id, signal.SIGTERM)
+            group_signaled = True
+        except ProcessLookupError:
+            if not running:
+                return
+        except OSError:
+            pass
+    if not group_signaled and running:
+        process.terminate()
     try:
         process.wait(timeout=_STOP_SECONDS)
     except subprocess.TimeoutExpired:
-        process.kill()
+        if os.name == "posix" and isinstance(process_id, int) and process_id > 0:
+            try:
+                os.killpg(process_id, signal.SIGKILL)
+            except ProcessLookupError:
+                if process.poll() is None:
+                    process.kill()
+            except OSError:
+                process.kill()
+        else:
+            process.kill()
         process.wait(timeout=_STOP_SECONDS)
+    else:
+        # The session leader can exit before descendants that inherited its
+        # pipes. Escalate the isolated group so timeout/output-limit cleanup
+        # cannot leave those descendants running.
+        if group_signaled:
+            try:
+                assert isinstance(process_id, int)
+                os.killpg(process_id, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def run_bounded_command(
@@ -79,6 +112,7 @@ def run_bounded_command(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             bufsize=0,
+            start_new_session=os.name == "posix",
         )
         returncode, stdout, stderr = communicate_bounded(
             process,
@@ -118,6 +152,8 @@ def run_bounded_command(
         stderr_text if capture_output else None,
     )
     if check and returncode != 0:
+        if stdout_path is not None:
+            stdout_path.unlink(missing_ok=True)
         raise subprocess.CalledProcessError(
             returncode,
             argv,

@@ -228,7 +228,7 @@ def _prepare(
         raise ValueError(
             "caller-owned evidence/verifier keys and trust root are required"
         )
-    output = output.expanduser().resolve()
+    output = Path(os.path.abspath(output.expanduser()))
     if os.path.lexists(output):
         raise FileExistsError(f"output already exists: {output}")
     verifier = output / "verifier"
@@ -238,17 +238,17 @@ def _prepare(
         "request": root / _REQUEST,
         "evidence": root / _EVIDENCE,
         "signer": (
-            evidence_signing_key.expanduser().absolute()
+            Path(os.path.abspath(evidence_signing_key.expanduser()))
             if external_trust and evidence_signing_key is not None
             else output / "keys/evidence-signer.pem"
         ),
         "trust": (
-            trust_root.expanduser().absolute() / "trusted-inputs.json"
+            Path(os.path.abspath(trust_root.expanduser())) / "trusted-inputs.json"
             if external_trust and trust_root is not None
             else verifier / "trusted-inputs.json"
         ),
         "verifier": (
-            trust_root.expanduser().absolute() / "verifier.pem"
+            Path(os.path.abspath(trust_root.expanduser())) / "verifier.pem"
             if external_trust and trust_root is not None
             else verifier / "keys/verifier.pem"
         ),
@@ -280,7 +280,7 @@ def _prepare(
         ):
             if candidate == output or output in candidate.parents:
                 raise ValueError(f"{label} must remain outside the output workspace")
-        trust_candidate = trust_root.expanduser().absolute()
+        trust_candidate = Path(os.path.abspath(trust_root.expanduser()))
         if trust_candidate == output or output in trust_candidate.parents:
             raise ValueError("trust root must remain outside the output workspace")
     else:

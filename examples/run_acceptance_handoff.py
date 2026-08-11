@@ -7,6 +7,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import shutil
 import stat
 import tempfile
@@ -208,7 +209,7 @@ def _recipient_policy(
             "max_evidence_age_seconds": max_evidence_age_seconds,
             "clock_skew_seconds": 0,
         },
-        "allowed_contract_versions": versions or ["0.13.0"],
+        "allowed_contract_versions": versions or ["0.15.0"],
         "required_technical_verdict": "pass",
         "allow_countersigned_receipts": True,
     }
@@ -624,7 +625,7 @@ def main() -> int:
         print(f"PASS generated golden handoff package: {GOLDEN_ROOT}")
         return 0
     workspace = (
-        args.workspace.resolve()
+        Path(os.path.abspath(args.workspace.expanduser()))
         if args.workspace is not None
         else Path(tempfile.mkdtemp(prefix="invarlock-acceptance-handoff-")).resolve()
         / "workspace"

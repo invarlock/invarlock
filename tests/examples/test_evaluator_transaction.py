@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
+import importlib
 import json
 import subprocess
 import sys
@@ -15,35 +15,29 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from examples.integrations.evaluator_transaction.build_attestation import (
-    make_level3_build_attestation,
-    sign_level3_build_attestation,
-    write_level3_build_attestation,
+    make_evaluator_build_attestation,
+    sign_evaluator_build_attestation,
+    write_evaluator_build_attestation,
 )
 from invarlock.core.runtime_provider import (
     build_runtime_behavioral_schedule_from_material,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-MODULE_PATH = ROOT / "examples/integrations/evaluator_level3.py"
-LAUNCHER_PATH = ROOT / "examples/integrations/evaluator_level3_launch.py"
 
 
 def _module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("evaluator_level3_test", MODULE_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return importlib.reload(
+        importlib.import_module(
+            "examples.integrations.evaluator_transaction.transaction"
+        )
+    )
 
 
 def _launcher_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        "evaluator_level3_launcher_test", LAUNCHER_PATH
+    return importlib.reload(
+        importlib.import_module("examples.integrations.evaluator_transaction.launcher")
     )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _schedule():
@@ -82,7 +76,7 @@ def _sample(module: ModuleType, *, score: float = 1.0) -> dict[str, object]:
 
 
 @pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
-def test_level3_profiles_bind_distinct_upstream_entrypoints(evaluator: str) -> None:
+def test_evaluator_profiles_bind_distinct_upstream_entrypoints(evaluator: str) -> None:
     module = _module()
     config = module.execution_config(evaluator)
     assert config["evaluator"] == evaluator
@@ -92,7 +86,9 @@ def test_level3_profiles_bind_distinct_upstream_entrypoints(evaluator: str) -> N
 
 
 @pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
-def test_level3_worker_images_include_flat_script_dependencies(evaluator: str) -> None:
+def test_evaluator_transaction_worker_images_include_flat_script_dependencies(
+    evaluator: str,
+) -> None:
     dockerfile = (ROOT / "examples/integrations" / evaluator / "Dockerfile").read_text(
         encoding="utf-8"
     )
@@ -104,14 +100,11 @@ def test_level3_worker_images_include_flat_script_dependencies(evaluator: str) -
     ):
         assert f"COPY examples/integrations/{helper}" in dockerfile
         assert f"/opt/invarlock/examples/{helper}" in dockerfile
-    assert (
-        "COPY examples/integrations/evaluator_transaction/build_attestation.py"
-        in dockerfile
-    )
-    assert "COPY examples/integrations/evaluator_transaction/worker.py" in dockerfile
+    assert "COPY examples/integrations/evaluator_transaction" in dockerfile
+    assert "/opt/invarlock/examples/evaluator_transaction" in dockerfile
 
 
-def test_level3_dataset_digest_matches_the_staging_writer() -> None:
+def test_evaluator_transaction_dataset_digest_matches_the_staging_writer() -> None:
     module = _module()
     records = json.loads(
         (ROOT / "examples/integrations/lm-evaluation-harness/records.json").read_text(
@@ -127,9 +120,13 @@ def test_level3_dataset_digest_matches_the_staging_writer() -> None:
 def test_inspect_bridge_restores_the_authenticated_causal_boundary() -> None:
     module = _module()
 
-    assert module._restore_inspect_causal_boundary("Paris", " Paris") == " Paris"
-    assert module._restore_inspect_causal_boundary("Paris", "Paris") == "Paris"
-    assert module._restore_inspect_causal_boundary(" Paris", " Paris") == " Paris"
+    assert (
+        module.adapters._restore_inspect_causal_boundary("Paris", " Paris") == " Paris"
+    )
+    assert module.adapters._restore_inspect_causal_boundary("Paris", "Paris") == "Paris"
+    assert (
+        module.adapters._restore_inspect_causal_boundary(" Paris", " Paris") == " Paris"
+    )
 
 
 def _records_bytes(module: ModuleType, *, duplicate: bool = False) -> bytes:
@@ -142,16 +139,18 @@ def _records_bytes(module: ModuleType, *, duplicate: bool = False) -> bytes:
     return b"".join(module.canonical_json_bytes(record) for record in records)
 
 
-def test_level3_record_loader_rejects_incomplete_and_duplicate_corpora() -> None:
+def test_evaluator_transaction_record_loader_rejects_incomplete_and_duplicate_corpora() -> (
+    None
+):
     module = _module()
-    assert len(module._records(_records_bytes(module))) == 102
+    assert len(module.adapters._records(_records_bytes(module))) == 102
     with pytest.raises(module.BridgeError, match="102 complete records"):
-        module._records(module.canonical_json_bytes({"id": "only-one"}))
+        module.adapters._records(module.canonical_json_bytes({"id": "only-one"}))
     with pytest.raises(module.BridgeError, match="not unique"):
-        module._records(_records_bytes(module, duplicate=True))
+        module.adapters._records(_records_bytes(module, duplicate=True))
 
 
-def test_level3_worker_and_cli_command_wrappers_are_bounded(
+def test_evaluator_transaction_worker_and_cli_command_wrappers_are_bounded(
     tmp_path: Path,
 ) -> None:
     del tmp_path
@@ -201,7 +200,9 @@ def test_inspect_runner_binds_each_sample_to_native_output_and_score(
     monkeypatch.setitem(sys.modules, "inspect_ai.scorer", scorer)
     monkeypatch.setitem(sys.modules, "inspect_ai.solver", solver)
 
-    generated, scored = module._run_inspect_ai(Path("/model"), _records_bytes(module))
+    generated, scored = module.adapters._run_inspect_ai(
+        Path("/model"), _records_bytes(module)
+    )
     assert generated[0]["output"] == "Answer"
     assert generated[-1]["id"] == "stable-101"
     assert scored[0][0] == 1.0
@@ -271,12 +272,14 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
     monkeypatch.setitem(sys.modules, "evals.elsuite.basic", basic)
     monkeypatch.setitem(sys.modules, "evals.elsuite.basic.match", match)
     monkeypatch.setitem(sys.modules, "evals.record", record)
-    monkeypatch.setattr(module, "_HfGreedyGenerator", FakeGenerator)
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", FakeGenerator)
     monkeypatch.setenv("EVALS_SEQUENTIAL", "before")
     monkeypatch.delenv("EVALS_THREADS", raising=False)
     monkeypatch.delenv("EVALS_SHOW_EVAL_PROGRESS", raising=False)
 
-    generated, scored = module._run_openai_evals(Path("/model"), _records_bytes(module))
+    generated, scored = module.adapters._run_openai_evals(
+        Path("/model"), _records_bytes(module)
+    )
     assert generated[0]["output"] == "Answer"
     assert scored[-1][0] == 1.0
     assert module.os.environ["EVALS_SEQUENTIAL"] == "before"
@@ -293,15 +296,15 @@ def test_openai_completion_callback_rejects_invalid_adapter_results() -> None:
         def generate(self, _prompts: list[str]) -> list[str]:
             return self.result
 
-    callback = module._OpenAIHfCompletionFn(Generator(["Answer"]))
+    callback = module.adapters._OpenAIHfCompletionFn(Generator(["Answer"]))
     assert callback(prompt="Prompt").get_completions() == ["Answer"]
     with pytest.raises(module.BridgeError, match="non-text prompt"):
         callback(prompt=1)  # type: ignore[arg-type]
     with pytest.raises(module.BridgeError, match="invalid result"):
-        module._OpenAIHfCompletionFn(Generator([]))(prompt="Prompt")
+        module.adapters._OpenAIHfCompletionFn(Generator([]))(prompt="Prompt")
 
 
-def test_level3_complete_replays_and_authenticates_a_fully_stubbed_transaction(
+def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbed_transaction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -404,7 +407,7 @@ def test_level3_complete_replays_and_authenticates_a_fully_stubbed_transaction(
         sample_bytes = b"".join(module.canonical_json_bytes(item) for item in samples)
         (output / "samples.jsonl").write_bytes(sample_bytes)
         manifest = {
-            "format": "invarlock/evaluator-level3-run-v1",
+            "format": "invarlock/evaluator-run-v1",
             "role": role,
             "evaluator": "inspect-ai",
             "evaluator_version": module.EVALUATORS["inspect-ai"]["version"],
@@ -534,7 +537,7 @@ def test_openai_evals_event_shape_is_bound_to_the_upstream_record() -> None:
     module = _module()
     record = {"id": "stable-1", "prompt": "Prompt", "expected": "Answer"}
 
-    completion, score, detail = module._openai_event_to_sample(
+    completion, score, detail = module.adapters._openai_event_to_sample(
         record,
         {
             "expected": "Answer",
@@ -553,7 +556,7 @@ def test_openai_evals_event_shape_is_bound_to_the_upstream_record() -> None:
         },
     )
 
-    completion, score, detail = module._openai_event_to_sample(
+    completion, score, detail = module.adapters._openai_event_to_sample(
         record,
         {
             "expected": "Answer",
@@ -571,13 +574,13 @@ def test_openai_evals_event_shape_is_bound_to_the_upstream_record() -> None:
     }
 
     with pytest.raises(module.BridgeError, match="identity or target"):
-        module._openai_event_to_sample(
+        module.adapters._openai_event_to_sample(
             record,
             {"expected": ["Answer"], "sampled": "Answer", "correct": True},
         )
 
     with pytest.raises(module.BridgeError, match="inconsistent native match"):
-        module._openai_event_to_sample(
+        module.adapters._openai_event_to_sample(
             record,
             {"expected": "Answer", "sampled": "Answer", "correct": False},
         )
@@ -646,7 +649,7 @@ def test_runtime_image_inspection_requires_and_dispatches_attestation(
 
     monkeypatch.setattr(
         module,
-        "inspect_level3_image",
+        "inspect_evaluator_image",
         lambda **kwargs: captured.update(kwargs),
     )
 
@@ -665,7 +668,8 @@ def test_runtime_image_inspection_requires_and_dispatches_attestation(
     assert captured["lock_sha256"] == lock
     assert captured["expected_entrypoint"] == (
         "python",
-        "/opt/invarlock/examples/evaluator-level3.py",
+        "-m",
+        "evaluator_transaction.cli",
         "worker",
     )
 
@@ -681,7 +685,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
     source = "sha256:" + "d" * 64
     lock = "sha256:" + "e" * 64
     commit = "f" * 40
-    entrypoint = ("python", "/opt/invarlock/examples/evaluator-level3.py", "worker")
+    entrypoint = ("python", "-m", "evaluator_transaction.cli", "worker")
     config = {
         "Entrypoint": list(entrypoint),
         "Labels": {
@@ -694,7 +698,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
         },
     }
     signing_key = ed25519.Ed25519PrivateKey.generate()
-    attestation = make_level3_build_attestation(
+    attestation = make_evaluator_build_attestation(
         evaluator="inspect-ai",
         evaluator_version="0.3.254",
         runtime_image_id=image,
@@ -708,8 +712,8 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
         config=config,
     )
     attestation_path = tmp_path / "attestation.json"
-    write_level3_build_attestation(
-        attestation_path, sign_level3_build_attestation(attestation, signing_key)
+    write_evaluator_build_attestation(
+        attestation_path, sign_evaluator_build_attestation(attestation, signing_key)
     )
 
     def fake_run(
@@ -728,7 +732,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
         return subprocess.CompletedProcess(command, 0, stdout, "")
 
     monkeypatch.setattr(shared_launch, "_run", fake_run)
-    observed = shared_launch.inspect_level3_image(
+    observed = shared_launch.inspect_evaluator_image(
         engine="docker",
         image=image,
         repository=tmp_path,
@@ -795,7 +799,7 @@ def test_launcher_returns_the_verified_child_image_id(
     child_id = "sha256:" + "b" * 64
     commit = "c" * 40
     base_layers = ["sha256:" + "1" * 64]
-    child_layers = base_layers + ["sha256:" + digit * 64 for digit in "23456789a"]
+    child_layers = base_layers + ["sha256:" + digit * 64 for digit in "2345678"]
     base_config = {
         "ArgsEscaped": False,
         "Cmd": ["/bin/sh"],
@@ -812,7 +816,8 @@ def test_launcher_returns_the_verified_child_image_id(
         **base_config,
         "Entrypoint": [
             "python",
-            "/opt/invarlock/examples/evaluator-level3.py",
+            "-m",
+            "evaluator_transaction.cli",
             "worker",
         ],
         "Env": [
@@ -839,7 +844,6 @@ def test_launcher_returns_the_verified_child_image_id(
     child_config["Labels"]["org.invarlock.example.evaluator-lock-sha256"] = lock_digest
     calls: list[list[str]] = []
     monkeypatch.setattr(shared_launch, "_require_committed_checkout", lambda _r: commit)
-    monkeypatch.setattr(launcher, "require_image_tag_available", lambda *_args: None)
     monkeypatch.setattr(
         shared_launch, "_runtime_image", lambda **_kwargs: (base_id, base_id)
     )
@@ -868,7 +872,7 @@ def test_launcher_returns_the_verified_child_image_id(
                     base_config if command[-1] == base_id else child_config
                 )
             if template == "{{.Id}}":
-                return child_id
+                return base_id if "example-runtime" in command[-1] else child_id
             if "base-image-id" in template:
                 return base_id
             if "evaluator-lock-sha256" in template:
@@ -895,15 +899,16 @@ def test_launcher_returns_the_verified_child_image_id(
     assert "--pull=false" in build
     assert "--iidfile" in build
     assert result == (child_id, commit, base_id)
-    child_tag = "invarlock-inspect-ai-level3:" + commit[:12]
-    assert not any(
-        command[-1] == child_tag
+    build_tag = build[build.index("--tag") + 1]
+    assert build_tag.startswith("invarlock-inspect-ai-evaluator:" + commit[:12])
+    assert any(
+        command[-1] == build_tag
         for command in calls
         if command[:3] == ["docker", "image", "inspect"]
     )
 
 
-def test_launcher_cleanup_removes_only_owned_image_tags(
+def test_launcher_cleanup_removes_only_tags_that_still_name_owned_images(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     launcher = _launcher_module()
@@ -913,23 +918,141 @@ def test_launcher_cleanup_removes_only_owned_image_tags(
         command: list[str], *, cwd: Path, stdin_path: Path | None = None
     ) -> str:
         calls.append(command)
+        if command[:3] == ["docker", "image", "inspect"]:
+            return {
+                "invarlock-base:owned": "sha256:" + "a" * 64,
+                "invarlock-child:owned": "sha256:" + "b" * 64,
+            }[command[-1]]
         return ""
 
     monkeypatch.setattr(launcher, "run", fake_run)
-    launcher.remove_temporary_image_tags(
+    launcher.remove_owned_image_tags(
         launcher.run,
         "docker",
         ROOT,
-        ["invarlock-base:owned", "invarlock-base:owned", "invarlock-child:owned"],
+        [
+            launcher.OwnedImageTag("invarlock-base:owned", "sha256:" + "a" * 64),
+            launcher.OwnedImageTag("invarlock-base:owned", "sha256:" + "a" * 64),
+            launcher.OwnedImageTag("invarlock-child:owned", "sha256:" + "b" * 64),
+        ],
     )
 
     assert calls == [
-        ["docker", "image", "rm", "--force", "invarlock-base:owned"],
-        ["docker", "image", "rm", "--force", "invarlock-child:owned"],
+        ["docker", "image", "inspect", "--format", "{{.Id}}", "invarlock-base:owned"],
+        ["docker", "image", "rm", "invarlock-base:owned"],
+        ["docker", "image", "inspect", "--format", "{{.Id}}", "invarlock-child:owned"],
+        ["docker", "image", "rm", "invarlock-child:owned"],
     ]
 
 
-def test_level3_launcher_bounds_child_output_and_runtime(
+def test_launcher_cleanup_refuses_a_reassigned_tag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launcher = _launcher_module()
+    calls: list[list[str]] = []
+
+    def fake_run(
+        command: list[str], *, cwd: Path, stdin_path: Path | None = None
+    ) -> str:
+        calls.append(command)
+        return "sha256:" + "b" * 64
+
+    with pytest.raises(RuntimeError, match="ownership changed"):
+        launcher.remove_owned_image_tags(
+            fake_run,
+            "docker",
+            ROOT,
+            [launcher.OwnedImageTag("invarlock-base:owned", "sha256:" + "a" * 64)],
+        )
+
+    assert not any(command[:3] == ["docker", "image", "rm"] for command in calls)
+
+
+def test_launcher_cleanup_refuses_conflicting_ownership_records() -> None:
+    launcher = _launcher_module()
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], *, cwd: Path) -> str:
+        calls.append(command)
+        return ""
+
+    with pytest.raises(RuntimeError, match="conflicting owned image identities"):
+        launcher.remove_owned_image_tags(
+            fake_run,
+            "docker",
+            ROOT,
+            [
+                launcher.OwnedImageTag("shared", "sha256:" + "a" * 64),
+                launcher.OwnedImageTag("shared", "sha256:" + "b" * 64),
+            ],
+        )
+
+    assert calls == []
+
+
+def test_launcher_records_only_a_tag_created_for_the_built_image() -> None:
+    launcher = _launcher_module()
+
+    def missing_tag(*_args: object, **_kwargs: object) -> str:
+        raise RuntimeError("No such image")
+
+    with pytest.raises(RuntimeError, match="temporary image tag was not created"):
+        launcher.record_owned_image_tag(
+            missing_tag,
+            "docker",
+            "invarlock-base:owned",
+            "sha256:" + "a" * 64,
+            ROOT,
+        )
+
+    with pytest.raises(RuntimeError, match="does not name the image built"):
+        launcher.record_owned_image_tag(
+            lambda *_args, **_kwargs: "sha256:" + "b" * 64,
+            "docker",
+            "invarlock-base:owned",
+            "sha256:" + "a" * 64,
+            ROOT,
+        )
+
+
+def test_launcher_cleanup_ignores_absent_tags_and_reports_engine_failures() -> None:
+    launcher = _launcher_module()
+    calls: list[list[str]] = []
+    image_id = "sha256:" + "a" * 64
+
+    def fake_run(command: list[str], *, cwd: Path) -> str:
+        calls.append(command)
+        tag = command[-1]
+        if command[:3] == ["docker", "image", "inspect"]:
+            if tag == "absent":
+                raise RuntimeError("No such object")
+            if tag == "inspect-failed":
+                raise RuntimeError("daemon unavailable")
+            return image_id
+        if tag == "remove-failed":
+            raise RuntimeError("permission denied")
+        return ""
+
+    with pytest.raises(RuntimeError) as raised:
+        launcher.remove_owned_image_tags(
+            fake_run,
+            "docker",
+            ROOT,
+            [
+                launcher.OwnedImageTag("absent", image_id),
+                launcher.OwnedImageTag("inspect-failed", image_id),
+                launcher.OwnedImageTag("remove-failed", image_id),
+            ],
+        )
+
+    diagnostic = str(raised.value)
+    assert "inspect-failed: daemon unavailable" in diagnostic
+    assert "remove-failed: permission denied" in diagnostic
+    assert ["docker", "image", "rm", "absent"] not in calls
+    assert ["docker", "image", "rm", "inspect-failed"] not in calls
+
+
+def test_evaluator_transaction_launcher_bounds_child_output_and_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     launcher = _launcher_module()
@@ -995,7 +1118,7 @@ def test_worker_load_run_returns_the_verified_sample_snapshot(
         for i in range(102)
     ]
     monkeypatch.setattr(
-        module,
+        module.adapters,
         "_run_upstream_evaluator",
         lambda _model, _dataset, _evaluator: (generated, [(1.0, {})] * 102),
     )
@@ -1052,7 +1175,7 @@ def test_worker_binds_model_dataset_and_upstream_output_provenance(
         for i in range(102)
     ]
     monkeypatch.setattr(
-        module,
+        module.adapters,
         "_run_upstream_evaluator",
         lambda _model, _dataset, _evaluator: (generated, [(1.0, {})] * 102),
     )
@@ -1061,7 +1184,7 @@ def test_worker_binds_model_dataset_and_upstream_output_provenance(
     module.worker("baseline", model, dataset, output)
 
     manifest = json.loads((output / "run-manifest.json").read_text(encoding="utf-8"))
-    assert manifest["format"] == "invarlock/evaluator-level3-run-v1"
+    assert manifest["format"] == "invarlock/evaluator-run-v1"
     assert manifest["evaluator"] == "inspect-ai"
     assert manifest["record_count"] == 102
     assert manifest["samples_sha256"] == module.digest(
@@ -1093,7 +1216,7 @@ def test_worker_rejects_symlinked_dataset(
         module.worker("baseline", model, dataset, tmp_path / "output")
 
 
-def test_level3_boundary_helpers_reject_untrusted_files_and_identity_inputs(
+def test_evaluator_transaction_boundary_helpers_reject_untrusted_files_and_identity_inputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -1160,7 +1283,58 @@ def test_level3_boundary_helpers_reject_untrusted_files_and_identity_inputs(
     )
 
 
-def test_level3_image_and_mount_validation_fail_closed(
+def test_evaluator_transaction_cli_preserves_symlink_for_nofollow_rejection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _module()
+    real_key = tmp_path / "real-evidence.pem"
+    real_key.write_bytes(
+        ed25519.Ed25519PrivateKey.generate().private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    key_link = tmp_path / "evidence.pem"
+    key_link.symlink_to(real_key)
+    prepared = tmp_path / "prepared"
+    prepared.mkdir()
+
+    result = module.main(
+        [
+            "complete",
+            "--workspace",
+            str(tmp_path / "transaction"),
+            "--prepared",
+            str(prepared),
+            "--runtime-image",
+            "sha256:" + "a" * 64,
+            "--evaluator",
+            "inspect-ai",
+            "--evidence-signing-key",
+            str(key_link),
+            "--verifier-signing-key",
+            str(tmp_path / "verifier.pem"),
+            "--trust-root",
+            str(tmp_path / "trust"),
+            "--builder-public-key",
+            str(tmp_path / "builder.pem"),
+            "--source-commit",
+            "b" * 40,
+            "--base-image-id",
+            "sha256:" + "c" * 64,
+            "--build-attestation",
+            str(tmp_path / "build-attestation.json"),
+        ]
+    )
+
+    assert result == 2
+    assert (
+        "evidence signing key is not an Ed25519 private key" in capsys.readouterr().err
+    )
+
+
+def test_evaluator_transaction_image_and_mount_validation_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -1186,7 +1360,7 @@ def test_level3_image_and_mount_validation_fail_closed(
             )
     monkeypatch.setattr(
         module,
-        "inspect_level3_image",
+        "inspect_evaluator_image",
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("bad image")),
     )
     with pytest.raises(module.BridgeError, match="did not authenticate"):
@@ -1257,7 +1431,7 @@ def test_hf_generator_and_compatibility_adapter_are_exercised_without_model_weig
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setitem(sys.modules, "transformers", transformers)
 
-    generator = module._HfGreedyGenerator(tmp_path / "model")
+    generator = module.adapters._HfGreedyGenerator(tmp_path / "model")
     assert generator._tokenizer.pad_token == "<eos>"
     assert generator.generate(["Prompt"]) == ["Answer"]
     generator.close()
@@ -1272,13 +1446,13 @@ def test_hf_generator_and_compatibility_adapter_are_exercised_without_model_weig
         def close(self) -> None:
             pass
 
-    monkeypatch.setattr(module, "_HfGreedyGenerator", FakeGenerator)
-    generated = module._generate(tmp_path / "model", _records_bytes(module))
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", FakeGenerator)
+    generated = module.adapters._generate(tmp_path / "model", _records_bytes(module))
     assert len(generated) == 102
     assert generated[0]["output"] == "Answer"
 
 
-def test_level3_runner_rejects_malformed_native_results_and_restores_environment(
+def test_evaluator_transaction_runner_rejects_malformed_native_results_and_restores_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _module()
@@ -1292,7 +1466,7 @@ def test_level3_runner_rejects_malformed_native_results_and_restores_environment
         (None, "identity or target"),
     ):
         with pytest.raises(module.BridgeError, match=message):
-            module._openai_event_to_sample(record, data)
+            module.adapters._openai_event_to_sample(record, data)
 
     class FakeGenerator:
         def __init__(self, _path: Path) -> None:
@@ -1327,14 +1501,14 @@ def test_level3_runner_rejects_malformed_native_results_and_restores_environment
         ),
     }.items():
         monkeypatch.setitem(sys.modules, name, value)
-    monkeypatch.setattr(module, "_HfGreedyGenerator", FakeGenerator)
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", FakeGenerator)
     monkeypatch.setenv("EVALS_SEQUENTIAL", "previous")
     with pytest.raises(module.BridgeError, match="one match event"):
-        module._run_openai_evals(Path("/model"), _records_bytes(module))
+        module.adapters._run_openai_evals(Path("/model"), _records_bytes(module))
     assert module.os.environ["EVALS_SEQUENTIAL"] == "previous"
 
 
-def test_level3_local_cli_and_worker_validation_errors_are_bounded(
+def test_evaluator_transaction_local_cli_and_worker_validation_errors_are_bounded(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -1355,7 +1529,7 @@ def test_level3_local_cli_and_worker_validation_errors_are_bounded(
         module.worker("baseline", tmp_path, tmp_path / "records", tmp_path / "output")
 
 
-def test_level3_adaptation_and_canonical_sample_boundaries(
+def test_evaluator_transaction_adaptation_and_canonical_sample_boundaries(
     tmp_path: Path,
 ) -> None:
     module = _module()
@@ -1393,7 +1567,7 @@ def test_level3_adaptation_and_canonical_sample_boundaries(
         )
 
 
-def test_level3_completion_output_and_path_guards(
+def test_evaluator_transaction_completion_output_and_path_guards(
     tmp_path: Path,
 ) -> None:
     module = _module()
@@ -1452,7 +1626,7 @@ def test_level3_completion_output_and_path_guards(
         module.validate_completed_outputs(root / "evidence", receipt, report)
 
 
-def test_level3_main_dispatches_and_reports_failures(
+def test_evaluator_transaction_main_dispatches_and_reports_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     module = _module()
@@ -1497,7 +1671,7 @@ def test_level3_main_dispatches_and_reports_failures(
     assert "FAIL bad worker" in capsys.readouterr().err
 
 
-def test_level3_launcher_entrypoint_covers_success_and_cleanup_paths(
+def test_evaluator_transaction_launcher_entrypoint_covers_success_and_cleanup_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     launcher = _launcher_module()
@@ -1522,6 +1696,12 @@ def test_level3_launcher_entrypoint_covers_success_and_cleanup_paths(
     existing_args[1] = str(existing)
     assert launcher.main("inspect-ai", existing_args) == 2
 
+    linked = tmp_path / "linked"
+    linked.symlink_to(tmp_path / "missing-workspace", target_is_directory=True)
+    linked_args = list(args)
+    linked_args[1] = str(linked)
+    assert launcher.main("inspect-ai", linked_args) == 2
+
     cleanup: list[list[str]] = []
     commands: list[list[str]] = []
     monkeypatch.setattr(launcher, "load_builder_signing_key", lambda _path: key)
@@ -1533,7 +1713,9 @@ def test_level3_launcher_entrypoint_covers_success_and_cleanup_paths(
         launcher,
         "_build_image",
         lambda _evaluator, _repository, _build, _engine, **kwargs: (
-            kwargs["cleanup_tags"].append("owned-tag")
+            kwargs["cleanup_tags"].append(
+                launcher.OwnedImageTag("owned-tag", "sha256:" + "a" * 64)
+            )
             or ("sha256:" + "a" * 64, "c" * 40, "sha256:" + "b" * 64)
         ),
     )
@@ -1544,24 +1726,25 @@ def test_level3_launcher_entrypoint_covers_success_and_cleanup_paths(
             commands.append(command)
             or (
                 "Evidence: complete"
-                if "evaluator_level3.py" in " ".join(command)
+                if "examples.integrations.evaluator_transaction.cli"
+                in " ".join(command)
                 else ""
             )
         ),
     )
     monkeypatch.setattr(
         launcher,
-        "remove_temporary_image_tags",
+        "remove_owned_image_tags",
         lambda _run, _engine, _repo, tags: cleanup.append(list(tags)),
     )
     result = launcher.main("inspect-ai", ["--container-engine", "podman", *args])
     assert result == 0
-    assert cleanup == [["owned-tag"]]
+    assert cleanup == [[launcher.OwnedImageTag("owned-tag", "sha256:" + "a" * 64)]]
     assert any("model_inputs.py" in " ".join(command) for command in commands)
     assert "Complete integration workspace" in capsys.readouterr().out
 
 
-def test_level3_launcher_reports_build_and_cleanup_failures(
+def test_evaluator_transaction_launcher_reports_build_and_cleanup_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     launcher = _launcher_module()
@@ -1590,7 +1773,7 @@ def test_level3_launcher_reports_build_and_cleanup_failures(
         "_build_image",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("build failed")),
     )
-    monkeypatch.setattr(launcher, "remove_temporary_image_tags", lambda *_args: None)
+    monkeypatch.setattr(launcher, "remove_owned_image_tags", lambda *_args: None)
     assert launcher.main("inspect-ai", common) == 2
 
     workspace = tmp_path / "cleanup-workspace"
@@ -1607,12 +1790,14 @@ def test_level3_launcher_reports_build_and_cleanup_failures(
         launcher,
         "run",
         lambda command, **_kwargs: (
-            "done" if "evaluator_level3.py" in " ".join(command) else ""
+            "done"
+            if "examples.integrations.evaluator_transaction.cli" in " ".join(command)
+            else ""
         ),
     )
     monkeypatch.setattr(
         launcher,
-        "remove_temporary_image_tags",
+        "remove_owned_image_tags",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("cleanup failed")),
     )
     cleanup_args = list(common)
@@ -1620,7 +1805,7 @@ def test_level3_launcher_reports_build_and_cleanup_failures(
     assert launcher.main("inspect-ai", cleanup_args) == 2
 
 
-def test_level3_launcher_command_and_inspection_helpers_fail_closed(
+def test_evaluator_transaction_launcher_command_and_inspection_helpers_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     launcher = _launcher_module()
@@ -1654,7 +1839,7 @@ def test_level3_launcher_command_and_inspection_helpers_fail_closed(
         launcher._image_layers("docker", "image", tmp_path)
 
 
-def test_level3_native_runner_and_worker_failure_boundaries(
+def test_evaluator_transaction_native_runner_and_worker_failure_boundaries(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -1693,7 +1878,7 @@ def test_level3_native_runner_and_worker_failure_boundaries(
 
     def run_logs(samples: object, status: str = "success") -> None:
         logs[:] = [SimpleNamespace(status=status, samples=samples)]
-        module._run_inspect_ai(Path("/model"), _records_bytes(module))
+        module.adapters._run_inspect_ai(Path("/model"), _records_bytes(module))
 
     with pytest.raises(module.BridgeError, match="one successful sample log"):
         run_logs(None, status="failed")
@@ -1754,9 +1939,9 @@ def test_level3_native_runner_and_worker_failure_boundaries(
         "evals.record": record,
     }.items():
         monkeypatch.setitem(sys.modules, name, value)
-    monkeypatch.setattr(module, "_HfGreedyGenerator", FakeGenerator)
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", FakeGenerator)
     with pytest.raises(module.BridgeError, match="ambiguous"):
-        module._run_openai_evals(Path("/model"), _records_bytes(module))
+        module.adapters._run_openai_evals(Path("/model"), _records_bytes(module))
 
     assert module._run_local_cli([sys.executable, "-c", "print('ok')"]) == "ok\n"
     mount_target = tmp_path / "mount-target"
@@ -1767,7 +1952,7 @@ def test_level3_native_runner_and_worker_failure_boundaries(
         module.mount_source(mount_link, label="mount")
 
 
-def test_level3_worker_and_main_complete_guards(
+def test_evaluator_transaction_worker_and_main_complete_guards(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     module = _module()
@@ -1850,7 +2035,7 @@ def test_level3_worker_and_main_complete_guards(
     assert "Evidence:" in capsys.readouterr().out
 
 
-def test_level3_remaining_artifact_and_worker_guards(
+def test_evaluator_transaction_remaining_artifact_and_worker_guards(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -1901,7 +2086,7 @@ def test_level3_remaining_artifact_and_worker_guards(
 
     monkeypatch.setitem(sys.modules, "torch", None)
     with pytest.raises(module.BridgeError, match="lacks the Hugging Face"):
-        module._HfGreedyGenerator(tmp_path / "model")
+        module.adapters._HfGreedyGenerator(tmp_path / "model")
 
     class ShortGenerator:
         def __init__(self, _path: Path) -> None:
@@ -1913,9 +2098,9 @@ def test_level3_remaining_artifact_and_worker_guards(
         def close(self) -> None:
             pass
 
-    monkeypatch.setattr(module, "_HfGreedyGenerator", ShortGenerator)
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", ShortGenerator)
     with pytest.raises(module.BridgeError, match="incomplete result"):
-        module._generate(tmp_path / "model", _records_bytes(module))
+        module.adapters._generate(tmp_path / "model", _records_bytes(module))
 
     with pytest.raises(module.BridgeError, match="inspected image"):
         module.complete(
@@ -1927,6 +2112,24 @@ def test_level3_remaining_artifact_and_worker_guards(
             tmp_path / "prepared",
             "sha256:" + "a" * 64,
             "inspect-ai",
+        )
+    real_prepared = tmp_path / "real-prepared"
+    real_prepared.mkdir()
+    linked_prepared = tmp_path / "linked-prepared"
+    linked_prepared.symlink_to(real_prepared, target_is_directory=True)
+    with pytest.raises(module.BridgeError, match="prepared workspace"):
+        module.complete(
+            tmp_path / "transaction-3",
+            linked_prepared,
+            "sha256:" + "a" * 64,
+            "inspect-ai",
+            evidence_signing_key=tmp_path / "evidence.pem",
+            verifier_signing_key=tmp_path / "verifier.pem",
+            trust_root=tmp_path / "trust-root",
+            source_commit="c" * 40,
+            base_image_id="sha256:" + "b" * 64,
+            build_attestation=tmp_path / "attestation.json",
+            builder_public_key=tmp_path / "builder-public.pem",
         )
 
     prepared = tmp_path / "prepared-workers"
@@ -1969,7 +2172,7 @@ def test_level3_remaining_artifact_and_worker_guards(
         )
 
 
-def test_level3_lock_and_worker_contract_mismatch_guards(
+def test_evaluator_transaction_lock_and_worker_contract_mismatch_guards(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
@@ -1993,7 +2196,7 @@ def test_level3_lock_and_worker_contract_mismatch_guards(
         module, "checkpoint_tree_sha256", lambda _path: "sha256:" + "c" * 64
     )
     monkeypatch.setattr(
-        module, "_run_upstream_evaluator", lambda *_args: ([], [(1.0, {})])
+        module.adapters, "_run_upstream_evaluator", lambda *_args: ([], [(1.0, {})])
     )
     with pytest.raises(module.BridgeError, match="one result per record"):
         module.worker("baseline", model, dataset, tmp_path / "output")
@@ -2007,4 +2210,4 @@ def test_level3_lock_and_worker_contract_mismatch_guards(
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
     with pytest.raises(module.BridgeError, match="generation defaults"):
-        module._HfGreedyGenerator(model)
+        module.adapters._HfGreedyGenerator(model)

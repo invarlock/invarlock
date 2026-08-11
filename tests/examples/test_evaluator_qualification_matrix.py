@@ -13,8 +13,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from examples.integrations.evaluator_transaction.build_attestation import (
-    load_level3_build_attestation,
-    verify_level3_build_attestation,
+    load_evaluator_build_attestation,
+    verify_evaluator_build_attestation,
 )
 from invarlock.core.runtime_provider import load_runtime_behavioral_schedule
 from invarlock.evidence_pack_verification import verify_comparison_evidence
@@ -222,8 +222,8 @@ def test_flagship_signed_transaction_is_retained_and_replays_offline(
         (root / "builder.public.pem").read_bytes()
     )
     assert isinstance(loaded_key, ed25519.Ed25519PublicKey)
-    attestation = load_level3_build_attestation(root / "build-attestation.json")
-    build = verify_level3_build_attestation(
+    attestation = load_evaluator_build_attestation(root / "build-attestation.json")
+    build = verify_evaluator_build_attestation(
         attestation,
         builder_public_key=loaded_key,
         evaluator=profile_id,
@@ -333,8 +333,11 @@ def test_line_coverage_exemptions_are_exactly_the_isolated_execution_surface() -
     expected.add("examples/evaluator-qualification/authoritative/generate_cases.py")
     expected.update(
         {
-            "examples/integrations/evaluator_level3.py",
-            "examples/integrations/evaluator_level3_launch.py",
+            "examples/integrations/evaluator_transaction/cli.py",
+            "examples/integrations/evaluator_transaction/adapters.py",
+            "examples/integrations/evaluator_transaction/config.py",
+            "examples/integrations/evaluator_transaction/launcher.py",
+            "examples/integrations/evaluator_transaction/transaction.py",
             "examples/integrations/evaluator_transaction/build_attestation.py",
             "examples/integrations/evaluator_transaction/worker.py",
             "examples/integrations/gguf_llama_cpp.py",

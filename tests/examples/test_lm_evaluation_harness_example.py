@@ -703,6 +703,17 @@ def test_complete_rejects_existing_workspace_and_mismatched_harness_runs(
     existing.mkdir()
     with pytest.raises(module.BridgeError, match="workspace must be new"):
         module.complete(existing, tmp_path / "prepared", image)
+    real_prepared = tmp_path / "real-prepared"
+    real_prepared.mkdir()
+    linked_prepared = tmp_path / "linked-prepared"
+    linked_prepared.symlink_to(real_prepared, target_is_directory=True)
+    with pytest.raises(module.BridgeError, match="prepared workspace must be a real"):
+        module.complete(
+            tmp_path / "linked-transaction",
+            linked_prepared,
+            image,
+            **_complete_kwargs(tmp_path, module),
+        )
     _prepare_test_transaction(tmp_path / "prepared", module, image)
 
     monkeypatch.setattr(
@@ -753,15 +764,19 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
         )
         == 0
     )
-    monkeypatch.setattr(
-        module,
-        "complete",
-        lambda *_args, **_kwargs: (
+    completed_paths: list[tuple[Path, Path]] = []
+
+    def fake_complete(
+        root: Path, prepared: Path, *_args: object, **_kwargs: object
+    ) -> tuple[Path, Path, Path]:
+        completed_paths.append((root, prepared))
+        return (
             tmp_path / "evidence",
             tmp_path / "receipt.json",
             tmp_path / "report.html",
-        ),
-    )
+        )
+
+    monkeypatch.setattr(module, "complete", fake_complete)
     completion_keys = _complete_kwargs(tmp_path, module)
     assert (
         module.main(
@@ -792,6 +807,12 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
         == 0
     )
     assert observed == ["worker"]
+    assert completed_paths == [
+        (
+            (tmp_path / "transaction").absolute(),
+            (tmp_path / "prepared").absolute(),
+        )
+    ]
     assert "Evidence:" in capsys.readouterr().out
 
     monkeypatch.setattr(
@@ -1053,7 +1074,6 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
                         "sha256:" + "9" * 64,
                         "sha256:" + "a" * 64,
                         "sha256:" + "b" * 64,
-                        "sha256:" + "c" * 64,
                     ]
                 )
             if command[4] == "{{json .Config}}":
@@ -1061,7 +1081,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
                     base_config if command[-1] == base_id else child_config
                 )
             if command[4] == "{{.Id}}" and not command[-1].startswith("sha256:"):
-                raise RuntimeError("No such image")
+                return base_id if "example-runtime" in command[-1] else final_id
             if "org.invarlock.example.base-image-id" in " ".join(command):
                 return base_id
             return final_id
@@ -1102,10 +1122,15 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
     assert "--source-commit" in completion
     assert "--base-image-id" in completion
     build = next(command for command in commands if command[:2] == ["docker", "build"])
-    assert "BASE_IMAGE=invarlock-example-runtime:cccccccccccc" in build
+    base_argument = next(
+        argument for argument in build if argument.startswith("BASE_IMAGE=")
+    )
+    assert base_argument.startswith(
+        "BASE_IMAGE=invarlock-example-runtime:cccccccccccc-"
+    )
     assert "--iidfile" in build
     assert any(
-        command[-1] == "invarlock-lm-eval-example:cccccccccccc"
+        command[-1].startswith("invarlock-lm-eval-example:cccccccccccc-")
         for command in commands
         if command[:3] == ["docker", "image", "inspect"]
     )
@@ -1521,6 +1546,7 @@ def test_model_input_main_resolves_workspace_and_dispatches(
     workspace = tmp_path / "parent/../prepared"
     image = "sha256:" + "c" * 64
     observed: list[tuple[Path, str]] = []
+    real_prepare = module.prepare
     monkeypatch.setattr(
         module.argparse.ArgumentParser,
         "parse_args",
@@ -1536,6 +1562,21 @@ def test_model_input_main_resolves_workspace_and_dispatches(
 
     assert module.main() == 0
     assert observed == [(workspace.expanduser().resolve(), image)]
+
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    monkeypatch.setattr(
+        module.argparse.ArgumentParser,
+        "parse_args",
+        lambda _parser: module.argparse.Namespace(
+            workspace=linked, runtime_image=image
+        ),
+    )
+    monkeypatch.setattr(module, "prepare", real_prepare)
+    with pytest.raises(RuntimeError, match="prepared workspace must be new"):
+        module.main()
+    assert not missing.exists()
 
 
 def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) -> None:
@@ -1658,6 +1699,12 @@ def test_launcher_command_runner_and_existing_workspace_fail_closed(
         module.main(["--workspace", str(existing), *_launcher_args(tmp_path, module)])
         == 2
     )
+    linked = tmp_path / "linked"
+    linked.symlink_to(tmp_path / "missing-workspace", target_is_directory=True)
+    assert (
+        module.main(["--workspace", str(linked), *_launcher_args(tmp_path, module)])
+        == 2
+    )
 
 
 def test_launcher_canonicalizes_default_workspace_before_source_build(
@@ -1681,7 +1728,6 @@ def test_launcher_canonicalizes_default_workspace_before_source_build(
         raise RuntimeError("stop after canonical workspace check")
 
     monkeypatch.setattr(shared_launch, "_runtime_image", stop)
-    monkeypatch.setattr(module, "require_image_tag_available", lambda *_args: None)
     assert module.main(_launcher_args(tmp_path, module)) == 2
     assert observed == [real.resolve() / "build"]
 

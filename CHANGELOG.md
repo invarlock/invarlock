@@ -9,11 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added an exact-match `minimum_side_accuracy` policy control and a versioned
+  comparison-report v3 field that records both side results.
+
 ### Changed
+
+- Kept generic receipt signing role-neutral while high-assurance evaluator
+  transactions continue to require separate evidence, verifier, and builder
+  keys.
+- Separated the immutable v0.13 compatibility package from the current
+  acceptance-handoff golden, and labeled report-v3 acceptance envelopes as the
+  v0.15 contract set without relabeling v0.13 report-v1/v2 evidence.
+- Preserved retained OCI build attestations in their original signed format;
+  current transaction writers emit only the evaluator-named format while the
+  offline verifier strictly reads both versions.
 
 ### Removed
 
 ### Fixed
+
+- Bound temporary container tags and worker cleanup to immutable engine IDs,
+  preserved no-follow validation for caller-owned key and workspace paths,
+  and removed partial streamed output after bounded command failures.
 
 ## [0.14.0] - 2026-07-27
 

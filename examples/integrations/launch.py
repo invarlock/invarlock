@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -50,24 +51,24 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
     from trust_material import read_external_file  # type: ignore[no-redef]
 try:
     from examples.integrations.evaluator_transaction.build_attestation import (
-        Level3BuildAttestationError,
-        load_level3_build_attestation,
-        make_level3_build_attestation,
-        sign_level3_build_attestation,
-        verify_level3_build_attestation,
-        write_level3_build_attestation,
+        EvaluatorBuildAttestationError,
+        load_evaluator_build_attestation,
+        make_evaluator_build_attestation,
+        sign_evaluator_build_attestation,
+        verify_evaluator_build_attestation,
+        write_evaluator_build_attestation,
     )
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
     try:
         from evaluator_transaction.build_attestation import (
-            Level3BuildAttestationError,
-            load_level3_build_attestation,
-            make_level3_build_attestation,
-            sign_level3_build_attestation,
-            verify_level3_build_attestation,
-            write_level3_build_attestation,
+            EvaluatorBuildAttestationError,
+            load_evaluator_build_attestation,
+            make_evaluator_build_attestation,
+            sign_evaluator_build_attestation,
+            verify_evaluator_build_attestation,
+            write_evaluator_build_attestation,
         )
     except (
         ModuleNotFoundError
@@ -78,12 +79,12 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         }:
             raise
         from evaluator_transaction import (  # type: ignore[no-redef]
-            Level3BuildAttestationError,
-            load_level3_build_attestation,
-            make_level3_build_attestation,
-            sign_level3_build_attestation,
-            verify_level3_build_attestation,
-            write_level3_build_attestation,
+            EvaluatorBuildAttestationError,
+            load_evaluator_build_attestation,
+            make_evaluator_build_attestation,
+            sign_evaluator_build_attestation,
+            verify_evaluator_build_attestation,
+            write_evaluator_build_attestation,
         )
 
 
@@ -383,7 +384,7 @@ def _require_child_image_config(
         raise RuntimeError("child image labels do not match their contract")
 
 
-def _level3_config_digest(config: Mapping[str, object]) -> str:
+def _evaluator_config_digest(config: Mapping[str, object]) -> str:
     return (
         "sha256:"
         + hashlib.sha256(canonical_json_bytes(dict(config), newline=False)).hexdigest()
@@ -428,7 +429,7 @@ def require_builder_key_pair(
         raise RuntimeError("builder signing and public keys do not match")
 
 
-def write_level3_attestation(
+def write_evaluator_attestation(
     *,
     path: Path,
     evaluator: str,
@@ -444,9 +445,9 @@ def write_level3_attestation(
     config: Mapping[str, object],
     builder_signing_key: ed25519.Ed25519PrivateKey,
 ) -> None:
-    """Persist one engine-observed Level 3 build attestation."""
+    """Persist one engine-observed evaluator build attestation."""
 
-    payload = make_level3_build_attestation(
+    payload = make_evaluator_build_attestation(
         evaluator=evaluator,
         evaluator_version=evaluator_version,
         runtime_image_id=runtime_image_id,
@@ -459,13 +460,13 @@ def write_level3_attestation(
         image_layers=image_layers,
         config=config,
     )
-    write_level3_build_attestation(
+    write_evaluator_build_attestation(
         path,
-        sign_level3_build_attestation(payload, builder_signing_key),
+        sign_evaluator_build_attestation(payload, builder_signing_key),
     )
 
 
-def inspect_level3_image(
+def inspect_evaluator_image(
     *,
     engine: str,
     image: str,
@@ -479,21 +480,21 @@ def inspect_level3_image(
     base_image_id: str,
     builder_public_key: ed25519.Ed25519PublicKey,
 ) -> dict[str, object]:
-    """Re-inspect the exact image used by a Level 3 worker."""
+    """Re-inspect the exact image used by an evaluator worker."""
 
     try:
-        attestation = load_level3_build_attestation(attestation_path)
+        attestation = load_evaluator_build_attestation(attestation_path)
         statement = (
             attestation.get("statement") if isinstance(attestation, dict) else None
         )
         if not isinstance(statement, dict):
-            raise Level3BuildAttestationError(
-                "signed Level 3 build statement is missing"
+            raise EvaluatorBuildAttestationError(
+                "signed evaluator build statement is missing"
             )
         source_bundle_sha256 = statement.get("source_bundle_sha256")
         if not isinstance(source_bundle_sha256, str):
-            raise Level3BuildAttestationError("source bundle digest is missing")
-        verify_level3_build_attestation(
+            raise EvaluatorBuildAttestationError("source bundle digest is missing")
+        verify_evaluator_build_attestation(
             attestation,
             builder_public_key=builder_public_key,
             evaluator=evaluator,
@@ -511,7 +512,7 @@ def inspect_level3_image(
             capture_output=True,
         ).stdout.strip()
         if actual_id != image:
-            raise Level3BuildAttestationError(
+            raise EvaluatorBuildAttestationError(
                 "engine image identity changed after build"
             )
         actual_layers = json.loads(
@@ -552,7 +553,7 @@ def inspect_level3_image(
         )
         labels = config.get("Labels")
         if not isinstance(labels, dict):
-            raise Level3BuildAttestationError("Level 3 image labels are invalid")
+            raise EvaluatorBuildAttestationError("evaluator image labels are invalid")
         expected_labels = {
             "org.invarlock.example.base-image-id": base_image_id,
             "org.invarlock.example.evaluator": evaluator,
@@ -564,27 +565,31 @@ def inspect_level3_image(
             ],
         }
         if any(labels.get(key) != value for key, value in expected_labels.items()):
-            raise Level3BuildAttestationError(
-                "Level 3 image labels are not authenticated"
+            raise EvaluatorBuildAttestationError(
+                "evaluator image labels are not authenticated"
             )
         if config.get("Entrypoint") != list(expected_entrypoint):
-            raise Level3BuildAttestationError("Level 3 image entrypoint is not exact")
+            raise EvaluatorBuildAttestationError(
+                "evaluator image entrypoint is not exact"
+            )
         if not isinstance(actual_layers, list) or not isinstance(base_layers, list):
-            raise Level3BuildAttestationError(
-                "Level 3 image layer inspection is invalid"
+            raise EvaluatorBuildAttestationError(
+                "evaluator image layer inspection is invalid"
             )
         if actual_layers[: len(base_layers)] != base_layers:
-            raise Level3BuildAttestationError(
-                "Level 3 image does not derive from its base"
+            raise EvaluatorBuildAttestationError(
+                "evaluator image does not derive from its base"
             )
         if actual_layers != statement["image_layers"]:
-            raise Level3BuildAttestationError("Level 3 image layer chain changed")
+            raise EvaluatorBuildAttestationError("evaluator image layer chain changed")
         if base_layers != statement["base_layers"]:
-            raise Level3BuildAttestationError("Level 3 base layer chain changed")
-        if _level3_config_digest(config) != statement["config_sha256"]:
-            raise Level3BuildAttestationError("Level 3 image configuration changed")
+            raise EvaluatorBuildAttestationError("evaluator base layer chain changed")
+        if _evaluator_config_digest(config) != statement["config_sha256"]:
+            raise EvaluatorBuildAttestationError(
+                "evaluator image configuration changed"
+            )
         return attestation
-    except Level3BuildAttestationError as exc:
+    except EvaluatorBuildAttestationError as exc:
         raise RuntimeError(str(exc)) from exc
 
 
@@ -595,6 +600,7 @@ def _runtime_image(
     container_engine: str,
     dockerfile: str = "runtime/Dockerfile",
     image_prefix: str = "invarlock-example-runtime",
+    image_tag: str | None = None,
     build_arguments: tuple[str, ...] = (),
     authenticated_base_image: str | None = None,
 ) -> tuple[str, str]:
@@ -620,7 +626,7 @@ def _runtime_image(
     if not isinstance(bundle_digest, str):
         raise RuntimeError("source-bundle creation did not return its digest")
     epoch = _git(repository, "show", "-s", "--format=%ct", commit)
-    image = f"{image_prefix}:{commit[:12]}"
+    image = image_tag or f"{image_prefix}:{commit[:12]}"
     build_command = [
         sys.executable,
         str(repository / "scripts/authenticated_runtime_build.py"),
@@ -772,7 +778,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     repository = Path(__file__).resolve().parents[2]
     workspace = (
-        arguments.workspace.expanduser().resolve()
+        Path(os.path.abspath(arguments.workspace.expanduser()))
         if arguments.workspace is not None
         else Path(
             tempfile.mkdtemp(prefix=f"invarlock-{arguments.integration}-")

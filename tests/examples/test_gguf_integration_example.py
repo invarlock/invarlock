@@ -564,10 +564,16 @@ def test_execute_rejects_false_green_outputs(
         )
 
 
-def test_main_rejects_existing_workspace(tmp_path: Path) -> None:
+@pytest.mark.parametrize("kind", ["directory", "symlink"])
+def test_main_rejects_existing_workspace(tmp_path: Path, kind: str) -> None:
     existing = tmp_path / "existing"
-    existing.mkdir()
-    assert example.main(["--workspace", str(existing)]) == 2
+    missing = tmp_path / "missing-workspace"
+    if kind == "directory":
+        existing.mkdir()
+    else:
+        existing.symlink_to(missing, target_is_directory=True)
+    assert example.main(["--workspace", str(existing), "--ephemeral-trust-root"]) == 2
+    assert not missing.exists()
 
 
 def test_default_workspace_is_canonical_before_source_build(

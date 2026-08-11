@@ -18,14 +18,14 @@
       "baseline": "sha256:05150beac8c0312c2ce8c474cb0b6d2c7c0a22adff5d60a234a241393f9d2ddd",
       "subject": "sha256:6dcb18c7dafa4b0c36063bb7346452b24609c199205b5d8ed984c9059b0129fe"
     },
-    "evidence_signer_fingerprint": "sha256:18222750063d7faf0f3cf28a831e11d7ec4a99232734c352e73e92f489e2eca5",
+    "evidence_signer_fingerprint": "sha256:900e95ca895f15de22add1bac3b4e72b589e4fe870b641b19b7b563daa419770",
     "runtime_digests": {
       "baseline": "sha256:074607b62d74d51dcda9d50e8a9ac2e890bcb021adf18243b4a799e4c9166fc4",
       "subject": "sha256:074607b62d74d51dcda9d50e8a9ac2e890bcb021adf18243b4a799e4c9166fc4"
     },
     "schedule_digest": "sha256:f0fcecbb04157568c100d14f0b8aacbaaadcdbe30be4cb8eea3400433586179b",
     "trust_profile_digest": "sha256:c28e7aaa1a05215c2eae59ca6d82d0934181b08867515d4a40745a9e2dbd779f",
-    "verifier_fingerprint": "sha256:c5ceabd2d7084da4e4ae00cd35d774ec116a962fa327c86b57ea3426694f6d37",
+    "verifier_fingerprint": "sha256:3cd74dfc3d0680fe445ed60a7423c25dc37ab8f8225eb4e6cca453491dd7eca4",
     "verifier_identity": "invarlock-example/lm-evaluation-harness-verifier"
   }
 }

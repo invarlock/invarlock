@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,7 +20,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
     from bounded_command import run_bounded_command  # type: ignore[no-redef]
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-ADDED_LAYERS = 11
+ADDED_LAYERS = 10
 _COMMAND_TIMEOUT_SECONDS = 24 * 60 * 60
 _COMMAND_STDOUT_LIMIT = 4 * 1024 * 1024
 _COMMAND_STDERR_LIMIT = 4 * 1024 * 1024
@@ -27,8 +28,10 @@ if str(REPOSITORY) not in sys.path:
     sys.path.insert(0, str(REPOSITORY))
 
 from examples.integrations.evaluator_transaction.image_cleanup import (  # noqa: E402
-    remove_temporary_image_tags,
-    require_image_tag_available,
+    OwnedImageTag,
+    record_owned_image_tag,
+    remove_owned_image_tags,
+    temporary_image_tag,
 )
 
 
@@ -105,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         load_builder_public_key,
         load_builder_signing_key,
         require_builder_key_pair,
-        write_level3_attestation,
+        write_evaluator_attestation,
     )
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -120,10 +123,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--builder-public-key", type=Path, required=True)
     args = parser.parse_args(argv)
     builder_signing_key = load_builder_signing_key(
-        args.builder_signing_key.expanduser().resolve()
+        Path(os.path.abspath(args.builder_signing_key.expanduser()))
     )
     builder_public_key = load_builder_public_key(
-        args.builder_public_key.expanduser().resolve()
+        Path(os.path.abspath(args.builder_public_key.expanduser()))
     )
     require_builder_key_pair(builder_signing_key, builder_public_key)
     repository = REPOSITORY
@@ -132,12 +135,12 @@ def main(argv: list[str] | None = None) -> int:
             strict=True
         )
     else:
-        workspace = args.workspace.expanduser().resolve()
+        workspace = Path(os.path.abspath(args.workspace.expanduser()))
         if workspace.exists() or workspace.is_symlink():
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2
         workspace.mkdir(parents=True)
-    cleanup_tags: list[str] = []
+    cleanup_tags: list[OwnedImageTag] = []
     cleanup_error: RuntimeError | None = None
     output: str | None = None
     result = 2
@@ -145,14 +148,18 @@ def main(argv: list[str] | None = None) -> int:
         commit = _require_committed_checkout(repository)
         build = workspace / "build"
         build.mkdir()
-        base_tag = f"invarlock-example-runtime:{commit[:12]}"
-        require_image_tag_available(run, args.container_engine, base_tag, repository)
-        cleanup_tags.append(base_tag)
+        base_tag = temporary_image_tag("invarlock-example-runtime", commit)
         status("Building the source-bound InvarLock runtime image...")
         base_id, _ = _runtime_image(
             repository=repository,
             build_root=build,
             container_engine=args.container_engine,
+            image_tag=base_tag,
+        )
+        cleanup_tags.append(
+            record_owned_image_tag(
+                run, args.container_engine, base_tag, base_id, repository
+            )
         )
         base_layers = _image_layers(args.container_engine, base_id, repository)
         base_config = _image_config(args.container_engine, base_id, repository)
@@ -181,9 +188,7 @@ def main(argv: list[str] | None = None) -> int:
                 ).read_bytes()
             ).hexdigest()
         )
-        image_tag = f"invarlock-lm-eval-example:{commit[:12]}"
-        require_image_tag_available(run, args.container_engine, image_tag, repository)
-        cleanup_tags.append(image_tag)
+        image_tag = temporary_image_tag("invarlock-lm-eval-example", commit)
         image_id_file = build / "harness-image-id"
         if image_id_file.exists() or image_id_file.is_symlink():
             raise RuntimeError("Harness image identity file already exists")
@@ -218,6 +223,11 @@ def main(argv: list[str] | None = None) -> int:
             stdin_path=source,
         )
         image_id = _load_image_id_file(image_id_file)
+        cleanup_tags.append(
+            record_owned_image_tag(
+                run, args.container_engine, image_tag, image_id, repository
+            )
+        )
         harness_layers = _image_layers(args.container_engine, image_id, repository)
         harness_config = _image_config(args.container_engine, image_id, repository)
         if len(harness_layers) != len(base_layers) + ADDED_LAYERS or (
@@ -272,8 +282,8 @@ def main(argv: list[str] | None = None) -> int:
             raise RuntimeError(
                 "Harness image does not bind the inspected base image ID"
             )
-        write_level3_attestation(
-            path=build / "level3-build-attestation.json",
+        write_evaluator_attestation(
+            path=build / "evaluator-build-attestation.json",
             evaluator="lm-evaluation-harness",
             evaluator_version="0.4.12+invarlock.nocache.1",
             runtime_image_id=image_id,
@@ -323,21 +333,21 @@ def main(argv: list[str] | None = None) -> int:
                 "--container-engine",
                 args.container_engine,
                 "--evidence-signing-key",
-                str(args.evidence_signing_key.expanduser().resolve()),
+                str(Path(os.path.abspath(args.evidence_signing_key.expanduser()))),
                 "--verifier-signing-key",
-                str(args.verifier_signing_key.expanduser().resolve())
+                str(Path(os.path.abspath(args.verifier_signing_key.expanduser())))
                 if args.verifier_signing_key is not None
                 else "",
                 "--trust-root",
-                str(args.trust_root.expanduser().absolute()),
+                str(Path(os.path.abspath(args.trust_root.expanduser()))),
                 "--builder-public-key",
-                str(args.builder_public_key.expanduser().resolve()),
+                str(Path(os.path.abspath(args.builder_public_key.expanduser()))),
                 "--source-commit",
                 commit,
                 "--base-image-id",
                 base_id,
                 "--build-attestation",
-                str(build / "level3-build-attestation.json"),
+                str(build / "evaluator-build-attestation.json"),
             ],
             cwd=repository,
         )
@@ -347,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         result = 0
     finally:
         try:
-            remove_temporary_image_tags(
+            remove_owned_image_tags(
                 run, args.container_engine, repository, cleanup_tags
             )
         except RuntimeError as exc:

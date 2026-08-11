@@ -45,11 +45,11 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         read_external_file,
     )
 try:
-    from examples.integrations.launch import inspect_level3_image
+    from examples.integrations.launch import inspect_evaluator_image
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
-    from launch import inspect_level3_image  # type: ignore[no-redef]
+    from launch import inspect_evaluator_image  # type: ignore[no-redef]
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
@@ -230,7 +230,7 @@ def _inspect_runtime_image(
         + hashlib.sha256((REPOSITORY_ROOT / HARNESS_LOCK_PATH).read_bytes()).hexdigest()
     )
     try:
-        inspect_level3_image(
+        inspect_evaluator_image(
             engine=engine,
             image=image,
             repository=REPOSITORY_ROOT,
@@ -249,7 +249,7 @@ def _inspect_runtime_image(
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise BridgeError(
-            "Level 3 build attestation did not authenticate the image"
+            "evaluator build attestation did not authenticate the image"
         ) from exc
 
 
@@ -726,6 +726,15 @@ def _validated_comparison(request: object) -> dict[str, Any]:
     return cast(dict[str, Any], comparison)
 
 
+def _validate_workspace_roots(root: Path, prepared: Path) -> None:
+    """Keep caller-selected transaction paths lexical and free of symlinks."""
+
+    if root.exists() or root.is_symlink():
+        raise BridgeError("transaction workspace must be new")
+    if not prepared.is_dir() or prepared.is_symlink():
+        raise BridgeError("prepared workspace must be a real directory")
+
+
 def complete(
     root: Path,
     prepared: Path,
@@ -744,8 +753,7 @@ def complete(
 
     if IMAGE_ID.fullmatch(image) is None:
         raise BridgeError("runtime image must be an immutable local sha256 ID")
-    if root.exists() or root.is_symlink():
-        raise BridgeError("transaction workspace must be new")
+    _validate_workspace_roots(root, prepared)
     if (
         evidence_signing_key is None
         or verifier_signing_key is None
@@ -1123,34 +1131,34 @@ def main(argv: list[str] | None = None) -> int:
             worker(args.role, args.model, args.dataset, args.output)
         else:
             evidence, receipt, report = complete(
-                args.workspace.resolve(),
-                args.prepared.resolve(),
+                Path(os.path.abspath(args.workspace.expanduser())),
+                Path(os.path.abspath(args.prepared.expanduser())),
                 args.runtime_image,
                 container_engine=args.container_engine,
                 evidence_signing_key=(
-                    args.evidence_signing_key.resolve()
+                    Path(os.path.abspath(args.evidence_signing_key.expanduser()))
                     if args.evidence_signing_key is not None
                     else None
                 ),
                 verifier_signing_key=(
-                    args.verifier_signing_key.resolve()
+                    Path(os.path.abspath(args.verifier_signing_key.expanduser()))
                     if args.verifier_signing_key is not None
                     else None
                 ),
                 trust_root=(
-                    args.trust_root.expanduser().absolute()
+                    Path(os.path.abspath(args.trust_root.expanduser()))
                     if args.trust_root is not None
                     else None
                 ),
                 source_commit=args.source_commit,
                 base_image_id=args.base_image_id,
                 builder_public_key=(
-                    args.builder_public_key.resolve()
+                    Path(os.path.abspath(args.builder_public_key.expanduser()))
                     if args.builder_public_key is not None
                     else None
                 ),
                 build_attestation=(
-                    args.build_attestation.resolve()
+                    Path(os.path.abspath(args.build_attestation.expanduser()))
                     if args.build_attestation is not None
                     else None
                 ),

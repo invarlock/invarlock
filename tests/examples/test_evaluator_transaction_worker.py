@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import io
 import subprocess
 import sys
@@ -13,13 +14,13 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 import examples.integrations.evaluator_transaction.worker as oci
 import examples.integrations.trust_material as trust_material
 from examples.integrations.evaluator_transaction.build_attestation import (
-    Level3BuildAttestationError,
-    load_level3_build_attestation,
-    make_level3_build_attestation,
-    sign_level3_build_attestation,
-    validate_level3_build_attestation,
-    verify_level3_build_attestation,
-    write_level3_build_attestation,
+    EvaluatorBuildAttestationError,
+    load_evaluator_build_attestation,
+    make_evaluator_build_attestation,
+    sign_evaluator_build_attestation,
+    validate_evaluator_build_attestation,
+    verify_evaluator_build_attestation,
+    write_evaluator_build_attestation,
 )
 from examples.integrations.trust_material import (
     create_trust_material,
@@ -53,7 +54,7 @@ def _attestation(**overrides: object) -> dict[str, object]:
     }
     values.update(overrides)
     config = values.pop("config")
-    return make_level3_build_attestation(
+    return make_evaluator_build_attestation(
         **values,  # type: ignore[arg-type]
         config=config,  # type: ignore[arg-type]
     )
@@ -62,25 +63,83 @@ def _attestation(**overrides: object) -> dict[str, object]:
 def test_build_attestation_is_canonical_and_bounded(tmp_path: Path) -> None:
     path = tmp_path / "build-attestation.json"
     payload = _attestation()
-    signed = sign_level3_build_attestation(
+    signed = sign_evaluator_build_attestation(
         payload, ed25519.Ed25519PrivateKey.generate()
     )
-    write_level3_build_attestation(path, signed)
+    write_evaluator_build_attestation(path, signed)
 
-    assert load_level3_build_attestation(path) == signed
+    assert load_evaluator_build_attestation(path) == signed
     assert path.read_bytes() == canonical_json_bytes(signed)
 
-    with pytest.raises(Level3BuildAttestationError, match="destination exists"):
-        write_level3_build_attestation(path, signed)
+    with pytest.raises(EvaluatorBuildAttestationError, match="destination exists"):
+        write_evaluator_build_attestation(path, signed)
+
+
+def test_retained_build_attestation_format_is_read_only_and_strict(
+    tmp_path: Path,
+) -> None:
+    key = ed25519.Ed25519PrivateKey.generate()
+    statement = {
+        **_attestation(),
+        "format_version": "invarlock/level3-build-attestation-v2",
+    }
+    current = sign_evaluator_build_attestation(_attestation(), key)
+    signature = {
+        **current["signature"],
+        "value": base64.b64encode(
+            key.sign(canonical_json_bytes(statement, newline=False))
+        ).decode("ascii"),
+    }
+    retained = {
+        "format_version": "invarlock/signed-level3-build-attestation-v1",
+        "signature": signature,
+        "statement": statement,
+    }
+    path = tmp_path / "retained.json"
+    path.write_bytes(canonical_json_bytes(retained))
+
+    loaded = load_evaluator_build_attestation(path)
+    assert (
+        verify_evaluator_build_attestation(
+            loaded,
+            builder_public_key=key.public_key(),
+            evaluator="inspect-ai",
+            evaluator_version="0.3.254",
+            runtime_image_id=IMAGE,
+            base_image_id=BASE,
+            source_commit=COMMIT,
+            source_bundle_sha256=SOURCE,
+            lock_sha256=LOCK,
+            entrypoint=ENTRYPOINT,
+        )
+        == statement
+    )
+    with pytest.raises(EvaluatorBuildAttestationError, match="only signed"):
+        write_evaluator_build_attestation(tmp_path / "copy.json", retained)
+
+    mismatched = {**retained, "format_version": current["format_version"]}
+    with pytest.raises(EvaluatorBuildAttestationError, match="format is invalid"):
+        verify_evaluator_build_attestation(
+            mismatched,
+            builder_public_key=key.public_key(),
+            evaluator="inspect-ai",
+            evaluator_version="0.3.254",
+            runtime_image_id=IMAGE,
+            base_image_id=BASE,
+            source_commit=COMMIT,
+            source_bundle_sha256=SOURCE,
+            lock_sha256=LOCK,
+            entrypoint=ENTRYPOINT,
+        )
 
 
 def test_builder_signature_binds_the_complete_build_statement() -> None:
     key = ed25519.Ed25519PrivateKey.generate()
     payload = _attestation()
-    signed = sign_level3_build_attestation(payload, key)
+    signed = sign_evaluator_build_attestation(payload, key)
 
     assert (
-        verify_level3_build_attestation(
+        verify_evaluator_build_attestation(
             signed,
             builder_public_key=key.public_key(),
             evaluator="inspect-ai",
@@ -97,8 +156,8 @@ def test_builder_signature_binds_the_complete_build_statement() -> None:
 
     tampered = dict(signed)
     tampered["statement"] = {**payload, "image_layers": [BASE]}
-    with pytest.raises(Level3BuildAttestationError, match="does not verify"):
-        verify_level3_build_attestation(
+    with pytest.raises(EvaluatorBuildAttestationError, match="does not verify"):
+        verify_evaluator_build_attestation(
             tampered,
             builder_public_key=key.public_key(),
             evaluator="inspect-ai",
@@ -111,8 +170,8 @@ def test_builder_signature_binds_the_complete_build_statement() -> None:
             entrypoint=ENTRYPOINT,
         )
 
-    with pytest.raises(Level3BuildAttestationError, match="not trusted"):
-        verify_level3_build_attestation(
+    with pytest.raises(EvaluatorBuildAttestationError, match="not trusted"):
+        verify_evaluator_build_attestation(
             signed,
             builder_public_key=ed25519.Ed25519PrivateKey.generate().public_key(),
             evaluator="inspect-ai",
@@ -143,8 +202,8 @@ def test_build_attestation_rejects_malformed_contract_fields(
 ) -> None:
     payload = _attestation()
     invalid = mutator(payload)  # type: ignore[operator]
-    with pytest.raises(Level3BuildAttestationError, match=message):
-        validate_level3_build_attestation(
+    with pytest.raises(EvaluatorBuildAttestationError, match=message):
+        validate_evaluator_build_attestation(
             invalid,
             evaluator="inspect-ai",
             evaluator_version="0.3.254",
@@ -162,7 +221,7 @@ def test_signed_build_attestation_rejects_invalid_envelopes_and_files(
 ) -> None:
     key = ed25519.Ed25519PrivateKey.generate()
     payload = _attestation()
-    signed = sign_level3_build_attestation(payload, key)
+    signed = sign_evaluator_build_attestation(payload, key)
     for invalid, message in (
         ([], "envelope is invalid"),
         ({**signed, "format_version": "wrong"}, "format is invalid"),
@@ -176,8 +235,8 @@ def test_signed_build_attestation_rejects_invalid_envelopes_and_files(
             "encoding is invalid",
         ),
     ):
-        with pytest.raises(Level3BuildAttestationError, match=message):
-            verify_level3_build_attestation(
+        with pytest.raises(EvaluatorBuildAttestationError, match=message):
+            verify_evaluator_build_attestation(
                 invalid,
                 builder_public_key=key.public_key(),
                 evaluator="inspect-ai",
@@ -191,10 +250,10 @@ def test_signed_build_attestation_rejects_invalid_envelopes_and_files(
             )
     unsigned = tmp_path / "unsigned.json"
     unsigned.write_text("{}\n", encoding="utf-8")
-    with pytest.raises(Level3BuildAttestationError, match="unsigned"):
-        load_level3_build_attestation(unsigned)
-    with pytest.raises(Level3BuildAttestationError, match="only signed"):
-        write_level3_build_attestation(tmp_path / "invalid.json", payload)
+    with pytest.raises(EvaluatorBuildAttestationError, match="unsigned"):
+        load_evaluator_build_attestation(unsigned)
+    with pytest.raises(EvaluatorBuildAttestationError, match="only signed"):
+        write_evaluator_build_attestation(tmp_path / "invalid.json", payload)
 
 
 @pytest.mark.parametrize(
@@ -211,8 +270,8 @@ def test_build_attestation_rejects_profile_or_identity_tampering(
     payload = _attestation()
     payload[field] = value
 
-    with pytest.raises(Level3BuildAttestationError):
-        validate_level3_build_attestation(
+    with pytest.raises(EvaluatorBuildAttestationError):
+        validate_evaluator_build_attestation(
             payload,
             evaluator="inspect-ai",
             evaluator_version="0.3.254",
@@ -228,8 +287,8 @@ def test_build_attestation_rejects_profile_or_identity_tampering(
 def test_build_attestation_rejects_non_strings_and_version_mismatches() -> None:
     payload = _attestation()
     payload["config_sha256"] = None
-    with pytest.raises(Level3BuildAttestationError, match="OCI config digest"):
-        validate_level3_build_attestation(
+    with pytest.raises(EvaluatorBuildAttestationError, match="OCI config digest"):
+        validate_evaluator_build_attestation(
             payload,
             evaluator="inspect-ai",
             evaluator_version="0.3.254",
@@ -242,8 +301,8 @@ def test_build_attestation_rejects_non_strings_and_version_mismatches() -> None:
         )
     payload = _attestation()
     payload["evaluator_version"] = "wrong"
-    with pytest.raises(Level3BuildAttestationError, match="version is invalid"):
-        validate_level3_build_attestation(
+    with pytest.raises(EvaluatorBuildAttestationError, match="version is invalid"):
+        validate_evaluator_build_attestation(
             payload,
             evaluator="inspect-ai",
             evaluator_version="0.3.254",
@@ -256,7 +315,7 @@ def test_build_attestation_rejects_non_strings_and_version_mismatches() -> None:
         )
 
 
-def test_level3_command_keeps_control_file_private_and_output_bounded(
+def test_evaluator_transaction_command_keeps_control_file_private_and_output_bounded(
     tmp_path: Path,
 ) -> None:
     model = tmp_path / "model"
@@ -300,7 +359,7 @@ def test_level3_command_keeps_control_file_private_and_output_bounded(
     )
 
 
-def test_level3_worker_transfers_then_removes_preserved_container(
+def test_evaluator_transaction_worker_transfers_then_removes_preserved_container(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     model = tmp_path / "model"
@@ -308,14 +367,18 @@ def test_level3_worker_transfers_then_removes_preserved_container(
     dataset = tmp_path / "records.jsonl"
     dataset.write_text("{}\n", encoding="utf-8")
     output = tmp_path / "transaction" / "result"
-    observed_names: list[str] = []
+    observed_handles: list[str] = []
     observed: list[list[str]] = []
 
     def fake_run_side_worker(
         command: list[str], *, timeout_seconds: int
     ) -> subprocess.CompletedProcess[str]:
         assert timeout_seconds == 30
-        observed_names.append(command[command.index("--name") + 1])
+        handle = "a" * 64
+        Path(command[command.index("--cidfile") + 1]).write_text(
+            handle, encoding="ascii"
+        )
+        observed_handles.append(handle)
         return subprocess.CompletedProcess(command, 0, "", "")
 
     def fake_bounded_command(
@@ -355,15 +418,15 @@ def test_level3_worker_transfers_then_removes_preserved_container(
 
     assert result.returncode == 0
     assert output.is_dir()
-    assert len(observed_names) == 1
-    container_name = observed_names[0]
-    assert observed[0][1:4] == ["exec", container_name, "cat"]
+    assert len(observed_handles) == 1
+    container_handle = observed_handles[0]
+    assert observed[0][1:4] == ["exec", container_handle, "cat"]
     assert observed[1][1] == "exec"
     assert observed[2][1] == "rm"
-    assert container_name in observed[1]
+    assert container_handle in observed[1]
 
 
-def test_level3_worker_returns_bounded_container_diagnostics_on_failure(
+def test_evaluator_transaction_worker_returns_bounded_container_diagnostics_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     model = tmp_path / "model"
@@ -371,13 +434,17 @@ def test_level3_worker_returns_bounded_container_diagnostics_on_failure(
     dataset = tmp_path / "records.jsonl"
     dataset.write_text("{}\n", encoding="utf-8")
     output = tmp_path / "transaction" / "result"
-    observed_name: list[str] = []
+    observed_handle: list[str] = []
 
     def fake_run_side_worker(
         command: list[str], *, timeout_seconds: int
     ) -> subprocess.CompletedProcess[str]:
         assert timeout_seconds == 30
-        observed_name.append(command[command.index("--name") + 1])
+        handle = "b" * 64
+        Path(command[command.index("--cidfile") + 1]).write_text(
+            handle, encoding="ascii"
+        )
+        observed_handle.append(handle)
         return subprocess.CompletedProcess(command, 0, "container-id", "")
 
     def fake_bounded_command(
@@ -408,10 +475,10 @@ def test_level3_worker_returns_bounded_container_diagnostics_on_failure(
     assert result.returncode == 7
     assert result.stdout == ""
     assert result.stderr == "native evaluator failed\n"
-    assert len(observed_name) == 1
+    assert observed_handle == ["b" * 64]
 
 
-def test_level3_output_archive_rejects_links(tmp_path: Path) -> None:
+def test_evaluator_transaction_output_archive_rejects_links(tmp_path: Path) -> None:
     archive_bytes = io.BytesIO()
     with tarfile.open(fileobj=archive_bytes, mode="w") as archive:
         directory = tarfile.TarInfo("result")
@@ -690,7 +757,7 @@ def test_output_archive_rejects_empty_special_duplicate_and_oversized_payloads(
 
     with pytest.raises(oci.OciEvaluationError, match="size limit"):
         oci._extract_output_archive(
-            b"x" * (1024 + oci._LEVEL3_STATUS_RESERVE_BYTES + 1),
+            b"x" * (1024 + oci._EVALUATOR_STATUS_RESERVE_BYTES + 1),
             staging_root=tmp_path / "oversized",
             output_name="result",
             max_bytes=1024,
@@ -750,14 +817,16 @@ def test_worker_mount_permissions_and_bounded_file_output(
 
 
 def test_worker_process_and_container_handle_guards(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    command = ["docker", "run", "--cidfile", "/tmp/cid", "--name", "worker-name"]
-    assert oci._worker_cidfile(command) == Path("/tmp/cid")
-    assert oci._worker_container_name(command) == "worker-name"
-    assert oci._worker_container_handle(command, None) == "worker-name"
+    cidfile = tmp_path / "cid"
+    command = ["docker", "run", "--cidfile", str(cidfile)]
+    assert oci._worker_cidfile(command) == cidfile
+    assert oci._worker_container_handle(command, cidfile) is None
+    cidfile.write_text("c" * 64, encoding="ascii")
+    assert oci._worker_container_handle(command, cidfile) == "c" * 64
     assert oci._worker_cidfile(["docker", "run"]) is None
-    assert oci._worker_container_name(["docker", "run", "--name", "bad/name"]) is None
 
 
 def test_worker_archive_path_and_stream_error_boundaries(tmp_path: Path) -> None:

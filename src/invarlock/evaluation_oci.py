@@ -79,7 +79,6 @@ _CUDA_DEVICE_RE = re.compile(r"^cuda(?::(0|[1-9][0-9]*))?$")
 _CPU_LIMIT_RE = re.compile(r"^(?:0|[1-9][0-9]{0,3})(?:\.[0-9]{1,3})?$")
 _NUMERIC_USER_RE = re.compile(r"^(?P<uid>[1-9][0-9]{0,9}):(?P<gid>[1-9][0-9]{0,9})$")
 _CONTAINER_ID_RE = re.compile(r"^[0-9a-f]{12,64}$")
-_CONTAINER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
 _BARE_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _MAX_IMAGE_INSPECT_BYTES = 1024 * 1024
 _MAX_WORKER_DIAGNOSTIC_BYTES = 64 * 1024
@@ -1052,18 +1051,11 @@ def _read_worker_container_id(cidfile: Path | None) -> str | None:
     return value if _CONTAINER_ID_RE.fullmatch(value) is not None else None
 
 
-def _worker_container_name(command: Sequence[str]) -> str | None:
-    indexes = [index for index, value in enumerate(command) if value == "--name"]
-    if len(indexes) != 1 or indexes[0] + 1 >= len(command):
-        return None
-    value = command[indexes[0] + 1]
-    return value if _CONTAINER_NAME_RE.fullmatch(value) is not None else None
-
-
 def _worker_container_handle(
     command: Sequence[str], cidfile: Path | None
 ) -> str | None:
-    return _read_worker_container_id(cidfile) or _worker_container_name(command)
+    del command
+    return _read_worker_container_id(cidfile)
 
 
 def _container_control(

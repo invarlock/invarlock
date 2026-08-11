@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Build one pinned evaluator image and run its signed Level 3 journey."""
+"""Build one pinned evaluator image and run its signed transaction."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -24,21 +25,25 @@ _COMMAND_TIMEOUT_SECONDS = 24 * 60 * 60
 _COMMAND_STDOUT_LIMIT = 4 * 1024 * 1024
 _COMMAND_STDERR_LIMIT = 256 * 1024
 
-REPOSITORY = Path(__file__).resolve().parents[2]
+REPOSITORY = Path(__file__).resolve().parents[3]
 if str(REPOSITORY) not in sys.path:
     sys.path.insert(0, str(REPOSITORY))
 
 try:
     from examples.integrations.evaluator_transaction.image_cleanup import (
-        remove_temporary_image_tags,
-        require_image_tag_available,
+        OwnedImageTag,
+        record_owned_image_tag,
+        remove_owned_image_tags,
+        temporary_image_tag,
     )
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
     from evaluator_transaction.image_cleanup import (  # type: ignore[no-redef]
-        remove_temporary_image_tags,
-        require_image_tag_available,
+        OwnedImageTag,
+        record_owned_image_tag,
+        remove_owned_image_tags,
+        temporary_image_tag,
     )
 
 DOCKERFILES = {
@@ -46,12 +51,12 @@ DOCKERFILES = {
     "openai-evals": "examples/integrations/openai-evals/Dockerfile",
 }
 LOCKS = {
-    "inspect-ai": "requirements/workflows/inspect-ai-level3-py312.txt",
-    "openai-evals": "requirements/workflows/openai-evals-level3-py312.txt",
+    "inspect-ai": "requirements/workflows/inspect-ai-runtime-py312.txt",
+    "openai-evals": "requirements/workflows/openai-evals-runtime-py312.txt",
 }
 # Each integration image has one requirements COPY, one dependency-install
-# layer, one worker COPY, and six flat helper COPY layers.
-ADDED_LAYERS = {"inspect-ai": 9, "openai-evals": 9}
+# layer, one package COPY, and four flat helper COPY layers.
+ADDED_LAYERS = {"inspect-ai": 7, "openai-evals": 7}
 EVALUATOR_VERSIONS = {
     "inspect-ai": "0.3.254",
     "openai-evals": "3.0.1.post1",
@@ -83,7 +88,7 @@ def run(command: list[str], *, cwd: Path, stdin_path: Path | None = None) -> str
             timeout_seconds=_COMMAND_TIMEOUT_SECONDS,
             stdout_limit=_COMMAND_STDOUT_LIMIT,
             stderr_limit=_COMMAND_STDERR_LIMIT,
-            label="Level 3 launcher command",
+            label="evaluator launcher command",
         )
     except subprocess.CalledProcessError as exc:
         diagnostic = (exc.stderr or exc.output or "").strip()
@@ -141,7 +146,7 @@ def _build_image(
     engine: str,
     *,
     builder_signing_key: ed25519.Ed25519PrivateKey,
-    cleanup_tags: list[str],
+    cleanup_tags: list[OwnedImageTag],
 ) -> tuple[str, str, str]:
     try:
         from examples.integrations.launch import (
@@ -149,7 +154,7 @@ def _build_image(
             _require_child_image_config,
             _require_committed_checkout,
             _runtime_image,
-            write_level3_attestation,
+            write_evaluator_attestation,
         )
     except ModuleNotFoundError as exc:
         if not exc.name or not exc.name.startswith("examples"):
@@ -159,17 +164,21 @@ def _build_image(
             _require_child_image_config,
             _require_committed_checkout,
             _runtime_image,
-            write_level3_attestation,
+            write_evaluator_attestation,
         )
 
     commit = _require_committed_checkout(repository)
-    base_tag = f"invarlock-example-runtime:{commit[:12]}"
-    require_image_tag_available(run, engine, base_tag, repository)
-    cleanup_tags.append(base_tag)
+    base_tag = temporary_image_tag("invarlock-example-runtime", commit)
     base_build = build / "base"
     base_build.mkdir(parents=True, exist_ok=True)
     base_id, _ = _runtime_image(
-        repository=repository, build_root=base_build, container_engine=engine
+        repository=repository,
+        build_root=base_build,
+        container_engine=engine,
+        image_tag=base_tag,
+    )
+    cleanup_tags.append(
+        record_owned_image_tag(run, engine, base_tag, base_id, repository)
     )
     base_layers = _image_layers(engine, base_id, repository)
     base_config = _image_config(engine, base_id, repository)
@@ -178,9 +187,7 @@ def _build_image(
         ["git", "archive", "--format=tar", f"--output={source}", commit], cwd=repository
     )
     source_bundle_sha256 = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
-    image_tag = f"invarlock-{evaluator}-level3:{commit[:12]}"
-    require_image_tag_available(run, engine, image_tag, repository)
-    cleanup_tags.append(image_tag)
+    image_tag = temporary_image_tag(f"invarlock-{evaluator}-evaluator", commit)
     lock_digest = (
         "sha256:"
         + hashlib.sha256((repository / LOCKS[evaluator]).read_bytes()).hexdigest()
@@ -189,7 +196,7 @@ def _build_image(
     if image_id_file.exists() or image_id_file.is_symlink():
         raise RuntimeError("evaluator image identity file already exists")
     pull_policy = "--pull=never" if engine == "podman" else "--pull=false"
-    status(f"Building the pinned {evaluator} Level 3 image...")
+    status(f"Building the pinned {evaluator} evaluator image...")
     run(
         [
             engine,
@@ -217,6 +224,9 @@ def _build_image(
         stdin_path=source,
     )
     image_id = _load_image_id_file(image_id_file)
+    cleanup_tags.append(
+        record_owned_image_tag(run, engine, image_tag, image_id, repository)
+    )
     evaluator_layers = _image_layers(engine, image_id, repository)
     evaluator_config = _image_config(engine, image_id, repository)
     expected_layers = len(base_layers) + ADDED_LAYERS[evaluator]
@@ -243,7 +253,8 @@ def _build_image(
         },
         expected_entrypoint=[
             "python",
-            "/opt/invarlock/examples/evaluator-level3.py",
+            "-m",
+            "evaluator_transaction.cli",
             "worker",
         ],
     )
@@ -289,8 +300,8 @@ def _build_image(
     )
     if embedded_evaluator != evaluator or embedded_lock != lock_digest:
         raise RuntimeError("evaluator image does not bind its evaluator lock")
-    write_level3_attestation(
-        path=build / "level3-build-attestation.json",
+    write_evaluator_attestation(
+        path=build / "evaluator-build-attestation.json",
         evaluator=evaluator,
         evaluator_version=EVALUATOR_VERSIONS[evaluator],
         runtime_image_id=image_id,
@@ -300,7 +311,8 @@ def _build_image(
         lock_sha256=lock_digest,
         entrypoint=[
             "python",
-            "/opt/invarlock/examples/evaluator-level3.py",
+            "-m",
+            "evaluator_transaction.cli",
             "worker",
         ],
         base_layers=base_layers,
@@ -328,15 +340,15 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     repository = REPOSITORY
     if args.workspace is None:
         workspace = Path(
-            tempfile.mkdtemp(prefix=f"invarlock-{evaluator}-level3-")
+            tempfile.mkdtemp(prefix=f"invarlock-{evaluator}-transaction-")
         ).resolve(strict=True)
     else:
-        workspace = args.workspace.expanduser().resolve()
+        workspace = Path(os.path.abspath(args.workspace.expanduser()))
         if workspace.exists() or workspace.is_symlink():
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2
         workspace.mkdir(parents=True)
-    cleanup_tags: list[str] = []
+    cleanup_tags: list[OwnedImageTag] = []
     cleanup_error: RuntimeError | None = None
     output: str | None = None
     result = 2
@@ -344,10 +356,10 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
         build = workspace / "build"
         build.mkdir()
         builder_signing_key = load_builder_signing_key(
-            args.builder_signing_key.expanduser().resolve()
+            Path(os.path.abspath(args.builder_signing_key.expanduser()))
         )
         builder_public_key = load_builder_public_key(
-            args.builder_public_key.expanduser().resolve()
+            Path(os.path.abspath(args.builder_public_key.expanduser()))
         )
         require_builder_key_pair(builder_signing_key, builder_public_key)
         image, source_commit, base_image_id = _build_image(
@@ -381,7 +393,8 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
         output = run(
             [
                 sys.executable,
-                str(repository / "examples/integrations/evaluator_level3.py"),
+                "-m",
+                "examples.integrations.evaluator_transaction.cli",
                 "complete",
                 "--workspace",
                 str(workspace / "transaction"),
@@ -394,19 +407,19 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
                 "--container-engine",
                 args.container_engine,
                 "--evidence-signing-key",
-                str(args.evidence_signing_key.expanduser().resolve()),
+                str(Path(os.path.abspath(args.evidence_signing_key.expanduser()))),
                 "--verifier-signing-key",
-                str(args.verifier_signing_key.expanduser().resolve()),
+                str(Path(os.path.abspath(args.verifier_signing_key.expanduser()))),
                 "--trust-root",
-                str(args.trust_root.expanduser().absolute()),
+                str(Path(os.path.abspath(args.trust_root.expanduser()))),
                 "--builder-public-key",
-                str(args.builder_public_key.expanduser().resolve()),
+                str(Path(os.path.abspath(args.builder_public_key.expanduser()))),
                 "--source-commit",
                 source_commit,
                 "--base-image-id",
                 base_image_id,
                 "--build-attestation",
-                str(build / "level3-build-attestation.json"),
+                str(build / "evaluator-build-attestation.json"),
             ],
             cwd=repository,
         )
@@ -416,7 +429,7 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
         result = 0
     finally:
         try:
-            remove_temporary_image_tags(
+            remove_owned_image_tags(
                 run, args.container_engine, repository, cleanup_tags
             )
         except RuntimeError as exc:

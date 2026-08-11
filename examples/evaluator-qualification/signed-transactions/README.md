@@ -21,6 +21,11 @@ not production trust roots. The packages prove the retained transaction and
 support offline replay; production acceptance requires recipient-owned keys,
 policies, and anchors.
 
+The build attestations remain in the exact signed format emitted by their
+recorded OCI runs. Offline verification accepts that retained format without
+rewriting or re-signing it; newly executed transactions emit only the current
+evaluator-named format.
+
 Run the offline verification through:
 
 ```bash

@@ -36,7 +36,6 @@ from invarlock.evaluation_oci import (
 
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CONTAINER_ID_RE = re.compile(r"^[0-9a-f]{12,64}$")
-_CONTAINER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
 _DEFAULT_WORKER_CPUS = "4"
 _DEFAULT_WORKER_MEMORY_MIB = 65536
 _DEFAULT_WORKER_USER = "65532:65532"
@@ -44,10 +43,10 @@ _MAX_WORKER_DIAGNOSTIC_BYTES = 64 * 1024
 _MAX_OUTER_WORKER_TIMEOUT_SECONDS = 24 * 60 * 60
 _CONTAINER_STOP_SECONDS = 5
 _CONTAINER_CONTROL_TIMEOUT_SECONDS = 10
-_LEVEL3_DEFAULT_OUTPUT_BYTES = 64 * 1024 * 1024
-_LEVEL3_MAX_OUTPUT_BYTES = 1024 * 1024 * 1024
-_LEVEL3_STATUS_RESERVE_BYTES = 64 * 1024
-_LEVEL3_STATUS_PATH = "/outputs/.invarlock-level3-status"
+_EVALUATOR_DEFAULT_OUTPUT_BYTES = 64 * 1024 * 1024
+_EVALUATOR_MAX_OUTPUT_BYTES = 1024 * 1024 * 1024
+_EVALUATOR_STATUS_RESERVE_BYTES = 64 * 1024
+_EVALUATOR_STATUS_PATH = "/outputs/.invarlock-evaluator-status"
 
 
 def _artifact_mount_source(path: Path, *, label: str) -> Path:
@@ -168,7 +167,7 @@ def _run_bounded_command(
     )
 
 
-def _level3_output_name(output: Path) -> str:
+def _evaluator_output_name(output: Path) -> str:
     name = output.name
     if name in {"", ".", ".."} or "/" in name or "\\" in name:
         raise OciEvaluationError("evaluator worker output name is invalid")
@@ -187,7 +186,7 @@ def compose_evaluator_worker_command(
     control_root: Path,
     environment: Mapping[str, str] = MappingProxyType({}),
     timeout_seconds: int,
-    output_limit_bytes: int = _LEVEL3_DEFAULT_OUTPUT_BYTES,
+    output_limit_bytes: int = _EVALUATOR_DEFAULT_OUTPUT_BYTES,
     cpus: str = _DEFAULT_WORKER_CPUS,
     memory_mib: int = _DEFAULT_WORKER_MEMORY_MIB,
     user: str = _DEFAULT_WORKER_USER,
@@ -217,12 +216,12 @@ def compose_evaluator_worker_command(
         isinstance(output_limit_bytes, bool)
         or not isinstance(output_limit_bytes, int)
         or output_limit_bytes <= 0
-        or output_limit_bytes > _LEVEL3_MAX_OUTPUT_BYTES
+        or output_limit_bytes > _EVALUATOR_MAX_OUTPUT_BYTES
     ):
         raise OciEvaluationError("evaluator worker output limit is invalid")
     limits = OciWorkerLimits(cpus=cpus, memory_mib=memory_mib, user=user)
     cpus, memory_mib, user = limits.cpus, limits.memory_mib, limits.user
-    _level3_output_name(output)
+    _evaluator_output_name(output)
     try:
         control_stat = control_root.lstat()
     except OSError as exc:
@@ -237,10 +236,6 @@ def compose_evaluator_worker_command(
         raise OciEvaluationError(
             "evaluator worker container ID destination already exists"
         )
-    container_name = re.sub(r"[^A-Za-z0-9_.-]", "-", control_root.name)
-    container_name = f"invarlock-evaluator-{container_name}"[:63]
-    if _CONTAINER_NAME_RE.fullmatch(container_name) is None:
-        raise OciEvaluationError("evaluator worker container name is invalid")
     if output.exists() or output.is_symlink():
         raise OciEvaluationError("evaluator worker output destination must be new")
     if output.parent.is_symlink() or not output.parent.is_dir():
@@ -259,8 +254,6 @@ def compose_evaluator_worker_command(
         "--pull=never",
         "--cidfile",
         str(cidfile),
-        "--name",
-        container_name,
         "--stop-timeout",
         str(_CONTAINER_STOP_SECONDS),
         "--network",
@@ -282,7 +275,7 @@ def compose_evaluator_worker_command(
         "--tmpfs",
         (
             "/outputs:rw,noexec,nosuid,nodev,size="
-            f"{output_limit_bytes + _LEVEL3_STATUS_RESERVE_BYTES}"
+            f"{output_limit_bytes + _EVALUATOR_STATUS_RESERVE_BYTES}"
         ),
         *_mount(artifact, "/model", read_only=True),
         *_mount(dataset, "/records.jsonl", read_only=True),
@@ -305,10 +298,10 @@ def compose_evaluator_worker_command(
             "-c",
             (
                 "set -eu; "
-                f"rm -f {_LEVEL3_STATUS_PATH}; "
+                f"rm -f {_EVALUATOR_STATUS_PATH}; "
                 '"$@" & worker_pid=$!; '
                 'set +e; wait "$worker_pid"; worker_status=$?; set -e; '
-                f"printf '%s' \"$worker_status\" > {_LEVEL3_STATUS_PATH}; "
+                f"printf '%s' \"$worker_status\" > {_EVALUATOR_STATUS_PATH}; "
                 "while :; do sleep 1; done"
             ),
             "--",
@@ -329,7 +322,7 @@ def _extract_output_archive(
     """Extract one worker-owned tar stream without accepting links or devices."""
 
     if isinstance(payload, bytes):
-        if len(payload) > max_bytes + _LEVEL3_STATUS_RESERVE_BYTES:
+        if len(payload) > max_bytes + _EVALUATOR_STATUS_RESERVE_BYTES:
             raise OciEvaluationError("evaluator worker output exceeds its size limit")
         payload_stream: io.BufferedIOBase = io.BytesIO(payload)
     else:
@@ -337,7 +330,7 @@ def _extract_output_archive(
             facts = payload.lstat()
             if payload.is_symlink() or not stat.S_ISREG(facts.st_mode):
                 raise OciEvaluationError("evaluator worker output archive is unsafe")
-            if facts.st_size > max_bytes + _LEVEL3_STATUS_RESERVE_BYTES:
+            if facts.st_size > max_bytes + _EVALUATOR_STATUS_RESERVE_BYTES:
                 raise OciEvaluationError(
                     "evaluator worker output exceeds its size limit"
                 )
@@ -420,18 +413,11 @@ def _read_worker_container_id(cidfile: Path | None) -> str | None:
     return value if _CONTAINER_ID_RE.fullmatch(value) is not None else None
 
 
-def _worker_container_name(command: Sequence[str]) -> str | None:
-    indexes = [index for index, value in enumerate(command) if value == "--name"]
-    if len(indexes) != 1 or indexes[0] + 1 >= len(command):
-        return None
-    value = command[indexes[0] + 1]
-    return value if _CONTAINER_NAME_RE.fullmatch(value) is not None else None
-
-
 def _worker_container_handle(
     command: Sequence[str], cidfile: Path | None
 ) -> str | None:
-    return _read_worker_container_id(cidfile) or _worker_container_name(command)
+    del command
+    return _read_worker_container_id(cidfile)
 
 
 def _container_control(
@@ -481,7 +467,7 @@ def run_evaluator_worker(
     output: Path,
     environment: Mapping[str, str] = MappingProxyType({}),
     timeout_seconds: int,
-    output_limit_bytes: int = _LEVEL3_DEFAULT_OUTPUT_BYTES,
+    output_limit_bytes: int = _EVALUATOR_DEFAULT_OUTPUT_BYTES,
     cpus: str = _DEFAULT_WORKER_CPUS,
     memory_mib: int = _DEFAULT_WORKER_MEMORY_MIB,
     user: str = _DEFAULT_WORKER_USER,
@@ -523,13 +509,13 @@ def run_evaluator_worker(
                 detached_command,
                 timeout_seconds=timeout_seconds,
             )
+            if completed.returncode:
+                return completed
             container_handle = _worker_container_handle(command, cidfile)
             if container_handle is None:
                 raise OciEvaluationError(
                     "evaluator worker did not publish an engine-recognized container handle"
                 )
-            if completed.returncode:
-                return completed
             deadline = time.monotonic() + timeout_seconds
             worker_status: int | None = None
             while time.monotonic() < deadline:
@@ -539,10 +525,10 @@ def run_evaluator_worker(
                         "exec",
                         container_handle,
                         "cat",
-                        _LEVEL3_STATUS_PATH,
+                        _EVALUATOR_STATUS_PATH,
                     ],
                     timeout_seconds=_CONTAINER_CONTROL_TIMEOUT_SECONDS,
-                    stdout_limit=_LEVEL3_STATUS_RESERVE_BYTES,
+                    stdout_limit=_EVALUATOR_STATUS_RESERVE_BYTES,
                 )
                 if status.returncode == 0:
                     try:
@@ -581,7 +567,7 @@ def run_evaluator_worker(
                     diagnostic.decode("utf-8", errors="replace"),
                 )
                 return completed
-            output_name = _level3_output_name(output)
+            output_name = _evaluator_output_name(output)
             archive_path = staging_root / ".evaluator-output.tar"
             copied = _run_bounded_command(
                 [
@@ -597,7 +583,7 @@ def run_evaluator_worker(
                     output_name,
                 ],
                 timeout_seconds=_CONTAINER_CONTROL_TIMEOUT_SECONDS,
-                stdout_limit=output_limit_bytes + _LEVEL3_STATUS_RESERVE_BYTES,
+                stdout_limit=output_limit_bytes + _EVALUATOR_STATUS_RESERVE_BYTES,
                 stdout_path=archive_path,
             )
             if copied.returncode:

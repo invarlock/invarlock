@@ -30,8 +30,11 @@ examples/evaluator-qualification/authoritative/generate_cases.py
 # container engines. Their release gate is the bounded boundary-test suite plus
 # the real pinned journey/qualification checks, rather than in-process line
 # coverage of every engine- and dependency-specific failure branch.
-examples/integrations/evaluator_level3.py
-examples/integrations/evaluator_level3_launch.py
+examples/integrations/evaluator_transaction/cli.py
+examples/integrations/evaluator_transaction/adapters.py
+examples/integrations/evaluator_transaction/config.py
+examples/integrations/evaluator_transaction/launcher.py
+examples/integrations/evaluator_transaction/transaction.py
 examples/integrations/evaluator_transaction/build_attestation.py
 examples/integrations/trust_material.py
 examples/integrations/evaluator_transaction/worker.py

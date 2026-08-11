@@ -855,6 +855,24 @@ def test_run_main_prepare_only_and_input_errors(
         )
         == 2
     )
+    missing = tmp_path / "missing-prepared"
+    linked = tmp_path / "linked-prepared"
+    linked.symlink_to(missing, target_is_directory=True)
+    assert (
+        integration.main(
+            [
+                "hf-transformers",
+                "--workspace",
+                str(linked),
+                "--runtime-image-digest",
+                ZERO_DIGEST,
+                "--prepare-only",
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert not missing.exists()
     with pytest.raises(SystemExit, match="full execution requires"):
         integration.main(
             [
@@ -1507,7 +1525,34 @@ def test_launch_main_dispatches_prepare_and_full_runs(
 
     existing = tmp_path / "existing"
     existing.mkdir()
-    assert launch.main(["hf-transformers", "--workspace", str(existing)]) == 2
+    assert (
+        launch.main(
+            [
+                "hf-transformers",
+                "--prepare-only",
+                "--workspace",
+                str(existing),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    assert (
+        launch.main(
+            [
+                "hf-transformers",
+                "--prepare-only",
+                "--workspace",
+                str(linked),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert not missing.exists()
 
 
 def test_launch_runner_reports_subprocess_errors(

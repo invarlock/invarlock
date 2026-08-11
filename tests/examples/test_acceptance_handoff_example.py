@@ -187,6 +187,21 @@ def test_main_runs_handoff_in_explicit_workspace(
     )
 
 
+def test_main_preserves_explicit_workspace_symlink_for_rejection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--workspace", str(linked)])
+
+    with pytest.raises(RuntimeError, match="must be new"):
+        module.main()
+    assert not missing.exists()
+
+
 def test_main_uses_fresh_default_workspace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

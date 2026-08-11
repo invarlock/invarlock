@@ -1,4 +1,4 @@
-# CPU runtime constraints for evaluator images. Protobuf is lowered only for
+# CPU runtime constraints for evaluator transaction images. Protobuf is lowered only for
 # evaluator closures that depend on google-generativeai; the core runtime
 # requirement remains protobuf>=4.25.
 typer==0.24.1

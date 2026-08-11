@@ -299,7 +299,7 @@ the independent verifier anchors or replace the signed receipt.
 
 ## Interpret the result
 
-Every current `invarlock/comparison-report-v2` report records:
+Every current `invarlock/comparison-report-v3` report records:
 
 - a point estimate over all authenticated records;
 - a paired Newcombe 95% interval plus regression/improvement counts and an
@@ -307,7 +307,9 @@ Every current `invarlock/comparison-report-v2` report records:
   `paired_percentile_bootstrap_sha256_v1` interval for normalized NLL;
 - the selected policy limit; and
 - optional record-count and interval-width qualification when the policy binds
-  those coupled requirements; and
+  those coupled requirements;
+- optional baseline and subject accuracy qualification for exact match when the
+  policy binds `minimum_side_accuracy`; and
 - a verdict controlled by the conservative interval bound and any configured
   sample qualification.
 
@@ -318,8 +320,8 @@ stays coupled to its subject observation.
 
 Preflight can establish that the authenticated schedule meets a configured
 minimum count, but interval width remains pending until execution. Strict
-verification also preserves exact replay of legacy
-`invarlock/comparison-report-v1` evidence with its original exact-match method.
+verification also preserves v2 reports without side-accuracy qualification and
+v1 evidence with its original exact-match method.
 
 Normalized NLL is teacher-forced expected-continuation likelihood regression,
 not a general model-quality measure. A displayed token-weighted perplexity

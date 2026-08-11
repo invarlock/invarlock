@@ -121,7 +121,7 @@ independent acceptance record.
 | Authorized deterministic text scorer | Difference between subject and baseline arithmetic-mean `[0,1]` scores, in percentage points | Paired schedule-resampling interval lower bound is at least `metrics.scorer_extension.delta_min_pp` |
 
 Exact match uses the continuity-corrected paired Newcombe 95% effect-size
-interval emitted by `invarlock/comparison-report-v2`. Normalized NLL
+interval emitted by `invarlock/comparison-report-v3`. Normalized NLL
 uses the deterministic `paired_percentile_bootstrap_sha256_v1` method with
 2,048 replicates over the authenticated finite schedule. The selected policy
 reads the conservative bound of the corresponding interval.
@@ -131,6 +131,9 @@ maximum interval-width field. The two fields are supplied together. When they
 are present, the metric bound, record count, and precision width must all pass;
 the canonical report records each result. Preflight can qualify record count
 but leaves interval width pending until execution produces paired outcomes.
+Exact match may also bind `minimum_side_accuracy`; both baseline and subject
+accuracy must meet that floor, preventing an apparently acceptable delta
+between two unusably inaccurate models.
 
 Normalized NLL measures expected-continuation likelihood under teacher forcing,
 not general model quality. If tokenizer contracts and paired token counts are

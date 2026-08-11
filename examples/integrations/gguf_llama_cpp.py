@@ -463,9 +463,13 @@ def _prepare_transaction(
     paths = _paths(
         root,
         evidence_key=(
-            evidence_signing_key.expanduser().absolute() if external_trust else None
+            Path(os.path.abspath(evidence_signing_key.expanduser()))
+            if external_trust
+            else None
         ),
-        trust_root=(trust_root.expanduser().absolute() if external_trust else None),
+        trust_root=(
+            Path(os.path.abspath(trust_root.expanduser())) if external_trust else None
+        ),
     )
     (paths.evaluation / "inputs").mkdir(parents=True)
     evidence_key_bytes: bytes | None = None
@@ -490,7 +494,7 @@ def _prepare_transaction(
         paths = _paths(
             root,
             evidence_key=evidence_key_path,
-            trust_root=trust_root.expanduser().absolute()
+            trust_root=Path(os.path.abspath(trust_root.expanduser()))
             if trust_root is not None
             else None,
         )
@@ -867,7 +871,7 @@ def main(argv: list[str] | None = None) -> int:
             strict=True
         )
     else:
-        workspace = arguments.workspace.expanduser().resolve()
+        workspace = Path(os.path.abspath(arguments.workspace.expanduser()))
         if workspace.exists() or workspace.is_symlink():
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2

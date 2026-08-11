@@ -410,7 +410,8 @@ separate JSON Schema file:
 | `invarlock/scorer-extension-descriptor-v1` | One scorer's capabilities, input facts, result semantics, and trust constraints |
 | `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
 | `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
-| `invarlock/comparison-report-v2` | Current canonical means, point comparison, metric-specific paired interval, optional sample qualification, threshold, and verdict |
+| `invarlock/comparison-report-v3` | Current canonical means, point comparison, metric-specific paired interval, optional sample and exact-match side-accuracy qualification, threshold, and verdict |
+| `invarlock/comparison-report-v2` | Historical canonical report without side-accuracy qualification; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/comparison-report-v1` | Legacy canonical report replayed with its original exact-match interval method; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
 | `invarlock/evidence-pack-verify-v1` | Machine-readable independent verification result |

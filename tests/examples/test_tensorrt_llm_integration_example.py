@@ -431,6 +431,19 @@ def test_prepare_refuses_existing_output_and_non_object_policy(
             ("baseline", "subject"),
         )
 
+    missing = tmp_path / "missing-output"
+    linked = tmp_path / "linked-output"
+    linked.symlink_to(missing, target_is_directory=True)
+    with pytest.raises(FileExistsError, match="output already exists"):
+        example._prepare(
+            inputs,
+            linked,
+            _inspection(),
+            "sha256:" + "a" * 64,
+            ("baseline", "subject"),
+        )
+    assert not missing.exists()
+
     (inputs / "policy.json").write_text("[]", encoding="utf-8")
     with pytest.raises(ValueError, match="must contain a JSON object"):
         example._prepare(

@@ -202,8 +202,8 @@ run_workflow_locks() {
   rm -f "${harness_full_lock}"
 
   compile_req_platform \
-    "${WORKFLOW_DIR}/inspect-ai-level3.in" \
-    "${WORKFLOW_DIR}/inspect-ai-level3-py312.txt" \
+    "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
+    "${WORKFLOW_DIR}/inspect-ai-runtime-py312.txt" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
     --constraints "${WORKFLOW_DIR}/runtime-image.in" \
@@ -211,11 +211,11 @@ run_workflow_locks() {
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
 
   compile_req_platform \
-    "${WORKFLOW_DIR}/openai-evals-level3.in" \
-    "${WORKFLOW_DIR}/openai-evals-level3-py312.txt" \
+    "${WORKFLOW_DIR}/openai-evals-runtime.in" \
+    "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
-    --constraints "${WORKFLOW_DIR}/evaluator-level3-runtime.in" \
+    --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime.in" \
     --torch-backend cpu \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
 
