@@ -21,7 +21,7 @@ the exact upstream wheel from which the image builds a deterministic,
 cache-free local-version wheel. The image runs `pip check` after installing the
 two surfaces, so the resulting environment remains metadata-consistent without
 resolving a second inference stack.
-The `*-level3.in` inputs and corresponding Level 3 locks pin the Inspect AI
+The evaluator transaction inputs and corresponding locks pin the Inspect AI
 and OpenAI Evals evaluator closures against the authenticated CPU
 runtime. The evaluator images install those closures into the authenticated
 runtime itself, run `pip check`, and bind the lock digest into the worker

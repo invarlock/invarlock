@@ -4,8 +4,8 @@ This example runs a native Inspect AI Task with its exact-match scorer over two
 real, locally generated Qwen3 evaluations, then runs `invarlock evaluate`,
 `invarlock verify`, and `invarlock report`. InvarLock recomputes the exact-match
 comparison from the paired records and does not trust the evaluator aggregate
-score. The end-to-end qualification row remains pending until a clean OCI run
-is retained.
+score. A clean CPU-only OCI run of this journey is retained as the Inspect AI
+signed-transaction demonstration in the qualification matrix.
 
 The maintained journey compares the public, revision-pinned
 `Qwen/Qwen3-0.6B-Base` checkpoint with the public post-trained

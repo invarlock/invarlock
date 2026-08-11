@@ -183,13 +183,14 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     ]
     for phrase in (
         "Native execution",
-        "Qualified import",
-        "Authenticated observation",
-        "core exposes evaluator-neutral contracts",
+        "Adapter support",
+        "Replay authority",
+        "Signed-journey maturity",
+        "evaluator-neutral contracts",
     ):
         assert phrase in evidence_paths
     assert evidence_paths.index("evaluation-verification-flow.svg") < (
-        evidence_paths.index("| Path |")
+        evidence_paths.index("| Axis |")
     )
 
     introduction = readme[: positions[0]]
@@ -735,15 +736,15 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     text = _read("docs/reference/evaluator-qualification.md")
     normalized = " ".join(text.split())
 
-    assert "Qualification profile" in text
-    assert "Authoritative import adapter" in text
-    assert "End-to-end release-assurance journey" in text
+    assert "Adapter support" in text
+    assert "Replay authority" in text
+    assert "Signed-journey maturity" in text
     assert "LM Evaluation Harness" in text
-    assert "every retained authoritative import" in normalized
+    assert "every retained independently replayable import" in normalized
     assert "102-record" in text
-    assert "cumulative claims" in text
-    assert "not permanent evaluator classes" in text
-    assert "Profiles can advance" in text
+    assert "does not assign one cumulative" in text
+    assert "release focus is deliberately compact" in normalized
+    assert "profile count is not a release gate" in normalized
     assert "Benchmark harnesses" in text
     assert "Application evaluation SDKs" in text
     assert "Evaluation and observability platforms" in text

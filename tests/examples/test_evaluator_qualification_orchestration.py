@@ -271,7 +271,7 @@ def test_matrix_execution_orchestration_and_cli_branches(
     replayed = []
     monkeypatch.setattr(
         matrix,
-        "replay_authoritative_import",
+        "replay_import",
         lambda profile_id, *, write: replayed.append((profile_id, write)),
     )
     artifacts = tmp_path / "artifacts"
@@ -281,7 +281,7 @@ def test_matrix_execution_orchestration_and_cli_branches(
         artifacts=artifacts,
         cases=EXAMPLE / "cases.json",
         schedule=EXAMPLE / "schedule.json",
-        authoritative=True,
+        replayable=True,
     )
     assert len(calls) == 1
     assert replayed == [("promptfoo", True)]
@@ -293,17 +293,17 @@ def test_matrix_execution_orchestration_and_cli_branches(
     monkeypatch.setattr(matrix, "execute", lambda selected: dispatched.append(selected))
     monkeypatch.setattr(
         matrix,
-        "execute_authoritative",
+        "execute_replayable",
         lambda selected: dispatched.append(selected),
     )
     monkeypatch.setattr(
-        matrix, "verify_authoritative", lambda: dispatched.append("authoritative")
+        matrix, "verify_replayable", lambda: dispatched.append("replayable")
     )
     monkeypatch.setattr(matrix, "verify", lambda: dispatched.append("verify"))
     for namespace in (
         argparse.Namespace(command="execute", profiles=["one"]),
-        argparse.Namespace(command="execute-authoritative", profiles=["two"]),
-        argparse.Namespace(command="verify-authoritative"),
+        argparse.Namespace(command="execute-replayable", profiles=["two"]),
+        argparse.Namespace(command="verify-replayable"),
         argparse.Namespace(command="verify"),
     ):
         monkeypatch.setattr(matrix, "parse_args", lambda value=namespace: value)
@@ -311,7 +311,7 @@ def test_matrix_execution_orchestration_and_cli_branches(
     assert dispatched == [
         {"one"},
         {"two"},
-        "authoritative",
+        "replayable",
         "verify",
     ]
 
@@ -327,9 +327,9 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         lambda *args, **kwargs: calls.append((args, kwargs)),
     )
     matrix.execute({"promptfoo"})
-    matrix.execute_authoritative({"inspect-ai"})
-    assert calls[0][1]["authoritative"] is False
-    assert calls[1][1]["authoritative"] is True
+    matrix.execute_replayable({"inspect-ai"})
+    assert calls[0][1]["replayable"] is False
+    assert calls[1][1]["replayable"] is True
 
     profiles = matrix.profiles()
     observation_profiles = [
@@ -344,7 +344,7 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         for profile in profiles
     ]
     monkeypatch.setattr(matrix, "profiles", lambda: observation_profiles)
-    with pytest.raises(ValueError, match="at least ten"):
+    with pytest.raises(ValueError, match="replayable and observation-only"):
         matrix.verify()
 
     monkeypatch.setattr(matrix, "profiles", lambda: profiles)
@@ -362,7 +362,7 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         },
     )
     with pytest.raises(ValueError, match="102-record model execution"):
-        matrix.verify_authoritative()
+        matrix.verify_replayable()
 
 
 def test_matrix_rejects_invalid_control_documents(
@@ -387,6 +387,9 @@ def test_matrix_rejects_invalid_control_documents(
     monkeypatch.setattr(matrix, "matrix_document", lambda: {"selection": []})
     with pytest.raises(ValueError, match="matrix selection"):
         matrix.selection_policy()
+    monkeypatch.setattr(matrix, "matrix_document", lambda: {"release_focus": []})
+    with pytest.raises(ValueError, match="release focus"):
+        matrix.release_focus()
 
     duplicate = matrix.load = lambda _path: {
         "profiles": [{"profile_id": "same", "authority": {"mode": "observation_only"}}]
@@ -424,9 +427,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     selection = matrix.selection_policy()
     levels = {
         profile["profile_id"]: {
-            "authoritative_import": True,
-            "end_to_end_transaction": False,
-            "qualification_profile": True,
+            "retained_signed_transaction": False,
         }
         for profile in profiles
     }
@@ -466,6 +467,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     monkeypatch.setattr(matrix, "categories", lambda: categories)
     monkeypatch.setattr(matrix, "selection_policy", lambda: selection)
     monkeypatch.setattr(matrix, "demonstration_levels", lambda: levels)
+    monkeypatch.setattr(matrix, "release_focus", lambda: [])
     monkeypatch.setattr(
         matrix,
         "qualify",

@@ -1,4 +1,4 @@
-# Authoritative evaluator imports
+# Independently replayable evaluator imports
 
 This directory retains one real 102-record model evaluation and complete
 per-record imports for every maintained deterministic evaluator profile. It
@@ -24,7 +24,7 @@ For each deterministic evaluator,
 Run the network-free verification:
 
 ```bash
-make evaluator-authoritative-imports
+make evaluator-replayable-imports
 ```
 
 Re-execute the evaluator packages and CLIs:
@@ -37,11 +37,11 @@ Regenerate the model outputs with the repository's locked Hugging Face
 dependencies and compare them with the retained corpus:
 
 ```bash
-make evaluator-authoritative-corpus
+make evaluator-replayable-corpus
 ```
 
 This layer demonstrates complete replayable exact-match imports. It does not
-claim coverage of every evaluator capability or imply that authoritative import
+claim coverage of every evaluator capability or imply that replayable import
 alone completes a signed InvarLock transaction. End-to-end status is recorded
 separately as evidence maturity, not an architectural limitation on other
 profiles.

@@ -1,100 +1,62 @@
 {
-  "format": "invarlock/evaluator-demonstration-levels-v1",
+  "format": "invarlock/evaluator-demonstration-status-v2",
   "profiles": {
     "arize-phoenix-evals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "autoevals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "azure-ai-evaluation": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "deepeval": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "evidently": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "garak": {
-      "authoritative_import": false,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "langfuse": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "hugging-face-evaluate": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "openai-evals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "opik": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "inspect-ai": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": true
     },
     "lighteval": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "lm-evaluation-harness": {
-      "authoritative_import": true,
-      "end_to_end_transaction": true,
-      "qualification_profile": true
+      "retained_signed_transaction": true
     },
     "mlflow": {
-      "authoritative_import": false,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "openevals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "promptfoo": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "pydantic-evals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "ragas": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     },
     "trulens": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transaction": false
     }
   }
 }

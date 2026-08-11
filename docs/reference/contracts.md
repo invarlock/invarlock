@@ -31,6 +31,17 @@ The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
 receipt remains the authoritative replayable result.
 
+Evaluator qualification has two stable wire classifications:
+
+| Qualification result | Meaning |
+| --- | --- |
+| `outcome: qualified_for_import`, `authority: verdict_authority` | Complete ordered facts passed deterministic recomputation and are independently replayable |
+| `outcome: observation_only`, `authority: observation_only` | Authenticated context was retained but cannot contribute imported verdict facts |
+
+These fields do not express adapter maintenance or signed-journey maturity.
+Those independent axes belong to the examples-layer qualification catalog, so
+an export cannot promote itself by claiming support or demonstration status.
+
 ## Provider contracts
 
 The provider ABI uses these schema-backed documents:
