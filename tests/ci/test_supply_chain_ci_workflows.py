@@ -227,6 +227,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "requirements/workflows/ci-hf-py313.txt" in build_tooling
     assert "requirements/workflows/docs-ci-py313.txt" in build_tooling
     assert "requirements/workflows/release-security-py313.txt" in build_tooling
+    assert "python -m build --wheel --no-isolation" in build_tooling
+    assert "--no-deps --force-reinstall dist/*.whl" in build_tooling
     release_lock_audit = _step(build["steps"], "Audit maintained dependency locks")[
         "run"
     ]

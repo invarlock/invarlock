@@ -166,6 +166,8 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
           npm ci
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
