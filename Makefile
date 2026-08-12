@@ -53,6 +53,11 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/evidence_reporting.py \
 	src/invarlock/evidence_verification.py
 
+RELEASE_EXAMPLE_COVERAGE_FILES := \
+	examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
+	examples/evaluator-qualification/measure_signed_transactions.py \
+	examples/quickstart/run.py
+
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
@@ -236,6 +241,9 @@ coverage-examples:  ## Enforce branch-aware coverage for example launchers
 			if grep -Fqx "$$source" examples/coverage-exemptions.txt; then continue; fi; \
 			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
+	@for source in $(RELEASE_EXAMPLE_COVERAGE_FILES); do \
+		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
+	done
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 

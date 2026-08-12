@@ -102,6 +102,14 @@ def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
     assert '--include="$$source" --fail-under=90' in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE)" in block
+    assert "RELEASE_EXAMPLE_COVERAGE_FILES" in block
+    assert '--include="$$source" --fail-under=95' in block
+    for source in (
+        "examples/ci/standalone-consumer/review/verify_deployment_receipt.py",
+        "examples/evaluator-qualification/measure_signed_transactions.py",
+        "examples/quickstart/run.py",
+    ):
+        assert source in MAKEFILE
 
 
 def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:

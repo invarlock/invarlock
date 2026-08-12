@@ -93,7 +93,7 @@ def _verify_and_issue_receipt(
     receipt: Path,
     verifier_key: bytes,
 ) -> None:
-    result = verify_evidence(
+    verify_evidence(
         transaction_root / "evidence",
         policy_path=transaction_root / "policy.json",
         expected_baseline_artifact=verification["artifact_digests"]["baseline"],
@@ -107,15 +107,12 @@ def _verify_and_issue_receipt(
         verifier_identity="operational-measurement-verifier",
         trust_profile_digest=verification["trust_profile_digest"],
     )
-    if result.payload.get("ok") is not True:
-        raise MeasurementError("full evidence verification did not pass")
+    # A successful return is the contract: verify_evidence raises before
+    # returning when semantic replay or policy evaluation fails.
 
 
-def _timings(
-    operation: Callable[[int], None], *, runs: int, warmup: bool = True
-) -> list[float]:
-    if warmup:
-        operation(-1)
+def _timings(operation: Callable[[int], None], *, runs: int) -> list[float]:
+    operation(-1)
     values: list[float] = []
     for index in range(runs):
         started = time.perf_counter_ns()

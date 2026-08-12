@@ -100,6 +100,31 @@ def test_measurement_rejects_invalid_record_and_transaction_metadata(
     with pytest.raises(module.MeasurementError, match="retained flagship"):
         module.measure_transaction(transaction, runs=1, temporary_root=tmp_path)
 
+    with pytest.raises(module.MeasurementError, match="verification anchors"):
+        module._verification_anchors({"verification": []})
+
+
+def test_measurement_rejects_a_retained_receipt_outside_its_trust_roots() -> None:
+    module = _module()
+    transaction_root = TRANSACTIONS / "inspect-ai"
+    transaction = json.loads(transaction_root.joinpath("transaction.json").read_bytes())
+    verification = dict(transaction["verification"])
+    verification["verifier_fingerprint"] = "sha256:" + "0" * 64
+
+    with pytest.raises(module.MeasurementError, match="retained receipt verification"):
+        module._verify_retained_receipt(transaction_root, verification)
+
+
+def test_measurement_runs_one_untimed_warmup_before_every_sample() -> None:
+    module = _module()
+    observed: list[int] = []
+
+    timings = module._timings(observed.append, runs=3)
+
+    assert observed == [-1, 0, 1, 2]
+    assert len(timings) == 3
+    assert all(value >= 0 for value in timings)
+
 
 def test_measurement_main_prints_json_and_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
