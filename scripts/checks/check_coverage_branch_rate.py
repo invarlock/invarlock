@@ -228,9 +228,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         nargs=3,
         metavar=("REPORT", "SOURCE_ROOT", "MANIFEST"),
         help=(
-            "exclude exact entries in MANIFEST from line-coverage enforcement for "
-            "REPORT after removing SOURCE_ROOT; use only where an alternate "
-            "execution gate is documented"
+            "bind exact entries in MANIFEST to documented alternate execution "
+            "gates for REPORT after removing SOURCE_ROOT; those entries are omitted "
+            "from per-class and aggregate branch-coverage calculations"
         ),
     )
     args = parser.parse_args(argv)

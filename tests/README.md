@@ -92,7 +92,8 @@ well-covered distribution cannot mask a local gap. Each suite uses isolated
 coverage data to prevent concurrent or stale runs from inflating a result. The
 examples exemption manifest is limited to dependency-isolated or containerized
 journeys with explicit alternate execution gates; those classes are excluded
-from the line-coverage aggregate instead of being hidden by unrelated modules.
+from per-module and aggregate branch-coverage calculations instead of being
+hidden by unrelated modules.
 The complete add-in gate is Linux-authoritative because GGUF executes its pinned
 backend through Linux descriptor paths. CI runs that exact gate on Linux; run
 it through a Linux checkout or container when developing on another host
