@@ -59,11 +59,7 @@ def _strict_json_object(payload: bytes, *, label: str) -> dict[str, object]:
             )
         if isinstance(value, dict):
             count = len(value)
-            for key, child in value.items():
-                if not isinstance(key, str):
-                    raise TensorRTLLMExecutionError(
-                        f"{label} contains a non-text object key"
-                    )
+            for child in value.values():
                 count += validate_budget(child, depth=depth + 1)
         elif isinstance(value, list):
             count = len(value)

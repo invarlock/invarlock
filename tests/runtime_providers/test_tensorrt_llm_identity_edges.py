@@ -52,6 +52,10 @@ def test_root_open_and_directory_identity_errors_close_descriptors(
 def test_json_budget_and_config_validation_edges(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    empty_budget = identity._JsonBudget()
+    identity._validate_json_budget([], budget=empty_budget)
+    assert empty_budget.items == 0
+
     with _error("object keys must be strings"):
         identity._validate_json_budget({1: "value"}, budget=identity._JsonBudget())
     with _error("invalid Unicode key"):
@@ -117,6 +121,26 @@ def test_tree_budget_listing_and_entry_lookup_errors(
             identity.os, "listdir", lambda _fd: (_ for _ in ()).throw(OSError())
         )
         with _error("cannot be listed"):
+            identity._collect_files(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def test_tree_collection_reports_entry_disappearance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    descriptor = os.open(bundle, os.O_RDONLY | os.O_DIRECTORY)
+    monkeypatch.setattr(identity.os, "listdir", lambda _fd: ["missing.engine"])
+    monkeypatch.setattr(
+        identity.os,
+        "stat",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("gone")),
+    )
+    try:
+        with _error("entry 'missing.engine' is unavailable"):
             identity._collect_files(descriptor)
     finally:
         os.close(descriptor)
@@ -193,8 +217,84 @@ def test_bounded_reader_detects_size_and_stat_mutation(
         )
         with _error("changed before parsing"):
             identity._read_bounded_file(descriptor, changed, 10)
+
+        with _error("changed while parsing"):
+            identity._read_bounded_file(
+                descriptor,
+                identity._FileRecord("config.json", 1, value.stat()),
+                10,
+            )
     finally:
         os.close(descriptor)
+
+
+def test_file_hashing_rejects_nonregular_truncated_growing_and_replaced_sources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    value = root / "value.engine"
+    value.write_bytes(b"engine")
+    root_descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    initial = value.stat()
+    try:
+        monkeypatch.setattr(identity.os, "fstat", lambda _fd: root.stat())
+        with _error("not a stable regular file"):
+            identity._hash_file(
+                root_descriptor,
+                identity._FileRecord("value.engine", len(b"engine"), initial),
+            )
+        monkeypatch.undo()
+
+        with _error("truncated while hashing"):
+            identity._hash_file(
+                root_descriptor,
+                identity._FileRecord("value.engine", len(b"engine") + 1, initial),
+            )
+        with _error("grew while hashing"):
+            identity._hash_file(
+                root_descriptor,
+                identity._FileRecord("value.engine", len(b"engine") - 1, initial),
+            )
+
+        real_stat = identity.os.stat
+
+        def missing_after_hash(path, *args, **kwargs):  # noqa: ANN001, ANN202
+            if path == "value.engine" and kwargs.get("dir_fd") is not None:
+                raise OSError("replaced")
+            return real_stat(path, *args, **kwargs)
+
+        monkeypatch.setattr(identity.os, "stat", missing_after_hash)
+        with _error("changed after hashing"):
+            identity._hash_file(
+                root_descriptor,
+                identity._FileRecord("value.engine", len(b"engine"), initial),
+            )
+    finally:
+        os.close(root_descriptor)
+
+
+def test_bounded_config_reader_rejects_truncation_and_invalid_json(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    value = root / "config.json"
+    value.write_bytes(b"{}")
+    root_descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with _error("truncated while parsing"):
+            identity._read_bounded_file(
+                root_descriptor,
+                identity._FileRecord("config.json", 3, value.stat()),
+                10,
+            )
+    finally:
+        os.close(root_descriptor)
+
+    with _error("not strict JSON"):
+        identity._parse_config(b"{")
 
 
 def test_empty_authenticated_bundle_is_rejected(tmp_path: Path) -> None:

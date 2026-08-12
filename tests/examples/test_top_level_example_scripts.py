@@ -389,6 +389,19 @@ def test_regenerate_fixtures_matches_the_checked_in_golden_files(
     assert sum(record["subject"]["score"] for record in rejected["records"]) == 49
 
 
+def test_regenerate_fixtures_requires_a_complete_identity_pair(tmp_path: Path) -> None:
+    generated_root = tmp_path / "examples"
+    _empty_fixture_root(generated_root)
+
+    with pytest.raises(ValueError, match="require baseline and subject"):
+        regenerate_fixtures.regenerate(
+            generated_root,
+            identities={"baseline": object()},  # type: ignore[dict-item]
+        )
+
+    assert not (generated_root / "import").exists()
+
+
 def test_copy_generated_replaces_an_existing_destination_and_normalizes_mode(
     tmp_path: Path,
 ) -> None:

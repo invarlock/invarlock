@@ -132,6 +132,19 @@ def test_worker_refuses_to_expose_an_open_output_inventory(tmp_path: Path) -> No
         worker._make_output_collectible(output)  # noqa: SLF001
 
 
+def test_worker_refuses_to_expose_a_nonregular_closed_output_entry(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "output"
+    _write_closed_output(output)
+    report = output / "report.json"
+    report.unlink()
+    report.mkdir()
+
+    with pytest.raises(RuntimeSideWorkerError, match="must remain regular files"):
+        worker._make_output_collectible(output)  # noqa: SLF001
+
+
 def test_worker_input_preflight_rejects_before_model_preparation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

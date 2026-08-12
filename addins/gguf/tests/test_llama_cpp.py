@@ -836,6 +836,8 @@ def test_llama_cpp_strict_open_accepts_loopback_only_network_namespace(
 ) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
     ipv4, ipv6 = _write_route_tables(tmp_path, ipv4_interface="lo", ipv6_interface="lo")
+    ipv4.write_text(ipv4.read_text(encoding="ascii") + "\n", encoding="ascii")
+    ipv6.write_text("\n" + ipv6.read_text(encoding="ascii"), encoding="ascii")
     monkeypatch.setattr(
         llama_cpp,
         "_require_isolated_network_namespace",

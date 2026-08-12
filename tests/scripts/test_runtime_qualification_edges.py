@@ -4,6 +4,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
@@ -94,6 +95,25 @@ def test_regular_file_hashing_and_reads_reject_unsafe_inputs(
         )
 
 
+def test_regular_file_read_enforces_the_limit_after_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = tmp_path / "growing-input"
+    payload.write_bytes(b"ab")
+    real_fstat = qualification.os.fstat
+
+    def underreport_initial_size(descriptor: int) -> os.stat_result:
+        facts = real_fstat(descriptor)
+        values = list(facts)
+        values[6] = 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(qualification.os, "fstat", underreport_initial_size)
+
+    with pytest.raises(qualification.QualificationError, match="size limit"):
+        qualification._read_regular_bytes(payload, label="input", max_bytes=1)
+
+
 def test_candidate_manifest_and_file_identity_require_real_regular_files(
     tmp_path: Path,
 ) -> None:
@@ -107,6 +127,26 @@ def test_candidate_manifest_and_file_identity_require_real_regular_files(
         qualification._file_identity(tmp_path, label="candidate")
     with pytest.raises(qualification.QualificationError, match="is unavailable"):
         qualification._file_identity(tmp_path / "missing", label="candidate")
+
+
+def test_candidate_capture_fails_cleanly_if_the_bound_wheel_disappears(
+    tmp_path: Path,
+) -> None:
+    candidate_site = tmp_path / "candidate-site"
+    candidate_site.mkdir()
+    spec = qualification.CandidateWheelSpec(
+        path=tmp_path / "missing.whl",
+        sha256=DIGEST,
+    )
+
+    with pytest.raises(qualification.QualificationError, match="wheel is unavailable"):
+        qualification._capture_candidate_wheel(
+            spec,
+            archived={},
+            candidate_site=candidate_site,
+        )
+
+    assert list(candidate_site.iterdir()) == []
 
 
 def test_candidate_manifest_rejects_linked_and_repeated_wheel_paths(
@@ -543,6 +583,63 @@ def test_digest_json_and_isolated_command_validation(tmp_path: Path) -> None:
     assert qualification._isolated_python_command(
         ["/definitely/missing", "argument"], identity=identity, stage="run"
     ) == ["/definitely/missing", "argument"]
+
+
+def test_child_execution_rejects_output_overflow_and_start_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    working = tmp_path / "work"
+    candidate_site = tmp_path / "candidate-site"
+    source_root = tmp_path / "source"
+    for directory in (working, candidate_site, source_root):
+        directory.mkdir()
+    context = qualification.ExecutionContext(
+        source_root=source_root,
+        working_directory=working,
+        child_path=os.defpath.split(os.pathsep)[0],
+        candidate_site=candidate_site,
+        candidate_manifest_sha256=DIGEST,
+        candidate_wheels=(
+            qualification.CandidateWheelIdentity(
+                distribution="invarlock",
+                version="1.0",
+                filename="invarlock.whl",
+                sha256=DIGEST,
+            ),
+        ),
+        python_identity=_python_identity(Path(sys.executable).resolve()),
+    )
+
+    def oversized_output(
+        _command: list[str],
+        *,
+        stdout: object,
+        **_kwargs: object,
+    ) -> SimpleNamespace:
+        stdout.write(b"too large")  # type: ignore[attr-defined]
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(qualification, "_MAX_CHILD_OUTPUT_BYTES", 1)
+    monkeypatch.setattr(qualification.subprocess, "run", oversized_output)
+    with pytest.raises(qualification.QualificationError, match="output limit"):
+        qualification._run(
+            [str(Path(sys.executable).resolve()), "-c", "pass"],
+            context=context,
+            stage="probe",
+        )
+
+    monkeypatch.setattr(
+        qualification.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+    with pytest.raises(qualification.QualificationError, match="could not be started"):
+        qualification._run(
+            [str(Path(sys.executable).resolve()), "-c", "pass"],
+            context=context,
+            stage="probe",
+        )
 
 
 @pytest.mark.parametrize(

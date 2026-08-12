@@ -98,6 +98,8 @@ def test_renderer_formats_versions_authority_and_markdown_cells(
     assert (
         module.adapter_support({"support_status": "maintained_adapter"}) == "Maintained"
     )
+    with pytest.raises(ValueError, match="unsupported adapter support status"):
+        module.adapter_support({"support_status": "experimental"})
     assert module.escape_cell("a|b\nc") == r"a\|b c"
 
 

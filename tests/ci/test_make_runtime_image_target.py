@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
+from tests._support_repository_contracts import MakefileContract
 
-def _target_block(text: str, target: str) -> str:
-    pattern = re.compile(rf"^\s*{re.escape(target)}\s*:[^\n]*$", re.MULTILINE)
-    match = pattern.search(text)
-    assert match is not None, f"{target} target not found"
-    lines: list[str] = []
-    for line in text[match.end() :].splitlines():
-        if line and re.match(r"^[A-Za-z0-9_.-]+\s*:\s*", line):
-            break
-        lines.append(line)
-    return "\n".join(lines)
+MAKE = MakefileContract.read(Path(__file__).resolve().parents[2] / "Makefile")
 
 
 def test_make_exposes_the_canonical_cpu_runtime_image_build() -> None:
-    data = Path("Makefile").read_text(encoding="utf-8")
-    block = _target_block(data, "runtime-image")
+    data = MAKE.text
+    block = MAKE.target("runtime-image").text
 
     assert 'test -n "$(CONTAINER_ENGINE)"' in block
     assert 'test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
@@ -33,8 +24,8 @@ def test_make_exposes_the_canonical_cpu_runtime_image_build() -> None:
 
 
 def test_make_exposes_a_separate_minimal_cuda_runtime_image_build() -> None:
-    data = Path("Makefile").read_text(encoding="utf-8")
-    block = _target_block(data, "runtime-image-cuda")
+    data = MAKE.text
+    block = MAKE.target("runtime-image-cuda").text
 
     assert 'test -n "$(CONTAINER_ENGINE)"' in block
     assert 'test -n "$(RUNTIME_SOURCE_DATE_EPOCH)"' in block
@@ -50,8 +41,7 @@ def test_make_exposes_a_separate_minimal_cuda_runtime_image_build() -> None:
 
 
 def test_make_runtime_smoke_uses_the_built_image_offline() -> None:
-    data = Path("Makefile").read_text(encoding="utf-8")
-    block = _target_block(data, "runtime-smoke")
+    block = MAKE.target("runtime-smoke").text
 
     assert "$(CONTAINER_ENGINE) run --rm --network none" in block
     assert "--pull=never --read-only --cap-drop=ALL" in block
@@ -67,8 +57,8 @@ def test_make_runtime_smoke_uses_the_built_image_offline() -> None:
 
 
 def test_make_cuda_runtime_smoke_requires_a_visible_gpu() -> None:
-    data = Path("Makefile").read_text(encoding="utf-8")
-    block = _target_block(data, "runtime-smoke-cuda")
+    data = MAKE.text
+    block = MAKE.target("runtime-smoke-cuda").text
 
     assert (
         "$(CONTAINER_ENGINE) run --rm --network none $(RUNTIME_CUDA_DEVICE_ARGS)"
@@ -91,13 +81,9 @@ def test_make_cuda_runtime_smoke_requires_a_visible_gpu() -> None:
 
 
 def test_container_front_door_target_runs_the_opt_in_journey() -> None:
-    data = Path("Makefile").read_text(encoding="utf-8")
-    block = _target_block(data, "container-front-door-smoke")
+    block = MAKE.target("container-front-door-smoke").text
 
-    assert (
-        "runtime-image"
-        in data.split("container-front-door-smoke:", 1)[1].splitlines()[0]
-    )
+    assert "runtime-image" in MAKE.target("container-front-door-smoke").prerequisites
     assert "INVARLOCK_RUN_CONTAINER_SMOKE=1" in block
     assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in block
     assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in block

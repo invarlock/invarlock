@@ -163,6 +163,13 @@ def test_runtime_boundary_and_backend_version_fail_closed(
     with pytest.raises(runner.TensorRTLLMRunnerError, match="not pinned"):
         runner._require_backend_version()  # noqa: SLF001
 
+    monkeypatch.setattr(
+        runner.importlib.metadata,
+        "version",
+        lambda _name: runner._BACKEND_VERSION,  # noqa: SLF001
+    )
+    runner._require_backend_version()  # noqa: SLF001
+
 
 def test_backend_file_identity_rejects_missing_empty_and_unsafe_inventory(
     tmp_path: Path,
@@ -180,6 +187,32 @@ def test_backend_file_identity_rejects_missing_empty_and_unsafe_inventory(
     candidate.write_text("code", encoding="utf-8")
     with pytest.raises(runner.TensorRTLLMRunnerError, match="inventory is invalid"):
         runner._hash_regular_backend_file(candidate, logical_name="../backend.py")  # noqa: SLF001
+
+
+def test_backend_file_identity_detects_mutation_during_hash(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "backend.py"
+    candidate.write_text("code", encoding="utf-8")
+    opened = candidate.stat()
+    monkeypatch.setattr(
+        runner.os,
+        "fstat",
+        lambda _descriptor: SimpleNamespace(
+            st_dev=opened.st_dev,
+            st_ino=opened.st_ino,
+            st_size=opened.st_size + 1,
+            st_mtime_ns=opened.st_mtime_ns,
+            st_ctime_ns=opened.st_ctime_ns,
+        ),
+    )
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="changed while"):
+        runner._hash_regular_backend_file(  # noqa: SLF001
+            candidate,
+            logical_name="backend.py",
+        )
 
 
 def test_backend_inventory_rejects_missing_unavailable_and_oversized_sets(
@@ -266,3 +299,77 @@ def test_cuda_device_observation_rejects_absent_and_invalid_devices(
     invalid.cuda.get_device_capability = lambda _index: (True, 0)
     with pytest.raises(runner.TensorRTLLMRunnerError, match="capability is invalid"):
         runner._observe_cuda_device()  # noqa: SLF001
+
+
+def test_cuda_device_observation_binds_live_version_facts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed = SimpleNamespace(
+        cuda=SimpleNamespace(
+            is_available=lambda: True,
+            device_count=lambda: 1,
+            current_device=lambda: 0,
+            get_device_name=lambda _index: "NVIDIA H200",
+            get_device_capability=lambda _index: (9, 0),
+        )
+    )
+    monkeypatch.setattr(runner.importlib, "import_module", lambda _name: observed)
+    monkeypatch.setattr(runner, "_read_driver_version", lambda: "570.00")
+    monkeypatch.setattr(runner, "_read_cuda_runtime_version", lambda: "12.8")
+
+    device = runner._observe_cuda_device()  # noqa: SLF001
+
+    assert device == runner._ObservedDevice(  # noqa: SLF001
+        device_name="NVIDIA H200",
+        compute_capability="9.0",
+        driver_version="570.00",
+        cuda_runtime_version="12.8",
+    )
+
+
+def test_backend_and_tokenizer_adapters_reject_ambiguous_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    modules = {
+        "tensorrt_llm": SimpleNamespace(SamplingParams=lambda **_kwargs: None),
+        "tensorrt_llm._tensorrt_engine": SimpleNamespace(LLM=object()),
+        "transformers": SimpleNamespace(PreTrainedTokenizerFast=lambda **_kwargs: None),
+        "tokenizers": SimpleNamespace(
+            Tokenizer=SimpleNamespace(from_str=lambda _value: None)
+        ),
+    }
+    monkeypatch.setattr(runner, "_require_backend_version", lambda: None)
+    monkeypatch.setattr(runner.importlib, "import_module", modules.__getitem__)
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="connector API"):
+        runner._load_backend()  # noqa: SLF001
+
+    contract = runner._TokenizerContract(  # noqa: SLF001
+        tokenizer_json={"version": "1", "model": {"type": "test"}},
+        eos_token_id=1,
+        pad_token_id=0,
+        add_special_tokens=False,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )
+    backend = runner._Backend(  # noqa: SLF001
+        llm=lambda **_kwargs: None,
+        sampling_params=lambda **_kwargs: None,
+        fast_tokenizer=lambda **_kwargs: None,
+        raw_tokenizer_from_str=lambda _value: SimpleNamespace(
+            id_to_token=lambda _token_id: None
+        ),
+    )
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="IDs are unavailable"):
+        runner._tokenizer_from_contract(contract, backend)  # noqa: SLF001
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="invalid IDs"):
+        runner._prompt_token_ids(  # noqa: SLF001
+            SimpleNamespace(encode=lambda *_args, **_kwargs: [True]),
+            "prompt",
+            add_special_tokens=False,
+        )
+
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="completion count"):
+        runner._validated_generation_output(  # noqa: SLF001
+            SimpleNamespace(finished=True, outputs=[])
+        )

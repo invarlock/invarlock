@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import tarfile
@@ -254,6 +255,52 @@ def test_source_helpers_fail_closed_on_missing_tools_and_unsafe_files(
     monkeypatch.setattr(qualification_source, "_MAX_BUNDLE_BYTES", 0)
     with pytest.raises(SystemExit, match="size limit"):
         qualification_source._regular_file_bytes(oversized)
+
+
+def test_source_bundle_read_detects_short_extra_and_identity_races(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle = tmp_path / "source.tar"
+    bundle.write_bytes(b"authenticated")
+    real_read = qualification_source.os.read
+    real_fstat = qualification_source.os.fstat
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(qualification_source.os, "read", lambda *_args: b"")
+        with pytest.raises(SystemExit, match="changed while being read"):
+            qualification_source._regular_file_bytes(bundle)
+
+    read_count = 0
+
+    def read_with_trailing_byte(descriptor: int, size: int) -> bytes:
+        nonlocal read_count
+        read_count += 1
+        if read_count == 2:
+            return b"x"
+        return real_read(descriptor, size)
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(qualification_source.os, "read", read_with_trailing_byte)
+        with pytest.raises(SystemExit, match="changed while being read"):
+            qualification_source._regular_file_bytes(bundle)
+
+    stat_count = 0
+
+    def changed_identity(descriptor: int) -> os.stat_result:
+        nonlocal stat_count
+        stat_count += 1
+        facts = real_fstat(descriptor)
+        if stat_count == 2:
+            values = list(facts)
+            values[8] += 1
+            return os.stat_result(values)
+        return facts
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(qualification_source.os, "fstat", changed_identity)
+        with pytest.raises(SystemExit, match="changed while being read"):
+            qualification_source._regular_file_bytes(bundle)
 
 
 def test_archive_validation_rejects_unbound_invalid_and_unsafe_payloads(

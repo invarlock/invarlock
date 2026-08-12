@@ -60,7 +60,6 @@ _DRIVER_VERSION = re.compile(
     r"(?:19|20)[0-9]{2}$",
     re.MULTILINE,
 )
-_CUDA_RUNTIME_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
 _CRITICAL_BACKEND_FILES = (
     "tensorrt_llm/__init__.py",
     "tensorrt_llm/version.py",
@@ -776,8 +775,6 @@ def _read_cuda_runtime_version(
     minor = (encoded.value % 1000) // 10
     patch = encoded.value % 10
     version = f"{major}.{minor}" if patch == 0 else f"{major}.{minor}.{patch}"
-    if _CUDA_RUNTIME_VERSION.fullmatch(version) is None:
-        raise TensorRTLLMRunnerError("CUDA runtime version is invalid")
     return version
 
 

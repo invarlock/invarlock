@@ -278,6 +278,32 @@ def test_basename_and_directory_binding_identity_errors(
         os.close(descriptor)
 
 
+def test_empty_basename_and_prepublication_identity_drift_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(AtomicDirectoryPublicationError, match="one directory entry"):
+        atomic_directory._validate_basename(Path("/"), label="destination")
+
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    original_identity = atomic_directory._entry_identity
+    calls = 0
+
+    def drift_on_named_source(value: object) -> tuple[int, int, int]:
+        nonlocal calls
+        calls += 1
+        identity = original_identity(value)  # type: ignore[arg-type]
+        if calls == 2:
+            return (identity[0], identity[1] + 1, identity[2])
+        return identity
+
+    monkeypatch.setattr(atomic_directory, "_entry_identity", drift_on_named_source)
+
+    with pytest.raises(AtomicDirectoryPublicationError, match="identity changed"):
+        publish_directory_no_replace(staging, tmp_path / "published")
+    assert staging.is_dir()
+
+
 @pytest.mark.parametrize("error_number", [errno.EEXIST, errno.ENOTEMPTY])
 def test_rename_existing_errors_are_classified(error_number: int) -> None:
     with pytest.raises(atomic_directory.AtomicDirectoryExistsError):

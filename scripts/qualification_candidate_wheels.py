@@ -54,23 +54,22 @@ def _capture_wheel(value: Path) -> CandidateWheel:
             "candidate wheel must be one real .whl path without symbolic links"
         )
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = -1
     try:
         descriptor = os.open(lexical, flags)
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_WHEEL_BYTES:
-            raise CandidateWheelManifestError(
-                "candidate wheel must be one bounded regular file"
-            )
-        digest = hashlib.sha256()
-        while chunk := os.read(descriptor, 1024 * 1024):
-            digest.update(chunk)
-        after = os.fstat(descriptor)
+        try:
+            before = os.fstat(descriptor)
+            if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_WHEEL_BYTES:
+                raise CandidateWheelManifestError(
+                    "candidate wheel must be one bounded regular file"
+                )
+            digest = hashlib.sha256()
+            while chunk := os.read(descriptor, 1024 * 1024):
+                digest.update(chunk)
+            after = os.fstat(descriptor)
+        finally:
+            os.close(descriptor)
     except OSError as exc:
         raise CandidateWheelManifestError("candidate wheel could not be read") from exc
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
     identity = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
     if identity != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
         raise CandidateWheelManifestError("candidate wheel changed while it was read")

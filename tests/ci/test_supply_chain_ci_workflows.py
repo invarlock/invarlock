@@ -77,7 +77,16 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
                 line = line.strip()
                 if "pip install" not in line:
                     continue
-                is_built_artifact = "dist/*.whl" in line or "wheelhouse/*.whl" in line
+                is_built_artifact = any(
+                    pattern in line
+                    for pattern in (
+                        "dist/*.whl",
+                        "dist/addins/*.whl",
+                        "wheelhouse/*.whl",
+                        "wheelhouse/invarlock-*.whl",
+                        "wheelhouse/invarlock_*.whl",
+                    )
+                )
                 if not is_built_artifact and "--require-hashes" not in line:
                     offenders.append(f"{path.name}: {line}")
 
@@ -218,6 +227,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "requirements/workflows/ci-hf-py313.txt" in build_tooling
     assert "requirements/workflows/docs-ci-py313.txt" in build_tooling
     assert "requirements/workflows/release-security-py313.txt" in build_tooling
+    assert "python -m build --wheel --no-isolation" in build_tooling
+    assert "--no-deps --force-reinstall dist/*.whl" in build_tooling
     release_lock_audit = _step(build["steps"], "Audit maintained dependency locks")[
         "run"
     ]
@@ -270,8 +281,10 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert '--hash-manifest "${hash_manifest}"' in preflight
 
     install_smoke = _step(build["steps"], "Install smoke from wheel")["run"]
+    core_install = "--no-deps --force-reinstall dist/*.whl"
+    addin_install = "--no-deps --force-reinstall dist/addins/*.whl"
     assert install_smoke.index("release-install-py313.txt") < install_smoke.index(
-        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+        core_install
     )
     for isolation_command in (
         "export PYTHONNOUSERSITE=1",
@@ -279,7 +292,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "unset PYTHONPATH",
     ):
         assert install_smoke.index(isolation_command) < install_smoke.index(
-            "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+            core_install
         )
     assert "python -m pip check" in install_smoke
     assert "CoreRegistry" in install_smoke
@@ -288,6 +301,17 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "is_relative_to(site)" in install_smoke
     assert "first-party version mismatch" in install_smoke
     assert "release tag/version mismatch" in install_smoke
+    assert "examples/quickstart/run.py" in install_smoke
+    assert "examples/acceptance-handoff/golden" in install_smoke
+    assert "python run.py --fixture golden" in install_smoke
+    assert "examples/ci/standalone-consumer/." in install_smoke
+    assert "review/verify_deployment_receipt.py" in install_smoke
+    assert install_smoke.index(core_install) < install_smoke.index(
+        "python run.py --fixture golden"
+    )
+    assert install_smoke.index("review/verify_deployment_receipt.py") < (
+        install_smoke.index(addin_install)
+    )
     assert (
         _step(build["steps"], "Install smoke from wheel")["env"][
             "INVARLOCK_RELEASE_TAG"
@@ -720,23 +744,34 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "urllib.request" not in hosted_download["run"]
     smoke = _step(published_smoke["steps"], "Install published wheels and smoke test")
     assert "requirements/workflows/pip-bootstrap.txt" in smoke["run"]
+    core_install = "--no-deps --force-reinstall wheelhouse/invarlock-*.whl"
+    addin_install = "--no-deps --force-reinstall wheelhouse/invarlock_*.whl"
     assert smoke["run"].index("release-install-py313.txt") < smoke["run"].index(
-        "--no-deps --force-reinstall wheelhouse/*.whl"
+        core_install
     )
     for isolation_command in (
         "export PYTHONNOUSERSITE=1",
         "export PYTHONSAFEPATH=1",
         "unset PYTHONPATH",
     ):
-        assert smoke["run"].index(isolation_command) < smoke["run"].index(
-            "--no-deps --force-reinstall wheelhouse/*.whl"
-        )
+        assert smoke["run"].index(isolation_command) < smoke["run"].index(core_install)
     assert "python -m pip check" in smoke["run"]
     assert "CoreRegistry" in smoke["run"]
     assert "get_runtime_provider" in smoke["run"]
     assert "get_plugin_info" in smoke["run"]
     assert "is_relative_to(site)" in smoke["run"]
     assert "first-party version mismatch" in smoke["run"]
+    assert "examples/quickstart/run.py" in smoke["run"]
+    assert "examples/acceptance-handoff/golden" in smoke["run"]
+    assert "python run.py --fixture golden" in smoke["run"]
+    assert "examples/ci/standalone-consumer/." in smoke["run"]
+    assert "review/verify_deployment_receipt.py" in smoke["run"]
+    assert smoke["run"].index(core_install) < smoke["run"].index(
+        "python run.py --fixture golden"
+    )
+    assert smoke["run"].index("review/verify_deployment_receipt.py") < (
+        smoke["run"].index(addin_install)
+    )
 
     assert "record_testpypi_promotion" not in jobs
 

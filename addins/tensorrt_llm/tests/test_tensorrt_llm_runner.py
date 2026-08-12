@@ -710,6 +710,16 @@ def test_runner_loads_explicit_tensorrt_engine_hlapi(
             lambda request: request["settings"].update({"context_length": 65}),
             "context_length exceeds",
         ),
+        (
+            lambda request: request["settings"].update({"batch_size": 9}),
+            "batch_size exceeds",
+        ),
+        (
+            lambda request: request["settings"].update(
+                {"context_length": 64, "max_output_tokens": 33}
+            ),
+            "sequence limit",
+        ),
     ],
 )
 def test_runner_rejects_invalid_closed_requests(
@@ -733,6 +743,27 @@ def test_runner_rejects_multi_rank_engine(tmp_path: Path) -> None:
 
     with pytest.raises(runner.TensorRTLLMRunnerError, match="single-rank"):
         runner._parse_request(payload)  # noqa: SLF001
+
+
+def test_runner_rejects_nonregular_engine_payload_and_open_layout(
+    tmp_path: Path,
+) -> None:
+    payload, engine = _runtime_request(tmp_path)
+    engine.joinpath("rank0.engine").unlink()
+    engine.joinpath("rank0.engine").mkdir()
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="non-regular or empty"):
+        runner._parse_request(payload)  # noqa: SLF001
+
+    engine.joinpath("rank0.engine").rmdir()
+    engine.joinpath("rank0.engine").write_bytes(b"authenticated-engine")
+    request = json.loads(payload)
+    tokenizer = engine.parent / "renamed-tokenizer.json"
+    Path(request["tokenizer_contract"]).rename(tokenizer)
+    request["tokenizer_contract"] = str(tokenizer)
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="closed layout"):
+        runner._parse_request(  # noqa: SLF001
+            json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
+        )
 
 
 @pytest.mark.parametrize(
@@ -826,6 +857,13 @@ def test_runner_network_gate_accepts_only_loopback(tmp_path: Path) -> None:
         "00 00000000000000000000000000000000 00000000 00000000 00000000 00000001 lo\n",
         encoding="ascii",
     )
+    runner._require_isolated_network_namespace(  # noqa: SLF001
+        ipv4_route_path=ipv4,
+        ipv6_route_path=ipv6,
+    )
+
+    ipv4.write_text(ipv4.read_text(encoding="ascii") + "\n", encoding="ascii")
+    ipv6.write_text("\n" + ipv6.read_text(encoding="ascii"), encoding="ascii")
     runner._require_isolated_network_namespace(  # noqa: SLF001
         ipv4_route_path=ipv4,
         ipv6_route_path=ipv6,

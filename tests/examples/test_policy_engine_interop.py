@@ -453,6 +453,24 @@ def test_policy_runner_rejects_engine_disagreement(
         module.main()
 
 
+def test_policy_runner_parses_default_and_explicit_engine_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _runner_module()
+
+    monkeypatch.setattr(sys, "argv", ["run.py"])
+    defaults = module.parse_args()
+    assert (defaults.opa, defaults.cue) == ("opa", "cue")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run.py", "--opa", "/tools/opa", "--cue", "/tools/cue"],
+    )
+    explicit = module.parse_args()
+    assert (explicit.opa, explicit.cue) == ("/tools/opa", "/tools/cue")
+
+
 def test_pinned_opa_and_cue_conformance_when_available() -> None:
     opa = shutil.which("opa")
     cue = shutil.which("cue")

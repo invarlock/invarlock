@@ -175,6 +175,44 @@ def test_materialization_refuses_tampered_private_snapshot(tmp_path: Path) -> No
             pass
 
 
+def test_materialization_refuses_unsafe_private_snapshot_entry(tmp_path: Path) -> None:
+    root = _pack(tmp_path)
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is not None and errors == []
+    entry = snapshot.files.entry("manifest.json")
+    assert entry is not None
+    entry.snapshot_path.unlink()
+    entry.snapshot_path.symlink_to(root / "manifest.json")
+
+    with pytest.raises(RuntimeError, match="snapshot file became unsafe"):
+        with snapshot.files.materialized():
+            pass
+
+
+def test_materialized_stability_accepts_mode_drift_when_bytes_still_match(
+    tmp_path: Path,
+) -> None:
+    root = _pack(tmp_path)
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is not None and errors == []
+    storage = Path(snapshot.files.storage.name)
+    (storage / "manifest.json").chmod(0o600)
+
+    assert snapshot.files.materialized_stability_errors(storage) == []
+    snapshot.files.cleanup()
+
+
+def test_snapshot_cleanup_is_idempotent_after_backing_tree_removal(
+    tmp_path: Path,
+) -> None:
+    root = _pack(tmp_path)
+    snapshot, errors = PackSnapshot.capture(root)
+    assert snapshot is not None and errors == []
+
+    snapshot.files.storage.cleanup()
+    snapshot.files.cleanup()
+
+
 def test_structural_json_validation_can_be_disabled(tmp_path: Path) -> None:
     root = _pack(tmp_path)
     (root / "manifest.json").write_text("[]\n", encoding="utf-8")

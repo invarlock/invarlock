@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.runtime_provider_evidence as evidence_module
 from invarlock.core.runtime_provider import (
     GGUFArtifactIdentity,
     HFSnapshotArtifactIdentity,
@@ -784,6 +785,37 @@ def test_artifact_identity_codec_reconstructs_every_supported_type(
     assert encoded == canonical_artifact_identity_json(identity)
     assert decode_artifact_identity(encoded) == identity
     assert type(decode_artifact_identity(encoded)) is type(identity)
+
+
+def test_artifact_identity_dispatch_rejects_unknown_internal_format() -> None:
+    with pytest.raises(RuntimeProviderEvidenceError, match="unsupported artifact"):
+        evidence_module._artifact_from_payload({"artifact_format": "future"})
+
+
+def test_typed_decoder_enforces_sidecar_bound_before_json_parsing() -> None:
+    oversized = b"{" + b" " * MAX_RUNTIME_PROVIDER_SIDECAR_BYTES + b"}"
+
+    with pytest.raises(RuntimeProviderEvidenceError, match="size limit"):
+        decode_artifact_identity(oversized)
+
+
+def test_unknown_provider_cannot_claim_a_gguf_artifact_contract() -> None:
+    artifact, _observation_value, receipt = _bundle_values()
+    receipt = replace(
+        receipt,
+        plugin=replace(receipt.plugin, name="future_provider"),
+        capabilities=replace(
+            receipt.capabilities,
+            provider_name="future_provider",
+        ),
+    )
+
+    assert runtime_request_binding_errors(
+        provider_name="future_provider",
+        settings={},
+        artifact_identity=artifact,
+        receipt=receipt,
+    ) == ("llama_cpp request and GGUF artifact identity do not agree",)
 
 
 def test_write_and_reload_produces_cross_bound_canonical_sidecars(

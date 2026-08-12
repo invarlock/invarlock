@@ -15,7 +15,7 @@ import torch
 from modelopt.torch.export import export_tensorrt_llm_checkpoint
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-try:  # pragma: no cover - flat-script compatibility
+try:
     from examples.integrations.bounded_command import run_bounded_command
 except ModuleNotFoundError as exc:
     if exc.name != "examples":

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless a signed InvarLock receipt matches deployment anchors."""
+"""Fail closed unless a signed InvarLock receipt matches consumer anchors."""
 
 from __future__ import annotations
 

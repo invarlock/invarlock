@@ -92,7 +92,10 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
     assert not excluded.search(
         "examples/evaluator-qualification/signed-transactions/README.md"
     )
-    assert not excluded.search("examples/ci/inspect-ai-deployment-approval-inputs.json")
+    assert not excluded.search(
+        "examples/ci/standalone-consumer/review/"
+        "inspect-ai-deployment-approval-inputs.json"
+    )
 
 
 def test_full_ci_pins_make_to_setup_python() -> None:

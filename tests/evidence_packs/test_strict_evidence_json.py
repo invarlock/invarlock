@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -290,6 +291,74 @@ def test_snapshot_copy_rejects_invalid_limit_open_failure_and_mode_failure(
     )
     with pytest.raises(StrictJsonError, match="mode could not be preserved"):
         copy_regular_file_snapshot(source, destination, label="artifact", mode=0o440)
+    assert not destination.exists()
+
+
+def test_snapshot_copy_rejects_nonregular_descriptor_and_stream_overrun(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"12345")
+    destination = tmp_path / "destination.bin"
+    real_fstat = strict_json.os.fstat
+
+    def nonregular_fstat(descriptor: int) -> os.stat_result:
+        value = real_fstat(descriptor)
+        fields = list(value)
+        fields[0] = stat.S_IFDIR | 0o700
+        return os.stat_result(fields)
+
+    monkeypatch.setattr(strict_json.os, "fstat", nonregular_fstat)
+    with pytest.raises(StrictJsonError, match="changed while being opened"):
+        copy_regular_file_snapshot(source, destination, label="artifact")
+    assert not destination.exists()
+
+    monkeypatch.setattr(strict_json.os, "fstat", real_fstat)
+    real_read = strict_json.os.read
+    first_read = True
+
+    def oversized_read(descriptor: int, size: int) -> bytes:
+        nonlocal first_read
+        chunk = real_read(descriptor, size)
+        if first_read and chunk:
+            first_read = False
+            return chunk + b"6"
+        return chunk
+
+    monkeypatch.setattr(strict_json.os, "read", oversized_read)
+    with pytest.raises(StrictJsonError, match="5-byte size limit"):
+        copy_regular_file_snapshot(
+            source,
+            destination,
+            label="artifact",
+            max_bytes=5,
+        )
+    assert not destination.exists()
+
+
+def test_snapshot_copy_removes_output_when_source_identity_drifts_after_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"authenticated")
+    destination = tmp_path / "destination.bin"
+    real_stat = strict_json._regular_file_stat
+    calls = 0
+
+    def drift_after_copy(path: Path, *, label: str) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        value = real_stat(path, label=label)
+        if calls != 2:
+            return value
+        fields = list(value)
+        fields[9] = value.st_ctime + 1
+        return os.stat_result(fields)
+
+    monkeypatch.setattr(strict_json, "_regular_file_stat", drift_after_copy)
+
+    with pytest.raises(StrictJsonError, match="changed while being copied"):
+        copy_regular_file_snapshot(source, destination, label="artifact")
     assert not destination.exists()
 
 

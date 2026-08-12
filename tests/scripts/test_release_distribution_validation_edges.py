@@ -4,6 +4,7 @@ import base64
 import csv
 import hashlib
 import io
+import os
 import tarfile
 import zipfile
 from pathlib import Path
@@ -101,6 +102,13 @@ def _tar_info(
         member.size = len(payload)
         member.mode = 0o644
     return member, payload
+
+
+def _symlink_tar_info(name: str) -> tuple[tarfile.TarInfo, None]:
+    member = tarfile.TarInfo(name)
+    member.type = tarfile.SYMTYPE
+    member.linkname = "target"
+    return member, None
 
 
 def _write_sdist(
@@ -273,6 +281,23 @@ def test_checkout_entry_points_reject_invalid_toml(tmp_path: Path) -> None:
         validation._expected_entry_points(tmp_path)
 
 
+def test_checkout_entry_points_require_project_and_ignore_empty_groups(
+    tmp_path: Path,
+) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text('name = "not-a-project"\n', encoding="utf-8")
+    with pytest.raises(validation.ReleasePreflightError, match="no project table"):
+        validation._expected_entry_points(tmp_path)
+
+    pyproject.write_text(
+        '[project]\nname="example"\nversion="1.0"\n'
+        "[project.scripts]\n"
+        "[project.entry-points.empty]\n",
+        encoding="utf-8",
+    )
+    assert validation._expected_entry_points(tmp_path) == {}
+
+
 @pytest.mark.parametrize(
     ("raw", "message"),
     [
@@ -346,6 +371,21 @@ def test_wheel_record_rejects_unreadable_text(
     with zipfile.ZipFile(wheel) as archive:
         with pytest.raises(validation.ReleasePreflightError, match="unreadable"):
             validation._validate_wheel_record(archive, archive.infolist(), "RECORD")
+
+
+def test_wheel_record_rejects_an_empty_record(tmp_path: Path) -> None:
+    wheel = tmp_path / "record.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("RECORD", b"")
+    with zipfile.ZipFile(wheel) as archive:
+        with pytest.raises(
+            validation.ReleasePreflightError, match="missing or invalid"
+        ):
+            validation._validate_wheel_record(
+                archive,
+                archive.infolist(),
+                "RECORD",
+            )
 
 
 def test_sdist_hash_requires_extractable_member() -> None:
@@ -427,6 +467,15 @@ def test_checkout_package_rejects_source_links(tmp_path: Path) -> None:
         validation._checkout_package_files(_spec(tmp_path))
 
 
+def test_checkout_package_rejects_a_nonregular_source(tmp_path: Path) -> None:
+    source = tmp_path / "src/example"
+    source.mkdir(parents=True)
+    os.mkfifo(source / "generated.py")
+
+    with pytest.raises(validation.ReleasePreflightError, match="non-regular file"):
+        validation._checkout_package_files(_spec(tmp_path))
+
+
 def test_archive_metadata_readers_enforce_bounds() -> None:
     zip_member = SimpleNamespace(file_size=validation.MAX_METADATA_BYTES + 1)
     with pytest.raises(validation.ReleasePreflightError, match="too large"):
@@ -442,10 +491,20 @@ def test_archive_metadata_readers_enforce_bounds() -> None:
     with pytest.raises(validation.ReleasePreflightError, match="unreadable"):
         validation._read_tar_metadata(archive, tar_member, label="sdist")  # type: ignore[arg-type]
 
+    archive = SimpleNamespace(
+        extractfile=lambda _member: io.BytesIO(
+            b"x" * (validation.MAX_METADATA_BYTES + 1)
+        )
+    )
+    with pytest.raises(validation.ReleasePreflightError, match="too large"):
+        validation._read_tar_metadata(archive, tar_member, label="sdist")  # type: ignore[arg-type]
+
 
 @pytest.mark.parametrize(
     ("extra_files", "directories", "message"),
     [
+        ({"../unsafe.py": b"bad"}, (), "unsafe archive member"),
+        ({"example": b"bad"}, (), "top-level payload must be a directory"),
         ({"unsafe.pth": b"import bad\n"}, (), "pth import"),
         ({"payload.data/value": b"bad"}, (), "data payload"),
         ({"other/payload.txt": b"bad"}, (), "unexpected top-level"),
@@ -479,6 +538,21 @@ def test_wheel_validation_rejects_symlink_member(tmp_path: Path) -> None:
         _validate_wheel(wheel, tmp_path)
 
 
+def test_wheel_validation_requires_canonical_metadata(tmp_path: Path) -> None:
+    wheel = tmp_path / "candidate.whl"
+    files = _write_wheel(wheel)
+    files.pop("example-1.0.dist-info/METADATA")
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for name, payload in files.items():
+            archive.writestr(name, payload)
+
+    with pytest.raises(
+        validation.ReleasePreflightError,
+        match="exactly one dist-info METADATA",
+    ):
+        _validate_wheel(wheel, tmp_path)
+
+
 def test_wheel_validation_rejects_corrupt_archive(tmp_path: Path) -> None:
     wheel = tmp_path / "candidate.whl"
     wheel.write_bytes(b"not a wheel")
@@ -486,9 +560,28 @@ def test_wheel_validation_rejects_corrupt_archive(tmp_path: Path) -> None:
         _validate_wheel(wheel, tmp_path)
 
 
+def test_wheel_validation_rejects_member_count_and_duplicate_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wheel = tmp_path / "candidate.whl"
+    _write_wheel(wheel)
+    monkeypatch.setattr(validation, "MAX_ARCHIVE_MEMBERS", 0)
+    with pytest.raises(validation.ReleasePreflightError, match="too many"):
+        _validate_wheel(wheel, tmp_path)
+
+    monkeypatch.setattr(validation, "MAX_ARCHIVE_MEMBERS", 100)
+    with pytest.warns(UserWarning, match="Duplicate name"):
+        with zipfile.ZipFile(wheel, "a") as archive:
+            archive.writestr("example/__init__.py", b"changed\n")
+    with pytest.raises(validation.ReleasePreflightError, match="duplicate"):
+        _validate_wheel(wheel, tmp_path)
+
+
 @pytest.mark.parametrize(
     ("extra", "message"),
     [
+        (_symlink_tar_info("example-1.0/link"), "non-regular archive member"),
         (_tar_info("../unsafe", b"bad"), "unsafe archive"),
         (_tar_info("outside/file", b"bad"), "unexpected top-level"),
         (_tar_info("example-1.0/src/other.py", b"bad"), "unexpected source package"),

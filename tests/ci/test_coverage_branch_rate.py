@@ -120,6 +120,69 @@ def test_internal_branch_totals_must_match_root_totals(
     assert "branch totals do not match report contents" in capsys.readouterr().err
 
 
+def test_condition_and_class_branch_counts_are_independently_validated(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_module()
+    invalid_condition = tmp_path / "invalid-condition.xml"
+    _report(invalid_condition, covered=1, valid=2)
+    invalid_condition.write_text(
+        invalid_condition.read_text(encoding="utf-8").replace(
+            'condition-coverage="50.00% (1/2)"',
+            'condition-coverage="100% (2/1)"',
+        ),
+        encoding="utf-8",
+    )
+    assert module.main([str(invalid_condition)]) == 2
+    assert "invalid condition counts" in capsys.readouterr().err
+
+    mismatched_classes = tmp_path / "mismatched-classes.xml"
+    mismatched_classes.write_text(
+        '<coverage branches-covered="2" branches-valid="3">'
+        "<packages><package><classes>"
+        '<class name="branchless" filename="branchless.py"><lines>'
+        '<line number="1" hits="1"/>'
+        "</lines></class>"
+        '<class name="partial" filename="partial.py"><lines>'
+        '<line number="1" hits="1" branch="true" '
+        'condition-coverage="50% (1/2)"/>'
+        "</lines></class>"
+        "</classes>"
+        '<line number="2" hits="1" branch="true" '
+        'condition-coverage="100% (1/1)"/>'
+        "</package></packages></coverage>",
+        encoding="utf-8",
+    )
+    assert module.main([str(mismatched_classes)]) == 2
+    assert "class contents" in capsys.readouterr().err
+
+
+def test_unreadable_exemption_manifest_fails_closed(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_module()
+    report = tmp_path / "coverage.xml"
+    _report(report, covered=2, valid=2)
+    unreadable_manifest = tmp_path / "manifest-directory"
+    unreadable_manifest.mkdir()
+
+    assert (
+        module.main(
+            [
+                str(report),
+                "--class-exemptions",
+                str(report),
+                "examples",
+                str(unreadable_manifest),
+            ]
+        )
+        == 2
+    )
+    assert "cannot read class exemptions" in capsys.readouterr().err
+
+
 def test_class_branch_rate_fails_even_when_aggregate_rate_passes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -146,7 +209,7 @@ def test_class_branch_rate_fails_even_when_aggregate_rate_passes(
     assert "coverage.xml: 90.00% branch coverage (18/20)" in output.out
 
 
-def test_report_scoped_class_exemption_preserves_aggregate_enforcement(
+def test_report_scoped_class_exemption_removes_alternate_gated_code_from_aggregate(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -192,11 +255,11 @@ def test_report_scoped_class_exemption_preserves_aggregate_enforcement(
         == 0
     )
     output = capsys.readouterr()
-    assert "aggregate branch coverage: 90.00% (18/20)" in output.out
+    assert "aggregate branch coverage: 100.00% (10/10)" in output.out
     assert output.err == ""
 
 
-def test_class_exemption_does_not_remove_counts_from_aggregate(
+def test_class_exemption_cannot_remove_every_enforced_branch(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     module = _load_module()
@@ -217,11 +280,11 @@ def test_class_exemption_does_not_remove_counts_from_aggregate(
                 str(manifest),
             ]
         )
-        == 1
+        == 2
     )
     output = capsys.readouterr()
     assert "module.py: 80.00%" not in output.err
-    assert "ERROR: aggregate branch coverage: 80.00%" in output.err
+    assert "ERROR: no enforceable branch coverage remains" in output.err
 
 
 @pytest.mark.parametrize(

@@ -161,6 +161,88 @@ def test_input_binding_requires_mapping_comparison() -> None:
         )
 
 
+def test_input_binding_requires_mapping_artifact_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        publication, "dataset_preparation_binding_errors", lambda *_args: []
+    )
+
+    with pytest.raises(EvidencePackError, match="baseline artifact is invalid"):
+        publication._validate_input_bindings(
+            {
+                "comparison": {
+                    "policy": "inputs/policy.json",
+                    "baseline": {"artifact": []},
+                    "subject": {"artifact": {}},
+                }
+            },
+            schedule=object(),  # type: ignore[arg-type]
+            identities={
+                "baseline_runtime": InputIdentity(_digest("a"), locator="runtime:a"),
+                "subject_runtime": InputIdentity(_digest("b"), locator="runtime:b"),
+            },
+            baseline_evidence=object(),  # type: ignore[arg-type]
+            subject_evidence=object(),  # type: ignore[arg-type]
+        )
+
+
+def test_runtime_preflight_surfaces_closed_config_binding_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "fixture").mkdir()
+    _pack, _policy, _fingerprint, _runtimes, _key, arguments = _publish(
+        tmp_path / "fixture"
+    )
+    staging = tmp_path / "staging"
+    baseline = arguments["baseline_evidence"]
+    assert isinstance(baseline, publication.RuntimeSideEvidence)
+    for relative, payload in publication._side_payloads("baseline", baseline).items():
+        path = staging / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    monkeypatch.setattr(
+        publication,
+        "verify_runtime_manifest_snapshot",
+        lambda *_args, **_kwargs: SimpleNamespace(errors=()),
+    )
+    monkeypatch.setattr(
+        publication,
+        "runtime_side_config_errors",
+        lambda *_args, **_kwargs: ["runtime config binding mismatch"],
+    )
+
+    with pytest.raises(EvidencePackError, match="config binding mismatch"):
+        publication._preflight_runtime_side(
+            staging,
+            side="baseline",
+            runtime_digest="sha256:" + "a" * 64,
+            provider_name="llama_cpp",
+            schedule_sha256="b" * 64,
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+
+def test_failed_publication_removes_private_staging_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "fixture").mkdir()
+    _pack, _policy, _fingerprint, _runtimes, _key, arguments = _publish(
+        tmp_path / "fixture"
+    )
+    destination = tmp_path / "rejected"
+    monkeypatch.setattr(
+        publication,
+        "_publish_directory_no_clobber",
+        lambda *_args: (_ for _ in ()).throw(EvidencePackError("rejected")),
+    )
+
+    with pytest.raises(EvidencePackError, match="rejected"):
+        publication.publish_comparison_evidence(destination, **arguments)
+
+    assert list(tmp_path.glob(".rejected.*.staging")) == []
+
+
 def test_publication_enforces_observation_inventory_bound(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

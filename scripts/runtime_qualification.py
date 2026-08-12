@@ -1057,9 +1057,10 @@ def _captured_request(
 
 
 def _fresh_destination(path: Path, *, label: str) -> Path:
-    candidate = Path(os.path.abspath(os.fspath(path)))
-    if candidate.name in {"", ".", ".."}:
+    supplied = Path(path)
+    if supplied.name in {"", ".", ".."}:
         raise QualificationError("configuration", f"{label} must name a file")
+    candidate = Path(os.path.abspath(os.fspath(supplied)))
     current = Path(candidate.anchor)
     for part in candidate.parent.parts[1:]:
         current /= part
@@ -2111,10 +2112,7 @@ def _inputs(arguments: argparse.Namespace) -> QualificationInputs:
         raise QualificationError(
             "configuration", "request parent must be an existing directory"
         ) from exc
-    evidence = _fresh_destination(
-        Path(os.path.abspath(os.fspath(arguments.evidence))),
-        label="evidence destination",
-    )
+    evidence_candidate = Path(os.path.abspath(os.fspath(arguments.evidence)))
     trust_profile = Path(os.path.abspath(os.fspath(arguments.trust_profile)))
     canary_evidence_argument = getattr(arguments, "canary_evidence", None)
     canary_receipt_argument = getattr(arguments, "canary_receipt", None)
@@ -2134,41 +2132,53 @@ def _inputs(arguments: argparse.Namespace) -> QualificationInputs:
         if canary_trust_profile_argument is not None
         else None
     )
-    receipt = _fresh_destination(
-        Path(os.path.abspath(os.fspath(arguments.receipt))),
-        label="verification receipt",
-    )
-    report = (
-        _fresh_destination(
-            Path(os.path.abspath(os.fspath(arguments.report))),
-            label="qualification report",
-        )
+    receipt_candidate = Path(os.path.abspath(os.fspath(arguments.receipt)))
+    report_candidate = (
+        Path(os.path.abspath(os.fspath(arguments.report)))
         if arguments.report is not None
         else None
     )
     summary_argument = getattr(arguments, "summary", None)
-    summary = (
-        _fresh_destination(
-            Path(os.path.abspath(os.fspath(summary_argument))),
-            label="qualification summary",
-        )
+    summary_candidate = (
+        Path(os.path.abspath(os.fspath(summary_argument)))
         if summary_argument is not None
         else None
     )
-    outputs = [receipt, *(path for path in (report, summary) if path is not None)]
-    if len(set(outputs)) != len(outputs):
+    output_candidates = [
+        receipt_candidate,
+        *(path for path in (report_candidate, summary_candidate) if path is not None),
+    ]
+    if len(set(output_candidates)) != len(output_candidates):
         raise QualificationError(
             "configuration", "receipt, report, and summary must be distinct outputs"
         )
-    for output in outputs:
+    for output in output_candidates:
         try:
-            output.relative_to(evidence)
+            output.relative_to(evidence_candidate)
         except ValueError:
             continue
         raise QualificationError(
             "configuration",
             "qualification outputs must remain outside the immutable evidence pack",
         )
+    evidence = _fresh_destination(
+        evidence_candidate,
+        label="evidence destination",
+    )
+    receipt = _fresh_destination(
+        receipt_candidate,
+        label="verification receipt",
+    )
+    report = (
+        _fresh_destination(report_candidate, label="qualification report")
+        if report_candidate is not None
+        else None
+    )
+    summary = (
+        _fresh_destination(summary_candidate, label="qualification summary")
+        if summary_candidate is not None
+        else None
+    )
     engine_path = shutil.which(arguments.container_engine)
     if engine_path is None:
         raise QualificationError(

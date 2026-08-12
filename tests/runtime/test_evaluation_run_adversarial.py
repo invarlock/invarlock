@@ -24,6 +24,7 @@ from invarlock.core.runtime_provider import (
     canonical_runtime_behavioral_schedule_json,
 )
 from invarlock.evaluation_runtime import RuntimeResourceResolver
+from invarlock.evidence_pack_json import StrictJsonError
 
 _BASELINE_DIGEST = "sha256:" + "a" * 64
 _SUBJECT_DIGEST = "sha256:" + "b" * 64
@@ -273,3 +274,68 @@ def test_load_runtime_side_evidence_rejects_symlinked_bundle_root(
 
     with pytest.raises(ValueError, match="output directory must not be a symlink"):
         evaluation_run.load_runtime_side_evidence(linked_root)
+
+
+def test_load_runtime_side_evidence_rejects_nonregular_closed_entry(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    names = {
+        "report.json",
+        "runtime.manifest.json",
+        "run.yaml",
+        "model-artifact.identity.json",
+        "runtime-provider.receipt.json",
+        "runtime-scoring.observation.json",
+    }
+    for name in names - {"report.json"}:
+        output.joinpath(name).write_bytes(b"{}")
+    output.joinpath("report.json").mkdir()
+
+    with pytest.raises(ValueError, match="run report must be a regular file"):
+        evaluation_run.load_runtime_side_evidence(output)
+
+
+def test_runtime_side_read_errors_are_exposed_as_transaction_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    names = {
+        "report.json",
+        "runtime.manifest.json",
+        "run.yaml",
+        "model-artifact.identity.json",
+        "runtime-provider.receipt.json",
+        "runtime-scoring.observation.json",
+    }
+    for name in names:
+        output.joinpath(name).write_bytes(b"{}")
+    monkeypatch.setattr(
+        evaluation_run,
+        "read_regular_file_bytes",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            StrictJsonError("runtime output changed")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="runtime output changed"):
+        evaluation_run.load_runtime_side_evidence(output)
+
+
+def test_runtime_comparison_rejects_schedule_before_provider_lookup(
+    tmp_path: Path,
+) -> None:
+    class UnusedRegistry:
+        def get_runtime_provider(self, _name: str) -> RuntimeProvider:
+            pytest.fail("invalid schedules must fail before provider lookup")
+
+    with pytest.raises(ValueError, match="canonical schedule is invalid"):
+        evaluation_run.execute_runtime_comparison(
+            _request(tmp_path),
+            registry=cast(CoreRegistry, UnusedRegistry()),
+            resource_resolver=cast(RuntimeResourceResolver, _Resolver()),
+            schedule_bytes=b"not-json",
+            policy_digest="sha256:" + "c" * 64,
+        )

@@ -9,18 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a five-minute CPU-only wheel-user workflow that verifies retained
+  signed evidence, issues a fresh verifier receipt, renders HTML, and runs from
+  versioned example files outside the installed package.
 - Added an exact-match `minimum_side_accuracy` policy control and a versioned
   comparison-report v3 field that records both side results.
 - Added retained CPU-only signed OCI transactions for LM Evaluation Harness and
   Inspect AI, including 102 paired records, native evaluator provenance,
   independently signed verification receipts, policies, and builder-signed
   image attestations.
+- Added reproducible CPU verification-time, report-rendering-time, and retained
+  artifact-size measurements for both 102-record flagship transactions.
 - Added an example-layer evaluator transaction framework with source-specific
   native adapters, source-bound image construction, caller-owned signing and
   trust inputs, and cleanup of temporary container images.
-- Added a protected CI deployment-approval example that reauthenticates the
-  retained Inspect AI receipt against separately supplied recipient anchors
-  before an exact candidate can be deployed.
+- Added a standalone protected CI deployment-consumer fixture that
+  reauthenticates the retained Inspect AI receipt against separately supplied
+  recipient anchors before an exact candidate can be deployed.
 - Added one bounded examples-layer command runner with timeout, output-limit,
   cleanup, and nonzero-exit handling across maintained integration commands.
 
@@ -50,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded documentation checks to discover every tracked Markdown file and
   reject machine-specific paths, credential-like values, and review-process
   wording before publication.
+- Raised aggregate and per-module statement and branch coverage requirements to
+  95% across the engine, add-ins, qualification and release tooling, maintained
+  examples, and repository checks.
 
 ### Removed
 

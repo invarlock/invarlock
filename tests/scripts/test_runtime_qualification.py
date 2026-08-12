@@ -176,8 +176,19 @@ elif arguments[:3] == ["-m", "invarlock", "evaluate"]:
     else:
         fail("evaluation")
         Path(control["evidence"]).mkdir()
+        if control.get("binding_mutation") == "request_changed":
+            captured_request = Path(arguments[3])
+            captured_request.unlink()
+            captured_request.write_text("changed request\\n", encoding="utf-8")
+        published_evidence = control["evidence"]
+        if control.get("binding_mutation") == "evaluation_relative":
+            published_evidence = Path(published_evidence).name
+        elif control.get("binding_mutation") == "evaluation_destination":
+            published_evidence = str(
+                Path(published_evidence).with_name("other-evidence")
+            )
         print(json.dumps({{
-            "evidence": control["evidence"],
+            "evidence": published_evidence,
             "format_version": "invarlock/evaluation-result-v1",
             "ok": True,
             "pack_manifest_digest": {PACK_DIGEST!r},
@@ -206,7 +217,11 @@ elif arguments[:3] == ["-m", "invarlock", "verify"]:
         "format_version": "invarlock/evidence-pack-verify-v1",
         "integrity_ok": True,
         "ok": True,
-        "pack_manifest_digest": {PACK_DIGEST!r},
+        "pack_manifest_digest": (
+            "sha256:" + "9" * 64
+            if control.get("binding_mutation") == "verification_pack"
+            else {PACK_DIGEST!r}
+        ),
         "policy_verdict": "pass",
         "request_digest": "sha256:" + "7" * 64,
         "reports_verified": True,
@@ -239,6 +254,8 @@ elif arguments[:3] == ["-m", "invarlock", "verify"]:
 elif arguments[:3] == ["-m", "invarlock", "report"]:
     fail("report")
     report = Path(arguments[arguments.index("--html") + 1])
+    if control.get("binding_mutation") == "receipt_changed":
+        Path(control["receipt"]).write_text("changed receipt\\n", encoding="utf-8")
     report.write_text("<html>qualified</html>\\n", encoding="utf-8")
     report_pack = (
         "sha256:" + "9" * 64
@@ -247,7 +264,11 @@ elif arguments[:3] == ["-m", "invarlock", "report"]:
     )
     print(json.dumps({{
         "format_version": "invarlock/evidence-report-v1",
-        "html": str(report),
+        "html": (
+            str(report.with_name("other-report.html"))
+            if control.get("binding_mutation") == "report_destination"
+            else str(report)
+        ),
         "ok": True,
         "pack_manifest_digest": report_pack,
     }}))
@@ -367,6 +388,7 @@ def _write_control(
                 "evidence": str(paths["evidence"].absolute()),
                 "failure_stage": failure_stage,
                 "preflight_output": preflight_output,
+                "receipt": str(paths["receipt"]),
                 "runtime_source_commit": runtime_source_commit,
                 "source_bundle_digest": "sha256:"
                 + hashlib.sha256(paths["source_bundle"].read_bytes()).hexdigest(),
@@ -453,11 +475,19 @@ def _execute(
     binding_mutation: str | None = None,
     report: bool = False,
     runtime_source_commit: str = SOURCE_COMMIT,
-    relative_preflight_output: bool = False,
+    preflight_output: str = "bound",
     canary_runtime_digest: str | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, Path], Path]:
     python, log = _fake_python(tmp_path)
     paths = _inputs(tmp_path)
+    if preflight_output == "bound":
+        controlled_preflight_output = None
+    elif preflight_output == "relative":
+        controlled_preflight_output = paths["evidence"].name
+    elif preflight_output == "mismatched":
+        controlled_preflight_output = str(tmp_path / "other-evidence")
+    else:
+        raise ValueError(f"unknown preflight output mode: {preflight_output}")
     _write_control(
         tmp_path,
         paths,
@@ -465,9 +495,7 @@ def _execute(
         verified_trust=verified_trust,
         binding_mutation=binding_mutation,
         runtime_source_commit=runtime_source_commit,
-        preflight_output=(
-            paths["evidence"].name if relative_preflight_output else None
-        ),
+        preflight_output=controlled_preflight_output,
         canary_runtime_digest=canary_runtime_digest,
     )
     completed = subprocess.run(
@@ -602,11 +630,30 @@ def test_readiness_resolves_relative_output_against_original_request_root(
     completed, paths, _log = _execute(
         tmp_path,
         mode="readiness",
-        relative_preflight_output=True,
+        preflight_output="relative",
     )
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["evidence"] == str(paths["evidence"])
+
+
+def test_readiness_rejects_a_preflight_bound_to_another_destination(
+    tmp_path: Path,
+) -> None:
+    completed, paths, log = _execute(
+        tmp_path,
+        mode="readiness",
+        preflight_output="mismatched",
+    )
+
+    assert completed.returncode == 2
+    failure = json.loads(completed.stderr)
+    assert failure["stage"] == "preflight_binding"
+    assert "does not match --evidence" in failure["errors"][0]
+    invocations = _qualified_invocations(log)
+    assert len(invocations) == 2
+    assert "--preflight" in invocations[-1]["arguments"]
+    assert not paths["evidence"].exists()
 
 
 def test_missing_precheck_dependency_is_a_structured_stage_failure(
@@ -1108,6 +1155,46 @@ def test_run_rejects_a_renderer_pack_substitution(tmp_path: Path) -> None:
     failure = json.loads(completed.stderr)
     assert failure["stage"] == "report_binding"
     assert not paths["summary"].exists()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "stage", "report"),
+    (
+        ("evaluation_destination", "evaluation_binding", False),
+        ("request_changed", "evaluation_binding", False),
+        ("verification_pack", "verification_binding", False),
+        ("report_destination", "report_binding", True),
+        ("receipt_changed", "report_binding", True),
+    ),
+)
+def test_run_rejects_cross_stage_binding_drift(
+    tmp_path: Path,
+    mutation: str,
+    stage: str,
+    report: bool,
+) -> None:
+    completed, paths, _log = _execute(
+        tmp_path,
+        binding_mutation=mutation,
+        report=report,
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr)["stage"] == stage
+    assert not paths["summary"].exists()
+
+
+def test_run_accepts_request_relative_evidence_publication(tmp_path: Path) -> None:
+    completed, paths, _log = _execute(
+        tmp_path,
+        binding_mutation="evaluation_relative",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["evidence"]["pack_manifest_digest"] == (
+        PACK_DIGEST
+    )
+    assert paths["summary"].is_file()
 
 
 def test_child_environment_drops_caller_path_shadow(

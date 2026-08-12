@@ -4,6 +4,7 @@ import base64
 import copy
 import hashlib
 import json
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -186,6 +187,14 @@ def _resign_receipt(
             ),
             "not a supported contract set",
         ),
+        (
+            lambda: target._contract_release(
+                1,
+                "invarlock/evidence-pack-v1",
+                "invarlock/comparison-report-v1",
+            ),
+            "not a supported contract set",
+        ),
     ],
 )
 def test_scalar_contract_helpers_fail_closed(action: Any, message: str) -> None:
@@ -278,6 +287,32 @@ def test_no_clobber_and_invalid_evidence_are_rejected(tmp_path: Path) -> None:
         )
 
 
+def test_writer_rejects_receipt_bound_to_a_different_manifest(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence"
+    shutil.copytree(EVIDENCE, evidence)
+    manifest_path = evidence / "manifest.json"
+    manifest_path.chmod(0o644)
+    manifest = _object(manifest_path)
+    manifest["comparison_id"] = "different-comparison"
+    manifest_path.write_bytes(_canonical(manifest))
+    private = tmp_path / "envelope-signer.pem"
+    _write_private_key(private, _private_key())
+
+    with pytest.raises(
+        AcceptanceAttestationError,
+        match="receipt does not bind the supplied evidence manifest",
+    ):
+        target.write_acceptance_attestation(
+            GOLDEN / "verification.receipt.json",
+            evidence,
+            tmp_path / "acceptance.json",
+            signing_key_path=private,
+            signer_identity="recipient-tests/envelope",
+            policy_identity="recipient-tests/policy",
+            issued_at=ISSUED_AT,
+        )
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
@@ -346,6 +381,10 @@ def test_no_clobber_and_invalid_evidence_are_rejected(tmp_path: Path) -> None:
             lambda receipt: receipt["signature"].__setitem__("value", "***"),
             "signature verification",
         ),
+        (
+            lambda receipt: receipt["signature"].__setitem__("value", None),
+            "signature verification",
+        ),
     ],
 )
 def test_embedded_receipt_malformed_inputs_are_rejected(
@@ -377,6 +416,19 @@ def test_embedded_receipt_rejects_wrong_key_type_and_fingerprint() -> None:
     receipt["statement"]["verifier"]["signing_key_fingerprint"] = "sha256:" + "0" * 64
     with pytest.raises(AcceptanceAttestationError, match="does not match"):
         target._authenticate_receipt(receipt)
+
+
+def test_embedded_receipt_authenticates_optional_trust_profile_digest() -> None:
+    receipt = _object(GOLDEN / "verification.receipt.json")
+    receipt["statement"]["verifier"]["trust_profile_digest"] = "sha256:" + "a" * 64
+    key = _private_key()
+    _resign_receipt(receipt, key)
+
+    statement, identity, fingerprint = target._authenticate_receipt(receipt)
+
+    assert statement["verifier"]["trust_profile_digest"] == "sha256:" + "a" * 64
+    assert identity == "recipient-tests/verifier"
+    assert fingerprint == public_key_fingerprint(key.public_key())
 
 
 def test_bound_object_rejects_unsafe_and_unbound_references() -> None:
@@ -680,6 +732,35 @@ def test_receipt_consistency_reports_every_redundant_binding() -> None:
     assert any("receipt digest" in error for error in errors)
     assert any("evaluation source digest" in error for error in errors)
     assert any("policy digest" in error for error in errors)
+
+
+def test_receipt_consistency_rejects_raw_content_encoding_and_projection_drift() -> (
+    None
+):
+    content_drift = _statement()["predicate"]
+    content_drift["receipt"]["content"]["statement"]["verdict"]["ok"] = False
+    authenticated, errors = target._receipt_consistency_errors(content_drift)
+    assert authenticated is False
+    assert "raw bytes disagree with content" in " ".join(errors)
+
+    invalid_raw = _statement()["predicate"]
+    invalid_raw["receipt"]["raw_base64"] = "***"
+    authenticated, errors = target._receipt_consistency_errors(invalid_raw)
+    assert authenticated is False
+    assert "raw bytes are invalid" in " ".join(errors)
+
+    projection_drift = _statement()["predicate"]
+    projection_drift["baseline"]["extra"] = True
+    authenticated, errors = target._receipt_consistency_errors(projection_drift)
+    assert authenticated is True
+    assert "artifact disagrees with embedded identity" in " ".join(errors)
+
+
+def test_recipient_policy_path_loads_one_authenticated_object(tmp_path: Path) -> None:
+    policy = tmp_path / "policy.json"
+    policy.write_bytes(_canonical({"format": "fixture-policy"}))
+
+    assert target._load_policy(policy) == {"format": "fixture-policy"}
 
 
 @pytest.mark.parametrize("anchor_value", [None, {"artifact_digests": None}])

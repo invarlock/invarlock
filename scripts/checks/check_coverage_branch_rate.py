@@ -228,8 +228,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         nargs=3,
         metavar=("REPORT", "SOURCE_ROOT", "MANIFEST"),
         help=(
-            "waive per-class enforcement for exact entries in MANIFEST, after "
-            "removing SOURCE_ROOT, only for REPORT; aggregate coverage is unchanged"
+            "bind exact entries in MANIFEST to documented alternate execution "
+            "gates for REPORT after removing SOURCE_ROOT; those entries are omitted "
+            "from per-class and aggregate branch-coverage calculations"
         ),
     )
     args = parser.parse_args(argv)
@@ -271,10 +272,34 @@ def main(argv: list[str] | None = None) -> int:
                     f"required: {args.minimum:.2f}%"
                 )
 
+    enforced_counts: list[CoverageCounts] = []
+    for path, report in reports:
+        class_exemptions = exemptions_by_report.get(path.resolve(), frozenset())
+        exempt_counts = CoverageCounts(
+            covered=sum(
+                class_coverage.counts.covered
+                for class_coverage in report.classes
+                if class_coverage.name in class_exemptions
+            ),
+            valid=sum(
+                class_coverage.counts.valid
+                for class_coverage in report.classes
+                if class_coverage.name in class_exemptions
+            ),
+        )
+        enforced_counts.append(
+            CoverageCounts(
+                covered=report.counts.covered - exempt_counts.covered,
+                valid=report.counts.valid - exempt_counts.valid,
+            )
+        )
     total = CoverageCounts(
-        covered=sum(report.counts.covered for _, report in reports),
-        valid=sum(report.counts.valid for _, report in reports),
+        covered=sum(counts.covered for counts in enforced_counts),
+        valid=sum(counts.valid for counts in enforced_counts),
     )
+    if total.valid <= 0:
+        print("ERROR: no enforceable branch coverage remains", file=sys.stderr)
+        return 2
     summary = (
         f"aggregate branch coverage: {total.rate:.2f}% "
         f"({total.covered}/{total.valid}); required: {args.minimum:.2f}%"

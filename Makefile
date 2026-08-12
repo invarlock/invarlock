@@ -53,9 +53,14 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/evidence_reporting.py \
 	src/invarlock/evidence_verification.py
 
+RELEASE_EXAMPLE_COVERAGE_FILES := \
+	examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
+	examples/evaluator-qualification/measure_signed_transactions.py \
+	examples/quickstart/run.py
+
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
@@ -63,7 +68,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
 .PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
-.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke packaging-smoke-minimal packaging-smoke-front-door
+.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
@@ -121,11 +126,11 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 	COVERAGE_FILE=$(COVERAGE_CORE_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
-		--cov-report=xml:reports/cov.xml --cov-fail-under=90
+		--cov-report=xml:reports/cov.xml --cov-fail-under=95
 	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-linux-check:
@@ -136,29 +141,29 @@ coverage-linux-check:
 
 coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src \
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:. \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests \
 		--cov --cov-config=scripts/addins.coveragerc \
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/diagnostics/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/gguf/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/multimodal/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
-		--fail-under=90
+		--fail-under=95
 	@git ls-files 'addins/*/src/**/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-qualification:  ## Enforce branch-aware coverage for qualification tooling
@@ -177,23 +182,23 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 		--cov --cov-config=scripts/qualification.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/authenticated_runtime_build.py' --fail-under=90
+		--include='scripts/authenticated_runtime_build.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_precheck.py' --fail-under=90
+		--include='scripts/qualification_precheck.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_candidate_wheels.py' --fail-under=90
+		--include='scripts/qualification_candidate_wheels.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_receipt_check.py' --fail-under=90
+		--include='scripts/qualification_receipt_check.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_render_preflight.py' --fail-under=90
+		--include='scripts/qualification_render_preflight.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_source.py' --fail-under=90
+		--include='scripts/qualification_source.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/runtime_qualification.py' --fail-under=90
+		--include='scripts/runtime_qualification.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=90
+		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=95
 
 coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage erase
@@ -209,33 +214,40 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		--cov --cov-config=scripts/release.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/first_party_distribution_validation.py' --fail-under=90
+		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_distribution_validation.py' --fail-under=90
+		--include='scripts/release/release_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_preflight.py' --fail-under=90
+		--include='scripts/release/release_preflight.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/tagged_release_candidate.py' --fail-under=90
+		--include='scripts/release/tagged_release_candidate.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/verify_hosted_distributions.py' --fail-under=90
+		--include='scripts/release/verify_hosted_distributions.py' --fail-under=95
 
 coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/examples \
 		--cov=examples \
+		--cov-config=scripts/examples.coveragerc \
 		--cov-branch \
 		--cov-report=term-missing \
-		--cov-report=xml:reports/examples-cov.xml \
-		--cov-fail-under=90
+		--cov-report=xml:reports/examples-cov.xml
+	@exemptions="$$(grep -Ev '^(#|$$)' examples/coverage-exemptions.txt | paste -sd, -)"; \
+		test -n "$$exemptions"; \
+		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report \
+			--omit="$$exemptions" --fail-under=95
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
 			if grep -Fqx "$$source" examples/coverage-exemptions.txt; then continue; fi; \
-			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
+	@for source in $(RELEASE_EXAMPLE_COVERAGE_FILES); do \
+		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
+	done
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
@@ -256,11 +268,11 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		--cov --cov-config=scripts/maintenance.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/maintenance-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' \
 		'scripts/prepare_qualification_suites.py' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-enforce: PYTEST_WORKERS = 2
@@ -272,7 +284,7 @@ coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in para
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
-		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90 \
+		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 95 \
 		--class-exemptions reports/examples-cov.xml examples \
 		examples/coverage-exemptions.txt
 
@@ -286,8 +298,6 @@ trust-smoke:  ## Exercise pack tamper rejection and signed receipt verification
 compatibility-test:  ## Replay the permanent v0.13 compatibility corpus
 	PYTHONPATH=src $(PYTEST) -q tests/compatibility
 
-mutation-smoke: trust-smoke  ## CI alias for the trust-critical adversarial smoke
-
 trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example transaction
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py
 
@@ -295,6 +305,10 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 
 example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
+
+example-quickstart:  ## Verify signed fixture evidence and issue a fresh receipt
+	PYTHONPATH=src $(PYTHON) examples/quickstart/run.py \
+		--fixture examples/acceptance-handoff/golden
 
 evaluator-qualification:  ## Requalify the retained evaluator matrix offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
@@ -611,7 +625,27 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		$(PYTHON) -m venv "$$smoke_venv"; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl; \
+		"$$smoke_venv/bin/python" -m pip check; \
+		consumer_root="$$smoke_venv/quickstart-consumer"; \
+		mkdir "$$consumer_root"; \
+		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
+		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
+		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" run.py --fixture golden ); \
+		approval_root="$$smoke_venv/deployment-consumer"; \
+		cp -R examples/ci/standalone-consumer "$$approval_root"; \
+		mkdir "$$approval_root/incoming"; \
+		cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence "$$approval_root/incoming/evidence"; \
+		cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json "$$approval_root/incoming/verification.receipt.json"; \
+		( cd "$$approval_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" review/verify_deployment_receipt.py \
+			--approval-inputs review/inspect-ai-deployment-approval-inputs.json \
+			--evidence incoming/evidence \
+			--policy review/policy/acceptance.json \
+			--receipt incoming/verification.receipt.json \
+			--output deployment-approval.json ); \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/addins/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.gguf.conformance; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.multimodal.conformance; \
@@ -620,6 +654,8 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
+
+quickstart-wheel-smoke: addins-install-smoke  ## Run the five-minute flow from built wheels
 
 packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifacts
 

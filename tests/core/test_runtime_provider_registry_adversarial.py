@@ -142,6 +142,19 @@ def test_entry_point_without_distribution_uses_module_package_fallback(
     assert info.version is None
 
 
+def test_candidate_entry_point_requires_distribution_location_metadata(
+    tmp_path,  # noqa: ANN001
+) -> None:
+    entry = SimpleNamespace(dist=SimpleNamespace(locate_file=None))
+
+    assert (
+        registry_module._entry_point_is_from(  # noqa: SLF001
+            cast(EntryPoint, entry), candidate_site=tmp_path
+        )
+        is False
+    )
+
+
 def test_entry_point_class_resolution_uses_deferred_loader() -> None:
     class Provider:
         pass

@@ -9,20 +9,22 @@ domains:
 - `production` owns deployment approval inputs and independently checks the
   signed receipt before running the deployment command.
 
-[`github-actions/deployment-approval.yml`](github-actions/deployment-approval.yml)
-is a consumer workflow template. Replace the example policy, requirements,
-candidate, and deployment-script paths with repository-owned equivalents. Keep
-the action and third-party actions pinned to immutable commits.
+[`standalone-consumer/`](standalone-consumer/) is a copyable consumer-repository
+fixture. Its workflow, policy, recipient anchors, and receipt checker do not
+import helper code from the InvarLock source tree. Replace the demonstration
+requirements, evidence, candidate resolver, deployment adapter, and trust
+inputs with repository-owned equivalents. Keep the action and third-party
+actions pinned to immutable commits.
 
 The checked-in behavioral example consumes the retained Inspect AI evidence
 pack and signed verification receipt. Its separate example recipient anchors
 live in
-[`inspect-ai-deployment-approval-inputs.json`](inspect-ai-deployment-approval-inputs.json),
+[`inspect-ai-deployment-approval-inputs.json`](standalone-consumer/review/inspect-ai-deployment-approval-inputs.json),
 outside the submitted evidence. The fixture makes the flagship evaluator path
 concrete; production deployments must obtain the same classes of anchors
 through recipient-controlled channels.
 
-`verify_deployment_receipt.py` accepts an
+`standalone-consumer/review/verify_deployment_receipt.py` accepts an
 `invarlock/deployment-approval-inputs-v1` object containing exactly:
 
 - baseline and subject artifact digests;
@@ -54,10 +56,10 @@ python -m pytest -q tests/examples/test_ci_deployment_approval_example.py
 Or exercise the retained Inspect transaction directly:
 
 ```bash
-python examples/ci/verify_deployment_receipt.py \
-  --approval-inputs examples/ci/inspect-ai-deployment-approval-inputs.json \
+python examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
+  --approval-inputs examples/ci/standalone-consumer/review/inspect-ai-deployment-approval-inputs.json \
   --evidence examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
-  --policy examples/evaluator-qualification/signed-transactions/inspect-ai/policy.json \
+  --policy examples/ci/standalone-consumer/review/policy/acceptance.json \
   --receipt examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json
 ```
 

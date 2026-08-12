@@ -281,6 +281,28 @@ def test_verify_distribution_ledger_rejects_missing_nonregular_and_symlink(
         candidate.verify_distribution_ledger(tmp_path, TAG)
 
 
+def test_regular_file_reader_detects_size_change_during_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ledger = tmp_path / "SHA256SUMS"
+    ledger.write_bytes(b"original\n")
+    read_bytes = Path.read_bytes
+
+    monkeypatch.setattr(
+        Path,
+        "read_bytes",
+        lambda self: b"changed length\n" if self == ledger else read_bytes(self),
+    )
+
+    with pytest.raises(candidate.CandidateError, match="changed while it was read"):
+        candidate._regular_file_bytes(
+            ledger,
+            label="distribution digest ledger",
+            size_limit=1024,
+        )
+
+
 def test_github_output_helpers_emit_only_validated_scalars(tmp_path: Path) -> None:
     output = tmp_path.parent / f"{tmp_path.name}-github-output"
 

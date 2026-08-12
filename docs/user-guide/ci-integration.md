@@ -157,7 +157,7 @@ receipt, reauthenticate it against production-owned verifier and policy
 anchors, and deploy only the exact candidate bound by that receipt.
 
 The maintained
-[`deployment-approval.yml`](https://github.com/invarlock/invarlock/blob/main/examples/ci/github-actions/deployment-approval.yml)
+[`deployment-approval.yml`](https://github.com/invarlock/invarlock/blob/main/examples/ci/standalone-consumer/.github/workflows/deployment-approval.yml)
 example implements that separation:
 
 1. `verify-evidence` runs in the protected `release-review` environment and
@@ -165,7 +165,7 @@ example implements that separation:
 2. `deploy-candidate` depends on that successful job and enters a separate
    protected `production` environment.
 3. The deployment job downloads the artifact and runs
-   `examples/ci/verify_deployment_receipt.py` against production-owned approval
+   `review/verify_deployment_receipt.py` against production-owned approval
    inputs. The helper authenticates the receipt signature, verifier identity
    and fingerprint, evidence signer, artifact identities, schedule, runtimes,
    and policy digest.

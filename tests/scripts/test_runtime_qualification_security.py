@@ -74,6 +74,48 @@ def test_configuration_rejects_summary_alias_that_resolves_inside_evidence(
         )
 
 
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("runtime-image", "must equal or embed"),
+        ("request-parent", "request parent must be an existing directory"),
+        ("duplicate-outputs", "must be distinct outputs"),
+        ("inside-evidence", "outside the immutable evidence pack"),
+        ("missing-engine", "container engine is unavailable"),
+    ),
+)
+def test_configuration_rejects_invalid_output_and_runtime_boundaries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    evidence = tmp_path / "future-evidence"
+    arguments = _arguments(
+        tmp_path,
+        evidence=evidence,
+        summary=tmp_path / "summary.json",
+    )
+    monkeypatch.setattr(
+        runtime_qualification,
+        "_authenticate_source_bundle",
+        lambda *_args, **_kwargs: "sha256:" + "d" * 64,
+    )
+    if case == "runtime-image":
+        arguments.runtime_image = "mutable:latest"
+    elif case == "request-parent":
+        arguments.request = tmp_path / "missing" / "request.yaml"
+    elif case == "duplicate-outputs":
+        arguments.receipt = arguments.summary
+    elif case == "inside-evidence":
+        arguments.receipt = evidence / "verification-receipt.json"
+    else:
+        monkeypatch.setattr(runtime_qualification.shutil, "which", lambda _name: None)
+
+    with pytest.raises(runtime_qualification.QualificationError, match=message):
+        runtime_qualification._inputs(arguments)  # noqa: SLF001
+
+
 def test_fresh_destination_rejects_an_ancestor_symlink(
     tmp_path: Path,
 ) -> None:
@@ -88,6 +130,15 @@ def test_fresh_destination_rejects_an_ancestor_symlink(
     ):
         runtime_qualification._fresh_destination(  # noqa: SLF001
             alias / "nested" / "summary.json",
+            label="qualification summary",
+        )
+
+    with pytest.raises(
+        runtime_qualification.QualificationError,
+        match="must name a file",
+    ):
+        runtime_qualification._fresh_destination(  # noqa: SLF001
+            Path("."),
             label="qualification summary",
         )
 

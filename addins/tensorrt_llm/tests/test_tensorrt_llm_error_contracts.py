@@ -150,6 +150,66 @@ def test_pinned_file_rejects_size_mode_and_digest_drift(tmp_path: Path) -> None:
         pinned.recheck()
 
 
+@pytest.mark.skipif(
+    os.name != "posix" or not hasattr(os, "O_NOFOLLOW"),
+    reason="secure file pinning requires POSIX nofollow support",
+)
+def test_pinned_file_rejects_untrusted_parent_and_open_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "runner"
+    candidate.write_bytes(b"authenticated-runner")
+
+    real_open = execution.os.open
+    monkeypatch.setattr(
+        execution.os,
+        "open",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="root cannot"):
+        execution._PinnedFile.open(  # noqa: SLF001
+            candidate,
+            expected_sha256=None,
+            require_executable=False,
+        )
+
+    monkeypatch.setattr(execution.os, "open", real_open)
+    monkeypatch.setattr(execution, "_parent_entry_is_protected", lambda *_args: False)
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="writable parent"):
+        execution._PinnedFile.open(  # noqa: SLF001
+            candidate,
+            expected_sha256=None,
+            require_executable=False,
+            require_secure_parents=True,
+        )
+
+    monkeypatch.undo()
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir()
+    real_parent.joinpath("runner").write_bytes(b"authenticated-runner")
+    linked_parent = tmp_path / "linked-parent"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(
+        execution.TensorRTLLMExecutionError,
+        match="symlink or inaccessible directory",
+    ):
+        execution._PinnedFile.open(  # noqa: SLF001
+            linked_parent / "runner",
+            expected_sha256=None,
+            require_executable=False,
+        )
+
+    identities = iter(((1, 2, 3), (1, 2, 4)))
+    monkeypatch.setattr(execution, "_stat_identity", lambda _value: next(identities))
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="changed while"):
+        execution._PinnedFile.open(  # noqa: SLF001
+            candidate,
+            expected_sha256=None,
+            require_executable=False,
+        )
+
+
 def test_proc_fact_reader_rejects_missing_oversized_and_non_ascii_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -223,6 +283,81 @@ def test_strict_json_accepts_canonical_finite_object() -> None:
     assert runner._strict_json_object(payload, label="request") == {  # noqa: SLF001
         "nested": [1, 2.5]
     }
+
+
+def test_static_inspection_detects_short_and_growing_pinned_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pinned = SimpleNamespace(
+        descriptor=7,
+        initial_stat=SimpleNamespace(st_size=3),
+        recheck=lambda: None,
+    )
+    monkeypatch.setattr(inspection.os, "lseek", lambda *_args: 0)
+
+    reads = iter((b"",))
+    monkeypatch.setattr(inspection.os, "read", lambda *_args: next(reads))
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="changed while"):
+        inspection._read_pinned_bytes(pinned, label="contract")  # type: ignore[arg-type]  # noqa: SLF001
+
+    reads = iter((b"abc", b"x"))
+    monkeypatch.setattr(inspection.os, "read", lambda *_args: next(reads))
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="grew while"):
+        inspection._read_pinned_bytes(pinned, label="contract")  # type: ignore[arg-type]  # noqa: SLF001
+
+
+def test_static_inspection_cleanup_is_complete_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed: list[str] = []
+
+    class Resource:
+        def __init__(self, name: str, *, fail: bool = False) -> None:
+            self.name = name
+            self.fail = fail
+            self.sha256 = "expected"
+
+        def close(self) -> None:
+            closed.append(self.name)
+            if self.fail:
+                raise OSError("close failed")
+
+    resources = inspection._ValidatedTensorRTLLMStaticInputs(  # noqa: SLF001
+        tokenizer=Resource("tokenizer", fail=True),  # type: ignore[arg-type]
+        engine_config=Resource("engine"),  # type: ignore[arg-type]
+        engine_max_batch_size=1,
+        engine_max_input_len=8,
+        engine_max_seq_len=16,
+    )
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="cleanup"):
+        resources.close()
+    assert closed == ["engine", "tokenizer"]
+
+    tokenizer = Resource("opened-tokenizer")
+    engine = Resource("opened-engine")
+    opened = iter((tokenizer, engine))
+    monkeypatch.setattr(
+        inspection._PinnedFile,
+        "open",
+        lambda *_args, **_kwargs: next(opened),
+    )
+    monkeypatch.setattr(
+        inspection,
+        "_read_pinned_bytes",
+        lambda *_args, label: b"tokenizer" if label == "tokenizer contract" else b"{}",
+    )
+    monkeypatch.setattr(
+        inspection,
+        "authenticate_tensorrt_llm_tokenizer_contract",
+        lambda _payload: "changed",
+    )
+
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="changed while"):
+        inspection._open_validated_tensorrt_llm_static_inputs(  # noqa: SLF001
+            engine_bundle_path=Path("/engine"),
+            tokenizer_contract_path=Path("/tokenizer"),
+        )
+    assert closed[-2:] == ["opened-engine", "opened-tokenizer"]
 
 
 def test_execution_identity_helpers_cover_protected_and_rejected_entries() -> None:
@@ -345,6 +480,43 @@ def test_immutable_boundary_and_run_directory_reject_changed_state(
         original.rmdir()
         moved.rename(original)
         run_directory.close()
+
+
+def test_execution_boundary_and_cleanup_reject_named_object_replacement(
+    tmp_path: Path,
+) -> None:
+    descriptor = os.open(tmp_path, os.O_RDONLY)
+    boundary = execution._ImmutableExecutionBoundary(  # noqa: SLF001
+        root_descriptor=descriptor,
+        root_initial_stat=os.fstat(descriptor),
+        mount_id=1,
+    )
+    try:
+        with pytest.raises(
+            execution.TensorRTLLMExecutionError,
+            match="root filesystem changed",
+        ):
+            boundary.recheck(  # type: ignore[arg-type]
+                SimpleNamespace(),
+                SimpleNamespace(),
+            )
+    finally:
+        boundary.close()
+
+    run_directory = execution._RunDirectory.create()  # noqa: SLF001
+    original = run_directory.path
+    moved = original.with_name(original.name + "-moved")
+    original.rename(moved)
+    original.mkdir()
+    try:
+        with pytest.raises(
+            execution.TensorRTLLMExecutionError,
+            match="cleanup failed",
+        ):
+            run_directory.close()
+    finally:
+        original.rmdir()
+        moved.rmdir()
 
 
 def test_hash_descriptor_rejects_truncation_and_growth(tmp_path: Path) -> None:
@@ -509,6 +681,53 @@ def test_runner_info_probe_rejects_exit_and_stderr(
     )
     with pytest.raises(execution.TensorRTLLMExecutionError, match="emitted stderr"):
         session._probe_runner_info_object(*resources)  # type: ignore[arg-type]  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda info: info.update({"extra": "value"}), "unexpected fields"),
+        (
+            lambda info: info.update({"backend_build_sha256": "not-a-digest"}),
+            "build identity",
+        ),
+        (lambda info: info.update({"cuda_device_name": " GPU"}), "device name"),
+        (
+            lambda info: info.update({"cuda_runtime_version": "unknown"}),
+            "runtime version",
+        ),
+    ],
+)
+def test_runner_probe_rejects_ambiguous_device_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,  # noqa: ANN001
+    message: str,
+) -> None:
+    info: dict[str, object] = {
+        "backend_build_sha256": "b" * 64,
+        "backend_name": "TensorRT-LLM",
+        "backend_version": "1.2.1",
+        "cuda_compute_capability": "9.0",
+        "cuda_device_name": "NVIDIA H200",
+        "cuda_driver_version": "570.00",
+        "cuda_runtime_version": "12.8",
+        "device_kind": "cuda",
+        "format_version": "invarlock/tensorrt-llm-runner-info-v1",
+        "protocol_version": "invarlock/tensorrt-llm-runner-v1",
+    }
+    mutation(info)
+    monkeypatch.setattr(session, "_probe_runner_info_object", lambda *_args: info)
+
+    with pytest.raises(execution.TensorRTLLMExecutionError, match=message):
+        session._probe_runner(  # type: ignore[arg-type]  # noqa: SLF001
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            expected_version="1.2.1",
+            expected_build_sha256=str(info["backend_build_sha256"]),
+            expected_compute_capability="9.0",
+        )
 
 
 @pytest.mark.parametrize(

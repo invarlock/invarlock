@@ -82,3 +82,32 @@ Run the offline verification through:
 ```bash
 make evaluator-qualification
 ```
+
+## Operational footprint
+
+The retained transactions are compact and their independent CPU verification
+does not execute either evaluator or model. This reference measurement used
+seven measured runs after one warmup on arm64 macOS with Python 3.12.12:
+
+| Transaction | Records | Evidence bytes | Complete package bytes | Verify and issue receipt, median | Render HTML, median |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LM Evaluation Harness | 102 | 277,079 | 283,562 | 94.0 ms | 38.1 ms |
+| Inspect AI | 102 | 250,958 | 257,185 | 92.0 ms | 31.6 ms |
+
+`Verify and issue receipt` performs complete semantic evidence replay against
+independent anchors and writes a fresh Ed25519-signed receipt. `Render HTML`
+authenticates the evidence and writes the self-contained report. Model
+execution, evaluator execution, container construction, package installation,
+and network access are not included.
+
+Reproduce the measurement from a source checkout with:
+
+```bash
+PYTHONPATH=src python \
+  examples/evaluator-qualification/measure_signed_transactions.py --runs 7
+```
+
+The byte counts are exact for the committed packages. Timings describe this
+reference environment and are not a performance guarantee; compare results
+only when the machine, Python version, package version, and run count are also
+recorded.

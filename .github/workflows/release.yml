@@ -166,6 +166,8 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
           npm ci
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
@@ -374,7 +376,35 @@ jobs:
           unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+          python -m pip check
+          quickstart_root="$(mktemp -d)"
+          approval_root="$(mktemp -d)"
+          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
+          cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          (
+            cd "${quickstart_root}"
+            python run.py --fixture golden
+          )
+          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
+          mkdir "${approval_root}/incoming"
+          cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+            "${approval_root}/incoming/evidence"
+          cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json \
+            "${approval_root}/incoming/verification.receipt.json"
+          (
+            cd "${approval_root}"
+            python review/verify_deployment_receipt.py \
+              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
+              --evidence incoming/evidence \
+              --policy review/policy/acceptance.json \
+              --receipt incoming/verification.receipt.json \
+              --output deployment-approval.json
+          )
+          rm -rf "${quickstart_root}" "${approval_root}"
+          trap - EXIT
+          python -m pip install --no-deps --force-reinstall dist/addins/*.whl
           python -m pip check
           invarlock --help
           python -c "import invarlock.cli.app"
@@ -487,7 +517,7 @@ jobs:
           sha256sum --check SHA256SUMS
       - name: Attest tagged release candidate
         id: attest_candidate
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-checksums: dist/SHA256SUMS
       - name: Upload tagged candidate provenance
@@ -879,7 +909,7 @@ jobs:
             echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
           fi
       - name: Publish to TestPyPI/PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
@@ -980,7 +1010,35 @@ jobs:
           unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps --force-reinstall wheelhouse/*.whl
+          python -m pip install --no-deps --force-reinstall wheelhouse/invarlock-*.whl
+          python -m pip check
+          quickstart_root="$(mktemp -d)"
+          approval_root="$(mktemp -d)"
+          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
+          cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          (
+            cd "${quickstart_root}"
+            python run.py --fixture golden
+          )
+          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
+          mkdir "${approval_root}/incoming"
+          cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+            "${approval_root}/incoming/evidence"
+          cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json \
+            "${approval_root}/incoming/verification.receipt.json"
+          (
+            cd "${approval_root}"
+            python review/verify_deployment_receipt.py \
+              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
+              --evidence incoming/evidence \
+              --policy review/policy/acceptance.json \
+              --receipt incoming/verification.receipt.json \
+              --output deployment-approval.json
+          )
+          rm -rf "${quickstart_root}" "${approval_root}"
+          trap - EXIT
+          python -m pip install --no-deps --force-reinstall wheelhouse/invarlock_*.whl
           python -m pip check
           invarlock --help
           python -c "import invarlock.cli.app"
