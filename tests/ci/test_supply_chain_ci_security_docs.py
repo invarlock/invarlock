@@ -54,6 +54,12 @@ def test_gitleaks_allowlists_require_the_complete_detected_field_match() -> None
         )
         for pattern in digest_rule["paths"]
     )
+    for path in (
+        "examples/evaluator-qualification/signed-transactions/inspect-ai/"
+        "evidence/request.json",
+        "tests/fixtures/compatibility/v0.13.0/package/evidence/request.json",
+    ):
+        assert any(re.fullmatch(pattern, path) for pattern in digest_rule["paths"])
     assert not any(
         re.search(pattern, 'api_key":"' + "a" * 32 + '"')
         for pattern in digest_rule["regexes"]
@@ -68,6 +74,25 @@ def test_gitleaks_allowlists_require_the_complete_detected_field_match() -> None
         "_".join(("signing", "key")) + ": " + ".".join(("ed25519", "Ed25519PrivateKey"))
     )
     assert any(re.search(pattern, type_annotation) for pattern in type_rule["regexes"])
+
+
+def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
+    config = yaml.safe_load(Path(".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    hooks = [hook for repo in config["repos"] for hook in repo["hooks"]]
+    end_of_file = next(hook for hook in hooks if hook["id"] == "end-of-file-fixer")
+    excluded = re.compile(end_of_file["exclude"])
+
+    for path in (
+        "public_evidence/evidence/example/manifest.json",
+        "examples/evaluator-qualification/signed-transactions/inspect-ai/"
+        "build-attestation.json",
+        "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
+    ):
+        assert excluded.search(path)
+    assert not excluded.search(
+        "examples/evaluator-qualification/signed-transactions/README.md"
+    )
+    assert not excluded.search("examples/ci/inspect-ai-deployment-approval-inputs.json")
 
 
 def test_full_ci_pins_make_to_setup_python() -> None:

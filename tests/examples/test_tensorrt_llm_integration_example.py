@@ -251,6 +251,16 @@ def test_resource_root_rejects_symlinked_artifacts(example: Any, inputs: Path) -
         example._root(inputs)
 
 
+def test_resource_root_rejects_a_symlinked_root(
+    example: Any, inputs: Path, tmp_path: Path
+) -> None:
+    linked = tmp_path / "linked-inputs"
+    linked.symlink_to(inputs, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="non-symlink directory"):
+        example._root(linked)
+
+
 def test_resource_root_rejects_oversized_and_unmountable_inputs(
     example: Any, inputs: Path, tmp_path: Path
 ) -> None:
@@ -492,6 +502,41 @@ def test_run_main_rejects_non_cuda_devices(example: Any, tmp_path: Path) -> None
                 "cpu",
             ]
         )
+        == 2
+    )
+
+
+def test_run_main_rejects_incoherent_trust_modes(example: Any, tmp_path: Path) -> None:
+    common = [
+        "--runtime-image",
+        "sha256:" + "a" * 64,
+        "--resource-root",
+        str(tmp_path / "unused"),
+        "--baseline-locator",
+        "baseline",
+        "--subject-locator",
+        "subject",
+    ]
+    key = tmp_path / "key.pem"
+
+    assert example.main([*common, "--evidence-signing-key", str(key)]) == 2
+    assert (
+        example.main(
+            [
+                *common,
+                "--evidence-signing-key",
+                str(key),
+                "--verifier-signing-key",
+                str(key),
+                "--trust-root",
+                str(tmp_path / "trust"),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert (
+        example.main([*common, "--ephemeral-trust-root", "--baseline-device", "cpu"])
         == 2
     )
 

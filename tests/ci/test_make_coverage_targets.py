@@ -222,6 +222,8 @@ def test_primary_verification_and_coverage_targets_default_to_parallel() -> None
     assert (
         "reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90" in MAKEFILE
     )
+    assert "--class-exemptions reports/examples-cov.xml examples" in MAKEFILE
+    assert "examples/coverage-exemptions.txt" in MAKEFILE
 
 
 def test_primary_verification_runs_independent_suites_with_bounded_parallelism() -> (

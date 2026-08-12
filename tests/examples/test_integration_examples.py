@@ -703,6 +703,74 @@ def test_preparation_rejects_existing_and_unknown_workspace(tmp_path: Path) -> N
         )
 
 
+def test_preparation_rejects_incoherent_trust_modes(tmp_path: Path) -> None:
+    key = tmp_path / "key.pem"
+    integration._write_private_key(key)
+    common = {
+        "integration": "hf-transformers",
+        "runtime_image_digest": ZERO_DIGEST,
+    }
+
+    with pytest.raises(ValueError, match="must be supplied together"):
+        integration._prepare_workspace(
+            tmp_path / "partial-trust",
+            evidence_signing_key=key,
+            **common,
+        )
+    with pytest.raises(ValueError, match="cannot use ephemeral mode"):
+        integration._prepare_workspace(
+            tmp_path / "mixed-trust",
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "mixed-trust-root",
+            **common,
+        )
+    with pytest.raises(ValueError, match="caller-owned"):
+        integration._prepare_workspace(
+            tmp_path / "missing-trust",
+            ephemeral_trust_root=False,
+            **common,
+        )
+    with pytest.raises(ValueError, match="must be distinct"):
+        integration._prepare_workspace(
+            tmp_path / "shared-key",
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "shared-key-trust",
+            ephemeral_trust_root=False,
+            **common,
+        )
+
+
+def test_hf_subject_transformation_rejects_a_nonpositive_margin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import torch
+    import transformers
+
+    model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+        torch=torch,
+        transformers=transformers,
+    )
+    with torch.no_grad():
+        model.lm_head.weight.zero_()
+    monkeypatch.setattr(
+        torch.linalg,
+        "lstsq",
+        lambda rows, _desired: SimpleNamespace(
+            solution=torch.zeros((rows.shape[1], 1))
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="missed a prompt"):
+        integration._target_row_derivative(
+            model,
+            tokenizer,
+            torch,
+            expected_output=" target",
+        )
+
+
 @pytest.mark.parametrize(
     ("creator", "missing", "message"),
     (
@@ -881,6 +949,37 @@ def test_run_main_prepare_only_and_input_errors(
                 str(tmp_path / "missing-image"),
                 "--runtime-image-digest",
                 ZERO_DIGEST,
+                "--ephemeral-trust-root",
+            ]
+        )
+
+
+def test_run_main_rejects_incoherent_trust_arguments(tmp_path: Path) -> None:
+    common = [
+        "hf-transformers",
+        "--workspace",
+        str(tmp_path / "workspace"),
+        "--runtime-image-digest",
+        ZERO_DIGEST,
+        "--prepare-only",
+    ]
+    key = tmp_path / "key.pem"
+    trust_root = tmp_path / "trust"
+
+    with pytest.raises(SystemExit, match="must be supplied together"):
+        integration.main([*common, "--evidence-signing-key", str(key)])
+    with pytest.raises(SystemExit, match="caller-owned"):
+        integration.main(common)
+    with pytest.raises(SystemExit, match="cannot be combined"):
+        integration.main(
+            [
+                *common,
+                "--evidence-signing-key",
+                str(key),
+                "--verifier-signing-key",
+                str(key),
+                "--trust-root",
+                str(trust_root),
                 "--ephemeral-trust-root",
             ]
         )

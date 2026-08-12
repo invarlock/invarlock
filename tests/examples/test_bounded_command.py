@@ -141,6 +141,35 @@ def test_bounded_command_termination_handles_exited_and_hung_processes() -> None
 
     bounded_command._terminate(ExitedProcess())  # type: ignore[arg-type]  # noqa: SLF001
 
+    class ExitedGroupLeader:
+        pid = 2_147_483_647
+
+        def poll(self) -> int:
+            return 0
+
+    bounded_command._terminate(  # type: ignore[arg-type]  # noqa: SLF001
+        ExitedGroupLeader()
+    )
+
+    class RunningWithoutPid:
+        terminated = False
+
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def wait(self, *, timeout: int) -> int:
+            assert timeout > 0
+            return 0
+
+    running_without_pid = RunningWithoutPid()
+    bounded_command._terminate(  # type: ignore[arg-type]  # noqa: SLF001
+        running_without_pid
+    )
+    assert running_without_pid.terminated
+
     class HungProcess:
         def __init__(self) -> None:
             self.killed = False

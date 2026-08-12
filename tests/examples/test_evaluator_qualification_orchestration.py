@@ -405,7 +405,10 @@ def test_matrix_rejects_invalid_control_documents(
     ("failure", "message"),
     [
         ("category", "category is invalid"),
+        ("support", "support status is invalid"),
         ("selection", "selection review metadata is invalid"),
+        ("level", "demonstration status is invalid"),
+        ("focus", "release-focus profile is missing"),
         ("profile", "profile is stale"),
         ("result", "qualification result is stale"),
         ("format", "raw output format is invalid"),
@@ -478,8 +481,14 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     first_artifact = artifacts / first["profile_id"]
     if failure == "category":
         profiles[0] = {**first, "category": "missing"}
+    elif failure == "support":
+        profiles[0] = {**first, "support_status": "unmaintained"}
     elif failure == "selection":
         monkeypatch.setattr(matrix, "selection_policy", lambda: {})
+    elif failure == "level":
+        levels[first["profile_id"]] = {"retained_signed_transaction": "yes"}
+    elif failure == "focus":
+        monkeypatch.setattr(matrix, "release_focus", lambda: ["missing"])
     elif failure == "profile":
         first_artifact.joinpath("profile.json").write_bytes(b"{}\n")
     elif failure == "result":

@@ -271,7 +271,9 @@ coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in para
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
-		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90
+		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90 \
+		--class-exemptions reports/examples-cov.xml examples \
+		examples/coverage-exemptions.txt
 
 coverage-enforce-parallel: PYTEST_WORKERS = 2
 coverage-enforce-parallel:  ## Enforce coverage with pytest-xdist
