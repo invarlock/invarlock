@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from packaging.requirements import Requirement
 from packaging.version import Version
 
@@ -91,6 +92,38 @@ def test_type_checker_version_is_identical_in_local_and_workflow_locks() -> None
         for python_tag in ("312", "313")
     }
     assert {uv_version, *workflow_versions} == declared
+
+
+def test_ruff_version_is_identical_in_local_ci_and_precommit_surfaces() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    optional = project["project"]["optional-dependencies"]
+    declared = {
+        requirement.removeprefix("ruff==")
+        for group in ("dev", "ci")
+        for requirement in optional[group]
+        if requirement.startswith("ruff==")
+    }
+    assert len(declared) == 1
+
+    uv_version = _locked_package_version(
+        tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8")), "ruff"
+    )
+    workflow_versions = {
+        _hashed_requirement_version(
+            WORKFLOW_REQUIREMENTS / f"ci-hf-py{python_tag}.txt", "ruff"
+        )
+        for python_tag in ("312", "313")
+    }
+    precommit = yaml.safe_load(
+        (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    )
+    precommit_version = next(
+        repo["rev"].removeprefix("v")
+        for repo in precommit["repos"]
+        if repo["repo"] == "https://github.com/astral-sh/ruff-pre-commit"
+    )
+
+    assert {uv_version, precommit_version, *workflow_versions} == declared
 
 
 @pytest.mark.parametrize(

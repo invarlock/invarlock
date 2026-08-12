@@ -115,14 +115,17 @@ def test_ci_has_no_retired_product_workflows_or_jobs() -> None:
     assert [marker for marker in retired if marker in text] == []
 
 
-def test_docs_ci_uses_the_current_documentation_targets() -> None:
+def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     workflow = _load(".github/workflows/docs-ci.yml")
     docs = workflow["jobs"]["docs"]
 
     assert _step(docs, "Check documentation")["run"] == "make docs-check"
     assert _step(docs, "Exercise documented commands")["run"] == ("make docs-live-fast")
+    assert workflow["on"]["pull_request"] == {
+        "branches": ["main", "staging/next", "release/v*"]
+    }
 
-    paths = workflow["on"]["pull_request"]["paths"]
+    paths = workflow["on"]["push"]["paths"]
     assert "docs/**" in paths
     assert "*.md" in paths
     assert "*.MD" in paths
