@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -13,24 +14,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "examples/ci/verify_deployment_receipt.py"
 WORKFLOW = ROOT / "examples/ci/github-actions/deployment-approval.yml"
-GOLDEN = ROOT / "examples/acceptance-handoff/golden"
-
-APPROVAL_INPUTS = {
-    "artifact_digests": {
-        "baseline": "sha256:1a06e3f2b3fdd505dcdf8b2aa7a8696a18be09881872742274525164567c5f53",
-        "subject": "sha256:3028c4d2bd723a42aa88630b212996dde2ac62f6f25374b421a86066c600c930",
-    },
-    "evidence_signer_fingerprint": "sha256:fe2b99fd9afaa999241faf924364da249f769fd984813db0d42f389f30c65005",
-    "format": "invarlock/deployment-approval-inputs-v1",
-    "policy_sha256": "sha256:4df8b25e462f8173c7a4b329d24f9d286b0ad59bb0b5441fe700c1038ea4bcc1",
-    "runtime_digests": {
-        "baseline": "sha256:" + "1" * 64,
-        "subject": "sha256:" + "2" * 64,
-    },
-    "schedule_digest": "sha256:adf6af826b0a72ee32a9d5a156144d716afe93bb280a763a56076f1554e223bf",
-    "verifier_fingerprint": "sha256:74a97c1d8fe8d7d58faac074d3a3a9267d8db501d9e4aed77eaeb9ad4efb32ff",
-    "verifier_identity": "verifier.example/release-qualification",
-}
+APPROVAL_INPUTS_PATH = ROOT / "examples/ci/inspect-ai-deployment-approval-inputs.json"
+TRANSACTION = ROOT / "examples/evaluator-qualification/signed-transactions/inspect-ai"
+APPROVAL_INPUTS = json.loads(APPROVAL_INPUTS_PATH.read_bytes())
 
 
 def _module() -> ModuleType:
@@ -50,11 +36,11 @@ def _run(
         "--approval-inputs",
         str(inputs),
         "--evidence",
-        str(GOLDEN / "evidence"),
+        str(TRANSACTION / "evidence"),
         "--policy",
-        str(GOLDEN / "evaluated-policy.json"),
+        str(TRANSACTION / "policy.json"),
         "--receipt",
-        str(GOLDEN / "verification.receipt.json"),
+        str(TRANSACTION / "verification.receipt.json"),
     ]
     if output is not None:
         command.extend(("--output", str(output)))
@@ -65,6 +51,33 @@ def _run(
         capture_output=True,
         text=True,
     )
+
+
+def test_deployment_inputs_are_independent_anchors_for_retained_inspect_transaction() -> (
+    None
+):
+    transaction = json.loads((TRANSACTION / "transaction.json").read_bytes())
+    verification = transaction["verification"]
+    policy_sha256 = (
+        "sha256:"
+        + hashlib.sha256((TRANSACTION / "policy.json").read_bytes()).hexdigest()
+    )
+
+    assert APPROVAL_INPUTS["artifact_digests"] == verification["artifact_digests"]
+    assert APPROVAL_INPUTS["runtime_digests"] == verification["runtime_digests"]
+    assert APPROVAL_INPUTS["schedule_digest"] == verification["schedule_digest"]
+    assert (
+        APPROVAL_INPUTS["evidence_signer_fingerprint"]
+        == verification["evidence_signer_fingerprint"]
+    )
+    assert APPROVAL_INPUTS["verifier_identity"] == verification["verifier_identity"]
+    assert (
+        APPROVAL_INPUTS["verifier_fingerprint"] == verification["verifier_fingerprint"]
+    )
+    assert (
+        APPROVAL_INPUTS["trust_profile_digest"] == verification["trust_profile_digest"]
+    )
+    assert APPROVAL_INPUTS["policy_sha256"] == policy_sha256
 
 
 def test_deployment_receipt_gate_accepts_only_the_independent_signed_result(
@@ -80,6 +93,7 @@ def test_deployment_receipt_gate_accepts_only_the_independent_signed_result(
     assert result["artifact_digests"] == APPROVAL_INPUTS["artifact_digests"]
     assert result["runtime_digests"] == APPROVAL_INPUTS["runtime_digests"]
     assert result["schedule_digest"] == APPROVAL_INPUTS["schedule_digest"]
+    assert result["trust_profile_digest"] == APPROVAL_INPUTS["trust_profile_digest"]
     assert result["verifier_identity"] == APPROVAL_INPUTS["verifier_identity"]
     assert result["pack_manifest_digest"].startswith("sha256:")
 
@@ -109,6 +123,7 @@ def test_deployment_receipt_gate_rejects_changed_policy_anchor(tmp_path: Path) -
         ({"format": "wrong"}, "format is invalid"),
         ({"verifier_identity": " "}, "identity must be non-empty"),
         ({"schedule_digest": "wrong"}, "must be a sha256 digest"),
+        ({"trust_profile_digest": "wrong"}, "must be a sha256 digest"),
         ({"artifact_digests": {}}, "exactly baseline and subject"),
         (
             {
@@ -149,15 +164,35 @@ def test_deployment_inputs_reject_invalid_json_and_unreadable_policy(
     with pytest.raises(module.DeploymentApprovalError, match="regular file"):
         module.approve(
             approval_inputs_path=inputs,
-            evidence_path=GOLDEN / "evidence",
+            evidence_path=TRANSACTION / "evidence",
             policy_path=tmp_path,
-            receipt_path=GOLDEN / "verification.receipt.json",
+            receipt_path=TRANSACTION / "verification.receipt.json",
         )
 
 
+def test_deployment_inputs_allow_explicit_anchor_receipts_without_trust_profile(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    inputs = tmp_path / "approval-inputs.json"
+    value = dict(APPROVAL_INPUTS)
+    value["trust_profile_digest"] = None
+    inputs.write_text(json.dumps(value), encoding="utf-8")
+
+    assert module.load_approval_inputs(inputs)["trust_profile_digest"] is None
+
+
+@pytest.mark.parametrize(
+    "verdict",
+    [
+        {"ok": False, "policy_verdict": "fail"},
+        {"ok": True, "policy_verdict": None},
+    ],
+)
 def test_deployment_gate_rejects_a_signed_non_authorizing_verdict(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    verdict: dict[str, object],
 ) -> None:
     module = _module()
     inputs = tmp_path / "approval-inputs.json"
@@ -168,7 +203,7 @@ def test_deployment_gate_rejects_a_signed_non_authorizing_verdict(
         lambda *_args, **_kwargs: SimpleNamespace(
             errors=(),
             ok=True,
-            statement={"verdict": {"ok": False}},
+            statement={"verdict": verdict},
             verifier_fingerprint=APPROVAL_INPUTS["verifier_fingerprint"],
         ),
     )
@@ -176,9 +211,9 @@ def test_deployment_gate_rejects_a_signed_non_authorizing_verdict(
     with pytest.raises(module.DeploymentApprovalError, match="does not authorize"):
         module.approve(
             approval_inputs_path=inputs,
-            evidence_path=GOLDEN / "evidence",
-            policy_path=GOLDEN / "evaluated-policy.json",
-            receipt_path=GOLDEN / "verification.receipt.json",
+            evidence_path=TRANSACTION / "evidence",
+            policy_path=TRANSACTION / "policy.json",
+            receipt_path=TRANSACTION / "verification.receipt.json",
         )
 
 

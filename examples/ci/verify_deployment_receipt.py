@@ -29,6 +29,7 @@ EXPECTED_FIELDS = {
     "policy_sha256",
     "runtime_digests",
     "schedule_digest",
+    "trust_profile_digest",
     "verifier_fingerprint",
     "verifier_identity",
 }
@@ -42,6 +43,12 @@ def _digest(value: object, *, label: str) -> str:
     if not isinstance(value, str) or DIGEST.fullmatch(value) is None:
         raise DeploymentApprovalError(f"{label} must be a sha256 digest")
     return value
+
+
+def _optional_digest(value: object, *, label: str) -> str | None:
+    if value is None:
+        return None
+    return _digest(value, label=label)
 
 
 def _side_digests(value: object, *, label: str) -> dict[str, str]:
@@ -88,6 +95,9 @@ def load_approval_inputs(path: Path) -> dict[str, Any]:
         "verifier_fingerprint",
     ):
         result[field] = _digest(value[field], label=field.replace("_", " "))
+    result["trust_profile_digest"] = _optional_digest(
+        value["trust_profile_digest"], label="trust profile digest"
+    )
     return result
 
 
@@ -123,12 +133,17 @@ def approve(
         expected_pack_signer_fingerprint=inputs["evidence_signer_fingerprint"],
         expected_verifier_identity=inputs["verifier_identity"],
         expected_verifier_fingerprint=inputs["verifier_fingerprint"],
+        expected_trust_profile_digest=inputs["trust_profile_digest"],
     )
     if not verified.ok or verified.statement is None:
         diagnostic = "; ".join(verified.errors) or "signed receipt was not accepted"
         raise DeploymentApprovalError(diagnostic)
     verdict = verified.statement.get("verdict")
-    if not isinstance(verdict, dict) or verdict.get("ok") is not True:
+    if (
+        not isinstance(verdict, dict)
+        or verdict.get("ok") is not True
+        or verdict.get("policy_verdict") != "pass"
+    ):
         raise DeploymentApprovalError("signed receipt does not authorize deployment")
     manifest_digest = verified.statement.get("pack_manifest_digest")
     return {
@@ -141,6 +156,7 @@ def approve(
         "policy_sha256": policy_sha256,
         "runtime_digests": inputs["runtime_digests"],
         "schedule_digest": inputs["schedule_digest"],
+        "trust_profile_digest": inputs["trust_profile_digest"],
         "verifier_fingerprint": verified.verifier_fingerprint,
         "verifier_identity": inputs["verifier_identity"],
     }

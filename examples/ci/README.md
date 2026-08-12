@@ -14,6 +14,14 @@ is a consumer workflow template. Replace the example policy, requirements,
 candidate, and deployment-script paths with repository-owned equivalents. Keep
 the action and third-party actions pinned to immutable commits.
 
+The checked-in behavioral example consumes the retained Inspect AI evidence
+pack and signed verification receipt. Its separate example recipient anchors
+live in
+[`inspect-ai-deployment-approval-inputs.json`](inspect-ai-deployment-approval-inputs.json),
+outside the submitted evidence. The fixture makes the flagship evaluator path
+concrete; production deployments must obtain the same classes of anchors
+through recipient-controlled channels.
+
 `verify_deployment_receipt.py` accepts an
 `invarlock/deployment-approval-inputs-v1` object containing exactly:
 
@@ -21,7 +29,9 @@ the action and third-party actions pinned to immutable commits.
 - baseline and subject runtime digests;
 - schedule and policy digests;
 - the authorized evidence-signer fingerprint; and
-- the authorized verifier identity and fingerprint.
+- the authorized verifier identity and fingerprint; and
+- the verifier trust-profile digest recorded when the receipt was issued, or
+  `null` when receipt issuance used explicit anchors without a trust profile.
 
 The helper fails closed if any anchor, signature, policy, receipt verdict, or
 evidence binding differs. On success it emits a canonical
@@ -41,6 +51,15 @@ Run the behavioral tests with:
 python -m pytest -q tests/examples/test_ci_deployment_approval_example.py
 ```
 
-The test uses the committed acceptance-handoff evidence and signed receipt. It
-also changes verifier and policy anchors to prove that artifact transfer or job
-success alone cannot authorize deployment.
+Or exercise the retained Inspect transaction directly:
+
+```bash
+python examples/ci/verify_deployment_receipt.py \
+  --approval-inputs examples/ci/inspect-ai-deployment-approval-inputs.json \
+  --evidence examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+  --policy examples/evaluator-qualification/signed-transactions/inspect-ai/policy.json \
+  --receipt examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json
+```
+
+The tests also change verifier and policy anchors to prove that artifact
+transfer or job success alone cannot authorize deployment.
