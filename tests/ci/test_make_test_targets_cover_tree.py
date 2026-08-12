@@ -74,10 +74,23 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert "trap 'exit 129' HUP" in install_smoke
     assert "trap 'exit 130' INT" in install_smoke
     assert "trap 'exit 143' TERM" in install_smoke
-    assert (
+    core_install = (
         "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
         '"$$smoke_venv/bin/python" -m pip install '
-        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl" in install_smoke
+        "--no-deps --force-reinstall dist/*.whl"
+    )
+    addin_install = (
+        "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
+        '"$$smoke_venv/bin/python" -m pip install '
+        "--no-deps --force-reinstall dist/addins/*.whl"
+    )
+    assert core_install in install_smoke
+    assert addin_install in install_smoke
+    assert install_smoke.index(core_install) < install_smoke.index(
+        "run.py --fixture golden"
+    )
+    assert install_smoke.index("review/verify_deployment_receipt.py") < (
+        install_smoke.index(addin_install)
     )
     assert "-m pip check" in install_smoke
     assert "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH=" in install_smoke
