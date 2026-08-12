@@ -313,7 +313,7 @@ def test_peft_preparation_trains_serializes_reloads_and_merges(tmp_path: Path) -
         )
     )
     assert summary["library"] == "peft"
-    assert summary["library_version"] == "0.19.1"
+    assert summary["library_version"] == "0.20.0"
     assert summary["source_model_id"] == qwen3_profile.MODEL_ID
     assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
     assert summary["target_modules"] == ["q_proj", "v_proj"]

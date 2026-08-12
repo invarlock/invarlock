@@ -61,7 +61,7 @@ dev = [
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
-  "ruff==0.16.0",
+  "ruff==0.16.2",
   "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
@@ -73,7 +73,7 @@ dev = [
   "build>=0.10.0",
   "wheel>=0.47.0",
   "twine>=4.0.0",
-  "peft==0.19.1",
+  "peft==0.20.0",
   "torchao==0.18.0",
 ]
 
@@ -84,13 +84,13 @@ ci = [
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
   "hypothesis>=6.98",
-  "ruff==0.16.0",
+  "ruff==0.16.2",
   "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
   "wheel>=0.47.0",
   "twine>=4.0.0",
-  "peft==0.19.1",
+  "peft==0.20.0",
   "torchao==0.18.0",
 ]
 
@@ -123,7 +123,7 @@ security-ci = [
 
 [dependency-groups]
 example-peft = [
-  "peft==0.19.1",
+  "peft==0.20.0",
 ]
 example-torchao = [
   "torchao==0.18.0",
