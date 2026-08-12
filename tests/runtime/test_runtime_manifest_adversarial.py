@@ -128,3 +128,28 @@ def test_manifest_rejects_duplicate_or_reserved_binding_paths(
             provider_files=sidecars,
             config_path=report,
         )
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "message"),
+    [
+        ("not-a-timestamp", "ISO 8601"),
+        ("2026-08-12T04:00:00", "include a UTC offset"),
+        ("2026-08-12T04:00:00-04:00", "must use UTC"),
+    ],
+)
+def test_manifest_rejects_invalid_generation_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    timestamp: str,
+    message: str,
+) -> None:
+    report, sidecars = _files(tmp_path)
+    _container_environment(monkeypatch)
+
+    with pytest.raises(ValueError, match=message):
+        write_runtime_manifest(
+            report,
+            provider_files=sidecars,
+            generated_at_utc=timestamp,
+        )
