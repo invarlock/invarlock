@@ -206,6 +206,15 @@ def test_candidate_qualification_uses_real_provider_session_contract(
                     output_text="qualified",
                     output_sha256=hashlib.sha256(b"qualified").hexdigest(),
                 )
+            elif self.status == "logprob":
+                record = RuntimeScoringRecord(
+                    record_id=batch.records[0].record_id,
+                    input_sha256=batch.records[0].input_sha256,
+                    status="ok",
+                    logprob_sum=-1.0,
+                    token_count=1,
+                    utf8_byte_count=1,
+                )
             else:
                 record = RuntimeScoringRecord(
                     record_id=batch.records[0].record_id,
@@ -308,6 +317,13 @@ def test_candidate_qualification_uses_real_provider_session_contract(
 
     Session.status = "error"
     with pytest.raises(canary.TensorRTLLMCanaryError, match="did not complete"):
+        canary.qualify_candidate(
+            **qualification_args,
+            expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
+        )
+
+    Session.status = "logprob"
+    with pytest.raises(canary.TensorRTLLMCanaryError, match="has no text output"):
         canary.qualify_candidate(
             **qualification_args,
             expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),

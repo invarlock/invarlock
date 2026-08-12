@@ -278,7 +278,8 @@ def qualify_candidate(
         if len(observation.records) != 1 or observation.records[0].status != "ok":
             raise TensorRTLLMCanaryError("candidate provider score did not complete")
         output_text = observation.records[0].output_text
-        assert output_text is not None
+        if output_text is None:
+            raise TensorRTLLMCanaryError("candidate provider score has no text output")
         if hashlib.sha256(output_text.encode("utf-8")).hexdigest() != (
             expected_output_sha256
         ):
