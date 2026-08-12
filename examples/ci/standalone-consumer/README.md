@@ -11,7 +11,7 @@ submitted evidence and uses two protected GitHub environments:
 
 The repository owner supplies these files before enabling the workflow:
 
-- `incoming/evidence/`, delivered by the evidence producer;
+- `incoming/evidence/`, delivered by the evaluation operator;
 - `review/requirements/invarlock-verifier.txt`, a hash-pinned lock for the
   selected InvarLock release and its complete verifier dependency closure;
 - `deployment/fetch-approved-candidate.sh`, which resolves a candidate and

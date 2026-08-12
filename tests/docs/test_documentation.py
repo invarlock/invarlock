@@ -215,9 +215,12 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
     makefile = _read("Makefile")
     evidence_root = REPO_ROOT / "public_evidence/evidence/mistral-7b-weight-scale-hf"
 
-    assert "make example-acceptance-handoff" in readme
-    assert "\nexample-acceptance-handoff:" in makefile
-    assert REPO_ROOT.joinpath("examples/run_acceptance_handoff.py").is_file()
+    assert "python run.py --fixture golden" in readme
+    assert "\nexample-quickstart:" in makefile
+    assert REPO_ROOT.joinpath("examples/quickstart/run.py").is_file()
+    assert REPO_ROOT.joinpath(
+        "examples/acceptance-handoff/golden/technical-anchors.json"
+    ).is_file()
 
     report_path = "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence"
     receipt_path = (
