@@ -102,6 +102,26 @@ Set `PYTEST_WORKERS=0` for an explicit sequential diagnostic run.
 Tests must execute production behavior and assert meaningful outcomes. A test
 that merely restates fixture contents does not validate the user journey.
 
+Use the narrowest boundary that can prove the contract:
+
+- Prefer public APIs and complete transaction boundaries. Test a private helper
+  directly when it owns a security or resource-limit invariant that cannot be
+  observed precisely through a broader call.
+- Acceptance tests that pass by not raising must execute a concrete validator,
+  parser, or runtime boundary. Reaching the end of an otherwise inert test is
+  not a meaningful outcome.
+- Source and configuration assertions are appropriate for declarative surfaces
+  such as workflow permissions, package metadata, and Make target composition.
+  Parse structured formats and shared target definitions instead of slicing
+  neighboring text. Pair executable shell or Python snippets with a behavioral
+  test where practical.
+- Keep environment and module mutation local to the test through pytest
+  fixtures. Avoid blanket autouse repair fixtures that can hide leaked state or
+  import failures.
+- Coverage locates untested behavior; it does not justify tests written only to
+  execute a line. Every added case should name the accepted result, rejected
+  boundary, cleanup guarantee, or externally visible side effect it proves.
+
 The evaluation evidence destination comes from `output.evidence` in the
 request. Verification receipts and HTML reports use the explicit destinations
 passed to the CLI. These outputs are no-clobber and should be written to pytest

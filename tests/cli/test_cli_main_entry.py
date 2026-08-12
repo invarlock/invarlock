@@ -1,20 +1,17 @@
-import sys
+from importlib import import_module
 
-import pytest
-
-from invarlock import security
-from invarlock.cli.app import main
+cli_app = import_module("invarlock.cli.app")
 
 
-def test_cli_main_invokes_app(monkeypatch):
-    # Ensure no args so Typer shows help and exits
-    monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
-    argv_backup = sys.argv[:]
-    sys.argv = [argv_backup[0]]
-    try:
-        with pytest.raises(SystemExit):
-            main()
-    finally:
-        # Restore argv and network policy so subsequent tests are unaffected
-        sys.argv = argv_backup
-        security.enforce_network_policy(True)
+def test_installed_entrypoint_delegates_to_the_supported_cli(monkeypatch) -> None:  # noqa: ANN001
+    calls = 0
+
+    def fake_app() -> None:
+        nonlocal calls
+        calls += 1
+
+    monkeypatch.setattr(cli_app, "app", fake_app)
+
+    cli_app.main()
+
+    assert calls == 1

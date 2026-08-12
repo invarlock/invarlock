@@ -60,7 +60,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
@@ -293,8 +293,6 @@ trust-smoke:  ## Exercise pack tamper rejection and signed receipt verification
 
 compatibility-test:  ## Replay the permanent v0.13 compatibility corpus
 	PYTHONPATH=src $(PYTEST) -q tests/compatibility
-
-mutation-smoke: trust-smoke  ## CI alias for the trust-critical adversarial smoke
 
 trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example transaction
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py

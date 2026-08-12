@@ -7,19 +7,18 @@ import tomllib
 from collections import Counter
 from pathlib import Path
 
+from tests._support_repository_contracts import MakefileContract
+
 ROOT = Path(__file__).resolve().parents[2]
-MAKEFILE = (ROOT / "Makefile").read_text(encoding="utf-8")
+MAKE = MakefileContract.read(ROOT / "Makefile")
+MAKEFILE = MAKE.text
 QUALIFICATION_COVERAGE_CONFIG = (
     ROOT / "scripts" / "qualification.coveragerc"
 ).read_text(encoding="utf-8")
 
 
-def _target(name: str, next_name: str) -> str:
-    return MAKEFILE.split(f"{name}:", 1)[1].split(f"{next_name}:", 1)[0]
-
-
 def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
-    block = _target("coverage", "coverage-addins")
+    block = MAKE.target("coverage").text
     assert "--cov=src/invarlock" in block
     assert "--cov-branch" in block
     assert "--cov-fail-under=90" in block
@@ -33,7 +32,7 @@ def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
 
 
 def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
-    block = _target("coverage-addins", "coverage-qualification")
+    block = MAKE.target("coverage-addins").text
     config = (ROOT / "scripts" / "addins.coveragerc").read_text(encoding="utf-8")
     for package in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
         assert f"--include='addins/{package}/src/*'" in block
@@ -53,7 +52,7 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
 
 
 def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-qualification", "coverage-release")
+    block = MAKE.target("coverage-qualification").text
     for script in (
         "authenticated_runtime_build.py",
         "qualification_candidate_wheels.py",
@@ -76,7 +75,7 @@ def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> N
 
 
 def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-release", "coverage-examples")
+    block = MAKE.target("coverage-release").text
     for script in (
         "first_party_distribution_validation.py",
         "release_distribution_validation.py",
@@ -93,7 +92,7 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
 
 
 def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-examples", "coverage-maintenance")
+    block = MAKE.target("coverage-examples").text
     assert "tests/examples" in block
     assert "--cov=examples" in block
     assert "--cov-branch" in block
@@ -113,7 +112,7 @@ def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
 
 
 def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:
-    block = _target("coverage-maintenance", "coverage-enforce")
+    block = MAKE.target("coverage-maintenance").text
     config = (ROOT / "scripts" / "maintenance.coveragerc").read_text(encoding="utf-8")
     for test_file in (
         "test_coverage_branch_rate.py",
@@ -175,7 +174,7 @@ def test_every_maintained_script_is_assigned_to_one_coverage_surface() -> None:
 
 
 def test_every_ratchet_example_module_is_collected_for_coverage() -> None:
-    block = _target("coverage-examples", "coverage-enforce")
+    block = MAKE.target("coverage-examples").text
     selectors = set(re.findall(r"--cov=([^ \\\n]+)", block))
     maintained = sorted((ROOT / "examples").rglob("*.py"))
 
@@ -238,8 +237,8 @@ def test_primary_verification_and_coverage_targets_default_to_parallel() -> None
 def test_primary_verification_runs_independent_suites_with_bounded_parallelism() -> (
     None
 ):
-    complete = _target("verify", "verify-fast")
-    fast = _target("verify-fast", "contracts-check")
+    complete = MAKE.target("verify").text
+    fast = MAKE.target("verify-fast").text
 
     for block, test_target in ((complete, "test"), (fast, "test-fast")):
         assert "$(MAKE) repo-cruft-check" in block
@@ -260,14 +259,14 @@ def test_primary_verification_runs_independent_suites_with_bounded_parallelism()
 
 
 def test_verify_fast_never_requires_a_container() -> None:
-    block = _target("verify-fast", "contracts-check")
+    block = MAKE.target("verify-fast").text
     assert "docker" not in block.lower()
     assert "podman" not in block.lower()
     assert "container-front-door-smoke" not in block
 
 
 def test_makefile_exposes_only_the_supported_cli_smoke() -> None:
-    block = _target("cli-smoke-core", "hf-provider-smoke")
+    block = MAKE.target("cli-smoke-core").text
     assert "invarlock evaluate --help" in block
     assert "invarlock verify --help" in block
     assert "invarlock report --help" in block

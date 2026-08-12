@@ -4,9 +4,10 @@ import subprocess
 import time
 from pathlib import Path
 
-MAKEFILE = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
-    encoding="utf-8"
-)
+from tests._support_repository_contracts import MakefileContract
+
+MAKE = MakefileContract.read(Path(__file__).resolve().parents[2] / "Makefile")
+MAKEFILE = MAKE.text
 
 
 def test_test_directories_use_one_pattern_target() -> None:
@@ -60,9 +61,7 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
         "addins/tensorrt_llm",
     ):
         assert path in MAKEFILE
-    install_smoke = MAKEFILE.split("addins-install-smoke:", 1)[1].split(
-        "packaging-smoke-minimal:", 1
-    )[0]
+    install_smoke = MAKE.target("addins-install-smoke").text
     assert "CoreRegistry" in install_smoke
     assert "get_runtime_provider" in install_smoke
     assert "get_plugin_info" in install_smoke
@@ -96,7 +95,7 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH=" in install_smoke
     assert ".addins-smoke-site" not in install_smoke
 
-    clean = MAKEFILE.split("clean:", 1)[1].split("docsclean:", 1)[0]
+    clean = MAKE.target("clean").text
     assert "src/*.egg-info" in clean
 
 
@@ -134,9 +133,7 @@ def test_install_smoke_signal_trap_exits_and_cleans(tmp_path: Path) -> None:
 
 
 def test_container_smoke_explicitly_enables_the_gated_integration_test() -> None:
-    block = MAKEFILE.split("container-front-door-smoke:", 1)[1].split(
-        "##@ Verification", 1
-    )[0]
+    block = MAKE.target("container-front-door-smoke").text
 
     assert "INVARLOCK_RUN_CONTAINER_SMOKE=1" in block
     assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in block
