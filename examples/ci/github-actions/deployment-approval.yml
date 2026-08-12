@@ -1,0 +1,95 @@
+name: Verify and deploy an InvarLock-approved candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-evidence:
+    runs-on: ubuntu-latest
+    environment: release-review
+    steps:
+      - name: Check out verifier-controlled inputs
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+
+      - name: Install the hash-pinned verifier
+        run: python -m pip install --require-hashes -r review/requirements/invarlock-verifier.txt
+
+      - name: Materialize the verifier key
+        env:
+          VERIFIER_KEY_PEM: ${{ secrets.INVARLOCK_VERIFIER_KEY_PEM }}
+        run: |
+          umask 077
+          printf '%s\n' "$VERIFIER_KEY_PEM" > "$RUNNER_TEMP/invarlock-verifier.pem"
+
+      - name: Verify evidence and issue the signed receipt
+        uses: invarlock/invarlock/.github/actions/invarlock-report-gate@57521e3bb288e1b8a43aac24217d4e9db875a908
+        with:
+          evidence: incoming/evidence
+          policy: policy/acceptance.json
+          expected-baseline-artifact: ${{ vars.INVARLOCK_BASELINE_ARTIFACT_DIGEST }}
+          expected-subject-artifact: ${{ vars.INVARLOCK_SUBJECT_ARTIFACT_DIGEST }}
+          expected-schedule: ${{ vars.INVARLOCK_SCHEDULE_DIGEST }}
+          expected-baseline-runtime: ${{ vars.INVARLOCK_BASELINE_RUNTIME_DIGEST }}
+          expected-subject-runtime: ${{ vars.INVARLOCK_SUBJECT_RUNTIME_DIGEST }}
+          expected-signer: ${{ vars.INVARLOCK_EVIDENCE_SIGNER_FINGERPRINT }}
+          verifier-signing-key: ${{ runner.temp }}/invarlock-verifier.pem
+          verifier-identity: ${{ vars.INVARLOCK_VERIFIER_IDENTITY }}
+          artifact-name: candidate-invarlock-evidence
+
+  deploy-candidate:
+    needs: verify-evidence
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out deployment policy and tooling
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+
+      - name: Install the hash-pinned receipt verifier
+        run: python -m pip install --require-hashes -r review/requirements/invarlock-verifier.txt
+
+      - name: Download the verified evidence and signed receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: candidate-invarlock-evidence
+          path: review-artifact
+
+      - name: Materialize production-owned approval inputs
+        env:
+          APPROVAL_INPUTS_JSON: ${{ secrets.INVARLOCK_DEPLOYMENT_APPROVAL_INPUTS_JSON }}
+        run: |
+          umask 077
+          printf '%s\n' "$APPROVAL_INPUTS_JSON" > "$RUNNER_TEMP/deployment-approval-inputs.json"
+
+      - name: Reauthenticate the signed receipt for deployment
+        run: |
+          python examples/ci/verify_deployment_receipt.py \
+            --approval-inputs "$RUNNER_TEMP/deployment-approval-inputs.json" \
+            --evidence review-artifact/incoming/evidence \
+            --policy policy/acceptance.json \
+            --receipt review-artifact/reports/invarlock/verification.receipt.json \
+            --output review-artifact/deployment-approval.json
+
+      - name: Resolve and validate the exact approved candidate
+        run: |
+          ./deployment/fetch-approved-candidate.sh \
+            --approval review-artifact/deployment-approval.json \
+            --output candidate/model
+
+      - name: Deploy the exact approved candidate
+        run: |
+          ./deployment/deploy-candidate.sh \
+            --artifact candidate/model \
+            --approval review-artifact/deployment-approval.json

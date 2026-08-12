@@ -10,7 +10,6 @@ import os
 import shutil
 import stat
 import struct
-import subprocess
 import sys
 import zlib
 from dataclasses import dataclass
@@ -21,6 +20,17 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from huggingface_hub import snapshot_download
 
+try:
+    from examples.integrations.bounded_command import run_bounded_command
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if exc.name != "examples":
+        raise
+    from bounded_command import run_bounded_command  # type: ignore[no-redef]
+from examples.integrations.trust_material import (
+    create_trust_material,
+    load_external_key,
+    validate_new_trust_root,
+)
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
     HFSnapshotArtifactIdentity,
@@ -101,9 +111,15 @@ class VisionExamplePaths:
     html_report: Path
 
 
-def _paths(root: Path) -> VisionExamplePaths:
+def _paths(
+    root: Path,
+    *,
+    evidence_key: Path | None = None,
+    trust_root: Path | None = None,
+) -> VisionExamplePaths:
     evaluation = root / "evaluation"
-    verifier = root / "verifier"
+    verifier = trust_root or root / "verifier"
+    receipt_root = root / "verifier-output" if trust_root is not None else verifier
     return VisionExamplePaths(
         root=root,
         evaluation=evaluation,
@@ -114,9 +130,13 @@ def _paths(root: Path) -> VisionExamplePaths:
         policy=evaluation / "inputs" / "acceptance.json",
         evidence=evaluation / "evidence",
         trusted_inputs=verifier / "trusted-inputs.json",
-        evidence_key=root / "keys" / "evidence-signer.pem",
-        verifier_key=verifier / "keys" / "verifier.pem",
-        receipt=verifier / "verification.receipt.json",
+        evidence_key=evidence_key or root / "keys" / "evidence-signer.pem",
+        verifier_key=(
+            verifier / "verifier.pem"
+            if trust_root is not None
+            else verifier / "keys" / "verifier.pem"
+        ),
+        receipt=receipt_root / "verification.receipt.json",
         html_report=root / "comparison-report.html",
     )
 
@@ -260,22 +280,81 @@ def prepare_workspace(
     *,
     runtime_image_digest: str,
     materialize_models: bool,
+    evidence_signing_key: Path | None = None,
+    verifier_signing_key: Path | None = None,
+    trust_root: Path | None = None,
+    ephemeral_trust_root: bool = True,
 ) -> tuple[VisionExamplePaths, dict[str, str]]:
     """Author the complete tutorial closure, optionally materializing models."""
 
-    root = root.expanduser().resolve()
+    external_trust = any(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    )
+    if external_trust and not all(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    ):
+        raise ValueError(
+            "evidence key, verifier key, and trust root must be supplied together"
+        )
+    if external_trust and ephemeral_trust_root:
+        raise ValueError("external trust material cannot use ephemeral mode")
+    if not external_trust and not ephemeral_trust_root:
+        raise ValueError(
+            "caller-owned evidence/verifier keys and trust root are required"
+        )
+    root = Path(os.path.abspath(root.expanduser()))
     if root.exists() or root.is_symlink():
         raise FileExistsError(
             f"workspace already exists: {root}; choose a new disposable path"
         )
     root.parent.mkdir(parents=True, exist_ok=True)
     root.mkdir()
-    paths = _paths(root)
+    paths = _paths(
+        root,
+        evidence_key=(
+            Path(os.path.abspath(evidence_signing_key.expanduser()))
+            if external_trust
+            else None
+        ),
+        trust_root=(
+            Path(os.path.abspath(trust_root.expanduser())) if external_trust else None
+        ),
+    )
     try:
         paths.content.mkdir(parents=True)
-        (paths.trusted_inputs.parent / "policy").mkdir(parents=True)
-        paths.evidence_key.parent.mkdir(parents=True)
-        paths.verifier_key.parent.mkdir(parents=True)
+        evidence_key_bytes: bytes | None = None
+        verifier_key_bytes: bytes | None = None
+        if external_trust:
+            assert evidence_signing_key is not None
+            assert verifier_signing_key is not None
+            assert trust_root is not None
+            trust_root = validate_new_trust_root(trust_root, transaction_root=root)
+            evidence_key_path, evidence_key_bytes, evidence_signer = load_external_key(
+                evidence_signing_key,
+                transaction_root=root,
+                label="evidence signing key",
+            )
+            _verifier_key_path, verifier_key_bytes, verifier_signer = load_external_key(
+                verifier_signing_key,
+                transaction_root=root,
+                label="verifier signing key",
+            )
+            if evidence_signer == verifier_signer:
+                raise ValueError("evidence and verifier signing keys must be distinct")
+            paths = _paths(
+                root,
+                evidence_key=evidence_key_path,
+                trust_root=Path(os.path.abspath(trust_root.expanduser()))
+                if trust_root is not None
+                else None,
+            )
+        else:
+            paths.evidence_key.parent.mkdir(parents=True)
+            paths.verifier_key.parent.mkdir(parents=True)
+            (paths.trusted_inputs.parent / "policy").mkdir(parents=True)
+        paths.receipt.parent.mkdir(parents=True, exist_ok=True)
         if materialize_models:
             download_models(paths.evaluation / "models")
         else:
@@ -320,9 +399,10 @@ def prepare_workspace(
         }
         policy_bytes = canonical_json_bytes(policy)
         paths.policy.write_bytes(policy_bytes)
-        paths.trusted_inputs.parent.joinpath("policy/acceptance.json").write_bytes(
-            policy_bytes
-        )
+        if not external_trust:
+            paths.trusted_inputs.parent.joinpath("policy/acceptance.json").write_bytes(
+                policy_bytes
+            )
 
         def side(role: str) -> dict[str, object]:
             profile = MODEL_PROFILES[role]
@@ -383,8 +463,9 @@ def prepare_workspace(
             )
             for role, profile in MODEL_PROFILES.items()
         }
-        evidence_signer = _write_private_key(paths.evidence_key)
-        verifier_signer = _write_private_key(paths.verifier_key)
+        if not external_trust:
+            evidence_signer = _write_private_key(paths.evidence_key)
+            verifier_signer = _write_private_key(paths.verifier_key)
         image_digest = normalize_digest(
             runtime_image_digest, label="runtime image digest"
         )
@@ -395,26 +476,45 @@ def prepare_workspace(
             "subject_runtime_digest": image_digest,
             "evidence_signer_fingerprint": evidence_signer,
         }
-        paths.trusted_inputs.write_bytes(
-            canonical_json_bytes(
-                {
-                    "format": "invarlock/trust-inputs-v1",
-                    "policy": {"path": "policy/acceptance.json"},
-                    "anchors": anchors,
-                    "verifier": {
-                        "identity": "invarlock-example/hf-vision-text-verifier",
-                        "signing_key_path": "keys/verifier.pem",
-                    },
-                    "allow_installed_scorers": False,
-                }
+        if external_trust:
+            assert trust_root is not None
+            assert verifier_key_bytes is not None
+            material = create_trust_material(
+                transaction_root=root,
+                evidence_key=paths.evidence_key,
+                verifier_key_bytes=verifier_key_bytes,
+                evidence_fingerprint=evidence_signer,
+                verifier_fingerprint=verifier_signer,
+                trust_root=trust_root,
+                policy_bytes=policy_bytes,
+                verifier_identity="invarlock-example/hf-vision-text-verifier",
+                anchors=anchors,
             )
-        )
-        paths.evidence_key.with_suffix(".fingerprint").write_text(
-            evidence_signer + "\n", encoding="ascii"
-        )
-        paths.verifier_key.with_suffix(".fingerprint").write_text(
-            verifier_signer + "\n", encoding="ascii"
-        )
+            if material.trusted_inputs != paths.trusted_inputs:
+                raise ValueError(
+                    "external trust material resolved to an unexpected root"
+                )
+        else:
+            paths.trusted_inputs.write_bytes(
+                canonical_json_bytes(
+                    {
+                        "format": "invarlock/trust-inputs-v1",
+                        "policy": {"path": "policy/acceptance.json"},
+                        "anchors": anchors,
+                        "verifier": {
+                            "identity": "invarlock-example/hf-vision-text-verifier",
+                            "signing_key_path": "keys/verifier.pem",
+                        },
+                        "allow_installed_scorers": False,
+                    }
+                )
+            )
+            paths.evidence_key.with_suffix(".fingerprint").write_text(
+                evidence_signer + "\n", encoding="ascii"
+            )
+            paths.verifier_key.with_suffix(".fingerprint").write_text(
+                verifier_signer + "\n", encoding="ascii"
+            )
         return paths, anchors
     except Exception:
         shutil.rmtree(root)
@@ -423,12 +523,11 @@ def prepare_workspace(
 
 def _run(command: list[str], *, environment: dict[str, str]) -> None:
     print("+ " + " ".join(command))
-    completed = subprocess.run(
+    completed = run_bounded_command(
         command,
-        check=False,
         capture_output=True,
-        text=True,
-        env=environment,
+        environment=environment,
+        label="HF vision integration command",
     )
     if completed.stdout:
         print(completed.stdout, end="")
@@ -519,11 +618,41 @@ def _parser() -> argparse.ArgumentParser:
         "--container-engine", choices=("docker", "podman"), default="docker"
     )
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--evidence-signing-key", type=Path)
+    parser.add_argument("--verifier-signing-key", type=Path)
+    parser.add_argument("--trust-root", type=Path)
+    parser.add_argument(
+        "--ephemeral-trust-root",
+        action="store_true",
+        help="Use disposable generated keys; never use this mode for acceptance.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    trust_values = (
+        arguments.evidence_signing_key,
+        arguments.verifier_signing_key,
+        arguments.trust_root,
+    )
+    provided_trust = any(value is not None for value in trust_values)
+    external_trust = all(value is not None for value in trust_values)
+    if provided_trust and not external_trust:
+        raise SystemExit(
+            "--evidence-signing-key, --verifier-signing-key, and --trust-root "
+            "must be supplied together"
+        )
+    if not external_trust and not arguments.ephemeral_trust_root:
+        raise SystemExit(
+            "caller-owned --evidence-signing-key, --verifier-signing-key, and "
+            "--trust-root are required; use --ephemeral-trust-root only for a "
+            "disposable non-acceptance demo"
+        )
+    if external_trust and arguments.ephemeral_trust_root:
+        raise SystemExit(
+            "--ephemeral-trust-root cannot be combined with caller-owned trust"
+        )
     if not arguments.prepare_only and not arguments.runtime_image:
         raise SystemExit("full execution requires --runtime-image")
     try:
@@ -531,6 +660,10 @@ def main(argv: list[str] | None = None) -> int:
             arguments.workspace,
             runtime_image_digest=arguments.runtime_image_digest,
             materialize_models=not arguments.prepare_only,
+            evidence_signing_key=arguments.evidence_signing_key,
+            verifier_signing_key=arguments.verifier_signing_key,
+            trust_root=arguments.trust_root,
+            ephemeral_trust_root=arguments.ephemeral_trust_root,
         )
         print(f"Prepared: {paths.root}")
         print(f"Request: {paths.request}")

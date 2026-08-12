@@ -33,10 +33,16 @@ def pinned_version(profile: dict[str, Any]) -> str:
     return f"`{package['name']}{separator}{package['version']}`"
 
 
-def qualification(profile: dict[str, Any]) -> str:
+def adapter_support(profile: dict[str, Any]) -> str:
+    if profile["support_status"] != "maintained_adapter":
+        raise ValueError("unsupported adapter support status")
+    return "Maintained"
+
+
+def replay_authority(profile: dict[str, Any]) -> str:
     authority = profile["authority"]
     if authority["mode"] == "deterministic_per_record":
-        return "Per-record"
+        return "Independently replayable"
     reason = str(authority["reason"]).replace("_", " ")
     return f"Observation-only: {reason}"
 
@@ -63,8 +69,8 @@ def render() -> str:
                 f"### {category['display_name']}",
                 "",
                 "| Upstream evaluator | Pinned version | Executed upstream entry "
-                "point | Qualification profile | Authoritative import | "
-                "End-to-end transaction |",
+                "point | Adapter support | Replay authority | "
+                "Retained signed transaction |",
                 "| --- | --- | --- | --- | --- | --- |",
             ]
         )
@@ -75,20 +81,21 @@ def render() -> str:
             profile_id = profile["profile_id"]
             levels = demonstrations[profile_id]
             raw = load(ROOT / "artifacts" / profile_id / "upstream-output.json")
-            authoritative = (
-                f"{record_count} records" if levels["authoritative_import"] else "No"
-            )
             end_to_end = (
                 "Demonstrated"
-                if levels["end_to_end_transaction"]
+                if levels["retained_signed_transaction"]
                 else "Not yet demonstrated"
             )
             cells = (
                 profile["display_name"],
                 pinned_version(profile),
                 f"`{raw['entrypoint']}`",
-                qualification(profile),
-                authoritative,
+                adapter_support(profile),
+                (
+                    f"Independently replayable ({record_count} records)"
+                    if profile["authority"]["mode"] == "deterministic_per_record"
+                    else replay_authority(profile)
+                ),
                 end_to_end,
             )
             lines.append(

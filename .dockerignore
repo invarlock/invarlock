@@ -16,6 +16,12 @@
 !requirements/workflows/multimodal-runtime-py312.txt
 !requirements/workflows/lm-evaluation-harness-py312.txt
 !requirements/workflows/lm-evaluation-harness-upstream-wheel.txt
+!requirements/workflows/inspect-ai-level3.in
+!requirements/workflows/inspect-ai-level3-py312.txt
+!requirements/workflows/lighteval-level3.in
+!requirements/workflows/lighteval-level3-py312.txt
+!requirements/workflows/openai-evals-level3.in
+!requirements/workflows/openai-evals-level3-py312.txt
 !scripts/
 !scripts/security/
 !scripts/security/build_cache_free_lm_eval_wheel.py
@@ -23,6 +29,13 @@
 !examples/integrations/
 !examples/integrations/lm-evaluation-harness/
 !examples/integrations/lm-evaluation-harness/example.py
+!examples/integrations/evaluator_level3.py
+!examples/integrations/inspect-ai/
+!examples/integrations/inspect-ai/Dockerfile
+!examples/integrations/lighteval/
+!examples/integrations/lighteval/Dockerfile
+!examples/integrations/openai-evals/
+!examples/integrations/openai-evals/Dockerfile
 !runtime/
 !runtime/Dockerfile
 !runtime/Dockerfile.cuda

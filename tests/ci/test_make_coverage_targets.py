@@ -110,6 +110,7 @@ def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:
     for test_file in (
         "test_coverage_branch_rate.py",
         "test_public_evidence_audit.py",
+        "test_public_text_check.py",
         "test_check_repo_cruft.py",
         "test_sync_packaged_contracts.py",
         "test_sync_packaged_public_evidence.py",
@@ -222,6 +223,8 @@ def test_primary_verification_and_coverage_targets_default_to_parallel() -> None
     assert (
         "reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90" in MAKEFILE
     )
+    assert "--class-exemptions reports/examples-cov.xml examples" in MAKEFILE
+    assert "examples/coverage-exemptions.txt" in MAKEFILE
 
 
 def test_primary_verification_runs_independent_suites_with_bounded_parallelism() -> (

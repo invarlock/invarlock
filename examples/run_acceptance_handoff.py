@@ -7,6 +7,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import shutil
 import stat
 import tempfile
@@ -208,7 +209,7 @@ def _recipient_policy(
             "max_evidence_age_seconds": max_evidence_age_seconds,
             "clock_skew_seconds": 0,
         },
-        "allowed_contract_versions": versions or ["0.13.0"],
+        "allowed_contract_versions": versions or ["0.15.0"],
         "required_technical_verdict": "pass",
         "allow_countersigned_receipts": True,
     }
@@ -580,6 +581,34 @@ def write_golden(destination: Path = GOLDEN_ROOT) -> None:
         _copy_golden(workspace, destination)
 
 
+def print_handoff_summary(workspace: Path) -> None:
+    """Print the useful decision and signed outputs from a successful handoff."""
+
+    results = json.loads((workspace / "results.json").read_bytes())
+    scenarios = results.get("scenarios")
+    if not isinstance(scenarios, dict) or scenarios.get("accepted") is not True:
+        raise RuntimeError("acceptance handoff summary is invalid")
+    rejection_results = {
+        name: passed for name, passed in scenarios.items() if name != "accepted"
+    }
+    if not rejection_results or any(
+        passed is not True for passed in rejection_results.values()
+    ):
+        raise RuntimeError("acceptance handoff rejection summary is invalid")
+
+    print("PASS offline acceptance handoff")
+    print("Fixture decision: accepted")
+    print(
+        "Fail-closed scenarios rejected: "
+        f"{len(rejection_results)}/{len(rejection_results)}"
+    )
+    print(f"Signed evidence: {workspace / 'handoff/evidence'}")
+    print(f"Signed verifier receipt: {workspace / 'handoff/verification.receipt.json'}")
+    print(f"Acceptance envelope: {workspace / 'handoff/acceptance.dsse.json'}")
+    print(f"Scenario results: {workspace / 'results.json'}")
+    print(f"Workspace: {workspace}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="run the offline acceptance handoff")
     parser.add_argument("--workspace", type=Path)
@@ -596,13 +625,13 @@ def main() -> int:
         print(f"PASS generated golden handoff package: {GOLDEN_ROOT}")
         return 0
     workspace = (
-        args.workspace.resolve()
+        Path(os.path.abspath(args.workspace.expanduser()))
         if args.workspace is not None
         else Path(tempfile.mkdtemp(prefix="invarlock-acceptance-handoff-")).resolve()
         / "workspace"
     )
     run_handoff(workspace)
-    print(f"PASS offline acceptance handoff: {workspace}")
+    print_handoff_summary(workspace)
     return 0
 
 

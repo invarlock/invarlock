@@ -10,7 +10,10 @@ InvarLock's built-in Hugging Face runtime.
 From a clean checkout with `uv` and Docker or Podman installed:
 
 ```bash
-make example-peft-lora
+make example-peft-lora \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/peft-lora"
 ```
 
 The command installs the locked PEFT example dependency, builds the
@@ -29,7 +32,10 @@ worker:
 
 ```bash
 make example-peft-lora \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs"
+  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/peft-lora"
 ```
 
 CUDA is selected when available and CPU remains supported. The first run needs

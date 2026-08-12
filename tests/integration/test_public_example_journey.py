@@ -186,6 +186,7 @@ def test_hf_integration_prepares_from_committed_export(tmp_path: Path) -> None:
             str(workspace),
             "--runtime-image-digest",
             "sha256:" + ("0" * 64),
+            "--ephemeral-trust-root",
             "--prepare-only",
         ],
         cwd=exported,
@@ -247,11 +248,13 @@ def test_every_example_request_input_is_present_in_committed_head(
         assert (REPO_ROOT / repository_path).is_file()
 
 
-def test_only_fixed_runtime_receipts_are_unignored() -> None:
-    fixture_receipts = {
+def test_only_bounded_fixture_receipts_are_unignored() -> None:
+    receipt_exceptions = {
+        "examples/evaluator-qualification/signed-transactions/*/evidence/providers/*/runtime-provider.receipt.json",
+        "examples/evaluator-qualification/signed-transactions/*/verification.receipt.json",
         "examples/import/baseline/runtime-provider.receipt.json",
-        "examples/import/subject/runtime-provider.receipt.json",
         "examples/import/rejected-subject/runtime-provider.receipt.json",
+        "examples/import/subject/runtime-provider.receipt.json",
     }
     ignore_lines = (
         (REPO_ROOT / "examples/.gitignore").read_text(encoding="utf-8").splitlines()
@@ -260,7 +263,18 @@ def test_only_fixed_runtime_receipts_are_unignored() -> None:
         f"examples/{line.removeprefix('!')}"
         for line in ignore_lines
         if line.startswith("!")
-    } == fixture_receipts
+    } == receipt_exceptions
+    fixture_receipts = {
+        "examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json",
+        "examples/evaluator-qualification/signed-transactions/inspect-ai/evidence/providers/baseline/runtime-provider.receipt.json",
+        "examples/evaluator-qualification/signed-transactions/inspect-ai/evidence/providers/subject/runtime-provider.receipt.json",
+        "examples/evaluator-qualification/signed-transactions/lm-evaluation-harness/verification.receipt.json",
+        "examples/evaluator-qualification/signed-transactions/lm-evaluation-harness/evidence/providers/baseline/runtime-provider.receipt.json",
+        "examples/evaluator-qualification/signed-transactions/lm-evaluation-harness/evidence/providers/subject/runtime-provider.receipt.json",
+        "examples/import/baseline/runtime-provider.receipt.json",
+        "examples/import/rejected-subject/runtime-provider.receipt.json",
+        "examples/import/subject/runtime-provider.receipt.json",
+    }
     for receipt in fixture_receipts:
         assert _git("check-ignore", "--quiet", receipt).returncode == 1
 
@@ -399,7 +413,7 @@ def test_checked_in_example_completes_the_public_signed_journey(
         "minimum": -10.0,
         "value": 0.0,
     }
-    assert report["format"] == "invarlock/comparison-report-v2"
+    assert report["format"] == "invarlock/comparison-report-v3"
     assert report["sample_qualification"] == {
         "record_count": {"minimum": 50, "observed": 50, "passed": True},
         "interval_width": {
@@ -469,7 +483,7 @@ def test_trust_boundary_demo_accepts_rejects_and_detects_tampering(
             / "verifier/submissions/rejected-evidence/reports/evaluation.report.json"
         ).read_text(encoding="utf-8")
     )
-    assert rejected_report["format"] == "invarlock/comparison-report-v2"
+    assert rejected_report["format"] == "invarlock/comparison-report-v3"
     assert rejected_report["comparison"] == {
         "kind": "exact_match_delta_pp",
         "minimum": -10.0,

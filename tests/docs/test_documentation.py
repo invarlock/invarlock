@@ -166,6 +166,7 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     readme = _read("README.md")
     headings = (
         "## Evidence paths",
+        "## Decision boundary",
         "## Try the signed handoff locally",
         "## Inspect published evidence",
         "## Run, verify, and report",
@@ -178,23 +179,33 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     positions = [readme.index(heading) for heading in headings]
 
     assert positions == sorted(positions)
-    evidence_paths = readme[
-        positions[0] : readme.index("## Try the signed handoff locally")
-    ]
+    evidence_paths = readme[positions[0] : positions[1]]
     for phrase in (
         "Native execution",
-        "Qualified import",
-        "Authenticated observation",
-        "core exposes evaluator-neutral contracts",
+        "Adapter support",
+        "Replay authority",
+        "Signed-journey maturity",
+        "evaluator-neutral contracts",
     ):
         assert phrase in evidence_paths
     assert evidence_paths.index("evaluation-verification-flow.svg") < (
-        evidence_paths.index("| Path |")
+        evidence_paths.index("| Axis |")
     )
 
     introduction = readme[: positions[0]]
     assert "in-toto/DSSE" not in introduction
-    acceptance = readme[positions[6] : positions[7]]
+    decision_boundary = " ".join(readme[positions[1] : positions[2]].split())
+    for phrase in (
+        "one precise question",
+        "authenticated evidence and independently supplied trust anchors",
+        "reproducible, portable, and suitable for recipient-controlled approval",
+        "Broader deployment, safety, compliance, and organizational decisions",
+        "complete claim boundary and assumptions",
+    ):
+        assert phrase in decision_boundary
+    assert "## Scope and non-goals" not in readme
+
+    acceptance = readme[positions[7] : positions[8]]
     assert "in-toto/DSSE" in acceptance
     assert "**Compatibility note:**" in acceptance
 
@@ -330,25 +341,26 @@ def test_runtime_qualification_docs_use_authenticated_candidate_wheels() -> None
 def test_documentation_lint_covers_maintained_markdown_surfaces() -> None:
     makefile = _read("Makefile")
     workflow = _read(".github/workflows/docs-ci.yml")
-    for pattern in (
-        "CODE_OF_CONDUCT.md",
-        "SUPPORT.md",
-        "THIRD_PARTY_NOTICES.md",
-        '".github/**/*.md"',
-        '"examples/**/*.md"',
-        '"requirements/**/*.md"',
-        '"tests/README.md"',
-    ):
-        assert makefile.count(pattern) == 2
+    assert makefile.count("git ls-files -z -- ':(icase,glob)**/*.md'") == 2
+    assert makefile.count("xargs -0") == 2
+    assert "scripts/checks/check_public_text.py" in makefile
+
     for pattern in (
         "- '*.md'",
+        "- '*.MD'",
+        "- '**/*.md'",
+        "- '**/*.MD'",
+        "- 'tests/docs/**'",
+    ):
+        assert workflow.count(pattern) == 2
+
+    for obsolete_pattern in (
         "- '.github/**/*.md'",
         "- 'examples/**/*.md'",
         "- 'requirements/**/*.md'",
         "- 'tests/README.md'",
-        "- 'tests/docs/**'",
     ):
-        assert workflow.count(pattern) == 2
+        assert obsolete_pattern not in workflow
 
 
 def test_docs_describe_the_narrow_engine_and_embedding_facade() -> None:
@@ -735,15 +747,15 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     text = _read("docs/reference/evaluator-qualification.md")
     normalized = " ".join(text.split())
 
-    assert "Qualification profile" in text
-    assert "Authoritative import adapter" in text
-    assert "End-to-end release-assurance journey" in text
+    assert "Adapter support" in text
+    assert "Replay authority" in text
+    assert "Signed-journey maturity" in text
     assert "LM Evaluation Harness" in text
-    assert "every retained authoritative import" in normalized
+    assert "every retained independently replayable import" in normalized
     assert "102-record" in text
-    assert "cumulative claims" in text
-    assert "not permanent evaluator classes" in text
-    assert "Profiles can advance" in text
+    assert "does not assign one cumulative" in text
+    assert "release focus is deliberately compact" in normalized
+    assert "profile count is not a release gate" in normalized
     assert "Benchmark harnesses" in text
     assert "Application evaluation SDKs" in text
     assert "Evaluation and observability platforms" in text

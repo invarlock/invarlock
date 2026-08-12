@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -15,6 +14,13 @@ import modelopt.torch.quantization as mtq
 import torch
 from modelopt.torch.export import export_tensorrt_llm_checkpoint
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+try:  # pragma: no cover - flat-script compatibility
+    from examples.integrations.bounded_command import run_bounded_command
+except ModuleNotFoundError as exc:
+    if exc.name != "examples":
+        raise
+    from bounded_command import run_bounded_command  # type: ignore[no-redef]
 
 
 def _canonical_tokenizer_contract(model: Path) -> bytes:
@@ -130,7 +136,7 @@ def _build(checkpoint: Path, engine: Path, *, quantization: str) -> None:
     executable = shutil.which("trtllm-build")
     if executable is None:
         raise RuntimeError("trtllm-build is unavailable in the runtime image")
-    subprocess.run(
+    run_bounded_command(
         [
             executable,
             "--checkpoint_dir",
@@ -153,6 +159,7 @@ def _build(checkpoint: Path, engine: Path, *, quantization: str) -> None:
             "1024",
         ],
         check=True,
+        label="TensorRT-LLM engine build",
     )
     expected = {"config.json", "rank0.engine"}
     observed = {path.name for path in engine.iterdir() if path.is_file()}

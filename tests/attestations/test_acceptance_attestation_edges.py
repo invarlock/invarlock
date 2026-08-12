@@ -128,7 +128,7 @@ def _policy(
             "max_evidence_age_seconds": None,
             "clock_skew_seconds": 0,
         },
-        "allowed_contract_versions": ["0.13.0"],
+        "allowed_contract_versions": ["0.15.0"],
         "required_technical_verdict": "pass",
         "allow_countersigned_receipts": True,
     }
@@ -191,6 +191,28 @@ def _resign_receipt(
 def test_scalar_contract_helpers_fail_closed(action: Any, message: str) -> None:
     with pytest.raises(AcceptanceAttestationError, match=message):
         action()
+
+
+@pytest.mark.parametrize(
+    ("report_format", "expected_release"),
+    [
+        ("invarlock/comparison-report-v1", "0.13.0"),
+        ("invarlock/comparison-report-v2", "0.13.0"),
+        ("invarlock/comparison-report-v3", "0.15.0"),
+    ],
+)
+def test_contract_release_tracks_the_report_semantics(
+    report_format: str,
+    expected_release: str,
+) -> None:
+    assert (
+        target._contract_release(
+            "invarlock/evidence-verification-receipt-v1",
+            "invarlock/evidence-pack-v1",
+            report_format,
+        )
+        == expected_release
+    )
 
 
 def test_object_and_key_loaders_reject_malformed_or_wrong_types(

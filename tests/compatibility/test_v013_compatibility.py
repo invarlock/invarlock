@@ -89,6 +89,10 @@ def _mutate(value: dict[str, Any], path: list[str], replacement: object) -> None
 def test_v013_corpus_inventory_is_immutable() -> None:
     case = _case()
     evidence, receipt, _policy = _paths(case)
+    package = FIXTURE_ROOT / "package"
+    assert evidence.is_relative_to(package)
+    assert receipt.is_relative_to(package)
+    assert _policy.is_relative_to(package)
     files = {
         "manifest": evidence / "manifest.json",
         "receipt": receipt,

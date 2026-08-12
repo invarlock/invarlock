@@ -32,6 +32,7 @@ def communicate_bounded(
     timeout_seconds: int,
     stdout_limit: int,
     stderr_limit: int,
+    stdout_destination: BinaryIO | None = None,
     error_type: type[Exception],
     timeout_label: str,
     output_label: str,
@@ -53,6 +54,7 @@ def communicate_bounded(
 
         selector = selectors.DefaultSelector()
         stdout = bytearray()
+        stdout_size = 0
         stderr = bytearray()
         input_offset = 0
         if not input_bytes and process.stdin is not None:
@@ -101,16 +103,27 @@ def communicate_bounded(
                 if not chunk:
                     close_selector_stream(selector, stream)
                     continue
-                target = stdout if key.data == "stdout" else stderr
-                target.extend(chunk)
-                limit = stdout_limit if key.data == "stdout" else stderr_limit
-                if len(target) > limit:
+                if key.data == "stdout":
+                    stdout_size += len(chunk)
+                    if stdout_destination is None:
+                        stdout.extend(chunk)
+                    else:
+                        stdout_destination.write(chunk)
+                    observed_size = stdout_size
+                    limit = stdout_limit
+                else:
+                    stderr.extend(chunk)
+                    observed_size = len(stderr)
+                    limit = stderr_limit
+                if observed_size > limit:
                     raise error_type(f"{output_label} {key.data} limit exceeded")
 
         try:
             status = process.wait(timeout=max(0.1, deadline - time.monotonic()))
         except subprocess.TimeoutExpired as exc:
             raise error_type(f"{timeout_label} timed out") from exc
+        if stdout_destination is not None:
+            stdout_destination.flush()
         failed = False
         return status, bytes(stdout), bytes(stderr)
     finally:

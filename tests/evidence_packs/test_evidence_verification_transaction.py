@@ -86,6 +86,34 @@ def test_independent_verification_user_journey_emits_a_signed_external_receipt(
     assert '"ok":true' in verified.as_json()
 
 
+def test_generic_verification_leaves_signer_role_separation_to_the_caller(
+    tmp_path: Path,
+) -> None:
+    pack, policy, signer, runtimes, evidence_key, arguments = _publish(tmp_path)
+    baseline = arguments["baseline"]
+    subject = arguments["subject"]
+    dataset = arguments["dataset"]
+
+    receipt = tmp_path / "same-signer.receipt.json"
+    verified = verify_evidence(
+        pack,
+        policy_path=policy,
+        expected_baseline_artifact=baseline.digest,
+        expected_subject_artifact=subject.digest,
+        expected_schedule=dataset.digest,
+        expected_baseline_runtime=runtimes["baseline"],
+        expected_subject_runtime=runtimes["subject"],
+        expected_signer=signer,
+        expected_request_digest=sha256_digest((pack / "request.json").read_bytes()),
+        receipt_path=receipt,
+        verifier_signing_key_path=evidence_key,
+        verifier_identity="invarlock-verifier/release",
+    )
+
+    assert verified.receipt_path == receipt.resolve()
+    assert receipt.is_file()
+
+
 def test_failed_policy_is_reported_after_signing_the_verification_receipt(
     tmp_path: Path,
 ) -> None:

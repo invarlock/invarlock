@@ -3,7 +3,10 @@
 Run a complete image-and-text comparison with one command:
 
 ```console
-make example-hf-vision-text
+make example-hf-vision-text \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/hf-vision-text"
 ```
 
 The command downloads the immutable Qwen2-VL 2B and 7B revisions, verifies the
@@ -37,7 +40,10 @@ an explicit new workspace with `EXAMPLE_ARGS`:
 
 ```console
 make example-hf-vision-text \
-  EXAMPLE_ARGS="--runtime-device cuda:1 --workspace /tmp/invarlock-vision"
+  EXAMPLE_ARGS="--runtime-device cuda:1 --workspace /tmp/invarlock-vision \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/hf-vision-text"
 ```
 
 The command prints the workspace, evidence pack, signed verification receipt,
@@ -46,12 +52,15 @@ and HTML report paths when it completes.
 ## Inspect the transaction without GPU work
 
 Preparation-only mode creates the request, four-record schedule, content store,
-policy, signing keys, and independent trust profile. It does not download the
+policy, and independent trust profile from the caller-owned signing keys. It does not download the
 checkpoints, build an image, initialize CUDA, or execute either model:
 
 ```console
 make example-hf-vision-text \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-vision-inputs"
+  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-vision-inputs \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/hf-vision-text"
 ```
 
 The model directories contain only coordinate markers in this mode, not model

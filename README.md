@@ -36,7 +36,7 @@ against independently supplied trust anchors.
 
 ## Evidence paths
 
-Native execution and qualified import converge on the same signed evidence,
+Native execution and independently replayable import converge on the same signed evidence,
 independent verification, and reporting transaction:
 
 <p align="center">
@@ -62,16 +62,37 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-External evaluator adapters normalize source exports through the same
-versioned JSON, CLI, and Python qualification contracts. They remain in the
-example and integration layer; the core exposes evaluator-neutral contracts.
-The engine distinguishes three evidence paths:
+Native execution receives pinned artifacts, evaluation source, runtime,
+deterministic scoring, and policy; InvarLock runs both sides and derives the
+paired result. External evaluator adapters remain in the example and
+integration layer and normalize source exports through evaluator-neutral
+contracts; the core exposes evaluator-neutral contracts only. Their status is
+recorded on three independent axes:
 
-| Path | What enters InvarLock | Decision authority |
+| Axis | Values | Meaning |
 | --- | --- | --- |
-| Native execution | Pinned artifacts, evaluation source, runtime, metric or deterministic scorer, and policy | InvarLock runs both sides and derives the paired result |
-| Qualified import | Complete ordered per-record results, provenance, identities, schedule, and runtime bindings | InvarLock authenticates the import and recomputes the supported result |
-| Authenticated observation | Aggregate-only results, external judges, or other non-replayable context | Preserved as signed context; replayable evidence retains verdict authority |
+| Adapter support | Maintained or external | Whether an adapter and pinned upstream entry point are maintained; this grants no decision authority |
+| Replay authority | Independently replayable or observation-only | Whether complete ordered facts can be deterministically recomputed, or can only be preserved as authenticated context |
+| Signed-journey maturity | Retained or not yet demonstrated | Whether a model-running signed `evaluate` → `verify` → `report` OCI transaction has been retained |
+
+The stable qualification result expresses replay authority as
+`verdict_authority` or `observation_only`. Adapter support and signed-journey
+maturity are catalog metadata, not fields that an imported result can claim
+for itself.
+
+## Decision boundary
+
+InvarLock answers one precise question: whether a subject artifact satisfies an
+agreed release-regression policy relative to a baseline, using authenticated
+evidence and independently supplied trust anchors. It makes that decision
+reproducible, portable, and suitable for recipient-controlled approval.
+
+The decision remains bounded by the supplied evidence and identities. Broader
+deployment, safety, compliance, and organizational decisions remain with their
+corresponding controls and reviewers. See the
+[threat model](https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md#explicit-non-goals)
+and [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md)
+for the complete claim boundary and assumptions.
 
 ## Try the signed handoff locally
 
@@ -89,7 +110,9 @@ make example-acceptance-handoff
 ```
 
 The command runs from checked-in fixtures in a temporary workspace using the
-installed package on a regular CPU. See the
+installed package on a regular CPU. It prints the fixture decision, the number
+of rejected fail-closed scenarios, and direct paths to the signed evidence,
+verifier receipt, acceptance envelope, and machine-readable results. See the
 [offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff).
 
 ## Inspect published evidence
@@ -185,7 +208,7 @@ JSON, the `invarlock-qualify-evaluator` companion CLI, and
 proprietary evaluators reached through an SDK, CLI, or API normalize into that
 same boundary outside the core.
 
-Verdict authority requires complete ordered per-record evidence that passes
+Independent replay requires complete ordered per-record evidence that passes
 identity, provenance, schedule, and deterministic recomputation requirements.
 Aggregate-only outputs and unsupported judge results remain observation-only.
 A signed observation proves what was supplied; a replayable source additionally
@@ -193,20 +216,25 @@ requires the identity, schedule, and recomputation guarantees above.
 
 The maintained
 [evaluator qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
-groups recognizable upstream evaluators by role and records their source
-version, evidence granularity, identity and provenance binding, replay status,
-and authority boundary. Each authoritative import demonstration starts with
+groups recognizable upstream evaluators by role and records adapter support,
+source version, replay authority, and retained signed-journey maturity. Each
+independently replayable import starts with
 retained output from a pinned real model evaluation, passes through a
 source-shaped adapter, and completes the closed import replay. The matrix
-separately records model-running signed journeys. These are example-owned
-adapters and profiles; new profiles extend the same evaluator-neutral engine
-contract.
+is a secondary compatibility catalog rather than a release breadth target.
+LM Evaluation Harness and Inspect AI are the compact flagship set. These are
+example-owned adapters and profiles; new profiles extend the same
+evaluator-neutral engine contract. The retained
+[flagship proof map](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/signed-transactions/README.md#flagship-proof-map)
+links each upstream output, qualified import, signed transaction, and verifier
+receipt.
 
 The
 [`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
 directory contains maintained artifact-producing journeys for Hugging Face,
 PEFT, TorchAO, GGUF/llama.cpp, TensorRT-LLM, Hugging Face vision-text, and LM
-Evaluation Harness. The
+Evaluation Harness, plus the compact Inspect AI bridge. OpenAI Evals has a
+maintained native adapter without retained signed-journey evidence. The
 [model-change workflow guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md)
 maps common model and runtime changes to native execution, optional-runtime, or
 import boundaries.

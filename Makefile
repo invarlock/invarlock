@@ -56,13 +56,13 @@ MYPY_TYPED_SURFACE := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus evaluator-docs-matrix-check
+.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
-.PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
+.PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
-.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-strict docs-check-build docs-check-links
+.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
 .PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke packaging-smoke-minimal packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
@@ -237,13 +237,14 @@ coverage-examples:  ## Enforce branch-aware coverage for example launchers
 			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
 		done
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
-	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
 coverage-maintenance:  ## Measure maintained repository checks and security tooling
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/ci/test_coverage_branch_rate.py \
 		tests/ci/test_public_evidence_audit.py \
+		tests/ci/test_public_text_check.py \
 		tests/scripts/test_check_repo_cruft.py \
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
@@ -271,7 +272,9 @@ coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in para
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
-		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90
+		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90 \
+		--class-exemptions reports/examples-cov.xml examples \
+		examples/coverage-exemptions.txt
 
 coverage-enforce-parallel: PYTEST_WORKERS = 2
 coverage-enforce-parallel:  ## Enforce coverage with pytest-xdist
@@ -295,17 +298,17 @@ example-acceptance-handoff:  ## Run the service-free acceptance handoff
 
 evaluator-qualification:  ## Requalify the retained evaluator matrix offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
-	$(MAKE) evaluator-authoritative-imports
+	$(MAKE) evaluator-replayable-imports
 
-evaluator-authoritative-imports:  ## Replay authoritative 102-record imports offline
-	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
+evaluator-replayable-imports:  ## Replay independently replayable 102-record imports
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
 evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
-	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-authoritative
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-replayable
 	$(MAKE) evaluator-qualification
 
-evaluator-authoritative-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
+evaluator-replayable-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
 	PYTHONPATH=src:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 		uv run --isolated --locked --extra hf python \
 		examples/evaluator-qualification/authoritative/generate_cases.py --check
@@ -338,6 +341,14 @@ example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
 	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
 		examples/integrations/lm-evaluation-harness/launch.py $(EXAMPLE_ARGS)
+
+example-inspect-ai:  ## Run Inspect AI through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/inspect-ai/launch.py $(EXAMPLE_ARGS)
+
+example-openai-evals:  ## Run OpenAI Evals through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/openai-evals/launch.py $(EXAMPLE_ARGS)
 
 example-tensorrt-llm:  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
 	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --extra hf \
@@ -543,25 +554,18 @@ evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
 
 docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
 
-docs-lint: docs-lint-markdown docs-lint-spell  ## Run established documentation linters
+docs-lint: docs-lint-markdown docs-lint-spell docs-lint-public-text  ## Run documentation linters and public-text checks
 
 docs-lint-strict: docs-lint  ## Strict documentation lint alias
 
 docs-lint-markdown:  ## Run markdownlint-cli2
-	npx --no-install markdownlint-cli2 README.md CODE_OF_CONDUCT.md \
-		CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_NOTICES.md \
-		".github/**/*.md" \
-		"docs/**/*.md" "scripts/**/*.md" "public_evidence/**/*.md" \
-		"examples/**/*.md" "requirements/**/*.md" "tests/README.md" \
-		"addins/**/*.md"
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint-cli2 --
 
 docs-lint-spell:  ## Run cspell
-	npx --no-install cspell --no-progress README.md CODE_OF_CONDUCT.md \
-		CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_NOTICES.md \
-		".github/**/*.md" \
-		"docs/**/*.md" "scripts/**/*.md" "public_evidence/**/*.md" \
-		"examples/**/*.md" "requirements/**/*.md" "tests/README.md" \
-		"addins/**/*.md"
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install cspell --no-progress --
+
+docs-lint-public-text:  ## Reject private operational details and process-only wording
+	$(PYTHON) scripts/checks/check_public_text.py
 
 ##@ Packaging and security
 actionlint:  ## Lint GitHub Actions workflows

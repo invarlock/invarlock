@@ -1,0 +1,3 @@
+# Inspect AI evaluator image closure. It is installed into an isolated evaluator
+# environment because this pinned release requires click below 8.2.2.
+inspect-ai==0.3.254

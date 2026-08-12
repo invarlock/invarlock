@@ -5,13 +5,14 @@ import hashlib
 import json
 import math
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import yaml
 
-from examples.integrations import launch, local_registry, qwen3_profile
+from examples.integrations import launch, local_registry, qwen3_profile, trust_material
 from examples.integrations import run as integration
 
 ZERO_DIGEST = "sha256:" + ("0" * 64)
@@ -137,6 +138,84 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
             path.stat().st_mode & (0o005 if path.is_dir() else 0o004)
             for path in model_root.rglob("*")
         )
+
+
+def test_hf_preparation_uses_caller_owned_external_trust_material(
+    tmp_path: Path,
+) -> None:
+    evidence_key = tmp_path / "evidence.pem"
+    verifier_key = tmp_path / "verifier.pem"
+    integration._write_private_key(evidence_key)
+    integration._write_private_key(verifier_key)
+    trust_root = tmp_path / "trust" / "hf"
+    trust_root.parent.mkdir()
+
+    paths, _anchors = integration._prepare_workspace(
+        tmp_path / "external",
+        integration="hf-transformers",
+        runtime_image_digest=ZERO_DIGEST,
+        evidence_signing_key=evidence_key,
+        verifier_signing_key=verifier_key,
+        trust_root=trust_root,
+        ephemeral_trust_root=False,
+    )
+
+    assert paths.evidence_key == evidence_key.resolve()
+    assert paths.verifier_key == trust_root / "verifier.pem"
+    assert paths.trusted_inputs == trust_root / "trusted-inputs.json"
+    assert paths.independent_policy == trust_root / "policy/acceptance.json"
+    assert not (paths.root / "keys").exists()
+    assert not (paths.root / "verifier").exists()
+    assert json.loads(paths.independent_policy.read_text()) == json.loads(
+        (paths.evaluation / "inputs/acceptance.json").read_text()
+    )
+
+    with pytest.raises(ValueError, match="trust root must be new"):
+        integration._prepare_workspace(
+            tmp_path / "existing-trust-rejected",
+            integration="hf-transformers",
+            runtime_image_digest=ZERO_DIGEST,
+            evidence_signing_key=evidence_key,
+            verifier_signing_key=verifier_key,
+            trust_root=trust_root,
+            ephemeral_trust_root=False,
+        )
+
+
+def test_external_trust_material_rejects_intermediate_symlink_aliases(
+    tmp_path: Path,
+) -> None:
+    transaction = tmp_path / "transaction"
+    transaction.mkdir()
+    inside = transaction / "inside"
+    inside.mkdir()
+    key_inside = inside / "key.pem"
+    integration._write_private_key(key_inside)
+    key_alias = tmp_path / "key-alias"
+    key_alias.symlink_to(inside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Ed25519 private key"):
+        trust_material.load_external_key(
+            key_alias / key_inside.name,
+            transaction_root=transaction,
+            label="evidence signing key",
+        )
+
+    trust_alias = tmp_path / "trust-alias"
+    trust_alias.symlink_to(inside, target_is_directory=True)
+    with pytest.raises(ValueError, match="without symlinks"):
+        trust_material.create_trust_material(
+            transaction_root=transaction,
+            evidence_key=tmp_path / "evidence.pem",
+            verifier_key_bytes=b"verifier",
+            evidence_fingerprint="evidence",
+            verifier_fingerprint="verifier",
+            trust_root=trust_alias / "profile",
+            policy_bytes=b"{}\n",
+            verifier_identity="test/verifier",
+            anchors={},
+        )
+    assert not (inside / "profile").exists()
 
 
 def test_hf_preparation_can_author_an_exact_match_transaction(tmp_path: Path) -> None:
@@ -624,6 +703,74 @@ def test_preparation_rejects_existing_and_unknown_workspace(tmp_path: Path) -> N
         )
 
 
+def test_preparation_rejects_incoherent_trust_modes(tmp_path: Path) -> None:
+    key = tmp_path / "key.pem"
+    integration._write_private_key(key)
+    common = {
+        "integration": "hf-transformers",
+        "runtime_image_digest": ZERO_DIGEST,
+    }
+
+    with pytest.raises(ValueError, match="must be supplied together"):
+        integration._prepare_workspace(
+            tmp_path / "partial-trust",
+            evidence_signing_key=key,
+            **common,
+        )
+    with pytest.raises(ValueError, match="cannot use ephemeral mode"):
+        integration._prepare_workspace(
+            tmp_path / "mixed-trust",
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "mixed-trust-root",
+            **common,
+        )
+    with pytest.raises(ValueError, match="caller-owned"):
+        integration._prepare_workspace(
+            tmp_path / "missing-trust",
+            ephemeral_trust_root=False,
+            **common,
+        )
+    with pytest.raises(ValueError, match="must be distinct"):
+        integration._prepare_workspace(
+            tmp_path / "shared-key",
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "shared-key-trust",
+            ephemeral_trust_root=False,
+            **common,
+        )
+
+
+def test_hf_subject_transformation_rejects_a_nonpositive_margin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import torch
+    import transformers
+
+    model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+        torch=torch,
+        transformers=transformers,
+    )
+    with torch.no_grad():
+        model.lm_head.weight.zero_()
+    monkeypatch.setattr(
+        torch.linalg,
+        "lstsq",
+        lambda rows, _desired: SimpleNamespace(
+            solution=torch.zeros((rows.shape[1], 1))
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="missed a prompt"):
+        integration._target_row_derivative(
+            model,
+            tokenizer,
+            torch,
+            expected_output=" target",
+        )
+
+
 @pytest.mark.parametrize(
     ("creator", "missing", "message"),
     (
@@ -710,8 +857,8 @@ def test_execute_invokes_public_commands_and_checks_report(
 
 def test_command_runner_surfaces_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        integration.subprocess,
-        "run",
+        integration,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 3, stdout="out\n", stderr="bad\n"
         ),
@@ -724,8 +871,8 @@ def test_command_runner_accepts_success_and_handles_empty_diagnostic(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
-        integration.subprocess,
-        "run",
+        integration,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 0, stdout="done\n", stderr=""
         ),
@@ -734,8 +881,8 @@ def test_command_runner_accepts_success_and_handles_empty_diagnostic(
     assert "done" in capsys.readouterr().out
 
     monkeypatch.setattr(
-        integration.subprocess,
-        "run",
+        integration,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 3, stdout="", stderr=""
         ),
@@ -755,6 +902,7 @@ def test_run_main_prepare_only_and_input_errors(
             "--runtime-image-digest",
             ZERO_DIGEST,
             "--prepare-only",
+            "--ephemeral-trust-root",
         ]
     )
     assert prepared == 0
@@ -770,10 +918,29 @@ def test_run_main_prepare_only_and_input_errors(
                 "--runtime-image-digest",
                 ZERO_DIGEST,
                 "--prepare-only",
+                "--ephemeral-trust-root",
             ]
         )
         == 2
     )
+    missing = tmp_path / "missing-prepared"
+    linked = tmp_path / "linked-prepared"
+    linked.symlink_to(missing, target_is_directory=True)
+    assert (
+        integration.main(
+            [
+                "hf-transformers",
+                "--workspace",
+                str(linked),
+                "--runtime-image-digest",
+                ZERO_DIGEST,
+                "--prepare-only",
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert not missing.exists()
     with pytest.raises(SystemExit, match="full execution requires"):
         integration.main(
             [
@@ -782,6 +949,38 @@ def test_run_main_prepare_only_and_input_errors(
                 str(tmp_path / "missing-image"),
                 "--runtime-image-digest",
                 ZERO_DIGEST,
+                "--ephemeral-trust-root",
+            ]
+        )
+
+
+def test_run_main_rejects_incoherent_trust_arguments(tmp_path: Path) -> None:
+    common = [
+        "hf-transformers",
+        "--workspace",
+        str(tmp_path / "workspace"),
+        "--runtime-image-digest",
+        ZERO_DIGEST,
+        "--prepare-only",
+    ]
+    key = tmp_path / "key.pem"
+    trust_root = tmp_path / "trust"
+
+    with pytest.raises(SystemExit, match="must be supplied together"):
+        integration.main([*common, "--evidence-signing-key", str(key)])
+    with pytest.raises(SystemExit, match="caller-owned"):
+        integration.main(common)
+    with pytest.raises(SystemExit, match="cannot be combined"):
+        integration.main(
+            [
+                *common,
+                "--evidence-signing-key",
+                str(key),
+                "--verifier-signing-key",
+                str(key),
+                "--trust-root",
+                str(trust_root),
+                "--ephemeral-trust-root",
             ]
         )
 
@@ -806,6 +1005,7 @@ def test_run_main_executes_the_prepared_transaction(
                 "runtime@" + ZERO_DIGEST,
                 "--runtime-image-digest",
                 ZERO_DIGEST,
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -892,14 +1092,37 @@ def test_runtime_image_builds_from_authenticated_source(
     monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
     monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
 
+    def write_statement(command: list[str]) -> None:
+        statement = Path(command[command.index("--statement") + 1])
+        statement.write_text(
+            json.dumps(
+                {
+                    "base_image": None,
+                    "build_arguments": {},
+                    "dockerfile": {"path": "runtime/Dockerfile", "sha256": ZERO_DIGEST},
+                    "format_version": "invarlock/runtime-image-build-v1",
+                    "image": "custom-example:" + "c" * 12,
+                    "ok": True,
+                    "platform": None,
+                    "runtime_image_id": "sha256:" + "d" * 64,
+                    "source_bundle_sha256": ZERO_DIGEST,
+                    "source_commit": "c" * 40,
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def fake_run(
         command: list[str], *, cwd: Path, capture_output: bool = False
     ) -> subprocess.CompletedProcess[str]:
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif "authenticated_runtime_build.py" in " ".join(command):
+            write_statement(command)
+            output = ""
         elif command[1:4] == ["image", "inspect", "--format"]:
-            output = "sha256:" + ("d" * 64)
+            output = "sha256:" + ("d" * 64) + "\t" + ("c" * 40) + "\t" + ZERO_DIGEST
         else:
             output = ""
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
@@ -923,6 +1146,69 @@ def test_runtime_image_builds_from_authenticated_source(
     assert build_command[build_command.index("--statement") + 1] == str(
         build / "runtime-build.json"
     )
+    assert not any(
+        command[:4] == ["docker", "image", "inspect", "--format"]
+        and command[-1] == "custom-example:" + "c" * 12
+        for command in commands
+    )
+
+
+def test_runtime_image_rejects_source_label_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        if "qualification_source.py" in " ".join(command):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps({"source_bundle_sha256": ZERO_DIGEST}),
+                stderr="",
+            )
+        if "authenticated_runtime_build.py" in " ".join(command):
+            Path(command[command.index("--statement") + 1]).write_text(
+                json.dumps(
+                    {
+                        "base_image": None,
+                        "build_arguments": {},
+                        "dockerfile": {
+                            "path": "runtime/Dockerfile",
+                            "sha256": ZERO_DIGEST,
+                        },
+                        "format_version": "invarlock/runtime-image-build-v1",
+                        "image": "invarlock-example-runtime:" + "c" * 12,
+                        "ok": True,
+                        "platform": None,
+                        "runtime_image_id": "sha256:" + "d" * 64,
+                        "source_bundle_sha256": ZERO_DIGEST,
+                        "source_commit": "c" * 40,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="sha256:" + "d" * 64 + "\t" + "e" * 40 + "\t" + ZERO_DIGEST,
+            stderr="",
+        )
+
+    monkeypatch.setattr(launch, "_run", fake_run)
+    with pytest.raises(RuntimeError, match="not bound to the source"):
+        launch._runtime_image(
+            repository=repository,
+            build_root=build,
+            container_engine="docker",
+        )
 
 
 def test_runtime_image_authenticates_a_layered_base(
@@ -937,14 +1223,37 @@ def test_runtime_image_authenticates_a_layered_base(
     monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
     monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
 
+    def write_statement(command: list[str]) -> None:
+        statement = Path(command[command.index("--statement") + 1])
+        statement.write_text(
+            json.dumps(
+                {
+                    "base_image": base,
+                    "build_arguments": {},
+                    "dockerfile": {"path": "runtime/Dockerfile", "sha256": ZERO_DIGEST},
+                    "format_version": "invarlock/runtime-image-build-v1",
+                    "image": "invarlock-example-runtime:" + "c" * 12,
+                    "ok": True,
+                    "platform": None,
+                    "runtime_image_id": "sha256:" + "d" * 64,
+                    "source_bundle_sha256": ZERO_DIGEST,
+                    "source_commit": "c" * 40,
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def fake_run(
         command: list[str], *, cwd: Path, capture_output: bool = False
     ) -> subprocess.CompletedProcess[str]:
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif "authenticated_runtime_build.py" in " ".join(command):
+            write_statement(command)
+            output = ""
         elif command[1:4] == ["image", "inspect", "--format"]:
-            output = "sha256:" + ("d" * 64)
+            output = "sha256:" + ("d" * 64) + "\t" + ("c" * 40) + "\t" + ZERO_DIGEST
         else:
             output = ""
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
@@ -1018,24 +1327,24 @@ def test_local_image_publication_is_digest_bound_and_disposable(
 def test_local_registry_command_runner_reports_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def fake_subprocess_run(
-        command: list[str], **_kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
-        if command == ["success"]:
-            return subprocess.CompletedProcess(command, 0, stdout="ready", stderr="")
-        if command == ["stderr"]:
-            return subprocess.CompletedProcess(command, 9, stdout="", stderr="denied")
-        return subprocess.CompletedProcess(command, 7, stdout="", stderr="")
-
-    monkeypatch.setattr(local_registry.subprocess, "run", fake_subprocess_run)
+    del monkeypatch
+    success = [sys.executable, "-c", "print('ready', end='')"]
+    stderr = [
+        sys.executable,
+        "-c",
+        "import sys; print('denied', file=sys.stderr); sys.exit(9)",
+    ]
+    silent = [sys.executable, "-c", "import sys; sys.exit(7)"]
     assert (
-        local_registry._run(["success"], cwd=tmp_path, capture_output=True).stdout
+        local_registry._run(success, cwd=tmp_path, capture_output=True).stdout
         == "ready"
     )
-    with pytest.raises(RuntimeError, match=r"status 9: stderr\ndenied"):
-        local_registry._run(["stderr"], cwd=tmp_path)
-    with pytest.raises(RuntimeError, match=r"status 7: silent$"):
-        local_registry._run(["silent"], cwd=tmp_path)
+    with pytest.raises(RuntimeError, match=r"status 9: .*denied"):
+        local_registry._run(stderr, cwd=tmp_path)
+    with pytest.raises(RuntimeError, match=r"status 7:"):
+        local_registry._run(silent, cwd=tmp_path)
+    with pytest.raises(RuntimeError, match="could not start"):
+        local_registry._run([str(tmp_path / "missing-command")], cwd=tmp_path)
 
 
 def test_local_image_publication_cleans_nothing_when_volume_creation_fails(
@@ -1206,6 +1515,29 @@ def test_runtime_image_rejects_non_digest_engine_identity(
     ) -> subprocess.CompletedProcess[str]:
         if "qualification_source.py" in " ".join(command):
             output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif "authenticated_runtime_build.py" in " ".join(command):
+            statement = Path(command[command.index("--statement") + 1])
+            statement.write_text(
+                json.dumps(
+                    {
+                        "base_image": None,
+                        "build_arguments": {},
+                        "dockerfile": {
+                            "path": "runtime/Dockerfile",
+                            "sha256": ZERO_DIGEST,
+                        },
+                        "format_version": "invarlock/runtime-image-build-v1",
+                        "image": "invarlock-example-runtime:" + "c" * 12,
+                        "ok": True,
+                        "platform": None,
+                        "runtime_image_id": "not-a-digest",
+                        "source_bundle_sha256": ZERO_DIGEST,
+                        "source_commit": "c" * 40,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = ""
         elif command[1:4] == ["image", "inspect", "--format"]:
             output = "not-a-digest"
         else:
@@ -1213,7 +1545,7 @@ def test_runtime_image_rejects_non_digest_engine_identity(
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     monkeypatch.setattr(launch, "_run", invalid_inspect)
-    with pytest.raises(RuntimeError, match="sha256 image ID"):
+    with pytest.raises(RuntimeError, match="runtime build statement does not bind"):
         launch._runtime_image(
             repository=repository,
             build_root=build,
@@ -1240,6 +1572,7 @@ def test_launch_main_dispatches_prepare_and_full_runs(
                 "--prepare-only",
                 "--workspace",
                 str(tmp_path / "prepare"),
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -1253,7 +1586,10 @@ def test_launch_main_dispatches_prepare_and_full_runs(
         "mkdtemp",
         lambda *, prefix: str(disposable),
     )
-    assert launch.main(["hf-transformers", "--prepare-only"]) == 0
+    assert (
+        launch.main(["hf-transformers", "--prepare-only", "--ephemeral-trust-root"])
+        == 0
+    )
     assert commands[-1][commands[-1].index("--workspace") + 1] == str(
         disposable / "transaction"
     )
@@ -1273,6 +1609,7 @@ def test_launch_main_dispatches_prepare_and_full_runs(
                 str(tmp_path / "full"),
                 "--runtime-device",
                 "cuda:1",
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -1287,31 +1624,95 @@ def test_launch_main_dispatches_prepare_and_full_runs(
 
     existing = tmp_path / "existing"
     existing.mkdir()
-    assert launch.main(["hf-transformers", "--workspace", str(existing)]) == 2
+    assert (
+        launch.main(
+            [
+                "hf-transformers",
+                "--prepare-only",
+                "--workspace",
+                str(existing),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    assert (
+        launch.main(
+            [
+                "hf-transformers",
+                "--prepare-only",
+                "--workspace",
+                str(linked),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert not missing.exists()
 
 
 def test_launch_runner_reports_subprocess_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        launch.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(
-            args[0], 7, stdout="", stderr="failed"
-        ),
-    )
+    del monkeypatch
+    failing = [
+        sys.executable,
+        "-c",
+        "import sys; print('failed', file=sys.stderr); sys.exit(7)",
+    ]
     with pytest.raises(RuntimeError, match="status 7"):
-        launch._run(["bad"], cwd=tmp_path)
+        launch._run(failing, cwd=tmp_path)
 
-    monkeypatch.setattr(
-        launch.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(
-            args[0], 9, stdout="", stderr=""
-        ),
-    )
-    with pytest.raises(RuntimeError, match="status 9: silent-failure$"):
-        launch._run(["silent-failure"], cwd=tmp_path)
+    silent = [sys.executable, "-c", "import sys; sys.exit(9)"]
+    with pytest.raises(RuntimeError, match="status 9:"):
+        launch._run(silent, cwd=tmp_path)
+
+
+def test_shared_and_registry_runners_bound_output_and_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(launch, "_COMMAND_STDOUT_LIMIT", 8)
+    with pytest.raises(RuntimeError, match="stdout limit exceeded"):
+        launch._run(
+            [sys.executable, "-c", "print('x' * 100)"],
+            cwd=tmp_path,
+            capture_output=True,
+        )
+    monkeypatch.setattr(launch, "_COMMAND_TIMEOUT_SECONDS", 1)
+    with pytest.raises(RuntimeError, match="timed out"):
+        launch._run([sys.executable, "-c", "import time; time.sleep(2)"], cwd=tmp_path)
+
+    monkeypatch.setattr(local_registry, "_COMMAND_OUTPUT_LIMIT", 8)
+    with pytest.raises(RuntimeError, match="stdout limit exceeded"):
+        local_registry._run(
+            [sys.executable, "-c", "print('x' * 100)"],
+            cwd=tmp_path,
+            capture_output=True,
+        )
+    monkeypatch.setattr(local_registry, "_COMMAND_TIMEOUT_SECONDS", 1)
+    with pytest.raises(RuntimeError, match="timed out"):
+        local_registry._run(
+            [sys.executable, "-c", "import time; time.sleep(2)"], cwd=tmp_path
+        )
+
+
+def test_shared_runner_success_capture_modes_and_start_failure(tmp_path: Path) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        "import sys; print('out'); print('err', file=sys.stderr)",
+    ]
+    uncaptured = launch._run(command, cwd=tmp_path)
+    assert uncaptured.returncode == 0
+    assert uncaptured.stdout is None
+    captured = launch._run(command, cwd=tmp_path, capture_output=True)
+    assert captured.stdout == "out\n"
+    assert captured.stderr == "err\n"
+    with pytest.raises(RuntimeError, match="could not start"):
+        launch._run([str(tmp_path / "missing-command")], cwd=tmp_path)
 
 
 def test_runtime_image_requires_source_bundle_digest(

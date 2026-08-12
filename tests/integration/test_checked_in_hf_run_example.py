@@ -174,6 +174,7 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
         str(workspace),
         "--runtime-image-digest",
         IMAGE_DIGEST,
+        "--ephemeral-trust-root",
         "--prepare-only",
     ]
     assert example.main(arguments) == 0

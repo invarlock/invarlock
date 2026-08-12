@@ -13,7 +13,10 @@ invarlock evaluate -> invarlock verify -> invarlock report
 Run it from the repository root:
 
 ```bash
-make example-gguf-llama-cpp
+make example-gguf-llama-cpp \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/gguf-llama-cpp"
 ```
 
 Docker or Podman, network access for the pinned download and image build, and

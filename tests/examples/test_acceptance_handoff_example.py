@@ -160,14 +160,46 @@ def test_main_runs_handoff_in_explicit_workspace(
     module = _module()
     workspace = tmp_path / "explicit"
     calls: list[Path] = []
-    monkeypatch.setattr(module, "run_handoff", calls.append)
+
+    def run(path: Path) -> None:
+        calls.append(path)
+        path.mkdir(parents=True)
+        path.joinpath("results.json").write_bytes(
+            GOLDEN.joinpath("results.json").read_bytes()
+        )
+
+    monkeypatch.setattr(module, "run_handoff", run)
     monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--workspace", str(workspace)])
 
     assert module.main() == 0
     assert calls == [workspace.resolve()]
     assert capsys.readouterr().out == (
-        f"PASS offline acceptance handoff: {workspace.resolve()}\n"
+        "PASS offline acceptance handoff\n"
+        "Fixture decision: accepted\n"
+        "Fail-closed scenarios rejected: 10/10\n"
+        f"Signed evidence: {workspace.resolve() / 'handoff/evidence'}\n"
+        "Signed verifier receipt: "
+        f"{workspace.resolve() / 'handoff/verification.receipt.json'}\n"
+        "Acceptance envelope: "
+        f"{workspace.resolve() / 'handoff/acceptance.dsse.json'}\n"
+        f"Scenario results: {workspace.resolve() / 'results.json'}\n"
+        f"Workspace: {workspace.resolve()}\n"
     )
+
+
+def test_main_preserves_explicit_workspace_symlink_for_rejection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--workspace", str(linked)])
+
+    with pytest.raises(RuntimeError, match="must be new"):
+        module.main()
+    assert not missing.exists()
 
 
 def test_main_uses_fresh_default_workspace(
@@ -176,7 +208,15 @@ def test_main_uses_fresh_default_workspace(
 ) -> None:
     module = _module()
     calls: list[Path] = []
-    monkeypatch.setattr(module, "run_handoff", calls.append)
+
+    def run(path: Path) -> None:
+        calls.append(path)
+        path.mkdir(parents=True)
+        path.joinpath("results.json").write_bytes(
+            GOLDEN.joinpath("results.json").read_bytes()
+        )
+
+    monkeypatch.setattr(module, "run_handoff", run)
     monkeypatch.setattr(module.tempfile, "mkdtemp", lambda **_kwargs: str(tmp_path))
     monkeypatch.setattr(sys, "argv", [str(SCRIPT)])
 
@@ -273,3 +313,16 @@ def test_handoff_fails_closed_when_any_scenario_fails(
 
     with pytest.raises(RuntimeError, match="did not satisfy every scenario"):
         module.run_handoff(tmp_path / "handoff")
+
+
+def test_handoff_summary_rejects_a_missing_acceptance_decision(tmp_path: Path) -> None:
+    module = _module()
+    workspace = tmp_path / "handoff"
+    workspace.mkdir()
+    workspace.joinpath("results.json").write_text(
+        json.dumps({"scenarios": {"tampered_evidence_rejected": True}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="summary is invalid"):
+        module.print_handoff_summary(workspace)

@@ -186,8 +186,37 @@ def test_image_inspection_and_runtime_build_use_immutable_current_source(
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             return _completed(command, json.dumps({"source_bundle_sha256": image_id}))
+        if command[:3] == ["make", "-C", "addins/gguf"]:
+            statement_path = next(
+                Path(value.split("=", 1)[1])
+                for value in command
+                if value.startswith("BUILD_STATEMENT=")
+            )
+            statement_path.write_text(
+                json.dumps(
+                    {
+                        "base_image": None,
+                        "build_arguments": {},
+                        "dockerfile": {
+                            "path": "runtime/Dockerfile",
+                            "sha256": image_id,
+                        },
+                        "format_version": "invarlock/runtime-image-build-v1",
+                        "image": "invarlock-example-gguf:" + "c" * 12,
+                        "ok": True,
+                        "platform": None,
+                        "runtime_image_id": image_id,
+                        "source_bundle_sha256": image_id,
+                        "source_commit": "c" * 40,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return _completed(command)
         if command[1:3] == ["image", "inspect"]:
-            return _completed(command, image_id + "\n")
+            return _completed(
+                command, image_id + "\t" + ("c" * 40) + "\t" + image_id + "\n"
+            )
         return _completed(command)
 
     monkeypatch.setattr(example.launch, "_run", fake_run)
@@ -305,6 +334,7 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         "delta_min_pp": -15.0,
         "maximum_interval_width_pp": 20.0,
         "minimum_record_count": 50,
+        "minimum_side_accuracy": example._MINIMUM_SIDE_ACCURACY,
     }
     assert (
         trust["anchors"]["baseline_artifact_digest"]
@@ -534,10 +564,16 @@ def test_execute_rejects_false_green_outputs(
         )
 
 
-def test_main_rejects_existing_workspace(tmp_path: Path) -> None:
+@pytest.mark.parametrize("kind", ["directory", "symlink"])
+def test_main_rejects_existing_workspace(tmp_path: Path, kind: str) -> None:
     existing = tmp_path / "existing"
-    existing.mkdir()
-    assert example.main(["--workspace", str(existing)]) == 2
+    missing = tmp_path / "missing-workspace"
+    if kind == "directory":
+        existing.mkdir()
+    else:
+        existing.symlink_to(missing, target_is_directory=True)
+    assert example.main(["--workspace", str(existing), "--ephemeral-trust-root"]) == 2
+    assert not missing.exists()
 
 
 def test_default_workspace_is_canonical_before_source_build(
@@ -555,7 +591,7 @@ def test_default_workspace_is_canonical_before_source_build(
         raise RuntimeError("stop after canonical workspace check")
 
     monkeypatch.setattr(example, "_build_runtime_image", stop)
-    assert example.main([]) == 2
+    assert example.main(["--ephemeral-trust-root"]) == 2
     assert observed == [real.resolve() / "build"]
 
 
@@ -609,7 +645,18 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
         lambda *_args, **_kwargs: observed.append("execute"),
     )
 
-    assert example.main(["--workspace", str(workspace), "--runtime-image", digest]) == 0
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--runtime-image",
+                digest,
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 0
+    )
     assert observed == ["image", "models", "backend", "prepare", "execute"]
 
 
@@ -621,7 +668,16 @@ def test_main_reports_runtime_failures(
         "_build_runtime_image",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("build failed")),
     )
-    assert example.main(["--workspace", str(tmp_path / "workspace")]) == 2
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(tmp_path / "workspace"),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
     assert "build failed" in capsys.readouterr().err
 
 

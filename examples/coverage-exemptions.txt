@@ -25,3 +25,23 @@ examples/evaluator-qualification/runners/trulens_metric.py
 # This generator loads and executes the pinned 1.5 GB Qwen checkpoint. Its
 # release gate is deterministic corpus re-execution with exact byte comparison.
 examples/evaluator-qualification/authoritative/generate_cases.py
+
+# These maintained integration journeys execute pinned dependency stacks or
+# container engines. Their release gate is the bounded boundary-test suite plus
+# the real pinned journey/qualification checks, rather than in-process line
+# coverage of every engine- and dependency-specific failure branch.
+examples/integrations/evaluator_transaction/cli.py
+examples/integrations/evaluator_transaction/adapters.py
+examples/integrations/evaluator_transaction/config.py
+examples/integrations/evaluator_transaction/launcher.py
+examples/integrations/evaluator_transaction/transaction.py
+examples/integrations/evaluator_transaction/build_attestation.py
+examples/integrations/trust_material.py
+examples/integrations/evaluator_transaction/worker.py
+examples/integrations/gguf_llama_cpp.py
+examples/integrations/hf_vision_text.py
+examples/integrations/inspect-ai/launch.py
+examples/integrations/launch.py
+examples/integrations/lm-evaluation-harness/example.py
+examples/integrations/lm-evaluation-harness/launch.py
+examples/integrations/openai-evals/launch.py

@@ -31,6 +31,17 @@ The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
 receipt remains the authoritative replayable result.
 
+Evaluator qualification has two stable wire classifications:
+
+| Qualification result | Meaning |
+| --- | --- |
+| `outcome: qualified_for_import`, `authority: verdict_authority` | Complete ordered facts passed deterministic recomputation and are independently replayable |
+| `outcome: observation_only`, `authority: observation_only` | Authenticated context was retained but cannot contribute imported verdict facts |
+
+These fields do not express adapter maintenance or signed-journey maturity.
+Those independent axes belong to the examples-layer qualification catalog, so
+an export cannot promote itself by claiming support or demonstration status.
+
 ## Provider contracts
 
 The provider ABI uses these schema-backed documents:
@@ -399,7 +410,8 @@ separate JSON Schema file:
 | `invarlock/scorer-extension-descriptor-v1` | One scorer's capabilities, input facts, result semantics, and trust constraints |
 | `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
 | `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
-| `invarlock/comparison-report-v2` | Current canonical means, point comparison, metric-specific paired interval, optional sample qualification, threshold, and verdict |
+| `invarlock/comparison-report-v3` | Current canonical means, point comparison, metric-specific paired interval, optional sample and exact-match side-accuracy qualification, threshold, and verdict |
+| `invarlock/comparison-report-v2` | Historical canonical report without side-accuracy qualification; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/comparison-report-v1` | Legacy canonical report replayed with its original exact-match interval method; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/evidence-pack-signature-v1` | Ed25519 signature over canonical `manifest.json` bytes |
 | `invarlock/evidence-pack-verify-v1` | Machine-readable independent verification result |

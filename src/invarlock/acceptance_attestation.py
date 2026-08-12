@@ -61,6 +61,28 @@ _SUPPORTED_V013_RECEIPTS = {
     SIGNED_RECEIPT_FORMAT_V1,
     SIGNED_RECEIPT_FORMAT_V2,
 }
+_CONTRACT_RELEASES = {
+    (
+        receipt_format,
+        "invarlock/evidence-pack-v1",
+        report_format,
+    ): "0.13.0"
+    for receipt_format in _SUPPORTED_V013_RECEIPTS
+    for report_format in (
+        "invarlock/comparison-report-v1",
+        "invarlock/comparison-report-v2",
+    )
+}
+_CONTRACT_RELEASES.update(
+    {
+        (
+            receipt_format,
+            "invarlock/evidence-pack-v1",
+            "invarlock/comparison-report-v3",
+        ): "0.15.0"
+        for receipt_format in _SUPPORTED_V013_RECEIPTS
+    }
+)
 
 
 class AcceptanceAttestationError(ValueError):
@@ -461,16 +483,17 @@ def _contract_release(
     evidence_format: object,
     report_format: object,
 ) -> str:
-    if (
-        receipt_format in _SUPPORTED_V013_RECEIPTS
-        and evidence_format == "invarlock/evidence-pack-v1"
-        and report_format
-        in {
-            "invarlock/comparison-report-v1",
-            "invarlock/comparison-report-v2",
-        }
+    if not (
+        isinstance(receipt_format, str)
+        and isinstance(evidence_format, str)
+        and isinstance(report_format, str)
     ):
-        return "0.13.0"
+        raise AcceptanceAttestationError(
+            "receipt, evidence, and report versions are not a supported contract set"
+        )
+    release = _CONTRACT_RELEASES.get((receipt_format, evidence_format, report_format))
+    if release is not None:
+        return release
     raise AcceptanceAttestationError(
         "receipt, evidence, and report versions are not a supported contract set"
     )

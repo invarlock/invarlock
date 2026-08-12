@@ -49,11 +49,12 @@
   It identifies one closed comparison; it is not a human authorization.
 
 **Comparison report**
-: The current `invarlock/comparison-report-v2` document derived from paired
+: The current `invarlock/comparison-report-v3` document derived from paired
   records and policy. It contains the baseline mean, subject mean, comparison
   value, metric-specific paired interval, threshold, optional sample
-  qualification, and finite-schedule verdict. Strict verification also replays
-  signed v1 reports under their original method.
+  qualification, optional exact-match side-accuracy qualification, and
+  finite-schedule verdict. Strict verification also preserves signed v1 and v2
+  report semantics.
 
 **Evidence pack**
 : The immutable `invarlock/evidence-pack-v1` directory containing the request,

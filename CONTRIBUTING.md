@@ -119,14 +119,14 @@ Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
 ## Documentation and public text
 
 Document what the current repository does. Keep local paths, hosts, private
-artifact locations, credentials, internal run notes, and unrelated product
-planning out of public files and pull requests. Examples should use portable
-request-relative paths and placeholder digests.
+artifact locations, credentials, execution notes intended only for maintainers,
+and unrelated product planning out of public files and pull requests. Examples
+should use portable request-relative paths and placeholder digests.
 
-Documentation lint covers maintained Markdown at the repository root and under
-`.github/`, `addins/`, `docs/`, `examples/`, `public_evidence/`,
-`requirements/`, `scripts/`, and the test-tree overview. Update these public
-surfaces together when a product or release boundary changes.
+Documentation lint discovers every tracked Markdown file through Git. It checks
+formatting, spelling, machine-specific paths, credential-like values, and
+review-process wording. Update affected public surfaces together when a product
+or release boundary changes.
 
 ### Documentation type contracts
 

@@ -475,7 +475,7 @@ def test_image_inspection_parses_bounded_docker_and_podman_json_with_argv_only(
             stderr=b"",
         )
 
-    monkeypatch.setattr(evaluation_oci.subprocess, "run", run)
+    monkeypatch.setattr(evaluation_oci, "_run_bounded_command", run)
     image = "registry.example:5000/team/runtime:candidate"
 
     inspected = evaluation_oci._inspect_local_image(  # noqa: SLF001
@@ -491,8 +491,8 @@ def test_image_inspection_parses_bounded_docker_and_podman_json_with_argv_only(
         image,
     ]
     keywords = cast(dict[str, object], observed["kwargs"])
-    assert keywords["shell"] is False
-    assert keywords["timeout"] == 30
+    assert keywords["timeout_seconds"] == 30
+    assert keywords["stdout_limit"] == evaluation_oci._MAX_IMAGE_INSPECT_BYTES
 
 
 def test_tag_resolution_selects_matching_repository_manifest_not_first_entry(
@@ -594,10 +594,10 @@ def test_image_inspection_and_launch_inputs_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        evaluation_oci.subprocess,
-        "run",
+        evaluation_oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            subprocess.TimeoutExpired("docker", 30)
+            evaluation_oci.OciEvaluationError("timed out")
         ),
     )
     with pytest.raises(OciEvaluationError, match="could not be inspected locally"):
@@ -606,13 +606,13 @@ def test_image_inspection_and_launch_inputs_fail_closed(
         )
 
     monkeypatch.setattr(
-        evaluation_oci.subprocess,
-        "run",
+        evaluation_oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
             ["docker", "image", "inspect"],
             1,
-            stdout="",
-            stderr="image is missing",
+            stdout=b"",
+            stderr=b"image is missing",
         ),
     )
     with pytest.raises(OciEvaluationError, match="image is missing"):
@@ -621,8 +621,8 @@ def test_image_inspection_and_launch_inputs_fail_closed(
         )
 
     monkeypatch.setattr(
-        evaluation_oci.subprocess,
-        "run",
+        evaluation_oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
             ["docker", "image", "inspect"],
             0,
@@ -1001,7 +1001,7 @@ def test_timeout_cleanup_stops_then_kills_the_engine_issued_container(
             return -15
 
     process = Process()
-    monkeypatch.setattr(evaluation_oci.subprocess, "run", control)
+    monkeypatch.setattr(evaluation_oci, "_run_bounded_command", control)
 
     evaluation_oci._terminate_worker(  # type: ignore[arg-type]  # noqa: SLF001
         process,

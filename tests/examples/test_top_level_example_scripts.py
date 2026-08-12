@@ -331,6 +331,24 @@ def test_trust_boundary_main_selects_a_temporary_or_explicit_workspace(
     assert calls == [(EXAMPLE_ROOT, expected.resolve())]
 
 
+def test_trust_boundary_main_preserves_explicit_symlink_for_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_trust_boundary_demo.py", "--workspace", str(linked)],
+    )
+
+    with pytest.raises(RuntimeError, match="already exists"):
+        trust_demo.main()
+    assert not missing.exists()
+
+
 def _empty_fixture_root(root: Path) -> None:
     (root / "policy").mkdir(parents=True)
     (root / "inputs").mkdir()

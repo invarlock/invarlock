@@ -5,7 +5,7 @@ This example executes one complete, service-free handoff:
 1. an evaluation operator identifies the exact baseline and subject artifacts;
 2. the evaluation operator imports authenticated per-record results, recomputes the
    paired metric, and signs the evidence pack;
-3. an independent technical verifier checks the pack and signs a v0.13
+3. an independent technical verifier checks the pack and signs a verification
    receipt;
 4. an envelope signer wraps that receipt in an in-toto Statement and DSSE
    envelope;
@@ -24,6 +24,9 @@ stricter current policy, a wrong artifact, tampered evidence, a tampered
 envelope, an unknown envelope signer, a revoked envelope signer, an unknown
 receipt verifier, a stale envelope, a missing authoritative evidence timestamp,
 and a contradiction between the receipt and envelope.
+On success it prints the fixture decision, the rejected-scenario count, and
+the exact paths to the signed evidence, verifier receipt, acceptance envelope,
+scenario results, and retained workspace.
 
 ## Committed package
 
@@ -31,7 +34,7 @@ and a contradiction between the receipt and envelope.
 release-blocking compatibility and acceptance tests. It contains:
 
 - the exact subject artifact;
-- the signed evidence pack and v0.13 verification receipt;
+- the current signed evidence pack and verification receipt;
 - the standards-shaped in-toto/DSSE acceptance envelope, including the exact
   supplied receipt bytes;
 - the envelope-signer and verifier public keys;
@@ -56,12 +59,12 @@ receipt-verifier trust registries, freshness rules, supported contract
 versions, and exact artifact bytes or digest. Within each registry, every
 identity/fingerprint pair must be unique: duplicate pairs invalidate the policy
 regardless of order or status, and each authenticated signer must match exactly
-one trust record. Because v0.13 receipts have no authenticated issuance
-timestamp, a recipient that requires an evidence-age limit rejects them; a new
-envelope cannot renew that missing history.
+one trust record. Because the retained receipt format has no authenticated
+issuance timestamp, a recipient that requires an evidence-age limit rejects
+them; a new envelope cannot renew that missing history.
 
-Historical technical verification answers whether the signed v0.13 evidence
-still satisfies its recorded contract. Present-day acceptability is a
+Historical technical verification answers whether signed evidence still
+satisfies its recorded contract. Present-day acceptability is a
 separate decision made under the recipient's current policy. A stricter
 recipient can therefore reject an authentic historical pass.
 
