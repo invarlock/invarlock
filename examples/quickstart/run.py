@@ -8,15 +8,18 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 _DIGEST = re.compile(r"sha256:[a-f0-9]{64}\Z")
+_MAX_ANCHOR_BYTES = 64 * 1024
 _MAX_COMMAND_OUTPUT = 1024 * 1024
 _COMMAND_TIMEOUT_SECONDS = 30
 
@@ -34,10 +37,24 @@ def _strict_object(path: Path, *, label: str) -> dict[str, Any]:
             result[key] = value
         return result
 
+    descriptor = -1
     try:
-        value = json.loads(path.read_bytes(), object_pairs_hook=pairs)
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise QuickstartError(f"{label} must be a real regular file")
+        payload = os.read(descriptor, _MAX_ANCHOR_BYTES + 1)
+        if len(payload) > _MAX_ANCHOR_BYTES:
+            raise QuickstartError(f"{label} exceeds the size limit")
+        value = json.loads(payload, object_pairs_hook=pairs)
+    except QuickstartError:
+        raise
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise QuickstartError(f"{label} is not readable strict JSON") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
     if not isinstance(value, dict):
         raise QuickstartError(f"{label} must be a JSON object")
     return value
@@ -131,30 +148,49 @@ def _write_verifier_key(path: Path) -> None:
         raise QuickstartError("could not create the temporary verifier key") from exc
 
 
+def _read_command_output(handle: BinaryIO, *, limit: int) -> bytes:
+    handle.seek(0)
+    return handle.read(limit + 1)
+
+
 def _run_cli(arguments: list[str], *, cwd: Path) -> dict[str, Any]:
     environment = dict(os.environ)
     environment.pop("PYTHONPATH", None)
     environment.update({"PYTHONNOUSERSITE": "1", "PYTHONSAFEPATH": "1"})
     try:
-        completed = subprocess.run(
-            [sys.executable, "-m", "invarlock", *arguments],
-            cwd=cwd,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=_COMMAND_TIMEOUT_SECONDS,
-        )
+        with (
+            tempfile.TemporaryFile(dir=cwd) as stdout_file,
+            tempfile.TemporaryFile(dir=cwd) as stderr_file,
+        ):
+            completed = subprocess.run(
+                [sys.executable, "-m", "invarlock", *arguments],
+                cwd=cwd,
+                env=environment,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                timeout=_COMMAND_TIMEOUT_SECONDS,
+            )
+            stdout_bytes = _read_command_output(stdout_file, limit=_MAX_COMMAND_OUTPUT)
+            stderr_bytes = _read_command_output(
+                stderr_file,
+                limit=max(0, _MAX_COMMAND_OUTPUT - len(stdout_bytes)),
+            )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise QuickstartError("InvarLock command did not complete safely") from exc
-    output_bytes = len(completed.stdout.encode()) + len(completed.stderr.encode())
-    if output_bytes > _MAX_COMMAND_OUTPUT:
+    if len(stdout_bytes) + len(stderr_bytes) > _MAX_COMMAND_OUTPUT:
         raise QuickstartError("InvarLock command output exceeded the size limit")
+    try:
+        stdout = stdout_bytes.decode("utf-8")
+        stderr = stderr_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise QuickstartError("InvarLock command did not return UTF-8 output") from exc
     if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout).strip()
+        detail = (stderr or stdout).strip()
         raise QuickstartError(f"InvarLock command rejected the fixture: {detail}")
     try:
-        result = json.loads(completed.stdout)
+        result = json.loads(stdout)
     except json.JSONDecodeError as exc:
         raise QuickstartError("InvarLock command did not return JSON") from exc
     if not isinstance(result, dict):
@@ -204,10 +240,11 @@ def run_quickstart(*, fixture: Path, output: Path) -> dict[str, Path]:
         )
         if verified.get("ok") is not True or verified.get("policy_verdict") != "pass":
             raise QuickstartError("signed evidence did not produce a passing verdict")
-        verification.write_text(
-            json.dumps(verified, separators=(",", ":"), sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        with verification.open("x", encoding="utf-8") as handle:
+            json.dump(verified, handle, separators=(",", ":"), sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         rendered = _run_cli(
             [
                 "report",
@@ -225,7 +262,7 @@ def run_quickstart(*, fixture: Path, output: Path) -> dict[str, Path]:
             or not report.is_file()
         ):
             raise QuickstartError("signed handoff outputs are incomplete")
-    except Exception:
+    except BaseException:
         shutil.rmtree(destination, ignore_errors=True)
         raise
     finally:

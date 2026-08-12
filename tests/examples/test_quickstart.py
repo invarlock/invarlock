@@ -97,6 +97,19 @@ def test_quickstart_rejects_malformed_anchor_files(
         module._anchors(path)
 
 
+def test_quickstart_bounds_anchor_input_and_rejects_nonfiles(tmp_path: Path) -> None:
+    module = _module()
+    oversized = tmp_path / "oversized.json"
+    oversized.write_bytes(b" " * (module._MAX_ANCHOR_BYTES + 1))
+    with pytest.raises(module.QuickstartError, match="size limit"):
+        module._strict_object(oversized, label="anchors")
+
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    with pytest.raises(module.QuickstartError, match="regular file"):
+        module._strict_object(directory, label="anchors")
+
+
 def test_quickstart_rejects_invalid_digest_and_incomplete_fixture(
     tmp_path: Path,
 ) -> None:
@@ -138,15 +151,12 @@ def test_quickstart_bounds_child_execution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
-    monkeypatch.setattr(
-        module.subprocess,
-        "run",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="x" * (module._MAX_COMMAND_OUTPUT + 1),
-            stderr="",
-        ),
-    )
+
+    def oversized(*_args: object, **kwargs: object) -> SimpleNamespace:
+        kwargs["stdout"].write(b"x" * (module._MAX_COMMAND_OUTPUT + 1))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(module.subprocess, "run", oversized)
     with pytest.raises(module.QuickstartError, match="size limit"):
         module._run_cli(["--version"], cwd=tmp_path)
 
@@ -169,17 +179,36 @@ def test_quickstart_rejects_invalid_command_results(
     message: str,
 ) -> None:
     module = _module()
-    monkeypatch.setattr(
-        module.subprocess,
-        "run",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            returncode=0,
-            stdout=stdout,
-            stderr="",
-        ),
-    )
+
+    def command(*_args: object, **kwargs: object) -> SimpleNamespace:
+        kwargs["stdout"].write(stdout.encode())
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(module.subprocess, "run", command)
     with pytest.raises(module.QuickstartError, match=message):
         module._run_cli(["--version"], cwd=tmp_path)
+
+
+def test_quickstart_rejects_nonzero_and_non_utf8_command_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+
+    def rejected(*_args: object, **kwargs: object) -> SimpleNamespace:
+        kwargs["stderr"].write(b"rejected")
+        return SimpleNamespace(returncode=2)
+
+    monkeypatch.setattr(module.subprocess, "run", rejected)
+    with pytest.raises(module.QuickstartError, match="rejected the fixture"):
+        module._run_cli(["verify"], cwd=tmp_path)
+
+    def non_utf8(*_args: object, **kwargs: object) -> SimpleNamespace:
+        kwargs["stdout"].write(b"\xff")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(module.subprocess, "run", non_utf8)
+    with pytest.raises(module.QuickstartError, match="UTF-8"):
+        module._run_cli(["verify"], cwd=tmp_path)
 
 
 @pytest.mark.parametrize("failure", ["verdict", "outputs"])
