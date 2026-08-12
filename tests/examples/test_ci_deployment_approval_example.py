@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,9 +14,11 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "examples/ci/verify_deployment_receipt.py"
-WORKFLOW = ROOT / "examples/ci/github-actions/deployment-approval.yml"
-APPROVAL_INPUTS_PATH = ROOT / "examples/ci/inspect-ai-deployment-approval-inputs.json"
+CONSUMER = ROOT / "examples/ci/standalone-consumer"
+SCRIPT = CONSUMER / "review/verify_deployment_receipt.py"
+WORKFLOW = CONSUMER / ".github/workflows/deployment-approval.yml"
+APPROVAL_INPUTS_PATH = CONSUMER / "review/inspect-ai-deployment-approval-inputs.json"
+POLICY = CONSUMER / "review/policy/acceptance.json"
 TRANSACTION = ROOT / "examples/evaluator-qualification/signed-transactions/inspect-ai"
 APPROVAL_INPUTS = json.loads(APPROVAL_INPUTS_PATH.read_bytes())
 
@@ -38,7 +42,7 @@ def _run(
         "--evidence",
         str(TRANSACTION / "evidence"),
         "--policy",
-        str(TRANSACTION / "policy.json"),
+        str(POLICY),
         "--receipt",
         str(TRANSACTION / "verification.receipt.json"),
     ]
@@ -58,10 +62,7 @@ def test_deployment_inputs_are_independent_anchors_for_retained_inspect_transact
 ):
     transaction = json.loads((TRANSACTION / "transaction.json").read_bytes())
     verification = transaction["verification"]
-    policy_sha256 = (
-        "sha256:"
-        + hashlib.sha256((TRANSACTION / "policy.json").read_bytes()).hexdigest()
-    )
+    policy_sha256 = "sha256:" + hashlib.sha256(POLICY.read_bytes()).hexdigest()
 
     assert APPROVAL_INPUTS["artifact_digests"] == verification["artifact_digests"]
     assert APPROVAL_INPUTS["runtime_digests"] == verification["runtime_digests"]
@@ -212,7 +213,7 @@ def test_deployment_gate_rejects_a_signed_non_authorizing_verdict(
         module.approve(
             approval_inputs_path=inputs,
             evidence_path=TRANSACTION / "evidence",
-            policy_path=TRANSACTION / "policy.json",
+            policy_path=POLICY,
             receipt_path=TRANSACTION / "verification.receipt.json",
         )
 
@@ -231,6 +232,42 @@ def test_deployment_output_is_canonical_and_no_clobber(tmp_path: Path) -> None:
     assert "output already exists" in repeated.stderr
 
 
+def test_consumer_fixture_runs_from_an_independent_copy(tmp_path: Path) -> None:
+    consumer = tmp_path / "consumer"
+    shutil.copytree(CONSUMER, consumer)
+    incoming = consumer / "incoming/evidence"
+    incoming.parent.mkdir()
+    shutil.copytree(TRANSACTION / "evidence", incoming)
+    receipt = consumer / "incoming/verification.receipt.json"
+    shutil.copy2(TRANSACTION / "verification.receipt.json", receipt)
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
+    environment.update({"PYTHONNOUSERSITE": "1", "PYTHONSAFEPATH": "1"})
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "review/verify_deployment_receipt.py",
+            "--approval-inputs",
+            "review/inspect-ai-deployment-approval-inputs.json",
+            "--evidence",
+            "incoming/evidence",
+            "--policy",
+            "review/policy/acceptance.json",
+            "--receipt",
+            "incoming/verification.receipt.json",
+        ],
+        cwd=consumer,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["accepted"] is True
+
+
 def test_deployment_workflow_has_separate_verification_and_protected_deploy_jobs() -> (
     None
 ):
@@ -243,6 +280,9 @@ def test_deployment_workflow_has_separate_verification_and_protected_deploy_jobs
     assert deploy["environment"] == "production"
     rendered = WORKFLOW.read_text(encoding="utf-8")
     assert "verify_deployment_receipt.py" in rendered
+    assert "review/verify_deployment_receipt.py" in rendered
+    assert "review/policy/acceptance.json" in rendered
+    assert "examples/ci/" not in rendered
     assert "actions/download-artifact@" in rendered
     assert "fetch-approved-candidate.sh" in rendered
     assert "Deploy the exact approved candidate" in rendered

@@ -33,7 +33,7 @@ jobs:
         uses: invarlock/invarlock/.github/actions/invarlock-report-gate@57521e3bb288e1b8a43aac24217d4e9db875a908
         with:
           evidence: incoming/evidence
-          policy: policy/acceptance.json
+          policy: review/policy/acceptance.json
           expected-baseline-artifact: ${{ vars.INVARLOCK_BASELINE_ARTIFACT_DIGEST }}
           expected-subject-artifact: ${{ vars.INVARLOCK_SUBJECT_ARTIFACT_DIGEST }}
           expected-schedule: ${{ vars.INVARLOCK_SCHEDULE_DIGEST }}
@@ -75,10 +75,10 @@ jobs:
 
       - name: Reauthenticate the signed receipt for deployment
         run: |
-          python examples/ci/verify_deployment_receipt.py \
+          python review/verify_deployment_receipt.py \
             --approval-inputs "$RUNNER_TEMP/deployment-approval-inputs.json" \
             --evidence review-artifact/incoming/evidence \
-            --policy policy/acceptance.json \
+            --policy review/policy/acceptance.json \
             --receipt review-artifact/reports/invarlock/verification.receipt.json \
             --output review-artifact/deployment-approval.json
 

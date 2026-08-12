@@ -21,9 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an example-layer evaluator transaction framework with source-specific
   native adapters, source-bound image construction, caller-owned signing and
   trust inputs, and cleanup of temporary container images.
-- Added a protected CI deployment-approval example that reauthenticates the
-  retained Inspect AI receipt against separately supplied recipient anchors
-  before an exact candidate can be deployed.
+- Added a standalone protected CI deployment-consumer fixture that
+  reauthenticates the retained Inspect AI receipt against separately supplied
+  recipient anchors before an exact candidate can be deployed.
 - Added one bounded examples-layer command runner with timeout, output-limit,
   cleanup, and nonzero-exit handling across maintained integration commands.
 
