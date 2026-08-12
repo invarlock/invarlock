@@ -119,8 +119,8 @@ Use the narrowest boundary that can prove the contract:
   neighboring text. Pair executable shell or Python snippets with a behavioral
   test where practical.
 - Keep environment and module mutation local to the test through pytest
-  fixtures. Avoid blanket autouse repair fixtures that can hide leaked state or
-  import failures.
+  fixtures. Avoid blanket automatically applied repair fixtures that can hide
+  leaked state or import failures.
 - Coverage locates untested behavior; it does not justify tests written only to
   execute a line. Every added case should name the accepted result, rejected
   boundary, cleanup guarantee, or externally visible side effect it proves.
