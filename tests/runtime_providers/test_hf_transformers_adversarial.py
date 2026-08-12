@@ -948,6 +948,12 @@ def test_model_config_binding_requires_loader_and_mapping_payloads(
             tmp_path, model=SimpleNamespace(config=Config({}))
         )
 
+    loader.from_pretrained = lambda *_args, **_kwargs: object()
+    with pytest.raises(RuntimeError, match="could not be authenticated"):
+        hf._require_model_config_match(
+            tmp_path, model=SimpleNamespace(config=Config({}))
+        )
+
 
 def test_model_config_binding_rejects_class_and_payload_drift(
     tmp_path: Path,

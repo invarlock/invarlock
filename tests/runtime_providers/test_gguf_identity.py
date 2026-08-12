@@ -208,6 +208,41 @@ def test_gguf_identity_rejects_truncated_and_unsupported_metadata(
             gguf_identity.read_gguf_artifact_identity(path)
 
 
+def test_header_reader_rejects_descriptor_truncation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reader = gguf_identity._HeaderReader(0, file_size=4)
+    monkeypatch.setattr(gguf_identity.os, "read", lambda *_args: b"")
+
+    with pytest.raises(gguf_identity.GGUFIdentityError, match="truncated GGUF"):
+        reader.read_exact(1, label="fixture")
+
+
+def test_metadata_array_depth_is_bounded_before_reading() -> None:
+    reader = gguf_identity._HeaderReader(0, file_size=0)
+
+    with pytest.raises(gguf_identity.GGUFIdentityError, match="nesting"):
+        gguf_identity._read_metadata_value(
+            reader,
+            9,
+            budget=gguf_identity._ParseBudget(),
+            depth=gguf_identity._MAX_ARRAY_DEPTH + 1,
+        )
+
+
+def test_general_alignment_requires_authenticated_uint32(tmp_path: Path) -> None:
+    payload = (
+        b"GGUF"
+        + struct.pack("<IQQ", 3, 0, 1)
+        + _metadata("general.alignment", 8, _string_value("32"))
+    )
+    path = tmp_path / "string-alignment.gguf"
+    path.write_bytes(payload)
+
+    with pytest.raises(gguf_identity.GGUFIdentityError, match="must be uint32"):
+        gguf_identity.read_gguf_artifact_identity(path)
+
+
 def test_gguf_identity_rejects_duplicate_metadata_and_tensor_names(
     tmp_path: Path,
 ) -> None:

@@ -504,6 +504,14 @@ def _rebind_and_resign_pack(pack: Path, key_path: Path) -> None:
         json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode("utf-8")
     manifest_path.write_bytes(manifest_bytes)
+    _resign_manifest(pack, key_path)
+
+
+def _resign_manifest(pack: Path, key_path: Path) -> None:
+    manifest_path = pack / "manifest.json"
+    signature_path = pack / "manifest.signature.json"
+    manifest_bytes = manifest_path.read_bytes()
+    signature_path.chmod(0o644)
     key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
     assert isinstance(key, ed25519.Ed25519PrivateKey)
     public_key = key.public_key()
@@ -530,6 +538,94 @@ def _rebind_and_resign_pack(pack: Path, key_path: Path) -> None:
         )
         + "\n",
         encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(
+    ("relative", "message"),
+    [
+        ("request.json", "normalized request is not canonical JSON"),
+        (
+            "schedule/runtime-behavioral-schedule.json",
+            "runtime behavioral schedule is not canonical JSON",
+        ),
+        ("records/paired-records.json", "paired records are not canonical JSON"),
+        (
+            "reports/evaluation.report.json",
+            "comparison report is not canonical JSON",
+        ),
+    ],
+)
+def test_resigned_noncanonical_payloads_fail_semantic_replay(
+    tmp_path: Path,
+    relative: str,
+    message: str,
+) -> None:
+    pack, policy, fingerprint, runtimes, key, arguments = _publish(tmp_path)
+    target_path = pack / relative
+    target_path.chmod(0o644)
+    target_path.write_bytes(
+        (json.dumps(json.loads(target_path.read_bytes()), indent=2) + "\n").encode()
+    )
+    _rebind_and_resign_pack(pack, key)
+
+    result = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **_verification_anchors(arguments),
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+
+    assert result.payload["ok"] is False
+    assert message in " ".join(result.payload["errors"])
+
+
+def test_resigned_manifest_cannot_misstate_paired_record_count(
+    tmp_path: Path,
+) -> None:
+    pack, policy, fingerprint, runtimes, key, arguments = _publish(tmp_path)
+    manifest_path = pack / "manifest.json"
+    manifest_path.chmod(0o644)
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["paired_records"]["count"] += 1
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
+    _resign_manifest(pack, key)
+
+    result = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **_verification_anchors(arguments),
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+
+    assert result.payload["ok"] is False
+    assert "paired records count does not match manifest" in " ".join(
+        result.payload["errors"]
+    )
+
+
+def test_resigned_report_claim_must_equal_verifier_replay(tmp_path: Path) -> None:
+    pack, policy, fingerprint, runtimes, key, arguments = _publish(tmp_path)
+    report_path = pack / "reports/evaluation.report.json"
+    report_path.chmod(0o644)
+    report = json.loads(report_path.read_bytes())
+    report["verdict"] = "fail"
+    report_path.write_bytes(canonical_json_bytes(report))
+    _rebind_and_resign_pack(pack, key)
+
+    result = verify_comparison_evidence(
+        pack,
+        policy_path=policy,
+        **_verification_anchors(arguments),
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint=fingerprint,
+    )
+
+    assert result.payload["ok"] is False
+    assert "comparison report does not match verifier replay" in " ".join(
+        result.payload["errors"]
     )
 
 

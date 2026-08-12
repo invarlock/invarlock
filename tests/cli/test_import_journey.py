@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -331,6 +333,28 @@ def _materialize_request(
         "runtime_digests": runtime_digests,
         "records": records_path,
     }
+
+
+def _rewrite_provider_receipt(
+    tmp_path: Path,
+    *,
+    side: str,
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    """Mutate a provider receipt while preserving its transport manifest binding."""
+
+    side_root = tmp_path / "imports" / side
+    receipt_path = side_root / "runtime-provider.receipt.json"
+    receipt = json.loads(receipt_path.read_bytes())
+    mutate(receipt)
+    receipt_path.write_bytes(canonical_json_bytes(receipt))
+
+    manifest_path = side_root / "runtime.manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["runtime_provider"]["receipt"]["sha256"] = hashlib.sha256(
+        receipt_path.read_bytes()
+    ).hexdigest()
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
 
 
 _TEXT_SCORER_CONFIGURATION_SCHEMA: dict[str, object] = {
@@ -820,6 +844,99 @@ def test_evaluate_rejects_invalid_observation_before_import_replay(
     assert not (tmp_path / "artifacts/evidence").exists()
 
 
+def test_import_rejects_schedule_for_a_different_task(tmp_path: Path) -> None:
+    material = _materialize_request(tmp_path)
+    schedule_path = tmp_path / "inputs/schedule.json"
+    schedule = json.loads(schedule_path.read_bytes())
+    schedule["task"] = "text_seq2seq"
+    schedule_path.write_bytes(canonical_json_bytes(schedule))
+    evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+
+    with pytest.raises(
+        EvaluationTransactionError,
+        match="imported schedule task does not match comparison.task",
+    ):
+        evaluate_request_file(
+            material["request"],  # type: ignore[arg-type]
+            signing_key_path=evidence_key,
+        )
+
+    assert not (tmp_path / "artifacts/evidence").exists()
+
+
+def test_import_rejects_noncanonical_schedule_encoding(tmp_path: Path) -> None:
+    material = _materialize_request(tmp_path)
+    schedule_path = tmp_path / "inputs/schedule.json"
+    schedule_path.write_bytes(schedule_path.read_bytes() + b"\n")
+    evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+
+    with pytest.raises(EvaluationTransactionError, match="bytes are not canonical"):
+        evaluate_request_file(
+            material["request"],  # type: ignore[arg-type]
+            signing_key_path=evidence_key,
+        )
+
+    assert not (tmp_path / "artifacts/evidence").exists()
+
+
+def test_import_rejects_dataset_that_differs_from_schedule(tmp_path: Path) -> None:
+    material = _materialize_request(tmp_path)
+    request_path = material["request"]
+    assert isinstance(request_path, Path)
+    request = yaml.safe_load(request_path.read_text(encoding="utf-8"))
+    dataset_path = tmp_path / "inputs/dataset.json"
+    dataset_path.write_bytes((tmp_path / "inputs/schedule.json").read_bytes() + b"\n")
+    request["comparison"]["dataset"] = "inputs/dataset.json"
+    request_path.write_text(yaml.safe_dump(request, sort_keys=False), encoding="utf-8")
+    evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+
+    with pytest.raises(
+        EvaluationTransactionError,
+        match="dataset input must be the exact canonical imported schedule",
+    ):
+        evaluate_request_file(request_path, signing_key_path=evidence_key)
+
+    assert not (tmp_path / "artifacts/evidence").exists()
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda receipt: (
+                receipt["plugin"].update(name="gguf_cpp"),
+                receipt["capabilities"].update(provider_name="gguf_cpp"),
+            ),
+            "provider evidence does not match the requested runtime",
+        ),
+        (
+            lambda receipt: receipt["capabilities"].update(tasks=["text_seq2seq"]),
+            "provider evidence does not declare requested task",
+        ),
+        (
+            lambda receipt: receipt.update(outer_image_digest=None),
+            "provider receipt lacks a strict outer runtime image digest",
+        ),
+    ],
+)
+def test_import_rejects_semantically_unbound_provider_receipt(
+    tmp_path: Path,
+    mutate: Callable[[dict[str, Any]], object],
+    message: str,
+) -> None:
+    material = _materialize_request(tmp_path)
+    _rewrite_provider_receipt(tmp_path, side="baseline", mutate=mutate)
+    evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+
+    with pytest.raises(EvaluationTransactionError, match=message):
+        evaluate_request_file(
+            material["request"],  # type: ignore[arg-type]
+            signing_key_path=evidence_key,
+        )
+
+    assert not (tmp_path / "artifacts/evidence").exists()
+
+
 @pytest.mark.parametrize("runtime_binding_matches", [True, False])
 def test_run_executor_converges_through_the_same_host_verifier_and_publication(
     tmp_path: Path,
@@ -1045,6 +1162,29 @@ def test_import_rejects_attacker_supplied_paired_scores(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "do not equal verifier-derived pairs" in result.stdout
+    assert not (tmp_path / "artifacts/evidence").exists()
+
+
+def test_import_preflight_rejects_noncanonical_paired_record_encoding(
+    tmp_path: Path,
+) -> None:
+    material = _materialize_request(tmp_path)
+    records_path = material["records"]
+    assert isinstance(records_path, Path)
+    records_path.write_bytes(
+        (json.dumps(json.loads(records_path.read_bytes()), indent=2) + "\n").encode()
+    )
+    evidence_key, _fingerprint = _key(tmp_path / "evidence.pem")
+
+    with pytest.raises(
+        EvaluationTransactionError,
+        match="imported paired records must use canonical JSON",
+    ):
+        evaluate_request_file(
+            material["request"],  # type: ignore[arg-type]
+            signing_key_path=evidence_key,
+        )
+
     assert not (tmp_path / "artifacts/evidence").exists()
 
 

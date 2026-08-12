@@ -9,8 +9,10 @@ import pytest
 
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     RuntimeExecutionSettings,
+    evaluation_input_parts_sha256,
 )
 from invarlock.runtime_providers import hf_transformers as provider
 
@@ -141,6 +143,10 @@ def test_legacy_gpt2_mask_helpers_validate_config_prefix_and_tensor_shape() -> N
         "h.0.attn.bias", model=model, prefix=None
     )
     model.config.num_hidden_layers = 2
+    model.config.max_position_embeddings = "8"
+    assert not provider._is_authenticated_legacy_gpt2_causal_mask(
+        "h.0.attn.bias", object(), model=model, prefix=None
+    )
     model.config.max_position_embeddings = True
     assert not provider._is_authenticated_legacy_gpt2_causal_mask(
         "h.0.attn.bias", object(), model=model, prefix=None
@@ -333,3 +339,262 @@ def test_causal_scorer_rejects_non_unit_batch_before_runtime_import() -> None:
 
     with pytest.raises(ValueError, match="requires batch_size=1"):
         scorer(batch, _settings(batch_size=2))
+
+
+class _FakeQwenTextConfig:
+    model_type = "qwen3_5_text"
+
+    def __init__(self) -> None:
+        self.dtype = "bfloat16"
+        self.num_hidden_layers = 1
+        self.layer_types = ["linear_attention"]
+
+
+class _FakeQwenConfig:
+    model_type = "qwen3_5"
+
+    def __init__(self) -> None:
+        self.dtype = "bfloat16"
+        self.text_config = _FakeQwenTextConfig()
+        self.quantization_config = None
+
+
+class _FakeQwenNativeModel:
+    def __init__(self) -> None:
+        self.config = _FakeQwenConfig()
+        self.is_quantized = False
+        self.hf_quantizer = None
+        self._get_dtype_plan = lambda _dtype: {}
+
+
+class _FakeQwenCausalModel:
+    _keys_to_ignore_on_load_unexpected = [r"^mtp.*", r"^model.visual.*"]
+
+    def __init__(self) -> None:
+        self.config = SimpleNamespace(model_type="qwen3_5_text")
+        self.named_parameters = lambda: ()
+        self.named_buffers = lambda: ()
+        self.named_modules = lambda: ()
+
+
+def _install_fake_qwen_module(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = SimpleNamespace(
+        Qwen3_5ForCausalLM=_FakeQwenCausalModel,
+        Qwen3_5ForConditionalGeneration=_FakeQwenNativeModel,
+    )
+    monkeypatch.setattr(provider.importlib, "import_module", lambda _name: module)
+
+
+@pytest.mark.parametrize("native_api", ["missing", "malformed"])
+def test_qwen_nonexecuting_profile_requires_introspectable_native_state(
+    monkeypatch: pytest.MonkeyPatch,
+    native_api: str,
+) -> None:
+    _install_fake_qwen_module(monkeypatch)
+    model = _FakeQwenCausalModel()
+    if native_api == "missing":
+        model.named_parameters = None
+    else:
+        model.named_parameters = lambda: (("valid", object()), ("malformed",))
+
+    with pytest.raises(RuntimeError, match="native model state is unavailable"):
+        provider._qwen3_5_non_executing_checkpoint_keys(
+            {
+                "mtp.fc.weight",
+                "mtp.layers.0.input_layernorm.weight",
+                "mtp.layers.0.mlp.down_proj.weight",
+                "mtp.layers.0.mlp.gate_proj.weight",
+                "mtp.layers.0.mlp.up_proj.weight",
+                "mtp.layers.0.post_attention_layernorm.weight",
+                "mtp.layers.0.self_attn.k_norm.weight",
+                "mtp.layers.0.self_attn.k_proj.weight",
+                "mtp.layers.0.self_attn.o_proj.weight",
+                "mtp.layers.0.self_attn.q_norm.weight",
+                "mtp.layers.0.self_attn.q_proj.weight",
+                "mtp.layers.0.self_attn.v_proj.weight",
+                "mtp.norm.weight",
+                "mtp.pre_fc_norm_embedding.weight",
+                "mtp.pre_fc_norm_hidden.weight",
+            },
+            live_state={},
+            model=model,
+        )
+
+
+def test_qwen_native_bfloat16_profile_rejects_unbound_runtime_shapes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_qwen_module(monkeypatch)
+    model = _FakeQwenNativeModel()
+    authenticated = _FakeQwenConfig()
+
+    with pytest.raises(ValueError, match="model class is unsupported"):
+        provider._qwen3_5_native_float32_to_bfloat16_keys(
+            SimpleNamespace(config=model.config),
+            authenticated_config=authenticated,
+        )
+    with pytest.raises(RuntimeError, match="configuration is unavailable"):
+        provider._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=None,
+        )
+    with pytest.raises(ValueError, match="configuration is unsupported"):
+        provider._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=SimpleNamespace(
+                model_type="qwen3_5",
+                text_config=_FakeQwenTextConfig(),
+            ),
+        )
+
+    model.config.dtype = "float32"
+    with pytest.raises(ValueError, match="materialization was not preserved"):
+        provider._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=authenticated,
+        )
+    model.config.dtype = "bfloat16"
+    model._get_dtype_plan = None
+    with pytest.raises(RuntimeError, match="dtype plan is unavailable"):
+        provider._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=authenticated,
+        )
+    model._get_dtype_plan = lambda _dtype: {}
+    authenticated.text_config.layer_types = ["unsupported"]
+    with pytest.raises(ValueError, match="conversion profile is invalid"):
+        provider._qwen3_5_native_float32_to_bfloat16_keys(
+            model,
+            authenticated_config=authenticated,
+        )
+
+
+def test_live_tensor_binding_rejects_many_checkpoint_keys_for_one_live_name() -> None:
+    with pytest.raises(ValueError, match="conversion is not one-to-one"):
+        provider._bind_authenticated_live_tensors(
+            {"first", "second"},
+            live_state={"shared": object()},
+            model=object(),
+            prefix=None,
+            authoritative_targets={"first": "shared", "second": "shared"},
+        )
+
+
+def test_hf_model_inputs_reject_structured_non_prompt_text() -> None:
+    text = "prompt"
+    part = EvaluationInputPart(
+        kind="text",
+        role="context",
+        text=text,
+        sha256=hashlib.sha256(text.encode()).hexdigest(),
+    )
+    record = EvaluationRecord(
+        record_id="structured",
+        input_text=text,
+        input_sha256=evaluation_input_parts_sha256((part,)),
+        input_parts=(part,),
+    )
+
+    with pytest.raises(ValueError, match="one prompt text input part"):
+        provider._hf_model_inputs(
+            record=record,
+            tokenizer_call=lambda *_args, **_kwargs: {},
+            settings=_settings(),
+            device="cpu",
+        )
+
+
+def test_hf_scoring_rejects_invalid_logprob_timeout_and_unknown_metric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch = provider.importlib.import_module("torch")
+    input_ids = torch.tensor([[1]])
+    target_ids = torch.tensor([[2]])
+
+    def decode(token_ids: list[int], **_kwargs: object) -> str:
+        return "prompt" if len(token_ids) == 1 else "promptx"
+
+    def model(**kwargs: object) -> SimpleNamespace:
+        window = kwargs["input_ids"]
+        return SimpleNamespace(logits=torch.zeros((1, window.shape[1], 3)))
+
+    invalid_logprob = SimpleNamespace(
+        gather=lambda *_args, **_kwargs: SimpleNamespace(item=lambda: 0.1)
+    )
+    monkeypatch.setattr(torch, "log_softmax", lambda *_args, **_kwargs: invalid_logprob)
+    with pytest.raises(RuntimeError, match="invalid target logprob"):
+        provider._hf_normalized_nll(
+            record=_record(),
+            tokenizer_call=lambda *_args, **_kwargs: {"input_ids": target_ids},
+            decode=decode,
+            model=model,
+            torch=torch,
+            input_ids=input_ids,
+            device="cpu",
+            settings=_settings(),
+            deadline=math.inf,
+        )
+
+    with pytest.raises(TimeoutError, match="causal scoring timed out"):
+        provider._hf_exact_match_output(
+            tokenizer=SimpleNamespace(eos_token_id=None),
+            decode=lambda *_args, **_kwargs: "",
+            model=model,
+            torch=torch,
+            input_ids=input_ids,
+            settings=_settings(),
+            deadline=-1.0,
+        )
+
+    with pytest.raises(ValueError, match="unsupported built-in HF metric"):
+        provider._hf_score_record(
+            record=_record(),
+            metric="future_metric",
+            tokenizer=object(),
+            tokenizer_call=lambda *_args, **_kwargs: {"input_ids": input_ids},
+            decode=lambda *_args, **_kwargs: "",
+            model=model,
+            torch=torch,
+            device="cpu",
+            settings=_settings(),
+        )
+
+
+def test_hf_scorer_requires_callable_apis_and_execution_tensors() -> None:
+    record = _record()
+    batch = EvaluationBatch(schedule_sha256="a" * 64, records=(record,))
+    invalid_api = provider.HFTransformersCausalScorer(
+        model=object(),
+        tokenizer=object(),
+        artifact_identity_sha256="b" * 64,
+    )
+    with pytest.raises(RuntimeError, match="requires model and tokenizer APIs"):
+        invalid_api(batch, _settings())
+
+    class EmptyModel:
+        def __call__(self, **_kwargs: object) -> object:
+            return object()
+
+        def modules(self) -> tuple[object, ...]:
+            return (SimpleNamespace(training=False),)
+
+        def parameters(self) -> tuple[object, ...]:
+            return ()
+
+        def buffers(self) -> tuple[object, ...]:
+            return ()
+
+    class Tokenizer:
+        def __call__(self, *_args: object, **_kwargs: object) -> object:
+            return object()
+
+        def decode(self, *_args: object, **_kwargs: object) -> str:
+            return ""
+
+    no_tensors = provider.HFTransformersCausalScorer(
+        model=EmptyModel(),
+        tokenizer=Tokenizer(),
+        artifact_identity_sha256="b" * 64,
+    )
+    with pytest.raises(RuntimeError, match="no execution tensors"):
+        no_tensors(batch, _settings())

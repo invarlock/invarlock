@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import hashlib
 import sys
@@ -298,6 +299,7 @@ def test_extensions_cannot_customize_value_aggregation_or_direction(
         ({"supported_tasks": ("text_causal", "text_causal")}, "duplicates"),
         ({"supported_input_kinds": ("audio",)}, "unsupported value"),
         ({"supported_output_kinds": ("not-canonical",)}, "canonical identifier"),
+        ({"required_facts": ("output_text",)}, "require exactly"),
         ({"replay_mode": "provider_aggregate"}, "authenticated per-record facts"),
     ],
 )
@@ -342,6 +344,39 @@ def test_binding_rejects_ambiguous_or_unbounded_configuration(
 ) -> None:
     with pytest.raises(ScorerExtensionError, match=message):
         build_scorer_binding(_descriptor(), cast(Mapping[str, object], configuration))
+
+
+def test_binding_constructor_requires_a_mapping_before_freezing() -> None:
+    binding = build_scorer_binding(_descriptor(), {"scale": 2.0})
+
+    with pytest.raises(ScorerExtensionError, match="configuration must be"):
+        ScorerExtensionBinding(
+            scorer_id=binding.scorer_id,
+            scorer_version=binding.scorer_version,
+            descriptor_sha256=binding.descriptor_sha256,
+            configuration=cast(Mapping[str, object], []),
+            configuration_sha256=binding.configuration_sha256,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("format_version", "wrong", "format is invalid"),
+        ("scorer_abi", "wrong", "ABI is invalid"),
+        ("configuration", [], "configuration must be an object"),
+    ],
+)
+def test_binding_decoder_rejects_invalid_closed_fields(
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    payload = copy.deepcopy(scorer_binding_payload(_request().binding))
+    payload[field] = value
+
+    with pytest.raises(ScorerExtensionError, match=message):
+        scorer_module.decode_scorer_binding(payload)
 
 
 def test_authenticated_record_facts_are_deeply_immutable_and_digest_bound() -> None:
@@ -759,6 +794,22 @@ def test_result_and_builder_reject_missing_or_duplicate_record_values() -> None:
             record_results=duplicated,
             aggregate=0.5,
             aggregate_source_sha256=scorer_record_results_sha256(duplicated),
+        )
+
+
+def test_result_requires_nonempty_typed_record_results() -> None:
+    result = _valid_replay(_request())
+
+    with pytest.raises(ScorerExtensionError, match="non-empty tuple"):
+        dataclasses.replace(result, record_results=())
+    with pytest.raises(ScorerExtensionError, match="ScorerRecordResult"):
+        dataclasses.replace(result, record_results=(object(),))  # type: ignore[arg-type]
+
+
+def test_registry_replay_requires_a_typed_request() -> None:
+    with pytest.raises(ScorerExtensionError, match="ScorerReplayRequest"):
+        ScorerExtensionRegistry(allow_installed=False).replay(
+            cast(ScorerReplayRequest, object())
         )
 
 

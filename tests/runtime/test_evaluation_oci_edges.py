@@ -103,6 +103,28 @@ def test_bounded_engine_termination_escalates_after_stop_timeout() -> None:
     assert process.waits == 2
 
 
+def test_completed_engine_process_needs_no_termination() -> None:
+    class CompletedProcess:
+        def poll(self) -> int:
+            return 0
+
+        def terminate(self) -> None:
+            pytest.fail("completed process must not be terminated")
+
+    oci._terminate_bounded_process(CompletedProcess())  # type: ignore[arg-type]
+
+
+def test_bounded_engine_command_can_return_captured_stdout() -> None:
+    completed = oci._run_bounded_command(  # noqa: SLF001
+        [sys.executable, "-c", "print('captured')"],
+        timeout_seconds=5,
+        stdout_limit=1024,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == b"captured\n"
+
+
 def test_provider_bindings_require_complete_optional_resources(
     tmp_path: Path,
 ) -> None:
@@ -255,6 +277,39 @@ def test_worker_readability_rejects_nested_symlinks(tmp_path: Path) -> None:
 
     with _error("not readable"):
         oci._assert_worker_readable(root, user="65532:65532", label="artifact")
+
+
+def test_worker_readability_checks_nested_directories(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    nested = root / "private"
+    nested.mkdir(parents=True)
+    root.chmod(0o755)
+    nested.chmod(0o700)
+
+    with _error("private"):
+        oci._assert_worker_readable(root, user="65532:65532", label="artifact")
+
+
+def test_tensorrt_scratch_rejects_special_bundle_entries(tmp_path: Path) -> None:
+    engine = tmp_path / "engine"
+    engine.mkdir()
+    os.mkfifo(engine / "control.pipe")
+
+    with _error("unsupported entry"):
+        oci._worker_tmpfs_size_gib(
+            provider_name="tensorrt_llm",
+            artifact_source=engine,
+        )
+
+
+@pytest.mark.parametrize(
+    "timeout", [True, 0, oci._MAX_OUTER_WORKER_TIMEOUT_SECONDS + 1]
+)
+def test_side_worker_rejects_invalid_outer_timeout_before_launch(
+    timeout: object,
+) -> None:
+    with _error("outer timeout is invalid"):
+        oci.run_side_worker([], timeout_seconds=timeout)  # type: ignore[arg-type]
 
 
 def test_gpu_arguments_and_worker_stream_fail_closed_edges() -> None:
