@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Inspect AI, including 102 paired records, native evaluator provenance,
   independently signed verification receipts, policies, and builder-signed
   image attestations.
+- Added reproducible CPU verification-time, report-rendering-time, and retained
+  artifact-size measurements for both 102-record flagship transactions.
 - Added an example-layer evaluator transaction framework with source-specific
   native adapters, source-bound image construction, caller-owned signing and
   trust inputs, and cleanup of temporary container images.
