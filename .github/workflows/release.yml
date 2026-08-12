@@ -374,7 +374,35 @@ jobs:
           unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+          python -m pip check
+          quickstart_root="$(mktemp -d)"
+          approval_root="$(mktemp -d)"
+          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
+          cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          (
+            cd "${quickstart_root}"
+            python run.py --fixture golden
+          )
+          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
+          mkdir "${approval_root}/incoming"
+          cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+            "${approval_root}/incoming/evidence"
+          cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json \
+            "${approval_root}/incoming/verification.receipt.json"
+          (
+            cd "${approval_root}"
+            python review/verify_deployment_receipt.py \
+              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
+              --evidence incoming/evidence \
+              --policy review/policy/acceptance.json \
+              --receipt incoming/verification.receipt.json \
+              --output deployment-approval.json
+          )
+          rm -rf "${quickstart_root}" "${approval_root}"
+          trap - EXIT
+          python -m pip install --no-deps --force-reinstall dist/addins/*.whl
           python -m pip check
           invarlock --help
           python -c "import invarlock.cli.app"
@@ -404,16 +432,6 @@ jobs:
                   f"release tag/version mismatch: tag={release_version}, packages={observed}"
               )
           PY
-          quickstart_root="$(mktemp -d)"
-          trap 'rm -rf "${quickstart_root}"' EXIT
-          cp examples/quickstart/run.py "${quickstart_root}/run.py"
-          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
-          (
-            cd "${quickstart_root}"
-            python run.py --fixture golden
-          )
-          rm -rf "${quickstart_root}"
-          trap - EXIT
       - name: Create release install-surface venv
         id: install_surface
         shell: bash
@@ -990,7 +1008,35 @@ jobs:
           unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps --force-reinstall wheelhouse/*.whl
+          python -m pip install --no-deps --force-reinstall wheelhouse/invarlock-*.whl
+          python -m pip check
+          quickstart_root="$(mktemp -d)"
+          approval_root="$(mktemp -d)"
+          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
+          cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          (
+            cd "${quickstart_root}"
+            python run.py --fixture golden
+          )
+          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
+          mkdir "${approval_root}/incoming"
+          cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+            "${approval_root}/incoming/evidence"
+          cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json \
+            "${approval_root}/incoming/verification.receipt.json"
+          (
+            cd "${approval_root}"
+            python review/verify_deployment_receipt.py \
+              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
+              --evidence incoming/evidence \
+              --policy review/policy/acceptance.json \
+              --receipt incoming/verification.receipt.json \
+              --output deployment-approval.json
+          )
+          rm -rf "${quickstart_root}" "${approval_root}"
+          trap - EXIT
+          python -m pip install --no-deps --force-reinstall wheelhouse/invarlock_*.whl
           python -m pip check
           invarlock --help
           python -c "import invarlock.cli.app"
@@ -1014,13 +1060,3 @@ jobs:
           if any(candidate != expected for candidate in observed.values()):
               raise SystemExit(f"first-party version mismatch: {observed}")
           PY
-          quickstart_root="$(mktemp -d)"
-          trap 'rm -rf "${quickstart_root}"' EXIT
-          cp examples/quickstart/run.py "${quickstart_root}/run.py"
-          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
-          (
-            cd "${quickstart_root}"
-            python run.py --fixture golden
-          )
-          rm -rf "${quickstart_root}"
-          trap - EXIT

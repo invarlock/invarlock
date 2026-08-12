@@ -33,6 +33,7 @@ surfaces above, configure the `release-review` and `production` environments,
 and replace the demonstration anchors before using it for a deployment.
 
 The repository tests execute the composite action's command steps from an
-isolated copy of this consumer layout using the built candidate package. They
-cover a valid signed pack and a tampered pack. Verification against the hosted
-package is repeated only after that version has been published.
+isolated copy of this consumer layout and cover a valid signed pack and a
+tampered pack. Distribution smoke tests separately run the copied receipt
+consumer after installing only the built core wheel. Verification against the
+hosted package is repeated only after that version has been published.

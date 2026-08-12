@@ -44,7 +44,12 @@ def _strict_object(path: Path, *, label: str) -> dict[str, Any]:
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
             raise QuickstartError(f"{label} must be a real regular file")
-        payload = os.read(descriptor, _MAX_ANCHOR_BYTES + 1)
+        payload = b""
+        while len(payload) <= _MAX_ANCHOR_BYTES:
+            chunk = os.read(descriptor, _MAX_ANCHOR_BYTES + 1 - len(payload))
+            if not chunk:
+                break
+            payload += chunk
         if len(payload) > _MAX_ANCHOR_BYTES:
             raise QuickstartError(f"{label} exceeds the size limit")
         value = json.loads(payload, object_pairs_hook=pairs)
