@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import runpy
 import stat
 import subprocess
 import sys
@@ -260,17 +261,27 @@ def test_generator_never_clobbers_existing_or_racing_destination(
     assert not list(tmp_path.glob(".candidate-wheels.json.*.tmp"))
 
 
-def test_main_reports_creation_error_without_output(tmp_path: Path) -> None:
+def test_script_guard_reports_creation_error_without_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     output = tmp_path / "candidate-wheels.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(ROOT / "scripts/qualification_candidate_wheels.py"),
+            "--wheel",
+            str(tmp_path / "missing.whl"),
+            "--output",
+            str(output),
+        ],
+    )
 
     with pytest.raises(SystemExit, match="candidate wheel is unavailable"):
-        candidate_wheels.main(
-            [
-                "--wheel",
-                str(tmp_path / "missing.whl"),
-                "--output",
-                str(output),
-            ]
+        runpy.run_path(
+            str(ROOT / "scripts/qualification_candidate_wheels.py"),
+            run_name="__main__",
         )
 
     assert not output.exists()
