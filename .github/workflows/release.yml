@@ -404,6 +404,16 @@ jobs:
                   f"release tag/version mismatch: tag={release_version}, packages={observed}"
               )
           PY
+          quickstart_root="$(mktemp -d)"
+          trap 'rm -rf "${quickstart_root}"' EXIT
+          cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          (
+            cd "${quickstart_root}"
+            python run.py --fixture golden
+          )
+          rm -rf "${quickstart_root}"
+          trap - EXIT
       - name: Create release install-surface venv
         id: install_surface
         shell: bash
@@ -1004,3 +1014,13 @@ jobs:
           if any(candidate != expected for candidate in observed.values()):
               raise SystemExit(f"first-party version mismatch: {observed}")
           PY
+          quickstart_root="$(mktemp -d)"
+          trap 'rm -rf "${quickstart_root}"' EXIT
+          cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          (
+            cd "${quickstart_root}"
+            python run.py --fixture golden
+          )
+          rm -rf "${quickstart_root}"
+          trap - EXIT

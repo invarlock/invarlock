@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a five-minute CPU-only wheel-user workflow that verifies retained
+  signed evidence, issues a fresh verifier receipt, renders HTML, and runs from
+  versioned example files outside the installed package.
 - Added an exact-match `minimum_side_accuracy` policy control and a versioned
   comparison-report v3 field that records both side results.
 - Added retained CPU-only signed OCI transactions for LM Evaluation Harness and

@@ -55,7 +55,7 @@ MYPY_TYPED_SURFACE := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
@@ -63,7 +63,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
 .PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
-.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke packaging-smoke-minimal packaging-smoke-front-door
+.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
@@ -295,6 +295,10 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 
 example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
+
+example-quickstart:  ## Verify signed fixture evidence and issue a fresh receipt
+	PYTHONPATH=src $(PYTHON) examples/quickstart/run.py \
+		--fixture examples/acceptance-handoff/golden
 
 evaluator-qualification:  ## Requalify the retained evaluator matrix offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
@@ -619,7 +623,16 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from pathlib import Path; import invarlock; import sysconfig; site = Path(sysconfig.get_path('purelib')).resolve(); assert Path(invarlock.__file__).resolve().is_relative_to(site)"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"; \
+		consumer_root="$$smoke_venv/quickstart-consumer"; \
+		mkdir "$$consumer_root"; \
+		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
+		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
+		cd "$$consumer_root"; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" run.py --fixture golden
+
+quickstart-wheel-smoke: addins-install-smoke  ## Run the five-minute flow from built wheels
 
 packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifacts
 

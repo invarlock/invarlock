@@ -288,6 +288,9 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "is_relative_to(site)" in install_smoke
     assert "first-party version mismatch" in install_smoke
     assert "release tag/version mismatch" in install_smoke
+    assert "examples/quickstart/run.py" in install_smoke
+    assert "examples/acceptance-handoff/golden" in install_smoke
+    assert "python run.py --fixture golden" in install_smoke
     assert (
         _step(build["steps"], "Install smoke from wheel")["env"][
             "INVARLOCK_RELEASE_TAG"
@@ -737,6 +740,9 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "get_plugin_info" in smoke["run"]
     assert "is_relative_to(site)" in smoke["run"]
     assert "first-party version mismatch" in smoke["run"]
+    assert "examples/quickstart/run.py" in smoke["run"]
+    assert "examples/acceptance-handoff/golden" in smoke["run"]
+    assert "python run.py --fixture golden" in smoke["run"]
 
     assert "record_testpypi_promotion" not in jobs
 

@@ -5,6 +5,13 @@ deterministically prepared schedule, applies a release-regression policy to the
 selected paired interval, publishes signed evidence, and lets a separate
 verifier replay the result.
 
+For a first useful result without a model or container engine, run the
+[five-minute signed-evidence check](https://github.com/invarlock/invarlock/tree/main/examples/quickstart).
+It installs the core wheel, verifies retained evidence against independent
+anchors, issues a new verifier-signed receipt, and renders HTML on a regular
+CPU. Continue here when you are ready to produce evidence from your own model
+artifacts.
+
 ```text
 invarlock evaluate request.yaml
 invarlock verify evidence/ ... --receipt verification.receipt.json

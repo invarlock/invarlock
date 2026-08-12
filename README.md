@@ -96,24 +96,29 @@ for the complete claim boundary and assumptions.
 
 ## Try the signed handoff locally
 
-The service-free acceptance example runs a complete signed evaluation
-transaction over fixture artifacts and imported per-record results, independent
-technical verification, and recipient-policy handoff. It also demonstrates
-fail-closed rejection for changed artifacts, tampered evidence, untrusted or
-revoked signers, stale evidence, and contradictory envelope content.
+The five-minute wheel workflow verifies retained signed evidence against
+independent anchors, issues a fresh verifier-signed receipt, and renders an HTML
+report. It needs only Python 3.12 or newer and a regular CPU.
 
 ```bash
-git clone https://github.com/invarlock/invarlock.git
-cd invarlock
-python -m pip install -e .
-make example-acceptance-handoff
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install "invarlock==0.15.0"
+
+curl -fsSLO \
+  https://github.com/invarlock/invarlock/archive/refs/tags/v0.15.0.tar.gz
+tar -xzf v0.15.0.tar.gz --strip-components=3 \
+  invarlock-0.15.0/examples/quickstart \
+  invarlock-0.15.0/examples/acceptance-handoff/golden
+
+python run.py --fixture golden
 ```
 
-The command runs from checked-in fixtures in a temporary workspace using the
-installed package on a regular CPU. It prints the fixture decision, the number
-of rejected fail-closed scenarios, and direct paths to the signed evidence,
-verifier receipt, acceptance envelope, and machine-readable results. See the
-[offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff).
+The command prints `Decision: pass` and the paths to the signed receipt,
+machine-readable verification result, and human report. The versioned example
+files stay outside the package; the command imports only the installed wheel.
+The fuller [offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff)
+also builds fixture evidence and exercises ten fail-closed recipient scenarios.
 
 ## Inspect published evidence
 
