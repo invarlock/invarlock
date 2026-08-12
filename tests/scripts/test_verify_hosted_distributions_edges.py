@@ -128,6 +128,58 @@ def test_hosted_download_failure_removes_partial_wheel(
     assert list(wheel_staging.iterdir()) == []
 
 
+def test_hosted_missing_mode_propagates_non_not_found_http_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = urllib.error.HTTPError(
+        "https://example.invalid/metadata",
+        503,
+        "unavailable",
+        None,
+        None,
+    )
+    monkeypatch.setattr(
+        verifier,
+        "_open_url",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(urllib.error.HTTPError) as failure:
+        verifier._verify_project(
+            api_root=verifier.API_ROOTS["pypi"],
+            project="invarlock",
+            version="1.2.3",
+            expected=_expected_files(),
+            timeout=30,
+            allow_missing=True,
+        )
+    assert failure.value.code == 503
+
+
+def test_hosted_download_failure_without_materialization_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = _expected_files()
+    metadata_url = f"{verifier.API_ROOTS['pypi']}/invarlock/1.2.3/json"
+
+    def fake_open_url(url: str, *, timeout: float) -> io.BytesIO:
+        assert timeout == 30
+        if url == metadata_url:
+            return io.BytesIO(_metadata(expected))
+        raise urllib.error.URLError("download unavailable")
+
+    monkeypatch.setattr(verifier, "_open_url", fake_open_url)
+
+    with pytest.raises(urllib.error.URLError, match="download unavailable"):
+        verifier._verify_project(
+            api_root=verifier.API_ROOTS["pypi"],
+            project="invarlock",
+            version="1.2.3",
+            expected=expected,
+            timeout=30,
+        )
+
+
 def test_hosted_byte_mismatch_removes_materialized_wheel(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

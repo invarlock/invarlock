@@ -239,6 +239,25 @@ def test_installed_wheel_cli_smoke_rejects_retired_commands(
         preflight._smoke_installed_wheel_cli(tmp_path / "invarlock", cwd=tmp_path)
 
 
+def test_installed_wheel_cli_smoke_requires_every_supported_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        preflight,
+        "_require_successful_installed_wheel_command",
+        lambda *args, **_kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "evaluate verify version",
+            "",
+        ),
+    )
+
+    with pytest.raises(preflight.ReleasePreflightError, match="omitted 'report'"):
+        preflight._smoke_installed_wheel_cli(tmp_path / "invarlock", cwd=tmp_path)
+
+
 def test_dependency_bridge_is_a_plain_locked_site_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -406,6 +425,21 @@ def test_config_from_args_rejects_a_symlinked_release_path(tmp_path: Path) -> No
     )
 
     with pytest.raises(preflight.ReleasePreflightError, match="symbolic link"):
+        preflight._config_from_args(args)
+
+
+def test_config_from_args_requires_a_directory_checkout(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.write_text("not a directory\n", encoding="utf-8")
+    args = argparse.Namespace(
+        repo_root=checkout,
+        release_sha="a" * 40,
+        expected_version="1.2.3",
+        dist_dir=Path("dist"),
+        hash_manifest=Path("hashes.txt"),
+    )
+
+    with pytest.raises(preflight.ReleasePreflightError, match="must be a directory"):
         preflight._config_from_args(args)
 
 
