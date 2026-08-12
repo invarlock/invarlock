@@ -177,7 +177,9 @@ elif arguments[:3] == ["-m", "invarlock", "evaluate"]:
         fail("evaluation")
         Path(control["evidence"]).mkdir()
         if control.get("binding_mutation") == "request_changed":
-            Path(arguments[3]).write_text("changed request\\n", encoding="utf-8")
+            captured_request = Path(arguments[3])
+            captured_request.unlink()
+            captured_request.write_text("changed request\\n", encoding="utf-8")
         published_evidence = control["evidence"]
         if control.get("binding_mutation") == "evaluation_relative":
             published_evidence = Path(published_evidence).name

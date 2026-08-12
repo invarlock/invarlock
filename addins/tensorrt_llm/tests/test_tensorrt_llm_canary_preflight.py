@@ -329,3 +329,14 @@ def test_tokenizer_contract_read_detects_short_and_trailing_bytes(
             match="while being authenticated",
         ):
             preflight._read_tokenizer_contract(root, relative)
+
+
+def test_tokenizer_contract_rejects_a_missing_nested_directory(tmp_path: Path) -> None:
+    root = tmp_path / "inputs"
+    root.mkdir()
+
+    with pytest.raises(
+        preflight.CanaryPreflightError,
+        match="must exist beneath INPUT_ROOT",
+    ):
+        preflight._read_tokenizer_contract(root, "missing/tokenizer.json")

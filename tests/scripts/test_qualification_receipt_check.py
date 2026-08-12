@@ -974,6 +974,36 @@ def test_authenticated_canary_requires_checksum_coverage_for_request(
         )
 
 
+def test_authenticated_canary_requires_checksum_coverage_for_provider_receipts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _receipt, evidence, _profile, manifest_digest = _case(tmp_path)
+    verify_checksums = qualification_receipt_check.verify_checksums
+    missing = "providers/baseline/runtime-provider.receipt.json"
+
+    def without_baseline_receipt(root: Path) -> tuple[list[str], set[str]]:
+        errors, covered = verify_checksums(root)
+        return errors, covered - {missing}
+
+    monkeypatch.setattr(
+        qualification_receipt_check,
+        "verify_checksums",
+        without_baseline_receipt,
+    )
+    monkeypatch.setattr(
+        qualification_receipt_check,
+        "verify_no_extra_files",
+        lambda *_args, **_kwargs: ([], []),
+    )
+
+    with pytest.raises(ValueError, match=f"{missing} is not covered"):
+        qualification_receipt_check._authenticated_canary_compatibility(
+            evidence,
+            expected_manifest_digest=manifest_digest,
+        )
+
+
 def test_authenticated_canary_rejects_checksum_valid_invalid_provider_receipt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
