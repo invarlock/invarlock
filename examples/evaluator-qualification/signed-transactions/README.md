@@ -26,6 +26,57 @@ recorded OCI runs. Offline verification accepts that retained format without
 rewriting or re-signing it; newly executed transactions emit only the current
 evaluator-named format.
 
+## Flagship proof map
+
+For each flagship, the map connects three complementary demonstrations: the
+small upstream conformance qualification, the 102-record model-output import
+replay, and the separately executed signed OCI journey. They share the reviewed
+profile and evaluator-neutral contracts; the retained conformance output is not
+claimed as the source of the signed evidence pack.
+
+### Inspect AI
+
+1. [Qualification profile](../artifacts/inspect-ai/profile.json) binds the
+   maintained adapter, upstream package, runner, and dependency declaration.
+2. [Retained upstream output](../artifacts/inspect-ai/upstream-output.json) is
+   normalized into the [qualification export](../artifacts/inspect-ai/export.json)
+   and independently checked in the
+   [qualification result](../artifacts/inspect-ai/qualification-result.json).
+3. The [102-record import replay](../authoritative/artifacts/inspect-ai/import-replay.json)
+   demonstrates verdict-authoritative replay over retained model outputs.
+4. The signed journey retains the [evidence manifest](inspect-ai/evidence/manifest.json),
+   [verification receipt](inspect-ai/verification.receipt.json),
+   [builder attestation](inspect-ai/build-attestation.json), and
+   [transaction anchors](inspect-ai/transaction.json).
+5. The [runnable integration](../../integrations/inspect-ai/README.md) produces
+   the transaction, and the [deployment approval example](../../ci/README.md)
+   consumes its signed receipt under separate recipient-controlled anchors.
+
+### LM Evaluation Harness
+
+1. [Qualification profile](../artifacts/lm-evaluation-harness/profile.json)
+   binds the maintained adapter, upstream package, runner, and dependency
+   declaration.
+2. [Retained upstream output](../artifacts/lm-evaluation-harness/upstream-output.json)
+   is normalized into the
+   [qualification export](../artifacts/lm-evaluation-harness/export.json) and
+   independently checked in the
+   [qualification result](../artifacts/lm-evaluation-harness/qualification-result.json).
+3. The [102-record import replay](../authoritative/artifacts/lm-evaluation-harness/import-replay.json)
+   demonstrates verdict-authoritative replay over retained model outputs.
+4. The signed journey retains the
+   [evidence manifest](lm-evaluation-harness/evidence/manifest.json),
+   [verification receipt](lm-evaluation-harness/verification.receipt.json),
+   [builder attestation](lm-evaluation-harness/build-attestation.json), and
+   [transaction anchors](lm-evaluation-harness/transaction.json).
+5. The [runnable integration](../../integrations/lm-evaluation-harness/README.md)
+   produces the transaction.
+
+The [qualification matrix](../../../docs/reference/evaluator-qualification.md#qualification-matrix)
+records adapter support, replay authority, and retained signed-journey maturity
+as independent properties. None of these demonstrations generalizes beyond the
+pinned exact-match workflow.
+
 Run the offline verification through:
 
 ```bash

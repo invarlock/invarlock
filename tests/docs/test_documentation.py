@@ -166,6 +166,7 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     readme = _read("README.md")
     headings = (
         "## Evidence paths",
+        "## Decision boundary",
         "## Try the signed handoff locally",
         "## Inspect published evidence",
         "## Run, verify, and report",
@@ -178,9 +179,7 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     positions = [readme.index(heading) for heading in headings]
 
     assert positions == sorted(positions)
-    evidence_paths = readme[
-        positions[0] : readme.index("## Try the signed handoff locally")
-    ]
+    evidence_paths = readme[positions[0] : positions[1]]
     for phrase in (
         "Native execution",
         "Adapter support",
@@ -195,7 +194,18 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
 
     introduction = readme[: positions[0]]
     assert "in-toto/DSSE" not in introduction
-    acceptance = readme[positions[6] : positions[7]]
+    decision_boundary = " ".join(readme[positions[1] : positions[2]].split())
+    for phrase in (
+        "one precise question",
+        "authenticated evidence and independently supplied trust anchors",
+        "reproducible, portable, and suitable for recipient-controlled approval",
+        "Broader deployment, safety, compliance, and organizational decisions",
+        "complete claim boundary and assumptions",
+    ):
+        assert phrase in decision_boundary
+    assert "## Scope and non-goals" not in readme
+
+    acceptance = readme[positions[7] : positions[8]]
     assert "in-toto/DSSE" in acceptance
     assert "**Compatibility note:**" in acceptance
 

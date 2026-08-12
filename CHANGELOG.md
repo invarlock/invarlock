@@ -11,18 +11,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added an exact-match `minimum_side_accuracy` policy control and a versioned
   comparison-report v3 field that records both side results.
+- Added retained CPU-only signed OCI transactions for LM Evaluation Harness and
+  Inspect AI, including 102 paired records, native evaluator provenance,
+  independently signed verification receipts, policies, and builder-signed
+  image attestations.
+- Added an example-layer evaluator transaction framework with source-specific
+  native adapters, source-bound image construction, caller-owned signing and
+  trust inputs, and cleanup of temporary container images.
+- Added a protected CI deployment-approval example that reauthenticates the
+  retained Inspect AI receipt against separately supplied recipient anchors
+  before an exact candidate can be deployed.
+- Added one bounded examples-layer command runner with timeout, output-limit,
+  cleanup, and nonzero-exit handling across maintained integration commands.
 
 ### Changed
 
 - Kept generic receipt signing role-neutral while high-assurance evaluator
   transactions continue to require separate evidence, verifier, and builder
   keys.
-- Separated the immutable v0.13 compatibility package from the current
-  acceptance-handoff golden, and labeled report-v3 acceptance envelopes as the
-  v0.15 contract set without relabeling v0.13 report-v1/v2 evidence.
+- Preserved previously released evidence under its original comparison-report
+  v1/v2 contract identities, while current acceptance envelopes bind
+  comparison-report v3.
 - Preserved retained OCI build attestations in their original signed format;
   current transaction writers emit only the evaluator-named format while the
   offline verifier strictly reads both versions.
+- Focused evaluator release evidence on LM Evaluation Harness and Inspect AI,
+  while preserving the wider matrix as a compatibility catalog and reporting
+  adapter support, replay authority, and signed-journey maturity independently.
+- Kept evaluator-specific SDKs, parsers, launchers, and image-build logic in the
+  example layer; the installed engine continues to expose evaluator-neutral
+  qualification and runtime-import contracts.
+- Refreshed hash-pinned runtime and workflow dependencies, including the
+  cryptography security baseline used by signed evidence and receipt paths.
+- Reframed the public project overview around independently replayable signed
+  evaluation evidence, with a clear decision boundary and assurance limits plus
+  a flagship proof map connecting evaluator output, qualification, evidence,
+  receipts, attestations, and runnable integrations.
 
 ### Removed
 
@@ -31,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bound temporary container tags and worker cleanup to immutable engine IDs,
   preserved no-follow validation for caller-owned key and workspace paths,
   and removed partial streamed output after bounded command failures.
+- Bounded container-engine inspection and control output, rejected symlinked
+  worker inputs, and limited runtime-side evidence loading to size-bounded
+  regular files.
+- Required deployment-approval inputs to bind the verifier trust-profile digest
+  or its explicit absence, and required both successful receipt verification
+  and an explicit policy-pass verdict before approval.
 
 ## [0.14.0] - 2026-07-27
 

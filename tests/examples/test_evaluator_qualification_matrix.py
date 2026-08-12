@@ -189,6 +189,30 @@ def test_matrix_preserves_independent_support_authority_and_maturity_axes() -> N
     assert retained == ["inspect-ai", "lm-evaluation-harness"]
 
 
+def test_flagship_proof_map_links_every_retained_evidence_stage() -> None:
+    proof_map = (SIGNED_TRANSACTIONS / "README.md").read_text(encoding="utf-8")
+    common = (
+        "profile.json",
+        "upstream-output.json",
+        "export.json",
+        "qualification-result.json",
+        "import-replay.json",
+        "evidence/manifest.json",
+        "verification.receipt.json",
+        "build-attestation.json",
+        "transaction.json",
+    )
+    for profile_id in ("inspect-ai", "lm-evaluation-harness"):
+        targets = (
+            *(f"../artifacts/{profile_id}/{name}" for name in common[:4]),
+            f"../authoritative/artifacts/{profile_id}/{common[4]}",
+            *(f"{profile_id}/{name}" for name in common[5:]),
+        )
+        for target in targets:
+            assert f"({target})" in proof_map
+            assert (SIGNED_TRANSACTIONS / target).resolve().is_file()
+
+
 @pytest.mark.parametrize("profile_id", ["lm-evaluation-harness", "inspect-ai"])
 def test_flagship_signed_transaction_is_retained_and_replays_offline(
     profile_id: str,

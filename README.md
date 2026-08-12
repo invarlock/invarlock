@@ -80,6 +80,20 @@ The stable qualification result expresses replay authority as
 maturity are catalog metadata, not fields that an imported result can claim
 for itself.
 
+## Decision boundary
+
+InvarLock answers one precise question: whether a subject artifact satisfies an
+agreed release-regression policy relative to a baseline, using authenticated
+evidence and independently supplied trust anchors. It makes that decision
+reproducible, portable, and suitable for recipient-controlled approval.
+
+The decision remains bounded by the supplied evidence and identities. Broader
+deployment, safety, compliance, and organizational decisions remain with their
+corresponding controls and reviewers. See the
+[threat model](https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md#explicit-non-goals)
+and [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md)
+for the complete claim boundary and assumptions.
+
 ## Try the signed handoff locally
 
 The service-free acceptance example runs a complete signed evaluation
@@ -210,13 +224,17 @@ source-shaped adapter, and completes the closed import replay. The matrix
 is a secondary compatibility catalog rather than a release breadth target.
 LM Evaluation Harness and Inspect AI are the compact flagship set. These are
 example-owned adapters and profiles; new profiles extend the same
-evaluator-neutral engine contract.
+evaluator-neutral engine contract. The retained
+[flagship proof map](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/signed-transactions/README.md#flagship-proof-map)
+links each upstream output, qualified import, signed transaction, and verifier
+receipt.
 
 The
 [`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
 directory contains maintained artifact-producing journeys for Hugging Face,
 PEFT, TorchAO, GGUF/llama.cpp, TensorRT-LLM, Hugging Face vision-text, and LM
-Evaluation Harness. The
+Evaluation Harness, plus the compact Inspect AI bridge. OpenAI Evals has a
+maintained native adapter without retained signed-journey evidence. The
 [model-change workflow guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md)
 maps common model and runtime changes to native execution, optional-runtime, or
 import boundaries.
