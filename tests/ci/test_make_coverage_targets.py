@@ -21,10 +21,10 @@ def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
     block = MAKE.target("coverage").text
     assert "--cov=src/invarlock" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "check_coverage_thresholds.py" not in MAKEFILE
     assert "scripts/evidence_packs" not in MAKEFILE
     assert "--fail-under=80" not in MAKEFILE
@@ -40,11 +40,11 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     assert "source =\n    addins" in config
     assert "addins/*/tests/*" in config
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
-    assert block.count("--fail-under=90") == 5
+    assert "--cov-fail-under=95" in block
+    assert block.count("--fail-under=95") == 5
     assert "git ls-files 'addins/*/src/**/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "ADDIN_COVERAGE_MIN" not in MAKEFILE
     assert "coverage-addins: coverage-linux-check" in MAKEFILE
     assert 'test "$$(uname -s)" = Linux' in MAKEFILE
@@ -67,13 +67,13 @@ def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> N
         "runtime_qualification.py",
         "tensorrt_llm_canary_preflight.py",
     ):
-        assert f"--include='scripts/{script}' --fail-under=90" in block
+        assert f"--include='scripts/{script}' --fail-under=95" in block
         assert f"scripts/{script}" in QUALIFICATION_COVERAGE_CONFIG
     assert "addins/tensorrt_llm/tests/test_tensorrt_llm_canary_preflight.py" in block
     assert "PYTHONPATH=src:addins/tensorrt_llm/src" in block
     assert "--cov-config=scripts/qualification.coveragerc" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE)" in block
 
@@ -87,10 +87,10 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
         "tagged_release_candidate.py",
         "verify_hosted_distributions.py",
     ):
-        assert f"--include='scripts/release/{script}' --fail-under=90" in block
+        assert f"--include='scripts/release/{script}' --fail-under=95" in block
     assert "--cov-config=scripts/release.coveragerc" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_RELEASE_FILE)" in block
 
@@ -99,10 +99,17 @@ def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
     block = MAKE.target("coverage-examples").text
     assert "tests/examples" in block
     assert "--cov=examples" in block
+    assert "--cov-config=scripts/examples.coveragerc" in block
+    config = (ROOT / "scripts" / "examples.coveragerc").read_text(encoding="utf-8")
+    assert "source =\n    examples" in config
+    assert "if __name__ == .__main__.:" in config
+    assert "fail_under" not in config
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under" not in block
+    assert "grep -Ev '^(#|$$)' examples/coverage-exemptions.txt" in block
+    assert '--omit="$$exemptions" --fail-under=95' in block
     assert "find examples -type f -name '*.py'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE)" in block
     assert "RELEASE_EXAMPLE_COVERAGE_FILES" in block
@@ -132,10 +139,10 @@ def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:
     ):
         assert test_file in block
     assert "--cov-config=scripts/maintenance.coveragerc" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE)" in block
     assert "git ls-files 'scripts/checks/*.py' 'scripts/security/*.py'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "scripts/checks/*.py" in config
     assert "scripts/prepare_qualification_suites.py" in config
     assert "scripts/security/*.py" in config
@@ -205,7 +212,7 @@ def test_coverage_configuration_is_the_core_surface() -> None:
     run = pyproject["tool"]["coverage"]["run"]
     report = pyproject["tool"]["coverage"]["report"]
     assert run["source"] == ["src/invarlock"]
-    assert report["fail_under"] == 90
+    assert report["fail_under"] == 95
     assert "include" not in report
 
 
@@ -232,7 +239,7 @@ def test_primary_verification_and_coverage_targets_default_to_parallel() -> None
     assert "scripts/checks/check_coverage_branch_rate.py" in MAKEFILE
     assert "reports/cov.xml reports/addins-cov.xml" in MAKEFILE
     assert (
-        "reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90" in MAKEFILE
+        "reports/examples-cov.xml reports/maintenance-cov.xml --minimum 95" in MAKEFILE
     )
     assert "--class-exemptions reports/examples-cov.xml examples" in MAKEFILE
     assert "examples/coverage-exemptions.txt" in MAKEFILE

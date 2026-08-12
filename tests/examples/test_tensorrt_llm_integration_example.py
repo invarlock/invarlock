@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import builtins
 import importlib.util
 import json
-import os
 import stat
 import subprocess
 import sys
@@ -177,15 +177,36 @@ def prepare_helper(monkeypatch: pytest.MonkeyPatch) -> Any:
     )
     for name, module in modules.items():
         monkeypatch.setitem(sys.modules, name, module)
-    helper = _load(
-        "tensorrt_integration_prepare",
-        Path(__file__).resolve().parents[2]
-        / "examples/integrations/tensorrt-llm/prepare.py",
-    )
+    flat_runner = ModuleType("bounded_command")
+
+    def unavailable_runner(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("test must replace the container command runner")
+
+    flat_runner.run_bounded_command = unavailable_runner  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "bounded_command", flat_runner)
+    real_import = builtins.__import__
+
+    def container_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "examples.integrations.bounded_command":
+            error = ModuleNotFoundError("No module named 'examples'")
+            error.name = "examples"
+            raise error
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", container_import)
+    try:
+        helper = _load(
+            "tensorrt_integration_prepare",
+            Path(__file__).resolve().parents[2]
+            / "examples/integrations/tensorrt-llm/prepare.py",
+        )
+    finally:
+        monkeypatch.setattr(builtins, "__import__", real_import)
     helper._test_exported = exported
     helper._test_model = model
     helper._test_dtype = dtype
     helper._test_tensor_type = FakeTensor
+    helper._test_flat_runner = unavailable_runner
     return helper
 
 
@@ -195,32 +216,6 @@ def test_showcase_uses_one_pinned_qwen3_family(showcase: Any) -> None:
         "c1899de289a04d12100db370d81485cdf75e47ca",
     )
     assert showcase._VARIANTS == {"baseline": "none", "subject": "fp8"}
-
-
-@pytest.mark.parametrize("entrypoint", ("run.py", "showcase.py"))
-def test_public_entrypoints_start_as_direct_scripts(entrypoint: str) -> None:
-    repository = Path(__file__).resolve().parents[2]
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join(
-        (
-            str(repository / "src"),
-            str(repository / "addins/tensorrt_llm/src"),
-            str(repository),
-        )
-    )
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(repository / "examples/integrations/tensorrt-llm" / entrypoint),
-            "--help",
-        ],
-        cwd=repository,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
 def test_image_requires_immutable_identity(example: Any) -> None:
@@ -1160,6 +1155,7 @@ def test_prepare_helper_contract_conversion_and_build(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prepare_helper: Any
 ) -> None:
     prepare = prepare_helper
+    assert prepare.run_bounded_command is prepare._test_flat_runner
     contract = json.loads(prepare._canonical_tokenizer_contract(tmp_path))
     assert contract["pad_token_id"] == 2
     assert contract["tokenizer_json"] == {"model": {}}

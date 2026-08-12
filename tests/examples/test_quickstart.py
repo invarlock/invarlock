@@ -99,6 +99,9 @@ def test_quickstart_rejects_malformed_anchor_files(
 
 def test_quickstart_bounds_anchor_input_and_rejects_nonfiles(tmp_path: Path) -> None:
     module = _module()
+    with pytest.raises(module.QuickstartError, match="strict JSON"):
+        module._strict_object(tmp_path / "missing.json", label="anchors")
+
     oversized = tmp_path / "oversized.json"
     oversized.write_bytes(b" " * (module._MAX_ANCHOR_BYTES + 1))
     with pytest.raises(module.QuickstartError, match="size limit"):
@@ -127,6 +130,20 @@ def test_quickstart_rejects_invalid_digest_and_incomplete_fixture(
     leaked.symlink_to(tmp_path / "missing")
     with pytest.raises(module.QuickstartError, match="must not contain"):
         module._real_fixture(fixture)
+
+
+def test_quickstart_rejects_a_fixture_reached_through_an_ancestor_symlink(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    real_parent = tmp_path / "real-parent"
+    fixture = real_parent / "fixture"
+    shutil.copytree(FIXTURE, fixture)
+    alias = tmp_path / "alias"
+    alias.symlink_to(real_parent, target_is_directory=True)
+
+    with pytest.raises(module.QuickstartError, match="must not traverse"):
+        module._real_fixture(alias / "fixture")
 
 
 def test_quickstart_rejects_unsafe_output_and_key_destinations(tmp_path: Path) -> None:

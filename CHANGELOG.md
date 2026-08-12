@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded documentation checks to discover every tracked Markdown file and
   reject machine-specific paths, credential-like values, and review-process
   wording before publication.
+- Raised aggregate and per-module statement and branch coverage requirements to
+  95% across the engine, add-ins, qualification and release tooling, maintained
+  examples, and repository checks.
 
 ### Removed
 

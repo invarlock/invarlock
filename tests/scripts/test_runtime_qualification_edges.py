@@ -95,6 +95,25 @@ def test_regular_file_hashing_and_reads_reject_unsafe_inputs(
         )
 
 
+def test_regular_file_read_enforces_the_limit_after_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = tmp_path / "growing-input"
+    payload.write_bytes(b"ab")
+    real_fstat = qualification.os.fstat
+
+    def underreport_initial_size(descriptor: int) -> os.stat_result:
+        facts = real_fstat(descriptor)
+        values = list(facts)
+        values[6] = 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(qualification.os, "fstat", underreport_initial_size)
+
+    with pytest.raises(qualification.QualificationError, match="size limit"):
+        qualification._read_regular_bytes(payload, label="input", max_bytes=1)
+
+
 def test_candidate_manifest_and_file_identity_require_real_regular_files(
     tmp_path: Path,
 ) -> None:
@@ -108,6 +127,26 @@ def test_candidate_manifest_and_file_identity_require_real_regular_files(
         qualification._file_identity(tmp_path, label="candidate")
     with pytest.raises(qualification.QualificationError, match="is unavailable"):
         qualification._file_identity(tmp_path / "missing", label="candidate")
+
+
+def test_candidate_capture_fails_cleanly_if_the_bound_wheel_disappears(
+    tmp_path: Path,
+) -> None:
+    candidate_site = tmp_path / "candidate-site"
+    candidate_site.mkdir()
+    spec = qualification.CandidateWheelSpec(
+        path=tmp_path / "missing.whl",
+        sha256=DIGEST,
+    )
+
+    with pytest.raises(qualification.QualificationError, match="wheel is unavailable"):
+        qualification._capture_candidate_wheel(
+            spec,
+            archived={},
+            candidate_site=candidate_site,
+        )
+
+    assert list(candidate_site.iterdir()) == []
 
 
 def test_candidate_manifest_rejects_linked_and_repeated_wheel_paths(

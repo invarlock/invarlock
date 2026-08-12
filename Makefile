@@ -126,11 +126,11 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 	COVERAGE_FILE=$(COVERAGE_CORE_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
-		--cov-report=xml:reports/cov.xml --cov-fail-under=90
+		--cov-report=xml:reports/cov.xml --cov-fail-under=95
 	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-linux-check:
@@ -147,23 +147,23 @@ coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for opti
 		--cov --cov-config=scripts/addins.coveragerc \
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/diagnostics/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/gguf/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/multimodal/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
-		--fail-under=90
+		--fail-under=95
 	@git ls-files 'addins/*/src/**/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-qualification:  ## Enforce branch-aware coverage for qualification tooling
@@ -182,23 +182,23 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 		--cov --cov-config=scripts/qualification.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/authenticated_runtime_build.py' --fail-under=90
+		--include='scripts/authenticated_runtime_build.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_precheck.py' --fail-under=90
+		--include='scripts/qualification_precheck.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_candidate_wheels.py' --fail-under=90
+		--include='scripts/qualification_candidate_wheels.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_receipt_check.py' --fail-under=90
+		--include='scripts/qualification_receipt_check.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_render_preflight.py' --fail-under=90
+		--include='scripts/qualification_render_preflight.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_source.py' --fail-under=90
+		--include='scripts/qualification_source.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/runtime_qualification.py' --fail-under=90
+		--include='scripts/runtime_qualification.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=90
+		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=95
 
 coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage erase
@@ -214,32 +214,36 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		--cov --cov-config=scripts/release.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/first_party_distribution_validation.py' --fail-under=90
+		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_distribution_validation.py' --fail-under=90
+		--include='scripts/release/release_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_preflight.py' --fail-under=90
+		--include='scripts/release/release_preflight.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/tagged_release_candidate.py' --fail-under=90
+		--include='scripts/release/tagged_release_candidate.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/verify_hosted_distributions.py' --fail-under=90
+		--include='scripts/release/verify_hosted_distributions.py' --fail-under=95
 
 coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/examples \
 		--cov=examples \
+		--cov-config=scripts/examples.coveragerc \
 		--cov-branch \
 		--cov-report=term-missing \
-		--cov-report=xml:reports/examples-cov.xml \
-		--cov-fail-under=90
+		--cov-report=xml:reports/examples-cov.xml
+	@exemptions="$$(grep -Ev '^(#|$$)' examples/coverage-exemptions.txt | paste -sd, -)"; \
+		test -n "$$exemptions"; \
+		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report \
+			--omit="$$exemptions" --fail-under=95
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
 			if grep -Fqx "$$source" examples/coverage-exemptions.txt; then continue; fi; \
-			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 	@for source in $(RELEASE_EXAMPLE_COVERAGE_FILES); do \
 		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
@@ -264,11 +268,11 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		--cov --cov-config=scripts/maintenance.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/maintenance-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' \
 		'scripts/prepare_qualification_suites.py' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-enforce: PYTEST_WORKERS = 2
@@ -280,7 +284,7 @@ coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in para
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
-		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90 \
+		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 95 \
 		--class-exemptions reports/examples-cov.xml examples \
 		examples/coverage-exemptions.txt
 

@@ -475,11 +475,19 @@ def _execute(
     binding_mutation: str | None = None,
     report: bool = False,
     runtime_source_commit: str = SOURCE_COMMIT,
-    relative_preflight_output: bool = False,
+    preflight_output: str = "bound",
     canary_runtime_digest: str | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, Path], Path]:
     python, log = _fake_python(tmp_path)
     paths = _inputs(tmp_path)
+    if preflight_output == "bound":
+        controlled_preflight_output = None
+    elif preflight_output == "relative":
+        controlled_preflight_output = paths["evidence"].name
+    elif preflight_output == "mismatched":
+        controlled_preflight_output = str(tmp_path / "other-evidence")
+    else:
+        raise ValueError(f"unknown preflight output mode: {preflight_output}")
     _write_control(
         tmp_path,
         paths,
@@ -487,9 +495,7 @@ def _execute(
         verified_trust=verified_trust,
         binding_mutation=binding_mutation,
         runtime_source_commit=runtime_source_commit,
-        preflight_output=(
-            paths["evidence"].name if relative_preflight_output else None
-        ),
+        preflight_output=controlled_preflight_output,
         canary_runtime_digest=canary_runtime_digest,
     )
     completed = subprocess.run(
@@ -624,11 +630,30 @@ def test_readiness_resolves_relative_output_against_original_request_root(
     completed, paths, _log = _execute(
         tmp_path,
         mode="readiness",
-        relative_preflight_output=True,
+        preflight_output="relative",
     )
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["evidence"] == str(paths["evidence"])
+
+
+def test_readiness_rejects_a_preflight_bound_to_another_destination(
+    tmp_path: Path,
+) -> None:
+    completed, paths, log = _execute(
+        tmp_path,
+        mode="readiness",
+        preflight_output="mismatched",
+    )
+
+    assert completed.returncode == 2
+    failure = json.loads(completed.stderr)
+    assert failure["stage"] == "preflight_binding"
+    assert "does not match --evidence" in failure["errors"][0]
+    invocations = _qualified_invocations(log)
+    assert len(invocations) == 2
+    assert "--preflight" in invocations[-1]["arguments"]
+    assert not paths["evidence"].exists()
 
 
 def test_missing_precheck_dependency_is_a_structured_stage_failure(
