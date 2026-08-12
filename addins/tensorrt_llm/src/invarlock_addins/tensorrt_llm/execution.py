@@ -283,10 +283,6 @@ def _resolve_vendor_python() -> _PinnedFile:
         raise TensorRTLLMExecutionError(
             "the fixed TensorRT-LLM Python interpreter cannot be resolved"
         ) from exc
-    if not resolved.is_absolute():
-        raise TensorRTLLMExecutionError(
-            "the fixed TensorRT-LLM Python interpreter is not absolute"
-        )
     return _pin_trusted_executable(
         resolved,
         expected_sha256=None,

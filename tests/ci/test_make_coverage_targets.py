@@ -49,6 +49,10 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     assert "coverage-addins: coverage-linux-check" in MAKEFILE
     assert 'test "$$(uname -s)" = Linux' in MAKEFILE
     assert "COVERAGE_FILE=$(COVERAGE_ADDINS_FILE)" in block
+    assert (
+        "PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:"
+        "addins/multimodal/src:addins/tensorrt_llm/src:."
+    ) in block
 
 
 def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> None:

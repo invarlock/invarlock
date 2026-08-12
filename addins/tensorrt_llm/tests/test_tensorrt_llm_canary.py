@@ -335,6 +335,34 @@ def test_candidate_qualification_uses_real_provider_session_contract(
             expected_output_sha256=hashlib.sha256(b"wrong").hexdigest(),
         )
 
+    encoded_observations: list[bytes] = []
+    real_encode_observation = canary.encode_scoring_observation
+
+    def unstable_observation_encoding(observation: ScoringObservation) -> bytes:
+        payload = real_encode_observation(observation)
+        encoded_observations.append(payload)
+        return payload if len(encoded_observations) == 1 else payload + b"\n"
+
+    with monkeypatch.context() as observation_context:
+        observation_context.setattr(
+            canary,
+            "encode_scoring_observation",
+            unstable_observation_encoding,
+        )
+        observation_context.setattr(
+            canary,
+            "runtime_provider_evidence_errors",
+            lambda **_kwargs: (),
+        )
+        with pytest.raises(
+            canary.TensorRTLLMCanaryError,
+            match="observation is not deterministic",
+        ):
+            canary.qualify_candidate(
+                **qualification_args,
+                expected_output_sha256=hashlib.sha256(b"qualified").hexdigest(),
+            )
+
     calls.clear()
     receipt_versions[:] = ["0.0.0", "0.0.1"]
     with pytest.raises(canary.TensorRTLLMCanaryError, match="not deterministic"):

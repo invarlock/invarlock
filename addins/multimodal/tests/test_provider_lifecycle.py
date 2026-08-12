@@ -25,6 +25,7 @@ from invarlock.core.runtime_provider import (
     RuntimeExecutionSettings,
     RuntimeScoringRecord,
     ScoringObservation,
+    artifact_identity_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
@@ -661,6 +662,219 @@ def test_prepare_open_score_receipt_and_close_lifecycle(
         session.score(_batch())
     with pytest.raises(RuntimeError, match="session is closed"):
         session.runtime_receipt()
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("missing-resources", "checkpoint and content directories"),
+        ("processor-api", "AutoProcessor"),
+        ("model-api", "model APIs"),
+        ("tokenizer-contract", "tokenizer contract"),
+        ("processor-contract", "processor contract"),
+        ("checkpoint-race", "changed during loading"),
+    ],
+)
+def test_prepare_execution_rejects_incomplete_or_mutated_runtime_bindings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    message: str,
+) -> None:
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    content = tmp_path / "images"
+    if failure == "missing-resources":
+        content.write_bytes(b"not-a-directory")
+    else:
+        content.mkdir()
+    resources = RuntimeArtifactResources(
+        root=tmp_path,
+        primary_artifact=checkpoint.name,
+        support_resources={"content_store": content.name},
+        device_kind="cpu",
+        container_image_digest=_IMAGE_DIGEST,
+    )
+    provider = HFVisionTextProvider()
+    spec = _spec()
+    identity = provider.identify_artifact(spec)
+    monkeypatch.setattr(
+        HFVisionTextProvider,
+        "authenticate_artifact",
+        lambda _self, _spec, _path: identity,
+    )
+
+    processor = _Processor()
+    model: object = object() if failure == "model-api" else _Model()
+    transformers = SimpleNamespace(
+        AutoProcessor=SimpleNamespace(
+            from_pretrained=(
+                None
+                if failure == "processor-api"
+                else lambda *_args, **_kwargs: processor
+            )
+        ),
+        AutoModelForImageTextToText=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: model
+        ),
+    )
+    monkeypatch.setattr(
+        provider_module.importlib,
+        "import_module",
+        lambda _name: transformers,
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "load_hf_model_with_strict_loading_info",
+        lambda *_args, **_kwargs: model,
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "hf_tokenizer_contract_sha256",
+        lambda _tokenizer: "0" * 64 if failure == "tokenizer-contract" else "d" * 64,
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "processor_contract_sha256",
+        lambda _processor: "0" * 64 if failure == "processor-contract" else "c" * 64,
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "require_loaded_hf_checkpoint_binding",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "checkpoint_tree_sha256",
+        lambda _path: "sha256:" + "0" * 64,
+    )
+
+    with pytest.raises((RuntimeError, ValueError), match=message):
+        provider.prepare_execution(spec, resources)
+
+
+def test_input_preflight_rejects_missing_content_directory(tmp_path: Path) -> None:
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    tmp_path.joinpath("missing-images").write_bytes(b"not-a-directory")
+    resources = RuntimeArtifactResources(
+        root=tmp_path,
+        primary_artifact=checkpoint.name,
+        support_resources={"content_store": "missing-images"},
+        device_kind="cpu",
+        container_image_digest=_IMAGE_DIGEST,
+    )
+
+    with pytest.raises(ValueError, match="content directory is unavailable"):
+        HFVisionTextProvider().validate_evaluation_inputs(
+            _spec(),
+            resources,
+            SimpleNamespace(),  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("scorer", "authenticated scorer"),
+        ("state", "bindings are absent"),
+        ("identity", "artifact identity does not match"),
+        ("object-binding", "does not bind the loaded objects"),
+    ],
+)
+def test_open_rejects_context_identity_and_object_alias_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    message: str,
+) -> None:
+    provider = HFVisionTextProvider()
+    spec = _spec()
+    identity_sha256 = artifact_identity_sha256(provider.identify_artifact(spec))
+    model = _Model().eval()
+    processor = _Processor()
+    scorer_model = object() if failure == "object-binding" else model
+    scorer: object = HFVisionTextScorer(
+        scorer_model,
+        processor,
+        tmp_path,
+        identity_sha256,
+    )
+    if failure == "scorer":
+        scorer = str
+    provider_state: object = (model, processor, tmp_path)
+    if failure == "state":
+        provider_state = (model, processor)
+    context = RuntimeExecutionContext(
+        strict=True,
+        allow_network=False,
+        container_image_digest=_IMAGE_DIGEST,
+        device_kind="cpu",
+        artifact_identity_sha256=(
+            "f" * 64 if failure == "identity" else identity_sha256
+        ),
+        provider_state=provider_state,
+        scorer=scorer,  # type: ignore[arg-type]
+    )
+    monkeypatch.setattr(provider_module, "_require_runtime_boundary", lambda _c: None)
+
+    with pytest.raises(ValueError, match=message):
+        provider.open(spec, context)
+
+
+def test_open_session_rechecks_processor_binding_before_scoring(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = HFVisionTextProvider()
+    spec = _spec()
+    identity_sha256 = artifact_identity_sha256(provider.identify_artifact(spec))
+    model = _Model().eval()
+    processor = _Processor()
+    scorer = HFVisionTextScorer(model, processor, tmp_path, identity_sha256)
+    context = RuntimeExecutionContext(
+        strict=True,
+        allow_network=False,
+        container_image_digest=_IMAGE_DIGEST,
+        device_kind="cpu",
+        artifact_identity_sha256=identity_sha256,
+        provider_state=(model, processor, tmp_path),
+        scorer=scorer,
+    )
+    monkeypatch.setattr(provider_module, "_require_runtime_boundary", lambda _c: None)
+    monkeypatch.setattr(
+        provider_module,
+        "_backend_identity",
+        lambda: RuntimeBackendIdentity(
+            name="backend",
+            version="1",
+            source_sha256="a" * 64,
+            binary_sha256=None,
+            build_sha256=None,
+        ),
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "_device_facts",
+        lambda _model, *, expected_kind: RuntimeDeviceFacts(
+            device_kind=expected_kind,
+            device_name="CPU",
+        ),
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "require_loaded_hf_checkpoint_binding",
+        lambda **_kwargs: None,
+    )
+    session = provider.open(spec, context)
+    monkeypatch.setattr(
+        provider_module,
+        "processor_contract_sha256",
+        lambda _processor: "0" * 64,
+    )
+
+    with pytest.raises(ValueError, match="processor contract changed"):
+        session.score(_batch())
 
 
 def test_prepare_execution_rejects_missing_checkpoint(

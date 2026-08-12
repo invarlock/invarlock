@@ -141,7 +141,7 @@ coverage-linux-check:
 
 coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src \
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:. \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests \
 		--cov --cov-config=scripts/addins.coveragerc \
