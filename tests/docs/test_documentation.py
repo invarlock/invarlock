@@ -355,7 +355,7 @@ def test_documentation_lint_covers_maintained_markdown_surfaces() -> None:
         "- '**/*.MD'",
         "- 'tests/docs/**'",
     ):
-        assert workflow.count(pattern) == 2
+        assert workflow.count(pattern) == 1
 
     for obsolete_pattern in (
         "- '.github/**/*.md'",
