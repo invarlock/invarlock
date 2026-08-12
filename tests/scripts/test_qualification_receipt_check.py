@@ -949,6 +949,49 @@ def test_authenticated_canary_rejects_missing_pack_and_manifest_substitution(
         )
 
 
+def test_authenticated_canary_requires_checksum_coverage_for_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    receipt, evidence, _profile, manifest_digest = _case(tmp_path)
+    assert receipt.is_file()
+    verify_checksums = qualification_receipt_check.verify_checksums
+
+    def without_request(root: Path) -> tuple[list[str], set[str]]:
+        errors, covered = verify_checksums(root)
+        return errors, covered - {"request.json"}
+
+    monkeypatch.setattr(
+        qualification_receipt_check,
+        "verify_checksums",
+        without_request,
+    )
+
+    with pytest.raises(ValueError, match="request.json is not covered"):
+        qualification_receipt_check._authenticated_canary_compatibility(
+            evidence,
+            expected_manifest_digest=manifest_digest,
+        )
+
+
+def test_authenticated_canary_rejects_checksum_valid_invalid_provider_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _receipt, evidence, _profile, manifest_digest = _case(tmp_path)
+    monkeypatch.setattr(
+        qualification_receipt_check,
+        "decode_runtime_provider_receipt",
+        lambda _payload: (_ for _ in ()).throw(ValueError("invalid sidecar")),
+    )
+
+    with pytest.raises(ValueError, match="runtime provider receipt is invalid"):
+        qualification_receipt_check._authenticated_canary_compatibility(
+            evidence,
+            expected_manifest_digest=manifest_digest,
+        )
+
+
 @pytest.mark.parametrize("kind", ("private-rsa", "public-rsa"))
 def test_receipt_check_requires_ed25519_verifier_material(
     tmp_path: Path, kind: str

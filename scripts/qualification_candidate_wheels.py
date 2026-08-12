@@ -69,7 +69,7 @@ def _capture_wheel(value: Path) -> CandidateWheel:
     except OSError as exc:
         raise CandidateWheelManifestError("candidate wheel could not be read") from exc
     finally:
-        if descriptor >= 0:
+        if descriptor >= 0:  # pragma: no branch - a successful open always sets it
             os.close(descriptor)
     identity = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
     if identity != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
@@ -165,5 +165,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - exercised through the CLI gate
     raise SystemExit(main())
