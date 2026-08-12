@@ -47,14 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example layer; the installed engine continues to expose evaluator-neutral
   qualification and runtime-import contracts.
 - Refreshed hash-pinned runtime and workflow dependencies, including the
-  cryptography security baseline used by signed evidence and receipt paths.
+  cryptography security baseline used by signed evidence and receipt paths,
+  Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.18.0.
 - Reframed the public project overview around independently replayable signed
   evaluation evidence, with a clear decision boundary and assurance limits plus
   a flagship proof map connecting evaluator output, qualification, evidence,
   receipts, attestations, and runnable integrations.
 - Expanded documentation checks to discover every tracked Markdown file and
   reject machine-specific paths, credential-like values, and review-process
-  wording before publication.
+  wording before publication, while reporting the required documentation
+  status on every pull request and path-scoping push runs.
 - Raised aggregate and per-module statement and branch coverage requirements to
   95% across the engine, add-ins, qualification and release tooling, maintained
   examples, and repository checks.

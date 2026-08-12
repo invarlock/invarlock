@@ -126,11 +126,19 @@ def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     }
 
     paths = workflow["on"]["push"]["paths"]
-    assert "docs/**" in paths
-    assert "*.md" in paths
-    assert "*.MD" in paths
-    assert "**/*.md" in paths
-    assert "**/*.MD" in paths
-    assert "tests/docs/**" in paths
-    assert not any(path.startswith("notebooks/") for path in paths)
-    assert not any(path.startswith("scripts/docs/") for path in paths)
+    expected_paths = {
+        "*.md",
+        "*.MD",
+        "**/*.md",
+        "**/*.MD",
+        "docs/**",
+        "tests/docs/**",
+        "mkdocs.yml",
+        "Makefile",
+        "package.json",
+        "package-lock.json",
+        "requirements/workflows/docs-ci-py313.txt",
+        ".github/workflows/docs-ci.yml",
+    }
+    assert len(paths) == len(expected_paths)
+    assert set(paths) == expected_paths
