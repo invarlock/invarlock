@@ -18,19 +18,6 @@ on:
       - '.github/workflows/docs-ci.yml'
   pull_request:
     branches: [main, staging/next, 'release/v*']
-    paths:
-      - '*.md'
-      - '*.MD'
-      - '**/*.md'
-      - '**/*.MD'
-      - 'docs/**'
-      - 'tests/docs/**'
-      - 'mkdocs.yml'
-      - 'Makefile'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'requirements/workflows/docs-ci-py313.txt'
-      - '.github/workflows/docs-ci.yml'
   schedule:
     - cron: '0 2 * * 1'
   workflow_dispatch:
