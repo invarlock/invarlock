@@ -497,7 +497,7 @@ jobs:
           sha256sum --check SHA256SUMS
       - name: Attest tagged release candidate
         id: attest_candidate
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-checksums: dist/SHA256SUMS
       - name: Upload tagged candidate provenance
@@ -889,7 +889,7 @@ jobs:
             echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
           fi
       - name: Publish to TestPyPI/PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
