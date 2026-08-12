@@ -360,7 +360,7 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
         (paths.evaluation / "inputs/acceptance.json").read_text(encoding="utf-8")
     )
     assert summary["library"] == "torchao"
-    assert summary["library_version"] == "0.17.0"
+    assert summary["library_version"] == "0.18.0"
     assert summary["source_model_id"] == qwen3_profile.MODEL_ID
     assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
     assert summary["quantization"] == {
