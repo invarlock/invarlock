@@ -74,7 +74,7 @@ dev = [
   "wheel>=0.47.0",
   "twine>=4.0.0",
   "peft==0.19.1",
-  "torchao==0.17.0",
+  "torchao==0.18.0",
 ]
 
 ci = [
@@ -91,7 +91,7 @@ ci = [
   "wheel>=0.47.0",
   "twine>=4.0.0",
   "peft==0.19.1",
-  "torchao==0.17.0",
+  "torchao==0.18.0",
 ]
 
 docs-ci = [
@@ -126,7 +126,7 @@ example-peft = [
   "peft==0.19.1",
 ]
 example-torchao = [
-  "torchao==0.17.0",
+  "torchao==0.18.0",
 ]
 
 [project.entry-points."invarlock.runtime_providers"]
