@@ -38,8 +38,23 @@ def test_verify_fast_includes_the_example_contract() -> None:
 def test_docs_are_checked_by_established_tools() -> None:
     assert "npx --no-install markdownlint-cli2" in MAKEFILE
     assert "npx --no-install cspell" in MAKEFILE
+    assert "scripts/checks/check_public_text.py" in MAKEFILE
     assert "$(MKDOCS) build --strict" in MAKEFILE
     assert "scripts/docs/" not in MAKEFILE
+
+
+def test_docs_linters_discover_every_tracked_markdown_file() -> None:
+    markdown_block = _block("docs-lint-markdown", "docs-lint-spell")
+    spell_block = _block("docs-lint-spell", "docs-lint-public-text")
+
+    for block in (markdown_block, spell_block):
+        assert "git ls-files -z -- ':(icase,glob)**/*.md'" in block
+        assert "xargs -0" in block
+        assert block.rstrip().endswith("--")
+        assert "README.md CODE_OF_CONDUCT.md" not in block
+
+    public_text_block = _block("docs-lint-public-text", "##@ Packaging and security")
+    assert "scripts/checks/check_public_text.py" in public_text_block
 
 
 def test_public_evidence_gate_is_canonical_index_only() -> None:

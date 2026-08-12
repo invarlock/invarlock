@@ -35,10 +35,10 @@ outside the transaction workspace, for example:
 make example-inspect-ai EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
 ```
 
-Use a path whose directory components are not symlinks. On macOS,
-`/private/tmp/...` is valid for disposable testing while `/tmp/...` is rejected
-because `/tmp` is a symlink. Production keys and trust roots belong in the
-operator's protected storage.
+Use a path whose directory components are not symlinks. On macOS, use the
+resolved system temporary directory rather than the `/tmp` alias, which is
+rejected because it is a symlink. Production keys and trust roots belong in
+the operator's protected storage.
 
 Apply the evidence, verifier, and trust-root options to the Hugging Face, PEFT,
 TorchAO, vision-text, GGUF, and prepared TensorRT-LLM commands. The three

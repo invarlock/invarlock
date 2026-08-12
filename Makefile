@@ -62,7 +62,7 @@ MYPY_TYPED_SURFACE := \
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
-.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-strict docs-check-build docs-check-links
+.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
 .PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke packaging-smoke-minimal packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
@@ -244,6 +244,7 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/ci/test_coverage_branch_rate.py \
 		tests/ci/test_public_evidence_audit.py \
+		tests/ci/test_public_text_check.py \
 		tests/scripts/test_check_repo_cruft.py \
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
@@ -553,25 +554,18 @@ evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
 
 docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
 
-docs-lint: docs-lint-markdown docs-lint-spell  ## Run established documentation linters
+docs-lint: docs-lint-markdown docs-lint-spell docs-lint-public-text  ## Run documentation linters and public-text checks
 
 docs-lint-strict: docs-lint  ## Strict documentation lint alias
 
 docs-lint-markdown:  ## Run markdownlint-cli2
-	npx --no-install markdownlint-cli2 README.md CODE_OF_CONDUCT.md \
-		CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_NOTICES.md \
-		".github/**/*.md" \
-		"docs/**/*.md" "scripts/**/*.md" "public_evidence/**/*.md" \
-		"examples/**/*.md" "requirements/**/*.md" "tests/README.md" \
-		"addins/**/*.md"
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint-cli2 --
 
 docs-lint-spell:  ## Run cspell
-	npx --no-install cspell --no-progress README.md CODE_OF_CONDUCT.md \
-		CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_NOTICES.md \
-		".github/**/*.md" \
-		"docs/**/*.md" "scripts/**/*.md" "public_evidence/**/*.md" \
-		"examples/**/*.md" "requirements/**/*.md" "tests/README.md" \
-		"addins/**/*.md"
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install cspell --no-progress --
+
+docs-lint-public-text:  ## Reject private operational details and process-only wording
+	$(PYTHON) scripts/checks/check_public_text.py
 
 ##@ Packaging and security
 actionlint:  ## Lint GitHub Actions workflows

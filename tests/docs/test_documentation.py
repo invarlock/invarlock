@@ -341,25 +341,26 @@ def test_runtime_qualification_docs_use_authenticated_candidate_wheels() -> None
 def test_documentation_lint_covers_maintained_markdown_surfaces() -> None:
     makefile = _read("Makefile")
     workflow = _read(".github/workflows/docs-ci.yml")
-    for pattern in (
-        "CODE_OF_CONDUCT.md",
-        "SUPPORT.md",
-        "THIRD_PARTY_NOTICES.md",
-        '".github/**/*.md"',
-        '"examples/**/*.md"',
-        '"requirements/**/*.md"',
-        '"tests/README.md"',
-    ):
-        assert makefile.count(pattern) == 2
+    assert makefile.count("git ls-files -z -- ':(icase,glob)**/*.md'") == 2
+    assert makefile.count("xargs -0") == 2
+    assert "scripts/checks/check_public_text.py" in makefile
+
     for pattern in (
         "- '*.md'",
+        "- '*.MD'",
+        "- '**/*.md'",
+        "- '**/*.MD'",
+        "- 'tests/docs/**'",
+    ):
+        assert workflow.count(pattern) == 2
+
+    for obsolete_pattern in (
         "- '.github/**/*.md'",
         "- 'examples/**/*.md'",
         "- 'requirements/**/*.md'",
         "- 'tests/README.md'",
-        "- 'tests/docs/**'",
     ):
-        assert workflow.count(pattern) == 2
+        assert obsolete_pattern not in workflow
 
 
 def test_docs_describe_the_narrow_engine_and_embedding_facade() -> None:

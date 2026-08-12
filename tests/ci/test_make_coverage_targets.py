@@ -110,6 +110,7 @@ def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:
     for test_file in (
         "test_coverage_branch_rate.py",
         "test_public_evidence_audit.py",
+        "test_public_text_check.py",
         "test_check_repo_cruft.py",
         "test_sync_packaged_contracts.py",
         "test_sync_packaged_public_evidence.py",

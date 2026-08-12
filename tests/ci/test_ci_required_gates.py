@@ -114,16 +114,9 @@ def test_docs_ci_uses_the_current_documentation_targets() -> None:
     paths = workflow["on"]["pull_request"]["paths"]
     assert "docs/**" in paths
     assert "*.md" in paths
-    for maintained_surface in (
-        ".github/**/*.md",
-        "addins/**/*.md",
-        "examples/**/*.md",
-        "public_evidence/**/*.md",
-        "requirements/**/*.md",
-        "scripts/**/*.md",
-        "tests/README.md",
-        "tests/docs/**",
-    ):
-        assert maintained_surface in paths
+    assert "*.MD" in paths
+    assert "**/*.md" in paths
+    assert "**/*.MD" in paths
+    assert "tests/docs/**" in paths
     assert not any(path.startswith("notebooks/") for path in paths)
     assert not any(path.startswith("scripts/docs/") for path in paths)
