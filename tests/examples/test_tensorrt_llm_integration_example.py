@@ -427,6 +427,58 @@ def test_prepare_uses_external_keys_and_copies_the_signed_policy(
     assert not (output / "keys").exists()
 
 
+def test_prepare_rejects_incoherent_or_shared_external_trust(
+    example: Any,
+    inputs: Path,
+    tmp_path: Path,
+) -> None:
+    common = (
+        inputs,
+        _inspection(),
+        "sha256:" + "a" * 64,
+        ("hf://owner/baseline@rev", "hf://owner/subject@rev"),
+    )
+    key = tmp_path / "shared.pem"
+    example._key(key)
+
+    with pytest.raises(ValueError, match="must be supplied together"):
+        example._prepare(
+            common[0],
+            tmp_path / "partial-output",
+            *common[1:],
+            evidence_signing_key=key,
+        )
+    with pytest.raises(ValueError, match="cannot use ephemeral mode"):
+        example._prepare(
+            common[0],
+            tmp_path / "mixed-output",
+            *common[1:],
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "mixed-trust",
+        )
+    with pytest.raises(ValueError, match="caller-owned"):
+        example._prepare(
+            common[0],
+            tmp_path / "missing-output",
+            *common[1:],
+            ephemeral_trust_root=False,
+        )
+
+    trust_root = tmp_path / "trust" / "shared"
+    trust_root.parent.mkdir()
+    with pytest.raises(ValueError, match="must be distinct"):
+        example._prepare(
+            common[0],
+            tmp_path / "shared-output",
+            *common[1:],
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=trust_root,
+            ephemeral_trust_root=False,
+        )
+
+
 def test_prepare_refuses_existing_output_and_non_object_policy(
     example: Any, inputs: Path, tmp_path: Path
 ) -> None:
@@ -1212,6 +1264,31 @@ def test_prepare_helper_rejects_invalid_contract_calibration_and_outputs(
             tmp_path,
             tmp_path / "unsupported",
             quantization="int4",
+            calibration_records=None,
+        )
+
+    def export_with_wrong_quantization(
+        _model: object,
+        *,
+        export_dir: Path,
+        **_kwargs: object,
+    ) -> None:
+        export_dir.mkdir()
+        export_dir.joinpath("config.json").write_text(
+            '{"quantization":{"quant_algo":"FP8"}}\n',
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        prepare,
+        "export_tensorrt_llm_checkpoint",
+        export_with_wrong_quantization,
+    )
+    with pytest.raises(RuntimeError, match="metadata does not match"):
+        prepare._convert(
+            tmp_path,
+            tmp_path / "wrong-quantization",
+            quantization="none",
             calibration_records=None,
         )
 

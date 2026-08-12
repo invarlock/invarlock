@@ -409,10 +409,13 @@ def test_matrix_rejects_invalid_control_documents(
         ("selection", "selection review metadata is invalid"),
         ("level", "demonstration status is invalid"),
         ("focus", "release-focus profile is missing"),
+        ("focus-authority", "release-focus profile is not replayable"),
+        ("focus-retained", "lacks a retained signed transaction"),
         ("profile", "profile is stale"),
         ("result", "qualification result is stale"),
         ("format", "raw output format is invalid"),
         ("upstream", "upstream identity is invalid"),
+        ("directories", "packages do not match demonstration status"),
     ],
 )
 def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
@@ -489,6 +492,22 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
         levels[first["profile_id"]] = {"retained_signed_transaction": "yes"}
     elif failure == "focus":
         monkeypatch.setattr(matrix, "release_focus", lambda: ["missing"])
+    elif failure == "focus-authority":
+        profiles[0] = {
+            **first,
+            "authority": {"mode": "observation_only", "reason": "aggregate_only"},
+        }
+        monkeypatch.setattr(
+            matrix,
+            "release_focus",
+            lambda: [first["profile_id"]],
+        )
+    elif failure == "focus-retained":
+        monkeypatch.setattr(
+            matrix,
+            "release_focus",
+            lambda: [first["profile_id"]],
+        )
     elif failure == "profile":
         first_artifact.joinpath("profile.json").write_bytes(b"{}\n")
     elif failure == "result":
@@ -501,7 +520,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
         first_artifact.joinpath("upstream-output.json").write_bytes(
             canonical_json_bytes(document)
         )
-    else:
+    elif failure == "upstream":
         document = json.loads(
             first_artifact.joinpath("upstream-output.json").read_bytes()
         )
@@ -509,9 +528,40 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
         first_artifact.joinpath("upstream-output.json").write_bytes(
             canonical_json_bytes(document)
         )
+    else:
+        signed_transactions = tmp_path / "signed-transactions"
+        signed_transactions.joinpath("undeclared-profile").mkdir(parents=True)
+        monkeypatch.setattr(matrix, "SIGNED_TRANSACTIONS", signed_transactions)
 
     with pytest.raises(ValueError, match=message):
         matrix.verify()
+
+
+def test_matrix_rejects_missing_or_stale_replayable_profiles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matrix = _module(
+        "qualification_matrix_replayable_profiles_test",
+        EXAMPLE / "matrix.py",
+    )
+    profile = matrix.profiles()[0]
+    cases = matrix.load(matrix.REPLAYABLE_CORPUS / "cases.json")
+    monkeypatch.setattr(matrix, "load", lambda _path: cases)
+    monkeypatch.setattr(matrix, "replayable_profiles", lambda: [])
+
+    with pytest.raises(ValueError, match="at least one independently replayable"):
+        matrix.verify_replayable()
+
+    artifacts = tmp_path / "artifacts"
+    profile_artifact = artifacts / profile["profile_id"]
+    profile_artifact.mkdir(parents=True)
+    profile_artifact.joinpath("profile.json").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(matrix, "REPLAYABLE_ARTIFACTS", artifacts)
+    monkeypatch.setattr(matrix, "replayable_profiles", lambda: [profile])
+
+    with pytest.raises(ValueError, match="replayable profile is stale"):
+        matrix.verify_replayable()
 
 
 def test_authoritative_replay_write_staleness_and_cli(
@@ -527,6 +577,15 @@ def test_authoritative_replay_write_staleness_and_cli(
     document = replay.replay("inspect-ai", write=True)
     assert document["record_count"] == 102
     replay.replay("inspect-ai", write=False)
+
+    cases_path = copied / "cases.json"
+    cases = json.loads(cases_path.read_bytes())
+    original_cases = cases_path.read_bytes()
+    cases["source_evaluation"] = {"kind": "model_execution", "model": "other"}
+    cases_path.write_bytes(canonical_json_bytes(cases))
+    with pytest.raises(ValueError, match="source model execution is not bound"):
+        replay.replay("inspect-ai", write=False)
+    cases_path.write_bytes(original_cases)
 
     artifact = copied / "artifacts" / "inspect-ai"
     records = artifact / "runtime-import-records.jsonl"

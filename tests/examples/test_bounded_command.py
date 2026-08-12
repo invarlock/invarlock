@@ -134,7 +134,9 @@ def test_bounded_command_supports_file_stdin_and_bounded_stdout_transfer(
     assert not nonzero_destination.exists()
 
 
-def test_bounded_command_termination_handles_exited_and_hung_processes() -> None:
+def test_bounded_command_termination_handles_exited_and_hung_processes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class ExitedProcess:
         def poll(self) -> int:
             return 0
@@ -170,6 +172,21 @@ def test_bounded_command_termination_handles_exited_and_hung_processes() -> None
     )
     assert running_without_pid.terminated
 
+    class RunningWithUnavailableProcessGroup(RunningWithoutPid):
+        pid = 2_147_483_647
+
+    unavailable_group = RunningWithUnavailableProcessGroup()
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            bounded_command.os,
+            "killpg",
+            lambda *_args: (_ for _ in ()).throw(OSError("process groups unavailable")),
+        )
+        bounded_command._terminate(  # type: ignore[arg-type]  # noqa: SLF001
+            unavailable_group
+        )
+    assert unavailable_group.terminated
+
     class HungProcess:
         def __init__(self) -> None:
             self.killed = False
@@ -195,6 +212,17 @@ def test_bounded_command_termination_handles_exited_and_hung_processes() -> None
     process = HungProcess()
     bounded_command._terminate(process)  # type: ignore[arg-type]  # noqa: SLF001
     assert process.terminated and process.killed and process.wait_count == 2
+
+    class HungWithoutProcessGroup(HungProcess):
+        pid = None
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.pid = None
+
+    ungrouped = HungWithoutProcessGroup()
+    bounded_command._terminate(ungrouped)  # type: ignore[arg-type]  # noqa: SLF001
+    assert ungrouped.terminated and ungrouped.killed and ungrouped.wait_count == 2
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process-group cleanup")

@@ -315,12 +315,23 @@ def test_handoff_fails_closed_when_any_scenario_fails(
         module.run_handoff(tmp_path / "handoff")
 
 
-def test_handoff_summary_rejects_a_missing_acceptance_decision(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "scenarios",
+    [
+        {"tampered_evidence_rejected": True},
+        {"accepted": True},
+        {"accepted": True, "tampered_evidence_rejected": False},
+    ],
+)
+def test_handoff_summary_rejects_incomplete_or_failed_scenarios(
+    tmp_path: Path,
+    scenarios: dict[str, bool],
+) -> None:
     module = _module()
     workspace = tmp_path / "handoff"
     workspace.mkdir()
     workspace.joinpath("results.json").write_text(
-        json.dumps({"scenarios": {"tampered_evidence_rejected": True}}),
+        json.dumps({"scenarios": scenarios}),
         encoding="utf-8",
     )
 

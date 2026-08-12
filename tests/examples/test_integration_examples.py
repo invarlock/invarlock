@@ -142,6 +142,7 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
 
 def test_hf_preparation_uses_caller_owned_external_trust_material(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     evidence_key = tmp_path / "evidence.pem"
     verifier_key = tmp_path / "verifier.pem"
@@ -180,6 +181,26 @@ def test_hf_preparation_uses_caller_owned_external_trust_material(
             trust_root=trust_root,
             ephemeral_trust_root=False,
         )
+
+    monkeypatch.setattr(
+        integration,
+        "create_trust_material",
+        lambda **_kwargs: SimpleNamespace(
+            trusted_inputs=tmp_path / "unexpected-trusted-inputs.json"
+        ),
+    )
+    mismatched_trust_root = tmp_path / "trust" / "mismatched"
+    with pytest.raises(ValueError, match="unexpected root"):
+        integration._prepare_workspace(
+            tmp_path / "mismatched-trust-material",
+            integration="hf-transformers",
+            runtime_image_digest=ZERO_DIGEST,
+            evidence_signing_key=evidence_key,
+            verifier_signing_key=verifier_key,
+            trust_root=mismatched_trust_root,
+            ephemeral_trust_root=False,
+        )
+    assert not (tmp_path / "mismatched-trust-material").exists()
 
 
 def test_external_trust_material_rejects_intermediate_symlink_aliases(
@@ -651,6 +672,91 @@ def test_torchao_checkpoint_authoring_rejects_invalid_materialization_state(
             transformers.AutoModelForCausalLM,
             "from_pretrained",
             lambda *_args, **_kwargs: SubjectModel(),
+        )
+
+    with pytest.raises(RuntimeError, match=message):
+        integration._create_torchao_checkpoints(integration._paths(tmp_path / case))
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("tokenizer", "baseline and subject tokenizers do not match"),
+        ("identical", "subject is identical to baseline"),
+        ("nonfinite-logits", "probe produced non-finite logits"),
+        ("nonfinite-delta", "probe produced a non-finite difference"),
+        ("persisted", "saved checkpoint does not preserve TorchAO materialization"),
+    ),
+)
+def test_torchao_checkpoint_authoring_rejects_post_materialization_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    import torch
+    import transformers
+
+    if case == "tokenizer":
+        save_checkpoint = qwen3_profile.save_checkpoint
+        save_count = 0
+
+        def save_with_tokenizer_drift(*args: object, **kwargs: object) -> str:
+            nonlocal save_count
+            digest = save_checkpoint(*args, **kwargs)  # type: ignore[arg-type]
+            save_count += 1
+            return digest if save_count == 1 else "changed-tokenizer"
+
+        monkeypatch.setattr(
+            qwen3_profile,
+            "save_checkpoint",
+            save_with_tokenizer_drift,
+        )
+    elif case == "identical":
+        monkeypatch.setattr(
+            integration,
+            "checkpoint_tree_sha256",
+            lambda _path: "identical-checkpoint",
+        )
+    elif case in {"nonfinite-logits", "nonfinite-delta"}:
+        isfinite = torch.isfinite
+
+        def reject_probe_tensor(value: object) -> object:
+            tensor = value  # preserve the real tensor protocol for this boundary test
+            if case == "nonfinite-logits" and tensor.ndim == 3:  # type: ignore[attr-defined]
+                return torch.zeros_like(tensor, dtype=torch.bool)  # type: ignore[arg-type]
+            if (
+                case == "nonfinite-delta"
+                and tensor.ndim == 2  # type: ignore[attr-defined]
+                and tensor.shape[0] == 50  # type: ignore[attr-defined]
+            ):
+                return torch.zeros_like(tensor, dtype=torch.bool)  # type: ignore[arg-type]
+            return isfinite(tensor)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(torch, "isfinite", reject_probe_tensor)
+    else:
+        load_model = transformers.AutoModelForCausalLM.from_pretrained
+        load_count = 0
+
+        def load_with_persisted_drift(*args: object, **kwargs: object) -> object:
+            nonlocal load_count
+            load_count += 1
+            if load_count == 2:
+
+                class PersistedModel:
+                    def eval(self) -> PersistedModel:
+                        return self
+
+                    def state_dict(self) -> dict[str, object]:
+                        return {}
+
+                return PersistedModel()
+            return load_model(*args, **kwargs)
+
+        monkeypatch.setattr(
+            transformers.AutoModelForCausalLM,
+            "from_pretrained",
+            load_with_persisted_drift,
         )
 
     with pytest.raises(RuntimeError, match=message):
