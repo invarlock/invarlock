@@ -4,6 +4,7 @@ import hashlib
 import os
 import socket
 import struct
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -455,19 +456,18 @@ def test_gguf_identity_rejects_non_regular_and_symlink_inputs(tmp_path: Path) ->
 
 
 def test_gguf_identity_rejects_socket_input() -> None:
-    socket_path = Path.cwd() / f".invarlock-gguf-{os.getpid()}.sock"
-    socket_path.unlink(missing_ok=True)
-    unix_socket = socket.socket(socket.AF_UNIX)
-    try:
+    with tempfile.TemporaryDirectory(prefix="ivl-gguf-") as temp_dir:
+        socket_path = Path(temp_dir) / "input.sock"
+        unix_socket = socket.socket(socket.AF_UNIX)
         try:
-            unix_socket.bind(str(socket_path))
-        except PermissionError:
-            pytest.skip("sandbox does not permit creating Unix-domain sockets")
-        with pytest.raises(gguf_identity.GGUFIdentityError):
-            gguf_identity.read_gguf_artifact_identity(socket_path)
-    finally:
-        unix_socket.close()
-        socket_path.unlink(missing_ok=True)
+            try:
+                unix_socket.bind(str(socket_path))
+            except PermissionError:
+                pytest.skip("sandbox does not permit creating Unix-domain sockets")
+            with pytest.raises(gguf_identity.GGUFIdentityError):
+                gguf_identity.read_gguf_artifact_identity(socket_path)
+        finally:
+            unix_socket.close()
 
 
 def test_gguf_identity_rejects_symlinked_parent_directory(tmp_path: Path) -> None:
