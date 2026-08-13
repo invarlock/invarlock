@@ -414,10 +414,24 @@ def _read_worker_container_id(cidfile: Path | None) -> str | None:
 
 
 def _worker_container_handle(
-    command: Sequence[str], cidfile: Path | None
+    command: Sequence[str],
+    cidfile: Path | None,
+    detached_output: str | bytes | None = None,
 ) -> str | None:
-    del command
-    return _read_worker_container_id(cidfile)
+    from_cidfile = _read_worker_container_id(cidfile)
+    if from_cidfile is not None:
+        return from_cidfile
+    if not command or Path(command[0]).name not in {"docker", "podman"}:
+        return None
+    if isinstance(detached_output, bytes):
+        try:
+            detached_output = detached_output.decode("ascii")
+        except UnicodeDecodeError:
+            return None
+    if not isinstance(detached_output, str):
+        return None
+    value = detached_output.strip()
+    return value if _CONTAINER_ID_RE.fullmatch(value) is not None else None
 
 
 def _container_control(
@@ -511,7 +525,9 @@ def run_evaluator_worker(
             )
             if completed.returncode:
                 return completed
-            container_handle = _worker_container_handle(command, cidfile)
+            container_handle = _worker_container_handle(
+                command, cidfile, completed.stdout
+            )
             if container_handle is None:
                 raise OciEvaluationError(
                     "evaluator worker did not publish an engine-recognized container handle"
@@ -603,7 +619,11 @@ def run_evaluator_worker(
             return completed
         finally:
             if container_handle is None:
-                container_handle = _worker_container_handle(command, cidfile)
+                container_handle = _worker_container_handle(
+                    command,
+                    cidfile,
+                    completed.stdout if completed is not None else None,
+                )
             if container_handle is not None:
                 try:
                     _remove_worker_container(command[0], container_handle)

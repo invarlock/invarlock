@@ -1,10 +1,10 @@
 # Runnable integrations
 
 Every entry in this directory has one maintained command for the named
-upstream operation or runtime call. LM Evaluation Harness and Inspect AI are
-the compact evaluator release focus; both have retained CPU-only signed
-`evaluate → verify → report` OCI journeys. The wider table is a compatibility
-catalog, not a release breadth target.
+upstream operation or runtime call. LM Evaluation Harness and Inspect AI also
+have retained CPU-only signed `evaluate → verify → report` OCI journeys.
+The remaining entries demonstrate their named model-change, runtime, or
+evaluator compatibility paths.
 
 The evaluator transaction contracts, native adapters, and bounded result
 transfer helper are example-owned support under

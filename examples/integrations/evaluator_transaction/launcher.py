@@ -54,9 +54,6 @@ LOCKS = {
     "inspect-ai": "requirements/workflows/inspect-ai-runtime-py312.txt",
     "openai-evals": "requirements/workflows/openai-evals-runtime-py312.txt",
 }
-# Each integration image has one requirements COPY, one dependency-install
-# layer, one package COPY, and four flat helper COPY layers.
-ADDED_LAYERS = {"inspect-ai": 7, "openai-evals": 7}
 EVALUATOR_VERSIONS = {
     "inspect-ai": "0.3.254",
     "openai-evals": "3.0.1.post1",
@@ -152,6 +149,7 @@ def _build_image(
         from examples.integrations.launch import (
             _load_image_id_file,
             _require_child_image_config,
+            _require_child_image_layers,
             _require_committed_checkout,
             _runtime_image,
             write_evaluator_attestation,
@@ -162,6 +160,7 @@ def _build_image(
         from launch import (  # type: ignore[no-redef]
             _load_image_id_file,
             _require_child_image_config,
+            _require_child_image_layers,
             _require_committed_checkout,
             _runtime_image,
             write_evaluator_attestation,
@@ -229,13 +228,7 @@ def _build_image(
     )
     evaluator_layers = _image_layers(engine, image_id, repository)
     evaluator_config = _image_config(engine, image_id, repository)
-    expected_layers = len(base_layers) + ADDED_LAYERS[evaluator]
-    if len(evaluator_layers) != expected_layers or (
-        evaluator_layers[: len(base_layers)] != base_layers
-    ):
-        raise RuntimeError(
-            "evaluator image filesystem does not derive from the authenticated base"
-        )
+    _require_child_image_layers(base_layers, evaluator_layers)
     _require_child_image_config(
         base_config,
         evaluator_config,
@@ -257,6 +250,7 @@ def _build_image(
             "evaluator_transaction.cli",
             "worker",
         ],
+        expected_working_directory="/opt/invarlock/examples",
     )
     inspected_id = run(
         [engine, "image", "inspect", "--format", "{{.Id}}", image_id], cwd=repository
@@ -336,6 +330,10 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--trust-root", type=Path, required=True)
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
+    parser.add_argument(
+        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+    )
+    parser.add_argument("--benchmark-source", type=Path)
     args = parser.parse_args(argv)
     repository = REPOSITORY
     if args.workspace is None:
@@ -371,21 +369,31 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
             cleanup_tags=cleanup_tags,
         )
         prepared = workspace / "prepared"
-        status("Preparing the pinned Qwen3-0.6B checkpoints and 102-record dataset...")
-        run(
-            [
-                sys.executable,
-                str(
-                    repository
-                    / "examples/integrations/lm-evaluation-harness/model_inputs.py"
-                ),
-                "--workspace",
-                str(prepared),
-                "--runtime-image",
-                image,
-            ],
-            cwd=repository,
+        status(
+            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            f"{args.corpus_profile} corpus..."
         )
+        prepare_command = [
+            sys.executable,
+            str(
+                repository
+                / "examples/integrations/lm-evaluation-harness/model_inputs.py"
+            ),
+            "--workspace",
+            str(prepared),
+            "--runtime-image",
+            image,
+            "--corpus-profile",
+            args.corpus_profile,
+        ]
+        if args.benchmark_source is not None:
+            prepare_command.extend(
+                [
+                    "--benchmark-source",
+                    str(Path(os.path.abspath(args.benchmark_source.expanduser()))),
+                ]
+            )
+        run(prepare_command, cwd=repository)
         status(
             "Running the evaluator in the inspected image and independently verifying "
             "the signed evidence transaction..."

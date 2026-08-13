@@ -27,7 +27,7 @@ and cannot safely substitute for one another.
 | --- | --- | --- |
 | Adapter support | `maintained_adapter` or an external adapter | Whether this repository maintains the source-specific runner, dependency lock, and upstream entry point; support grants no replay authority |
 | Replay authority | `deterministic_per_record` or `observation_only` | Whether complete ordered facts can be independently recomputed and imported, or only retained as authenticated context |
-| Signed-journey maturity | Retained or not yet demonstrated | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
+| Signed-journey maturity | Retained with a named corpus and record count, or `—` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
 
 The stable qualification-result contract continues to emit
 `outcome: qualified_for_import` with `authority: verdict_authority` for an
@@ -48,20 +48,35 @@ scores all 102 model outputs through its real upstream entry point. InvarLock
 then recomputes every score and replays all 102 normalized records through the
 runtime-import authoring boundary.
 
-The catalog is reviewed rather than quota-driven. A row must represent a
-recognizable current evaluator or a maintained successor, add a distinct
-ecosystem or workflow, and support retained real upstream execution. Review
-timing and activity-window metadata live in `matrix.json`; the resulting catalog
-is reviewed coverage, not a hard cap or a release-quality score.
+Each row identifies a maintained evaluator entry point with retained upstream
+execution. The rows cover distinct evaluator ecosystems and workflows;
+`matrix.json` records their source, version, authority, and status metadata.
 
-The current release focus is deliberately compact: LM Evaluation Harness and
-Inspect AI. Both have independently replayable 102-record imports and retained
-CPU-only signed OCI journeys. Other rows remain useful compatibility evidence,
-but adding rows or increasing a profile count is not a release gate.
+LM Evaluation Harness and Inspect AI additionally have independently
+replayable 102-record shared-output imports and retained CPU-only signed OCI
+journeys over the same deterministic, stratified 400-record LAMBADA OpenAI
+projection. The other rows retain qualification and compatibility evidence
+without claiming a native signed journey.
+
 The compact evidence packs, signed verifier receipts, independent policies,
 and builder-signed OCI attestations are retained under
 `examples/evaluator-qualification/signed-transactions/` and replayed by
 `make evaluator-qualification`.
+
+The flagship profile derives 400 records from a revision- and hash-pinned
+[EleutherAI LAMBADA OpenAI dataset](https://huggingface.co/datasets/EleutherAI/lambada_openai).
+It samples four prompt-length strata after requiring a one-token, losslessly
+decoded target under both pinned Qwen tokenizers. The 400-record size supports
+the maximum 10-percentage-point paired interval width declared in advance: the
+retained LM Evaluation Harness and Inspect AI runs achieved widths of 8.39 and
+8.47 points.
+
+The retained flagship comparison confirms an identical ordered schedule and
+reports native agreement without creating another acceptance verdict. The two
+frameworks agree on 98.5% of baseline scores and 99.25% of subject scores. The
+shared-output replay and native signed journeys remain separate on purpose: the
+first isolates evaluator scoring, while the second exercises each framework's
+real model path.
 
 The matrix represents the Microsoft PromptFlow lineage with Azure AI Evaluation
 rather than preserving the deprecated `promptflow-evals` package as a second
@@ -71,19 +86,17 @@ upstream `basic.Match` evaluator from the hash-pinned `evals==3.0.1.post1` wheel
 in its isolated image.
 
 The generated matrix below describes the retained generic qualification
-profiles. The separate signed bridges execute the native Inspect task
-(`inspect_ai.eval` plus `inspect_ai.scorer.match`) and OpenAI Evals
-(`evals.elsuite.basic.match.Match`) paths. Inspect is marked demonstrated from
-its retained clean OCI transaction; OpenAI Evals remains a maintained catalog
-adapter without a retained signed journey. Their build attestations, worker
-protocol, and native adapters remain example-owned; the installed core only
-receives evaluator-neutral runtime-import and signed transaction contracts.
+profiles. The separate flagship bridges execute LM Evaluation Harness and the
+native Inspect task (`inspect_ai.eval` plus `inspect_ai.scorer.match`) in clean
+OCI transactions. Their build attestations, worker protocol, and native
+adapters remain example-owned; the installed core only receives
+evaluator-neutral runtime-import and signed transaction contracts.
 
 The signed bridges retain native evaluator facts but keep the transaction
-metric independent: Inspect's pinned causal HF decoder has an explicit
-authenticated boundary recovery, and OpenAI Evals `basic.Match` is a prefix
-matcher, so InvarLock replays byte-exact equality for the signed acceptance
-decision after checking the native event semantics.
+metric independent. Inspect's pinned causal HF decoder has an explicit
+authenticated boundary recovery, and InvarLock replays byte-exact equality for
+the signed acceptance decision after checking each evaluator's native event
+semantics.
 
 <!-- evaluator-matrix:start -->
 <!-- Generated by examples/evaluator-qualification/render_docs_matrix.py; do not edit by hand. -->
@@ -92,45 +105,45 @@ decision after checking the native event semantics.
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
 | --- | --- | --- | --- | --- | --- |
-| Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Ragas | `ragas==0.4.3` | `ragas.metrics.collections.ExactMatch.ascore` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Pydantic Evals | `pydantic-evals==2.18.0` | `pydantic_evals.Dataset.evaluate_sync/EqualsExpected` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Braintrust AutoEvals | `autoevals==0.3.0` | `autoevals.ExactMatch.__call__` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| OpenEvals | `openevals==0.2.0` | `openevals.exact.exact_match` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Azure AI Evaluation | `azure-ai-evaluation==1.18.1` | `azure.ai.evaluation.evaluate` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
+| Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 shared outputs) | — |
+| DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 shared outputs) | — |
+| Ragas | `ragas==0.4.3` | `ragas.metrics.collections.ExactMatch.ascore` | Maintained | Independently replayable (102 shared outputs) | — |
+| Pydantic Evals | `pydantic-evals==2.18.0` | `pydantic_evals.Dataset.evaluate_sync/EqualsExpected` | Maintained | Independently replayable (102 shared outputs) | — |
+| Braintrust AutoEvals | `autoevals==0.3.0` | `autoevals.ExactMatch.__call__` | Maintained | Independently replayable (102 shared outputs) | — |
+| OpenEvals | `openevals==0.2.0` | `openevals.exact.exact_match` | Maintained | Independently replayable (102 shared outputs) | — |
+| Azure AI Evaluation | `azure-ai-evaluation==1.18.1` | `azure.ai.evaluation.evaluate` | Maintained | Independently replayable (102 shared outputs) | — |
 
 ### Benchmark harnesses
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
 | --- | --- | --- | --- | --- | --- |
-| LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 records) | Demonstrated |
-| Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 records) | Demonstrated |
-| LightEval | `lighteval==0.13.0` | `lighteval.metrics.metrics_sample.ExactMatches.compute` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| OpenAI Evals | source revision `8eac7a7` (`3.0.1.post1`) | `evals.elsuite.modelgraded.classify_utils.MATCH_FNS['exact']` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
+| LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 shared outputs) | Retained (400 native records) |
+| Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 shared outputs) | Retained (400 native records) |
+| LightEval | `lighteval==0.13.0` | `lighteval.metrics.metrics_sample.ExactMatches.compute` | Maintained | Independently replayable (102 shared outputs) | — |
+| OpenAI Evals | source revision `8eac7a7` (`3.0.1.post1`) | `evals.elsuite.modelgraded.classify_utils.MATCH_FNS['exact']` | Maintained | Independently replayable (102 shared outputs) | — |
 
 ### Evaluation and observability platforms
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
 | --- | --- | --- | --- | --- | --- |
-| MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | Not yet demonstrated |
-| Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Langfuse | `langfuse==4.14.1` | `langfuse.Langfuse.run_experiment` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Opik | `opik==2.2.7` | `opik.evaluation.metrics.Equals.score` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| Evidently | `evidently==0.7.21` | `evidently.Dataset.from_pandas/Evidently ExactMatch` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
-| TruLens | `trulens==2.9.0` | `trulens.core.Metric.__call__` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
+| MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | — |
+| Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 shared outputs) | — |
+| Langfuse | `langfuse==4.14.1` | `langfuse.Langfuse.run_experiment` | Maintained | Independently replayable (102 shared outputs) | — |
+| Opik | `opik==2.2.7` | `opik.evaluation.metrics.Equals.score` | Maintained | Independently replayable (102 shared outputs) | — |
+| Evidently | `evidently==0.7.21` | `evidently.Dataset.from_pandas/Evidently ExactMatch` | Maintained | Independently replayable (102 shared outputs) | — |
+| TruLens | `trulens==2.9.0` | `trulens.core.Metric.__call__` | Maintained | Independently replayable (102 shared outputs) | — |
 
 ### General metric libraries
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
 | --- | --- | --- | --- | --- | --- |
-| Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 records) | Not yet demonstrated |
+| Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 shared outputs) | — |
 
 ### Security and red-team evaluators
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
 | --- | --- | --- | --- | --- | --- |
-| Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | Not yet demonstrated |
+| Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | — |
 <!-- evaluator-matrix:end -->
 
 Each row under
@@ -188,11 +201,11 @@ imports for one real, pinned model evaluation. They do not demonstrate every
 metric, task type, hosted mode, or model-judge feature offered by those
 evaluators. They also do not turn example runners into engine plugins.
 
-Profiles marked `Demonstrated` in the matrix separately carry model execution
-and signed release-assurance evidence. A replayable row without that mark
-begins with the already authenticated model-output corpus and demonstrates
-evaluator execution, normalization, qualification, and strict runtime-import
-replay.
+Profiles marked `Retained` in the matrix separately carry model execution and
+signed release-assurance evidence with an explicit record count. A replayable
+row without a retained package begins with the already authenticated
+model-output corpus and demonstrates evaluator execution, normalization,
+qualification, and strict runtime-import replay.
 
 ## Authority rules
 

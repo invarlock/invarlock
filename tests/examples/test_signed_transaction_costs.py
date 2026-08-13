@@ -31,7 +31,7 @@ def test_measurements_replay_both_real_signed_transactions(tmp_path: Path) -> No
     transactions = result["transactions"]
     assert [item["profile_id"] for item in transactions] == list(module.PROFILE_IDS)
     for item in transactions:
-        assert item["record_count"] == 102
+        assert item["record_count"] == 400
         assert item["evidence_files"] > 20
         assert item["evidence_bytes"] > 100_000
         assert item["package_bytes"] > item["evidence_bytes"]

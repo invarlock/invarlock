@@ -225,11 +225,11 @@ groups recognizable upstream evaluators by role and records adapter support,
 source version, replay authority, and retained signed-journey maturity. Each
 independently replayable import starts with
 retained output from a pinned real model evaluation, passes through a
-source-shaped adapter, and completes the closed import replay. The matrix
-is a secondary compatibility catalog rather than a release breadth target.
-LM Evaluation Harness and Inspect AI are the compact flagship set. These are
-example-owned adapters and profiles; new profiles extend the same
-evaluator-neutral engine contract. The retained
+source-shaped adapter, and completes the closed import replay. LM Evaluation
+Harness and Inspect AI additionally include retained 400-record native signed
+OCI transactions over a shared deterministic corpus. Their adapters and
+profiles are example-owned; new profiles extend the same evaluator-neutral
+engine contract. The retained
 [flagship proof map](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/signed-transactions/README.md#flagship-proof-map)
 links each upstream output, qualified import, signed transaction, and verifier
 receipt.

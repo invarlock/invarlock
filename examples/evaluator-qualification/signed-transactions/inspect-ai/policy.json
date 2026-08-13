@@ -1,1 +1,1 @@
-{"resolved_policy": {"metrics": {"exact_match": {"delta_min_pp": -20.0, "maximum_interval_width_pp": 20.0, "minimum_record_count": 102, "minimum_side_accuracy": 0.2}}}}
+{"resolved_policy": {"metrics": {"exact_match": {"delta_min_pp": -20.0, "maximum_interval_width_pp": 10.0, "minimum_record_count": 400, "minimum_side_accuracy": 0.05}}}}

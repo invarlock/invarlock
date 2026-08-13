@@ -33,13 +33,15 @@ def _restore_inspect_causal_boundary(completion: str, target: str) -> str:
 
 def _records(dataset_bytes: bytes) -> list[dict[str, str]]:
     values = [json.loads(line) for line in dataset_bytes.splitlines()]
-    if len(values) != 102 or any(
+    if len(values) not in {102, 400} or any(
         not isinstance(value, dict)
         or set(value) != {"expected", "id", "prompt"}
         or any(not isinstance(value[key], str) or not value[key] for key in value)
         for value in values
     ):
-        raise BridgeError("the evaluator corpus must contain 102 complete records")
+        raise BridgeError(
+            "the evaluator corpus must contain 102 or 400 complete records"
+        )
     if len({value["id"] for value in values}) != len(values):
         raise BridgeError("the evaluator corpus IDs are not unique")
     return cast(list[dict[str, str]], values)

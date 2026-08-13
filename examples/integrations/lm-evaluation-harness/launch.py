@@ -20,7 +20,6 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
     from bounded_command import run_bounded_command  # type: ignore[no-redef]
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-ADDED_LAYERS = 10
 _COMMAND_TIMEOUT_SECONDS = 24 * 60 * 60
 _COMMAND_STDOUT_LIMIT = 4 * 1024 * 1024
 _COMMAND_STDERR_LIMIT = 4 * 1024 * 1024
@@ -103,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     from examples.integrations.launch import (
         _load_image_id_file,
         _require_child_image_config,
+        _require_child_image_layers,
         _require_committed_checkout,
         _runtime_image,
         load_builder_public_key,
@@ -121,6 +121,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trust-root", type=Path, required=True)
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
+    parser.add_argument(
+        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+    )
+    parser.add_argument("--benchmark-source", type=Path)
     args = parser.parse_args(argv)
     builder_signing_key = load_builder_signing_key(
         Path(os.path.abspath(args.builder_signing_key.expanduser()))
@@ -230,12 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         harness_layers = _image_layers(args.container_engine, image_id, repository)
         harness_config = _image_config(args.container_engine, image_id, repository)
-        if len(harness_layers) != len(base_layers) + ADDED_LAYERS or (
-            harness_layers[: len(base_layers)] != base_layers
-        ):
-            raise RuntimeError(
-                "Harness image filesystem does not derive from the authenticated base"
-            )
+        _require_child_image_layers(base_layers, harness_layers)
         _require_child_image_config(
             base_config,
             harness_config,
@@ -303,18 +302,28 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         prepared = workspace / "prepared"
-        status("Preparing the pinned Qwen3-0.6B checkpoints and 102-record dataset...")
-        run(
-            [
-                sys.executable,
-                str(Path(__file__).with_name("model_inputs.py")),
-                "--workspace",
-                str(prepared),
-                "--runtime-image",
-                image_id,
-            ],
-            cwd=repository,
+        status(
+            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            f"{args.corpus_profile} corpus..."
         )
+        prepare_command = [
+            sys.executable,
+            str(Path(__file__).with_name("model_inputs.py")),
+            "--workspace",
+            str(prepared),
+            "--runtime-image",
+            image_id,
+            "--corpus-profile",
+            args.corpus_profile,
+        ]
+        if args.benchmark_source is not None:
+            prepare_command.extend(
+                [
+                    "--benchmark-source",
+                    str(Path(os.path.abspath(args.benchmark_source.expanduser()))),
+                ]
+            )
+        run(prepare_command, cwd=repository)
         status(
             "Running the Harness in the inspected image and independently verifying "
             "the evidence transaction..."

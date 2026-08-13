@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -306,20 +309,16 @@ def _prepare_test_transaction(
             "timeout_seconds": 300,
             "tokenizer_metadata_sha256": "b" * 64,
         }
-    records = [
-        {
-            "id": f"harness-fixture-{index:02d}",
-            "prompt": "Prompt",
-            "expected": "Answer",
-        }
-        for index in range(102)
-    ]
+    records = json.loads(
+        (ROOT / "examples/integrations/lm-evaluation-harness/records.json").read_text(
+            encoding="utf-8"
+        )
+    )
     records_path = inputs / "records.jsonl"
     records_path.write_text(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
-    module.DATASET_SHA256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
     module.EXPECTED_MODEL_ARTIFACTS = {
         role: {
             "path": f"models/{role}",
@@ -341,6 +340,10 @@ def _prepare_test_transaction(
         }
     }
     (inputs / "acceptance.json").write_text(json.dumps(policy), encoding="utf-8")
+    (inputs / "corpus-profile.json").write_text(
+        json.dumps(module.corpus_provenance(module.corpus_profile("quick"))),
+        encoding="utf-8",
+    )
 
     def side(role: str) -> dict[str, object]:
         return {
@@ -534,6 +537,24 @@ def test_worker_rejects_checkpoint_generation_defaults(
         module.worker("baseline", model, dataset, tmp_path / "output")
 
 
+def test_harness_worker_rejects_a_dataset_outside_its_declared_corpus_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setenv("INVARLOCK_CORPUS_PROFILE", "flagship")
+    monkeypatch.setattr(
+        module.importlib.metadata, "version", lambda _name: module.VERSION
+    )
+    monkeypatch.setattr(module, "checkpoint_tree_sha256", lambda _path: "a" * 64)
+    model = tmp_path / "model"
+    model.mkdir()
+    dataset = tmp_path / "records.jsonl"
+    dataset.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(module.BridgeError, match="pinned evaluator corpus"):
+        module.worker("baseline", model, dataset, tmp_path / "output")
+
+
 def test_adapter_rejects_aggregate_only_results(tmp_path: Path) -> None:
     module = _module()
     samples = tmp_path / "samples.jsonl"
@@ -719,7 +740,7 @@ def test_complete_rejects_existing_workspace_and_mismatched_harness_runs(
     monkeypatch.setattr(
         module,
         "load_run",
-        lambda _path, role, _image: (
+        lambda _path, role, _image, _profile: (
             {
                 "execution_config_sha256": "shared-execution",
                 "task_config_sha256": f"different-{role}",
@@ -930,7 +951,7 @@ def test_complete_rejects_tampered_prepared_acceptance_inputs(
     if tamper == "dataset":
         with records_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(records[0]) + "\n")
-        error = "dataset does not match"
+        error = "pinned evaluator corpus"
     else:
         policy_path = prepared / "evaluation/inputs/acceptance.json"
         policy = json.loads(policy_path.read_text(encoding="utf-8"))
@@ -1274,6 +1295,51 @@ def test_model_inputs_pin_public_qwen3_snapshots_and_closed_records() -> None:
     assert all(record["id"].startswith("causal-cloze-") for record in records)
 
 
+def test_model_inputs_direct_script_bootstraps_the_repository(
+    tmp_path: Path,
+) -> None:
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT / "src")
+
+    completed = subprocess.run(
+        [sys.executable, str(MODEL_INPUTS), "--help"],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "--corpus-profile {quick,flagship}" in completed.stdout
+    assert "--benchmark-source BENCHMARK_SOURCE" in completed.stdout
+
+
+def test_model_inputs_do_not_mask_an_unrelated_import_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def reject_corpus_import(
+        name: str,
+        globals: object = None,
+        locals: object = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> object:
+        if name == "examples.integrations.evaluator_transaction.corpora":
+            raise ModuleNotFoundError(
+                "No module named 'unrelated_dependency'",
+                name="unrelated_dependency",
+            )
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", reject_corpus_import)
+
+    with pytest.raises(ModuleNotFoundError, match="unrelated_dependency"):
+        _model_inputs_module()
+
+
 def test_model_input_download_accepts_only_the_pinned_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1438,6 +1504,84 @@ def test_model_input_records_reject_bad_count_shape_and_duplicate_ids(
         module._records()
 
 
+def test_model_input_flagship_records_require_and_receive_closed_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _model_inputs_module()
+    profile = SimpleNamespace(key="flagship")
+
+    with pytest.raises(RuntimeError, match="requires its pinned source"):
+        module._records(profile)
+
+    baseline_tokenizer = object()
+    subject_tokenizer = object()
+    source_payload = b"pinned benchmark source"
+    expected = [{"id": "record-1", "prompt": "Prompt", "expected": " answer"}]
+    observed: list[tuple[bytes, tuple[object, object]]] = []
+
+    def select_records(
+        payload: bytes, tokenizers: tuple[object, object]
+    ) -> list[dict[str, str]]:
+        observed.append((payload, tokenizers))
+        return expected
+
+    monkeypatch.setattr(module, "flagship_records", select_records)
+
+    assert (
+        module._records(
+            profile,
+            tokenizers=(baseline_tokenizer, subject_tokenizer),
+            source_payload=source_payload,
+        )
+        == expected
+    )
+    assert observed == [(source_payload, (baseline_tokenizer, subject_tokenizer))]
+
+
+def test_model_input_prepare_rejects_benchmark_source_for_quick_profile(
+    tmp_path: Path,
+) -> None:
+    module = _model_inputs_module()
+
+    with pytest.raises(RuntimeError, match="only valid for the flagship corpus"):
+        module.prepare(
+            tmp_path / "prepared",
+            "sha256:" + "a" * 64,
+            benchmark_source=tmp_path / "benchmark.jsonl",
+        )
+
+    assert not (tmp_path / "prepared").exists()
+
+
+def test_model_input_prepare_rejects_unpinned_derived_corpus(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _model_inputs_module()
+    profile = SimpleNamespace(key="quick", dataset_sha256="0" * 64)
+    models = {
+        "baseline": tmp_path / "models/baseline",
+        "subject": tmp_path / "models/subject",
+    }
+
+    monkeypatch.setattr(module, "corpus_profile", lambda _key: profile)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(
+        module.AutoTokenizer,
+        "from_pretrained",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        module,
+        "_records",
+        lambda *_args, **_kwargs: [
+            {"id": "record-1", "prompt": "Prompt", "expected": " answer"}
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="does not match its pinned profile"):
+        module.prepare(tmp_path / "prepared", "sha256:" + "a" * 64)
+
+
 def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1577,6 +1721,43 @@ def test_model_input_main_resolves_workspace_and_dispatches(
     with pytest.raises(RuntimeError, match="prepared workspace must be new"):
         module.main()
     assert not missing.exists()
+
+
+def test_model_input_main_forwards_flagship_profile_and_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _model_inputs_module()
+    workspace = tmp_path / "parent/../prepared"
+    benchmark_source = tmp_path / "source/../benchmark.jsonl"
+    image = "sha256:" + "d" * 64
+    observed: list[tuple[Path, str, str, Path | None]] = []
+    monkeypatch.setattr(
+        module.argparse.ArgumentParser,
+        "parse_args",
+        lambda _parser: module.argparse.Namespace(
+            workspace=workspace,
+            runtime_image=image,
+            corpus_profile="flagship",
+            benchmark_source=benchmark_source,
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "prepare",
+        lambda root, runtime_image, *, corpus_profile_key, benchmark_source: (
+            observed.append((root, runtime_image, corpus_profile_key, benchmark_source))
+        ),
+    )
+
+    assert module.main() == 0
+    assert observed == [
+        (
+            workspace.expanduser().resolve(),
+            image,
+            "flagship",
+            benchmark_source.expanduser().resolve(),
+        )
+    ]
 
 
 def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) -> None:
@@ -1738,7 +1919,7 @@ def test_launcher_canonicalizes_default_workspace_before_source_build(
         ("mutable-image", "did not return an immutable ID"),
         ("wrong-base-label", "does not bind the inspected base image ID"),
         ("wrong-base-layers", "does not derive from the authenticated base"),
-        ("extra-base-layer", "does not derive from the authenticated base"),
+        ("no-child-layer", "does not derive from the authenticated base"),
     ],
 )
 def test_launcher_rejects_image_identity_drift(
@@ -1765,19 +1946,8 @@ def test_launcher_rejects_image_identity_drift(
         if "RootFS.Layers" in command[4]:
             if failure == "wrong-base-layers" and command[-1] != base_id:
                 return json.dumps(["sha256:" + "d" * 64])
-            if failure == "extra-base-layer" and command[-1] != base_id:
-                return json.dumps(
-                    [
-                        "sha256:" + "a" * 64,
-                        "sha256:" + "x" * 64,
-                        "sha256:" + "b" * 64,
-                        "sha256:" + "c" * 64,
-                        "sha256:" + "d" * 64,
-                        "sha256:" + "e" * 64,
-                        "sha256:" + "f" * 64,
-                        "sha256:" + "g" * 64,
-                    ]
-                )
+            if failure == "no-child-layer" and command[-1] != base_id:
+                return json.dumps(["sha256:" + "a" * 64])
             return json.dumps(
                 ["sha256:" + "a" * 64]
                 if command[-1] == base_id

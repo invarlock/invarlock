@@ -96,24 +96,49 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         from evaluator_transaction_worker import (  # type: ignore[no-redef]
             run_evaluator_worker,
         )
+try:
+    from examples.integrations.evaluator_transaction.corpora import (
+        CorpusProfile,
+        corpus_profile,
+        corpus_provenance,
+        profile_for_dataset,
+        profile_for_descriptor,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    from evaluator_transaction.corpora import (  # type: ignore[no-redef]
+        CorpusProfile,
+        corpus_profile,
+        corpus_provenance,
+        profile_for_dataset,
+        profile_for_descriptor,
+    )
 
 VERSION = "0.4.12+invarlock.nocache.1"
 MAX_GENERATION_TOKENS = 1
 HARNESS_BATCH_SIZE = 8
 HARNESS_SEED = 20_260_716
-RECORD_COUNT = 102
+QUICK_CORPUS = corpus_profile("quick")
+RECORD_COUNT = QUICK_CORPUS.record_count
 MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
 PER_RECORD_TIMEOUT_SECONDS = 300
 WORKER_TIMEOUT_SECONDS = min(
     PER_RECORD_TIMEOUT_SECONDS * (RECORD_COUNT + 2), 24 * 60 * 60
 )
 CLI_TIMEOUT_SECONDS = 10 * 60
-MINIMUM_SIDE_ACCURACY = 0.20
+MINIMUM_SIDE_ACCURACY = QUICK_CORPUS.minimum_side_accuracy
 TASK = "invarlock_exact_match"
-DATASET_NAME = "qwen3-0.6b-base-to-post-trained"
+DATASET_NAME = QUICK_CORPUS.dataset_name
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")
-DATASET_SHA256 = "d80e81ba17fb93b9b8a46f9817f9841f5f9c2858c9d703b3ce28847b2eaeb57c"
+DATASET_SHA256 = QUICK_CORPUS.dataset_sha256
+
+
+def worker_timeout_seconds(profile: CorpusProfile) -> int:
+    return min(PER_RECORD_TIMEOUT_SECONDS * (profile.record_count + 2), 24 * 60 * 60)
+
+
 HARNESS_LOCK_PATH = Path("requirements/workflows/lm-evaluation-harness-py312.txt")
 EXPECTED_MODEL_ARTIFACTS = {
     "baseline": {
@@ -328,6 +353,7 @@ def _run_verified_worker(
     role: str,
     prepared: Path,
     output: Path,
+    profile: CorpusProfile | None = None,
 ) -> None:
     model = prepared / f"evaluation/models/{role}"
     dataset = prepared / "evaluation/inputs/records.jsonl"
@@ -361,8 +387,15 @@ def _run_verified_worker(
             model_source=model,
             dataset_source=dataset,
             output=output,
-            environment={"INVARLOCK_RUNTIME_IMAGE_ID": image},
-            timeout_seconds=WORKER_TIMEOUT_SECONDS,
+            environment={
+                "INVARLOCK_RUNTIME_IMAGE_ID": image,
+                **(
+                    {"INVARLOCK_CORPUS_PROFILE": profile.key}
+                    if profile is not None
+                    else {}
+                ),
+            },
+            timeout_seconds=worker_timeout_seconds(profile or corpus_profile("quick")),
         )
     except OciEvaluationError as exc:
         raise BridgeError(f"Harness worker control failed for {role}: {exc}") from exc
@@ -429,7 +462,16 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         )
     output.mkdir(parents=True)
     model_tree_sha256 = checkpoint_tree_sha256(model)
-    dataset_sha256 = digest(_read_regular_file(dataset, label="Harness dataset"))
+    dataset_payload = _read_regular_file(dataset, label="Harness dataset")
+    profile_key = os.environ.get("INVARLOCK_CORPUS_PROFILE")
+    profile = corpus_profile(profile_key) if profile_key is not None else None
+    if profile is not None:
+        try:
+            if profile_for_dataset(dataset_payload) != profile:
+                raise BridgeError("worker corpus profile does not match the dataset")
+        except ValueError as exc:
+            raise BridgeError(str(exc)) from exc
+    dataset_sha256 = digest(dataset_payload)
     config = task_config(str(dataset))
     config_path = output / "task.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
@@ -463,7 +505,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     ]
     completed = _run_bounded_command(
         command,
-        timeout_seconds=WORKER_TIMEOUT_SECONDS,
+        timeout_seconds=worker_timeout_seconds(profile or corpus_profile("quick")),
         label="LM Evaluation Harness execution",
     )
     if completed.returncode:
@@ -484,6 +526,8 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     bound = config
     sample_bytes = _read_regular_file(destination, label="Harness samples")
     lines = sample_bytes.splitlines()
+    if profile is not None and len(lines) != profile.record_count:
+        raise BridgeError("LM Evaluation Harness returned an incomplete corpus")
     manifest = {
         "format": "invarlock/lm-evaluation-harness-run-v1",
         "role": role,
@@ -504,7 +548,10 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
 
 
 def load_run(
-    path: Path, role: str, image: str | None = None
+    path: Path,
+    role: str,
+    image: str | None = None,
+    profile: CorpusProfile | None = None,
 ) -> tuple[dict[str, Any], Path]:
     try:
         run = json.loads(_read_regular_file(path, label=f"{role} run provenance"))
@@ -526,6 +573,7 @@ def load_run(
         or run["execution_config"] != execution_config()
         or run["execution_config_sha256"]
         != digest(canonical_json_bytes(run["execution_config"]))
+        or (profile is not None and run["record_count"] != profile.record_count)
     ):
         raise BridgeError(f"{role} run provenance is invalid")
     samples = path.parent / run["samples"]
@@ -681,15 +729,19 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
         raise BridgeError("the completed transaction did not verify a passing result")
 
 
-def _validated_comparison(request: object) -> dict[str, Any]:
+def _validated_comparison(request: object) -> tuple[dict[str, Any], CorpusProfile]:
     comparison = request.get("comparison") if isinstance(request, dict) else None
     if not isinstance(comparison, dict) or comparison.get("metric") != "exact_match":
         raise BridgeError("prepared request is not the fixed exact-match transaction")
     if comparison.get("policy") != "inputs/acceptance.json":
         raise BridgeError("prepared request has an unexpected policy path")
+    try:
+        profile = profile_for_descriptor(comparison.get("dataset"))
+    except ValueError as exc:
+        raise BridgeError(str(exc)) from exc
     expected_settings = {
         "batch_size": HARNESS_BATCH_SIZE,
-        "context_length": 64,
+        "context_length": profile.context_length,
         "max_output_tokens": MAX_GENERATION_TOKENS,
         "offline": True,
         "seed": HARNESS_SEED,
@@ -723,7 +775,7 @@ def _validated_comparison(request: object) -> dict[str, Any]:
             or re.fullmatch(r"[0-9a-f]{64}", tokenizer_digest) is None
         ):
             raise BridgeError(f"{role} runtime settings are not canonical")
-    return cast(dict[str, Any], comparison)
+    return cast(dict[str, Any], comparison), profile
 
 
 def _validate_workspace_roots(root: Path, prepared: Path) -> None:
@@ -733,6 +785,37 @@ def _validate_workspace_roots(root: Path, prepared: Path) -> None:
         raise BridgeError("transaction workspace must be new")
     if not prepared.is_dir() or prepared.is_symlink():
         raise BridgeError("prepared workspace must be a real directory")
+
+
+def _authenticated_prepared_corpus(
+    prepared: Path,
+    comparison: dict[str, Any],
+    profile: CorpusProfile,
+) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
+    dataset = comparison.get("dataset")
+    if not isinstance(dataset, dict):
+        raise BridgeError("prepared request lacks the authenticated dataset")
+    raw_dataset = _read_regular_file(
+        prepared / "evaluation/inputs/records.jsonl", label="prepared dataset"
+    )
+    try:
+        dataset_profile = profile_for_dataset(raw_dataset)
+    except ValueError as exc:
+        raise BridgeError(str(exc)) from exc
+    if dataset_profile != profile or dataset["sha256"] != digest(raw_dataset):
+        raise BridgeError("prepared dataset does not match the request digest")
+    try:
+        provenance = json.loads(
+            _read_regular_file(
+                prepared / "evaluation/inputs/corpus-profile.json",
+                label="prepared corpus profile",
+            )
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BridgeError("prepared corpus profile is invalid") from exc
+    if provenance != corpus_provenance(profile):
+        raise BridgeError("prepared corpus provenance does not match the dataset")
+    return cast(dict[str, Any], dataset), raw_dataset, cast(dict[str, Any], provenance)
 
 
 def complete(
@@ -817,26 +900,11 @@ def complete(
             prepared / "evaluation/request.yaml", label="prepared request"
         )
     )
-    comparison0 = _validated_comparison(request0)
+    comparison0, profile = _validated_comparison(request0)
     dataset0 = prepared / "evaluation/inputs/records.jsonl"
-    dataset = comparison0.get("dataset")
-    if not isinstance(dataset, dict):
-        raise BridgeError("prepared request lacks the authenticated dataset")
-    raw_dataset = _read_regular_file(dataset0, label="prepared dataset")
-    expected_dataset = {
-        "path": "inputs/records.jsonl",
-        "sha256": DATASET_SHA256,
-        "format": "jsonl",
-        "name": DATASET_NAME,
-        "split": "validation",
-        "input_field": "prompt",
-        "expected_output_field": "expected",
-        "id_field": "id",
-    }
-    if dataset != expected_dataset:
-        raise BridgeError("prepared request has an unexpected dataset descriptor")
-    if dataset["sha256"] != digest(raw_dataset):
-        raise BridgeError("prepared dataset does not match the request digest")
+    dataset, raw_dataset, prepared_corpus_provenance = _authenticated_prepared_corpus(
+        prepared, comparison0, profile
+    )
     schedule = prepare_local_evaluation_schedule_bytes(
         LocalDatasetRequest(
             path=dataset0,
@@ -862,18 +930,7 @@ def complete(
         raise BridgeError("prepared exact-match targets must be non-empty")
     prepared_policy = prepared / "evaluation/inputs/acceptance.json"
     policy = _read_regular_file(prepared_policy, label="prepared policy")
-    expected_policy = {
-        "resolved_policy": {
-            "metrics": {
-                "exact_match": {
-                    "delta_min_pp": -20.0,
-                    "maximum_interval_width_pp": 20.0,
-                    "minimum_record_count": 102,
-                    "minimum_side_accuracy": MINIMUM_SIDE_ACCURACY,
-                }
-            }
-        }
-    }
+    expected_policy = profile.acceptance_policy()
     if json.loads(policy) != expected_policy:
         raise BridgeError("prepared exact-match policy is not the fixed example policy")
     for role in ("baseline", "subject"):
@@ -884,9 +941,15 @@ def complete(
             role=role,
             prepared=prepared,
             output=output,
+            profile=profile,
         )
     runs = {
-        role: load_run(root / f"upstream/{role}/result/run-manifest.json", role, image)
+        role: load_run(
+            root / f"upstream/{role}/result/run-manifest.json",
+            role,
+            image,
+            profile,
+        )
         for role in ("baseline", "subject")
     }
     if (
@@ -909,6 +972,7 @@ def complete(
             "runtime_image_digest": image,
             "source_commit": source_commit,
             "base_image_id": base_image_id,
+            "corpus_profile": prepared_corpus_provenance,
             "task_config": runs["baseline"][0]["task_config"],
             "task_config_sha256": runs["baseline"][0]["task_config_sha256"],
             "execution_config": runs["baseline"][0]["execution_config"],

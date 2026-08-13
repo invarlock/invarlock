@@ -23,6 +23,7 @@ SUPPORT = ROOT / "runner_support.py"
 REPLAYABLE_CORPUS = ROOT / "authoritative"
 REPLAYABLE_ARTIFACTS = REPLAYABLE_CORPUS / "artifacts"
 SIGNED_TRANSACTIONS = ROOT / "signed-transactions"
+FLAGSHIP_COMPARISON = SIGNED_TRANSACTIONS / "flagship-comparison.json"
 
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
@@ -74,6 +75,7 @@ _VERIFICATION_FIELDS = {
     "verifier_fingerprint",
     "verifier_identity",
 }
+_RETAINED_CLAIM_FIELDS = {"dataset_name", "record_count"}
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -164,14 +166,39 @@ def release_focus() -> list[str]:
     return profiles_value
 
 
-def demonstration_levels() -> dict[str, dict[str, bool]]:
-    values = load(ROOT / "demonstrations.json").get("profiles")
-    if not isinstance(values, dict) or any(
-        not isinstance(key, str) or not isinstance(value, dict)
-        for key, value in values.items()
+def demonstration_levels() -> dict[str, dict[str, object]]:
+    document = load(ROOT / "demonstrations.json")
+    values = document.get("profiles")
+    if (
+        not isinstance(values, dict)
+        or any(
+            not isinstance(key, str) or not isinstance(value, dict)
+            for key, value in values.items()
+        )
+        or document.get("format") != "invarlock/evaluator-demonstration-status-v3"
     ):
         raise ValueError("demonstration levels must be an object of profile objects")
     return values
+
+
+def retained_claim(value: object, *, profile_id: str) -> dict[str, object] | None:
+    """Validate one explicit retained-transaction claim."""
+
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != _RETAINED_CLAIM_FIELDS:
+        raise ValueError(f"{profile_id}: demonstration status is invalid")
+    dataset_name = value.get("dataset_name")
+    record_count = value.get("record_count")
+    if (
+        not isinstance(dataset_name, str)
+        or not dataset_name.strip()
+        or not isinstance(record_count, int)
+        or isinstance(record_count, bool)
+        or record_count < 1
+    ):
+        raise ValueError(f"{profile_id}: demonstration status is invalid")
+    return {"dataset_name": dataset_name, "record_count": record_count}
 
 
 def replayable_profiles() -> list[dict[str, Any]]:
@@ -270,7 +297,7 @@ def load_retained_transaction(path: Path, *, profile_id: str) -> dict[str, Any]:
     return value
 
 
-def verify_signed_transaction(profile_id: str) -> None:
+def verify_signed_transaction(profile_id: str, retained: dict[str, object]) -> None:
     root = SIGNED_TRANSACTIONS / profile_id
     transaction = load_retained_transaction(
         root / "transaction.json", profile_id=profile_id
@@ -323,7 +350,140 @@ def verify_signed_transaction(profile_id: str) -> None:
         or build.get("runtime_image_id") != transaction["runtime_image_id"]
     ):
         raise ValueError(f"{profile_id}: retained signed transaction did not pass")
+    report = load(root / "evidence/reports/evaluation.report.json")
+    schedule = load(root / "evidence/schedule/runtime-behavioral-schedule.json")
+    dataset_identity = schedule.get("dataset_identity")
+    records = schedule.get("records")
+    if (
+        report.get("record_count") != retained["record_count"]
+        or not isinstance(dataset_identity, dict)
+        or dataset_identity.get("dataset_name") != retained["dataset_name"]
+        or not isinstance(records, list)
+        or len(records) != retained["record_count"]
+    ):
+        raise ValueError(
+            f"{profile_id}: retained signed transaction does not match its "
+            "declared dataset"
+        )
     print(f"retained signed transaction {profile_id}: pass", flush=True)
+
+
+def _paired_records(profile_id: str) -> dict[str, Any]:
+    value = load(
+        SIGNED_TRANSACTIONS / profile_id / "evidence/records/paired-records.json"
+    )
+    records = value.get("records")
+    if (
+        value.get("format") != "invarlock/paired-records-v1"
+        or value.get("metric") != "exact_match"
+        or not isinstance(value.get("schedule_sha256"), str)
+        or not isinstance(records, list)
+        or not records
+        or any(not isinstance(record, dict) for record in records)
+    ):
+        raise ValueError(f"{profile_id}: retained paired records are invalid")
+    return value
+
+
+def _signed_result(profile_id: str) -> dict[str, object]:
+    report = load(
+        SIGNED_TRANSACTIONS / profile_id / "evidence/reports/evaluation.report.json"
+    )
+    paired = report.get("paired_binary")
+    qualification = report.get("sample_qualification")
+    interval = (
+        qualification.get("interval_width") if isinstance(qualification, dict) else None
+    )
+    if (
+        report.get("verdict") != "pass"
+        or not isinstance(report.get("record_count"), int)
+        or not isinstance(report.get("baseline"), dict)
+        or not isinstance(report.get("subject"), dict)
+        or not isinstance(paired, dict)
+        or not isinstance(interval, dict)
+    ):
+        raise ValueError(f"{profile_id}: retained comparison report is invalid")
+    return {
+        "baseline_accuracy": report["baseline"].get("mean_score"),
+        "delta_pp": paired.get("effect_size_pp"),
+        "interval_width_pp": interval.get("observed"),
+        "record_count": report["record_count"],
+        "subject_accuracy": report["subject"].get("mean_score"),
+        "verdict": report["verdict"],
+    }
+
+
+def flagship_comparison_document(profile_ids: list[str]) -> dict[str, object]:
+    """Compare two retained native journeys without assigning a new verdict."""
+
+    if len(profile_ids) != 2 or len(set(profile_ids)) != 2:
+        raise ValueError("flagship comparison requires exactly two profiles")
+    left_id, right_id = profile_ids
+    left = _paired_records(left_id)
+    right = _paired_records(right_id)
+    left_records = left["records"]
+    right_records = right["records"]
+    if left["schedule_sha256"] != right["schedule_sha256"] or len(left_records) != len(
+        right_records
+    ):
+        raise ValueError("flagship retained schedules do not match")
+    schedule = load(
+        SIGNED_TRANSACTIONS
+        / left_id
+        / "evidence/schedule/runtime-behavioral-schedule.json"
+    )
+    other_schedule = load(
+        SIGNED_TRANSACTIONS
+        / right_id
+        / "evidence/schedule/runtime-behavioral-schedule.json"
+    )
+    if schedule != other_schedule:
+        raise ValueError("flagship retained schedules do not match")
+    dataset_identity = schedule.get("dataset_identity")
+    if not isinstance(dataset_identity, dict):
+        raise ValueError("flagship retained dataset identity is invalid")
+    sides: dict[str, dict[str, object]] = {}
+    for side in ("baseline", "subject"):
+        score_mismatches: list[str] = []
+        record_mismatches: list[str] = []
+        for left_record, right_record in zip(left_records, right_records, strict=True):
+            record_id = left_record.get("record_id")
+            if (
+                not isinstance(record_id, str)
+                or right_record.get("record_id") != record_id
+                or left_record.get("input_sha256") != right_record.get("input_sha256")
+            ):
+                raise ValueError("flagship retained record identities do not match")
+            left_side = left_record.get(side)
+            right_side = right_record.get(side)
+            if not isinstance(left_side, dict) or not isinstance(right_side, dict):
+                raise ValueError("flagship retained record sides are invalid")
+            if left_side.get("score") != right_side.get("score"):
+                score_mismatches.append(record_id)
+            if left_side.get("observation_record_digest") != right_side.get(
+                "observation_record_digest"
+            ):
+                record_mismatches.append(record_id)
+        count = len(left_records)
+        sides[side] = {
+            "matching_record_digests": count - len(record_mismatches),
+            "record_digest_agreement": (count - len(record_mismatches)) / count,
+            "record_digest_mismatch_ids": record_mismatches,
+            "matching_scores": count - len(score_mismatches),
+            "score_agreement": (count - len(score_mismatches)) / count,
+            "score_mismatch_ids": score_mismatches,
+        }
+    return {
+        "dataset_identity": dataset_identity,
+        "format": "invarlock/flagship-evaluator-comparison-v1",
+        "profiles": profile_ids,
+        "record_count": len(left_records),
+        "schedule_sha256": f"sha256:{left['schedule_sha256']}",
+        "sides": sides,
+        "signed_results": {
+            profile_id: _signed_result(profile_id) for profile_id in profile_ids
+        },
+    }
 
 
 def write_profile(
@@ -486,19 +646,22 @@ def verify() -> None:
     levels = demonstration_levels()
     if set(levels) != set(identifiers):
         raise ValueError("demonstration levels must cover exactly the matrix profiles")
+    retained_claims: dict[str, dict[str, object] | None] = {}
     for profile_id, status in levels.items():
-        if set(status) != {"retained_signed_transaction"} or not isinstance(
-            status["retained_signed_transaction"], bool
-        ):
+        if set(status) != {"retained_signed_transaction"}:
             raise ValueError(f"{profile_id}: demonstration status is invalid")
+        retained_claims[profile_id] = retained_claim(
+            status["retained_signed_transaction"], profile_id=profile_id
+        )
     profiles_by_id = {profile["profile_id"]: profile for profile in matrix_profiles}
-    for profile_id in release_focus():
+    focus = release_focus()
+    for profile_id in focus:
         profile = profiles_by_id.get(profile_id)
         if profile is None:
             raise ValueError(f"release-focus profile is missing: {profile_id}")
         if profile["authority"]["mode"] != "deterministic_per_record":
             raise ValueError(f"release-focus profile is not replayable: {profile_id}")
-        if not levels[profile_id]["retained_signed_transaction"]:
+        if retained_claims[profile_id] is None:
             raise ValueError(
                 f"release-focus profile lacks a retained signed transaction: {profile_id}"
             )
@@ -521,9 +684,7 @@ def verify() -> None:
             flush=True,
         )
     retained_profiles = {
-        profile_id
-        for profile_id, status in levels.items()
-        if status["retained_signed_transaction"]
+        profile_id for profile_id, claim in retained_claims.items() if claim is not None
     }
     retained_directories = {
         path.name for path in SIGNED_TRANSACTIONS.iterdir() if path.is_dir()
@@ -533,7 +694,18 @@ def verify() -> None:
             "retained signed transaction packages do not match demonstration status"
         )
     for profile_id in sorted(retained_profiles):
-        verify_signed_transaction(profile_id)
+        claim = retained_claims[profile_id]
+        assert claim is not None
+        verify_signed_transaction(profile_id, claim)
+    if len(focus) == 2:
+        expected_comparison = canonical_json_bytes(flagship_comparison_document(focus))
+        retained_comparison = read_regular_file_bytes(
+            FLAGSHIP_COMPARISON,
+            label="retained flagship comparison",
+            max_bytes=1024 * 1024,
+        )
+        if retained_comparison != expected_comparison:
+            raise ValueError("flagship retained comparison is stale")
 
 
 def verify_replayable() -> None:
@@ -587,6 +759,7 @@ def parse_args() -> argparse.Namespace:
     replayable_parser.add_argument("profiles", nargs="*")
     subparsers.add_parser("verify")
     subparsers.add_parser("verify-replayable")
+    subparsers.add_parser("write-flagship-comparison")
     return parser.parse_args()
 
 
@@ -598,6 +771,25 @@ def main() -> None:
         execute_replayable(set(args.profiles))
     elif args.command == "verify-replayable":
         verify_replayable()
+    elif args.command == "write-flagship-comparison":
+        focus = release_focus()
+        if len(focus) != 2:
+            raise ValueError("flagship comparison requires exactly two profiles")
+        levels = demonstration_levels()
+        for profile_id in focus:
+            claim = retained_claim(
+                levels[profile_id]["retained_signed_transaction"],
+                profile_id=profile_id,
+            )
+            if claim is None:
+                raise ValueError(
+                    f"release-focus profile lacks a retained signed transaction: "
+                    f"{profile_id}"
+                )
+            verify_signed_transaction(profile_id, claim)
+        FLAGSHIP_COMPARISON.write_bytes(
+            canonical_json_bytes(flagship_comparison_document(focus))
+        )
     else:
         verify()
 

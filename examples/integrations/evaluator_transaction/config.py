@@ -5,12 +5,15 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from .corpora import CorpusProfile, corpus_profile
+
+QUICK_CORPUS = corpus_profile("quick")
 MAX_GENERATION_TOKENS = 1
 BATCH_SIZE = 8
 SEED = 20_260_716
-MINIMUM_SIDE_ACCURACY = 0.20
-DATASET_NAME = "qwen3-0.6b-base-to-post-trained"
-DATASET_SHA256 = "d80e81ba17fb93b9b8a46f9817f9841f5f9c2858c9d703b3ce28847b2eaeb57c"
+MINIMUM_SIDE_ACCURACY = QUICK_CORPUS.minimum_side_accuracy
+DATASET_NAME = QUICK_CORPUS.dataset_name
+DATASET_SHA256 = QUICK_CORPUS.dataset_sha256
 TOKENIZER_PADDING_SIDE = "left"
 TOKENIZER_ADD_SPECIAL_TOKENS = True
 TOKENIZER_CLEAN_UP_SPACES = False
@@ -18,12 +21,17 @@ PAD_TOKEN_POLICY = "eos_if_missing"
 MODEL_USE_CACHE = False
 TORCH_NUM_THREADS = 1
 INSPECT_RAW_CHAT_TEMPLATE = '{{ messages[0]["content"] }}'
-RECORD_COUNT = 102
+RECORD_COUNT = QUICK_CORPUS.record_count
 MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
 PER_RECORD_TIMEOUT_SECONDS = 300
 WORKER_TIMEOUT_SECONDS = min(
     PER_RECORD_TIMEOUT_SECONDS * (RECORD_COUNT + 2), 24 * 60 * 60
 )
+
+
+def worker_timeout_seconds(profile: CorpusProfile) -> int:
+    return min(PER_RECORD_TIMEOUT_SECONDS * (profile.record_count + 2), 24 * 60 * 60)
+
 
 EVALUATORS: dict[str, dict[str, str]] = {
     "inspect-ai": {
@@ -191,6 +199,7 @@ __all__ = [
     "TOKENIZER_PADDING_SIDE",
     "TORCH_NUM_THREADS",
     "WORKER_TIMEOUT_SECONDS",
+    "worker_timeout_seconds",
     "evaluator_id",
     "execution_config",
     "task_config",

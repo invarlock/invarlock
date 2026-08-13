@@ -10,9 +10,9 @@ signed-transaction demonstration in the qualification matrix.
 The maintained journey compares the public, revision-pinned
 `Qwen/Qwen3-0.6B-Base` checkpoint with the public post-trained
 `Qwen/Qwen3-0.6B` checkpoint. Every snapshot file is checked against a fixed
-byte length and SHA-256 before execution. The 102-record schedule carries stable
-IDs and fixed prompts and targets; both upstream runs execute offline after the
-snapshot and image downloads.
+byte length and SHA-256 before execution. The default 102-record schedule
+carries stable IDs and fixed prompts and targets; both upstream runs execute
+offline after the snapshot and image downloads.
 
 The curated snapshots contain the pinned weights, model configuration, and
 tokenizer files required by the run. Optional checkpoint generation defaults
@@ -26,6 +26,21 @@ From a clean committed checkout with Docker or Podman available:
 ```bash
 make example-inspect-ai EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
 ```
+
+Release qualification uses the larger flagship profile:
+
+```bash
+make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+```
+
+The flagship profile derives 400 records from an immutable
+`EleutherAI/lambada_openai` test source. It freezes the source revision and
+hash, deterministic stratified selection, selected indices, and derived JSONL
+hash. Every selected final-word target is one losslessly decoded token under
+both pinned Qwen tokenizers. Use `--benchmark-source PATH` to prepare from a
+previously downloaded copy with the same byte and hash checks. This is a
+paired generative exact-match projection, distinct from the standard
+log-likelihood LAMBADA metric.
 
 Pass `EXAMPLE_ARGS="--workspace PATH"` when you want to retain the transaction
 at a specific new path. The evidence and verifier keys must be caller-owned and
@@ -48,8 +63,13 @@ target-leading-whitespace recovery before strict replay. Evaluator provenance
 is attached as an authenticated observation, while acceptance is replayed from
 the recovered raw responses.
 
-The fixed policy requires all 102 records, limits the paired 95% confidence
-interval width to 20 percentage points, rejects a regression larger than 20
-percentage points, and requires each model to solve at least 20% of the corpus.
+The quick policy requires all 102 records, limits the paired 95% confidence
+interval width to 20 percentage points, and requires 20% accuracy on each
+side. The flagship policy requires all 400 records, tightens the interval-width
+limit to 10 percentage points, and requires 5% accuracy on each side. Both
+profiles reject a regression larger than 20 percentage points.
 
-This is a small integration demonstration, not a model-quality benchmark.
+The retained 400-record flagship transaction achieved an 8.47-percentage-point
+paired interval width under its 10-point maximum.
+
+This is a reference integration demonstration, not a model-quality benchmark.

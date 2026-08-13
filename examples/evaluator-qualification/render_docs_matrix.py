@@ -51,6 +51,21 @@ def escape_cell(value: str) -> str:
     return value.replace("|", r"\|").replace("\n", " ")
 
 
+def retained_transaction(value: object) -> str:
+    if value is None:
+        return "—"
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"dataset_name", "record_count"}
+        or not isinstance(value.get("dataset_name"), str)
+        or not isinstance(value.get("record_count"), int)
+        or isinstance(value.get("record_count"), bool)
+        or value["record_count"] < 1
+    ):
+        raise ValueError("retained signed transaction status is invalid")
+    return f"Retained ({value['record_count']} native records)"
+
+
 def render() -> str:
     matrix = load(ROOT / "matrix.json")
     demonstrations = load(ROOT / "demonstrations.json")["profiles"]
@@ -81,18 +96,14 @@ def render() -> str:
             profile_id = profile["profile_id"]
             levels = demonstrations[profile_id]
             raw = load(ROOT / "artifacts" / profile_id / "upstream-output.json")
-            end_to_end = (
-                "Demonstrated"
-                if levels["retained_signed_transaction"]
-                else "Not yet demonstrated"
-            )
+            end_to_end = retained_transaction(levels["retained_signed_transaction"])
             cells = (
                 profile["display_name"],
                 pinned_version(profile),
                 f"`{raw['entrypoint']}`",
                 adapter_support(profile),
                 (
-                    f"Independently replayable ({record_count} records)"
+                    f"Independently replayable ({record_count} shared outputs)"
                     if profile["authority"]["mode"] == "deterministic_per_record"
                     else replay_authority(profile)
                 ),

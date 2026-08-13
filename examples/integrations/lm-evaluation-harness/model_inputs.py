@@ -8,10 +8,12 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 from transformers import AutoTokenizer
@@ -19,7 +21,33 @@ from transformers import AutoTokenizer
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sha256
 
-DATASET_NAME = "qwen3-0.6b-base-to-post-trained"
+try:
+    from examples.integrations.evaluator_transaction.corpora import (
+        CorpusProfile,
+        corpus_profile,
+        corpus_provenance,
+        flagship_records,
+        load_flagship_source,
+        records_jsonl,
+        validate_dataset_records,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - direct-script execution
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    repository = Path(__file__).resolve().parents[3]
+    if str(repository) not in sys.path:
+        sys.path.insert(0, str(repository))
+    from examples.integrations.evaluator_transaction.corpora import (  # type: ignore[no-redef]
+        CorpusProfile,
+        corpus_profile,
+        corpus_provenance,
+        flagship_records,
+        load_flagship_source,
+        records_jsonl,
+        validate_dataset_records,
+    )
+
+DATASET_NAME = corpus_profile("quick").dataset_name
 MAX_GENERATION_TOKENS = 1
 HARNESS_BATCH_SIZE = 8
 RECORDS = Path(__file__).with_name("records.json")
@@ -171,56 +199,72 @@ def stage_snapshots(root: Path) -> dict[str, Path]:
         )
 
 
-def _records() -> list[dict[str, str]]:
-    values = json.loads(RECORDS.read_text(encoding="utf-8"))
-    if not isinstance(values, list) or len(values) != 102:
-        raise RuntimeError("the Qwen3 Harness journey requires exactly 102 records")
-    if any(
-        not isinstance(value, dict)
-        or set(value) != {"expected", "id", "prompt"}
-        or any(not isinstance(value[key], str) or not value[key] for key in value)
-        for value in values
-    ):
-        raise RuntimeError("the Qwen3 Harness records are invalid")
-    if len({value["id"] for value in values}) != len(values):
-        raise RuntimeError("the Qwen3 Harness record IDs are not unique")
-    return values
+def _records(
+    selected: CorpusProfile | None = None,
+    *,
+    tokenizers: tuple[Any, Any] | None = None,
+    source_payload: bytes | None = None,
+) -> list[dict[str, str]]:
+    profile = selected or corpus_profile("quick")
+    if profile.key == "quick":
+        try:
+            values = json.loads(RECORDS.read_text(encoding="utf-8"))
+            payload = records_jsonl(values)
+            validate_dataset_records(payload, profile)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("the Qwen3 Harness records are invalid") from exc
+        return cast(list[dict[str, str]], values)
+    if tokenizers is None or source_payload is None:
+        raise RuntimeError("flagship corpus preparation requires its pinned source")
+    return flagship_records(source_payload, tokenizers)
 
 
-def prepare(root: Path, image_id: str) -> None:
+def prepare(
+    root: Path,
+    image_id: str,
+    *,
+    corpus_profile_key: str = "quick",
+    benchmark_source: Path | None = None,
+) -> None:
     if root.exists() or root.is_symlink():
         raise RuntimeError("prepared workspace must be new")
+    selected = corpus_profile(corpus_profile_key)
+    if benchmark_source is not None and selected.key != "flagship":
+        raise RuntimeError("a benchmark source is only valid for the flagship corpus")
+    source_payload = (
+        load_flagship_source(benchmark_source) if selected.key == "flagship" else None
+    )
     inputs = root / "evaluation/inputs"
     inputs.mkdir(parents=True)
     models = stage_snapshots(root / "evaluation/models")
-    records = _records()
-    records_path = inputs / "records.jsonl"
-    records_path.write_text(
-        "".join(json.dumps(value, sort_keys=True) + "\n" for value in records),
-        encoding="utf-8",
-    )
-    dataset_sha256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
-    policy = {
-        "resolved_policy": {
-            "metrics": {
-                "exact_match": {
-                    "delta_min_pp": -20.0,
-                    "maximum_interval_width_pp": 20.0,
-                    "minimum_record_count": 102,
-                    "minimum_side_accuracy": 0.20,
-                }
-            }
-        }
+    tokenizers = {
+        role: AutoTokenizer.from_pretrained(
+            checkpoint, local_files_only=True, trust_remote_code=False
+        )
+        for role, checkpoint in models.items()
     }
+    records = _records(
+        selected,
+        tokenizers=(tokenizers["baseline"], tokenizers["subject"]),
+        source_payload=source_payload,
+    )
+    records_path = inputs / "records.jsonl"
+    records_path.write_bytes(records_jsonl(records))
+    dataset_sha256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
+    if dataset_sha256 != selected.dataset_sha256:
+        raise RuntimeError("prepared corpus does not match its pinned profile")
+    policy = selected.acceptance_policy()
     (inputs / "acceptance.json").write_text(
         json.dumps(policy, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (inputs / "corpus-profile.json").write_text(
+        json.dumps(corpus_provenance(selected), sort_keys=True) + "\n",
+        encoding="utf-8",
     )
     sides: dict[str, object] = {}
     for snapshot in SNAPSHOTS:
         checkpoint = models[snapshot.role]
-        tokenizer = AutoTokenizer.from_pretrained(
-            checkpoint, local_files_only=True, trust_remote_code=False
-        )
+        tokenizer = tokenizers[snapshot.role]
         for record in records:
             token_ids = tokenizer(record["expected"], add_special_tokens=False)[
                 "input_ids"
@@ -245,7 +289,7 @@ def prepare(root: Path, image_id: str) -> None:
                 "settings": {
                     "batch_size": HARNESS_BATCH_SIZE,
                     "checkpoint_tree_sha256": checkpoint_tree_sha256(checkpoint),
-                    "context_length": 64,
+                    "context_length": selected.context_length,
                     "max_output_tokens": MAX_GENERATION_TOKENS,
                     "offline": True,
                     "seed": 20_260_716,
@@ -261,16 +305,7 @@ def prepare(root: Path, image_id: str) -> None:
         "comparison": {
             "baseline": sides["baseline"],
             "subject": sides["subject"],
-            "dataset": {
-                "path": "inputs/records.jsonl",
-                "sha256": dataset_sha256,
-                "format": "jsonl",
-                "name": DATASET_NAME,
-                "split": "validation",
-                "input_field": "prompt",
-                "expected_output_field": "expected",
-                "id_field": "id",
-            },
+            "dataset": selected.dataset_descriptor(),
             "policy": "inputs/acceptance.json",
             "task": "text_causal",
             "metric": "exact_match",
@@ -288,11 +323,29 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--runtime-image", required=True)
-    arguments = parser.parse_args()
-    prepare(
-        Path(os.path.abspath(arguments.workspace.expanduser())),
-        arguments.runtime_image,
+    parser.add_argument(
+        "--corpus-profile", choices=("quick", "flagship"), default="quick"
     )
+    parser.add_argument("--benchmark-source", type=Path)
+    arguments = parser.parse_args()
+    selected = getattr(arguments, "corpus_profile", "quick")
+    benchmark_source = getattr(arguments, "benchmark_source", None)
+    if selected != "quick" or benchmark_source is not None:
+        prepare(
+            Path(os.path.abspath(arguments.workspace.expanduser())),
+            arguments.runtime_image,
+            corpus_profile_key=selected,
+            benchmark_source=(
+                Path(os.path.abspath(benchmark_source.expanduser()))
+                if benchmark_source is not None
+                else None
+            ),
+        )
+    else:
+        prepare(
+            Path(os.path.abspath(arguments.workspace.expanduser())),
+            arguments.runtime_image,
+        )
     return 0
 
 

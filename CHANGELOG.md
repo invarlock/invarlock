@@ -15,11 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an exact-match `minimum_side_accuracy` policy control and a versioned
   comparison-report v3 field that records both side results.
 - Added retained CPU-only signed OCI transactions for LM Evaluation Harness and
-  Inspect AI, including 102 paired records, native evaluator provenance,
-  independently signed verification receipts, policies, and builder-signed
-  image attestations.
+  Inspect AI, including 400 paired LAMBADA-derived records, native evaluator
+  provenance, independently signed verification receipts, policies, and
+  builder-signed image attestations.
 - Added reproducible CPU verification-time, report-rendering-time, and retained
-  artifact-size measurements for both 102-record flagship transactions.
+  artifact-size measurements for both 400-record flagship transactions.
+- Added a retained cross-evaluator comparison that confirms the shared ordered
+  schedule and reports native per-record agreement without creating a second
+  acceptance verdict.
 - Added an example-layer evaluator transaction framework with source-specific
   native adapters, source-bound image construction, caller-owned signing and
   trust inputs, and cleanup of temporary container images.
@@ -40,9 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserved retained OCI build attestations in their original signed format;
   current transaction writers emit only the evaluator-named format while the
   offline verifier strictly reads both versions.
-- Focused evaluator release evidence on LM Evaluation Harness and Inspect AI,
-  while preserving the wider matrix as a compatibility catalog and reporting
-  adapter support, replay authority, and signed-journey maturity independently.
+- Distinguished the retained 400-record native signed transactions for LM
+  Evaluation Harness and Inspect AI from the wider 102-record shared-output
+  qualification matrix, with adapter support, replay authority, signed corpus,
+  and signed-journey record count reported independently.
 - Kept evaluator-specific SDKs, parsers, launchers, and image-build logic in the
   example layer; the installed engine continues to expose evaluator-neutral
   qualification and runtime-import contracts.
@@ -55,8 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   receipts, attestations, and runnable integrations.
 - Expanded documentation checks to discover every tracked Markdown file and
   reject machine-specific paths, credential-like values, and review-process
-  wording before publication, while reporting the required documentation
-  status on every pull request and path-scoping push runs.
+  wording before publication.
 - Raised aggregate and per-module statement and branch coverage requirements to
   95% across the engine, add-ins, qualification and release tooling, maintained
   examples, and repository checks.

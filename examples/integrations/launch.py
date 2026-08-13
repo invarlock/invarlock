@@ -291,6 +291,22 @@ def _string_map(value: object, *, label: str) -> dict[str, str]:
     raise RuntimeError(f"{label} configuration map is invalid")
 
 
+def _require_child_image_layers(base: Sequence[str], child: Sequence[str]) -> None:
+    """Require the immutable child filesystem to extend the exact base chain.
+
+    OCI builders may materialize metadata-only instructions as empty rootfs
+    layers, so a numeric child-layer count is not portable across engines. The
+    committed Dockerfile and build context define the child delta; this check
+    binds that delta to the complete authenticated base prefix and rejects an
+    image that did not add a child filesystem at all.
+    """
+
+    if len(child) <= len(base) or tuple(child[: len(base)]) != tuple(base):
+        raise RuntimeError(
+            "child image filesystem does not derive from the authenticated base"
+        )
+
+
 def _require_child_image_config(
     base: Mapping[str, object],
     child: Mapping[str, object],
@@ -298,6 +314,7 @@ def _require_child_image_config(
     allowed_environment: set[str] | Mapping[str, str],
     allowed_labels: set[str] | Mapping[str, str],
     expected_entrypoint: Sequence[str] | None = None,
+    expected_working_directory: str | None = None,
 ) -> None:
     """Require that a child preserves every authenticated base config field.
 
@@ -307,8 +324,11 @@ def _require_child_image_config(
     required to remain byte-for-byte equivalent after JSON decoding.
     """
 
+    allowed_fields = set(_ALLOWED_CHILD_CONFIG_FIELDS)
+    if expected_working_directory is not None:
+        allowed_fields.add("WorkingDir")
     for field in set(base) | set(child):
-        if field in _ALLOWED_CHILD_CONFIG_FIELDS:
+        if field in allowed_fields:
             continue
         if base.get(field) != child.get(field):
             raise RuntimeError(
@@ -319,6 +339,11 @@ def _require_child_image_config(
         expected_entrypoint
     ):
         raise RuntimeError("child image entrypoint does not match its contract")
+    if (
+        expected_working_directory is not None
+        and child.get("WorkingDir") != expected_working_directory
+    ):
+        raise RuntimeError("child image working directory does not match its contract")
     base_environment = _string_map(base.get("Env"), label="base image")
     child_environment = _string_map(child.get("Env"), label="child image")
     allowed_environment_values = (

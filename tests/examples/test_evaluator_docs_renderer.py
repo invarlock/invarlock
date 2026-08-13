@@ -101,6 +101,15 @@ def test_renderer_formats_versions_authority_and_markdown_cells(
     with pytest.raises(ValueError, match="unsupported adapter support status"):
         module.adapter_support({"support_status": "experimental"})
     assert module.escape_cell("a|b\nc") == r"a\|b c"
+    assert module.retained_transaction(None) == "—"
+    assert (
+        module.retained_transaction(
+            {"dataset_name": "fixed-corpus", "record_count": 400}
+        )
+        == "Retained (400 native records)"
+    )
+    with pytest.raises(ValueError, match="status is invalid"):
+        module.retained_transaction(True)
 
 
 def test_updated_document_requires_exactly_one_generated_block() -> None:

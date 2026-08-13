@@ -3,7 +3,7 @@
 This directory retains the compact release evidence for LM Evaluation Harness
 and Inspect AI. Each package contains:
 
-- the complete signed evidence pack with 102 paired records and native
+- the complete signed evidence pack with 400 paired records and native
   evaluator provenance;
 - the independently signed verifier receipt;
 - the independent evaluated policy;
@@ -29,10 +29,10 @@ evaluator-named format.
 ## Flagship proof map
 
 For each flagship, the map connects three complementary demonstrations: the
-small upstream conformance qualification, the 102-record model-output import
-replay, and the separately executed signed OCI journey. They share the reviewed
-profile and evaluator-neutral contracts; the retained conformance output is not
-claimed as the source of the signed evidence pack.
+small upstream conformance qualification, the 102-record shared-output import
+replay, and the separately executed 400-record signed OCI journey. They share
+the reviewed profile and evaluator-neutral contracts; the retained conformance
+output is not claimed as the source of the signed evidence pack.
 
 ### Inspect AI
 
@@ -42,7 +42,7 @@ claimed as the source of the signed evidence pack.
    normalized into the [qualification export](../artifacts/inspect-ai/export.json)
    and independently checked in the
    [qualification result](../artifacts/inspect-ai/qualification-result.json).
-3. The [102-record import replay](../authoritative/artifacts/inspect-ai/import-replay.json)
+3. The [102-record shared-output import replay](../authoritative/artifacts/inspect-ai/import-replay.json)
    demonstrates verdict-authoritative replay over retained model outputs.
 4. The signed journey retains the [evidence manifest](inspect-ai/evidence/manifest.json),
    [verification receipt](inspect-ai/verification.receipt.json),
@@ -62,7 +62,7 @@ claimed as the source of the signed evidence pack.
    [qualification export](../artifacts/lm-evaluation-harness/export.json) and
    independently checked in the
    [qualification result](../artifacts/lm-evaluation-harness/qualification-result.json).
-3. The [102-record import replay](../authoritative/artifacts/lm-evaluation-harness/import-replay.json)
+3. The [102-record shared-output import replay](../authoritative/artifacts/lm-evaluation-harness/import-replay.json)
    demonstrates verdict-authoritative replay over retained model outputs.
 4. The signed journey retains the
    [evidence manifest](lm-evaluation-harness/evidence/manifest.json),
@@ -77,6 +77,15 @@ records adapter support, replay authority, and retained signed-journey maturity
 as independent properties. None of these demonstrations generalizes beyond the
 pinned exact-match workflow.
 
+The [flagship comparison](flagship-comparison.json) confirms that both signed
+journeys used the same ordered 400-record schedule and reports their native
+agreement without assigning another verdict. LM Evaluation Harness and Inspect
+AI agreed on 394 of 400 baseline scores (98.5%) and 397 of 400 subject scores
+(99.25%). The remaining differences are retained rather than normalized away:
+the signed journeys exercise each framework's native model path, while the
+102-record replay isolates evaluator scoring over identical precomputed model
+outputs.
+
 Run the offline verification through:
 
 ```bash
@@ -87,12 +96,12 @@ make evaluator-qualification
 
 The retained transactions are compact and their independent CPU verification
 does not execute either evaluator or model. This reference measurement used
-seven measured runs after one warmup on arm64 macOS with Python 3.12.12:
+seven measured runs after one warmup on arm64 macOS with Python 3.12.13:
 
 | Transaction | Records | Evidence bytes | Complete package bytes | Verify and issue receipt, median | Render HTML, median |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| LM Evaluation Harness | 102 | 277,079 | 283,562 | 94.0 ms | 38.1 ms |
-| Inspect AI | 102 | 250,958 | 257,185 | 92.0 ms | 31.6 ms |
+| LM Evaluation Harness | 400 | 1,697,002 | 1,703,418 | 248.6 ms | 104.6 ms |
+| Inspect AI | 400 | 1,320,166 | 1,326,305 | 238.5 ms | 66.8 ms |
 
 `Verify and issue receipt` performs complete semantic evidence replay against
 independent anchors and writes a fresh Ed25519-signed receipt. `Render HTML`
