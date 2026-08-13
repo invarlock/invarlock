@@ -107,3 +107,20 @@ def test_portability_profile_is_the_recent_gemma4_12b_cuda_comparison() -> None:
         sum(item.byte_length for item in snapshot.files) > 23_900_000_000
         for snapshot in profile.snapshots
     )
+    expected_identities = {
+        "baseline": (
+            "sha256:2eca938586c6fb57e6487553dc1cae9e388e8f922390def258e70d4fc64dbccb",
+            "59308d8748a71e3f03123d02eec3d1bd34557726306442800d4006e7420f48a7",
+        ),
+        "subject": (
+            "sha256:4b242ffea3b93942d347ff7c9c1982a0ec94b8a86e11ad94ccc41f0923da41dc",
+            "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21",
+        ),
+    }
+    assert {
+        snapshot.role: (
+            snapshot.checkpoint_tree_sha256,
+            snapshot.tokenizer_contract_sha256,
+        )
+        for snapshot in profile.snapshots
+    } == expected_identities

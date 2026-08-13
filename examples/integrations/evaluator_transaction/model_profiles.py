@@ -310,6 +310,12 @@ _PORTABILITY = ModelProfile(
                     "522a38334973725dba8f7c645195b19dda0c284f403f43273f77837679ba2eab",
                 ),
             ),
+            checkpoint_tree_sha256=(
+                "sha256:2eca938586c6fb57e6487553dc1cae9e388e8f922390def258e70d4fc64dbccb"
+            ),
+            tokenizer_contract_sha256=(
+                "59308d8748a71e3f03123d02eec3d1bd34557726306442800d4006e7420f48a7"
+            ),
         ),
         Snapshot(
             role="subject",
@@ -342,6 +348,12 @@ _PORTABILITY = ModelProfile(
                     3_089,
                     "a62f4e85a47c0c136edaaa3a4f591fd6783717299a9def47e5ad03a49f6a5eb9",
                 ),
+            ),
+            checkpoint_tree_sha256=(
+                "sha256:4b242ffea3b93942d347ff7c9c1982a0ec94b8a86e11ad94ccc41f0923da41dc"
+            ),
+            tokenizer_contract_sha256=(
+                "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21"
             ),
         ),
     ),
