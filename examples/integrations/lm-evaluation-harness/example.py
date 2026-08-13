@@ -104,6 +104,10 @@ try:
         profile_for_dataset,
         profile_for_descriptor,
     )
+    from examples.integrations.evaluator_transaction.model_profiles import (
+        ModelProfile,
+        model_profile,
+    )
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
@@ -114,12 +118,17 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         profile_for_dataset,
         profile_for_descriptor,
     )
+    from evaluator_transaction.model_profiles import (  # type: ignore[no-redef]
+        ModelProfile,
+        model_profile,
+    )
 
 VERSION = "0.4.12+invarlock.nocache.1"
 MAX_GENERATION_TOKENS = 1
-HARNESS_BATCH_SIZE = 8
 HARNESS_SEED = 20_260_716
 QUICK_CORPUS = corpus_profile("quick")
+QUICK_MODELS = model_profile("quick")
+HARNESS_BATCH_SIZE = QUICK_MODELS.batch_size
 RECORD_COUNT = QUICK_CORPUS.record_count
 MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
 PER_RECORD_TIMEOUT_SECONDS = 300
@@ -140,18 +149,23 @@ def worker_timeout_seconds(profile: CorpusProfile) -> int:
 
 
 HARNESS_LOCK_PATH = Path("requirements/workflows/lm-evaluation-harness-py312.txt")
-EXPECTED_MODEL_ARTIFACTS = {
-    "baseline": {
-        "path": "models/baseline",
-        "model_id": "Qwen/Qwen3-0.6B-Base",
-        "locator": "hf://Qwen/Qwen3-0.6B-Base@da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
-    },
-    "subject": {
-        "path": "models/subject",
-        "model_id": "Qwen/Qwen3-0.6B",
-        "locator": "hf://Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca",
-    },
-}
+HARNESS_CUDA_LOCK_PATH = Path(
+    "requirements/workflows/lm-evaluation-harness-py312-cu129.txt"
+)
+
+
+def _model_artifacts(profile: ModelProfile) -> dict[str, dict[str, str]]:
+    return {
+        snapshot.role: {
+            "path": f"models/{snapshot.role}",
+            "model_id": snapshot.repository,
+            "locator": snapshot.locator,
+        }
+        for snapshot in profile.snapshots
+    }
+
+
+EXPECTED_MODEL_ARTIFACTS = _model_artifacts(QUICK_MODELS)
 RUN_FIELDS = {
     "format",
     "role",
@@ -243,6 +257,7 @@ def _inspect_runtime_image(
     base_image_id: str,
     build_attestation: Path,
     builder_public_key: ed25519.Ed25519PublicKey,
+    profile: CorpusProfile = QUICK_CORPUS,
 ) -> None:
     if engine not in {"docker", "podman"}:
         raise BridgeError("container engine must be docker or podman")
@@ -252,7 +267,16 @@ def _inspect_runtime_image(
         raise BridgeError("base image identity must be an immutable image digest")
     lock_digest = (
         "sha256:"
-        + hashlib.sha256((REPOSITORY_ROOT / HARNESS_LOCK_PATH).read_bytes()).hexdigest()
+        + hashlib.sha256(
+            (
+                REPOSITORY_ROOT
+                / (
+                    HARNESS_CUDA_LOCK_PATH
+                    if model_profile(profile.key).device == "cuda"
+                    else HARNESS_LOCK_PATH
+                )
+            ).read_bytes()
+        ).hexdigest()
     )
     try:
         inspect_evaluator_image(
@@ -354,6 +378,7 @@ def _run_verified_worker(
     prepared: Path,
     output: Path,
     profile: CorpusProfile | None = None,
+    device: str = "cpu",
 ) -> None:
     model = prepared / f"evaluation/models/{role}"
     dataset = prepared / "evaluation/inputs/records.jsonl"
@@ -396,6 +421,7 @@ def _run_verified_worker(
                 ),
             },
             timeout_seconds=worker_timeout_seconds(profile or corpus_profile("quick")),
+            device=device,
         )
     except OciEvaluationError as exc:
         raise BridgeError(f"Harness worker control failed for {role}: {exc}") from exc
@@ -426,14 +452,18 @@ def task_config(dataset: str) -> dict[str, Any]:
     }
 
 
-def execution_config() -> dict[str, Any]:
+def execution_config(profile: CorpusProfile | None = None) -> dict[str, Any]:
     """Return the complete fixed execution profile authenticated by the bridge."""
 
+    selected_corpus = profile or corpus_profile(
+        os.environ.get("INVARLOCK_CORPUS_PROFILE", "quick")
+    )
+    selected_models = model_profile(selected_corpus.key)
     return {
-        "batch_size": HARNESS_BATCH_SIZE,
+        "batch_size": selected_models.batch_size,
         "checkpoint_generation_config": "excluded",
-        "device": "cpu",
-        "dtype": "float32",
+        "device": selected_models.device,
+        "dtype": selected_models.dtype,
         "harness_backend": "causal",
         "harness_model": "hf",
         "max_generation_tokens": MAX_GENERATION_TOKENS,
@@ -477,7 +507,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     config_sha256 = digest(_read_regular_file(config_path, label="Harness task config"))
     raw = output / "upstream"
-    execution = execution_config()
+    execution = execution_config(profile)
     command = [
         sys.executable,
         "-m",
@@ -570,7 +600,8 @@ def load_run(
         or (image is not None and run.get("runtime_image_digest") != image)
         or run["task_config"] != task_config("/records.jsonl")
         or run["task_config_sha256"] != digest(canonical_json_bytes(run["task_config"]))
-        or run["execution_config"] != execution_config()
+        or run["execution_config"]
+        != execution_config(profile or corpus_profile("quick"))
         or run["execution_config_sha256"]
         != digest(canonical_json_bytes(run["execution_config"]))
         or (profile is not None and run["record_count"] != profile.record_count)
@@ -739,8 +770,10 @@ def _validated_comparison(request: object) -> tuple[dict[str, Any], CorpusProfil
         profile = profile_for_descriptor(comparison.get("dataset"))
     except ValueError as exc:
         raise BridgeError(str(exc)) from exc
+    selected_models = model_profile(profile.key)
+    expected_artifacts = _model_artifacts(selected_models)
     expected_settings = {
-        "batch_size": HARNESS_BATCH_SIZE,
+        "batch_size": selected_models.batch_size,
         "context_length": profile.context_length,
         "max_output_tokens": MAX_GENERATION_TOKENS,
         "offline": True,
@@ -752,13 +785,13 @@ def _validated_comparison(request: object) -> tuple[dict[str, Any], CorpusProfil
         if (
             not isinstance(side, dict)
             or set(side) != {"artifact", "runtime"}
-            or side.get("artifact") != EXPECTED_MODEL_ARTIFACTS[role]
+            or side.get("artifact") != expected_artifacts[role]
             or not isinstance(side.get("runtime"), dict)
             or set(side["runtime"]) != {"provider", "settings"}
             or side["runtime"].get("provider") != "hf_transformers"
             or not isinstance(side["runtime"].get("settings"), dict)
         ):
-            raise BridgeError(f"{role} is not the canonical pinned Qwen3 model")
+            raise BridgeError(f"{role} is not the canonical pinned Qwen model")
         settings = side["runtime"]["settings"]
         checkpoint_digest = settings.get("checkpoint_tree_sha256")
         tokenizer_digest = settings.get("tokenizer_metadata_sha256")
@@ -831,6 +864,7 @@ def complete(
     base_image_id: str | None = None,
     build_attestation: Path | None = None,
     builder_public_key: Path | None = None,
+    device: str | None = None,
 ) -> tuple[Path, Path, Path]:
     """Author strict import inputs and execute evaluate, verify, and report."""
 
@@ -887,6 +921,18 @@ def complete(
         builder_public_key, label="builder public key"
     )
     _require_distinct_signers(evidence_key, verifier_key, builder_key)
+    request0 = yaml.safe_load(
+        _read_regular_file(
+            prepared / "evaluation/request.yaml", label="prepared request"
+        )
+    )
+    comparison0, profile = _validated_comparison(request0)
+    selected_models = model_profile(profile.key)
+    device_selector = device or selected_models.device
+    if selected_models.device == "cpu" and device_selector != "cpu":
+        raise BridgeError("the quick Harness profile requires a CPU worker")
+    if selected_models.device == "cuda" and not device_selector.startswith("cuda"):
+        raise BridgeError("the flagship Harness profile requires a CUDA worker")
     _inspect_runtime_image(
         container_engine,
         image,
@@ -894,13 +940,8 @@ def complete(
         base_image_id,
         build_attestation,
         builder_public_key=builder_key,
+        profile=profile,
     )
-    request0 = yaml.safe_load(
-        _read_regular_file(
-            prepared / "evaluation/request.yaml", label="prepared request"
-        )
-    )
-    comparison0, profile = _validated_comparison(request0)
     dataset0 = prepared / "evaluation/inputs/records.jsonl"
     dataset, raw_dataset, prepared_corpus_provenance = _authenticated_prepared_corpus(
         prepared, comparison0, profile
@@ -942,6 +983,7 @@ def complete(
             prepared=prepared,
             output=output,
             profile=profile,
+            device=device_selector,
         )
     runs = {
         role: load_run(
@@ -1019,6 +1061,17 @@ def complete(
             raise BridgeError(
                 f"{role} tokenizer identity does not match the checkpoint"
             )
+        snapshot = selected_models.snapshot(role)
+        if (
+            snapshot.checkpoint_tree_sha256 is not None
+            and observed_checkpoint_digest != snapshot.checkpoint_tree_sha256
+        ):
+            raise BridgeError(f"{role} checkpoint tree does not match its pin")
+        if (
+            snapshot.tokenizer_contract_sha256 is not None
+            and observed_tokenizer_digest != snapshot.tokenizer_contract_sha256
+        ):
+            raise BridgeError(f"{role} tokenizer contract does not match its pin")
         execution = runs[role][0]["execution_config"]
         if (
             settings.get("seed") != execution["seed"]
@@ -1189,6 +1242,7 @@ def main(argv: list[str] | None = None) -> int:
     bridge_parser.add_argument("--source-commit", required=True)
     bridge_parser.add_argument("--base-image-id", required=True)
     bridge_parser.add_argument("--build-attestation", type=Path, required=True)
+    bridge_parser.add_argument("--device")
     args = parser.parse_args(argv)
     try:
         if args.command == "worker":
@@ -1226,6 +1280,7 @@ def main(argv: list[str] | None = None) -> int:
                     if args.build_attestation is not None
                     else None
                 ),
+                device=args.device,
             )
             print(f"Evidence: {evidence}\nReceipt: {receipt}\nReport: {report}")
     except (BridgeError, OSError, RuntimeError, TypeError, ValueError) as exc:

@@ -40,6 +40,16 @@ def test_make_exposes_a_separate_minimal_cuda_runtime_image_build() -> None:
     assert "runtime-image-cuda-quant" not in data
 
 
+def test_make_exposes_the_blackwell_capable_cuda_runtime_profile() -> None:
+    block = MAKE.target("runtime-image-cuda129").text
+
+    assert "scripts/authenticated_runtime_build.py" in block
+    assert "--dockerfile runtime/Dockerfile.cuda" in block
+    assert '--build-arg "CUDA_PROFILE=cu129"' in block
+    assert '--image "$(RUNTIME_IMAGE_CUDA129)"' in block
+    assert "--platform linux/amd64" in block
+
+
 def test_make_runtime_smoke_uses_the_built_image_offline() -> None:
     block = MAKE.target("runtime-smoke").text
 
@@ -78,6 +88,16 @@ def test_make_cuda_runtime_smoke_requires_a_visible_gpu() -> None:
         "RUNTIME_CUDA_DEVICE_ARGS = $(if $(filter podman,$(CONTAINER_ENGINE)),"
         "--device nvidia.com/gpu=all,--gpus all)"
     ) in data
+
+
+def test_make_cuda129_smoke_executes_a_real_kernel() -> None:
+    block = MAKE.target("runtime-smoke-cuda129").text
+
+    assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in block
+    assert "--entrypoint python $(RUNTIME_IMAGE_CUDA129)" in block
+    assert "torch.__version__ == '2.13.0+cu129'" in block
+    assert "torch.version.cuda == '12.9'" in block
+    assert "torch.bmm(left, right)" in block
 
 
 def test_container_front_door_target_runs_the_opt_in_journey() -> None:

@@ -5,6 +5,7 @@ ARG BASE_IMAGE_ID
 ARG SOURCE_COMMIT
 ARG SOURCE_BUNDLE_SHA256
 ARG EVALUATOR_LOCK_SHA256
+ARG EVALUATOR_RUNTIME=cpu
 
 LABEL org.invarlock.example.base-image-id="${BASE_IMAGE_ID}"
 LABEL org.invarlock.example.source-commit="${SOURCE_COMMIT}"
@@ -12,17 +13,23 @@ LABEL org.invarlock.example.source-bundle-sha256="${SOURCE_BUNDLE_SHA256}"
 LABEL org.invarlock.example.evaluator="lm-evaluation-harness"
 LABEL org.invarlock.example.evaluator-version="0.4.12+invarlock.nocache.1"
 LABEL org.invarlock.example.evaluator-lock-sha256="sha256:${EVALUATOR_LOCK_SHA256}"
+LABEL org.invarlock.example.evaluator-runtime="${EVALUATOR_RUNTIME}"
 
 # LM Evaluation Harness is deliberately scoped to this integration image. The
 # resulting image is inspected after this layer is built and that immutable
 # image ID is carried into both runtime receipts.
 COPY requirements/workflows/lm-evaluation-harness-py312.txt \
-    /tmp/lm-evaluation-harness-requirements.txt
+    /tmp/lm-evaluation-harness-cpu.txt
+COPY requirements/workflows/lm-evaluation-harness-py312-cu129.txt \
+    /tmp/lm-evaluation-harness-cu129.txt
 COPY requirements/workflows/lm-evaluation-harness-upstream-wheel.txt \
     /tmp/lm-evaluation-harness-upstream-wheel.txt
 COPY scripts/security/build_cache_free_lm_eval_wheel.py \
     /tmp/build-cache-free-lm-eval-wheel.py
-RUN python -m pip download \
+RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
+    && install -m 0644 "/tmp/lm-evaluation-harness-${EVALUATOR_RUNTIME}.txt" \
+      /tmp/lm-evaluation-harness-requirements.txt \
+    && python -m pip download \
       --dest /tmp/lm-eval-upstream \
       --no-deps \
       --only-binary=:all: \

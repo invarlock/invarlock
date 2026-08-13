@@ -359,6 +359,73 @@ def test_evaluator_transaction_command_keeps_control_file_private_and_output_bou
     )
 
 
+@pytest.mark.parametrize(
+    ("engine", "device", "expected"),
+    [
+        ("docker", "cuda", ["--gpus", "all"]),
+        ("docker", "cuda:2", ["--gpus", "device=2"]),
+        ("podman", "cuda", ["--device", "nvidia.com/gpu=all"]),
+        ("podman", "cuda:2", ["--device", "nvidia.com/gpu=2"]),
+    ],
+)
+def test_evaluator_worker_routes_only_closed_cuda_selectors(
+    tmp_path: Path, engine: str, device: str, expected: list[str]
+) -> None:
+    model = tmp_path / "model"
+    model.mkdir()
+    dataset = tmp_path / "records.jsonl"
+    dataset.write_text("{}\n", encoding="utf-8")
+    output = tmp_path / "transaction" / "result"
+    output.parent.mkdir()
+    control = tmp_path / "control"
+    control.mkdir(mode=0o700)
+
+    command = oci.compose_evaluator_worker_command(
+        engine=engine,
+        image=IMAGE,
+        entrypoint=ENTRYPOINT,
+        worker_arguments=("--output", "/outputs/result"),
+        model_source=model,
+        dataset_source=dataset,
+        output=output,
+        control_root=control,
+        timeout_seconds=30,
+        device=device,
+    )
+
+    offset = command.index(expected[0])
+    assert command[offset : offset + 2] == expected
+    assert f"INVARLOCK_EVALUATOR_DEVICE={device.split(':', 1)[0]}" in command
+
+
+@pytest.mark.parametrize("device", ["gpu", "cuda:-1", "cuda:all", "cuda:1,2"])
+def test_evaluator_worker_rejects_ambiguous_device_selectors(
+    tmp_path: Path, device: str
+) -> None:
+    model = tmp_path / "model"
+    model.mkdir()
+    dataset = tmp_path / "records.jsonl"
+    dataset.write_text("{}\n", encoding="utf-8")
+    output = tmp_path / "transaction" / "result"
+    output.parent.mkdir()
+    control = tmp_path / "control"
+    control.mkdir(mode=0o700)
+
+    with pytest.raises(oci.OciEvaluationError, match="device"):
+        oci.compose_evaluator_worker_command(
+            engine="docker",
+            image=IMAGE,
+            entrypoint=ENTRYPOINT,
+            worker_arguments=("--output", "/outputs/result"),
+            model_source=model,
+            dataset_source=dataset,
+            output=output,
+            control_root=control,
+            timeout_seconds=30,
+            device=device,
+        )
+
+
 def test_evaluator_transaction_worker_transfers_then_removes_preserved_container(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

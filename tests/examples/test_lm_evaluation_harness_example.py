@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import threading
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -127,6 +128,19 @@ def _stub_completion_workers(
     monkeypatch: pytest.MonkeyPatch, module: ModuleType, prepared: Path
 ) -> None:
     monkeypatch.setattr(module, "_inspect_runtime_image", lambda *_a, **_k: None)
+    quick_models = module.model_profile("quick")
+    relaxed_models = replace(
+        quick_models,
+        snapshots=tuple(
+            replace(
+                snapshot,
+                checkpoint_tree_sha256=None,
+                tokenizer_contract_sha256=None,
+            )
+            for snapshot in quick_models.snapshots
+        ),
+    )
+    monkeypatch.setattr(module, "model_profile", lambda _key: relaxed_models)
 
     def copy_worker(*, role: str, output: Path, **_kwargs: object) -> None:
         shutil.copytree(prepared / "harness" / role, output)
@@ -319,14 +333,6 @@ def _prepare_test_transaction(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
-    module.EXPECTED_MODEL_ARTIFACTS = {
-        role: {
-            "path": f"models/{role}",
-            "model_id": f"test/{role}",
-            "locator": f"generated://test/{role}",
-        }
-        for role in ("baseline", "subject")
-    }
     policy = {
         "resolved_policy": {
             "metrics": {
@@ -347,11 +353,7 @@ def _prepare_test_transaction(
 
     def side(role: str) -> dict[str, object]:
         return {
-            "artifact": {
-                "path": f"models/{role}",
-                "model_id": f"test/{role}",
-                "locator": f"generated://test/{role}",
-            },
+            "artifact": module._model_artifacts(module.model_profile("quick"))[role],
             "runtime": {"provider": "hf_transformers", "settings": settings[role]},
         }
 
@@ -1054,6 +1056,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
                     ROOT / "requirements/workflows/lm-evaluation-harness-py312.txt"
                 ).read_bytes()
             ).hexdigest(),
+            "org.invarlock.example.evaluator-runtime": "cpu",
         },
     }
     commands: list[list[str]] = []
@@ -1312,7 +1315,7 @@ def test_model_inputs_direct_script_bootstraps_the_repository(
 
     assert completed.returncode == 0, completed.stderr
     assert "--corpus-profile {quick,flagship}" in completed.stdout
-    assert "--benchmark-source BENCHMARK_SOURCE" in completed.stdout
+    assert "--benchmark-source" not in completed.stdout
 
 
 def test_model_inputs_do_not_mask_an_unrelated_import_failure(
@@ -1449,7 +1452,7 @@ def test_model_input_snapshot_staging_validates_qwen3_and_cleans_failures(
     )
 
     root, snapshot = stage('{"model_type":"other"}')
-    with pytest.raises(RuntimeError, match="is not a Qwen3 checkpoint"):
+    with pytest.raises(RuntimeError, match="is not a maintained Qwen checkpoint"):
         module.stage_snapshot(root, snapshot)
     assert not (root / "baseline").exists()
 
@@ -1470,7 +1473,9 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
         rendezvous.wait()
         return root / snapshot.role
 
-    monkeypatch.setattr(module, "SNAPSHOTS", snapshots)
+    monkeypatch.setattr(
+        module, "model_profile", lambda _key: SimpleNamespace(snapshots=snapshots)
+    )
     monkeypatch.setattr(module, "stage_snapshot", stage)
 
     staged = module.stage_snapshots(tmp_path / "models")
@@ -1482,75 +1487,53 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
     assert sorted(observed) == ["baseline", "subject"]
 
 
-@pytest.mark.parametrize(
-    "records",
-    [
-        [],
-        ["not-an-object"] * 102,
-        [{"id": "same", "prompt": "Prompt", "expected": "Answer"}] * 102,
-    ],
-)
-def test_model_input_records_reject_bad_count_shape_and_duplicate_ids(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    records: list[object],
-) -> None:
+def test_model_input_records_use_only_the_two_closed_bundled_corpora() -> None:
     module = _model_inputs_module()
-    records_path = tmp_path / "records.json"
-    records_path.write_text(json.dumps(records), encoding="utf-8")
-    monkeypatch.setattr(module, "RECORDS", records_path)
+    quick = module._records(module.corpus_profile("quick"))
+    flagship = module._records(module.corpus_profile("flagship"))
 
-    with pytest.raises(RuntimeError, match="records|record IDs"):
-        module._records()
-
-
-def test_model_input_flagship_records_require_and_receive_closed_inputs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    module = _model_inputs_module()
-    profile = SimpleNamespace(key="flagship")
-
-    with pytest.raises(RuntimeError, match="requires its pinned source"):
-        module._records(profile)
-
-    baseline_tokenizer = object()
-    subject_tokenizer = object()
-    source_payload = b"pinned benchmark source"
-    expected = [{"id": "record-1", "prompt": "Prompt", "expected": " answer"}]
-    observed: list[tuple[bytes, tuple[object, object]]] = []
-
-    def select_records(
-        payload: bytes, tokenizers: tuple[object, object]
-    ) -> list[dict[str, str]]:
-        observed.append((payload, tokenizers))
-        return expected
-
-    monkeypatch.setattr(module, "flagship_records", select_records)
-
-    assert (
-        module._records(
-            profile,
-            tokenizers=(baseline_tokenizer, subject_tokenizer),
-            source_payload=source_payload,
-        )
-        == expected
+    assert len(quick) == 102
+    assert len(flagship) == 400
+    assert {record["expected"] for record in flagship} == set("ABCDEFGHIJ")
+    assert all(
+        record["prompt"].startswith("<|im_start|>system\n") for record in flagship
     )
-    assert observed == [(source_payload, (baseline_tokenizer, subject_tokenizer))]
 
 
-def test_model_input_prepare_rejects_benchmark_source_for_quick_profile(
-    tmp_path: Path,
-) -> None:
+def test_model_input_tokenization_enforces_target_and_context_bounds() -> None:
     module = _model_inputs_module()
+    record = {"id": "one", "prompt": "prompt", "expected": "A"}
 
-    with pytest.raises(RuntimeError, match="only valid for the flagship corpus"):
-        module.prepare(
-            tmp_path / "prepared",
-            "sha256:" + "a" * 64,
-            benchmark_source=tmp_path / "benchmark.jsonl",
+    class Tokenizer:
+        target_ids = [3]
+        decoded = "A"
+
+        def __call__(self, text: str, **_kwargs: object) -> dict[str, list[int]]:
+            return {"input_ids": [1, 2] if text == "prompt" else self.target_ids}
+
+        def decode(self, _ids: list[int], **_kwargs: object) -> str:
+            return self.decoded
+
+    tokenizer = Tokenizer()
+    module._validate_record_tokenization(
+        [record], tokenizer, role="baseline", context_length=3
+    )
+
+    with pytest.raises(RuntimeError, match="context length"):
+        module._validate_record_tokenization(
+            [record], tokenizer, role="baseline", context_length=2
         )
-
-    assert not (tmp_path / "prepared").exists()
+    tokenizer.target_ids = [3, 4]
+    with pytest.raises(RuntimeError, match="generation bound"):
+        module._validate_record_tokenization(
+            [record], tokenizer, role="baseline", context_length=4
+        )
+    tokenizer.target_ids = [3]
+    tokenizer.decoded = "B"
+    with pytest.raises(RuntimeError, match="generation bound"):
+        module._validate_record_tokenization(
+            [record], tokenizer, role="baseline", context_length=3
+        )
 
 
 def test_model_input_prepare_rejects_unpinned_derived_corpus(
@@ -1564,7 +1547,7 @@ def test_model_input_prepare_rejects_unpinned_derived_corpus(
     }
 
     monkeypatch.setattr(module, "corpus_profile", lambda _key: profile)
-    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root, _profile: models)
     monkeypatch.setattr(
         module.AutoTokenizer,
         "from_pretrained",
@@ -1595,7 +1578,7 @@ def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
         (path / "config.json").write_text('{"model_type":"qwen3"}\n')
         models[snapshot.role] = path
 
-    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root, _profile: models)
 
     class BoundTokenizer:
         last_text = ""
@@ -1665,7 +1648,7 @@ def test_model_input_authoring_rejects_existing_workspace_and_unsafe_targets(
             '{"model_type":"qwen3"}\n', encoding="utf-8"
         )
         models[snapshot.role] = checkpoint
-    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root, _profile: models)
 
     class OversizeTokenizer:
         def __call__(self, _text: str, **_kwargs: object) -> dict[str, list[int]]:
@@ -1723,14 +1706,13 @@ def test_model_input_main_resolves_workspace_and_dispatches(
     assert not missing.exists()
 
 
-def test_model_input_main_forwards_flagship_profile_and_source(
+def test_model_input_main_forwards_the_flagship_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _model_inputs_module()
     workspace = tmp_path / "parent/../prepared"
-    benchmark_source = tmp_path / "source/../benchmark.jsonl"
     image = "sha256:" + "d" * 64
-    observed: list[tuple[Path, str, str, Path | None]] = []
+    observed: list[tuple[Path, str, str]] = []
     monkeypatch.setattr(
         module.argparse.ArgumentParser,
         "parse_args",
@@ -1738,26 +1720,18 @@ def test_model_input_main_forwards_flagship_profile_and_source(
             workspace=workspace,
             runtime_image=image,
             corpus_profile="flagship",
-            benchmark_source=benchmark_source,
         ),
     )
     monkeypatch.setattr(
         module,
         "prepare",
-        lambda root, runtime_image, *, corpus_profile_key, benchmark_source: (
-            observed.append((root, runtime_image, corpus_profile_key, benchmark_source))
+        lambda root, runtime_image, *, corpus_profile_key: observed.append(
+            (root, runtime_image, corpus_profile_key)
         ),
     )
 
     assert module.main() == 0
-    assert observed == [
-        (
-            workspace.expanduser().resolve(),
-            image,
-            "flagship",
-            benchmark_source.expanduser().resolve(),
-        )
-    ]
+    assert observed == [(workspace.expanduser().resolve(), image, "flagship")]
 
 
 def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) -> None:

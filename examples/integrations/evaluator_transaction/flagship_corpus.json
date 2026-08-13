@@ -1,68 +1,29 @@
 {
-  "format": "invarlock/evaluator-corpus-selection-v1",
-  "profile_id": "lambada-openai-400-v1",
+  "format": "invarlock/evaluator-corpus-profile-v1",
+  "profile_id": "mmlu-pro-qwen-instruct-400-v1",
   "source": {
-    "repository": "EleutherAI/lambada_openai",
-    "revision": "900124bf3b8235c6daf21033af9948b3f07346c4",
-    "path": "data/lambada_test.jsonl",
-    "url": "https://huggingface.co/datasets/EleutherAI/lambada_openai/resolve/900124bf3b8235c6daf21033af9948b3f07346c4/data/lambada_test.jsonl",
-    "license": "MIT",
-    "byte_length": 1819752,
-    "record_count": 5153,
-    "sha256": "4aa8d02cd17c719165fc8a7887fddd641f43fcafa4b1c806ca8abc31fabdb226"
+    "dataset": "TIGER-Lab/MMLU-Pro",
+    "revision": "b189ec765aa7ed75c8acfea42df31fdae71f97be",
+    "split": "test",
+    "license": "MIT"
   },
-  "selection": {
-    "seed": "invarlock-lambada-400-v1",
-    "criteria": {
-      "projection": "all text before the final ASCII space is the prompt; the final space and word are the target",
-      "maximum_prompt_tokens": 256,
-      "target_tokens": 1,
-      "tokenizers": [
-        "hf://Qwen/Qwen3-0.6B-Base@da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
-        "hf://Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca"
-      ]
-    },
-    "eligible_record_count": 4020,
-    "strata": [
-      {"minimum_prompt_tokens": 0, "maximum_prompt_tokens": 69, "sample_count": 100},
-      {"minimum_prompt_tokens": 70, "maximum_prompt_tokens": 80, "sample_count": 100},
-      {"minimum_prompt_tokens": 81, "maximum_prompt_tokens": 92, "sample_count": 100},
-      {"minimum_prompt_tokens": 93, "maximum_prompt_tokens": 256, "sample_count": 100}
-    ],
-    "indices_sha256": "3e4c040854483e76b851283b8157ef3b0243efa9dde8a35059026aef4da0707f",
-    "selected_source_lines_sha256": "a54fc6dcb9a0a59d4779139f73c36a8b6b329a0e0f0cc92f2d4f7e6279cdeb69",
-    "indices": [
-      2, 8, 9, 16, 21, 26, 54, 64, 71, 89, 93, 107, 109, 116, 140, 148, 155, 160, 165, 175,
-      184, 196, 206, 238, 240, 255, 274, 284, 296, 325, 334, 339, 374, 377, 412, 417, 429, 432, 445, 459,
-      463, 469, 478, 480, 487, 510, 512, 513, 522, 527, 530, 554, 588, 623, 634, 640, 657, 659, 664, 683,
-      701, 702, 705, 714, 727, 731, 734, 744, 764, 780, 793, 795, 813, 820, 843, 844, 847, 871, 872, 878,
-      885, 898, 922, 924, 960, 966, 967, 979, 986, 987, 988, 995, 997, 1009, 1010, 1012, 1028, 1051, 1058,
-      1062, 1063, 1075, 1080, 1092, 1111, 1120, 1122, 1130, 1133, 1136, 1152, 1173, 1216, 1246, 1267,
-      1268, 1303, 1329, 1332, 1350, 1362, 1380, 1388, 1393, 1399, 1408, 1432, 1477, 1504, 1506, 1536,
-      1537, 1563, 1607, 1609, 1647, 1701, 1709, 1738, 1745, 1765, 1786, 1799, 1800, 1827, 1831, 1873,
-      1877, 1879, 1886, 1909, 1913, 1920, 1927, 1933, 1945, 1969, 1971, 1985, 2003, 2011, 2032, 2072,
-      2085, 2086, 2089, 2091, 2113, 2114, 2131, 2143, 2149, 2172, 2183, 2185, 2188, 2206, 2230, 2246,
-      2260, 2266, 2268, 2295, 2299, 2301, 2309, 2313, 2325, 2368, 2375, 2403, 2422, 2425, 2433, 2443,
-      2448, 2485, 2486, 2508, 2512, 2513, 2527, 2528, 2546, 2555, 2565, 2566, 2596, 2613, 2652, 2656,
-      2662, 2673, 2686, 2689, 2692, 2698, 2699, 2745, 2772, 2780, 2786, 2787, 2803, 2816, 2826, 2906,
-      2913, 2951, 2956, 2969, 2971, 2977, 2983, 2984, 2990, 2993, 2997, 3005, 3020, 3054, 3062, 3067,
-      3070, 3083, 3089, 3095, 3102, 3108, 3115, 3120, 3144, 3166, 3168, 3203, 3205, 3223, 3270, 3284,
-      3300, 3312, 3317, 3325, 3341, 3354, 3355, 3376, 3393, 3400, 3413, 3430, 3432, 3447, 3487, 3493,
-      3529, 3541, 3573, 3607, 3611, 3623, 3640, 3649, 3654, 3694, 3696, 3737, 3743, 3747, 3751, 3753,
-      3783, 3789, 3822, 3825, 3841, 3855, 3861, 3866, 3867, 3874, 3883, 3884, 3890, 3893, 3899, 3904,
-      3913, 3922, 3925, 3968, 3970, 3975, 3978, 4026, 4030, 4044, 4057, 4060, 4062, 4065, 4096, 4112,
-      4129, 4139, 4156, 4161, 4177, 4179, 4200, 4224, 4228, 4244, 4245, 4273, 4276, 4280, 4289, 4291,
-      4328, 4348, 4369, 4372, 4380, 4405, 4414, 4415, 4416, 4426, 4436, 4466, 4479, 4507, 4510, 4515,
-      4555, 4556, 4570, 4614, 4633, 4681, 4706, 4711, 4720, 4722, 4723, 4729, 4736, 4782, 4796, 4804,
-      4814, 4816, 4822, 4823, 4824, 4831, 4841, 4846, 4855, 4870, 4881, 4952, 4976, 4992, 5003, 5005,
-      5009, 5015, 5038, 5056, 5057, 5063, 5072, 5117, 5126, 5141, 5142, 5145, 5148
-    ]
+  "qualification_suite": {
+    "artifact": "text_qwen_instruct",
+    "artifact_sha256": "52b568fcbead27884b1c8e375c4e05111bcae25e40000e23c770675869e4a5b8",
+    "manifest_sha256": "1cb979170d16328b02b69b32d0ab9670365064ba3c112eed001515c549334d44",
+    "selection_algorithm": "balanced-bipartite-sha256-v1"
   },
   "derived_dataset": {
-    "name": "lambada-openai-qwen3-one-token-400-v1",
-    "split": "test-stratified-400",
+    "name": "TIGER-Lab/MMLU-Pro",
+    "split": "test-balanced-400",
     "record_count": 400,
-    "byte_length": 172751,
-    "sha256": "3e909f5b2ae36ed013807d47f4fa0618aceb173bdb20eada5e70f049036a1be3"
+    "byte_length": 396146,
+    "maximum_input_tokens": 1024,
+    "sha256": "52b568fcbead27884b1c8e375c4e05111bcae25e40000e23c770675869e4a5b8"
+  },
+  "acceptance_policy": {
+    "delta_min_pp": -2.0,
+    "maximum_interval_width_pp": 10.0,
+    "minimum_side_accuracy": 0.20
   }
 }

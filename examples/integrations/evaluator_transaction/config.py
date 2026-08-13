@@ -6,10 +6,12 @@ import os
 from typing import Any
 
 from .corpora import CorpusProfile, corpus_profile
+from .model_profiles import ModelProfile, model_profile
 
 QUICK_CORPUS = corpus_profile("quick")
+QUICK_MODELS = model_profile("quick")
 MAX_GENERATION_TOKENS = 1
-BATCH_SIZE = 8
+BATCH_SIZE = QUICK_MODELS.batch_size
 SEED = 20_260_716
 MINIMUM_SIDE_ACCURACY = QUICK_CORPUS.minimum_side_accuracy
 DATASET_NAME = QUICK_CORPUS.dataset_name
@@ -19,7 +21,7 @@ TOKENIZER_ADD_SPECIAL_TOKENS = True
 TOKENIZER_CLEAN_UP_SPACES = False
 PAD_TOKEN_POLICY = "eos_if_missing"
 MODEL_USE_CACHE = False
-TORCH_NUM_THREADS = 1
+TORCH_NUM_THREADS = QUICK_MODELS.torch_num_threads
 INSPECT_RAW_CHAT_TEMPLATE = '{{ messages[0]["content"] }}'
 RECORD_COUNT = QUICK_CORPUS.record_count
 MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
@@ -39,6 +41,7 @@ EVALUATORS: dict[str, dict[str, str]] = {
         "version": "0.3.254",
         "entrypoint": "inspect_ai.eval -> inspect_ai.scorer.match",
         "lock": "requirements/workflows/inspect-ai-runtime-py312.txt",
+        "cuda_lock": "requirements/workflows/inspect-ai-runtime-py312-cu129.txt",
         "container_lock": "/opt/invarlock/evaluator-locks/inspect-ai-runtime-requirements.txt",
     },
     "openai-evals": {
@@ -46,29 +49,33 @@ EVALUATORS: dict[str, dict[str, str]] = {
         "version": "3.0.1.post1",
         "entrypoint": "evals.elsuite.basic.match.Match",
         "lock": "requirements/workflows/openai-evals-runtime-py312.txt",
+        "cuda_lock": "requirements/workflows/openai-evals-runtime-py312-cu129.txt",
         "container_lock": "/opt/invarlock/evaluator-locks/openai-evals-runtime-requirements.txt",
     },
 }
 
-EXPECTED_MODEL_ARTIFACTS = {
-    "baseline": {
-        "path": "models/baseline",
-        "model_id": "Qwen/Qwen3-0.6B-Base",
-        "locator": "hf://Qwen/Qwen3-0.6B-Base@da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
-    },
-    "subject": {
-        "path": "models/subject",
-        "model_id": "Qwen/Qwen3-0.6B",
-        "locator": "hf://Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca",
-    },
-}
+
+def model_artifacts(profile: ModelProfile) -> dict[str, dict[str, str]]:
+    return {
+        snapshot.role: {
+            "path": f"models/{snapshot.role}",
+            "model_id": snapshot.repository,
+            "locator": snapshot.locator,
+        }
+        for snapshot in profile.snapshots
+    }
+
+
+EXPECTED_MODEL_ARTIFACTS = model_artifacts(QUICK_MODELS)
 EXPECTED_MODEL_TREE_DIGESTS = {
-    "baseline": "sha256:eddb974cecb32ecf6bfaec2a19ecfbb32c73be9f7c38c7b54d551cd8ef66bd75",
-    "subject": "sha256:f97b7ac0717847938aed654bf671a93a28cf13413e37d29040ebad85564f6346",
+    snapshot.role: snapshot.checkpoint_tree_sha256
+    for snapshot in QUICK_MODELS.snapshots
+    if snapshot.checkpoint_tree_sha256 is not None
 }
 EXPECTED_TOKENIZER_DIGESTS = {
-    "baseline": "c5f0898f912c7d953302779f61c86026b3cea05561a9520b6209e82b9d650581",
-    "subject": "ddf5fc73d604adf713f3d2fa98a9229c9dc05abb0881b33e636d15a5616dcd02",
+    snapshot.role: snapshot.tokenizer_contract_sha256
+    for snapshot in QUICK_MODELS.snapshots
+    if snapshot.tokenizer_contract_sha256 is not None
 }
 
 RUN_FIELDS = {
@@ -142,14 +149,20 @@ def task_config(dataset: str, selected: str | None = None) -> dict[str, Any]:
     }
 
 
-def execution_config(selected: str | None = None) -> dict[str, Any]:
+def execution_config(
+    selected: str | None = None, profile: CorpusProfile | None = None
+) -> dict[str, Any]:
     name = selected or evaluator_id()
     package = EVALUATORS[name]
+    selected_corpus = profile or corpus_profile(
+        os.environ.get("INVARLOCK_CORPUS_PROFILE", "quick")
+    )
+    selected_models = model_profile(selected_corpus.key)
     return {
-        "batch_size": BATCH_SIZE,
-        "device": "cpu",
+        "batch_size": selected_models.batch_size,
+        "device": selected_models.device,
         "do_sample": False,
-        "dtype": "float32",
+        "dtype": selected_models.dtype,
         "evaluator": name,
         "evaluator_distribution": package["distribution"],
         "evaluator_entrypoint": package["entrypoint"],
@@ -169,7 +182,7 @@ def execution_config(selected: str | None = None) -> dict[str, Any]:
         "tokenizer_add_special_tokens": TOKENIZER_ADD_SPECIAL_TOKENS,
         "tokenizer_clean_up_tokenization_spaces": TOKENIZER_CLEAN_UP_SPACES,
         "tokenizer_padding_side": TOKENIZER_PADDING_SIDE,
-        "torch_num_threads": TORCH_NUM_THREADS,
+        "torch_num_threads": selected_models.torch_num_threads,
         "trust_remote_code": False,
     }
 
@@ -202,5 +215,6 @@ __all__ = [
     "worker_timeout_seconds",
     "evaluator_id",
     "execution_config",
+    "model_artifacts",
     "task_config",
 ]

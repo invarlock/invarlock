@@ -11,6 +11,7 @@
 !requirements/workflows/runtime-image-py312.txt
 !requirements/workflows/runtime-image-py312-aarch64.txt
 !requirements/workflows/runtime-image-py312-cu126.txt
+!requirements/workflows/runtime-image-py312-cu129.txt
 !requirements/workflows/runtime-wheel-build-py312.txt
 !requirements/workflows/core-py312.txt
 !requirements/workflows/multimodal-runtime-py312.txt

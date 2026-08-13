@@ -72,11 +72,7 @@ from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
 from . import adapters
 from .config import (
-    BATCH_SIZE,
     EVALUATORS,
-    EXPECTED_MODEL_ARTIFACTS,
-    EXPECTED_MODEL_TREE_DIGESTS,
-    EXPECTED_TOKENIZER_DIGESTS,
     MAX_GENERATION_TOKENS,
     MAX_WORKER_ARTIFACT_BYTES,
     PER_RECORD_TIMEOUT_SECONDS,
@@ -87,6 +83,7 @@ from .config import (
     BridgeError,
     evaluator_id,
     execution_config,
+    model_artifacts,
     task_config,
     worker_timeout_seconds,
 )
@@ -97,6 +94,7 @@ from .corpora import (
     profile_for_dataset,
     profile_for_descriptor,
 )
+from .model_profiles import model_profile
 
 try:
     from examples.integrations.evaluator_transaction.worker import (
@@ -174,9 +172,21 @@ def _read_regular_file(
         os.close(descriptor)
 
 
-def evaluator_lock_digest(selected: str, *, container: bool = False) -> str:
+def evaluator_lock_digest(
+    selected: str,
+    *,
+    container: bool = False,
+    profile: CorpusProfile | None = None,
+) -> str:
     package = EVALUATORS[selected]
-    path = Path(package["container_lock"] if container else package["lock"])
+    lock_key = (
+        "container_lock"
+        if container
+        else "cuda_lock"
+        if profile is not None and model_profile(profile.key).device == "cuda"
+        else "lock"
+    )
+    path = Path(package[lock_key])
     if not container:
         path = REPOSITORY_ROOT / path
     return (
@@ -358,7 +368,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         or digest(_read_regular_file(dataset, label="worker dataset")) != dataset_digest
     ):
         raise BridgeError("model or dataset changed during evaluator execution")
-    execution = execution_config(selected)
+    execution = execution_config(selected, profile)
     manifest = {
         "format": "invarlock/evaluator-run-v1",
         "role": role,
@@ -407,6 +417,7 @@ def _run_verified_worker(
     output: Path,
     lock_digest: str,
     profile: CorpusProfile | None = None,
+    device: str = "cpu",
 ) -> None:
     """Re-run the evaluator in the inspected image for this transaction.
 
@@ -462,6 +473,7 @@ def _run_verified_worker(
                 ),
             },
             timeout_seconds=worker_timeout_seconds(profile or corpus_profile("quick")),
+            device=device,
         )
     except OciEvaluationError as exc:
         raise BridgeError(
@@ -503,10 +515,15 @@ def load_run(
         or IMAGE_ID.fullmatch(run["evaluator_lock_sha256"]) is None
         or IMAGE_ID.fullmatch(run["runtime_image_digest"]) is None
         or run["evaluator_lock_sha256"]
-        != evaluator_lock_digest(selected, container=False)
+        != evaluator_lock_digest(
+            selected,
+            container=False,
+            profile=profile or corpus_profile("quick"),
+        )
         or run["task_config"] != task_config("/records.jsonl", selected)
         or run["task_config_sha256"] != digest(canonical_json_bytes(run["task_config"]))
-        or run["execution_config"] != execution_config(selected)
+        or run["execution_config"]
+        != execution_config(selected, profile or corpus_profile("quick"))
         or run["execution_config_sha256"]
         != digest(canonical_json_bytes(run["execution_config"]))
     ):
@@ -673,6 +690,16 @@ def _validate_completion_paths(
             raise BridgeError(f"{label} must remain outside the transaction")
 
 
+def _worker_device(profile: CorpusProfile, requested: str | None) -> str:
+    selected_models = model_profile(profile.key)
+    device = requested or selected_models.device
+    if selected_models.device == "cpu" and device != "cpu":
+        raise BridgeError("the quick evaluator profile requires a CPU worker")
+    if selected_models.device == "cuda" and not device.startswith("cuda"):
+        raise BridgeError("the flagship evaluator profile requires a CUDA worker")
+    return device
+
+
 def complete(
     root: Path,
     prepared: Path,
@@ -687,6 +714,7 @@ def complete(
     base_image_id: str | None = None,
     build_attestation: Path | None = None,
     builder_public_key: Path | None = None,
+    device: str | None = None,
 ) -> tuple[Path, Path, Path]:
     """Author strict import inputs and execute evaluate, verify, and report."""
 
@@ -729,7 +757,14 @@ def complete(
         builder_public_key, label="builder public key"
     )
     _require_distinct_signers(evidence_key, verifier_key, builder_key)
-    lock_digest = evaluator_lock_digest(selected)
+    early_dataset = _read_regular_file(
+        prepared / "evaluation/inputs/records.jsonl", label="prepared dataset"
+    )
+    try:
+        early_profile = profile_for_dataset(early_dataset)
+    except ValueError as exc:
+        raise BridgeError(str(exc)) from exc
+    lock_digest = evaluator_lock_digest(selected, profile=early_profile)
     _inspect_runtime_image(
         container_engine,
         image,
@@ -788,6 +823,8 @@ def complete(
         raise BridgeError("prepared corpus profile is invalid") from exc
     if prepared_corpus_provenance != corpus_provenance(profile):
         raise BridgeError("prepared corpus provenance does not match the dataset")
+    selected_models = model_profile(profile.key)
+    device_selector = _worker_device(profile, device)
     schedule = prepare_local_evaluation_schedule_bytes(
         LocalDatasetRequest(
             path=dataset0,
@@ -826,6 +863,7 @@ def complete(
             output=output,
             lock_digest=lock_digest,
             profile=profile,
+            device=device_selector,
         )
     runs = {
         role: load_run(
@@ -881,36 +919,39 @@ def complete(
     provider = HFTransformersProvider()
     sides: dict[str, Any] = {}
     anchors: dict[str, str] = {}
+    expected_artifacts = model_artifacts(selected_models)
     for role in ("baseline", "subject"):
         records_path = root / f"imports/{role}-records.jsonl"
         adapt(runs[role][1], schedule, records_path)
         original = comparison0[role]
         if (
             not isinstance(original, dict)
-            or original.get("artifact") != EXPECTED_MODEL_ARTIFACTS[role]
+            or original.get("artifact") != expected_artifacts[role]
             or not isinstance(original.get("runtime"), dict)
             or original["runtime"].get("provider") != "hf_transformers"
             or set(original["runtime"]) != {"provider", "settings"}
         ):
-            raise BridgeError(f"{role} is not the canonical pinned Qwen3 model")
+            raise BridgeError(f"{role} is not the canonical pinned Qwen model")
         settings = original["runtime"]["settings"]
         if not isinstance(settings, dict):
             raise BridgeError(f"{role} runtime settings are not canonical")
+        checkpoint = prepared / f"evaluation/models/{role}"
+        observed_tree_digest = checkpoint_tree_sha256(checkpoint)
+        snapshot = selected_models.snapshot(role)
+        if (
+            snapshot.checkpoint_tree_sha256 is not None
+            and observed_tree_digest != snapshot.checkpoint_tree_sha256
+        ):
+            raise BridgeError(f"{role} checkpoint tree does not match its pinned model")
         expected_settings = {
-            "batch_size": BATCH_SIZE,
-            "checkpoint_tree_sha256": EXPECTED_MODEL_TREE_DIGESTS[role],
+            "batch_size": selected_models.batch_size,
+            "checkpoint_tree_sha256": observed_tree_digest,
             "context_length": profile.context_length,
             "max_output_tokens": MAX_GENERATION_TOKENS,
             "offline": True,
             "seed": SEED,
             "timeout_seconds": PER_RECORD_TIMEOUT_SECONDS,
-            "tokenizer_metadata_sha256": EXPECTED_TOKENIZER_DIGESTS[role],
         }
-        if set(settings) != set(expected_settings) or any(
-            settings.get(key) != value for key, value in expected_settings.items()
-        ):
-            raise BridgeError(f"{role} runtime settings are not canonical")
-        checkpoint = prepared / f"evaluation/models/{role}"
         if (checkpoint / "generation_config.json").exists() or (
             checkpoint / "generation_config.json"
         ).is_symlink():
@@ -932,10 +973,16 @@ def complete(
             raise BridgeError(
                 f"{role} tokenizer identity could not be authenticated"
             ) from exc
-        if settings["tokenizer_metadata_sha256"] != observed_tokenizer_digest:
-            raise BridgeError(
-                f"{role} tokenizer identity does not match the checkpoint"
-            )
+        if (
+            snapshot.tokenizer_contract_sha256 is not None
+            and observed_tokenizer_digest != snapshot.tokenizer_contract_sha256
+        ):
+            raise BridgeError(f"{role} tokenizer does not match its pinned contract")
+        expected_settings["tokenizer_metadata_sha256"] = observed_tokenizer_digest
+        if set(settings) != set(expected_settings) or any(
+            settings.get(key) != value for key, value in expected_settings.items()
+        ):
+            raise BridgeError(f"{role} runtime settings are not canonical")
         identity = provider.authenticate_artifact(
             ModelRuntimeSpec(
                 "hf_transformers", original["artifact"]["model_id"], settings
@@ -1111,6 +1158,7 @@ def main(argv: list[str] | None = None) -> int:
     bridge_parser.add_argument("--source-commit", required=True)
     bridge_parser.add_argument("--base-image-id", required=True)
     bridge_parser.add_argument("--build-attestation", type=Path, required=True)
+    bridge_parser.add_argument("--device")
     args = parser.parse_args(argv)
     try:
         if args.command == "worker":
@@ -1139,6 +1187,7 @@ def main(argv: list[str] | None = None) -> int:
                     if args.build_attestation is not None
                     else None
                 ),
+                device=args.device,
             )
             print(f"Evidence: {evidence}\nReceipt: {receipt}\nReport: {report}")
     except (BridgeError, OSError, RuntimeError, TypeError, ValueError) as exc:

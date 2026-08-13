@@ -14,6 +14,7 @@ PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:hf-cuda-local
+RUNTIME_IMAGE_CUDA129 ?= invarlock-runtime:hf-cuda129-local
 RUNTIME_CUDA_DEVICE_ARGS = $(if $(filter podman,$(CONTAINER_ENGINE)),--device nvidia.com/gpu=all,--gpus all)
 RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct 2>/dev/null)
 RUNTIME_SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
@@ -69,8 +70,8 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
 .PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
 .PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
-.PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
-.PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
+.PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
+.PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda129 container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
 .PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
 .PHONY: clean docsclean deepclean pre-commit pre-commit-install ensure-python ensure-ruff ensure-mypy
@@ -701,6 +702,22 @@ runtime-image-cuda:  ## Build the x86_64 CUDA Hugging Face runtime image
 runtime-image-cuda-podman: CONTAINER_ENGINE=podman
 runtime-image-cuda-podman: runtime-image-cuda  ## Build the CUDA runtime image with Podman
 
+runtime-image-cuda129:  ## Build the x86_64 CUDA 12.9 Hugging Face runtime image
+	@test -n "$(CONTAINER_ENGINE)" || { echo "Docker or Podman is required" >&2; exit 1; }
+	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "RUNTIME_SOURCE_DATE_EPOCH is required" >&2; exit 1; }
+	$(foreach variable,RUNTIME_SOURCE_COMMIT RUNTIME_SOURCE_BUNDLE RUNTIME_SOURCE_BUNDLE_SHA256,$(if $(strip $($(variable))),,$(error $(variable) is required)))
+	"$(PYTHON)" scripts/authenticated_runtime_build.py \
+		--repository "$(CURDIR)" \
+		--source-commit "$(RUNTIME_SOURCE_COMMIT)" \
+		--source-bundle "$(RUNTIME_SOURCE_BUNDLE)" \
+		--source-bundle-sha256 "$(RUNTIME_SOURCE_BUNDLE_SHA256)" \
+		--container-engine "$(CONTAINER_ENGINE)" \
+		--dockerfile runtime/Dockerfile.cuda \
+		--image "$(RUNTIME_IMAGE_CUDA129)" \
+		--platform linux/amd64 \
+		--build-arg "CUDA_PROFILE=cu129" \
+		--build-arg "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" $(if $(strip $(RUNTIME_BUILD_STATEMENT)),--statement "$(RUNTIME_BUILD_STATEMENT)")
+
 runtime-smoke:  ## Check the canonical runtime image imports
 	$(CONTAINER_ENGINE) run --rm --network none \
 		--pull=never --read-only --cap-drop=ALL \
@@ -726,6 +743,16 @@ runtime-smoke-cuda:  ## Confirm the CUDA runtime imports and sees an NVIDIA GPU
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: runtime-smoke-cuda  ## Smoke the CUDA runtime image with Podman
+
+runtime-smoke-cuda129:  ## Confirm the CUDA 12.9 runtime executes on an NVIDIA GPU
+	$(CONTAINER_ENGINE) run --rm --network none $(RUNTIME_CUDA_DEVICE_ARGS) \
+		--pull=never --read-only --cap-drop=ALL \
+		--security-opt no-new-privileges --pids-limit 1024 \
+		--user 65532:65532 \
+		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
+		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
+		--entrypoint python $(RUNTIME_IMAGE_CUDA129) \
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu129'; assert torch.version.cuda == '12.9'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 ##@ Housekeeping
 pre-commit:  ## Run configured pre-commit hooks

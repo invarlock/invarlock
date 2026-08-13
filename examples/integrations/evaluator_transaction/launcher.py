@@ -54,6 +54,10 @@ LOCKS = {
     "inspect-ai": "requirements/workflows/inspect-ai-runtime-py312.txt",
     "openai-evals": "requirements/workflows/openai-evals-runtime-py312.txt",
 }
+CUDA_LOCKS = {
+    "inspect-ai": "requirements/workflows/inspect-ai-runtime-py312-cu129.txt",
+    "openai-evals": "requirements/workflows/openai-evals-runtime-py312-cu129.txt",
+}
 EVALUATOR_VERSIONS = {
     "inspect-ai": "0.3.254",
     "openai-evals": "3.0.1.post1",
@@ -144,6 +148,7 @@ def _build_image(
     *,
     builder_signing_key: ed25519.Ed25519PrivateKey,
     cleanup_tags: list[OwnedImageTag],
+    runtime_profile: str = "cpu",
 ) -> tuple[str, str, str]:
     try:
         from examples.integrations.launch import (
@@ -167,7 +172,11 @@ def _build_image(
         )
 
     commit = _require_committed_checkout(repository)
-    base_tag = temporary_image_tag("invarlock-example-runtime", commit)
+    if runtime_profile not in {"cpu", "cu129"}:
+        raise ValueError("evaluator runtime profile is invalid")
+    base_tag = temporary_image_tag(
+        f"invarlock-example-runtime-{runtime_profile}", commit
+    )
     base_build = build / "base"
     base_build.mkdir(parents=True, exist_ok=True)
     base_id, _ = _runtime_image(
@@ -175,6 +184,12 @@ def _build_image(
         build_root=base_build,
         container_engine=engine,
         image_tag=base_tag,
+        dockerfile=(
+            "runtime/Dockerfile.cuda"
+            if runtime_profile == "cu129"
+            else "runtime/Dockerfile"
+        ),
+        build_arguments=(("CUDA_PROFILE=cu129",) if runtime_profile == "cu129" else ()),
     )
     cleanup_tags.append(
         record_owned_image_tag(run, engine, base_tag, base_id, repository)
@@ -187,9 +202,9 @@ def _build_image(
     )
     source_bundle_sha256 = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
     image_tag = temporary_image_tag(f"invarlock-{evaluator}-evaluator", commit)
+    lock_path = (CUDA_LOCKS if runtime_profile == "cu129" else LOCKS)[evaluator]
     lock_digest = (
-        "sha256:"
-        + hashlib.sha256((repository / LOCKS[evaluator]).read_bytes()).hexdigest()
+        "sha256:" + hashlib.sha256((repository / lock_path).read_bytes()).hexdigest()
     )
     image_id_file = build / "evaluator-image-id"
     if image_id_file.exists() or image_id_file.is_symlink():
@@ -215,6 +230,8 @@ def _build_image(
             f"SOURCE_BUNDLE_SHA256={source_bundle_sha256}",
             "--build-arg",
             f"EVALUATOR_LOCK_SHA256={lock_digest.removeprefix('sha256:')}",
+            "--build-arg",
+            f"EVALUATOR_RUNTIME={runtime_profile}",
             "--tag",
             image_tag,
             "-",
@@ -241,6 +258,7 @@ def _build_image(
             "org.invarlock.example.evaluator": evaluator,
             "org.invarlock.example.evaluator-version": EVALUATOR_VERSIONS[evaluator],
             "org.invarlock.example.evaluator-lock-sha256": lock_digest,
+            "org.invarlock.example.evaluator-runtime": runtime_profile,
             "org.invarlock.example.source-commit": commit,
             "org.invarlock.example.source-bundle-sha256": source_bundle_sha256,
         },
@@ -333,7 +351,7 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--corpus-profile", choices=("quick", "flagship"), default="quick"
     )
-    parser.add_argument("--benchmark-source", type=Path)
+    parser.add_argument("--device")
     args = parser.parse_args(argv)
     repository = REPOSITORY
     if args.workspace is None:
@@ -360,6 +378,12 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
             Path(os.path.abspath(args.builder_public_key.expanduser()))
         )
         require_builder_key_pair(builder_signing_key, builder_public_key)
+        runtime_profile = "cu129" if args.corpus_profile == "flagship" else "cpu"
+        device = args.device or ("cuda" if runtime_profile == "cu129" else "cpu")
+        if (runtime_profile == "cpu") != (device == "cpu"):
+            raise ValueError(
+                "the selected corpus and device require different runtimes"
+            )
         image, source_commit, base_image_id = _build_image(
             evaluator,
             repository,
@@ -367,10 +391,11 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
             args.container_engine,
             builder_signing_key=builder_signing_key,
             cleanup_tags=cleanup_tags,
+            runtime_profile=runtime_profile,
         )
         prepared = workspace / "prepared"
         status(
-            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            "Preparing the pinned evaluator checkpoints and "
             f"{args.corpus_profile} corpus..."
         )
         prepare_command = [
@@ -386,13 +411,6 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
             "--corpus-profile",
             args.corpus_profile,
         ]
-        if args.benchmark_source is not None:
-            prepare_command.extend(
-                [
-                    "--benchmark-source",
-                    str(Path(os.path.abspath(args.benchmark_source.expanduser()))),
-                ]
-            )
         run(prepare_command, cwd=repository)
         status(
             "Running the evaluator in the inspected image and independently verifying "
@@ -414,6 +432,8 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
                 evaluator,
                 "--container-engine",
                 args.container_engine,
+                "--device",
+                device,
                 "--evidence-signing-key",
                 str(Path(os.path.abspath(args.evidence_signing_key.expanduser()))),
                 "--verifier-signing-key",
