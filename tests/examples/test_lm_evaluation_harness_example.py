@@ -1456,6 +1456,84 @@ def test_model_input_records_reject_bad_count_shape_and_duplicate_ids(
         module._records()
 
 
+def test_model_input_flagship_records_require_and_receive_closed_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _model_inputs_module()
+    profile = SimpleNamespace(key="flagship")
+
+    with pytest.raises(RuntimeError, match="requires its pinned source"):
+        module._records(profile)
+
+    baseline_tokenizer = object()
+    subject_tokenizer = object()
+    source_payload = b"pinned benchmark source"
+    expected = [{"id": "record-1", "prompt": "Prompt", "expected": " answer"}]
+    observed: list[tuple[bytes, tuple[object, object]]] = []
+
+    def select_records(
+        payload: bytes, tokenizers: tuple[object, object]
+    ) -> list[dict[str, str]]:
+        observed.append((payload, tokenizers))
+        return expected
+
+    monkeypatch.setattr(module, "flagship_records", select_records)
+
+    assert (
+        module._records(
+            profile,
+            tokenizers=(baseline_tokenizer, subject_tokenizer),
+            source_payload=source_payload,
+        )
+        == expected
+    )
+    assert observed == [(source_payload, (baseline_tokenizer, subject_tokenizer))]
+
+
+def test_model_input_prepare_rejects_benchmark_source_for_quick_profile(
+    tmp_path: Path,
+) -> None:
+    module = _model_inputs_module()
+
+    with pytest.raises(RuntimeError, match="only valid for the flagship corpus"):
+        module.prepare(
+            tmp_path / "prepared",
+            "sha256:" + "a" * 64,
+            benchmark_source=tmp_path / "benchmark.jsonl",
+        )
+
+    assert not (tmp_path / "prepared").exists()
+
+
+def test_model_input_prepare_rejects_unpinned_derived_corpus(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _model_inputs_module()
+    profile = SimpleNamespace(key="quick", dataset_sha256="0" * 64)
+    models = {
+        "baseline": tmp_path / "models/baseline",
+        "subject": tmp_path / "models/subject",
+    }
+
+    monkeypatch.setattr(module, "corpus_profile", lambda _key: profile)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(
+        module.AutoTokenizer,
+        "from_pretrained",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        module,
+        "_records",
+        lambda *_args, **_kwargs: [
+            {"id": "record-1", "prompt": "Prompt", "expected": " answer"}
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="does not match its pinned profile"):
+        module.prepare(tmp_path / "prepared", "sha256:" + "a" * 64)
+
+
 def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1595,6 +1673,43 @@ def test_model_input_main_resolves_workspace_and_dispatches(
     with pytest.raises(RuntimeError, match="prepared workspace must be new"):
         module.main()
     assert not missing.exists()
+
+
+def test_model_input_main_forwards_flagship_profile_and_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _model_inputs_module()
+    workspace = tmp_path / "parent/../prepared"
+    benchmark_source = tmp_path / "source/../benchmark.jsonl"
+    image = "sha256:" + "d" * 64
+    observed: list[tuple[Path, str, str, Path | None]] = []
+    monkeypatch.setattr(
+        module.argparse.ArgumentParser,
+        "parse_args",
+        lambda _parser: module.argparse.Namespace(
+            workspace=workspace,
+            runtime_image=image,
+            corpus_profile="flagship",
+            benchmark_source=benchmark_source,
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "prepare",
+        lambda root, runtime_image, *, corpus_profile_key, benchmark_source: (
+            observed.append((root, runtime_image, corpus_profile_key, benchmark_source))
+        ),
+    )
+
+    assert module.main() == 0
+    assert observed == [
+        (
+            workspace.expanduser().resolve(),
+            image,
+            "flagship",
+            benchmark_source.expanduser().resolve(),
+        )
+    ]
 
 
 def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) -> None:
