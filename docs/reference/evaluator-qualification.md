@@ -48,18 +48,15 @@ scores all 102 model outputs through its real upstream entry point. InvarLock
 then recomputes every score and replays all 102 normalized records through the
 runtime-import authoring boundary.
 
-The catalog is reviewed rather than quota-driven. A row must represent a
-recognizable current evaluator or a maintained successor, add a distinct
-ecosystem or workflow, and support retained real upstream execution. Review
-timing and activity-window metadata live in `matrix.json`; the resulting catalog
-is reviewed coverage, not a hard cap or a release-quality score.
+Each row identifies a maintained evaluator entry point with retained upstream
+execution. The rows cover distinct evaluator ecosystems and workflows;
+`matrix.json` records their source, version, authority, and status metadata.
 
-The current release focus is deliberately compact: LM Evaluation Harness and
-Inspect AI. Both have independently replayable 102-record shared-output imports
-and retained CPU-only signed OCI journeys over the same deterministic,
-stratified 400-record LAMBADA OpenAI projection. Other rows remain useful
-compatibility evidence, but adding rows or increasing a profile count is not a
-release gate.
+LM Evaluation Harness and Inspect AI additionally have independently
+replayable 102-record shared-output imports and retained CPU-only signed OCI
+journeys over the same deterministic, stratified 400-record LAMBADA OpenAI
+projection. The other rows retain qualification and compatibility evidence
+without claiming a native signed journey.
 
 The compact evidence packs, signed verifier receipts, independent policies,
 and builder-signed OCI attestations are retained under
@@ -72,8 +69,7 @@ It samples four prompt-length strata after requiring a one-token, losslessly
 decoded target under both pinned Qwen tokenizers. The 400-record size supports
 the maximum 10-percentage-point paired interval width declared in advance: the
 retained LM Evaluation Harness and Inspect AI runs achieved widths of 8.39 and
-8.47 points. Increasing to 600 records would add 50% model-execution cost and
-is reserved for a future claim with a tighter uncertainty threshold.
+8.47 points.
 
 The retained flagship comparison confirms an identical ordered schedule and
 reports native agreement without creating another acceptance verdict. The two

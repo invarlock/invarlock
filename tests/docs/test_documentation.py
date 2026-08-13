@@ -745,8 +745,10 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     assert "Retained (400 native records)" in text
     assert "98.5% of baseline scores" in text
     assert "does not assign one cumulative" in text
-    assert "release focus is deliberately compact" in normalized
-    assert "profile count is not a release gate" in normalized
+    assert "retained CPU-only signed OCI journeys" in normalized
+    assert "without claiming a native signed journey" in normalized
+    assert "maximum 10-percentage-point paired interval width" in normalized
+    assert "600 records" not in normalized
     assert "Benchmark harnesses" in text
     assert "Application evaluation SDKs" in text
     assert "Evaluation and observability platforms" in text

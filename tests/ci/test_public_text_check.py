@@ -45,6 +45,17 @@ def public_text():
         ("Remote validation passed.", "avoidable_remote_validation_claim"),
         ("Added the engineering backlog lane.", "planning_or_workspace_note"),
         ("Added worktree-aware remote launch handling.", "planning_or_workspace_note"),
+        ("This is the compact evaluator release focus.", "planning_or_workspace_note"),
+        ("The matrix is not a release breadth target.", "planning_or_workspace_note"),
+        (
+            "The catalog is reviewed rather than quota-driven.",
+            "planning_or_workspace_note",
+        ),
+        ("Reserved for a future claim.", "planning_or_workspace_note"),
+        (
+            "Increasing to 600 records would add more execution cost.",
+            "planning_or_workspace_note",
+        ),
     ],
 )
 def test_detects_nonpublic_operational_language(
