@@ -84,23 +84,23 @@ def test_model_profile_lookup_rejects_unmaintained_profiles() -> None:
         raise AssertionError("an unknown profile was accepted")
 
 
-def test_portability_profile_is_the_recent_gemma4_12b_cuda_comparison() -> None:
+def test_portability_profile_is_the_recent_gemma4_12b_qat_comparison() -> None:
     profile = model_profiles.model_profile("portability")
 
     assert profile.profile_id == (
-        "gemma4-12b-base-to-post-trained-bf16-singleton-v1"
+        "gemma4-12b-it-to-qat-q4-bf16-singleton-v1"
     )
     assert profile.device == "cuda"
     assert profile.dtype == "bfloat16"
     assert profile.batch_size == 1
     assert [snapshot.repository for snapshot in profile.snapshots] == [
-        "google/gemma-4-12B",
         "google/gemma-4-12B-it",
+        "google/gemma-4-12B-it-qat-q4_0-unquantized",
     ]
     assert all(snapshot.model_type == "gemma4_unified" for snapshot in profile.snapshots)
     assert [snapshot.revision for snapshot in profile.snapshots] == [
-        "023679ed352de9bb66cc873c9009ce3482585c08",
         "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
+        "b6ed86275a6a5735884e208bfed95b445a684ca2",
     ]
     assert all(len(snapshot.files) >= 4 for snapshot in profile.snapshots)
     assert all(
@@ -109,10 +109,6 @@ def test_portability_profile_is_the_recent_gemma4_12b_cuda_comparison() -> None:
     )
     expected_identities = {
         "baseline": (
-            "sha256:2eca938586c6fb57e6487553dc1cae9e388e8f922390def258e70d4fc64dbccb",
-            "59308d8748a71e3f03123d02eec3d1bd34557726306442800d4006e7420f48a7",
-        ),
-        "subject": (
             "sha256:4b242ffea3b93942d347ff7c9c1982a0ec94b8a86e11ad94ccc41f0923da41dc",
             "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21",
         ),
@@ -123,4 +119,5 @@ def test_portability_profile_is_the_recent_gemma4_12b_cuda_comparison() -> None:
             snapshot.tokenizer_contract_sha256,
         )
         for snapshot in profile.snapshots
+        if snapshot.role == "baseline"
     } == expected_identities

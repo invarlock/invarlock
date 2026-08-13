@@ -277,7 +277,7 @@ _FLAGSHIP = ModelProfile(
 
 _PORTABILITY = ModelProfile(
     key="portability",
-    profile_id="gemma4-12b-base-to-post-trained-bf16-singleton-v1",
+    profile_id="gemma4-12b-it-to-qat-q4-bf16-singleton-v1",
     device="cuda",
     dtype="bfloat16",
     batch_size=1,
@@ -285,40 +285,6 @@ _PORTABILITY = ModelProfile(
     snapshots=(
         Snapshot(
             role="baseline",
-            repository="google/gemma-4-12B",
-            revision="023679ed352de9bb66cc873c9009ce3482585c08",
-            model_type="gemma4_unified",
-            files=(
-                SnapshotFile(
-                    "config.json",
-                    4_383,
-                    "14f38c5492ffc9cbcdf808647ca0c025bb5b9b4eb737526347134d500ace6098",
-                ),
-                SnapshotFile(
-                    "model.safetensors",
-                    23_919_549_408,
-                    "fe054ae05ff7f44318fd8ae90d58992531455c7ed31356704088f0f2d8c8009a",
-                ),
-                SnapshotFile(
-                    "tokenizer.json",
-                    32_170_070,
-                    "12bac982b793c44b03d52a250a9f0d0b666813da566b910c24a6da0695fd11e6",
-                ),
-                SnapshotFile(
-                    "tokenizer_config.json",
-                    888,
-                    "522a38334973725dba8f7c645195b19dda0c284f403f43273f77837679ba2eab",
-                ),
-            ),
-            checkpoint_tree_sha256=(
-                "sha256:2eca938586c6fb57e6487553dc1cae9e388e8f922390def258e70d4fc64dbccb"
-            ),
-            tokenizer_contract_sha256=(
-                "59308d8748a71e3f03123d02eec3d1bd34557726306442800d4006e7420f48a7"
-            ),
-        ),
-        Snapshot(
-            role="subject",
             repository="google/gemma-4-12B-it",
             revision="707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
             model_type="gemma4_unified",
@@ -354,6 +320,39 @@ _PORTABILITY = ModelProfile(
             ),
             tokenizer_contract_sha256=(
                 "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21"
+            ),
+        ),
+        Snapshot(
+            role="subject",
+            repository="google/gemma-4-12B-it-qat-q4_0-unquantized",
+            revision="b6ed86275a6a5735884e208bfed95b445a684ca2",
+            model_type="gemma4_unified",
+            files=(
+                SnapshotFile(
+                    "chat_template.jinja",
+                    18_683,
+                    "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4",
+                ),
+                SnapshotFile(
+                    "config.json",
+                    4_310,
+                    "a323d02f68420f6fa3a3548130a0d36356075a4047a622e57148558f8eee7077",
+                ),
+                SnapshotFile(
+                    "model.safetensors",
+                    23_919_549_408,
+                    "26f2cee4292298a3f9f92209643c37c80e34e011381e22434088870d9439a0a0",
+                ),
+                SnapshotFile(
+                    "tokenizer.json",
+                    32_169_626,
+                    "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+                ),
+                SnapshotFile(
+                    "tokenizer_config.json",
+                    3_089,
+                    "a62f4e85a47c0c136edaaa3a4f591fd6783717299a9def47e5ad03a49f6a5eb9",
+                ),
             ),
         ),
     ),
