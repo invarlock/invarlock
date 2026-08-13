@@ -306,20 +306,16 @@ def _prepare_test_transaction(
             "timeout_seconds": 300,
             "tokenizer_metadata_sha256": "b" * 64,
         }
-    records = [
-        {
-            "id": f"harness-fixture-{index:02d}",
-            "prompt": "Prompt",
-            "expected": "Answer",
-        }
-        for index in range(102)
-    ]
+    records = json.loads(
+        (ROOT / "examples/integrations/lm-evaluation-harness/records.json").read_text(
+            encoding="utf-8"
+        )
+    )
     records_path = inputs / "records.jsonl"
     records_path.write_text(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
-    module.DATASET_SHA256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
     module.EXPECTED_MODEL_ARTIFACTS = {
         role: {
             "path": f"models/{role}",
@@ -341,6 +337,10 @@ def _prepare_test_transaction(
         }
     }
     (inputs / "acceptance.json").write_text(json.dumps(policy), encoding="utf-8")
+    (inputs / "corpus-profile.json").write_text(
+        json.dumps(module.corpus_provenance(module.corpus_profile("quick"))),
+        encoding="utf-8",
+    )
 
     def side(role: str) -> dict[str, object]:
         return {
@@ -534,6 +534,24 @@ def test_worker_rejects_checkpoint_generation_defaults(
         module.worker("baseline", model, dataset, tmp_path / "output")
 
 
+def test_harness_worker_rejects_a_dataset_outside_its_declared_corpus_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setenv("INVARLOCK_CORPUS_PROFILE", "flagship")
+    monkeypatch.setattr(
+        module.importlib.metadata, "version", lambda _name: module.VERSION
+    )
+    monkeypatch.setattr(module, "checkpoint_tree_sha256", lambda _path: "a" * 64)
+    model = tmp_path / "model"
+    model.mkdir()
+    dataset = tmp_path / "records.jsonl"
+    dataset.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(module.BridgeError, match="pinned evaluator corpus"):
+        module.worker("baseline", model, dataset, tmp_path / "output")
+
+
 def test_adapter_rejects_aggregate_only_results(tmp_path: Path) -> None:
     module = _module()
     samples = tmp_path / "samples.jsonl"
@@ -719,7 +737,7 @@ def test_complete_rejects_existing_workspace_and_mismatched_harness_runs(
     monkeypatch.setattr(
         module,
         "load_run",
-        lambda _path, role, _image: (
+        lambda _path, role, _image, _profile: (
             {
                 "execution_config_sha256": "shared-execution",
                 "task_config_sha256": f"different-{role}",
@@ -930,7 +948,7 @@ def test_complete_rejects_tampered_prepared_acceptance_inputs(
     if tamper == "dataset":
         with records_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(records[0]) + "\n")
-        error = "dataset does not match"
+        error = "pinned evaluator corpus"
     else:
         policy_path = prepared / "evaluation/inputs/acceptance.json"
         policy = json.loads(policy_path.read_text(encoding="utf-8"))

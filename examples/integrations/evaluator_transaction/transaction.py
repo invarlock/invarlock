@@ -73,15 +73,12 @@ from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 from . import adapters
 from .config import (
     BATCH_SIZE,
-    DATASET_NAME,
-    DATASET_SHA256,
     EVALUATORS,
     EXPECTED_MODEL_ARTIFACTS,
     EXPECTED_MODEL_TREE_DIGESTS,
     EXPECTED_TOKENIZER_DIGESTS,
     MAX_GENERATION_TOKENS,
     MAX_WORKER_ARTIFACT_BYTES,
-    MINIMUM_SIDE_ACCURACY,
     PER_RECORD_TIMEOUT_SECONDS,
     RUN_FIELDS,
     SAMPLE_FIELDS,
@@ -91,6 +88,14 @@ from .config import (
     evaluator_id,
     execution_config,
     task_config,
+    worker_timeout_seconds,
+)
+from .corpora import (
+    CorpusProfile,
+    corpus_profile,
+    corpus_provenance,
+    profile_for_dataset,
+    profile_for_descriptor,
 )
 
 try:
@@ -312,6 +317,14 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     output.mkdir(parents=True)
     model_digest = checkpoint_tree_sha256(model)
     dataset_bytes = _read_regular_file(dataset, label="worker dataset")
+    profile_key = os.environ.get("INVARLOCK_CORPUS_PROFILE")
+    profile = corpus_profile(profile_key) if profile_key is not None else None
+    if profile is not None:
+        try:
+            if profile_for_dataset(dataset_bytes) != profile:
+                raise BridgeError("worker corpus profile does not match the dataset")
+        except ValueError as exc:
+            raise BridgeError(str(exc)) from exc
     dataset_digest = digest(dataset_bytes)
     config = task_config("/records.jsonl", selected)
     config_path = output / "task.json"
@@ -320,6 +333,8 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
     generated, scored = adapters._run_upstream_evaluator(model, dataset_bytes, selected)
     if len(generated) != len(scored):
         raise BridgeError("upstream scorer did not return one result per record")
+    if profile is not None and len(generated) != profile.record_count:
+        raise BridgeError("upstream evaluator returned an incomplete corpus")
     samples: list[dict[str, Any]] = []
     for sample, (score, detail) in zip(generated, scored, strict=True):
         samples.append(
@@ -391,6 +406,7 @@ def _run_verified_worker(
     prepared: Path,
     output: Path,
     lock_digest: str,
+    profile: CorpusProfile | None = None,
 ) -> None:
     """Re-run the evaluator in the inspected image for this transaction.
 
@@ -439,8 +455,13 @@ def _run_verified_worker(
             environment={
                 "INVARLOCK_RUNTIME_IMAGE_ID": image,
                 "INVARLOCK_EVALUATOR_LOCK_SHA256": lock_digest,
+                **(
+                    {"INVARLOCK_CORPUS_PROFILE": profile.key}
+                    if profile is not None
+                    else {}
+                ),
             },
-            timeout_seconds=WORKER_TIMEOUT_SECONDS,
+            timeout_seconds=worker_timeout_seconds(profile or corpus_profile("quick")),
         )
     except OciEvaluationError as exc:
         raise BridgeError(
@@ -454,7 +475,12 @@ def _run_verified_worker(
         )
 
 
-def load_run(path: Path, role: str, selected: str) -> tuple[dict[str, Any], bytes]:
+def load_run(
+    path: Path,
+    role: str,
+    selected: str,
+    profile: CorpusProfile | None = None,
+) -> tuple[dict[str, Any], bytes]:
     try:
         run = json.loads(_read_regular_file(path, label=f"{role} run manifest"))
     except (BridgeError, OSError, json.JSONDecodeError) as exc:
@@ -471,7 +497,7 @@ def load_run(path: Path, role: str, selected: str) -> tuple[dict[str, Any], byte
         or not isinstance(run["samples_sha256"], str)
         or not isinstance(run["record_count"], int)
         or isinstance(run["record_count"], bool)
-        or run["record_count"] != 102
+        or run["record_count"] != (profile or corpus_profile("quick")).record_count
         or IMAGE_ID.fullmatch(run["model_tree_sha256"]) is None
         or IMAGE_ID.fullmatch(f"sha256:{run['dataset_sha256']}") is None
         or IMAGE_ID.fullmatch(run["evaluator_lock_sha256"]) is None
@@ -746,18 +772,22 @@ def complete(
     if not isinstance(dataset, dict):
         raise BridgeError("prepared request lacks the authenticated dataset")
     raw_dataset = _read_regular_file(dataset0, label="prepared dataset")
-    expected_dataset = {
-        "path": "inputs/records.jsonl",
-        "sha256": DATASET_SHA256,
-        "format": "jsonl",
-        "name": DATASET_NAME,
-        "split": "validation",
-        "input_field": "prompt",
-        "expected_output_field": "expected",
-        "id_field": "id",
-    }
-    if dataset != expected_dataset or dataset["sha256"] != digest(raw_dataset):
+    try:
+        profile = profile_for_dataset(raw_dataset)
+        described_profile = profile_for_descriptor(dataset)
+    except ValueError as exc:
+        raise BridgeError(str(exc)) from exc
+    if described_profile != profile or dataset["sha256"] != digest(raw_dataset):
         raise BridgeError("prepared dataset does not match the request digest")
+    corpus_profile_path = prepared / "evaluation/inputs/corpus-profile.json"
+    try:
+        prepared_corpus_provenance = json.loads(
+            _read_regular_file(corpus_profile_path, label="prepared corpus profile")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BridgeError("prepared corpus profile is invalid") from exc
+    if prepared_corpus_provenance != corpus_provenance(profile):
+        raise BridgeError("prepared corpus provenance does not match the dataset")
     schedule = prepare_local_evaluation_schedule_bytes(
         LocalDatasetRequest(
             path=dataset0,
@@ -782,18 +812,7 @@ def complete(
     policy = _read_regular_file(
         prepared / "evaluation/inputs/acceptance.json", label="prepared policy"
     )
-    expected_policy = {
-        "resolved_policy": {
-            "metrics": {
-                "exact_match": {
-                    "delta_min_pp": -20.0,
-                    "maximum_interval_width_pp": 20.0,
-                    "minimum_record_count": 102,
-                    "minimum_side_accuracy": MINIMUM_SIDE_ACCURACY,
-                }
-            }
-        }
-    }
+    expected_policy = profile.acceptance_policy()
     if json.loads(policy) != expected_policy:
         raise BridgeError("prepared exact-match policy is not the fixed example policy")
     for role in ("baseline", "subject"):
@@ -806,10 +825,14 @@ def complete(
             prepared=prepared,
             output=output,
             lock_digest=lock_digest,
+            profile=profile,
         )
     runs = {
         role: load_run(
-            root / f"upstream/{role}/result/run-manifest.json", role, selected
+            root / f"upstream/{role}/result/run-manifest.json",
+            role,
+            selected,
+            profile,
         )
         for role in ("baseline", "subject")
     }
@@ -840,6 +863,7 @@ def complete(
             "runtime_image_digest": image,
             "source_commit": source_commit,
             "base_image_id": base_image_id,
+            "corpus_profile": prepared_corpus_provenance,
             "task_config": runs["baseline"][0]["task_config"],
             "task_config_sha256": runs["baseline"][0]["task_config_sha256"],
             "execution_config": runs["baseline"][0]["execution_config"],
@@ -875,7 +899,7 @@ def complete(
         expected_settings = {
             "batch_size": BATCH_SIZE,
             "checkpoint_tree_sha256": EXPECTED_MODEL_TREE_DIGESTS[role],
-            "context_length": 64,
+            "context_length": profile.context_length,
             "max_output_tokens": MAX_GENERATION_TOKENS,
             "offline": True,
             "seed": SEED,

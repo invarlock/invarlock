@@ -336,6 +336,10 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--trust-root", type=Path, required=True)
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
+    parser.add_argument(
+        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+    )
+    parser.add_argument("--benchmark-source", type=Path)
     args = parser.parse_args(argv)
     repository = REPOSITORY
     if args.workspace is None:
@@ -371,21 +375,31 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
             cleanup_tags=cleanup_tags,
         )
         prepared = workspace / "prepared"
-        status("Preparing the pinned Qwen3-0.6B checkpoints and 102-record dataset...")
-        run(
-            [
-                sys.executable,
-                str(
-                    repository
-                    / "examples/integrations/lm-evaluation-harness/model_inputs.py"
-                ),
-                "--workspace",
-                str(prepared),
-                "--runtime-image",
-                image,
-            ],
-            cwd=repository,
+        status(
+            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            f"{args.corpus_profile} corpus..."
         )
+        prepare_command = [
+            sys.executable,
+            str(
+                repository
+                / "examples/integrations/lm-evaluation-harness/model_inputs.py"
+            ),
+            "--workspace",
+            str(prepared),
+            "--runtime-image",
+            image,
+            "--corpus-profile",
+            args.corpus_profile,
+        ]
+        if args.benchmark_source is not None:
+            prepare_command.extend(
+                [
+                    "--benchmark-source",
+                    str(Path(os.path.abspath(args.benchmark_source.expanduser()))),
+                ]
+            )
+        run(prepare_command, cwd=repository)
         status(
             "Running the evaluator in the inspected image and independently verifying "
             "the signed evidence transaction..."

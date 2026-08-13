@@ -9,9 +9,9 @@ does not trust the harness aggregate score.
 The maintained journey compares the public, revision-pinned
 `Qwen/Qwen3-0.6B-Base` checkpoint with the public post-trained
 `Qwen/Qwen3-0.6B` checkpoint. Every snapshot file is checked against a fixed
-byte length and SHA-256 before execution. The 102-record schedule carries stable
-IDs and fixed prompts and targets; both upstream runs execute offline after the
-snapshot and image downloads.
+byte length and SHA-256 before execution. The default 102-record schedule
+carries stable IDs and fixed prompts and targets; both upstream runs execute
+offline after the snapshot and image downloads.
 
 The curated snapshots contain the pinned weights, model configuration, and
 tokenizer files required by the run. Optional checkpoint generation defaults
@@ -33,6 +33,22 @@ journey, for example:
 ```bash
 make example-lm-evaluation-harness EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
 ```
+
+Release qualification uses the larger flagship profile:
+
+```bash
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+```
+
+The flagship profile derives 400 records from the immutable
+`EleutherAI/lambada_openai` test source. It freezes the source revision, source
+hash, selection seed, four prompt-length strata, selected indices, and derived
+JSONL hash. A selected target must be one losslessly decoded token under both
+pinned Qwen tokenizers. The source can be supplied from a previously downloaded
+file with `--benchmark-source PATH`; the same byte length and SHA-256 checks
+apply. This generative exact-match projection uses LAMBADA's final-word
+boundary, while the retained score remains InvarLock's paired generation
+comparison rather than the standard log-likelihood LAMBADA metric.
 
 Pass `--workspace PATH` when you want to retain the transaction at a specific
 new path. Otherwise the launcher creates a temporary workspace and prints its
@@ -62,10 +78,12 @@ replayed from the raw responses. Every target fits the authenticated one-token
 generation bound, and the signed policy requires each model to solve at least
 20% of the fixed records.
 
-The schedule covers factual, numeric, temporal, spatial, scientific, and
-common-language completions. Its fixed policy requires all 102 records, limits
-the paired 95% confidence-interval width to 20 percentage points, and rejects
-a regression larger than 20 percentage points.
+The quick schedule covers factual, numeric, temporal, spatial, scientific, and
+common-language completions. Its fixed policy requires all 102 records and
+limits the paired 95% confidence-interval width to 20 percentage points. The
+flagship policy requires all 400 records, tightens that interval-width limit to
+10 percentage points, and requires at least 5% accuracy on each side. Both
+profiles reject a regression larger than 20 percentage points.
 
 This is a small integration demonstration, not a model-quality benchmark. Use
 a representative pinned dataset and reviewed policy for a production claim.

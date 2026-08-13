@@ -121,6 +121,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trust-root", type=Path, required=True)
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
+    parser.add_argument(
+        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+    )
+    parser.add_argument("--benchmark-source", type=Path)
     args = parser.parse_args(argv)
     builder_signing_key = load_builder_signing_key(
         Path(os.path.abspath(args.builder_signing_key.expanduser()))
@@ -303,18 +307,28 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         prepared = workspace / "prepared"
-        status("Preparing the pinned Qwen3-0.6B checkpoints and 102-record dataset...")
-        run(
-            [
-                sys.executable,
-                str(Path(__file__).with_name("model_inputs.py")),
-                "--workspace",
-                str(prepared),
-                "--runtime-image",
-                image_id,
-            ],
-            cwd=repository,
+        status(
+            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            f"{args.corpus_profile} corpus..."
         )
+        prepare_command = [
+            sys.executable,
+            str(Path(__file__).with_name("model_inputs.py")),
+            "--workspace",
+            str(prepared),
+            "--runtime-image",
+            image_id,
+            "--corpus-profile",
+            args.corpus_profile,
+        ]
+        if args.benchmark_source is not None:
+            prepare_command.extend(
+                [
+                    "--benchmark-source",
+                    str(Path(os.path.abspath(args.benchmark_source.expanduser()))),
+                ]
+            )
+        run(prepare_command, cwd=repository)
         status(
             "Running the Harness in the inspected image and independently verifying "
             "the evidence transaction..."

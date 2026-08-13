@@ -114,7 +114,10 @@ def test_evaluator_transaction_dataset_digest_matches_the_staging_writer() -> No
     staged_bytes = b"".join(
         (json.dumps(record, sort_keys=True) + "\n").encode() for record in records
     )
-    assert module.DATASET_SHA256 == hashlib.sha256(staged_bytes).hexdigest()
+    assert (
+        module.corpus_profile("quick").dataset_sha256
+        == hashlib.sha256(staged_bytes).hexdigest()
+    )
 
 
 def test_inspect_bridge_restores_the_authenticated_causal_boundary() -> None:
@@ -144,7 +147,7 @@ def test_evaluator_transaction_record_loader_rejects_incomplete_and_duplicate_co
 ):
     module = _module()
     assert len(module.adapters._records(_records_bytes(module))) == 102
-    with pytest.raises(module.BridgeError, match="102 complete records"):
+    with pytest.raises(module.BridgeError, match="102 or 400 complete records"):
         module.adapters._records(module.canonical_json_bytes({"id": "only-one"}))
     with pytest.raises(module.BridgeError, match="not unique"):
         module.adapters._records(_records_bytes(module, duplicate=True))
@@ -318,7 +321,8 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
     raw_dataset = b"".join(
         (json.dumps(record, sort_keys=True) + "\n").encode() for record in records
     )
-    assert module.digest(raw_dataset) == module.DATASET_SHA256
+    quick = module.corpus_profile("quick")
+    assert module.digest(raw_dataset) == quick.dataset_sha256
     dataset_path = prepared / "evaluation/inputs/records.jsonl"
     dataset_path.parent.mkdir(parents=True)
     dataset_path.write_bytes(raw_dataset)
@@ -329,13 +333,18 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
                     "delta_min_pp": -20.0,
                     "maximum_interval_width_pp": 20.0,
                     "minimum_record_count": 102,
-                    "minimum_side_accuracy": module.MINIMUM_SIDE_ACCURACY,
+                    "minimum_side_accuracy": quick.minimum_side_accuracy,
                 }
             }
         }
     }
     policy_path = prepared / "evaluation/inputs/acceptance.json"
     policy_path.write_bytes(module.canonical_json_bytes(policy))
+    (prepared / "evaluation/inputs/corpus-profile.json").write_bytes(
+        module.canonical_json_bytes(
+            module.corpus_provenance(module.corpus_profile("quick"))
+        )
+    )
     for role in ("baseline", "subject"):
         (prepared / f"evaluation/models/{role}").mkdir(parents=True)
 
@@ -366,9 +375,9 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
             "subject": comparisons["subject"],
             "dataset": {
                 "path": "inputs/records.jsonl",
-                "sha256": module.DATASET_SHA256,
+                "sha256": quick.dataset_sha256,
                 "format": "jsonl",
-                "name": module.DATASET_NAME,
+                "name": quick.dataset_name,
                 "split": "validation",
                 "input_field": "prompt",
                 "expected_output_field": "expected",
@@ -424,7 +433,7 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
             "samples": "samples.jsonl",
             "samples_sha256": module.digest(sample_bytes),
             "model_tree_sha256": module.EXPECTED_MODEL_TREE_DIGESTS[role],
-            "dataset_sha256": module.DATASET_SHA256,
+            "dataset_sha256": quick.dataset_sha256,
             "evaluator_lock_sha256": lock_digest,
             "runtime_image_digest": image,
             "record_count": 102,
@@ -1190,6 +1199,30 @@ def test_worker_binds_model_dataset_and_upstream_output_provenance(
     assert manifest["samples_sha256"] == module.digest(
         (output / "samples.jsonl").read_bytes()
     )
+
+
+def test_worker_rejects_a_dataset_outside_its_declared_corpus_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setenv("INVARLOCK_EVALUATOR", "inspect-ai")
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_ID", "sha256:" + "a" * 64)
+    monkeypatch.setenv("INVARLOCK_EVALUATOR_LOCK_SHA256", "sha256:" + "b" * 64)
+    monkeypatch.setenv("INVARLOCK_CORPUS_PROFILE", "quick")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(
+        module, "evaluator_lock_digest", lambda *_args, **_kwargs: "sha256:" + "b" * 64
+    )
+    monkeypatch.setattr(
+        module, "checkpoint_tree_sha256", lambda _path: "sha256:" + "c" * 64
+    )
+    model = tmp_path / "model"
+    model.mkdir()
+    dataset = tmp_path / "records.jsonl"
+    dataset.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(module.BridgeError, match="pinned evaluator corpus"):
+        module.worker("baseline", model, dataset, tmp_path / "output")
 
 
 def test_worker_rejects_symlinked_dataset(
