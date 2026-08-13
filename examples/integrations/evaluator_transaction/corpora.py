@@ -191,11 +191,14 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         qualification = _qualification_manifest()
         artifact_name = manifest["qualification_suite"]["artifact"]
         artifact = qualification["artifacts"][artifact_name]
+        records = flagship_records()
         if (
-            artifact["sha256"] != profile.dataset_sha256
+            artifact["sha256"] != manifest["qualification_suite"]["artifact_sha256"]
             or qualification["record_count"] != profile.record_count
             or qualification["selection_algorithm"]
             != manifest["qualification_suite"]["selection_algorithm"]
+            or qualification["selected_ids"]["text"]
+            != [record["id"] for record in records]
         ):
             raise ValueError("flagship corpus disagrees with its qualification suite")
         value.update(

@@ -96,17 +96,22 @@ def test_flagship_provenance_binds_the_shared_qualification_suite() -> None:
         "artifact_sha256": "52b568fcbead27884b1c8e375c4e05111bcae25e40000e23c770675869e4a5b8",
         "manifest_sha256": "1cb979170d16328b02b69b32d0ab9670365064ba3c112eed001515c549334d44",
         "selection_algorithm": "balanced-bipartite-sha256-v1",
+        "prompt_transformation": {
+            "algorithm": "append-qwen35-disable-thinking-block-v1",
+            "suffix": "<think>\n\n</think>\n\n",
+        },
     }
 
 
 def test_flagship_records_are_loaded_from_the_pinned_bundled_artifact() -> None:
     records = corpora.flagship_records()
+    no_thinking_suffix = "<|im_start|>assistant\n<think>\n\n</think>\n\n"
 
     assert len(records) == 400
     assert records[0]["id"] == "mmlu_pro_00075"
     assert records[-1]["id"] == "mmlu_pro_12236"
     assert records[0]["prompt"].startswith("<|im_start|>system\n")
-    assert records[0]["prompt"].endswith("<|im_start|>assistant\n")
+    assert all(record["prompt"].endswith(no_thinking_suffix) for record in records)
 
 
 def test_profile_lookup_rejects_unknown_and_tampered_material() -> None:

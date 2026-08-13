@@ -1,6 +1,6 @@
 {
   "format": "invarlock/evaluator-corpus-profile-v1",
-  "profile_id": "mmlu-pro-qwen-instruct-400-v1",
+  "profile_id": "mmlu-pro-qwen35-no-think-400-v1",
   "source": {
     "dataset": "TIGER-Lab/MMLU-Pro",
     "revision": "b189ec765aa7ed75c8acfea42df31fdae71f97be",
@@ -11,15 +11,19 @@
     "artifact": "text_qwen_instruct",
     "artifact_sha256": "52b568fcbead27884b1c8e375c4e05111bcae25e40000e23c770675869e4a5b8",
     "manifest_sha256": "1cb979170d16328b02b69b32d0ab9670365064ba3c112eed001515c549334d44",
-    "selection_algorithm": "balanced-bipartite-sha256-v1"
+    "selection_algorithm": "balanced-bipartite-sha256-v1",
+    "prompt_transformation": {
+      "algorithm": "append-qwen35-disable-thinking-block-v1",
+      "suffix": "<think>\n\n</think>\n\n"
+    }
   },
   "derived_dataset": {
     "name": "TIGER-Lab/MMLU-Pro",
     "split": "test-balanced-400",
     "record_count": 400,
-    "byte_length": 396146,
+    "byte_length": 405346,
     "maximum_input_tokens": 1024,
-    "sha256": "52b568fcbead27884b1c8e375c4e05111bcae25e40000e23c770675869e4a5b8"
+    "sha256": "c3f083ae0443648dc749f16df5bb1f5cd4531e0227903d3e86f8b853f54bd6cb"
   },
   "acceptance_policy": {
     "delta_min_pp": -2.0,

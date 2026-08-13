@@ -206,6 +206,12 @@ _FLAGSHIP = ModelProfile(
                     "3891e840d7dc5fca0af33d3a25083a735e36fe06214e3f707024820cb6b9f89c",
                 ),
             ),
+            checkpoint_tree_sha256=(
+                "sha256:20f0af4e87fa4fb226b702f7de1b1f21bf738a687fe9834cc0abda8964861dfe"
+            ),
+            tokenizer_contract_sha256=(
+                "7ff212d57b99bc9eba792a4ab0b32c080164f3d402ce898d00680d9df551b107"
+            ),
         ),
         Snapshot(
             role="subject",
@@ -253,6 +259,12 @@ _FLAGSHIP = ModelProfile(
                     16_710,
                     "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
                 ),
+            ),
+            checkpoint_tree_sha256=(
+                "sha256:a73abe2d4664cef43cf774e975ad86f614faf57a7e9e63ae660e42e4245bcbf7"
+            ),
+            tokenizer_contract_sha256=(
+                "a4dc0cc2bd8621a72a232a4889a8887b7d05482c7df8e6d42ac4c014cdbdad94"
             ),
         ),
     ),

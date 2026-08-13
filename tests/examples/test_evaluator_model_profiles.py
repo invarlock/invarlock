@@ -37,6 +37,16 @@ def test_flagship_profile_is_the_immutable_qwen35_9b_cuda_comparison() -> None:
             "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
         ),
     ]
+    expected_identities = {
+        "baseline": (
+            "sha256:20f0af4e87fa4fb226b702f7de1b1f21bf738a687fe9834cc0abda8964861dfe",
+            "7ff212d57b99bc9eba792a4ab0b32c080164f3d402ce898d00680d9df551b107",
+        ),
+        "subject": (
+            "sha256:a73abe2d4664cef43cf774e975ad86f614faf57a7e9e63ae660e42e4245bcbf7",
+            "a4dc0cc2bd8621a72a232a4889a8887b7d05482c7df8e6d42ac4c014cdbdad94",
+        ),
+    }
     for snapshot in profile.snapshots:
         names = {item.name for item in snapshot.files}
         assert {
@@ -54,6 +64,10 @@ def test_flagship_profile_is_the_immutable_qwen35_9b_cuda_comparison() -> None:
         assert all(
             item.byte_length > 0 and len(item.sha256) == 64 for item in snapshot.files
         )
+        assert (
+            snapshot.checkpoint_tree_sha256,
+            snapshot.tokenizer_contract_sha256,
+        ) == expected_identities[snapshot.role]
 
 
 def test_model_profile_lookup_rejects_unmaintained_profiles() -> None:
