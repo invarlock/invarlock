@@ -100,8 +100,8 @@ seven measured runs after one warmup on arm64 macOS with Python 3.12.13:
 
 | Transaction | Records | Evidence bytes | Complete package bytes | Verify and issue receipt, median | Render HTML, median |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| LM Evaluation Harness | 400 | 1,697,002 | 1,703,418 | 250.5 ms | 108.6 ms |
-| Inspect AI | 400 | 1,320,166 | 1,326,305 | 241.9 ms | 67.3 ms |
+| LM Evaluation Harness | 400 | 1,697,002 | 1,703,418 | 248.6 ms | 104.6 ms |
+| Inspect AI | 400 | 1,320,166 | 1,326,305 | 238.5 ms | 66.8 ms |
 
 `Verify and issue receipt` performs complete semantic evidence replay against
 independent anchors and writes a fresh Ed25519-signed receipt. `Render HTML`

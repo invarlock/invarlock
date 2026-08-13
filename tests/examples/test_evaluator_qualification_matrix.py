@@ -274,9 +274,7 @@ def test_flagship_signed_transaction_is_retained_and_replays_offline(
     assert report["verdict"] == "pass"
 
 
-def test_flagship_comparison_reports_native_agreement_without_a_new_verdict() -> (
-    None
-):
+def test_flagship_comparison_reports_native_agreement_without_a_new_verdict() -> None:
     module = _matrix_module()
     retained = _load(SIGNED_TRANSACTIONS / "flagship-comparison.json")
 
@@ -353,9 +351,9 @@ def _comparison_fixture(root: Path) -> None:
     ("mutation", "message"),
     [
         (
-            lambda root: (root / "left/evidence/records/paired-records.json").write_text(
-                "{}", encoding="utf-8"
-            ),
+            lambda root: (
+                root / "left/evidence/records/paired-records.json"
+            ).write_text("{}", encoding="utf-8"),
             "paired records are invalid",
         ),
         (

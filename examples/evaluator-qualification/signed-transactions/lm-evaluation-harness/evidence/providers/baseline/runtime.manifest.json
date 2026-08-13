@@ -5,15 +5,15 @@
     "source": "file"
   },
   "execution_mode": "container",
-  "generated_at_utc": "2026-08-13T01:01:33.191632+00:00",
+  "generated_at_utc": "2026-08-13T02:43:45.616366+00:00",
   "manifest_version": 1,
   "outer_container": {
     "allow_network": false,
     "allow_remote_code": false,
     "allow_third_party_plugins": false,
     "container_execution": true,
-    "image_digest": "sha256:5497b3fc24fa1d9e3f5b9dfc1fdceccbfd3a00fd945d228f2733f0209885b68a",
-    "image_ref": "sha256:5497b3fc24fa1d9e3f5b9dfc1fdceccbfd3a00fd945d228f2733f0209885b68a"
+    "image_digest": "sha256:d46633eadbb45dbd1dfbd6f31f0ad60fa739c9623b30bbcf82ccc1b4643600c3",
+    "image_ref": "sha256:d46633eadbb45dbd1dfbd6f31f0ad60fa739c9623b30bbcf82ccc1b4643600c3"
   },
   "report": {
     "filename": "report.json",
@@ -27,7 +27,7 @@
     },
     "receipt": {
       "filename": "runtime-provider.receipt.json",
-      "sha256": "4e329e55afd956f6dceb114825913e1442cebfa242f8d8d54e7790acd72fd77b"
+      "sha256": "28648afbac312053d4e93f7a0daf0bb8c9c57080924af03d460dab802582988c"
     },
     "scoring_observation": {
       "filename": "runtime-scoring.observation.json",

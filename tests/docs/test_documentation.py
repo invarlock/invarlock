@@ -282,6 +282,9 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
     for distribution in distributions:
         assert distribution in workflows
         assert distribution in notices
+    assert "EleutherAI/LAMBADA OpenAI" in notices
+    assert "Software Copyright (c) 2019 OpenAI" in notices
+    assert "flagship evaluator corpus descriptor" in notices
 
     core_section = notices.split("## Core distribution", maxsplit=1)[1].split(
         "## Hugging Face extra", maxsplit=1

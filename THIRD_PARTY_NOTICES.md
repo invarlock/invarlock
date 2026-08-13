@@ -59,19 +59,22 @@ contents, and generated SBOM before redistributing an image.
 
 ## Public qualification data
 
-The public evidence directory contains deterministic 400-record schedules
+The repository contains deterministic 400-record qualification schedules
 derived from these pinned public datasets:
 
 | Dataset | Upstream license | Material represented in evidence |
 | --- | --- | --- |
 | [TIGER-Lab/MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro) | MIT | Selected question text, answer choices, expected answers, categories, and stable record identities |
 | [MMMU/MMMU-Pro Vision](https://huggingface.co/datasets/MMMU/MMMU_Pro) | Apache-2.0 | Selected record identities, expected answers, media digests, and the authenticated vision-text prompt; original media bytes remain external |
+| [EleutherAI/LAMBADA OpenAI](https://huggingface.co/datasets/EleutherAI/lambada_openai) | MIT metadata; dataset card references Modified MIT | Selected English prompts, final-word targets, and stable record identities |
 
 The checked-in
 [qualification-suite manifest](docs/reference/qualification-suites.manifest.json)
-binds each exact upstream revision, license declaration, eligibility filter,
-selection algorithm, selected identity, and schedule digest. Those upstream
-terms continue to apply to the represented material.
+binds those details for MMLU-Pro and MMMU-Pro Vision. The
+[flagship evaluator corpus descriptor](examples/integrations/evaluator_transaction/flagship_corpus.json)
+binds the corresponding revision, source digest, eligibility criteria,
+selection seed, selected identities, and derived dataset digest for LAMBADA
+OpenAI. The upstream terms continue to apply to the represented material.
 
 ### MMLU-Pro selected dataset material
 
@@ -89,6 +92,44 @@ so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+### LAMBADA OpenAI selected dataset material
+
+The selected English LAMBADA material comes from the OpenAI-preprocessed test
+split distributed by EleutherAI. The dataset card declares `mit` in its
+metadata and identifies the following Modified MIT License in its licensing
+section. It attributes the original LAMBADA dataset to
+[Paperno et al.](https://doi.org/10.5281/zenodo.2630551) and the preprocessing
+to OpenAI's GPT-2 work.
+
+Modified MIT License
+
+Software Copyright (c) 2019 OpenAI
+
+We don't claim ownership of the content you create with GPT-2, so it is yours
+to do with as you please. We only ask that you use GPT-2 responsibly and
+clearly indicate your content was created using GPT-2.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+The above copyright notice and this permission notice need not be included
+with content created by the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

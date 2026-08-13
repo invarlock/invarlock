@@ -96,9 +96,7 @@ def render() -> str:
             profile_id = profile["profile_id"]
             levels = demonstrations[profile_id]
             raw = load(ROOT / "artifacts" / profile_id / "upstream-output.json")
-            end_to_end = retained_transaction(
-                levels["retained_signed_transaction"]
-            )
+            end_to_end = retained_transaction(levels["retained_signed_transaction"])
             cells = (
                 profile["display_name"],
                 pinned_version(profile),

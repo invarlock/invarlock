@@ -169,10 +169,14 @@ def release_focus() -> list[str]:
 def demonstration_levels() -> dict[str, dict[str, object]]:
     document = load(ROOT / "demonstrations.json")
     values = document.get("profiles")
-    if not isinstance(values, dict) or any(
-        not isinstance(key, str) or not isinstance(value, dict)
-        for key, value in values.items()
-    ) or document.get("format") != "invarlock/evaluator-demonstration-status-v3":
+    if (
+        not isinstance(values, dict)
+        or any(
+            not isinstance(key, str) or not isinstance(value, dict)
+            for key, value in values.items()
+        )
+        or document.get("format") != "invarlock/evaluator-demonstration-status-v3"
+    ):
         raise ValueError("demonstration levels must be an object of profile objects")
     return values
 
@@ -293,9 +297,7 @@ def load_retained_transaction(path: Path, *, profile_id: str) -> dict[str, Any]:
     return value
 
 
-def verify_signed_transaction(
-    profile_id: str, retained: dict[str, object]
-) -> None:
+def verify_signed_transaction(profile_id: str, retained: dict[str, object]) -> None:
     root = SIGNED_TRANSACTIONS / profile_id
     transaction = load_retained_transaction(
         root / "transaction.json", profile_id=profile_id
@@ -368,9 +370,7 @@ def verify_signed_transaction(
 
 def _paired_records(profile_id: str) -> dict[str, Any]:
     value = load(
-        SIGNED_TRANSACTIONS
-        / profile_id
-        / "evidence/records/paired-records.json"
+        SIGNED_TRANSACTIONS / profile_id / "evidence/records/paired-records.json"
     )
     records = value.get("records")
     if (
@@ -387,16 +387,12 @@ def _paired_records(profile_id: str) -> dict[str, Any]:
 
 def _signed_result(profile_id: str) -> dict[str, object]:
     report = load(
-        SIGNED_TRANSACTIONS
-        / profile_id
-        / "evidence/reports/evaluation.report.json"
+        SIGNED_TRANSACTIONS / profile_id / "evidence/reports/evaluation.report.json"
     )
     paired = report.get("paired_binary")
     qualification = report.get("sample_qualification")
     interval = (
-        qualification.get("interval_width")
-        if isinstance(qualification, dict)
-        else None
+        qualification.get("interval_width") if isinstance(qualification, dict) else None
     )
     if (
         report.get("verdict") != "pass"
@@ -427,9 +423,8 @@ def flagship_comparison_document(profile_ids: list[str]) -> dict[str, object]:
     right = _paired_records(right_id)
     left_records = left["records"]
     right_records = right["records"]
-    if (
-        left["schedule_sha256"] != right["schedule_sha256"]
-        or len(left_records) != len(right_records)
+    if left["schedule_sha256"] != right["schedule_sha256"] or len(left_records) != len(
+        right_records
     ):
         raise ValueError("flagship retained schedules do not match")
     schedule = load(
@@ -451,15 +446,12 @@ def flagship_comparison_document(profile_ids: list[str]) -> dict[str, object]:
     for side in ("baseline", "subject"):
         score_mismatches: list[str] = []
         record_mismatches: list[str] = []
-        for left_record, right_record in zip(
-            left_records, right_records, strict=True
-        ):
+        for left_record, right_record in zip(left_records, right_records, strict=True):
             record_id = left_record.get("record_id")
             if (
                 not isinstance(record_id, str)
                 or right_record.get("record_id") != record_id
-                or left_record.get("input_sha256")
-                != right_record.get("input_sha256")
+                or left_record.get("input_sha256") != right_record.get("input_sha256")
             ):
                 raise ValueError("flagship retained record identities do not match")
             left_side = left_record.get(side)
@@ -706,9 +698,7 @@ def verify() -> None:
         assert claim is not None
         verify_signed_transaction(profile_id, claim)
     if len(focus) == 2:
-        expected_comparison = canonical_json_bytes(
-            flagship_comparison_document(focus)
-        )
+        expected_comparison = canonical_json_bytes(flagship_comparison_document(focus))
         retained_comparison = read_regular_file_bytes(
             FLAGSHIP_COMPARISON,
             label="retained flagship comparison",
