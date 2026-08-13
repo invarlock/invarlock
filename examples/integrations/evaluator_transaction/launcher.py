@@ -250,6 +250,7 @@ def _build_image(
             "evaluator_transaction.cli",
             "worker",
         ],
+        expected_working_directory="/opt/invarlock/examples",
     )
     inspected_id = run(
         [engine, "image", "inspect", "--format", "{{.Id}}", image_id], cwd=repository

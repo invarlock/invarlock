@@ -314,6 +314,7 @@ def _require_child_image_config(
     allowed_environment: set[str] | Mapping[str, str],
     allowed_labels: set[str] | Mapping[str, str],
     expected_entrypoint: Sequence[str] | None = None,
+    expected_working_directory: str | None = None,
 ) -> None:
     """Require that a child preserves every authenticated base config field.
 
@@ -323,8 +324,11 @@ def _require_child_image_config(
     required to remain byte-for-byte equivalent after JSON decoding.
     """
 
+    allowed_fields = set(_ALLOWED_CHILD_CONFIG_FIELDS)
+    if expected_working_directory is not None:
+        allowed_fields.add("WorkingDir")
     for field in set(base) | set(child):
-        if field in _ALLOWED_CHILD_CONFIG_FIELDS:
+        if field in allowed_fields:
             continue
         if base.get(field) != child.get(field):
             raise RuntimeError(
@@ -335,6 +339,11 @@ def _require_child_image_config(
         expected_entrypoint
     ):
         raise RuntimeError("child image entrypoint does not match its contract")
+    if (
+        expected_working_directory is not None
+        and child.get("WorkingDir") != expected_working_directory
+    ):
+        raise RuntimeError("child image working directory does not match its contract")
     base_environment = _string_map(base.get("Env"), label="base image")
     child_environment = _string_map(child.get("Env"), label="child image")
     allowed_environment_values = (

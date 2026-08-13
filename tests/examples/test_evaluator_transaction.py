@@ -622,6 +622,21 @@ def test_child_image_config_rejects_uncontracted_runtime_changes() -> None:
             allowed_environment={"ALLOWED"},
             allowed_labels={"allowed"},
         )
+    _require_child_image_config(
+        base,
+        {**base, "WorkingDir": "/opt/invarlock/examples"},
+        allowed_environment=set(),
+        allowed_labels=set(),
+        expected_working_directory="/opt/invarlock/examples",
+    )
+    with pytest.raises(RuntimeError, match="working directory"):
+        _require_child_image_config(
+            base,
+            {**base, "WorkingDir": "/tmp"},
+            allowed_environment=set(),
+            allowed_labels=set(),
+            expected_working_directory="/opt/invarlock/examples",
+        )
 
     base_layers = ("sha256:" + "a" * 64, "sha256:" + "b" * 64)
     _require_child_image_layers(
@@ -839,6 +854,7 @@ def test_launcher_returns_the_verified_child_image_id(
     }
     child_config = {
         **base_config,
+        "WorkingDir": "/opt/invarlock/examples",
         "Entrypoint": [
             "python",
             "-m",
