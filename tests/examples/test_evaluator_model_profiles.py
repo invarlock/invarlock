@@ -112,6 +112,10 @@ def test_portability_profile_is_the_recent_gemma4_12b_qat_comparison() -> None:
             "sha256:4b242ffea3b93942d347ff7c9c1982a0ec94b8a86e11ad94ccc41f0923da41dc",
             "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21",
         ),
+        "subject": (
+            "sha256:107c7a1581a1215a5443429340a4d7618649e5a95d1cee9d4a93356885f35cd9",
+            "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21",
+        ),
     }
     assert {
         snapshot.role: (
@@ -119,5 +123,4 @@ def test_portability_profile_is_the_recent_gemma4_12b_qat_comparison() -> None:
             snapshot.tokenizer_contract_sha256,
         )
         for snapshot in profile.snapshots
-        if snapshot.role == "baseline"
     } == expected_identities

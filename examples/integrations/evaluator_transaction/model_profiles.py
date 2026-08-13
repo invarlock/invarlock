@@ -354,6 +354,12 @@ _PORTABILITY = ModelProfile(
                     "a62f4e85a47c0c136edaaa3a4f591fd6783717299a9def47e5ad03a49f6a5eb9",
                 ),
             ),
+            checkpoint_tree_sha256=(
+                "sha256:107c7a1581a1215a5443429340a4d7618649e5a95d1cee9d4a93356885f35cd9"
+            ),
+            tokenizer_contract_sha256=(
+                "3ee6db2a73bdd7e427cab96d315a5cfd3adde1e17143159481bef0317246fe21"
+            ),
         ),
     ),
 )
