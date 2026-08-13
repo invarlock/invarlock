@@ -18,10 +18,15 @@ def test_quick_profile_remains_the_small_cpu_ci_path() -> None:
 def test_flagship_profile_is_the_immutable_qwen35_9b_cuda_comparison() -> None:
     profile = model_profiles.model_profile("flagship")
 
-    assert profile.profile_id == "qwen35-9b-base-to-post-trained-bf16-v1"
+    assert (
+        profile.profile_id
+        == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
+    )
     assert profile.device == "cuda"
     assert profile.dtype == "bfloat16"
-    assert profile.batch_size == 4
+    # Singleton inference prevents evaluator-specific batch composition from
+    # changing borderline BF16 token decisions.
+    assert profile.batch_size == 1
     assert [
         (snapshot.role, snapshot.repository, snapshot.revision)
         for snapshot in profile.snapshots

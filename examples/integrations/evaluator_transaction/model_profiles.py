@@ -158,10 +158,10 @@ _QWEN35_SHARED = (
 
 _FLAGSHIP = ModelProfile(
     key="flagship",
-    profile_id="qwen35-9b-base-to-post-trained-bf16-v1",
+    profile_id="qwen35-9b-base-to-post-trained-bf16-singleton-v1",
     device="cuda",
     dtype="bfloat16",
-    batch_size=4,
+    batch_size=1,
     torch_num_threads=1,
     snapshots=(
         Snapshot(

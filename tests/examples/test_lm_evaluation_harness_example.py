@@ -59,6 +59,17 @@ def _digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def test_flagship_harness_profile_isolates_each_inference_record() -> None:
+    module = _module()
+    config = module.execution_config(module.corpus_profile("flagship"))
+
+    assert config["batch_size"] == 1
+    assert (
+        config["model_profile"]
+        == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
+    )
+
+
 def _complete_kwargs(tmp_path: Path, module: ModuleType) -> dict[str, object]:
     evidence_key = tmp_path / "evidence.pem"
     verifier_key = tmp_path / "verifier.pem"

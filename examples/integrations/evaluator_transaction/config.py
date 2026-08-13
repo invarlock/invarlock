@@ -169,6 +169,7 @@ def execution_config(
         "evaluator_entrypoint": package["entrypoint"],
         "evaluator_version": package["version"],
         "max_generation_tokens": MAX_GENERATION_TOKENS,
+        "model_profile": selected_models.profile_id,
         "model_use_cache": MODEL_USE_CACHE,
         "pad_token_policy": PAD_TOKEN_POLICY,
         "prompt_rendering": (

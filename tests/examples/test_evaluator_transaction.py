@@ -86,6 +86,22 @@ def test_evaluator_profiles_bind_distinct_upstream_entrypoints(evaluator: str) -
 
 
 @pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
+def test_flagship_evaluator_profile_isolates_each_inference_record(
+    evaluator: str,
+) -> None:
+    module = _module()
+    flagship = module.corpus_profile("flagship")
+
+    config = module.execution_config(evaluator, flagship)
+
+    assert config["batch_size"] == 1
+    assert (
+        config["model_profile"]
+        == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
+    )
+
+
+@pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
 def test_evaluator_transaction_worker_images_include_flat_script_dependencies(
     evaluator: str,
 ) -> None:

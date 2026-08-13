@@ -475,6 +475,7 @@ def execution_config(profile: CorpusProfile | None = None) -> dict[str, Any]:
         "harness_backend": "causal",
         "harness_model": "hf",
         "max_generation_tokens": MAX_GENERATION_TOKENS,
+        "model_profile": selected_models.profile_id,
         "seed": HARNESS_SEED,
         "trust_remote_code": False,
     }
