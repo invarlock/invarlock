@@ -1756,7 +1756,7 @@ def test_launcher_canonicalizes_default_workspace_before_source_build(
         ("mutable-image", "did not return an immutable ID"),
         ("wrong-base-label", "does not bind the inspected base image ID"),
         ("wrong-base-layers", "does not derive from the authenticated base"),
-        ("extra-base-layer", "does not derive from the authenticated base"),
+        ("no-child-layer", "does not derive from the authenticated base"),
     ],
 )
 def test_launcher_rejects_image_identity_drift(
@@ -1783,19 +1783,8 @@ def test_launcher_rejects_image_identity_drift(
         if "RootFS.Layers" in command[4]:
             if failure == "wrong-base-layers" and command[-1] != base_id:
                 return json.dumps(["sha256:" + "d" * 64])
-            if failure == "extra-base-layer" and command[-1] != base_id:
-                return json.dumps(
-                    [
-                        "sha256:" + "a" * 64,
-                        "sha256:" + "x" * 64,
-                        "sha256:" + "b" * 64,
-                        "sha256:" + "c" * 64,
-                        "sha256:" + "d" * 64,
-                        "sha256:" + "e" * 64,
-                        "sha256:" + "f" * 64,
-                        "sha256:" + "g" * 64,
-                    ]
-                )
+            if failure == "no-child-layer" and command[-1] != base_id:
+                return json.dumps(["sha256:" + "a" * 64])
             return json.dumps(
                 ["sha256:" + "a" * 64]
                 if command[-1] == base_id

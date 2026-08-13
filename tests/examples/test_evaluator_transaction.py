@@ -596,7 +596,10 @@ def test_openai_evals_event_shape_is_bound_to_the_upstream_record() -> None:
 
 
 def test_child_image_config_rejects_uncontracted_runtime_changes() -> None:
-    from examples.integrations.launch import _require_child_image_config
+    from examples.integrations.launch import (
+        _require_child_image_config,
+        _require_child_image_layers,
+    )
 
     base = {
         "Cmd": ["python"],
@@ -618,6 +621,19 @@ def test_child_image_config_rejects_uncontracted_runtime_changes() -> None:
             child,
             allowed_environment={"ALLOWED"},
             allowed_labels={"allowed"},
+        )
+
+    base_layers = ("sha256:" + "a" * 64, "sha256:" + "b" * 64)
+    _require_child_image_layers(
+        base_layers,
+        (*base_layers, "sha256:" + "c" * 64, "sha256:" + "d" * 64),
+    )
+    with pytest.raises(RuntimeError, match="derive from the authenticated base"):
+        _require_child_image_layers(base_layers, base_layers)
+    with pytest.raises(RuntimeError, match="derive from the authenticated base"):
+        _require_child_image_layers(
+            base_layers,
+            (base_layers[0], "sha256:" + "c" * 64, base_layers[1]),
         )
 
 
@@ -808,7 +824,7 @@ def test_launcher_returns_the_verified_child_image_id(
     child_id = "sha256:" + "b" * 64
     commit = "c" * 40
     base_layers = ["sha256:" + "1" * 64]
-    child_layers = base_layers + ["sha256:" + digit * 64 for digit in "2345678"]
+    child_layers = base_layers + ["sha256:" + digit * 64 for digit in "23456789"]
     base_config = {
         "ArgsEscaped": False,
         "Cmd": ["/bin/sh"],

@@ -291,6 +291,22 @@ def _string_map(value: object, *, label: str) -> dict[str, str]:
     raise RuntimeError(f"{label} configuration map is invalid")
 
 
+def _require_child_image_layers(base: Sequence[str], child: Sequence[str]) -> None:
+    """Require the immutable child filesystem to extend the exact base chain.
+
+    OCI builders may materialize metadata-only instructions as empty rootfs
+    layers, so a numeric child-layer count is not portable across engines. The
+    committed Dockerfile and build context define the child delta; this check
+    binds that delta to the complete authenticated base prefix and rejects an
+    image that did not add a child filesystem at all.
+    """
+
+    if len(child) <= len(base) or tuple(child[: len(base)]) != tuple(base):
+        raise RuntimeError(
+            "child image filesystem does not derive from the authenticated base"
+        )
+
+
 def _require_child_image_config(
     base: Mapping[str, object],
     child: Mapping[str, object],
