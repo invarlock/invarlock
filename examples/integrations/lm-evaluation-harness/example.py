@@ -978,7 +978,7 @@ def complete(
     if selected_models.device == "cpu" and device_selector != "cpu":
         raise BridgeError("the quick Harness profile requires a CPU worker")
     if selected_models.device == "cuda" and not device_selector.startswith("cuda"):
-        raise BridgeError("the flagship Harness profile requires a CUDA worker")
+        raise BridgeError("the selected Harness profile requires a CUDA worker")
     _inspect_runtime_image(
         container_engine,
         image,

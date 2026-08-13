@@ -17,6 +17,7 @@ class Snapshot:
     role: str
     repository: str
     revision: str
+    model_type: str
     files: tuple[SnapshotFile, ...]
     checkpoint_tree_sha256: str | None = None
     tokenizer_contract_sha256: str | None = None
@@ -71,6 +72,7 @@ _QUICK = ModelProfile(
             role="baseline",
             repository="Qwen/Qwen3-0.6B-Base",
             revision="da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
+            model_type="qwen3",
             files=(
                 SnapshotFile(
                     "config.json",
@@ -105,6 +107,7 @@ _QUICK = ModelProfile(
             role="subject",
             repository="Qwen/Qwen3-0.6B",
             revision="c1899de289a04d12100db370d81485cdf75e47ca",
+            model_type="qwen3",
             files=(
                 SnapshotFile(
                     "config.json",
@@ -168,6 +171,7 @@ _FLAGSHIP = ModelProfile(
             role="baseline",
             repository="Qwen/Qwen3.5-9B-Base",
             revision="68c46c4b3498877f3ef123c856ecfde50c39f404",
+            model_type="qwen3_5",
             files=(
                 *_QWEN35_SHARED,
                 SnapshotFile(
@@ -217,6 +221,7 @@ _FLAGSHIP = ModelProfile(
             role="subject",
             repository="Qwen/Qwen3.5-9B",
             revision="c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+            model_type="qwen3_5",
             files=(
                 SnapshotFile(
                     "chat_template.jinja",
@@ -270,10 +275,170 @@ _FLAGSHIP = ModelProfile(
     ),
 )
 
+_GRANITE_SHARED = (
+    SnapshotFile(
+        "merges.txt",
+        916_646,
+        "b6fe424e334903f7fb84d3a106d9730455f4744b9fe3c21ee136d97a00e72502",
+    ),
+    SnapshotFile(
+        "special_tokens_map.json",
+        579,
+        "c08676c49fd7969a3130f72be6d4bf34da66aa484a6e21dffe359893a1bd5f2e",
+    ),
+    SnapshotFile(
+        "tokenizer.json",
+        7_153_421,
+        "e2bad66439538cb4d5a7580680932432ed9ece9d3b8577e675512bdf11599253",
+    ),
+    SnapshotFile(
+        "tokenizer_config.json",
+        17_659,
+        "a5ec5daab12ba090a90f3dd169c8f9c275557013a87b9c1258dc7cb497a35c86",
+    ),
+    SnapshotFile(
+        "vocab.json",
+        1_612_704,
+        "8af71076de8b0b626eed0f4c984faf0a7c062479164b2a31308a948524d4f69c",
+    ),
+)
+
+
+def _granite_weights(digests: tuple[str, ...]) -> tuple[SnapshotFile, ...]:
+    sizes = (
+        4_931_823_752,
+        4_805_655_352,
+        4_684_967_104,
+        4_805_655_392,
+        4_805_655_400,
+        4_684_967_136,
+        4_805_655_400,
+        4_805_655_400,
+        4_684_967_136,
+        4_805_655_400,
+        4_805_655_400,
+        4_805_655_400,
+        4_684_967_144,
+        2_297_808_752,
+    )
+    if len(digests) != len(sizes):
+        raise ValueError("Granite snapshot shard metadata is incomplete")
+    return tuple(
+        SnapshotFile(
+            f"model-{index:05d}-of-00014.safetensors", size, digest
+        )
+        for index, (size, digest) in enumerate(zip(sizes, digests, strict=True), 1)
+    )
+
+
+_GRANITE_BASE_WEIGHTS = _granite_weights(
+    (
+        "22cdb9955764879404d1cbbd744520ec53c7986bf9c3e760533796ed8131ace4",
+        "e11b406e444df0be6c34eeb2fd4352478a8c512b7e63934b31621d02f611123c",
+        "1c159dabf6acc53763935a03435fd13d6e34fdcd8d5aacdfc87f6f45c0cb94f4",
+        "f56db2d9910619adece710cce488ab1809aac152274d1b9c469246bc4c013ad9",
+        "043bf16b004cb7a837aeea7805736940f6778f7f9eada8ceb0209086c022a1c4",
+        "9739029ca98cbab6038feb8dcc0b05883c0ba994aaba1d24c4bade08f4b8bece",
+        "6923892e50ded8070735cec45508a55640039f3e3f01ece3d6f322ce8db55f20",
+        "15e1a862fb9693f6d00ca07f38192393dd2cb1a413bfdb3de5e1b57efc2dafb3",
+        "7c04b55d66236d1e5995bb16e8df03fdf4fd6f6302ec693136f601a253417744",
+        "f6cd5063fbb77f96a44805f5c78fc5b8cfd80b82d1e9f522d3db4c7703e4b560",
+        "ca406c8f3da58f26b7e243009f1bd1fa85b3c3432890712940335d9c560bd64b",
+        "9d4ef298f04e8b44a2a2467a9d0646bb4dab2605c5f2662e98ef1fa62aaaf6e8",
+        "d508219e378cdec3ecc92d2cc9c83a2a7688cd4b5b0305e6d38c8add9a93a4ec",
+        "d299279ef4a04d12c39e223cb2a138df0c80cb433fb250912359baf70a89d0a8",
+    )
+)
+
+_GRANITE_SUBJECT_WEIGHTS = _granite_weights(
+    (
+        "f45359dac7e0fbffde4f4261d9959f86113e2347ef90e75e9b47f628c969ed38",
+        "10586e2ebd97b828d2ddbba49f9bc066d10cddf71a352f177e09491b5c891f5d",
+        "5b13bb3c47222bbbedda637125eae5300fd102bf4a9536313e6e736b2e37de02",
+        "9febd93455f138d2b08088131901a7b772e4a5c7b2a4c6cb73c524ed7b2a638c",
+        "c0b86c90323a9e80b229e99e727995d27e8d3d717cd20c0b1fbe7f09f036679e",
+        "07e746cdc60458973fbca6e2bbe14cf86990b04082b8020eb5fde24757566113",
+        "e99acbbdcba299f93b0b0b42ba9519626f086bed34593dbcc36b513195bf48d7",
+        "b9bde838b687e90aeb80d62cd35080cfbd8cb7c366e15601a4e058a348f1baac",
+        "06afd739e8c459b22d09dde380949ac29bb3efa008e932bd49496fc0863a120f",
+        "df18281f1f1e1ee2f0a2406ee5f18dba3c82127572b0ec61e995cb3f5f99bb13",
+        "15dd3482b3bb3ba2f498572ac370a15c8c9c59bfcc3c1fa0a730c133a03b9ea6",
+        "480b31305085ca70d6ceaf7294a38b008395a0466527333043a8daf42643536d",
+        "a8e8cbbe40341a49618ec39c2f657c4ee88f82beed252b157c55d97036b7b4ef",
+        "b4bc589e873c34c93586f5ce84446f0cee838ddd4e847493a618868815d8a8cb",
+    )
+)
+
+_PORTABILITY = ModelProfile(
+    key="portability",
+    profile_id="granite4-h-small-base-to-post-trained-bf16-singleton-v1",
+    device="cuda",
+    dtype="bfloat16",
+    batch_size=1,
+    torch_num_threads=1,
+    snapshots=(
+        Snapshot(
+            role="baseline",
+            repository="ibm-granite/granite-4.0-h-small-base",
+            revision="4b4faa80c56f74d6fbd8ff305646aa32dd53d600",
+            model_type="granitemoehybrid",
+            files=(
+                SnapshotFile(
+                    "config.json",
+                    1_800,
+                    "3557fc92ef2dcc113c85e3eb1d0898d5d33aa866ac294e6682d587d7ca9498d4",
+                ),
+                *_GRANITE_SHARED,
+                SnapshotFile(
+                    "model.safetensors.index.json",
+                    48_925,
+                    "6284b19b6f5b8fe785027406fdafe68eb5eef824667535ace82b30bad6841563",
+                ),
+                *_GRANITE_BASE_WEIGHTS,
+            ),
+            tokenizer_contract_sha256=(
+                "ae4db62486dcf8936c7c42e0e9e596f93b4f2da452834b12a71effb422d002a1"
+            ),
+        ),
+        Snapshot(
+            role="subject",
+            repository="ibm-granite/granite-4.0-h-small",
+            revision="b8c0982bab7fde4eb48110f5a069527c008fab39",
+            model_type="granitemoehybrid",
+            files=(
+                SnapshotFile(
+                    "chat_template.jinja",
+                    6_418,
+                    "9524df67b77a7b25a2dfee898f75b316a157eb9d855b51e32aeac79d7c8a83ce",
+                ),
+                SnapshotFile(
+                    "config.json",
+                    1_799,
+                    "8616e9f0b30e6fac9696f7c1e1dbd08f1a850ac4af0de6353f7d6009043702ae",
+                ),
+                *_GRANITE_SHARED,
+                SnapshotFile(
+                    "model.safetensors.index.json",
+                    48_915,
+                    "4dbfb53a28571da2a058a3fcf3464582fc73a43ac358f3c9ca9dd728d65e6478",
+                ),
+                *_GRANITE_SUBJECT_WEIGHTS,
+            ),
+            tokenizer_contract_sha256=(
+                "b86599de52621d29cfb2f1c64561d076ccb851e3edccccd22a0e700771cc8e06"
+            ),
+        ),
+    ),
+)
+
 
 def model_profile(key: str) -> ModelProfile:
     try:
-        return {"quick": _QUICK, "flagship": _FLAGSHIP}[key]
+        return {
+            "quick": _QUICK,
+            "flagship": _FLAGSHIP,
+            "portability": _PORTABILITY,
+        }[key]
     except KeyError as exc:
         raise ValueError(f"unknown evaluator model profile: {key}") from exc
 

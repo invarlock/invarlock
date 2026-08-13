@@ -349,7 +349,9 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
     parser.add_argument(
-        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+        "--corpus-profile",
+        choices=("quick", "flagship", "portability"),
+        default="quick",
     )
     parser.add_argument("--device")
     parser.add_argument(
@@ -374,6 +376,10 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     output: str | None = None
     result = 2
     try:
+        from examples.integrations.evaluator_transaction.model_profiles import (
+            model_profile,
+        )
+
         build = workspace / "build"
         build.mkdir()
         builder_signing_key = load_builder_signing_key(
@@ -383,8 +389,9 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
             Path(os.path.abspath(args.builder_public_key.expanduser()))
         )
         require_builder_key_pair(builder_signing_key, builder_public_key)
-        runtime_profile = "cu129" if args.corpus_profile == "flagship" else "cpu"
-        device = args.device or ("cuda" if runtime_profile == "cu129" else "cpu")
+        selected_models = model_profile(args.corpus_profile)
+        runtime_profile = "cu129" if selected_models.device == "cuda" else "cpu"
+        device = args.device or selected_models.device
         if (runtime_profile == "cpu") != (device == "cpu"):
             raise ValueError(
                 "the selected corpus and device require different runtimes"

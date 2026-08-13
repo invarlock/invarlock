@@ -22,10 +22,11 @@ from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sh
 
 try:
     from examples.integrations.evaluator_transaction.corpora import (
+        PROFILE_KEYS,
         CorpusProfile,
         corpus_profile,
         corpus_provenance,
-        flagship_records,
+        qualification_records,
         quick_records,
         records_jsonl,
     )
@@ -41,10 +42,11 @@ except ModuleNotFoundError as exc:  # pragma: no cover - direct-script execution
     if str(repository) not in sys.path:
         sys.path.insert(0, str(repository))
     from examples.integrations.evaluator_transaction.corpora import (  # type: ignore[no-redef]
+        PROFILE_KEYS,
         CorpusProfile,
         corpus_profile,
         corpus_provenance,
-        flagship_records,
+        qualification_records,
         quick_records,
         records_jsonl,
     )
@@ -94,10 +96,8 @@ def stage_snapshot(root: Path, snapshot: Snapshot) -> Path:
         for item in snapshot.files:
             _download(destination / item.name, snapshot, item)
         config = json.loads((destination / "config.json").read_text(encoding="utf-8"))
-        if config.get("model_type") not in {"qwen3", "qwen3_5"}:
-            raise RuntimeError(
-                f"{snapshot.role} snapshot is not a maintained Qwen checkpoint"
-            )
+        if config.get("model_type") != snapshot.model_type:
+            raise RuntimeError(f"{snapshot.role} snapshot architecture is not pinned")
     except Exception:
         shutil.rmtree(destination)
         raise
@@ -107,7 +107,7 @@ def stage_snapshot(root: Path, snapshot: Snapshot) -> Path:
 def stage_snapshots(root: Path, profile_key: str = "quick") -> dict[str, Path]:
     snapshots = model_profile(profile_key).snapshots
     root.mkdir(parents=True)
-    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="qwen-snapshot") as pool:
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="model-snapshot") as pool:
         return dict(
             pool.map(
                 lambda snapshot: (snapshot.role, stage_snapshot(root, snapshot)),
@@ -122,7 +122,7 @@ def _records(
     profile = selected or corpus_profile("quick")
     if profile.key == "quick":
         return quick_records()
-    return flagship_records()
+    return qualification_records(profile)
 
 
 def _validate_record_tokenization(
@@ -169,7 +169,7 @@ def prepare(
     }
     records = _records(selected)
     records_path = inputs / "records.jsonl"
-    records_path.write_bytes(records_jsonl(records, compact=selected.key == "flagship"))
+    records_path.write_bytes(records_jsonl(records, compact=selected.key != "quick"))
     dataset_sha256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
     if dataset_sha256 != selected.dataset_sha256:
         raise RuntimeError("prepared corpus does not match its pinned profile")
@@ -237,7 +237,7 @@ def main() -> int:
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--runtime-image", required=True)
     parser.add_argument(
-        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+        "--corpus-profile", choices=PROFILE_KEYS, default="quick"
     )
     arguments = parser.parse_args()
     selected = getattr(arguments, "corpus_profile", "quick")

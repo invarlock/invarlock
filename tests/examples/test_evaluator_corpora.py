@@ -51,16 +51,12 @@ def test_quick_profile_remains_bound_to_the_existing_102_record_corpus() -> None
 
 def test_flagship_profile_freezes_the_balanced_400_record_suite() -> None:
     profile = corpora.corpus_profile("flagship")
-    corpus_path = (
-        ROOT
-        / "examples/integrations/evaluator_transaction/mmlu_pro_qwen_instruct_400.jsonl"
-    )
-    payload = corpus_path.read_bytes()
-    records = [json.loads(line) for line in payload.splitlines()]
+    records = corpora.qualification_records(profile)
+    payload = corpora.records_jsonl(records, compact=True)
 
     assert profile.record_count == 400
     assert profile.context_length == 1024
-    assert profile.dataset_name == "TIGER-Lab/MMLU-Pro"
+    assert profile.dataset_name == "TIGER-Lab/MMLU-Pro/qwen35-no-think"
     assert profile.split == "test-balanced-400"
     assert profile.dataset_sha256 == hashlib.sha256(payload).hexdigest()
     assert {record["expected"] for record in records} == set("ABCDEFGHIJ")
@@ -68,6 +64,28 @@ def test_flagship_profile_freezes_the_balanced_400_record_suite() -> None:
         answer: sum(record["expected"] == answer for record in records)
         for answer in "ABCDEFGHIJ"
     } == dict.fromkeys("ABCDEFGHIJ", 40)
+    assert corpora.profile_for_dataset(payload) == profile
+
+
+def test_portability_profile_renders_the_same_semantic_ids_for_granite() -> None:
+    qwen = corpora.qualification_records(corpora.corpus_profile("flagship"))
+    profile = corpora.corpus_profile("portability")
+    granite = corpora.qualification_records(profile)
+    payload = corpora.records_jsonl(granite, compact=True)
+
+    assert profile.profile_id == "mmlu-pro-granite4-instruct-400-v1"
+    assert profile.dataset_sha256 == hashlib.sha256(payload).hexdigest()
+    assert [record["id"] for record in granite] == [record["id"] for record in qwen]
+    assert [record["expected"] for record in granite] == [
+        record["expected"] for record in qwen
+    ]
+    assert all(
+        record["prompt"].startswith("<|start_of_role|>system<|end_of_role|>")
+        and record["prompt"].endswith(
+            "<|start_of_role|>assistant<|end_of_role|>"
+        )
+        for record in granite
+    )
     assert corpora.profile_for_dataset(payload) == profile
 
 
@@ -92,14 +110,18 @@ def test_flagship_provenance_binds_the_shared_qualification_suite() -> None:
         "split": "test",
     }
     assert provenance["qualification_suite"] == {
-        "artifact": "text_qwen_instruct",
-        "artifact_sha256": "52b568fcbead27884b1c8e375c4e05111bcae25e40000e23c770675869e4a5b8",
         "manifest_sha256": "1cb979170d16328b02b69b32d0ab9670365064ba3c112eed001515c549334d44",
         "selection_algorithm": "balanced-bipartite-sha256-v1",
-        "prompt_transformation": {
-            "algorithm": "append-qwen35-disable-thinking-block-v1",
-            "suffix": "<think>\n\n</think>\n\n",
-        },
+        "semantic_artifact": "text_semantic_bank",
+        "semantic_byte_length": 339013,
+        "semantic_sha256": "18a88db999d8157ef051fee0eac4ad48b291853c970a5dc709d40b35e2da4430",
+    }
+    assert provenance["model_profile"] == (
+        "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
+    )
+    assert provenance["rendering"] == {
+        "algorithm": "qwen-chatml-disable-thinking-v1",
+        "suffix": "<think>\n\n</think>\n\n",
     }
 
 

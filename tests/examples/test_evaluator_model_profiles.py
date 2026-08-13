@@ -82,3 +82,24 @@ def test_model_profile_lookup_rejects_unmaintained_profiles() -> None:
         assert str(exc) == "unknown evaluator model profile: large"
     else:  # pragma: no cover - assertion branch
         raise AssertionError("an unknown profile was accepted")
+
+
+def test_portability_profile_is_a_serious_granite4_cuda_comparison() -> None:
+    profile = model_profiles.model_profile("portability")
+
+    assert profile.profile_id == (
+        "granite4-h-small-base-to-post-trained-bf16-singleton-v1"
+    )
+    assert profile.device == "cuda"
+    assert profile.dtype == "bfloat16"
+    assert profile.batch_size == 1
+    assert [snapshot.repository for snapshot in profile.snapshots] == [
+        "ibm-granite/granite-4.0-h-small-base",
+        "ibm-granite/granite-4.0-h-small",
+    ]
+    assert all(snapshot.model_type == "granitemoehybrid" for snapshot in profile.snapshots)
+    assert all(len(snapshot.files) >= 21 for snapshot in profile.snapshots)
+    assert all(
+        sum(item.byte_length for item in snapshot.files) > 64_000_000_000
+        for snapshot in profile.snapshots
+    )

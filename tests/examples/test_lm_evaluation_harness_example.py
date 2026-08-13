@@ -1367,7 +1367,7 @@ def test_model_inputs_direct_script_bootstraps_the_repository(
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert "--corpus-profile {quick,flagship}" in completed.stdout
+    assert "--corpus-profile {quick,flagship,portability}" in completed.stdout
     assert "--benchmark-source" not in completed.stdout
 
 
@@ -1404,7 +1404,9 @@ def test_model_input_download_accepts_only_the_pinned_bytes(
     item = module.SnapshotFile(
         "model.bin", len(payload), hashlib.sha256(payload).hexdigest()
     )
-    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, (item,))
+    snapshot = module.Snapshot(
+        "baseline", "Qwen/example", "a" * 40, "qwen3", (item,)
+    )
 
     class Response:
         def __init__(self) -> None:
@@ -1452,7 +1454,9 @@ def test_model_input_download_rejects_invalid_streams_and_removes_partial_file(
 ) -> None:
     module = _model_inputs_module()
     item = module.SnapshotFile("model.bin", byte_length, "0" * 64)
-    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, (item,))
+    snapshot = module.Snapshot(
+        "baseline", "Qwen/example", "a" * 40, "qwen3", (item,)
+    )
 
     class Response:
         def __init__(self) -> None:
@@ -1480,14 +1484,16 @@ def test_model_input_download_rejects_invalid_streams_and_removes_partial_file(
     assert not destination.with_suffix(".bin.partial").exists()
 
 
-def test_model_input_snapshot_staging_validates_qwen3_and_cleans_failures(
+def test_model_input_snapshot_staging_validates_architecture_and_cleans_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _model_inputs_module()
     item = module.SnapshotFile("config.json", 1, "0" * 64)
 
     def stage(payload: str) -> tuple[Path, object]:
-        snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, (item,))
+        snapshot = module.Snapshot(
+            "baseline", "Qwen/example", "a" * 40, "qwen3", (item,)
+        )
         root = tmp_path / ("valid" if "qwen3" in payload else "invalid")
         root.mkdir()
 
@@ -1505,7 +1511,7 @@ def test_model_input_snapshot_staging_validates_qwen3_and_cleans_failures(
     )
 
     root, snapshot = stage('{"model_type":"other"}')
-    with pytest.raises(RuntimeError, match="is not a maintained Qwen checkpoint"):
+    with pytest.raises(RuntimeError, match="architecture is not pinned"):
         module.stage_snapshot(root, snapshot)
     assert not (root / "baseline").exists()
 
@@ -1515,8 +1521,8 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
 ) -> None:
     module = _model_inputs_module()
     snapshots = (
-        module.Snapshot("baseline", "Qwen/base", "a" * 40, ()),
-        module.Snapshot("subject", "Qwen/subject", "b" * 40, ()),
+        module.Snapshot("baseline", "Qwen/base", "a" * 40, "qwen3", ()),
+        module.Snapshot("subject", "Qwen/subject", "b" * 40, "qwen3", ()),
     )
     observed: list[str] = []
     rendezvous = threading.Barrier(2, timeout=5)
@@ -1540,16 +1546,25 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
     assert sorted(observed) == ["baseline", "subject"]
 
 
-def test_model_input_records_use_only_the_two_closed_bundled_corpora() -> None:
+def test_model_input_records_render_the_closed_semantic_corpus_per_family() -> None:
     module = _model_inputs_module()
     quick = module._records(module.corpus_profile("quick"))
     flagship = module._records(module.corpus_profile("flagship"))
+    portability = module._records(module.corpus_profile("portability"))
 
     assert len(quick) == 102
     assert len(flagship) == 400
+    assert len(portability) == 400
+    assert [record["id"] for record in portability] == [
+        record["id"] for record in flagship
+    ]
     assert {record["expected"] for record in flagship} == set("ABCDEFGHIJ")
     assert all(
         record["prompt"].startswith("<|im_start|>system\n") for record in flagship
+    )
+    assert all(
+        record["prompt"].startswith("<|start_of_role|>system<|end_of_role|>")
+        for record in portability
     )
 
 

@@ -14,11 +14,12 @@ from typing import Any, cast
 _ROOT = Path(__file__).resolve().parent
 _REPOSITORY = _ROOT.parents[2]
 _QUICK_RECORDS = _ROOT.parent / "lm-evaluation-harness" / "records.json"
-_FLAGSHIP_RECORDS = _ROOT / "mmlu_pro_qwen_instruct_400.jsonl"
-_FLAGSHIP_MANIFEST = _ROOT / "flagship_corpus.json"
+_SEMANTIC_RECORDS = _ROOT / "mmlu_pro_semantic_400.jsonl"
+_QUALIFICATION_PROFILES = _ROOT / "qualification_profiles.json"
 _QUALIFICATION_MANIFEST = (
     _REPOSITORY / "docs/reference/qualification-suites.manifest.json"
 )
+PROFILE_KEYS = ("quick", "flagship", "portability")
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +73,7 @@ def _json(path: Path, *, label: str) -> dict[str, Any]:
 
 
 def _manifest() -> dict[str, Any]:
-    return _json(_FLAGSHIP_MANIFEST, label="flagship corpus manifest")
+    return _json(_QUALIFICATION_PROFILES, label="qualification profile manifest")
 
 
 def _qualification_manifest() -> dict[str, Any]:
@@ -110,13 +111,14 @@ def _quick_profile() -> CorpusProfile:
     )
 
 
-def _flagship_profile() -> CorpusProfile:
+def _qualification_profile(key: str) -> CorpusProfile:
     manifest = _manifest()
-    dataset = manifest["derived_dataset"]
+    declared = manifest["profiles"][key]
+    dataset = declared["derived_dataset"]
     policy = manifest["acceptance_policy"]
     return CorpusProfile(
-        key="flagship",
-        profile_id=manifest["profile_id"],
+        key=key,
+        profile_id=declared["profile_id"],
         dataset_name=dataset["name"],
         split=dataset["split"],
         record_count=dataset["record_count"],
@@ -129,7 +131,11 @@ def _flagship_profile() -> CorpusProfile:
 
 
 def corpus_profile(key: str) -> CorpusProfile:
-    profiles = {"quick": _quick_profile(), "flagship": _flagship_profile()}
+    profiles = {
+        "quick": _quick_profile(),
+        "flagship": _qualification_profile("flagship"),
+        "portability": _qualification_profile("portability"),
+    }
     try:
         return profiles[key]
     except KeyError as exc:
@@ -137,7 +143,7 @@ def corpus_profile(key: str) -> CorpusProfile:
 
 
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
-    return records_jsonl(values, compact=profile.key == "flagship")
+    return records_jsonl(values, compact=profile.key in {"flagship", "portability"})
 
 
 def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
@@ -163,7 +169,7 @@ def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
 
 def profile_for_dataset(payload: bytes) -> CorpusProfile:
     observed = hashlib.sha256(payload).hexdigest()
-    for key in ("quick", "flagship"):
+    for key in PROFILE_KEYS:
         profile = corpus_profile(key)
         if observed == profile.dataset_sha256:
             validate_dataset_records(payload, profile)
@@ -172,7 +178,7 @@ def profile_for_dataset(payload: bytes) -> CorpusProfile:
 
 
 def profile_for_descriptor(value: object) -> CorpusProfile:
-    for key in ("quick", "flagship"):
+    for key in PROFILE_KEYS:
         profile = corpus_profile(key)
         if value == profile.dataset_descriptor():
             return profile
@@ -186,14 +192,16 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         "dataset_sha256": profile.dataset_sha256,
         "record_count": profile.record_count,
     }
-    if profile.key == "flagship":
+    if profile.key != "quick":
         manifest = _manifest()
         qualification = _qualification_manifest()
-        artifact_name = manifest["qualification_suite"]["artifact"]
+        artifact_name = manifest["qualification_suite"]["semantic_artifact"]
         artifact = qualification["artifacts"][artifact_name]
-        records = flagship_records()
+        records = qualification_records(profile)
+        declared = manifest["profiles"][profile.key]
         if (
-            artifact["sha256"] != manifest["qualification_suite"]["artifact_sha256"]
+            artifact["sha256"]
+            != manifest["qualification_suite"]["semantic_sha256"]
             or qualification["record_count"] != profile.record_count
             or qualification["selection_algorithm"]
             != manifest["qualification_suite"]["selection_algorithm"]
@@ -205,6 +213,8 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
             {
                 "source": manifest["source"],
                 "qualification_suite": manifest["qualification_suite"],
+                "rendering": declared["rendering"],
+                "model_profile": declared["model_profile"],
             }
         )
     return value
@@ -247,18 +257,80 @@ def _read_regular_file(path: Path, *, expected_bytes: int) -> bytes:
         os.close(descriptor)
 
 
-def flagship_records() -> list[dict[str, str]]:
-    profile = corpus_profile("flagship")
-    expected_bytes = _manifest()["derived_dataset"]["byte_length"]
-    payload = _read_regular_file(_FLAGSHIP_RECORDS, expected_bytes=expected_bytes)
-    if hashlib.sha256(payload).hexdigest() != profile.dataset_sha256:
-        raise RuntimeError(
-            "bundled evaluator corpus does not match its pinned identity"
-        )
-    validate_dataset_records(payload, profile)
-    return cast(
-        list[dict[str, str]], [json.loads(line) for line in payload.splitlines()]
+def _semantic_records() -> list[dict[str, Any]]:
+    suite = _manifest()["qualification_suite"]
+    payload = _read_regular_file(
+        _SEMANTIC_RECORDS, expected_bytes=suite["semantic_byte_length"]
     )
+    if hashlib.sha256(payload).hexdigest() != suite["semantic_sha256"]:
+        raise RuntimeError(
+            "bundled semantic corpus does not match its pinned identity"
+        )
+    records = [json.loads(line) for line in payload.splitlines()]
+    if len(records) != 400 or any(
+        not isinstance(record, dict)
+        or set(record)
+        != {"answer", "id", "options", "question", "semantic_sha256", "source"}
+        for record in records
+    ):
+        raise RuntimeError("bundled semantic corpus is incomplete")
+    return cast(list[dict[str, Any]], records)
+
+
+def _question_body(record: dict[str, Any]) -> str:
+    options = record["options"]
+    if not isinstance(options, list) or not 2 <= len(options) <= 10:
+        raise RuntimeError("bundled semantic corpus has invalid choices")
+    choices = "\n".join(
+        f"{chr(ord('A') + index)}. {option}"
+        for index, option in enumerate(options)
+    )
+    return f"Question: {record['question']}\nChoices:\n{choices}"
+
+
+def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, str]:
+    body = _question_body(record)
+    instruction = "Reply with exactly one uppercase option letter and no other text."
+    if profile.key == "flagship":
+        prompt = (
+            "<|im_start|>system\nYou answer multiple-choice questions and follow "
+            "the requested output format exactly.<|im_end|>\n"
+            f"<|im_start|>user\n{body}\n{instruction}<|im_end|>\n"
+            "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        )
+    elif profile.key == "portability":
+        prompt = (
+            "<|start_of_role|>system<|end_of_role|>You answer multiple-choice "
+            "questions and follow the requested output format exactly."
+            "<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>"
+            f"{body}\n{instruction}<|end_of_text|>\n"
+            "<|start_of_role|>assistant<|end_of_role|>"
+        )
+    else:
+        raise ValueError(f"profile does not use the semantic corpus: {profile.key}")
+    return {
+        "id": str(record["id"]),
+        "prompt": prompt,
+        "expected": str(record["answer"]),
+    }
+
+
+def qualification_records(profile: CorpusProfile) -> list[dict[str, str]]:
+    if profile.key not in {"flagship", "portability"}:
+        raise ValueError("qualification records require a maintained GPU profile")
+    records = [_render_record(record, profile) for record in _semantic_records()]
+    payload = records_jsonl(records, compact=True)
+    if (
+        len(payload) != _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
+        or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
+    ):
+        raise RuntimeError("rendered evaluator corpus does not match its pinned identity")
+    validate_dataset_records(payload, profile)
+    return records
+
+
+def flagship_records() -> list[dict[str, str]]:
+    return qualification_records(corpus_profile("flagship"))
 
 
 def quick_records() -> list[dict[str, str]]:
@@ -270,9 +342,11 @@ def quick_records() -> list[dict[str, str]]:
 
 __all__ = [
     "CorpusProfile",
+    "PROFILE_KEYS",
     "corpus_profile",
     "corpus_provenance",
     "flagship_records",
+    "qualification_records",
     "profile_for_dataset",
     "profile_for_descriptor",
     "quick_records",

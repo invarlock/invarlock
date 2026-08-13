@@ -122,7 +122,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
     parser.add_argument(
-        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+        "--corpus-profile",
+        choices=("quick", "flagship", "portability"),
+        default="quick",
     )
     parser.add_argument("--device")
     parser.add_argument(

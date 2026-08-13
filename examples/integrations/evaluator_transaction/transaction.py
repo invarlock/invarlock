@@ -744,7 +744,7 @@ def _worker_device(profile: CorpusProfile, requested: str | None) -> str:
     if selected_models.device == "cpu" and device != "cpu":
         raise BridgeError("the quick evaluator profile requires a CPU worker")
     if selected_models.device == "cuda" and not device.startswith("cuda"):
-        raise BridgeError("the flagship evaluator profile requires a CUDA worker")
+        raise BridgeError("the selected evaluator profile requires a CUDA worker")
     return device
 
 
@@ -983,7 +983,7 @@ def complete(
             or original["runtime"].get("provider") != "hf_transformers"
             or set(original["runtime"]) != {"provider", "settings"}
         ):
-            raise BridgeError(f"{role} is not the canonical pinned Qwen model")
+            raise BridgeError(f"{role} is not the canonical pinned model")
         settings = original["runtime"]["settings"]
         if not isinstance(settings, dict):
             raise BridgeError(f"{role} runtime settings are not canonical")

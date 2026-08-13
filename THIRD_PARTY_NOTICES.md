@@ -71,10 +71,10 @@ derived from these pinned public datasets:
 The checked-in
 [qualification-suite manifest](docs/reference/qualification-suites.manifest.json)
 binds those details for MMLU-Pro and MMMU-Pro Vision. The
-[flagship evaluator corpus descriptor](examples/integrations/evaluator_transaction/flagship_corpus.json)
-binds the corresponding revision, source digest, eligibility criteria,
-selection seed, selected identities, and derived dataset digest for LAMBADA
-OpenAI. The upstream terms continue to apply to the represented material.
+[evaluator qualification profiles](examples/integrations/evaluator_transaction/qualification_profiles.json)
+bind the shared MMLU-Pro semantic artifact to each maintained model-family
+rendering and derived dataset digest. The upstream terms continue to apply to
+the represented material.
 
 ### MMLU-Pro selected dataset material
 
