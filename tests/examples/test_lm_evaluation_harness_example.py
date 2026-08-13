@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -1290,6 +1293,51 @@ def test_model_inputs_pin_public_qwen3_snapshots_and_closed_records() -> None:
     assert len(records) == 102
     assert len({record["id"] for record in records}) == 102
     assert all(record["id"].startswith("causal-cloze-") for record in records)
+
+
+def test_model_inputs_direct_script_bootstraps_the_repository(
+    tmp_path: Path,
+) -> None:
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT / "src")
+
+    completed = subprocess.run(
+        [sys.executable, str(MODEL_INPUTS), "--help"],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "--corpus-profile {quick,flagship}" in completed.stdout
+    assert "--benchmark-source BENCHMARK_SOURCE" in completed.stdout
+
+
+def test_model_inputs_do_not_mask_an_unrelated_import_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def reject_corpus_import(
+        name: str,
+        globals: object = None,
+        locals: object = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> object:
+        if name == "examples.integrations.evaluator_transaction.corpora":
+            raise ModuleNotFoundError(
+                "No module named 'unrelated_dependency'",
+                name="unrelated_dependency",
+            )
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", reject_corpus_import)
+
+    with pytest.raises(ModuleNotFoundError, match="unrelated_dependency"):
+        _model_inputs_module()
 
 
 def test_model_input_download_accepts_only_the_pinned_bytes(

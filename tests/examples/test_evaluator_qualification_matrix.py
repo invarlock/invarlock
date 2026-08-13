@@ -303,6 +303,18 @@ def test_retained_claim_rejects_ambiguous_or_invalid_counts(value: object) -> No
         module.retained_claim(value, profile_id="flagship")
 
 
+def test_matrix_rejects_extra_demonstration_status_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _matrix_module()
+    levels = module.demonstration_levels()
+    levels["inspect-ai"]["undeclared_maturity"] = True
+    monkeypatch.setattr(module, "demonstration_levels", lambda: levels)
+
+    with pytest.raises(ValueError, match="demonstration status is invalid"):
+        module.verify()
+
+
 def _comparison_fixture(root: Path) -> None:
     record = {
         "baseline": {
@@ -501,6 +513,34 @@ def test_write_flagship_comparison_command_verifies_before_writing(
         "format": "comparison",
         "profiles": ["left", "right"],
     }
+
+
+def test_write_flagship_comparison_requires_every_retained_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _matrix_module()
+    monkeypatch.setattr(
+        module,
+        "parse_args",
+        lambda: argparse.Namespace(command="write-flagship-comparison"),
+    )
+    monkeypatch.setattr(module, "release_focus", lambda: ["left", "right"])
+    monkeypatch.setattr(
+        module,
+        "demonstration_levels",
+        lambda: {
+            "left": {"retained_signed_transaction": None},
+            "right": {
+                "retained_signed_transaction": {
+                    "dataset_name": "fixed",
+                    "record_count": 1,
+                }
+            },
+        },
+    )
+
+    with pytest.raises(ValueError, match="lacks a retained signed transaction"):
+        module.main()
 
 
 def test_retained_transaction_metadata_is_strict_and_bounded(tmp_path: Path) -> None:
