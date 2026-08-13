@@ -20,6 +20,12 @@ from transformers import AutoTokenizer
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sha256
 
+_REPOSITORY = Path(__file__).resolve().parents[3]
+if str(_REPOSITORY) not in sys.path:
+    # Resolve the repository's examples package before an unrelated installed
+    # package named ``examples`` can occupy the import slot in direct-script use.
+    sys.path.insert(0, str(_REPOSITORY))
+
 try:
     from examples.integrations.evaluator_transaction.corpora import (
         PROFILE_KEYS,
@@ -38,9 +44,6 @@ try:
 except ModuleNotFoundError as exc:  # pragma: no cover - direct-script execution
     if not exc.name or not exc.name.startswith("examples"):
         raise
-    repository = Path(__file__).resolve().parents[3]
-    if str(repository) not in sys.path:
-        sys.path.insert(0, str(repository))
     from examples.integrations.evaluator_transaction.corpora import (  # type: ignore[no-redef]
         PROFILE_KEYS,
         CorpusProfile,
