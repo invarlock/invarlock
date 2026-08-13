@@ -826,6 +826,17 @@ def test_worker_process_and_container_handle_guards(
     assert oci._worker_container_handle(command, cidfile) is None
     cidfile.write_text("c" * 64, encoding="ascii")
     assert oci._worker_container_handle(command, cidfile) == "c" * 64
+    cidfile.unlink()
+    assert oci._worker_container_handle(command, cidfile, "d" * 64 + "\n") == ("d" * 64)
+    assert oci._worker_container_handle(command, cidfile, "not-an-id\n") is None
+    assert (
+        oci._worker_container_handle(
+            ["unknown-engine", "run", "--cidfile", str(cidfile)],
+            cidfile,
+            "e" * 64 + "\n",
+        )
+        is None
+    )
     assert oci._worker_cidfile(["docker", "run"]) is None
 
 
