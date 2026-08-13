@@ -1,31 +1,31 @@
 {
-  "base_image_id": "sha256:0c962dfb33d24fe6ff45f134b24fba2172034a094dc4d2459ae36150513087d8",
+  "base_image_id": "sha256:dd208c27eebfcaae913bc83ebc1131f06a46ed9ebed6fffa985a4b0576c61be2",
   "entrypoint": [
     "python",
     "/opt/invarlock/examples/lm-evaluation-harness-example.py",
     "worker"
   ],
   "evaluator_version": "0.4.12+invarlock.nocache.1",
-  "executed_on": "2026-08-11",
+  "executed_on": "2026-08-12",
   "format": "invarlock/retained-evaluator-transaction-v1",
   "lock_sha256": "sha256:590386cd33d87542ac9171af428e2615ce19c0e19f1afbf670c0138e747f538b",
   "profile_id": "lm-evaluation-harness",
-  "runtime_image_id": "sha256:074607b62d74d51dcda9d50e8a9ac2e890bcb021adf18243b4a799e4c9166fc4",
-  "source_bundle_sha256": "sha256:ece4d4aedd109fbaf7de79143b7424f5c4738c88fefe220ae7deedb6535b9e8b",
-  "source_commit": "f227d51b082bf05822116da5dcba289f14cb3ba8",
+  "runtime_image_id": "sha256:5497b3fc24fa1d9e3f5b9dfc1fdceccbfd3a00fd945d228f2733f0209885b68a",
+  "source_bundle_sha256": "sha256:c792899ffae36694bf2efec78ac398180b964c37ca9cc7eda4df63e32d570dd8",
+  "source_commit": "72a80bf0f8ea68129e51fa18c76e97f88686788c",
   "verification": {
     "artifact_digests": {
       "baseline": "sha256:05150beac8c0312c2ce8c474cb0b6d2c7c0a22adff5d60a234a241393f9d2ddd",
       "subject": "sha256:6dcb18c7dafa4b0c36063bb7346452b24609c199205b5d8ed984c9059b0129fe"
     },
-    "evidence_signer_fingerprint": "sha256:900e95ca895f15de22add1bac3b4e72b589e4fe870b641b19b7b563daa419770",
+    "evidence_signer_fingerprint": "sha256:316260b5a4e9b330ba374897952019520e23e5e59c3f27183ef959c38a3433de",
     "runtime_digests": {
-      "baseline": "sha256:074607b62d74d51dcda9d50e8a9ac2e890bcb021adf18243b4a799e4c9166fc4",
-      "subject": "sha256:074607b62d74d51dcda9d50e8a9ac2e890bcb021adf18243b4a799e4c9166fc4"
+      "baseline": "sha256:5497b3fc24fa1d9e3f5b9dfc1fdceccbfd3a00fd945d228f2733f0209885b68a",
+      "subject": "sha256:5497b3fc24fa1d9e3f5b9dfc1fdceccbfd3a00fd945d228f2733f0209885b68a"
     },
-    "schedule_digest": "sha256:f0fcecbb04157568c100d14f0b8aacbaaadcdbe30be4cb8eea3400433586179b",
-    "trust_profile_digest": "sha256:c28e7aaa1a05215c2eae59ca6d82d0934181b08867515d4a40745a9e2dbd779f",
-    "verifier_fingerprint": "sha256:3cd74dfc3d0680fe445ed60a7423c25dc37ab8f8225eb4e6cca453491dd7eca4",
+    "schedule_digest": "sha256:2773bb9dfe88250f6a1d5d551cc415732e22db0950ba27838a37216fdb9a5ee5",
+    "trust_profile_digest": "sha256:849165665daa6b5015092039477b7055e5d73a739c16ef699ad27ca07f14a40e",
+    "verifier_fingerprint": "sha256:dd7be0c6c0f133d85b07446217889a7359682007d123ea2bc80c83d08ed72fc7",
     "verifier_identity": "invarlock-example/lm-evaluation-harness-verifier"
   }
 }

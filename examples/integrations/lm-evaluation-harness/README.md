@@ -75,8 +75,8 @@ closed. Completion reruns both workers in the inspected image; prepared worker
 output is not authoritative. The full upstream per-record snapshots and
 manifests are attached as authenticated provenance, while acceptance is
 replayed from the raw responses. Every target fits the authenticated one-token
-generation bound, and the signed policy requires each model to solve at least
-20% of the fixed records.
+generation bound. The signed policy applies the profile-specific side-accuracy
+floor described below.
 
 The quick schedule covers factual, numeric, temporal, spatial, scientific, and
 common-language completions. Its fixed policy requires all 102 records and
@@ -85,5 +85,11 @@ flagship policy requires all 400 records, tightens that interval-width limit to
 10 percentage points, and requires at least 5% accuracy on each side. Both
 profiles reject a regression larger than 20 percentage points.
 
-This is a small integration demonstration, not a model-quality benchmark. Use
-a representative pinned dataset and reviewed policy for a production claim.
+The 400-record size targets a maximum 10-percentage-point paired interval for
+this release-assurance workload. The retained run achieved an 8.39-point width;
+increasing to 600 would add 50% model-execution cost for a materially smaller
+gain than the move from 102 to 400. A tighter future acceptance threshold can
+select a larger frozen profile before execution.
+
+This is a reference integration demonstration, not a model-quality benchmark.
+Use a representative pinned dataset and reviewed policy for a production claim.

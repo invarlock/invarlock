@@ -738,6 +738,9 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     assert "LM Evaluation Harness" in text
     assert "every retained independently replayable import" in normalized
     assert "102-record" in text
+    assert "102 shared outputs" in text
+    assert "Retained (400 native records)" in text
+    assert "98.5% of baseline scores" in text
     assert "does not assign one cumulative" in text
     assert "release focus is deliberately compact" in normalized
     assert "profile count is not a release gate" in normalized

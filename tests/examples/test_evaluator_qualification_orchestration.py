@@ -433,7 +433,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     selection = matrix.selection_policy()
     levels = {
         profile["profile_id"]: {
-            "retained_signed_transaction": False,
+            "retained_signed_transaction": None,
         }
         for profile in profiles
     }

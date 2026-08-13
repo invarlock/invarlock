@@ -69,4 +69,10 @@ side. The flagship policy requires all 400 records, tightens the interval-width
 limit to 10 percentage points, and requires 5% accuracy on each side. Both
 profiles reject a regression larger than 20 percentage points.
 
-This is a small integration demonstration, not a model-quality benchmark.
+The 400-record size targets a maximum 10-percentage-point paired interval for
+this release-assurance workload. The retained run achieved an 8.47-point width;
+increasing to 600 would add 50% model-execution cost for a materially smaller
+gain than the move from 102 to 400. A tighter future acceptance threshold can
+select a larger frozen profile before execution.
+
+This is a reference integration demonstration, not a model-quality benchmark.

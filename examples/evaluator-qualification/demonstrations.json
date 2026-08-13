@@ -1,62 +1,68 @@
 {
-  "format": "invarlock/evaluator-demonstration-status-v2",
+  "format": "invarlock/evaluator-demonstration-status-v3",
   "profiles": {
     "arize-phoenix-evals": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "autoevals": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "azure-ai-evaluation": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "deepeval": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "evidently": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "garak": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "langfuse": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "hugging-face-evaluate": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "openai-evals": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "opik": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "inspect-ai": {
-      "retained_signed_transaction": true
+      "retained_signed_transaction": {
+        "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
+        "record_count": 400
+      }
     },
     "lighteval": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "lm-evaluation-harness": {
-      "retained_signed_transaction": true
+      "retained_signed_transaction": {
+        "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
+        "record_count": 400
+      }
     },
     "mlflow": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "openevals": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "promptfoo": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "pydantic-evals": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "ragas": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     },
     "trulens": {
-      "retained_signed_transaction": false
+      "retained_signed_transaction": null
     }
   }
 }
