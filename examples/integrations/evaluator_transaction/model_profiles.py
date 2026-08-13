@@ -176,22 +176,22 @@ _FLAGSHIP = ModelProfile(
                     "026b9d9fe03f19fd065f2a2f56a332c67640878106c0ca6be2f60c655ed5a8c1",
                 ),
                 SnapshotFile(
-                    "model-00001-of-00004.safetensors",
+                    "model.safetensors-00001-of-00004.safetensors",
                     5_276_436_216,
                     "862bf7bba8a50145d19d0ae463931fae515284024736592a73a336bc4dfa54ee",
                 ),
                 SnapshotFile(
-                    "model-00002-of-00004.safetensors",
+                    "model.safetensors-00002-of-00004.safetensors",
                     5_335_161_576,
                     "bace8e115e11ca93c22f0352a60d2fb0c76ac6d7d1c2993c143b7ad2b6c8868c",
                 ),
                 SnapshotFile(
-                    "model-00003-of-00004.safetensors",
+                    "model.safetensors-00003-of-00004.safetensors",
                     5_368_717_376,
                     "63a021ac0011cbfc66166e77103327a8b45dee95832e36551f6b4c3337448959",
                 ),
                 SnapshotFile(
-                    "model-00004-of-00004.safetensors",
+                    "model.safetensors-00004-of-00004.safetensors",
                     3_325_995_704,
                     "1a643bbed669266917b5058b5d3f660c03233599249ff7d8fd083decfe662ae0",
                 ),
@@ -224,22 +224,22 @@ _FLAGSHIP = ModelProfile(
                     "26d3539b516be613f39563617cb9d33b3f83d401298125be392c80cefb8f7fe5",
                 ),
                 SnapshotFile(
-                    "model-00001-of-00004.safetensors",
+                    "model.safetensors-00001-of-00004.safetensors",
                     5_276_436_216,
                     "db6f444b43d318c92f360a13a25561a6a65b10c0631b8ed305a426dbaa6c380e",
                 ),
                 SnapshotFile(
-                    "model-00002-of-00004.safetensors",
+                    "model.safetensors-00002-of-00004.safetensors",
                     5_335_161_512,
                     "31c7d7e2dd5d207840b31cc59083c8f4c4718959149e0358c0364052bb9a0330",
                 ),
                 SnapshotFile(
-                    "model-00003-of-00004.safetensors",
+                    "model.safetensors-00003-of-00004.safetensors",
                     5_368_717_440,
                     "7ec36ba3a4176a44c3c0876ad80c56a2f70c84bf008d82e9501df642f17dadec",
                 ),
                 SnapshotFile(
-                    "model-00004-of-00004.safetensors",
+                    "model.safetensors-00004-of-00004.safetensors",
                     3_325_995_712,
                     "b62b0c4cd7e44edee103ee8f4fe225f246d5e768e07bfd5f25b63a8aa1fdd0c6",
                 ),

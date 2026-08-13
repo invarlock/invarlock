@@ -46,7 +46,10 @@ def test_flagship_profile_is_the_immutable_qwen35_9b_cuda_comparison() -> None:
             "tokenizer.json",
             "tokenizer_config.json",
             "vocab.json",
-            *(f"model-{index:05d}-of-00004.safetensors" for index in range(1, 5)),
+            *(
+                f"model.safetensors-{index:05d}-of-00004.safetensors"
+                for index in range(1, 5)
+            ),
         } <= names
         assert all(
             item.byte_length > 0 and len(item.sha256) == 64 for item in snapshot.files
