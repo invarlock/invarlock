@@ -106,9 +106,9 @@ SOFTWARE.
 The selected English LAMBADA material comes from the OpenAI-preprocessed test
 split distributed by EleutherAI. The dataset card declares `mit` in its
 metadata and identifies the following Modified MIT License in its licensing
-section. It attributes the original LAMBADA dataset to
-[Paperno et al.](https://doi.org/10.5281/zenodo.2630551) and the preprocessing
-to OpenAI's GPT-2 work.
+section. It links the
+[original LAMBADA dataset publication](https://doi.org/10.5281/zenodo.2630551)
+and attributes the preprocessing to OpenAI's GPT-2 work.
 
 Modified MIT License
 

@@ -61,6 +61,9 @@ def test_deployment_inputs_are_independent_anchors_for_retained_inspect_transact
     None
 ):
     transaction = json.loads((TRANSACTION / "transaction.json").read_bytes())
+    receipt = json.loads((TRANSACTION / "verification.receipt.json").read_bytes())[
+        "statement"
+    ]
     verification = transaction["verification"]
     policy_sha256 = "sha256:" + hashlib.sha256(POLICY.read_bytes()).hexdigest()
 
@@ -79,6 +82,7 @@ def test_deployment_inputs_are_independent_anchors_for_retained_inspect_transact
         APPROVAL_INPUTS["trust_profile_digest"] == verification["trust_profile_digest"]
     )
     assert APPROVAL_INPUTS["policy_sha256"] == policy_sha256
+    assert policy_sha256 == receipt["anchors"]["policy_digest"]
 
 
 def test_deployment_receipt_gate_accepts_only_the_independent_signed_result(

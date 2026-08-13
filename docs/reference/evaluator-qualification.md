@@ -70,10 +70,10 @@ The flagship profile derives 400 records from a revision- and hash-pinned
 [EleutherAI LAMBADA OpenAI dataset](https://huggingface.co/datasets/EleutherAI/lambada_openai).
 It samples four prompt-length strata after requiring a one-token, losslessly
 decoded target under both pinned Qwen tokenizers. The 400-record size supports
-the predeclared maximum 10-percentage-point paired interval width: the retained
-LM Evaluation Harness and Inspect AI runs achieved widths of 8.39 and 8.47
-points. Increasing to 600 records would add 50% model-execution cost and is
-reserved for a future claim with a tighter uncertainty threshold.
+the maximum 10-percentage-point paired interval width declared in advance: the
+retained LM Evaluation Harness and Inspect AI runs achieved widths of 8.39 and
+8.47 points. Increasing to 600 records would add 50% model-execution cost and
+is reserved for a future claim with a tighter uncertainty threshold.
 
 The retained flagship comparison confirms an identical ordered schedule and
 reports native agreement without creating another acceptance verdict. The two
