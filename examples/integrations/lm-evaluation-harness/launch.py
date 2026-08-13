@@ -327,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
 
         prepared = workspace / "prepared"
         status(
-            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            "Preparing the pinned model checkpoints and "
             f"{args.corpus_profile} corpus..."
         )
         prepare_command = [

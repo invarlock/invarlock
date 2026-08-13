@@ -554,6 +554,15 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
     assert evidence == tmp_path / "transaction/evidence"
     assert receipt == tmp_path / "transaction/verifier/verification.receipt.json"
     assert report == tmp_path / "transaction/comparison-report.html"
+    provenance = json.loads(
+        (tmp_path / "transaction/inputs/evaluator-provenance.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert all(
+        "samples" not in run and len(run["sample_bindings"]) == 102
+        for run in provenance["runs"].values()
+    )
 
 
 def test_openai_evals_event_shape_is_bound_to_the_upstream_record() -> None:
@@ -672,7 +681,7 @@ def test_adapter_emits_strict_runtime_import_records(tmp_path: Path) -> None:
     samples.write_bytes(module.canonical_json_bytes(_sample(module)))
     destination = tmp_path / "records.jsonl"
 
-    module.adapt(samples, _schedule(), destination)
+    bindings = module.adapt(samples, _schedule(), destination)
 
     record = json.loads(destination.read_text(encoding="utf-8"))
     assert record == {
@@ -682,6 +691,28 @@ def test_adapter_emits_strict_runtime_import_records(tmp_path: Path) -> None:
         "record_id": "stable-1",
         "status": "ok",
     }
+    assert bindings == [
+        {
+            "input_sha256": hashlib.sha256(b"Prompt").hexdigest(),
+            "output_sha256": hashlib.sha256(b"Answer").hexdigest(),
+            "record_id": "stable-1",
+            "reported_score": 1.0,
+            "status": "ok",
+            "target_sha256": hashlib.sha256(b"Answer").hexdigest(),
+        }
+    ]
+    assert "Prompt" not in json.dumps(bindings)
+
+
+def test_compact_evaluator_provenance_has_a_headroom_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+
+    assert module._compact_provenance_bytes({"format": "test"}).endswith(b"\n")
+    monkeypatch.setattr(module, "MAX_PROVENANCE_BYTES", 4)
+    with pytest.raises(module.BridgeError, match="provenance exceeds"):
+        module._compact_provenance_bytes({"format": "test"})
 
 
 def test_adapter_rejects_evaluator_score_disagreement(tmp_path: Path) -> None:

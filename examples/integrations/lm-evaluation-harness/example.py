@@ -131,6 +131,7 @@ QUICK_MODELS = model_profile("quick")
 HARNESS_BATCH_SIZE = QUICK_MODELS.batch_size
 RECORD_COUNT = QUICK_CORPUS.record_count
 MAX_WORKER_ARTIFACT_BYTES = 64 * 1024 * 1024
+MAX_PROVENANCE_BYTES = 768 * 1024
 PER_RECORD_TIMEOUT_SECONDS = 300
 WORKER_TIMEOUT_SECONDS = min(
     PER_RECORD_TIMEOUT_SECONDS * (RECORD_COUNT + 2), 24 * 60 * 60
@@ -200,6 +201,13 @@ class BridgeError(ValueError):
 
 def digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _compact_provenance_bytes(value: dict[str, object]) -> bytes:
+    payload = canonical_json_bytes(value)
+    if len(payload) > MAX_PROVENANCE_BYTES:
+        raise BridgeError("compact Harness provenance exceeds its size limit")
+    return payload
 
 
 def _run_bounded_command(
@@ -623,28 +631,14 @@ def load_run(
     return cast(dict[str, Any], run), samples
 
 
-def load_upstream_samples(path: Path, *, role: str) -> list[dict[str, Any]]:
-    values: list[dict[str, Any]] = []
-    for index, raw in enumerate(
-        _read_regular_file(path, label=f"{role} Harness samples").splitlines(), 1
-    ):
-        try:
-            value = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise BridgeError(f"{role} Harness sample {index} is not JSON") from exc
-        if not isinstance(value, dict):
-            raise BridgeError(f"{role} Harness sample {index} is not an object")
-        values.append(value)
-    return values
-
-
-def adapt(samples: Path, schedule: Any, destination: Path) -> None:
-    """Map upstream records to the strict ABI; never import aggregate scores."""
+def adapt(samples: Path, schedule: Any, destination: Path) -> list[dict[str, object]]:
+    """Map upstream records to the strict ABI and compact provenance bindings."""
 
     lines = _read_regular_file(samples, label="Harness samples").splitlines()
     if len(lines) != len(schedule.records):
         raise BridgeError("one Harness sample is required for every schedule record")
     output: list[dict[str, object]] = []
+    bindings: list[dict[str, object]] = []
     for index, (raw, expected) in enumerate(
         zip(lines, schedule.records, strict=True), 1
     ):
@@ -696,8 +690,18 @@ def adapt(samples: Path, schedule: Any, destination: Path) -> None:
                 "output_sha256": digest(response.encode()),
             }
         )
+        bindings.append(
+            {
+                "record_id": expected.record_id,
+                "doc_sha256": sample["doc_hash"],
+                "prompt_sha256": sample["prompt_hash"],
+                "target_sha256": sample["target_hash"],
+                "output_sha256": digest(response.encode()),
+            }
+        )
     destination.write_bytes(b"".join(canonical_json_bytes(item) for item in output))
     load_external_scoring_records_jsonl(destination, schedule=schedule)
+    return bindings
 
 
 def imported(role: str) -> dict[str, str]:
@@ -711,6 +715,15 @@ def imported(role: str) -> dict[str, str]:
         "runtime_config": "run.yaml",
     }
     return {key: f"{root}/{name}" for key, name in names.items()}
+
+
+def _adapt_run_bindings(
+    runs: dict[str, tuple[dict[str, Any], Path]], schedule: Any, root: Path
+) -> dict[str, list[dict[str, object]]]:
+    return {
+        role: adapt(runs[role][1], schedule, root / f"imports/{role}-records.jsonl")
+        for role in ("baseline", "subject")
+    }
 
 
 def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> None:
@@ -1008,7 +1021,8 @@ def complete(
             "fresh worker runs used different Harness configurations or dataset"
         )
     (root / "inputs/acceptance.json").write_bytes(policy)
-    provenance = canonical_json_bytes(
+    sample_bindings = _adapt_run_bindings(runs, schedule, root)
+    provenance = _compact_provenance_bytes(
         {
             "format": "invarlock/lm-evaluation-harness-provenance-v2",
             "runtime_image_digest": image,
@@ -1022,7 +1036,7 @@ def complete(
             "runs": {
                 role: {
                     "manifest": runs[role][0],
-                    "samples": load_upstream_samples(runs[role][1], role=role),
+                    "sample_bindings": sample_bindings[role],
                 }
                 for role in ("baseline", "subject")
             },
@@ -1034,7 +1048,6 @@ def complete(
     anchors: dict[str, str] = {}
     for role in ("baseline", "subject"):
         records_path = root / f"imports/{role}-records.jsonl"
-        adapt(runs[role][1], schedule, records_path)
         original = comparison0[role]
         settings = original["runtime"]["settings"]
         spec = ModelRuntimeSpec(

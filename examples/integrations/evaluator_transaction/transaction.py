@@ -74,6 +74,7 @@ from . import adapters
 from .config import (
     EVALUATORS,
     MAX_GENERATION_TOKENS,
+    MAX_PROVENANCE_BYTES,
     MAX_WORKER_ARTIFACT_BYTES,
     PER_RECORD_TIMEOUT_SECONDS,
     RUN_FIELDS,
@@ -122,6 +123,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 def digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _compact_provenance_bytes(value: dict[str, object]) -> bytes:
+    payload = canonical_json_bytes(value)
+    if len(payload) > MAX_PROVENANCE_BYTES:
+        raise BridgeError("compact evaluator provenance exceeds its size limit")
+    return payload
 
 
 def _read_regular_file(
@@ -544,7 +552,7 @@ def load_run(
 
 
 def load_canonical_samples(sample_bytes: bytes, *, role: str) -> list[dict[str, Any]]:
-    """Decode the exact upstream JSONL snapshot for signed provenance."""
+    """Decode canonical upstream JSONL before adaptation."""
 
     samples: list[dict[str, Any]] = []
     for index, raw in enumerate(sample_bytes.splitlines(), 1):
@@ -561,7 +569,9 @@ def load_canonical_samples(sample_bytes: bytes, *, role: str) -> list[dict[str, 
     return samples
 
 
-def adapt(samples: Path | bytes, schedule: Any, destination: Path) -> None:
+def adapt(
+    samples: Path | bytes, schedule: Any, destination: Path
+) -> list[dict[str, object]]:
     sample_bytes = (
         _read_regular_file(samples, label="evaluator samples")
         if isinstance(samples, Path)
@@ -569,14 +579,14 @@ def adapt(samples: Path | bytes, schedule: Any, destination: Path) -> None:
     )
     if not isinstance(sample_bytes, bytes):
         raise BridgeError("evaluator samples must be bytes or a regular file")
-    lines = sample_bytes.splitlines()
-    if len(lines) != len(schedule.records):
+    samples_values = load_canonical_samples(sample_bytes, role="transaction")
+    if len(samples_values) != len(schedule.records):
         raise BridgeError("one evaluator sample is required for every schedule record")
     output: list[dict[str, object]] = []
-    for index, (raw, expected) in enumerate(
-        zip(lines, schedule.records, strict=True), 1
+    bindings: list[dict[str, object]] = []
+    for index, (sample, expected) in enumerate(
+        zip(samples_values, schedule.records, strict=True), 1
     ):
-        sample = json.loads(raw)
         if not isinstance(sample, dict) or not SAMPLE_FIELDS.issubset(sample):
             raise BridgeError(f"sample {index} lacks complete per-record facts")
         if any(
@@ -611,8 +621,19 @@ def adapt(samples: Path | bytes, schedule: Any, destination: Path) -> None:
                 "output_sha256": sample["output_sha256"],
             }
         )
+        bindings.append(
+            {
+                "record_id": expected.record_id,
+                "input_sha256": sample["input_sha256"],
+                "target_sha256": sample["target_sha256"],
+                "output_sha256": sample["output_sha256"],
+                "reported_score": float(reported),
+                "status": "ok",
+            }
+        )
     destination.write_bytes(b"".join(canonical_json_bytes(item) for item in output))
     load_external_scoring_records_jsonl(destination, schedule=schedule)
+    return bindings
 
 
 def imported(role: str) -> dict[str, str]:
@@ -893,7 +914,11 @@ def complete(
             "fresh worker runs are not bound to the inspected image, lock, and dataset"
         )
     (root / "inputs/acceptance.json").write_bytes(policy)
-    provenance = canonical_json_bytes(
+    sample_bindings: dict[str, list[dict[str, object]]] = {}
+    for role in ("baseline", "subject"):
+        records_path = root / f"imports/{role}-records.jsonl"
+        sample_bindings[role] = adapt(runs[role][1], schedule, records_path)
+    provenance = _compact_provenance_bytes(
         {
             "format": "invarlock/evaluator-provenance-v1",
             "evaluator": selected,
@@ -909,7 +934,7 @@ def complete(
             "runs": {
                 role: {
                     "manifest": runs[role][0],
-                    "samples": load_canonical_samples(runs[role][1], role=role),
+                    "sample_bindings": sample_bindings[role],
                 }
                 for role in ("baseline", "subject")
             },
@@ -922,7 +947,6 @@ def complete(
     expected_artifacts = model_artifacts(selected_models)
     for role in ("baseline", "subject"):
         records_path = root / f"imports/{role}-records.jsonl"
-        adapt(runs[role][1], schedule, records_path)
         original = comparison0[role]
         if (
             not isinstance(original, dict)

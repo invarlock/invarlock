@@ -392,12 +392,33 @@ def test_adapter_writes_schedule_bound_records(tmp_path: Path) -> None:
     destination = tmp_path / "records.jsonl"
     _write_jsonl(samples, _sample())
 
-    module.adapt(samples, _schedule(), destination)
+    bindings = module.adapt(samples, _schedule(), destination)
 
     record = json.loads(destination.read_text(encoding="utf-8"))
     assert record["record_id"] == "stable-1"
     assert record["output_text"] == "Answer"
     assert "exact_match" not in record
+    assert bindings == [
+        {
+            "doc_sha256": _sample()["doc_hash"],
+            "output_sha256": _digest(b"Answer"),
+            "prompt_sha256": _digest(b"Prompt"),
+            "record_id": "stable-1",
+            "target_sha256": _digest(b"Answer"),
+        }
+    ]
+    assert "Prompt" not in json.dumps(bindings)
+
+
+def test_compact_provenance_has_a_headroom_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+
+    assert module._compact_provenance_bytes({"format": "test"}).endswith(b"\n")
+    monkeypatch.setattr(module, "MAX_PROVENANCE_BYTES", 4)
+    with pytest.raises(module.BridgeError, match="provenance exceeds"):
+        module._compact_provenance_bytes({"format": "test"})
 
 
 def test_worker_runs_the_pinned_harness_and_binds_official_samples(
@@ -908,6 +929,10 @@ def test_complete_replays_real_import_transaction(
         "max_gen_toks": module.MAX_GENERATION_TOKENS,
         "until": ["\n"],
     }
+    assert all(
+        "samples" not in run and len(run["sample_bindings"]) == 102
+        for run in provenance["runs"].values()
+    )
     for role in ("baseline", "subject"):
         provider_receipt = json.loads(
             (evidence / f"providers/{role}/runtime-provider.receipt.json").read_text(
