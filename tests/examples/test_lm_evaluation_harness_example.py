@@ -1563,7 +1563,7 @@ def test_model_input_records_render_the_closed_semantic_corpus_per_family() -> N
         record["prompt"].startswith("<|im_start|>system\n") for record in flagship
     )
     assert all(
-        record["prompt"].startswith("<|start_of_role|>system<|end_of_role|>")
+        record["prompt"].startswith("<bos><|turn>system\n")
         for record in portability
     )
 

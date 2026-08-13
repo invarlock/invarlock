@@ -84,22 +84,26 @@ def test_model_profile_lookup_rejects_unmaintained_profiles() -> None:
         raise AssertionError("an unknown profile was accepted")
 
 
-def test_portability_profile_is_a_serious_granite4_cuda_comparison() -> None:
+def test_portability_profile_is_the_recent_gemma4_12b_cuda_comparison() -> None:
     profile = model_profiles.model_profile("portability")
 
     assert profile.profile_id == (
-        "granite4-h-small-base-to-post-trained-bf16-singleton-v1"
+        "gemma4-12b-base-to-post-trained-bf16-singleton-v1"
     )
     assert profile.device == "cuda"
     assert profile.dtype == "bfloat16"
     assert profile.batch_size == 1
     assert [snapshot.repository for snapshot in profile.snapshots] == [
-        "ibm-granite/granite-4.0-h-small-base",
-        "ibm-granite/granite-4.0-h-small",
+        "google/gemma-4-12B",
+        "google/gemma-4-12B-it",
     ]
-    assert all(snapshot.model_type == "granitemoehybrid" for snapshot in profile.snapshots)
-    assert all(len(snapshot.files) >= 21 for snapshot in profile.snapshots)
+    assert all(snapshot.model_type == "gemma4_unified" for snapshot in profile.snapshots)
+    assert [snapshot.revision for snapshot in profile.snapshots] == [
+        "023679ed352de9bb66cc873c9009ce3482585c08",
+        "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
+    ]
+    assert all(len(snapshot.files) >= 4 for snapshot in profile.snapshots)
     assert all(
-        sum(item.byte_length for item in snapshot.files) > 64_000_000_000
+        sum(item.byte_length for item in snapshot.files) > 23_900_000_000
         for snapshot in profile.snapshots
     )

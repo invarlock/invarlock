@@ -67,24 +67,24 @@ def test_flagship_profile_freezes_the_balanced_400_record_suite() -> None:
     assert corpora.profile_for_dataset(payload) == profile
 
 
-def test_portability_profile_renders_the_same_semantic_ids_for_granite() -> None:
+def test_portability_profile_renders_the_same_semantic_ids_for_gemma() -> None:
     qwen = corpora.qualification_records(corpora.corpus_profile("flagship"))
     profile = corpora.corpus_profile("portability")
-    granite = corpora.qualification_records(profile)
-    payload = corpora.records_jsonl(granite, compact=True)
+    gemma = corpora.qualification_records(profile)
+    payload = corpora.records_jsonl(gemma, compact=True)
 
-    assert profile.profile_id == "mmlu-pro-granite4-instruct-400-v1"
+    assert profile.profile_id == "mmlu-pro-gemma4-12b-no-think-400-v1"
     assert profile.dataset_sha256 == hashlib.sha256(payload).hexdigest()
-    assert [record["id"] for record in granite] == [record["id"] for record in qwen]
-    assert [record["expected"] for record in granite] == [
+    assert [record["id"] for record in gemma] == [record["id"] for record in qwen]
+    assert [record["expected"] for record in gemma] == [
         record["expected"] for record in qwen
     ]
     assert all(
-        record["prompt"].startswith("<|start_of_role|>system<|end_of_role|>")
+        record["prompt"].startswith("<bos><|turn>system\n")
         and record["prompt"].endswith(
-            "<|start_of_role|>assistant<|end_of_role|>"
+            "<|turn>model\n<|channel>thought\n<channel|>"
         )
-        for record in granite
+        for record in gemma
     )
     assert corpora.profile_for_dataset(payload) == profile
 

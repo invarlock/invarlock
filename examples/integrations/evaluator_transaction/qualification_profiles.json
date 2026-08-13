@@ -31,19 +31,19 @@
       }
     },
     "portability": {
-      "profile_id": "mmlu-pro-granite4-instruct-400-v1",
-      "model_profile": "granite4-h-small-base-to-post-trained-bf16-singleton-v1",
+      "profile_id": "mmlu-pro-gemma4-12b-no-think-400-v1",
+      "model_profile": "gemma4-12b-base-to-post-trained-bf16-singleton-v1",
       "rendering": {
-        "algorithm": "granite4-chat-template-v1",
-        "template_sha256": "9524df67b77a7b25a2dfee898f75b316a157eb9d855b51e32aeac79d7c8a83ce"
+        "algorithm": "gemma4-unified-chat-disable-thinking-v1",
+        "template_sha256": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4"
       },
       "derived_dataset": {
-        "name": "TIGER-Lab/MMLU-Pro/granite4-instruct",
+        "name": "TIGER-Lab/MMLU-Pro/gemma4-12b-no-think",
         "split": "test-balanced-400",
         "record_count": 400,
-        "byte_length": 421746,
+        "byte_length": 399746,
         "maximum_input_tokens": 1024,
-        "sha256": "7595b4dab3ea78f5a31d2eff6386f12a44d9827a7fc70fcfebd4743e46803953"
+        "sha256": "c64e2bae4f516896b8d871d5d2e6367e4bf8e27a4be65167f37cc70650ec13fa"
       }
     }
   },

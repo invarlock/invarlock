@@ -300,11 +300,10 @@ def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, 
         )
     elif profile.key == "portability":
         prompt = (
-            "<|start_of_role|>system<|end_of_role|>You answer multiple-choice "
-            "questions and follow the requested output format exactly."
-            "<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>"
-            f"{body}\n{instruction}<|end_of_text|>\n"
-            "<|start_of_role|>assistant<|end_of_role|>"
+            "<bos><|turn>system\nYou answer multiple-choice questions and follow "
+            "the requested output format exactly.<turn|>\n"
+            f"<|turn>user\n{body}\n{instruction}<turn|>\n"
+            "<|turn>model\n<|channel>thought\n<channel|>"
         )
     else:
         raise ValueError(f"profile does not use the semantic corpus: {profile.key}")
