@@ -484,9 +484,11 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
     monkeypatch.setattr(
         module,
         "_run_local_cli",
-        lambda _command: "ok",
+        lambda _command, **_kwargs: "ok",
     )
-    monkeypatch.setattr(module, "validate_completed_outputs", lambda *_args: None)
+    monkeypatch.setattr(
+        module, "validate_completed_outputs", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         module,
         "load_external_scoring_records_jsonl",
@@ -1747,6 +1749,7 @@ def test_evaluator_transaction_completion_output_and_path_guards(
                         "ok": True,
                         "integrity_ok": True,
                         "policy_verdict": "pass",
+                        "verification_status": 0,
                     }
                 }
             }
@@ -1755,9 +1758,46 @@ def test_evaluator_transaction_completion_output_and_path_guards(
     )
     report.write_text("<html>", encoding="utf-8")
     module.validate_completed_outputs(root / "evidence", receipt, report)
-    report.unlink()
+
+    (evidence / "evaluation.report.json").write_text(
+        json.dumps({"verdict": "fail", "metric": "exact_match"}),
+        encoding="utf-8",
+    )
+    receipt.write_text(
+        json.dumps(
+            {
+                "statement": {
+                    "verdict": {
+                        "ok": False,
+                        "integrity_ok": True,
+                        "policy_verdict": "fail",
+                        "verification_status": 7,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     with pytest.raises(module.BridgeError, match="passing result"):
         module.validate_completed_outputs(root / "evidence", receipt, report)
+    module.validate_completed_outputs(
+        root / "evidence", receipt, report, require_policy_pass=False
+    )
+    rejected = json.loads(receipt.read_text(encoding="utf-8"))
+    rejected["statement"]["verdict"]["verification_status"] = 0
+    receipt.write_text(json.dumps(rejected), encoding="utf-8")
+    with pytest.raises(module.BridgeError, match="coherent result"):
+        module.validate_completed_outputs(
+            root / "evidence", receipt, report, require_policy_pass=False
+        )
+    rejected["statement"]["verdict"]["verification_status"] = 7
+    receipt.write_text(json.dumps(rejected), encoding="utf-8")
+
+    report.unlink()
+    with pytest.raises(module.BridgeError, match="coherent result"):
+        module.validate_completed_outputs(
+            root / "evidence", receipt, report, require_policy_pass=False
+        )
 
 
 def test_evaluator_transaction_main_dispatches_and_reports_failures(
@@ -1871,10 +1911,19 @@ def test_evaluator_transaction_launcher_entrypoint_covers_success_and_cleanup_pa
         "remove_owned_image_tags",
         lambda _run, _engine, _repo, tags: cleanup.append(list(tags)),
     )
-    result = launcher.main("inspect-ai", ["--container-engine", "podman", *args])
+    result = launcher.main(
+        "inspect-ai",
+        ["--container-engine", "podman", "--allow-policy-fail", *args],
+    )
     assert result == 0
     assert cleanup == [[launcher.OwnedImageTag("owned-tag", "sha256:" + "a" * 64)]]
     assert any("model_inputs.py" in " ".join(command) for command in commands)
+    completion = next(
+        command
+        for command in commands
+        if "examples.integrations.evaluator_transaction.cli" in " ".join(command)
+    )
+    assert "--allow-policy-fail" in completion
     assert "Complete integration workspace" in capsys.readouterr().out
 
 
@@ -2087,6 +2136,33 @@ def test_evaluator_transaction_native_runner_and_worker_failure_boundaries(
         module.mount_source(mount_link, label="mount")
 
 
+def test_completion_cli_accepts_only_an_explicit_policy_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+
+    def result(status: int) -> None:
+        monkeypatch.setattr(
+            module,
+            "run_bounded_command",
+            lambda *_args, **_kwargs: subprocess.CompletedProcess(
+                ["verify"], status, "decision", "diagnostic"
+            ),
+        )
+
+    result(7)
+    with pytest.raises(module.BridgeError, match="diagnostic"):
+        module._run_local_cli(["verify"])
+    assert (
+        module._run_local_cli(["verify"], allow_policy_failure=True)
+        == "decision"
+    )
+
+    result(6)
+    with pytest.raises(module.BridgeError, match="diagnostic"):
+        module._run_local_cli(["verify"], allow_policy_failure=True)
+
+
 def test_evaluator_transaction_worker_and_main_complete_guards(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -2132,15 +2208,17 @@ def test_evaluator_transaction_worker_and_main_complete_guards(
             lock_digest="sha256:" + "b" * 64,
         )
 
-    monkeypatch.setattr(
-        module,
-        "complete",
-        lambda *_args, **_kwargs: (
+    completion_options: list[bool] = []
+
+    def fake_complete(*_args: object, **kwargs: object) -> tuple[Path, Path, Path]:
+        completion_options.append(bool(kwargs.get("allow_policy_fail")))
+        return (
             tmp_path / "evidence",
             tmp_path / "receipt",
             tmp_path / "report",
-        ),
-    )
+        )
+
+    monkeypatch.setattr(module, "complete", fake_complete)
     arguments = [
         "complete",
         "--workspace",
@@ -2165,8 +2243,10 @@ def test_evaluator_transaction_worker_and_main_complete_guards(
         "sha256:" + "b" * 64,
         "--build-attestation",
         str(tmp_path / "attestation.json"),
+        "--allow-policy-fail",
     ]
     assert module.main(arguments) == 0
+    assert completion_options == [True]
     assert "Evidence:" in capsys.readouterr().out
 
 

@@ -125,6 +125,11 @@ def main(argv: list[str] | None = None) -> int:
         "--corpus-profile", choices=("quick", "flagship"), default="quick"
     )
     parser.add_argument("--device")
+    parser.add_argument(
+        "--allow-policy-fail",
+        action="store_true",
+        help="retain a verified policy rejection as a completed evidence transaction",
+    )
     args = parser.parse_args(argv)
     builder_signing_key = load_builder_signing_key(
         Path(os.path.abspath(args.builder_signing_key.expanduser()))
@@ -376,6 +381,7 @@ def main(argv: list[str] | None = None) -> int:
                 base_id,
                 "--build-attestation",
                 str(build / "evaluator-build-attestation.json"),
+                *(["--allow-policy-fail"] if args.allow_policy_fail else []),
             ],
             cwd=repository,
         )

@@ -69,6 +69,7 @@ from invarlock.evaluation_oci import OciEvaluationError
 from invarlock.evidence_pack_contract import canonical_json_bytes, sha256_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
+from invarlock.evidence_pack_support import EvidencePackStatus
 from invarlock.runtime_import_authoring import (
     load_external_scoring_records_jsonl,
     write_runtime_import_paired_records,
@@ -231,6 +232,14 @@ def _run_bounded_command(
         completed.returncode,
         completed.stdout or "",
         completed.stderr or "",
+    )
+
+
+def _transaction_command_succeeded(
+    returncode: int, *, allow_policy_failure: bool
+) -> bool:
+    return returncode == 0 or (
+        allow_policy_failure and returncode == int(EvidencePackStatus.REPORTS)
     )
 
 
@@ -727,8 +736,14 @@ def _adapt_run_bindings(
     }
 
 
-def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> None:
-    """Require a passing signed transaction, not merely successful processes."""
+def validate_completed_outputs(
+    evidence: Path,
+    receipt: Path,
+    report: Path,
+    *,
+    require_policy_pass: bool = True,
+) -> None:
+    """Require a coherent verified decision, and optionally a policy pass."""
 
     try:
         evaluation_report = json.loads(
@@ -753,8 +768,19 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
     comparison = evaluation_report.get("comparison")
     baseline = evaluation_report.get("baseline")
     subject = evaluation_report.get("subject")
+    policy_verdict = (
+        receipt_verdict.get("policy_verdict")
+        if isinstance(receipt_verdict, dict)
+        else None
+    )
+    evaluation_verdict = evaluation_report.get("verdict")
+    expected_status = (
+        int(EvidencePackStatus.OK)
+        if policy_verdict == "pass"
+        else int(EvidencePackStatus.REPORTS)
+    )
     if (
-        evaluation_report.get("verdict") != "pass"
+        evaluation_verdict not in {"pass", "fail"}
         or evaluation_report.get("metric") != "exact_match"
         or not isinstance(comparison, dict)
         or isinstance(comparison.get("value"), bool)
@@ -766,11 +792,16 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
         or isinstance(subject.get("mean_score"), bool)
         or not isinstance(subject.get("mean_score"), (int, float))
         or not isinstance(receipt_verdict, dict)
-        or receipt_verdict.get("ok") is not True
         or receipt_verdict.get("integrity_ok") is not True
-        or receipt_verdict.get("policy_verdict") != "pass"
+        or policy_verdict != evaluation_verdict
+        or receipt_verdict.get("ok") is not (policy_verdict == "pass")
+        or type(receipt_verdict.get("verification_status")) is not int
+        or receipt_verdict.get("verification_status") != expected_status
         or not report.is_file()
+        or report.is_symlink()
     ):
+        raise BridgeError("the completed transaction did not verify a coherent result")
+    if require_policy_pass and policy_verdict != "pass":
         raise BridgeError("the completed transaction did not verify a passing result")
 
 
@@ -879,6 +910,7 @@ def complete(
     build_attestation: Path | None = None,
     builder_public_key: Path | None = None,
     device: str | None = None,
+    allow_policy_fail: bool = False,
 ) -> tuple[Path, Path, Path]:
     """Author strict import inputs and execute evaluate, verify, and report."""
 
@@ -1228,9 +1260,14 @@ def complete(
             timeout_seconds=CLI_TIMEOUT_SECONDS,
             label="InvarLock transaction command",
         )
-        if completed.returncode:
+        if not _transaction_command_succeeded(
+            completed.returncode,
+            allow_policy_failure=(allow_policy_fail and arguments[0] == "verify"),
+        ):
             raise BridgeError(completed.stderr or completed.stdout)
-    validate_completed_outputs(evidence, receipt, report)
+    validate_completed_outputs(
+        evidence, receipt, report, require_policy_pass=not allow_policy_fail
+    )
     return evidence, receipt, report
 
 
@@ -1257,6 +1294,11 @@ def main(argv: list[str] | None = None) -> int:
     bridge_parser.add_argument("--base-image-id", required=True)
     bridge_parser.add_argument("--build-attestation", type=Path, required=True)
     bridge_parser.add_argument("--device")
+    bridge_parser.add_argument(
+        "--allow-policy-fail",
+        action="store_true",
+        help="retain a verified policy rejection as a completed evidence transaction",
+    )
     args = parser.parse_args(argv)
     try:
         if args.command == "worker":
@@ -1295,6 +1337,7 @@ def main(argv: list[str] | None = None) -> int:
                     else None
                 ),
                 device=args.device,
+                allow_policy_fail=args.allow_policy_fail,
             )
             print(f"Evidence: {evidence}\nReceipt: {receipt}\nReport: {report}")
     except (BridgeError, OSError, RuntimeError, TypeError, ValueError) as exc:

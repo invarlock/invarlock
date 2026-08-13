@@ -819,12 +819,14 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
         )
         == 0
     )
-    completed_paths: list[tuple[Path, Path]] = []
+    completed_paths: list[tuple[Path, Path, bool]] = []
 
     def fake_complete(
         root: Path, prepared: Path, *_args: object, **_kwargs: object
     ) -> tuple[Path, Path, Path]:
-        completed_paths.append((root, prepared))
+        completed_paths.append(
+            (root, prepared, bool(_kwargs.get("allow_policy_fail")))
+        )
         return (
             tmp_path / "evidence",
             tmp_path / "receipt.json",
@@ -857,6 +859,7 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
                 "sha256:" + "b" * 64,
                 "--build-attestation",
                 str(completion_keys["build_attestation"]),
+                "--allow-policy-fail",
             ]
         )
         == 0
@@ -866,6 +869,7 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
         (
             (tmp_path / "transaction").absolute(),
             (tmp_path / "prepared").absolute(),
+            True,
         )
     ]
     assert "Evidence:" in capsys.readouterr().out
@@ -1167,6 +1171,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
             [
                 "--workspace",
                 str(tmp_path / "journey"),
+                "--allow-policy-fail",
                 *_launcher_args(tmp_path, module),
             ]
         )
@@ -1181,6 +1186,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
     )
     assert "--source-commit" in completion
     assert "--base-image-id" in completion
+    assert "--allow-policy-fail" in completion
     build = next(command for command in commands if command[:2] == ["docker", "build"])
     base_argument = next(
         argument for argument in build if argument.startswith("BASE_IMAGE=")
@@ -1260,6 +1266,17 @@ def test_harness_bounded_command_captures_failures_and_start_errors(
             timeout_seconds=10,
             label="test command",
         )
+
+
+def test_harness_accepts_only_an_explicit_policy_rejection_status() -> None:
+    module = _module()
+
+    assert module._transaction_command_succeeded(0, allow_policy_failure=False)
+    assert not module._transaction_command_succeeded(
+        7, allow_policy_failure=False
+    )
+    assert module._transaction_command_succeeded(7, allow_policy_failure=True)
+    assert not module._transaction_command_succeeded(6, allow_policy_failure=True)
 
 
 def test_harness_workers_mount_role_private_output_parents(
@@ -1799,6 +1816,7 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
                         "integrity_ok": True,
                         "ok": True,
                         "policy_verdict": "pass",
+                        "verification_status": 0,
                     }
                 },
             }
@@ -1808,16 +1826,37 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
     module.validate_completed_outputs(evidence, receipt, rendered)
 
     value = json.loads(receipt.read_text(encoding="utf-8"))
-    value["statement"]["verdict"]["policy_verdict"] = "fail"
-    receipt.write_text(json.dumps(value), encoding="utf-8")
-    with pytest.raises(module.BridgeError, match="did not verify a passing"):
-        module.validate_completed_outputs(evidence, receipt, rendered)
-
-    value["statement"]["verdict"]["policy_verdict"] = "pass"
-    receipt.write_text(json.dumps(value), encoding="utf-8")
     evaluation = json.loads(
         (reports / "evaluation.report.json").read_text(encoding="utf-8")
     )
+    evaluation["verdict"] = "fail"
+    (reports / "evaluation.report.json").write_text(
+        json.dumps(evaluation), encoding="utf-8"
+    )
+    value["statement"]["verdict"]["ok"] = False
+    value["statement"]["verdict"]["policy_verdict"] = "fail"
+    value["statement"]["verdict"]["verification_status"] = 7
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(module.BridgeError, match="did not verify a passing"):
+        module.validate_completed_outputs(evidence, receipt, rendered)
+    module.validate_completed_outputs(
+        evidence, receipt, rendered, require_policy_pass=False
+    )
+    value["statement"]["verdict"]["verification_status"] = 0
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(module.BridgeError, match="coherent result"):
+        module.validate_completed_outputs(
+            evidence, receipt, rendered, require_policy_pass=False
+        )
+
+    evaluation["verdict"] = "pass"
+    (reports / "evaluation.report.json").write_text(
+        json.dumps(evaluation), encoding="utf-8"
+    )
+    value["statement"]["verdict"]["ok"] = True
+    value["statement"]["verdict"]["policy_verdict"] = "pass"
+    value["statement"]["verdict"]["verification_status"] = 0
+    receipt.write_text(json.dumps(value), encoding="utf-8")
     evaluation["baseline"]["mean_score"] = 0.19
     (reports / "evaluation.report.json").write_text(
         json.dumps(evaluation), encoding="utf-8"
@@ -1829,7 +1868,7 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
     (reports / "evaluation.report.json").write_text(
         json.dumps(evaluation), encoding="utf-8"
     )
-    with pytest.raises(module.BridgeError, match="did not verify a passing"):
+    with pytest.raises(module.BridgeError, match="coherent result"):
         module.validate_completed_outputs(evidence, receipt, rendered)
 
     receipt.unlink()

@@ -352,6 +352,11 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
         "--corpus-profile", choices=("quick", "flagship"), default="quick"
     )
     parser.add_argument("--device")
+    parser.add_argument(
+        "--allow-policy-fail",
+        action="store_true",
+        help="retain a verified policy rejection as a completed evidence transaction",
+    )
     args = parser.parse_args(argv)
     repository = REPOSITORY
     if args.workspace is None:
@@ -448,6 +453,7 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
                 base_image_id,
                 "--build-attestation",
                 str(build / "evaluator-build-attestation.json"),
+                *(["--allow-policy-fail"] if args.allow_policy_fail else []),
             ],
             cwd=repository,
         )

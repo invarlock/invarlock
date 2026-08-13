@@ -10,7 +10,6 @@ import json
 import os
 import re
 import stat
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,6 +62,7 @@ from invarlock.core.schedule_preparation import (
 from invarlock.evaluation_oci import OciEvaluationError
 from invarlock.evidence_pack_contract import canonical_json_bytes, sha256_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
+from invarlock.evidence_pack_support import EvidencePackStatus
 from invarlock.runtime_import_authoring import (
     load_external_scoring_records_jsonl,
     write_runtime_import_paired_records,
@@ -290,25 +290,30 @@ def _inspect_runtime_image(
         ) from exc
 
 
-def _run_local_cli(command: list[str]) -> str:
+def _run_local_cli(
+    command: list[str], *, allow_policy_failure: bool = False
+) -> str:
     """Run one completion CLI with bounded diagnostics and a hard deadline."""
     try:
         completed = run_bounded_command(
             command,
             capture_output=True,
-            check=True,
+            check=False,
             timeout_seconds=WORKER_TIMEOUT_SECONDS,
             stdout_limit=4 * 1024 * 1024,
             stderr_limit=256 * 1024,
             label="evaluator completion command",
         )
-    except subprocess.CalledProcessError as exc:
-        diagnostic = (exc.stderr or exc.output or "").strip()
-        raise BridgeError(
-            diagnostic or f"command exited with status {exc.returncode}"
-        ) from exc
     except RuntimeError as exc:
         raise BridgeError(str(exc)) from exc
+    if completed.returncode != 0 and not (
+        allow_policy_failure
+        and completed.returncode == int(EvidencePackStatus.REPORTS)
+    ):
+        diagnostic = (completed.stderr or completed.stdout or "").strip()
+        raise BridgeError(
+            diagnostic or f"command exited with status {completed.returncode}"
+        )
     return completed.stdout or ""
 
 
@@ -651,7 +656,13 @@ def imported(role: str) -> dict[str, str]:
     }
 
 
-def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> None:
+def validate_completed_outputs(
+    evidence: Path,
+    receipt: Path,
+    report: Path,
+    *,
+    require_policy_pass: bool = True,
+) -> None:
     try:
         evaluation = json.loads(
             _read_regular_file(
@@ -666,16 +677,32 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
         ) from exc
     statement = signed.get("statement") if isinstance(signed, dict) else None
     verdict = statement.get("verdict") if isinstance(statement, dict) else None
+    policy_verdict = (
+        verdict.get("policy_verdict") if isinstance(verdict, dict) else None
+    )
+    evaluation_verdict = (
+        evaluation.get("verdict") if isinstance(evaluation, dict) else None
+    )
+    expected_status = (
+        int(EvidencePackStatus.OK)
+        if policy_verdict == "pass"
+        else int(EvidencePackStatus.REPORTS)
+    )
     if (
         not isinstance(evaluation, dict)
-        or evaluation.get("verdict") != "pass"
+        or evaluation_verdict not in {"pass", "fail"}
         or evaluation.get("metric") != "exact_match"
         or not isinstance(verdict, dict)
-        or verdict.get("ok") is not True
         or verdict.get("integrity_ok") is not True
-        or verdict.get("policy_verdict") != "pass"
+        or policy_verdict != evaluation_verdict
+        or verdict.get("ok") is not (policy_verdict == "pass")
+        or type(verdict.get("verification_status")) is not int
+        or verdict.get("verification_status") != expected_status
         or not report.is_file()
+        or report.is_symlink()
     ):
+        raise BridgeError("the completed transaction did not verify a coherent result")
+    if require_policy_pass and policy_verdict != "pass":
         raise BridgeError("the completed transaction did not verify a passing result")
 
 
@@ -736,6 +763,7 @@ def complete(
     build_attestation: Path | None = None,
     builder_public_key: Path | None = None,
     device: str | None = None,
+    allow_policy_fail: bool = False,
 ) -> tuple[Path, Path, Path]:
     """Author strict import inputs and execute evaluate, verify, and report."""
 
@@ -1154,8 +1182,13 @@ def complete(
         ["report", str(evidence), "--html", str(report)],
     ]
     for arguments in commands:
-        _run_local_cli([sys.executable, "-m", "invarlock", *arguments])
-    validate_completed_outputs(evidence, receipt, report)
+        _run_local_cli(
+            [sys.executable, "-m", "invarlock", *arguments],
+            allow_policy_failure=(allow_policy_fail and arguments[0] == "verify"),
+        )
+    validate_completed_outputs(
+        evidence, receipt, report, require_policy_pass=not allow_policy_fail
+    )
     return evidence, receipt, report
 
 
@@ -1183,6 +1216,11 @@ def main(argv: list[str] | None = None) -> int:
     bridge_parser.add_argument("--base-image-id", required=True)
     bridge_parser.add_argument("--build-attestation", type=Path, required=True)
     bridge_parser.add_argument("--device")
+    bridge_parser.add_argument(
+        "--allow-policy-fail",
+        action="store_true",
+        help="retain a verified policy rejection as a completed evidence transaction",
+    )
     args = parser.parse_args(argv)
     try:
         if args.command == "worker":
@@ -1212,6 +1250,7 @@ def main(argv: list[str] | None = None) -> int:
                     else None
                 ),
                 device=args.device,
+                allow_policy_fail=args.allow_policy_fail,
             )
             print(f"Evidence: {evidence}\nReceipt: {receipt}\nReport: {report}")
     except (BridgeError, OSError, RuntimeError, TypeError, ValueError) as exc:
