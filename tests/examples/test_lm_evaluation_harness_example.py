@@ -64,10 +64,7 @@ def test_flagship_harness_profile_isolates_each_inference_record() -> None:
     config = module.execution_config(module.corpus_profile("flagship"))
 
     assert config["batch_size"] == 1
-    assert (
-        config["model_profile"]
-        == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
-    )
+    assert config["model_profile"] == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
 
 
 def _complete_kwargs(tmp_path: Path, module: ModuleType) -> dict[str, object]:
@@ -824,9 +821,7 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
     def fake_complete(
         root: Path, prepared: Path, *_args: object, **_kwargs: object
     ) -> tuple[Path, Path, Path]:
-        completed_paths.append(
-            (root, prepared, bool(_kwargs.get("allow_policy_fail")))
-        )
+        completed_paths.append((root, prepared, bool(_kwargs.get("allow_policy_fail"))))
         return (
             tmp_path / "evidence",
             tmp_path / "receipt.json",
@@ -1272,9 +1267,7 @@ def test_harness_accepts_only_an_explicit_policy_rejection_status() -> None:
     module = _module()
 
     assert module._transaction_command_succeeded(0, allow_policy_failure=False)
-    assert not module._transaction_command_succeeded(
-        7, allow_policy_failure=False
-    )
+    assert not module._transaction_command_succeeded(7, allow_policy_failure=False)
     assert module._transaction_command_succeeded(7, allow_policy_failure=True)
     assert not module._transaction_command_succeeded(6, allow_policy_failure=True)
 
@@ -1404,9 +1397,7 @@ def test_model_input_download_accepts_only_the_pinned_bytes(
     item = module.SnapshotFile(
         "model.bin", len(payload), hashlib.sha256(payload).hexdigest()
     )
-    snapshot = module.Snapshot(
-        "baseline", "Qwen/example", "a" * 40, "qwen3", (item,)
-    )
+    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, "qwen3", (item,))
 
     class Response:
         def __init__(self) -> None:
@@ -1454,9 +1445,7 @@ def test_model_input_download_rejects_invalid_streams_and_removes_partial_file(
 ) -> None:
     module = _model_inputs_module()
     item = module.SnapshotFile("model.bin", byte_length, "0" * 64)
-    snapshot = module.Snapshot(
-        "baseline", "Qwen/example", "a" * 40, "qwen3", (item,)
-    )
+    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, "qwen3", (item,))
 
     class Response:
         def __init__(self) -> None:
@@ -1563,8 +1552,7 @@ def test_model_input_records_render_the_closed_semantic_corpus_per_family() -> N
         record["prompt"].startswith("<|im_start|>system\n") for record in flagship
     )
     assert all(
-        record["prompt"].startswith("<bos><|turn>system\n")
-        for record in portability
+        record["prompt"].startswith("<bos><|turn>system\n") for record in portability
     )
 
 

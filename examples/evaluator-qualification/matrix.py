@@ -184,9 +184,7 @@ def demonstration_levels() -> dict[str, dict[str, object]]:
     return values
 
 
-def retained_transactions(
-    value: object, *, profile_id: str
-) -> list[dict[str, object]]:
+def retained_transactions(value: object, *, profile_id: str) -> list[dict[str, object]]:
     """Validate every explicitly retained signed transaction for one adapter."""
 
     if not isinstance(value, list):
@@ -379,7 +377,9 @@ def verify_signed_transaction(profile_id: str, retained: dict[str, object]) -> N
     expected_ok = expected_verdict == "pass"
     expected_status = 0 if expected_ok else 7
     receipt_verdict = (
-        receipt.statement.get("verdict") if isinstance(receipt.statement, dict) else None
+        receipt.statement.get("verdict")
+        if isinstance(receipt.statement, dict)
+        else None
     )
     if (
         evidence.payload.get("integrity_ok") is not True
@@ -412,9 +412,7 @@ def verify_signed_transaction(profile_id: str, retained: dict[str, object]) -> N
             f"{profile_id}: retained signed transaction does not match its "
             "declared dataset"
         )
-    print(
-        f"retained signed transaction {package_id}: {expected_verdict}", flush=True
-    )
+    print(f"retained signed transaction {package_id}: {expected_verdict}", flush=True)
 
 
 def _paired_records(package_id: str) -> dict[str, Any]:

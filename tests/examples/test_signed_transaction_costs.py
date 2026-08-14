@@ -54,9 +54,7 @@ def test_measurement_sizes_match_the_retained_directories() -> None:
 def test_public_cost_table_records_exact_sizes_and_claim_boundary() -> None:
     module = _module()
     for transaction_id in module.TRANSACTION_IDS:
-        _files, size = module._tree_stats(
-            TRANSACTIONS / transaction_id / "evidence"
-        )
+        _files, size = module._tree_stats(TRANSACTIONS / transaction_id / "evidence")
         assert f"{size:,}" in README
     assert "complete semantic evidence replay" in README
     assert "not a performance guarantee" in README

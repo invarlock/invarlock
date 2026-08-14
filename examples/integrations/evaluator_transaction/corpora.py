@@ -200,8 +200,7 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         records = qualification_records(profile)
         declared = manifest["profiles"][profile.key]
         if (
-            artifact["sha256"]
-            != manifest["qualification_suite"]["semantic_sha256"]
+            artifact["sha256"] != manifest["qualification_suite"]["semantic_sha256"]
             or qualification["record_count"] != profile.record_count
             or qualification["selection_algorithm"]
             != manifest["qualification_suite"]["selection_algorithm"]
@@ -263,9 +262,7 @@ def _semantic_records() -> list[dict[str, Any]]:
         _SEMANTIC_RECORDS, expected_bytes=suite["semantic_byte_length"]
     )
     if hashlib.sha256(payload).hexdigest() != suite["semantic_sha256"]:
-        raise RuntimeError(
-            "bundled semantic corpus does not match its pinned identity"
-        )
+        raise RuntimeError("bundled semantic corpus does not match its pinned identity")
     records = [json.loads(line) for line in payload.splitlines()]
     if len(records) != 400 or any(
         not isinstance(record, dict)
@@ -282,8 +279,7 @@ def _question_body(record: dict[str, Any]) -> str:
     if not isinstance(options, list) or not 2 <= len(options) <= 10:
         raise RuntimeError("bundled semantic corpus has invalid choices")
     choices = "\n".join(
-        f"{chr(ord('A') + index)}. {option}"
-        for index, option in enumerate(options)
+        f"{chr(ord('A') + index)}. {option}" for index, option in enumerate(options)
     )
     return f"Question: {record['question']}\nChoices:\n{choices}"
 
@@ -320,10 +316,13 @@ def qualification_records(profile: CorpusProfile) -> list[dict[str, str]]:
     records = [_render_record(record, profile) for record in _semantic_records()]
     payload = records_jsonl(records, compact=True)
     if (
-        len(payload) != _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
+        len(payload)
+        != _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
         or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
     ):
-        raise RuntimeError("rendered evaluator corpus does not match its pinned identity")
+        raise RuntimeError(
+            "rendered evaluator corpus does not match its pinned identity"
+        )
     validate_dataset_records(payload, profile)
     return records
 

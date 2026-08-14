@@ -592,11 +592,7 @@ def test_write_flagship_comparison_requires_every_retained_package(
 
 def test_retained_transaction_metadata_is_strict_and_bounded(tmp_path: Path) -> None:
     module = _matrix_module()
-    source = (
-        SIGNED_TRANSACTIONS
-        / "deployment-approval-inspect-ai"
-        / "transaction.json"
-    )
+    source = SIGNED_TRANSACTIONS / "deployment-approval-inspect-ai" / "transaction.json"
     transaction = _load(source)
     path = tmp_path / "transaction.json"
 
@@ -662,9 +658,7 @@ def test_retained_transaction_metadata_rejects_malformed_fields(
     module = _matrix_module()
     transaction = json.loads(
         (
-            SIGNED_TRANSACTIONS
-            / "deployment-approval-inspect-ai"
-            / "transaction.json"
+            SIGNED_TRANSACTIONS / "deployment-approval-inspect-ai" / "transaction.json"
         ).read_bytes()
     )
     assert callable(mutation)

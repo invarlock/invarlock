@@ -95,10 +95,7 @@ def test_flagship_evaluator_profile_isolates_each_inference_record(
     config = module.execution_config(evaluator, flagship)
 
     assert config["batch_size"] == 1
-    assert (
-        config["model_profile"]
-        == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
-    )
+    assert config["model_profile"] == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
 
 
 @pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
@@ -2153,10 +2150,7 @@ def test_completion_cli_accepts_only_an_explicit_policy_rejection(
     result(7)
     with pytest.raises(module.BridgeError, match="diagnostic"):
         module._run_local_cli(["verify"])
-    assert (
-        module._run_local_cli(["verify"], allow_policy_failure=True)
-        == "decision"
-    )
+    assert module._run_local_cli(["verify"], allow_policy_failure=True) == "decision"
 
     result(6)
     with pytest.raises(module.BridgeError, match="diagnostic"):

@@ -290,9 +290,7 @@ def _inspect_runtime_image(
         ) from exc
 
 
-def _run_local_cli(
-    command: list[str], *, allow_policy_failure: bool = False
-) -> str:
+def _run_local_cli(command: list[str], *, allow_policy_failure: bool = False) -> str:
     """Run one completion CLI with bounded diagnostics and a hard deadline."""
     try:
         completed = run_bounded_command(
@@ -307,8 +305,7 @@ def _run_local_cli(
     except RuntimeError as exc:
         raise BridgeError(str(exc)) from exc
     if completed.returncode != 0 and not (
-        allow_policy_failure
-        and completed.returncode == int(EvidencePackStatus.REPORTS)
+        allow_policy_failure and completed.returncode == int(EvidencePackStatus.REPORTS)
     ):
         diagnostic = (completed.stderr or completed.stdout or "").strip()
         raise BridgeError(

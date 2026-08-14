@@ -20,8 +20,7 @@ WORKFLOW = CONSUMER / ".github/workflows/deployment-approval.yml"
 APPROVAL_INPUTS_PATH = CONSUMER / "review/inspect-ai-deployment-approval-inputs.json"
 POLICY = CONSUMER / "review/policy/acceptance.json"
 TRANSACTION = (
-    ROOT
-    / "examples/evaluator-qualification/signed-transactions/"
+    ROOT / "examples/evaluator-qualification/signed-transactions/"
     "deployment-approval-inspect-ai"
 )
 APPROVAL_INPUTS = json.loads(APPROVAL_INPUTS_PATH.read_bytes())

@@ -81,9 +81,7 @@ def test_portability_profile_renders_the_same_semantic_ids_for_gemma() -> None:
     ]
     assert all(
         record["prompt"].startswith("<bos><|turn>system\n")
-        and record["prompt"].endswith(
-            "<|turn>model\n<|channel>thought\n<channel|>"
-        )
+        and record["prompt"].endswith("<|turn>model\n<|channel>thought\n<channel|>")
         for record in gemma
     )
     assert corpora.profile_for_dataset(payload) == profile

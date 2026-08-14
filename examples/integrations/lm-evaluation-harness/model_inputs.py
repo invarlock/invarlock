@@ -239,9 +239,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--runtime-image", required=True)
-    parser.add_argument(
-        "--corpus-profile", choices=PROFILE_KEYS, default="quick"
-    )
+    parser.add_argument("--corpus-profile", choices=PROFILE_KEYS, default="quick")
     arguments = parser.parse_args()
     selected = getattr(arguments, "corpus_profile", "quick")
     if selected != "quick":
