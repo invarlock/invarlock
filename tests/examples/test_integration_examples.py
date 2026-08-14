@@ -1862,15 +1862,31 @@ def test_compact_profile_pins_qwen35_08b() -> None:
     assert compact_model_profile.PEFT_TARGET_MODULES == ("q_proj", "v_proj")
 
 
-def test_qwen35_compact_loader_rejects_wrong_architecture() -> None:
-    class WrongConfig:
-        model_type = "qwen3"
-        architectures = ["Qwen3ForCausalLM"]
-
+@pytest.mark.parametrize(
+    "wrong_config",
+    [
+        SimpleNamespace(
+            model_type="qwen3",
+            architectures=["Qwen3ForCausalLM"],
+        ),
+        SimpleNamespace(
+            model_type="qwen3_5",
+            architectures=("Qwen3_5ForConditionalGeneration",),
+        ),
+        SimpleNamespace(
+            model_type="qwen3_5",
+            architectures=["Qwen3_5ForCausalLM"],
+        ),
+    ],
+    ids=["wrong-model-type", "non-list-architectures", "wrong-architecture"],
+)
+def test_qwen35_compact_loader_rejects_wrong_architecture(
+    wrong_config: SimpleNamespace,
+) -> None:
     class AutoConfig:
         @staticmethod
-        def from_pretrained(*_args: object, **_kwargs: object) -> WrongConfig:
-            return WrongConfig()
+        def from_pretrained(*_args: object, **_kwargs: object) -> SimpleNamespace:
+            return wrong_config
 
     class NotCalled:
         @staticmethod
@@ -1888,6 +1904,34 @@ def test_qwen35_compact_loader_rejects_wrong_architecture() -> None:
     )
 
     with pytest.raises(RuntimeError, match="Qwen3.5 text architecture"):
+        REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
+
+
+def test_qwen35_compact_loader_rejects_non_text_model_resolution() -> None:
+    class Loader:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(
+                config=SimpleNamespace(model_type="qwen3_5", use_cache=True)
+            )
+
+    transformers = SimpleNamespace(
+        AutoConfig=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: SimpleNamespace(
+                model_type="qwen3_5",
+                architectures=["Qwen3_5ForConditionalGeneration"],
+            )
+        ),
+        AutoTokenizer=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: SimpleNamespace(
+                pad_token_id=0,
+                eos_token_id=2,
+            )
+        ),
+        AutoModelForCausalLM=Loader,
+    )
+
+    with pytest.raises(RuntimeError, match="causal text model"):
         REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
 
 
