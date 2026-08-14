@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare an official Qwen3 Q8 GGUF with a pinned llama.cpp Q5 derivative."""
+"""Compare an official compact Q8 GGUF with a pinned llama.cpp Q5 derivative."""
 
 from __future__ import annotations
 
@@ -31,62 +31,62 @@ from invarlock.core.schedule_preparation import (
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.runtime_providers.gguf_identity import read_gguf_artifact_identity
 
-_MODEL_REPOSITORY = "Qwen/Qwen3-0.6B-GGUF"
-_MODEL_REVISION = "23749fefcc72300e3a2ad315e1317431b06b590a"
+_MODEL_REPOSITORY = "ggml-org/Qwen3.5-0.8B-GGUF"
+_MODEL_REVISION = "8fea620810c4afa23dd6443f999a48574c1611a3"
 _APT_SNAPSHOT = "20260701T000000Z"
-_MAX_DOWNLOAD_BYTES = 700 * 1024 * 1024
+_MAX_DOWNLOAD_BYTES = 900 * 1024 * 1024
 _QUANTIZATION = "Q5_K_M"
 _RECORDS = Path(__file__).with_name("gguf-llama-cpp") / "records.json"
 _MINIMUM_SIDE_ACCURACY = 0.40
-_PINNED_QWEN3_ONE_TOKEN_TARGET_IDS = {
-    " Africa": 10174,
-    " Asia": 13622,
-    " Atlantic": 22375,
-    " Berlin": 19846,
-    " Cairo": 52550,
-    " Canberra": 68790,
-    " English": 6364,
-    " Europe": 4505,
-    " Everest": 86478,
-    " Jupiter": 49689,
-    " Lisbon": 80701,
-    " Madrid": 24081,
-    " Mars": 21048,
-    " May": 3217,
-    " Nairobi": 96525,
-    " Nile": 76190,
-    " Ottawa": 32166,
-    " Pacific": 16462,
-    " Paris": 12095,
-    " Rome": 21718,
-    " Tokyo": 26194,
-    " blue": 6303,
-    " book": 2311,
-    " carbon": 12499,
-    " child": 1682,
-    " closed": 7877,
-    " cold": 9255,
-    " eight": 8063,
-    " energy": 4802,
-    " euro": 17672,
-    " fifty": 32417,
-    " four": 3040,
-    " freezing": 42218,
-    " gold": 6623,
-    " gravity": 23249,
-    " hundred": 7739,
-    " night": 3729,
-    " nine": 11627,
-    " oxygen": 23552,
-    " seven": 8094,
-    " six": 4743,
-    " slow": 6301,
-    " small": 2613,
-    " ten": 5779,
-    " twelve": 29235,
-    " vapor": 37652,
-    " water": 3015,
-    " yen": 57340,
+_PINNED_COMPACT_ONE_TOKEN_TARGET_IDS = {
+    " Africa": 9871,
+    " Asia": 13229,
+    " Atlantic": 21678,
+    " Berlin": 19241,
+    " Cairo": 50779,
+    " Canberra": 66463,
+    " English": 6163,
+    " Europe": 4357,
+    " Everest": 83489,
+    " Jupiter": 48017,
+    " Lisbon": 77916,
+    " Madrid": 23327,
+    " Mars": 20403,
+    " May": 3114,
+    " Nairobi": 93190,
+    " Nile": 73583,
+    " Ottawa": 31106,
+    " Pacific": 15979,
+    " Paris": 11751,
+    " Rome": 21047,
+    " Tokyo": 25358,
+    " blue": 6105,
+    " book": 2236,
+    " carbon": 12141,
+    " child": 1623,
+    " closed": 7629,
+    " cold": 8981,
+    " eight": 7810,
+    " energy": 4649,
+    " euro": 17146,
+    " fifty": 31347,
+    " four": 2943,
+    " freezing": 40818,
+    " gold": 6414,
+    " gravity": 22525,
+    " hundred": 7493,
+    " night": 3603,
+    " nine": 11292,
+    " oxygen": 22817,
+    " seven": 7840,
+    " six": 4590,
+    " slow": 6103,
+    " small": 2526,
+    " ten": 5600,
+    " twelve": 28279,
+    " vapor": 36405,
+    " water": 2919,
+    " yen": 55421,
 }
 
 
@@ -107,9 +107,9 @@ class ModelDownload:
 
 _OFFICIAL_MODEL = ModelDownload(
     role="baseline",
-    filename="Qwen3-0.6B-Q8_0.gguf",
-    byte_length=639_446_688,
-    sha256="9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+    filename="Qwen3.5-0.8B-Q8_0.gguf",
+    byte_length=833_592_096,
+    sha256="37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f",
 )
 
 
@@ -212,7 +212,7 @@ def _stage_models(
     model_root.mkdir(parents=True)
     baseline = model_root / _OFFICIAL_MODEL.filename
     _download_model(baseline, _OFFICIAL_MODEL)
-    subject = model_root / "Qwen3-0.6B-Q5_K_M.gguf"
+    subject = model_root / "Qwen3.5-0.8B-Q5_K_M.gguf"
     uid = os.getuid() if hasattr(os, "getuid") else 65532
     gid = os.getgid() if hasattr(os, "getgid") else 65532
     launch._run(
@@ -421,7 +421,7 @@ def _load_records() -> list[dict[str, str]]:
             not record["expected"].startswith(" ")
             or record["expected"].strip() != record["expected"][1:]
             or any(character.isspace() for character in record["expected"][1:])
-            or record["expected"] not in _PINNED_QWEN3_ONE_TOKEN_TARGET_IDS
+            or record["expected"] not in _PINNED_COMPACT_ONE_TOKEN_TARGET_IDS
         ):
             raise RuntimeError(
                 f"GGUF example record {index} must use one maintained target word"

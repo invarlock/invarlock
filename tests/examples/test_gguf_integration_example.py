@@ -31,11 +31,11 @@ def test_records_are_closed_unique_and_sufficient() -> None:
         for record in records
     )
     assert {record["expected"] for record in records} == set(
-        example._PINNED_QWEN3_ONE_TOKEN_TARGET_IDS
+        example._PINNED_COMPACT_ONE_TOKEN_TARGET_IDS
     )
     assert all(
         isinstance(token_id, int) and token_id > 0
-        for token_id in example._PINNED_QWEN3_ONE_TOKEN_TARGET_IDS.values()
+        for token_id in example._PINNED_COMPACT_ONE_TOKEN_TARGET_IDS.values()
     )
 
 
@@ -52,13 +52,13 @@ def test_records_reject_unreviewed_target_token_changes(
         example._load_records()
 
 
-def test_official_qwen3_source_and_pinned_quantizer_are_part_of_the_journey() -> None:
-    assert example._MODEL_REPOSITORY == "Qwen/Qwen3-0.6B-GGUF"
-    assert example._MODEL_REVISION == "23749fefcc72300e3a2ad315e1317431b06b590a"
-    assert example._OFFICIAL_MODEL.filename == "Qwen3-0.6B-Q8_0.gguf"
-    assert example._OFFICIAL_MODEL.byte_length == 639_446_688
+def test_official_qwen35_08b_gguf_identity() -> None:
+    assert example._MODEL_REPOSITORY == "ggml-org/Qwen3.5-0.8B-GGUF"
+    assert example._MODEL_REVISION == "8fea620810c4afa23dd6443f999a48574c1611a3"
+    assert example._OFFICIAL_MODEL.filename == "Qwen3.5-0.8B-Q8_0.gguf"
+    assert example._OFFICIAL_MODEL.byte_length == 833_592_096
     assert example._OFFICIAL_MODEL.sha256 == (
-        "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031"
+        "37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f"
     )
     dockerfile = (
         Path(__file__).resolve().parents[2] / "addins/gguf/runtime/Dockerfile"
@@ -124,7 +124,9 @@ def test_stage_models_derives_q5_with_the_pinned_networkless_quantizer(
         "_run",
         lambda command, **_kwargs: (
             commands.append(command),
-            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(b"derived-q5"),
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(
+                b"derived-q5"
+            ),
             _completed(command),
         )[-1],
     )
@@ -318,10 +320,10 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
     assert request["comparison"]["subject"]["runtime"]["provider"] == "llama_cpp"
     assert request["comparison"]["dataset"]["name"] == "qwen3-0.6b-q8-to-q5"
     assert request["comparison"]["baseline"]["artifact"]["locator"].startswith(
-        "hf://Qwen/Qwen3-0.6B-GGUF@23749fef"
+        "hf://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )
     assert request["comparison"]["subject"]["artifact"]["locator"].startswith(
-        "derived://Qwen/Qwen3-0.6B-GGUF@23749fef"
+        "derived://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )
     assert request["observations"][0]["path"] == ("inputs/subject-transformation.json")
     transformation = json.loads(
@@ -746,7 +748,7 @@ def test_quantization_requires_a_distinct_created_subject(
 
     def quantize(command: list[str], **_kwargs: object) -> object:
         if artifact == "identical":
-            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(payload)
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(payload)
         return _completed(command)
 
     monkeypatch.setattr(example.launch, "_run", quantize)
