@@ -5,6 +5,7 @@ ARG SOURCE_DATE_EPOCH=0
 
 FROM scratch AS runtime-inputs
 COPY requirements/workflows/runtime-image-py312-cu126.txt /requirements/workflows/runtime-image-py312-cu126.txt
+COPY requirements/workflows/runtime-image-py312-cu129.txt /requirements/workflows/runtime-image-py312-cu129.txt
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/workflows/runtime-wheel-build-py312.txt
 COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
 COPY contracts /project/contracts
@@ -36,11 +37,13 @@ ARG INVARLOCK_SOURCE_BUNDLE_SHA256
 ARG INVARLOCK_SOURCE_COMMIT
 ARG TARGETARCH
 ARG SOURCE_DATE_EPOCH
+ARG CUDA_PROFILE=cu126
 
 RUN python -c 'import re,sys; commit,digest=sys.argv[1:]; re.fullmatch(r"[0-9a-f]{40,64}", commit) or sys.exit("invalid INVARLOCK_SOURCE_COMMIT"); re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or sys.exit("invalid INVARLOCK_SOURCE_BUNDLE_SHA256")' \
       "${INVARLOCK_SOURCE_COMMIT}" "${INVARLOCK_SOURCE_BUNDLE_SHA256}"
 
 LABEL dev.invarlock.source-bundle-sha256="${INVARLOCK_SOURCE_BUNDLE_SHA256}" \
+      dev.invarlock.cuda-profile="${CUDA_PROFILE}" \
       org.opencontainers.image.revision="${INVARLOCK_SOURCE_COMMIT}"
 
 ENV HF_HUB_OFFLINE=1 \
@@ -54,18 +57,19 @@ ENV HF_HUB_OFFLINE=1 \
     TORCH_DISABLE_NATIVE_JIT=1 \
     TRANSFORMERS_OFFLINE=1
 
-# CUDA wheels carry the user-space CUDA 12.6 runtime. The host supplies only
-# the NVIDIA driver through its OCI GPU runtime. Torch's Python-native JIT is
+# CUDA wheels carry their pinned user-space runtime. CUDA 12.6 remains the
+# Hopper profile; CUDA 12.9 adds Blackwell kernels. The host supplies only the
+# NVIDIA driver through its OCI GPU runtime. Torch's Python-native JIT is
 # disabled so ordinary inference stays compatible with the image's read-only,
-# compiler-free, noexec runtime boundary. This image is intentionally x86_64-
-# only because the hash lock is compiled for that platform.
+# compiler-free, noexec boundary. Both locks are x86_64-only.
 RUN --mount=type=bind,from=runtime-inputs,source=/requirements,target=/mnt/requirements,ro \
     --mount=type=bind,from=public-wheel,source=/wheelhouse,target=/mnt/wheelhouse,ro \
     test "${TARGETARCH:-amd64}" = amd64 \
+    && case "${CUDA_PROFILE}" in cu126|cu129) ;; *) exit 2 ;; esac \
     && python -m pip install \
       --require-hashes \
-      --extra-index-url https://download.pytorch.org/whl/cu126 \
-      -r /mnt/requirements/workflows/runtime-image-py312-cu126.txt \
+      --extra-index-url "https://download.pytorch.org/whl/${CUDA_PROFILE}" \
+      -r "/mnt/requirements/workflows/runtime-image-py312-${CUDA_PROFILE}.txt" \
     && set -- /mnt/wheelhouse/invarlock-*.whl \
     && test "$#" -eq 1 \
     && install -d /opt/invarlock/artifacts \

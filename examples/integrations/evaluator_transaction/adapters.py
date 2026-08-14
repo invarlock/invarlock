@@ -11,7 +11,6 @@ from typing import Any, cast
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
 from .config import (
-    BATCH_SIZE,
     INSPECT_RAW_CHAT_TEMPLATE,
     MAX_GENERATION_TOKENS,
     PAD_TOKEN_POLICY,
@@ -19,6 +18,7 @@ from .config import (
     BridgeError,
     execution_config,
 )
+from .corpora import profile_for_dataset
 
 
 def _restore_inspect_causal_boundary(completion: str, target: str) -> str:
@@ -32,18 +32,11 @@ def _restore_inspect_causal_boundary(completion: str, target: str) -> str:
 
 
 def _records(dataset_bytes: bytes) -> list[dict[str, str]]:
-    values = [json.loads(line) for line in dataset_bytes.splitlines()]
-    if len(values) not in {102, 400} or any(
-        not isinstance(value, dict)
-        or set(value) != {"expected", "id", "prompt"}
-        or any(not isinstance(value[key], str) or not value[key] for key in value)
-        for value in values
-    ):
-        raise BridgeError(
-            "the evaluator corpus must contain 102 or 400 complete records"
-        )
-    if len({value["id"] for value in values}) != len(values):
-        raise BridgeError("the evaluator corpus IDs are not unique")
+    try:
+        profile_for_dataset(dataset_bytes)
+        values = [json.loads(line) for line in dataset_bytes.splitlines()]
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise BridgeError(str(exc)) from exc
     return cast(list[dict[str, str]], values)
 
 
@@ -67,6 +60,9 @@ class _HfGreedyGenerator:
             raise BridgeError("model snapshot must not provide generation defaults")
         torch.manual_seed(execution["seed"])
         torch.set_num_threads(execution["torch_num_threads"])
+        dtype = getattr(torch, execution["dtype"], None)
+        if dtype is None:
+            raise BridgeError("the evaluator dtype is unavailable")
         tokenizer = AutoTokenizer.from_pretrained(
             model_path, local_files_only=True, trust_remote_code=False
         )
@@ -78,25 +74,33 @@ class _HfGreedyGenerator:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = execution["tokenizer_padding_side"]
         self._tokenizer = tokenizer
-        self._model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            local_files_only=True,
-            dtype=torch.float32,
-            trust_remote_code=False,
-        ).eval()
+        self._model = (
+            AutoModelForCausalLM.from_pretrained(
+                model_path,
+                local_files_only=True,
+                dtype=dtype,
+                trust_remote_code=False,
+            )
+            .to(execution["device"])
+            .eval()
+        )
 
     def generate(self, prompts: list[str]) -> list[str]:
         execution = execution_config()
         output: list[str] = []
         with self._torch.inference_mode():
-            for offset in range(0, len(prompts), BATCH_SIZE):
-                batch = prompts[offset : offset + BATCH_SIZE]
+            batch_size = execution["batch_size"]
+            for offset in range(0, len(prompts), batch_size):
+                batch = prompts[offset : offset + batch_size]
                 encoded = self._tokenizer(
                     batch,
                     add_special_tokens=execution["tokenizer_add_special_tokens"],
                     padding=True,
                     return_tensors="pt",
                 )
+                encoded = {
+                    key: value.to(execution["device"]) for key, value in encoded.items()
+                }
                 generated = self._model.generate(
                     **encoded,
                     do_sample=execution["do_sample"],
@@ -119,6 +123,8 @@ class _HfGreedyGenerator:
 
     def close(self) -> None:
         del self._model
+        if self._torch.cuda.is_available():
+            self._torch.cuda.empty_cache()
 
 
 def _generate(model_path: Path, dataset_bytes: bytes) -> list[dict[str, str]]:
@@ -148,6 +154,7 @@ def _run_inspect_ai(
     from inspect_ai.solver import generate
 
     records = _records(dataset_bytes)
+    execution = execution_config()
     task = Task(
         dataset=MemoryDataset(
             [
@@ -164,8 +171,8 @@ def _run_inspect_ai(
         model="hf/invarlock",
         model_args={
             "model_path": str(model_path),
-            "device": "cpu",
-            "batch_size": BATCH_SIZE,
+            "device": execution["device"],
+            "batch_size": execution["batch_size"],
             "do_sample": False,
             "chat_template": INSPECT_RAW_CHAT_TEMPLATE,
             "trust_remote_code": False,
@@ -183,8 +190,8 @@ def _run_inspect_ai(
         epochs=1,
         fail_on_error=True,
         continue_on_fail=False,
-        max_connections=BATCH_SIZE,
-        max_samples=BATCH_SIZE,
+        max_connections=execution["batch_size"],
+        max_samples=execution["batch_size"],
         max_tokens=MAX_GENERATION_TOKENS,
         stop_seqs=["\n"],
         seed=SEED,

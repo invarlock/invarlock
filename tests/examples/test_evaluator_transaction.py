@@ -86,6 +86,19 @@ def test_evaluator_profiles_bind_distinct_upstream_entrypoints(evaluator: str) -
 
 
 @pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
+def test_flagship_evaluator_profile_isolates_each_inference_record(
+    evaluator: str,
+) -> None:
+    module = _module()
+    flagship = module.corpus_profile("flagship")
+
+    config = module.execution_config(evaluator, flagship)
+
+    assert config["batch_size"] == 1
+    assert config["model_profile"] == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
+
+
+@pytest.mark.parametrize("evaluator", ["inspect-ai", "openai-evals"])
 def test_evaluator_transaction_worker_images_include_flat_script_dependencies(
     evaluator: str,
 ) -> None:
@@ -133,23 +146,24 @@ def test_inspect_bridge_restores_the_authenticated_causal_boundary() -> None:
 
 
 def _records_bytes(module: ModuleType, *, duplicate: bool = False) -> bytes:
-    records = [
-        {"expected": "Answer", "id": f"stable-{index}", "prompt": "Prompt"}
-        for index in range(102)
-    ]
+    records = json.loads(
+        (ROOT / "examples/integrations/lm-evaluation-harness/records.json").read_text(
+            encoding="utf-8"
+        )
+    )
     if duplicate:
         records[-1]["id"] = records[0]["id"]
-    return b"".join(module.canonical_json_bytes(record) for record in records)
+    return b"".join(
+        (json.dumps(record, sort_keys=True) + "\n").encode() for record in records
+    )
 
 
-def test_evaluator_transaction_record_loader_rejects_incomplete_and_duplicate_corpora() -> (
-    None
-):
+def test_evaluator_transaction_record_loader_accepts_only_pinned_corpora() -> None:
     module = _module()
     assert len(module.adapters._records(_records_bytes(module))) == 102
-    with pytest.raises(module.BridgeError, match="102 or 400 complete records"):
+    with pytest.raises(module.BridgeError, match="not a pinned evaluator corpus"):
         module.adapters._records(module.canonical_json_bytes({"id": "only-one"}))
-    with pytest.raises(module.BridgeError, match="not unique"):
+    with pytest.raises(module.BridgeError, match="not a pinned evaluator corpus"):
         module.adapters._records(_records_bytes(module, duplicate=True))
 
 
@@ -169,6 +183,7 @@ def test_inspect_runner_binds_each_sample_to_native_output_and_score(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _module()
+    monkeypatch.setenv("INVARLOCK_EVALUATOR", "inspect-ai")
     records = [json.loads(line) for line in _records_bytes(module).splitlines()]
 
     class FakeSample:
@@ -176,10 +191,10 @@ def test_inspect_runner_binds_each_sample_to_native_output_and_score(
             self.id = item["id"]
             self.input = item["prompt"]
             self.target = item["expected"]
-            self.output = SimpleNamespace(completion="Answer")
+            self.output = SimpleNamespace(completion=item["expected"])
             self.scores = {
                 "match": SimpleNamespace(
-                    value="C", answer="Answer", explanation="exact"
+                    value="C", answer=item["expected"], explanation="exact"
                 )
             }
 
@@ -206,8 +221,8 @@ def test_inspect_runner_binds_each_sample_to_native_output_and_score(
     generated, scored = module.adapters._run_inspect_ai(
         Path("/model"), _records_bytes(module)
     )
-    assert generated[0]["output"] == "Answer"
-    assert generated[-1]["id"] == "stable-101"
+    assert generated[0]["output"] == records[0]["expected"]
+    assert generated[-1]["id"] == records[-1]["id"]
     assert scored[0][0] == 1.0
     assert scored[0][1]["value"] == "C"
 
@@ -218,13 +233,14 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
     module = _module()
     records = [json.loads(line) for line in _records_bytes(module).splitlines()]
     samples = [{"input": item["prompt"], "ideal": item["expected"]} for item in records]
+    targets = iter(item["expected"] for item in records)
 
     class FakeGenerator:
         def __init__(self, _path: Path) -> None:
             self.closed = False
 
         def generate(self, prompts: list[str]) -> list[str]:
-            return ["Answer" for _ in prompts]
+            return [next(targets) for _ in prompts]
 
         def close(self) -> None:
             self.closed = True
@@ -283,7 +299,7 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
     generated, scored = module.adapters._run_openai_evals(
         Path("/model"), _records_bytes(module)
     )
-    assert generated[0]["output"] == "Answer"
+    assert generated[0]["output"] == records[0]["expected"]
     assert scored[-1][0] == 1.0
     assert module.os.environ["EVALS_SEQUENTIAL"] == "before"
     assert "EVALS_THREADS" not in module.os.environ
@@ -322,6 +338,14 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
         (json.dumps(record, sort_keys=True) + "\n").encode() for record in records
     )
     quick = module.corpus_profile("quick")
+    models = module.model_profile("quick")
+    tree_digests = {
+        snapshot.role: snapshot.checkpoint_tree_sha256 for snapshot in models.snapshots
+    }
+    tokenizer_digests = {
+        snapshot.role: snapshot.tokenizer_contract_sha256
+        for snapshot in models.snapshots
+    }
     assert module.digest(raw_dataset) == quick.dataset_sha256
     dataset_path = prepared / "evaluation/inputs/records.jsonl"
     dataset_path.parent.mkdir(parents=True)
@@ -349,24 +373,24 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
         (prepared / f"evaluation/models/{role}").mkdir(parents=True)
 
     expected_settings = {
-        "batch_size": module.BATCH_SIZE,
-        "checkpoint_tree_sha256": module.EXPECTED_MODEL_TREE_DIGESTS["baseline"],
+        "batch_size": models.batch_size,
+        "checkpoint_tree_sha256": tree_digests["baseline"],
         "context_length": 64,
         "max_output_tokens": module.MAX_GENERATION_TOKENS,
         "offline": True,
         "seed": module.SEED,
         "timeout_seconds": module.PER_RECORD_TIMEOUT_SECONDS,
-        "tokenizer_metadata_sha256": module.EXPECTED_TOKENIZER_DIGESTS["baseline"],
+        "tokenizer_metadata_sha256": tokenizer_digests["baseline"],
     }
     comparisons: dict[str, object] = {}
     for role in ("baseline", "subject"):
         settings = {
             **expected_settings,
-            "checkpoint_tree_sha256": module.EXPECTED_MODEL_TREE_DIGESTS[role],
-            "tokenizer_metadata_sha256": module.EXPECTED_TOKENIZER_DIGESTS[role],
+            "checkpoint_tree_sha256": tree_digests[role],
+            "tokenizer_metadata_sha256": tokenizer_digests[role],
         }
         comparisons[role] = {
-            "artifact": module.EXPECTED_MODEL_ARTIFACTS[role],
+            "artifact": module.model_artifacts(models)[role],
             "runtime": {"provider": "hf_transformers", "settings": settings},
         }
     request = {
@@ -432,7 +456,7 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
             ),
             "samples": "samples.jsonl",
             "samples_sha256": module.digest(sample_bytes),
-            "model_tree_sha256": module.EXPECTED_MODEL_TREE_DIGESTS[role],
+            "model_tree_sha256": tree_digests[role],
             "dataset_sha256": quick.dataset_sha256,
             "evaluator_lock_sha256": lock_digest,
             "runtime_image_digest": image,
@@ -446,15 +470,22 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
     monkeypatch.setattr(module, "_inspect_runtime_image", lambda *_a, **_k: None)
     monkeypatch.setattr(
         module,
+        "checkpoint_tree_sha256",
+        lambda path: tree_digests["subject" if "subject" in str(path) else "baseline"],
+    )
+    monkeypatch.setattr(
+        module,
         "_run_verified_worker",
         lambda **kwargs: write_run(kwargs["role"], kwargs["output"]),
     )
     monkeypatch.setattr(
         module,
         "_run_local_cli",
-        lambda _command: "ok",
+        lambda _command, **_kwargs: "ok",
     )
-    monkeypatch.setattr(module, "validate_completed_outputs", lambda *_args: None)
+    monkeypatch.setattr(
+        module, "validate_completed_outputs", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         module,
         "load_external_scoring_records_jsonl",
@@ -478,9 +509,7 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
     transformers = types.ModuleType("transformers")
     transformers.AutoTokenizer = SimpleNamespace(
         from_pretrained=lambda path, **_kwargs: FakeTokenizer(
-            module.EXPECTED_TOKENIZER_DIGESTS[
-                "subject" if "subject" in str(path) else "baseline"
-            ]
+            tokenizer_digests["subject" if "subject" in str(path) else "baseline"]
         )
     )
     monkeypatch.setitem(sys.modules, "transformers", transformers)
@@ -540,6 +569,15 @@ def test_evaluator_transaction_complete_replays_and_authenticates_a_fully_stubbe
     assert evidence == tmp_path / "transaction/evidence"
     assert receipt == tmp_path / "transaction/verifier/verification.receipt.json"
     assert report == tmp_path / "transaction/comparison-report.html"
+    provenance = json.loads(
+        (tmp_path / "transaction/inputs/evaluator-provenance.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert all(
+        "samples" not in run and len(run["sample_bindings"]) == 102
+        for run in provenance["runs"].values()
+    )
 
 
 def test_openai_evals_event_shape_is_bound_to_the_upstream_record() -> None:
@@ -658,7 +696,7 @@ def test_adapter_emits_strict_runtime_import_records(tmp_path: Path) -> None:
     samples.write_bytes(module.canonical_json_bytes(_sample(module)))
     destination = tmp_path / "records.jsonl"
 
-    module.adapt(samples, _schedule(), destination)
+    bindings = module.adapt(samples, _schedule(), destination)
 
     record = json.loads(destination.read_text(encoding="utf-8"))
     assert record == {
@@ -668,6 +706,28 @@ def test_adapter_emits_strict_runtime_import_records(tmp_path: Path) -> None:
         "record_id": "stable-1",
         "status": "ok",
     }
+    assert bindings == [
+        {
+            "input_sha256": hashlib.sha256(b"Prompt").hexdigest(),
+            "output_sha256": hashlib.sha256(b"Answer").hexdigest(),
+            "record_id": "stable-1",
+            "reported_score": 1.0,
+            "status": "ok",
+            "target_sha256": hashlib.sha256(b"Answer").hexdigest(),
+        }
+    ]
+    assert "Prompt" not in json.dumps(bindings)
+
+
+def test_compact_evaluator_provenance_has_a_headroom_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+
+    assert module._compact_provenance_bytes({"format": "test"}).endswith(b"\n")
+    monkeypatch.setattr(module, "MAX_PROVENANCE_BYTES", 4)
+    with pytest.raises(module.BridgeError, match="provenance exceeds"):
+        module._compact_provenance_bytes({"format": "test"})
 
 
 def test_adapter_rejects_evaluator_score_disagreement(tmp_path: Path) -> None:
@@ -872,6 +932,7 @@ def test_launcher_returns_the_verified_child_image_id(
             "org.invarlock.example.evaluator": "inspect-ai",
             "org.invarlock.example.evaluator-version": "0.3.254",
             "org.invarlock.example.evaluator-lock-sha256": "sha256:" + "f" * 64,
+            "org.invarlock.example.evaluator-runtime": "cpu",
             "org.invarlock.example.source-commit": commit,
             "org.invarlock.example.source-bundle-sha256": "sha256:"
             + hashlib.sha256(b"test-source").hexdigest(),
@@ -1134,7 +1195,7 @@ def test_worker_load_run_returns_the_verified_sample_snapshot(
     monkeypatch.setattr(
         module,
         "evaluator_lock_digest",
-        lambda _selected, *, container=False: "sha256:" + ("c" * 64),
+        lambda _selected, *, container=False, profile=None: "sha256:" + ("c" * 64),
     )
     monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
     monkeypatch.setattr(
@@ -1188,7 +1249,7 @@ def test_worker_binds_model_dataset_and_upstream_output_provenance(
     monkeypatch.setattr(
         module,
         "evaluator_lock_digest",
-        lambda _selected, *, container=False: "sha256:" + ("c" * 64),
+        lambda _selected, *, container=False, profile=None: "sha256:" + ("c" * 64),
     )
     monkeypatch.setattr(
         module.importlib.metadata,
@@ -1267,7 +1328,7 @@ def test_worker_rejects_symlinked_dataset(
     monkeypatch.setattr(
         module,
         "evaluator_lock_digest",
-        lambda _selected, *, container=False: "sha256:" + ("c" * 64),
+        lambda _selected, *, container=False, profile=None: "sha256:" + ("c" * 64),
     )
     monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
     model = tmp_path / "model"
@@ -1451,6 +1512,9 @@ def test_hf_generator_and_compatibility_adapter_are_exercised_without_model_weig
     class FakeTensor:
         shape = (1, 1)
 
+        def to(self, _device: str) -> FakeTensor:
+            return self
+
     class FakeTokenizer:
         pad_token_id = None
         eos_token_id = 2
@@ -1464,6 +1528,9 @@ def test_hf_generator_and_compatibility_adapter_are_exercised_without_model_weig
             return "Answer\nignored"
 
     class FakeModel:
+        def to(self, _device: str) -> FakeModel:
+            return self
+
         def eval(self) -> FakeModel:
             return self
 
@@ -1486,6 +1553,7 @@ def test_hf_generator_and_compatibility_adapter_are_exercised_without_model_weig
     torch.manual_seed = lambda _seed: None
     torch.set_num_threads = lambda _count: None
     torch.inference_mode = lambda: Inference()
+    torch.cuda = SimpleNamespace(is_available=lambda: False, empty_cache=lambda: None)
     transformers = types.ModuleType("transformers")
     transformers.AutoTokenizer = SimpleNamespace(
         from_pretrained=lambda *_a, **_k: FakeTokenizer()
@@ -1678,6 +1746,7 @@ def test_evaluator_transaction_completion_output_and_path_guards(
                         "ok": True,
                         "integrity_ok": True,
                         "policy_verdict": "pass",
+                        "verification_status": 0,
                     }
                 }
             }
@@ -1686,9 +1755,46 @@ def test_evaluator_transaction_completion_output_and_path_guards(
     )
     report.write_text("<html>", encoding="utf-8")
     module.validate_completed_outputs(root / "evidence", receipt, report)
-    report.unlink()
+
+    (evidence / "evaluation.report.json").write_text(
+        json.dumps({"verdict": "fail", "metric": "exact_match"}),
+        encoding="utf-8",
+    )
+    receipt.write_text(
+        json.dumps(
+            {
+                "statement": {
+                    "verdict": {
+                        "ok": False,
+                        "integrity_ok": True,
+                        "policy_verdict": "fail",
+                        "verification_status": 7,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     with pytest.raises(module.BridgeError, match="passing result"):
         module.validate_completed_outputs(root / "evidence", receipt, report)
+    module.validate_completed_outputs(
+        root / "evidence", receipt, report, require_policy_pass=False
+    )
+    rejected = json.loads(receipt.read_text(encoding="utf-8"))
+    rejected["statement"]["verdict"]["verification_status"] = 0
+    receipt.write_text(json.dumps(rejected), encoding="utf-8")
+    with pytest.raises(module.BridgeError, match="coherent result"):
+        module.validate_completed_outputs(
+            root / "evidence", receipt, report, require_policy_pass=False
+        )
+    rejected["statement"]["verdict"]["verification_status"] = 7
+    receipt.write_text(json.dumps(rejected), encoding="utf-8")
+
+    report.unlink()
+    with pytest.raises(module.BridgeError, match="coherent result"):
+        module.validate_completed_outputs(
+            root / "evidence", receipt, report, require_policy_pass=False
+        )
 
 
 def test_evaluator_transaction_main_dispatches_and_reports_failures(
@@ -1802,10 +1908,19 @@ def test_evaluator_transaction_launcher_entrypoint_covers_success_and_cleanup_pa
         "remove_owned_image_tags",
         lambda _run, _engine, _repo, tags: cleanup.append(list(tags)),
     )
-    result = launcher.main("inspect-ai", ["--container-engine", "podman", *args])
+    result = launcher.main(
+        "inspect-ai",
+        ["--container-engine", "podman", "--allow-policy-fail", *args],
+    )
     assert result == 0
     assert cleanup == [[launcher.OwnedImageTag("owned-tag", "sha256:" + "a" * 64)]]
     assert any("model_inputs.py" in " ".join(command) for command in commands)
+    completion = next(
+        command
+        for command in commands
+        if "examples.integrations.evaluator_transaction.cli" in " ".join(command)
+    )
+    assert "--allow-policy-fail" in completion
     assert "Complete integration workspace" in capsys.readouterr().out
 
 
@@ -1908,6 +2023,7 @@ def test_evaluator_transaction_native_runner_and_worker_failure_boundaries(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _module()
+    monkeypatch.setenv("INVARLOCK_EVALUATOR", "inspect-ai")
     records = [json.loads(line) for line in _records_bytes(module).splitlines()]
 
     class Sample:
@@ -2017,6 +2133,30 @@ def test_evaluator_transaction_native_runner_and_worker_failure_boundaries(
         module.mount_source(mount_link, label="mount")
 
 
+def test_completion_cli_accepts_only_an_explicit_policy_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+
+    def result(status: int) -> None:
+        monkeypatch.setattr(
+            module,
+            "run_bounded_command",
+            lambda *_args, **_kwargs: subprocess.CompletedProcess(
+                ["verify"], status, "decision", "diagnostic"
+            ),
+        )
+
+    result(7)
+    with pytest.raises(module.BridgeError, match="diagnostic"):
+        module._run_local_cli(["verify"])
+    assert module._run_local_cli(["verify"], allow_policy_failure=True) == "decision"
+
+    result(6)
+    with pytest.raises(module.BridgeError, match="diagnostic"):
+        module._run_local_cli(["verify"], allow_policy_failure=True)
+
+
 def test_evaluator_transaction_worker_and_main_complete_guards(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -2062,15 +2202,17 @@ def test_evaluator_transaction_worker_and_main_complete_guards(
             lock_digest="sha256:" + "b" * 64,
         )
 
-    monkeypatch.setattr(
-        module,
-        "complete",
-        lambda *_args, **_kwargs: (
+    completion_options: list[bool] = []
+
+    def fake_complete(*_args: object, **kwargs: object) -> tuple[Path, Path, Path]:
+        completion_options.append(bool(kwargs.get("allow_policy_fail")))
+        return (
             tmp_path / "evidence",
             tmp_path / "receipt",
             tmp_path / "report",
-        ),
-    )
+        )
+
+    monkeypatch.setattr(module, "complete", fake_complete)
     arguments = [
         "complete",
         "--workspace",
@@ -2095,8 +2237,10 @@ def test_evaluator_transaction_worker_and_main_complete_guards(
         "sha256:" + "b" * 64,
         "--build-attestation",
         str(tmp_path / "attestation.json"),
+        "--allow-policy-fail",
     ]
     assert module.main(arguments) == 0
+    assert completion_options == [True]
     assert "Evidence:" in capsys.readouterr().out
 
 

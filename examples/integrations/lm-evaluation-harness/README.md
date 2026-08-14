@@ -1,92 +1,98 @@
 # LM Evaluation Harness
 
-This example imports complete per-record output from
-[LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness),
-then runs `invarlock evaluate`, `invarlock verify`, and `invarlock report`.
-InvarLock recomputes the exact-match comparison from the paired records. It
-does not trust the harness aggregate score.
+This example runs [LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness)
+over two pinned checkpoints, imports every output, and completes `invarlock
+evaluate`, `invarlock verify`, and `invarlock report`. InvarLock recomputes the
+paired exact-match result instead of trusting the Harness aggregate.
 
-The maintained journey compares the public, revision-pinned
-`Qwen/Qwen3-0.6B-Base` checkpoint with the public post-trained
-`Qwen/Qwen3-0.6B` checkpoint. Every snapshot file is checked against a fixed
-byte length and SHA-256 before execution. The default 102-record schedule
-carries stable IDs and fixed prompts and targets; both upstream runs execute
-offline after the snapshot and image downloads.
+Three profiles serve different purposes:
 
-The curated snapshots contain the pinned weights, model configuration, and
-tokenizer files required by the run. Optional checkpoint generation defaults
-are excluded, so the task owns the sampling mode, newline stop, and
-authenticated one-token limit. Vocabulary and special-token behavior remain
-bound to each checkpoint. Every run manifest records the Harness model and
-backend, fixed CPU/float32 profile, batch size 8, seed, and disabled remote code
-alongside the task and per-record output digests.
+| Profile | Models | Records | Runtime | Purpose |
+| --- | --- | ---: | --- | --- |
+| `quick` | Qwen3 0.6B Base → post-trained | 102 local records | CPU/float32, batch 8 | Short local workflow |
+| `flagship` | Qwen3.5 9B Base → post-trained | 400 balanced MMLU-Pro records | CUDA/BF16, batch 1 | Current-model evaluator comparison |
+| `portability` | Gemma 4 12B IT → official QAT-Q4 source checkpoint | The same 400 semantic MMLU-Pro items | CUDA/BF16, batch 1 | Cross-family deployment-change evidence |
 
-From a clean committed checkout with Docker or Podman available:
+Every model revision and required snapshot file is bound by byte length and
+SHA-256. Each run records its model tree, tokenizer contract, evaluator and
+backend, generation settings, seed, runtime image, task configuration, and
+per-record output digests. Remote model code and checkpoint generation defaults
+are disabled.
 
-```bash
-make example-lm-evaluation-harness
-```
+## Run a profile
 
-Supply caller-owned signing keys and a new trust root when running the signed
-journey, for example:
+From a clean committed checkout with Docker or Podman available, the quick
+profile is:
 
 ```bash
 make example-lm-evaluation-harness EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
 ```
 
-Release qualification uses the larger flagship profile:
+Select the Qwen3.5 flagship with:
 
 ```bash
 make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
 ```
 
-The flagship profile derives 400 records from the immutable
-`EleutherAI/lambada_openai` test source. It freezes the source revision, source
-hash, selection seed, four prompt-length strata, selected indices, and derived
-JSONL hash. A selected target must be one losslessly decoded token under both
-pinned Qwen tokenizers. The source can be supplied from a previously downloaded
-file with `--benchmark-source PATH`; the same byte length and SHA-256 checks
-apply. This generative exact-match projection uses LAMBADA's final-word
-boundary, while the retained score remains InvarLock's paired generation
-comparison rather than the standard log-likelihood LAMBADA metric.
+Select the Gemma 4 portability profile with:
 
-Pass `--workspace PATH` when you want to retain the transaction at a specific
-new path. Otherwise the launcher creates a temporary workspace and prints its
-location.
+```bash
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile portability --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+```
 
-The launcher removes the exact temporary base and Harness image tags it creates
-after the journey, including when the workspace is retained.
+The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
+at a time. A 32 GB GPU is a practical minimum for these BF16 singleton
+runs. Allow roughly 50 GB of workspace disk per prepared profile, plus model
+cache and container-image storage.
 
-The command builds the repository's source-authenticated CPU runtime and adds
-a deterministic cache-free package derived from the hash-pinned upstream
-`lm-eval` 0.4.12 wheel. The integration never reads or writes Harness response
-caches, and its image contains neither the vulnerable `sqlitedict` package nor
-a cache entry point. It needs roughly 7 GB of temporary
-disk for the two Qwen3 snapshots, runtime images, and outputs. Both model runs
-execute without network access inside that derived image. The inspected
-immutable image ID is bound into both runtime receipts before the import
-transaction is signed.
+Pass `--workspace PATH` to retain the complete transaction at a new path. The
+launcher otherwise creates a temporary workspace and prints it at completion.
+It removes the exact temporary base and evaluator image tags it creates,
+including when the workspace is retained.
 
-The adapter requires one upstream sample for each schedule record, stable
-dataset IDs, matching prompt and target hashes, the exact task configuration,
-and a digest-bound run manifest. Aggregate-only result files, missing IDs,
-reordered records, source-input changes, and post-run sample changes fail
-closed. Completion reruns both workers in the inspected image; prepared worker
-output is not authoritative. The full upstream per-record snapshots and
-manifests are attached as authenticated provenance, while acceptance is
-replayed from the raw responses. Every target fits the authenticated one-token
-generation bound. The signed policy applies the profile-specific side-accuracy
-floor described below.
+## Frozen 400-record suite
 
-The quick schedule covers factual, numeric, temporal, spatial, scientific, and
-common-language completions. Its fixed policy requires all 102 records and
-limits the paired 95% confidence-interval width to 20 percentage points. The
-flagship policy requires all 400 records, tightens that interval-width limit to
-10 percentage points, and requires at least 5% accuracy on each side. Both
-profiles reject a regression larger than 20 percentage points.
+The flagship and portability profiles derive model-specific prompts from one
+revision- and hash-pinned 400-item semantic selection of
+[TIGER-Lab/MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro). The
+selection balances all 14 subject categories and answer labels A–J. Stable
+record IDs preserve pairing across model families, while each profile binds
+its own official no-thinking chat rendering and derived JSONL digest.
 
-The retained 400-record flagship transaction achieved an 8.39-percentage-point
-paired interval width under its 10-point maximum.
+The source can be supplied from a previously downloaded file with
+`--benchmark-source PATH`; the same byte length and SHA-256 checks apply. Both
+model runs execute without network access after snapshots and images are
+prepared.
 
-This is a reference integration demonstration, not a model-quality benchmark.
-Use a representative pinned dataset and reviewed policy for a production claim.
+The 400-record policy was fixed before model execution. It requires all
+records, at least 20% accuracy on each side, a paired 95% interval no wider than
+10 percentage points, and a confidence-interval lower bound of at least −2
+percentage points. A verified policy rejection is retained only when the
+caller explicitly supplies `--allow-policy-fail`; integrity failures remain
+errors.
+
+The retained Qwen3.5 transaction measured 55.5% baseline accuracy and 53.0%
+subject accuracy, with a −2.5-point estimate and a 7.85-point interval width.
+The retained Gemma 4 transaction measured 44.0% and 42.5%, with a −1.5-point
+estimate and a 4.68-point interval width. Both evidence packs passed integrity,
+record-count, interval-width, and side-accuracy checks; both were rejected by
+the conservative regression rule because their lower confidence bounds crossed
+the declared −2-point floor.
+
+## Trust boundary
+
+The command builds a source-authenticated runtime and adds a cache-free package
+derived from the hash-pinned `lm-eval` 0.4.12 wheel. The immutable inspected
+image ID is bound into both runtime receipts and a builder-signed image
+attestation before the evidence is signed.
+
+The adapter requires one upstream sample for every schedule record, stable
+dataset IDs, exact prompt and target hashes, the declared task configuration,
+and a digest-bound run manifest. Aggregate-only files, missing or reordered
+records, changed inputs, and post-run sample changes fail closed. Full upstream
+samples and manifests remain authenticated provenance; the acceptance result is
+replayed from raw responses.
+
+This is a reproducible integration and regression-policy demonstration, not a
+general model-quality ranking. Production use should select datasets and
+thresholds that represent the intended deployment.

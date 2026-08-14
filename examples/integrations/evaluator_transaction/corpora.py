@@ -1,4 +1,4 @@
-"""Closed corpus profiles shared by the flagship evaluator transactions."""
+"""Closed corpus profiles shared by maintained evaluator transactions."""
 
 from __future__ import annotations
 
@@ -6,15 +6,20 @@ import hashlib
 import json
 import os
 import stat
-import urllib.request
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
 _ROOT = Path(__file__).resolve().parent
+_REPOSITORY = _ROOT.parents[2]
 _QUICK_RECORDS = _ROOT.parent / "lm-evaluation-harness" / "records.json"
-_FLAGSHIP_MANIFEST = _ROOT / "flagship_corpus.json"
+_SEMANTIC_RECORDS = _ROOT / "mmlu_pro_semantic_400.jsonl"
+_QUALIFICATION_PROFILES = _ROOT / "qualification_profiles.json"
+_QUALIFICATION_MANIFEST = (
+    _REPOSITORY / "docs/reference/qualification-suites.manifest.json"
+)
+PROFILE_KEYS = ("quick", "flagship", "portability")
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +33,7 @@ class CorpusProfile:
     context_length: int
     minimum_side_accuracy: float
     maximum_interval_width_pp: float
+    delta_min_pp: float
 
     def dataset_descriptor(self, path: str = "inputs/records.jsonl") -> dict[str, Any]:
         return {
@@ -46,7 +52,7 @@ class CorpusProfile:
             "resolved_policy": {
                 "metrics": {
                     "exact_match": {
-                        "delta_min_pp": -20.0,
+                        "delta_min_pp": self.delta_min_pp,
                         "maximum_interval_width_pp": self.maximum_interval_width_pp,
                         "minimum_record_count": self.record_count,
                         "minimum_side_accuracy": self.minimum_side_accuracy,
@@ -56,41 +62,37 @@ class CorpusProfile:
         }
 
 
-@dataclass(frozen=True, slots=True)
-class SelectionStratum:
-    minimum_prompt_tokens: int
-    maximum_prompt_tokens: int
-    sample_count: int
-
-
-@dataclass(frozen=True, slots=True)
-class SelectionCandidate:
-    source_index: int
-    prompt_token_count: int
-    source_line_sha256: str
-
-
-@dataclass(frozen=True, slots=True)
-class FlagshipSelection:
-    seed: str
-    eligible_record_count: int
-    strata: tuple[SelectionStratum, ...]
-    indices: tuple[int, ...]
-    indices_sha256: str
-    selected_source_lines_sha256: str
-
-
-def _manifest() -> dict[str, Any]:
-    value = json.loads(_FLAGSHIP_MANIFEST.read_text(encoding="utf-8"))
+def _json(path: Path, *, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{label} is unavailable or invalid") from exc
     if not isinstance(value, dict):
-        raise ValueError("flagship corpus manifest must contain an object")
+        raise ValueError(f"{label} must contain an object")
     return value
 
 
-def records_jsonl(records: Iterable[dict[str, str]]) -> bytes:
+def _manifest() -> dict[str, Any]:
+    return _json(_QUALIFICATION_PROFILES, label="qualification profile manifest")
+
+
+def _qualification_manifest() -> dict[str, Any]:
+    manifest = _manifest()
+    payload = _QUALIFICATION_MANIFEST.read_bytes()
+    expected = manifest["qualification_suite"]["manifest_sha256"]
+    if hashlib.sha256(payload).hexdigest() != expected:
+        raise ValueError(
+            "qualification suite manifest does not match its pinned digest"
+        )
+    return _json(_QUALIFICATION_MANIFEST, label="qualification suite manifest")
+
+
+def records_jsonl(records: Iterable[dict[str, str]], *, compact: bool = False) -> bytes:
+    options: dict[str, Any] = {"sort_keys": True}
+    if compact:
+        options.update(separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     return b"".join(
-        (json.dumps(record, sort_keys=True) + "\n").encode("utf-8")
-        for record in records
+        (json.dumps(record, **options) + "\n").encode("utf-8") for record in records
     )
 
 
@@ -105,48 +107,43 @@ def _quick_profile() -> CorpusProfile:
         context_length=64,
         minimum_side_accuracy=0.20,
         maximum_interval_width_pp=20.0,
+        delta_min_pp=-20.0,
     )
 
 
-def _flagship_profile() -> CorpusProfile:
-    value = _manifest()["derived_dataset"]
+def _qualification_profile(key: str) -> CorpusProfile:
+    manifest = _manifest()
+    declared = manifest["profiles"][key]
+    dataset = declared["derived_dataset"]
+    policy = manifest["acceptance_policy"]
     return CorpusProfile(
-        key="flagship",
-        profile_id=_manifest()["profile_id"],
-        dataset_name=value["name"],
-        split=value["split"],
-        record_count=value["record_count"],
-        dataset_sha256=value["sha256"],
-        context_length=256,
-        minimum_side_accuracy=0.05,
-        maximum_interval_width_pp=10.0,
+        key=key,
+        profile_id=declared["profile_id"],
+        dataset_name=dataset["name"],
+        split=dataset["split"],
+        record_count=dataset["record_count"],
+        dataset_sha256=dataset["sha256"],
+        context_length=dataset["maximum_input_tokens"],
+        minimum_side_accuracy=policy["minimum_side_accuracy"],
+        maximum_interval_width_pp=policy["maximum_interval_width_pp"],
+        delta_min_pp=policy["delta_min_pp"],
     )
 
 
 def corpus_profile(key: str) -> CorpusProfile:
-    profiles = {"quick": _quick_profile(), "flagship": _flagship_profile()}
+    profiles = {
+        "quick": _quick_profile(),
+        "flagship": _qualification_profile("flagship"),
+        "portability": _qualification_profile("portability"),
+    }
     try:
         return profiles[key]
     except KeyError as exc:
         raise ValueError(f"unknown corpus profile: {key}") from exc
 
 
-def profile_for_dataset(payload: bytes) -> CorpusProfile:
-    observed = hashlib.sha256(payload).hexdigest()
-    for key in ("quick", "flagship"):
-        profile = corpus_profile(key)
-        if observed == profile.dataset_sha256:
-            validate_dataset_records(payload, profile)
-            return profile
-    raise ValueError("dataset is not a pinned evaluator corpus")
-
-
-def profile_for_descriptor(value: object) -> CorpusProfile:
-    for key in ("quick", "flagship"):
-        profile = corpus_profile(key)
-        if value == profile.dataset_descriptor():
-            return profile
-    raise ValueError("dataset descriptor is not a pinned evaluator corpus")
+def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
+    return records_jsonl(values, compact=profile.key in {"flagship", "portability"})
 
 
 def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
@@ -163,45 +160,29 @@ def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
         raise ValueError(
             f"evaluator corpus must contain {profile.record_count} complete records"
         )
-    if len({value["id"] for value in values}) != len(values):
+    records = cast(list[dict[str, str]], values)
+    if len({value["id"] for value in records}) != len(records):
         raise ValueError("evaluator corpus IDs are not unique")
-    if records_jsonl(values) != payload:
+    if _canonical_payload(records, profile) != payload:
         raise ValueError("evaluator corpus JSONL is not canonical")
 
 
-def index_digest(indices: Sequence[int]) -> str:
-    payload = json.dumps(list(indices), separators=(",", ":")).encode("ascii")
-    return hashlib.sha256(payload).hexdigest()
+def profile_for_dataset(payload: bytes) -> CorpusProfile:
+    observed = hashlib.sha256(payload).hexdigest()
+    for key in PROFILE_KEYS:
+        profile = corpus_profile(key)
+        if observed == profile.dataset_sha256:
+            validate_dataset_records(payload, profile)
+            return profile
+    raise ValueError("dataset is not a pinned evaluator corpus")
 
 
-def flagship_selection() -> FlagshipSelection:
-    value = _manifest()["selection"]
-    strata = tuple(
-        SelectionStratum(
-            item["minimum_prompt_tokens"],
-            item["maximum_prompt_tokens"],
-            item["sample_count"],
-        )
-        for item in value["strata"]
-    )
-    selection = FlagshipSelection(
-        seed=value["seed"],
-        eligible_record_count=value["eligible_record_count"],
-        strata=strata,
-        indices=tuple(value["indices"]),
-        indices_sha256=value["indices_sha256"],
-        selected_source_lines_sha256=value["selected_source_lines_sha256"],
-    )
-    if index_digest(selection.indices) != selection.indices_sha256:
-        raise ValueError("flagship corpus indices do not match their digest")
-    return selection
-
-
-def flagship_source() -> dict[str, Any]:
-    value = _manifest()["source"]
-    if not isinstance(value, dict):
-        raise ValueError("flagship corpus source metadata is invalid")
-    return value
+def profile_for_descriptor(value: object) -> CorpusProfile:
+    for key in PROFILE_KEYS:
+        profile = corpus_profile(key)
+        if value == profile.dataset_descriptor():
+            return profile
+    raise ValueError("dataset descriptor is not a pinned evaluator corpus")
 
 
 def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
@@ -211,231 +192,143 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         "dataset_sha256": profile.dataset_sha256,
         "record_count": profile.record_count,
     }
-    if profile.key == "flagship":
-        manifest_payload = _FLAGSHIP_MANIFEST.read_bytes()
+    if profile.key != "quick":
         manifest = _manifest()
-        selection = manifest["selection"]
+        qualification = _qualification_manifest()
+        artifact_name = manifest["qualification_suite"]["semantic_artifact"]
+        artifact = qualification["artifacts"][artifact_name]
+        records = qualification_records(profile)
+        declared = manifest["profiles"][profile.key]
+        if (
+            artifact["sha256"] != manifest["qualification_suite"]["semantic_sha256"]
+            or qualification["record_count"] != profile.record_count
+            or qualification["selection_algorithm"]
+            != manifest["qualification_suite"]["selection_algorithm"]
+            or qualification["selected_ids"]["text"]
+            != [record["id"] for record in records]
+        ):
+            raise ValueError("flagship corpus disagrees with its qualification suite")
         value.update(
             {
-                "manifest_sha256": hashlib.sha256(manifest_payload).hexdigest(),
                 "source": manifest["source"],
-                "selection": {
-                    key: selection[key]
-                    for key in (
-                        "criteria",
-                        "eligible_record_count",
-                        "indices_sha256",
-                        "seed",
-                        "selected_source_lines_sha256",
-                        "strata",
-                    )
-                },
+                "qualification_suite": manifest["qualification_suite"],
+                "rendering": declared["rendering"],
+                "model_profile": declared["model_profile"],
             }
         )
     return value
 
 
-def load_flagship_source(path: Path | None = None) -> bytes:
-    source = flagship_source()
-    expected_length = source["byte_length"]
-    if path is not None:
-        nofollow = getattr(os, "O_NOFOLLOW", None)
-        if not isinstance(nofollow, int):
-            raise RuntimeError("secure benchmark source loading is unavailable")
-        try:
-            descriptor = os.open(path, os.O_RDONLY | nofollow)
-        except OSError as exc:
-            raise RuntimeError("benchmark source could not be opened safely") from exc
-        try:
-            before = os.fstat(descriptor)
-            if not stat.S_ISREG(before.st_mode) or before.st_size != expected_length:
-                raise RuntimeError("benchmark source does not have its pinned size")
-            chunks: list[bytes] = []
-            remaining = expected_length + 1
-            while remaining:
-                chunk = os.read(descriptor, min(1024 * 1024, remaining))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                remaining -= len(chunk)
-            after = os.fstat(descriptor)
-            identity = lambda value: (  # noqa: E731 - stable file projection
-                value.st_dev,
-                value.st_ino,
-                value.st_size,
-                value.st_mtime_ns,
-                value.st_ctime_ns,
-            )
-            if identity(before) != identity(after):
-                raise RuntimeError("benchmark source changed while being read")
-            payload = b"".join(chunks)
-        finally:
-            os.close(descriptor)
+def _read_regular_file(path: Path, *, expected_bytes: int) -> bytes:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("secure bundled corpus loading is unavailable")
+    try:
+        descriptor = os.open(path, os.O_RDONLY | nofollow)
+    except OSError as exc:
+        raise RuntimeError(
+            "bundled evaluator corpus could not be opened safely"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_size != expected_bytes:
+            raise RuntimeError("bundled evaluator corpus does not have its pinned size")
+        chunks: list[bytes] = []
+        remaining = expected_bytes + 1
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        identity = lambda item: (  # noqa: E731 - stable file projection
+            item.st_dev,
+            item.st_ino,
+            item.st_size,
+            item.st_mtime_ns,
+            item.st_ctime_ns,
+        )
+        if identity(before) != identity(after):
+            raise RuntimeError("bundled evaluator corpus changed while being read")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _semantic_records() -> list[dict[str, Any]]:
+    suite = _manifest()["qualification_suite"]
+    payload = _read_regular_file(
+        _SEMANTIC_RECORDS, expected_bytes=suite["semantic_byte_length"]
+    )
+    if hashlib.sha256(payload).hexdigest() != suite["semantic_sha256"]:
+        raise RuntimeError("bundled semantic corpus does not match its pinned identity")
+    records = [json.loads(line) for line in payload.splitlines()]
+    if len(records) != 400 or any(
+        not isinstance(record, dict)
+        or set(record)
+        != {"answer", "id", "options", "question", "semantic_sha256", "source"}
+        for record in records
+    ):
+        raise RuntimeError("bundled semantic corpus is incomplete")
+    return cast(list[dict[str, Any]], records)
+
+
+def _question_body(record: dict[str, Any]) -> str:
+    options = record["options"]
+    if not isinstance(options, list) or not 2 <= len(options) <= 10:
+        raise RuntimeError("bundled semantic corpus has invalid choices")
+    choices = "\n".join(
+        f"{chr(ord('A') + index)}. {option}" for index, option in enumerate(options)
+    )
+    return f"Question: {record['question']}\nChoices:\n{choices}"
+
+
+def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, str]:
+    body = _question_body(record)
+    instruction = "Reply with exactly one uppercase option letter and no other text."
+    if profile.key == "flagship":
+        prompt = (
+            "<|im_start|>system\nYou answer multiple-choice questions and follow "
+            "the requested output format exactly.<|im_end|>\n"
+            f"<|im_start|>user\n{body}\n{instruction}<|im_end|>\n"
+            "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        )
+    elif profile.key == "portability":
+        prompt = (
+            "<bos><|turn>system\nYou answer multiple-choice questions and follow "
+            "the requested output format exactly.<turn|>\n"
+            f"<|turn>user\n{body}\n{instruction}<turn|>\n"
+            "<|turn>model\n<|channel>thought\n<channel|>"
+        )
     else:
-        request = urllib.request.Request(
-            source["url"], headers={"User-Agent": "invarlock-evaluator-corpus/1"}
-        )
-        with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310
-            chunks = []
-            total = 0
-            while total <= expected_length:
-                chunk = response.read(min(1024 * 1024, expected_length + 1 - total))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                total += len(chunk)
-            payload = b"".join(chunks)
+        raise ValueError(f"profile does not use the semantic corpus: {profile.key}")
+    return {
+        "id": str(record["id"]),
+        "prompt": prompt,
+        "expected": str(record["answer"]),
+    }
+
+
+def qualification_records(profile: CorpusProfile) -> list[dict[str, str]]:
+    if profile.key not in {"flagship", "portability"}:
+        raise ValueError("qualification records require a maintained GPU profile")
+    records = [_render_record(record, profile) for record in _semantic_records()]
+    payload = records_jsonl(records, compact=True)
     if (
-        len(payload) != expected_length
-        or hashlib.sha256(payload).hexdigest() != source["sha256"]
+        len(payload)
+        != _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
+        or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
     ):
-        raise RuntimeError("benchmark source does not match its pinned identity")
-    return payload
-
-
-def derive_selected_indices(
-    candidates: Sequence[SelectionCandidate],
-    strata: Sequence[SelectionStratum],
-    *,
-    seed: str,
-) -> tuple[int, ...]:
-    for previous, current in zip(strata, strata[1:], strict=False):
-        if previous.maximum_prompt_tokens >= current.minimum_prompt_tokens:
-            raise ValueError("selection strata overlap")
-    selected: list[int] = []
-    for stratum in strata:
-        eligible = [
-            candidate
-            for candidate in candidates
-            if stratum.minimum_prompt_tokens
-            <= candidate.prompt_token_count
-            <= stratum.maximum_prompt_tokens
-        ]
-        if len(eligible) < stratum.sample_count:
-            raise ValueError("selection stratum lacks enough eligible records")
-        eligible.sort(
-            key=lambda candidate: hashlib.sha256(
-                (
-                    f"{seed}:{candidate.source_index}:{candidate.source_line_sha256}"
-                ).encode("ascii")
-            ).digest()
+        raise RuntimeError(
+            "rendered evaluator corpus does not match its pinned identity"
         )
-        selected.extend(
-            candidate.source_index for candidate in eligible[: stratum.sample_count]
-        )
-    if len(selected) != len(set(selected)):
-        raise ValueError("selection strata produced duplicate records")
-    return tuple(sorted(selected))
-
-
-def project_lambada_records(
-    source_payload: bytes, indices: Sequence[int]
-) -> list[dict[str, str]]:
-    lines = source_payload.splitlines()
-    records: list[dict[str, str]] = []
-    for index in indices:
-        if index < 0 or index >= len(lines):
-            raise ValueError("flagship source index is outside the pinned source")
-        try:
-            value = json.loads(lines[index])
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ValueError("flagship source row is not valid JSON") from exc
-        if (
-            not isinstance(value, dict)
-            or set(value) != {"text"}
-            or not isinstance(value["text"], str)
-        ):
-            raise ValueError("flagship source row has an invalid text field")
-        prompt, separator, final_word = value["text"].rpartition(" ")
-        if not prompt or separator != " " or not final_word:
-            raise ValueError("flagship source row lacks a final-word boundary")
-        records.append(
-            {
-                "expected": separator + final_word,
-                "id": f"lambada-openai-{index:04d}",
-                "prompt": prompt,
-            }
-        )
-    return records
-
-
-def flagship_records(
-    source_payload: bytes, tokenizers: Sequence[Any]
-) -> list[dict[str, str]]:
-    source = flagship_source()
-    if (
-        len(source_payload) != source["byte_length"]
-        or hashlib.sha256(source_payload).hexdigest() != source["sha256"]
-    ):
-        raise ValueError("flagship source does not match its pinned identity")
-    lines = source_payload.splitlines()
-    if len(lines) != source["record_count"] or len(tokenizers) != 2:
-        raise ValueError("flagship source or tokenizer set is incomplete")
-    selection = flagship_selection()
-    candidates: list[SelectionCandidate] = []
-    for index, raw in enumerate(lines):
-        try:
-            value = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ValueError("flagship source row is not valid JSON") from exc
-        if (
-            not isinstance(value, dict)
-            or set(value) != {"text"}
-            or not isinstance(value["text"], str)
-        ):
-            raise ValueError("flagship source row has an invalid text field")
-        prompt, separator, final_word = value["text"].rpartition(" ")
-        if not prompt or separator != " " or not final_word:
-            continue
-        target = separator + final_word
-        target_ids = [
-            tokenizer(target, add_special_tokens=False)["input_ids"]
-            for tokenizer in tokenizers
-        ]
-        if any(len(token_ids) != 1 for token_ids in target_ids):
-            continue
-        if any(
-            tokenizer.decode(
-                token_ids,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False,
-            )
-            != target
-            for tokenizer, token_ids in zip(tokenizers, target_ids, strict=True)
-        ):
-            continue
-        prompt_token_count = max(
-            len(tokenizer(prompt, add_special_tokens=True)["input_ids"])
-            for tokenizer in tokenizers
-        )
-        if prompt_token_count <= corpus_profile("flagship").context_length:
-            candidates.append(
-                SelectionCandidate(
-                    source_index=index,
-                    prompt_token_count=prompt_token_count,
-                    source_line_sha256=hashlib.sha256(raw).hexdigest(),
-                )
-            )
-    indices = derive_selected_indices(candidates, selection.strata, seed=selection.seed)
-    if (
-        len(candidates) != selection.eligible_record_count
-        or indices != selection.indices
-    ):
-        raise ValueError("flagship corpus selection does not match the frozen manifest")
-    selected_line_digest = hashlib.sha256(
-        "".join(hashlib.sha256(lines[index]).hexdigest() for index in indices).encode(
-            "ascii"
-        )
-    ).hexdigest()
-    if selected_line_digest != selection.selected_source_lines_sha256:
-        raise ValueError("flagship selected source lines do not match their digest")
-    records = project_lambada_records(source_payload, indices)
-    payload = records_jsonl(records)
-    profile = corpus_profile("flagship")
-    if hashlib.sha256(payload).hexdigest() != profile.dataset_sha256:
-        raise ValueError("flagship derived dataset does not match its pinned digest")
     validate_dataset_records(payload, profile)
     return records
+
+
+def flagship_records() -> list[dict[str, str]]:
+    return qualification_records(corpus_profile("flagship"))
 
 
 def quick_records() -> list[dict[str, str]]:
@@ -447,20 +340,13 @@ def quick_records() -> list[dict[str, str]]:
 
 __all__ = [
     "CorpusProfile",
-    "FlagshipSelection",
-    "SelectionCandidate",
-    "SelectionStratum",
+    "PROFILE_KEYS",
     "corpus_profile",
     "corpus_provenance",
-    "derive_selected_indices",
-    "flagship_selection",
     "flagship_records",
-    "flagship_source",
-    "index_digest",
-    "load_flagship_source",
+    "qualification_records",
     "profile_for_dataset",
     "profile_for_descriptor",
-    "project_lambada_records",
     "quick_records",
     "records_jsonl",
     "validate_dataset_records",

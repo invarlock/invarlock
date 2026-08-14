@@ -53,9 +53,10 @@ execution. The rows cover distinct evaluator ecosystems and workflows;
 `matrix.json` records their source, version, authority, and status metadata.
 
 LM Evaluation Harness and Inspect AI additionally have independently
-replayable 102-record shared-output imports and retained CPU-only signed OCI
-journeys over the same deterministic, stratified 400-record LAMBADA OpenAI
-projection. The other rows retain qualification and compatibility evidence
+replayable 102-record shared-output imports. Their retained current-model OCI
+journeys execute Qwen3.5 9B over the same ordered 400-record MMLU-Pro schedule.
+LM Evaluation Harness also retains a Gemma 4 12B instruction-to-QAT portability
+transaction. The other rows retain qualification and compatibility evidence
 without claiming a native signed journey.
 
 The compact evidence packs, signed verifier receipts, independent policies,
@@ -63,20 +64,22 @@ and builder-signed OCI attestations are retained under
 `examples/evaluator-qualification/signed-transactions/` and replayed by
 `make evaluator-qualification`.
 
-The flagship profile derives 400 records from a revision- and hash-pinned
-[EleutherAI LAMBADA OpenAI dataset](https://huggingface.co/datasets/EleutherAI/lambada_openai).
-It samples four prompt-length strata after requiring a one-token, losslessly
-decoded target under both pinned Qwen tokenizers. The 400-record size supports
-the maximum 10-percentage-point paired interval width declared in advance: the
-retained LM Evaluation Harness and Inspect AI runs achieved widths of 8.39 and
-8.47 points.
+The 400-item semantic suite is selected deterministically from a revision- and
+hash-pinned
+[TIGER-Lab MMLU-Pro dataset](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro).
+It balances all 14 subject categories and answer labels A–J. Qwen and Gemma
+prompts derive from those same semantic records using separately pinned
+model-native no-thinking renderings. The 400-record size supports the maximum
+10-percentage-point paired interval width declared in advance: Qwen achieved a
+7.85-point width and Gemma achieved a 4.68-point width.
 
 The retained flagship comparison confirms an identical ordered schedule and
-reports native agreement without creating another acceptance verdict. The two
-frameworks agree on 98.5% of baseline scores and 99.25% of subject scores. The
-shared-output replay and native signed journeys remain separate on purpose: the
-first isolates evaluator scoring, while the second exercises each framework's
-real model path.
+reports native agreement without creating another acceptance verdict. LM
+Evaluation Harness and Inspect AI agree on every baseline and subject output
+and score across all 800 side records. The shared-output replay and native
+signed journeys answer complementary questions: the first isolates evaluator
+scoring across the wider matrix, while the second exercises both flagship
+frameworks' real model paths.
 
 The matrix represents the Microsoft PromptFlow lineage with Azure AI Evaluation
 rather than preserving the deprecated `promptflow-evals` package as a second
@@ -86,11 +89,11 @@ upstream `basic.Match` evaluator from the hash-pinned `evals==3.0.1.post1` wheel
 in its isolated image.
 
 The generated matrix below describes the retained generic qualification
-profiles. The separate flagship bridges execute LM Evaluation Harness and the
-native Inspect task (`inspect_ai.eval` plus `inspect_ai.scorer.match`) in clean
-OCI transactions. Their build attestations, worker protocol, and native
-adapters remain example-owned; the installed core only receives
-evaluator-neutral runtime-import and signed transaction contracts.
+profiles. The signed bridges execute LM Evaluation Harness and the native
+Inspect task (`inspect_ai.eval` plus `inspect_ai.scorer.match`) in clean OCI
+transactions. Their build attestations, worker protocol, and native adapters
+remain example-owned; the installed core receives evaluator-neutral
+runtime-import and signed transaction contracts.
 
 The signed bridges retain native evaluator facts but keep the transaction
 metric independent. Inspect's pinned causal HF decoder has an explicit
@@ -103,7 +106,7 @@ semantics.
 
 ### Application evaluation SDKs
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
 | Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 shared outputs) | — |
 | DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 shared outputs) | — |
@@ -115,16 +118,16 @@ semantics.
 
 ### Benchmark harnesses
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
-| LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 shared outputs) | Retained (400 native records) |
-| Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 shared outputs) | Retained (400 native records) |
+| LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
+| Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
 | LightEval | `lighteval==0.13.0` | `lighteval.metrics.metrics_sample.ExactMatches.compute` | Maintained | Independently replayable (102 shared outputs) | — |
 | OpenAI Evals | source revision `8eac7a7` (`3.0.1.post1`) | `evals.elsuite.modelgraded.classify_utils.MATCH_FNS['exact']` | Maintained | Independently replayable (102 shared outputs) | — |
 
 ### Evaluation and observability platforms
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
 | MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | — |
 | Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 shared outputs) | — |
@@ -135,13 +138,13 @@ semantics.
 
 ### General metric libraries
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
 | Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 shared outputs) | — |
 
 ### Security and red-team evaluators
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transaction |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
 | Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | — |
 <!-- evaluator-matrix:end -->

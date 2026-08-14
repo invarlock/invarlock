@@ -179,20 +179,23 @@ def test_matrix_preserves_independent_support_authority_and_maturity_axes() -> N
     retained = []
     profiles = {profile["profile_id"]: profile for profile in matrix["profiles"]}
     for profile_id, levels in demonstrations.items():
-        assert set(levels) == {"retained_signed_transaction"}
+        assert set(levels) == {"retained_signed_transactions"}
         profile = profiles[profile_id]
         if profile["authority"]["mode"] == "deterministic_per_record":
             replayable.append(profile_id)
-        retained_transaction = levels["retained_signed_transaction"]
-        if retained_transaction is not None:
-            assert retained_transaction == {
-                "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
-                "record_count": 400,
-            }
-            retained.append(profile_id)
+        retained_transactions = levels["retained_signed_transactions"]
+        assert isinstance(retained_transactions, list)
+        for transaction in retained_transactions:
+            assert transaction["record_count"] == 400
+            retained.append((profile_id, transaction["role"]))
 
     assert len(replayable) == 17
-    assert retained == ["inspect-ai", "lm-evaluation-harness"]
+    assert retained == [
+        ("inspect-ai", "flagship"),
+        ("inspect-ai", "deployment_approval"),
+        ("lm-evaluation-harness", "flagship"),
+        ("lm-evaluation-harness", "portability"),
+    ]
 
 
 def test_flagship_proof_map_links_every_retained_evidence_stage() -> None:
@@ -208,22 +211,38 @@ def test_flagship_proof_map_links_every_retained_evidence_stage() -> None:
         "build-attestation.json",
         "transaction.json",
     )
-    for profile_id in ("inspect-ai", "lm-evaluation-harness"):
+    packages = {
+        "deployment-approval-inspect-ai": "inspect-ai",
+        "gemma4-lm-evaluation-harness": "lm-evaluation-harness",
+        "qwen35-inspect-ai": "inspect-ai",
+        "qwen35-lm-evaluation-harness": "lm-evaluation-harness",
+    }
+    for package_id, profile_id in packages.items():
         targets = (
             *(f"../artifacts/{profile_id}/{name}" for name in common[:4]),
             f"../authoritative/artifacts/{profile_id}/{common[4]}",
-            *(f"{profile_id}/{name}" for name in common[5:]),
+            *(f"{package_id}/{name}" for name in common[5:]),
         )
         for target in targets:
             assert f"({target})" in proof_map
             assert (SIGNED_TRANSACTIONS / target).resolve().is_file()
 
 
-@pytest.mark.parametrize("profile_id", ["lm-evaluation-harness", "inspect-ai"])
+@pytest.mark.parametrize(
+    ("package_id", "profile_id", "expected_verdict"),
+    [
+        ("deployment-approval-inspect-ai", "inspect-ai", "pass"),
+        ("gemma4-lm-evaluation-harness", "lm-evaluation-harness", "fail"),
+        ("qwen35-inspect-ai", "inspect-ai", "fail"),
+        ("qwen35-lm-evaluation-harness", "lm-evaluation-harness", "fail"),
+    ],
+)
 def test_flagship_signed_transaction_is_retained_and_replays_offline(
+    package_id: str,
     profile_id: str,
+    expected_verdict: str,
 ) -> None:
-    root = SIGNED_TRANSACTIONS / profile_id
+    root = SIGNED_TRANSACTIONS / package_id
     transaction = _load(root / "transaction.json")
     verification = transaction["verification"]
 
@@ -267,11 +286,13 @@ def test_flagship_signed_transaction_is_retained_and_replays_offline(
     )
 
     report = _load(root / "evidence/reports/evaluation.report.json")
-    assert evidence.payload["ok"] is True
+    assert evidence.payload["integrity_ok"] is True
+    assert evidence.payload["policy_verdict"] == expected_verdict
+    assert evidence.payload["ok"] is (expected_verdict == "pass")
     assert receipt.ok is True
     assert build["runtime_image_id"] == transaction["runtime_image_id"]
     assert report["record_count"] == 400
-    assert report["verdict"] == "pass"
+    assert report["verdict"] == expected_verdict
 
 
 def test_flagship_comparison_reports_native_agreement_without_a_new_verdict() -> None:
@@ -279,28 +300,68 @@ def test_flagship_comparison_reports_native_agreement_without_a_new_verdict() ->
     retained = _load(SIGNED_TRANSACTIONS / "flagship-comparison.json")
 
     assert retained == module.flagship_comparison_document(
-        ["lm-evaluation-harness", "inspect-ai"]
+        ["qwen35-lm-evaluation-harness", "qwen35-inspect-ai"]
     )
     assert retained["record_count"] == 400
-    assert retained["sides"]["baseline"]["score_agreement"] == 0.985
-    assert retained["sides"]["subject"]["score_agreement"] == 0.9925
+    assert retained["sides"]["baseline"]["score_agreement"] == 1.0
+    assert retained["sides"]["subject"]["score_agreement"] == 1.0
     assert "verdict" not in retained
+
+
+def test_flagship_comparison_identifies_score_and_record_digest_disagreement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _matrix_module()
+    _comparison_fixture(tmp_path)
+    _mutate_json(
+        tmp_path / "right/evidence/records/paired-records.json",
+        lambda value: (
+            value["records"][0]["baseline"].update(score=0.0),
+            value["records"][0]["subject"].update(
+                observation_record_digest="sha256:" + "e" * 64
+            ),
+        ),
+    )
+    monkeypatch.setattr(module, "SIGNED_TRANSACTIONS", tmp_path)
+
+    comparison = module.flagship_comparison_document(["left", "right"])
+
+    assert comparison["sides"]["baseline"]["score_agreement"] == 0.0
+    assert comparison["sides"]["baseline"]["score_mismatch_ids"] == ["record-1"]
+    assert comparison["sides"]["subject"]["record_digest_agreement"] == 0.0
+    assert comparison["sides"]["subject"]["record_digest_mismatch_ids"] == ["record-1"]
 
 
 @pytest.mark.parametrize(
     "value",
     [
         {},
-        {"dataset_name": "", "record_count": 400},
-        {"dataset_name": "fixed", "record_count": True},
-        {"dataset_name": "fixed", "record_count": 0},
+        [{}],
+        [
+            {
+                "dataset_name": "fixed",
+                "package_id": "../unsafe",
+                "record_count": 400,
+                "role": "flagship",
+            }
+        ],
+        [
+            {
+                "dataset_name": "fixed",
+                "package_id": "fixed",
+                "record_count": True,
+                "role": "flagship",
+            }
+        ],
     ],
 )
-def test_retained_claim_rejects_ambiguous_or_invalid_counts(value: object) -> None:
+def test_retained_transactions_reject_ambiguous_or_invalid_claims(
+    value: object,
+) -> None:
     module = _matrix_module()
 
     with pytest.raises(ValueError, match="demonstration status is invalid"):
-        module.retained_claim(value, profile_id="flagship")
+        module.retained_transactions(value, profile_id="flagship")
 
 
 def test_matrix_rejects_extra_demonstration_status_fields(
@@ -411,7 +472,7 @@ def _comparison_fixture(root: Path) -> None:
         (
             lambda root: _mutate_json(
                 root / "right/evidence/reports/evaluation.report.json",
-                lambda value: value.update(verdict="fail"),
+                lambda value: value.update(verdict="unknown"),
             ),
             "comparison report is invalid",
         ),
@@ -455,7 +516,9 @@ def test_retained_transaction_claim_is_verified_against_signed_dataset() -> None
             "inspect-ai",
             {
                 "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
+                "package_id": "deployment-approval-inspect-ai",
                 "record_count": 401,
+                "role": "deployment_approval",
             },
         )
 
@@ -479,10 +542,14 @@ def test_write_flagship_comparison_command_verifies_before_writing(
     output = tmp_path / "flagship-comparison.json"
     claims = {
         profile_id: {
-            "retained_signed_transaction": {
-                "dataset_name": "fixed",
-                "record_count": 1,
-            }
+            "retained_signed_transactions": [
+                {
+                    "dataset_name": "fixed",
+                    "package_id": f"{profile_id}-package",
+                    "record_count": 1,
+                    "role": "flagship",
+                }
+            ]
         }
         for profile_id in ("left", "right")
     }
@@ -502,7 +569,7 @@ def test_write_flagship_comparison_command_verifies_before_writing(
     monkeypatch.setattr(
         module,
         "flagship_comparison_document",
-        lambda profile_ids: {"format": "comparison", "profiles": profile_ids},
+        lambda package_ids: {"format": "comparison", "transactions": package_ids},
     )
     monkeypatch.setattr(module, "FLAGSHIP_COMPARISON", output)
 
@@ -511,7 +578,7 @@ def test_write_flagship_comparison_command_verifies_before_writing(
     assert verified == ["left", "right"]
     assert json.loads(output.read_bytes()) == {
         "format": "comparison",
-        "profiles": ["left", "right"],
+        "transactions": ["left-package", "right-package"],
     }
 
 
@@ -529,23 +596,27 @@ def test_write_flagship_comparison_requires_every_retained_package(
         module,
         "demonstration_levels",
         lambda: {
-            "left": {"retained_signed_transaction": None},
+            "left": {"retained_signed_transactions": []},
             "right": {
-                "retained_signed_transaction": {
-                    "dataset_name": "fixed",
-                    "record_count": 1,
-                }
+                "retained_signed_transactions": [
+                    {
+                        "dataset_name": "fixed",
+                        "package_id": "right-package",
+                        "record_count": 1,
+                        "role": "flagship",
+                    }
+                ]
             },
         },
     )
 
-    with pytest.raises(ValueError, match="lacks a retained signed transaction"):
+    with pytest.raises(ValueError, match="exactly one retained flagship"):
         module.main()
 
 
 def test_retained_transaction_metadata_is_strict_and_bounded(tmp_path: Path) -> None:
     module = _matrix_module()
-    source = SIGNED_TRANSACTIONS / "inspect-ai" / "transaction.json"
+    source = SIGNED_TRANSACTIONS / "deployment-approval-inspect-ai" / "transaction.json"
     transaction = _load(source)
     path = tmp_path / "transaction.json"
 
@@ -597,6 +668,10 @@ def test_retained_transaction_metadata_is_strict_and_bounded(tmp_path: Path) -> 
             lambda value: value["verification"].update(verifier_identity=" "),
             "verifier identity",
         ),
+        (
+            lambda value: value["verification"].update(policy_verdict="unknown"),
+            "policy verdict",
+        ),
     ],
 )
 def test_retained_transaction_metadata_rejects_malformed_fields(
@@ -606,7 +681,9 @@ def test_retained_transaction_metadata_rejects_malformed_fields(
 ) -> None:
     module = _matrix_module()
     transaction = json.loads(
-        (SIGNED_TRANSACTIONS / "inspect-ai" / "transaction.json").read_bytes()
+        (
+            SIGNED_TRANSACTIONS / "deployment-approval-inspect-ai" / "transaction.json"
+        ).read_bytes()
     )
     assert callable(mutation)
     mutation(transaction)

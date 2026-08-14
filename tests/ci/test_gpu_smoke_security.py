@@ -44,6 +44,16 @@ def test_cuda_runtime_smoke_is_local_only_and_unprivileged() -> None:
     assert "torch.bmm" in recipe
 
 
+def test_cuda129_runtime_smoke_is_local_only_and_unprivileged() -> None:
+    recipe = _target_recipe(ROOT / "Makefile", "runtime-smoke-cuda129")
+
+    _assert_hardened_container_smoke(recipe)
+    assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in recipe
+    assert "torch.cuda.is_available()" in recipe
+    assert "TORCH_DISABLE_NATIVE_JIT" in recipe
+    assert "torch.bmm" in recipe
+
+
 def test_multimodal_smoke_is_local_only_and_unprivileged() -> None:
     recipe = _target_recipe(ROOT / "addins/multimodal/Makefile", "smoke")
 

@@ -36,6 +36,7 @@ from invarlock.evaluation_oci import (
 
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CONTAINER_ID_RE = re.compile(r"^[0-9a-f]{12,64}$")
+_CUDA_DEVICE_RE = re.compile(r"^cuda(?::(0|[1-9][0-9]*))?$")
 _DEFAULT_WORKER_CPUS = "4"
 _DEFAULT_WORKER_MEMORY_MIB = 65536
 _DEFAULT_WORKER_USER = "65532:65532"
@@ -138,6 +139,21 @@ def _mount(source: Path, target: str, *, read_only: bool) -> list[str]:
     return ["--mount", ",".join(fields)]
 
 
+def _device_arguments(engine: str, device: str) -> tuple[list[str], str]:
+    if device == "cpu":
+        return [], "cpu"
+    match = _CUDA_DEVICE_RE.fullmatch(device)
+    if match is None:
+        raise OciEvaluationError("evaluator worker device selector is invalid")
+    index = match.group(1)
+    if engine == "docker":
+        return ["--gpus", "all" if index is None else f"device={index}"], "cuda"
+    return [
+        "--device",
+        "nvidia.com/gpu=all" if index is None else f"nvidia.com/gpu={index}",
+    ], "cuda"
+
+
 def _run_bounded_command(
     command: Sequence[str],
     *,
@@ -186,6 +202,7 @@ def compose_evaluator_worker_command(
     control_root: Path,
     environment: Mapping[str, str] = MappingProxyType({}),
     timeout_seconds: int,
+    device: str = "cpu",
     output_limit_bytes: int = _EVALUATOR_DEFAULT_OUTPUT_BYTES,
     cpus: str = _DEFAULT_WORKER_CPUS,
     memory_mib: int = _DEFAULT_WORKER_MEMORY_MIB,
@@ -221,6 +238,9 @@ def compose_evaluator_worker_command(
         raise OciEvaluationError("evaluator worker output limit is invalid")
     limits = OciWorkerLimits(cpus=cpus, memory_mib=memory_mib, user=user)
     cpus, memory_mib, user = limits.cpus, limits.memory_mib, limits.user
+    device_arguments, worker_device = _device_arguments(engine, device)
+    if "INVARLOCK_EVALUATOR_DEVICE" in environment:
+        raise OciEvaluationError("evaluator worker device environment is reserved")
     _evaluator_output_name(output)
     try:
         control_stat = control_root.lstat()
@@ -258,6 +278,7 @@ def compose_evaluator_worker_command(
         str(_CONTAINER_STOP_SECONDS),
         "--network",
         "none",
+        *device_arguments,
         "--read-only",
         "--cap-drop=ALL",
         "--security-opt",
@@ -286,6 +307,7 @@ def compose_evaluator_worker_command(
         if not key or "=" in key or "\x00" in key or "\x00" in value:
             raise OciEvaluationError("evaluator worker environment is invalid")
         command.extend(("--env", f"{key}={value}"))
+    command.extend(("--env", f"INVARLOCK_EVALUATOR_DEVICE={worker_device}"))
     command.extend(
         [
             "--env",
@@ -481,6 +503,7 @@ def run_evaluator_worker(
     output: Path,
     environment: Mapping[str, str] = MappingProxyType({}),
     timeout_seconds: int,
+    device: str = "cpu",
     output_limit_bytes: int = _EVALUATOR_DEFAULT_OUTPUT_BYTES,
     cpus: str = _DEFAULT_WORKER_CPUS,
     memory_mib: int = _DEFAULT_WORKER_MEMORY_MIB,
@@ -508,6 +531,7 @@ def run_evaluator_worker(
             control_root=control_root,
             environment=environment,
             timeout_seconds=timeout_seconds,
+            device=device,
             output_limit_bytes=output_limit_bytes,
             cpus=cpus,
             memory_mib=memory_mib,

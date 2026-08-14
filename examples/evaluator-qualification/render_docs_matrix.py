@@ -51,19 +51,39 @@ def escape_cell(value: str) -> str:
     return value.replace("|", r"\|").replace("\n", " ")
 
 
-def retained_transaction(value: object) -> str:
-    if value is None:
+def retained_transactions(value: object) -> str:
+    if value == []:
         return "—"
-    if (
-        not isinstance(value, dict)
-        or set(value) != {"dataset_name", "record_count"}
-        or not isinstance(value.get("dataset_name"), str)
-        or not isinstance(value.get("record_count"), int)
-        or isinstance(value.get("record_count"), bool)
-        or value["record_count"] < 1
-    ):
+    if not isinstance(value, list) or not value:
         raise ValueError("retained signed transaction status is invalid")
-    return f"Retained ({value['record_count']} native records)"
+    counts: set[int] = set()
+    packages: set[str] = set()
+    for claim in value:
+        if (
+            not isinstance(claim, dict)
+            or set(claim) != {"dataset_name", "package_id", "record_count", "role"}
+            or not isinstance(claim.get("dataset_name"), str)
+            or not claim["dataset_name"].strip()
+            or not isinstance(claim.get("package_id"), str)
+            or not claim["package_id"].strip()
+            or claim["package_id"] in packages
+            or not isinstance(claim.get("record_count"), int)
+            or isinstance(claim.get("record_count"), bool)
+            or claim["record_count"] < 1
+            or claim.get("role")
+            not in {"deployment_approval", "flagship", "portability"}
+        ):
+            raise ValueError("retained signed transaction status is invalid")
+        packages.add(claim["package_id"])
+        counts.add(claim["record_count"])
+    count = len(value)
+    noun = "transaction" if count == 1 else "transactions"
+    record_text = (
+        f", {next(iter(counts))} records each" if len(counts) == 1 and count > 1 else ""
+    )
+    if count == 1:
+        record_text = f", {next(iter(counts))} records"
+    return f"Retained ({count} signed {noun}{record_text})"
 
 
 def render() -> str:
@@ -85,7 +105,7 @@ def render() -> str:
                 "",
                 "| Upstream evaluator | Pinned version | Executed upstream entry "
                 "point | Adapter support | Replay authority | "
-                "Retained signed transaction |",
+                "Retained signed transactions |",
                 "| --- | --- | --- | --- | --- | --- |",
             ]
         )
@@ -96,7 +116,7 @@ def render() -> str:
             profile_id = profile["profile_id"]
             levels = demonstrations[profile_id]
             raw = load(ROOT / "artifacts" / profile_id / "upstream-output.json")
-            end_to_end = retained_transaction(levels["retained_signed_transaction"])
+            end_to_end = retained_transactions(levels["retained_signed_transactions"])
             cells = (
                 profile["display_name"],
                 pinned_version(profile),

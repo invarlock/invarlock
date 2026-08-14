@@ -122,9 +122,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--builder-signing-key", type=Path, required=True)
     parser.add_argument("--builder-public-key", type=Path, required=True)
     parser.add_argument(
-        "--corpus-profile", choices=("quick", "flagship"), default="quick"
+        "--corpus-profile",
+        choices=("quick", "flagship", "portability"),
+        default="quick",
     )
-    parser.add_argument("--benchmark-source", type=Path)
+    parser.add_argument("--device")
+    parser.add_argument(
+        "--allow-policy-fail",
+        action="store_true",
+        help="retain a verified policy rejection as a completed evidence transaction",
+    )
     args = parser.parse_args(argv)
     builder_signing_key = load_builder_signing_key(
         Path(os.path.abspath(args.builder_signing_key.expanduser()))
@@ -149,6 +156,17 @@ def main(argv: list[str] | None = None) -> int:
     output: str | None = None
     result = 2
     try:
+        from examples.integrations.evaluator_transaction.model_profiles import (
+            model_profile,
+        )
+
+        selected_models = model_profile(args.corpus_profile)
+        runtime_profile = "cu129" if selected_models.device == "cuda" else "cpu"
+        device = args.device or selected_models.device
+        if (selected_models.device == "cpu") != (device == "cpu"):
+            raise ValueError(
+                "the selected corpus and device require different runtimes"
+            )
         commit = _require_committed_checkout(repository)
         build = workspace / "build"
         build.mkdir()
@@ -159,6 +177,14 @@ def main(argv: list[str] | None = None) -> int:
             build_root=build,
             container_engine=args.container_engine,
             image_tag=base_tag,
+            dockerfile=(
+                "runtime/Dockerfile.cuda"
+                if runtime_profile == "cu129"
+                else "runtime/Dockerfile"
+            ),
+            build_arguments=(
+                ("CUDA_PROFILE=cu129",) if runtime_profile == "cu129" else ()
+            ),
         )
         cleanup_tags.append(
             record_owned_image_tag(
@@ -183,13 +209,15 @@ def main(argv: list[str] | None = None) -> int:
         source_bundle_sha256 = (
             "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
         )
+        lock_name = (
+            "lm-evaluation-harness-py312-cu129.txt"
+            if runtime_profile == "cu129"
+            else "lm-evaluation-harness-py312.txt"
+        )
         lock_sha256 = (
             "sha256:"
             + hashlib.sha256(
-                (
-                    repository
-                    / "requirements/workflows/lm-evaluation-harness-py312.txt"
-                ).read_bytes()
+                (repository / "requirements/workflows" / lock_name).read_bytes()
             ).hexdigest()
         )
         image_tag = temporary_image_tag("invarlock-lm-eval-example", commit)
@@ -219,6 +247,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"SOURCE_BUNDLE_SHA256={source_bundle_sha256}",
                 "--build-arg",
                 f"EVALUATOR_LOCK_SHA256={lock_sha256.removeprefix('sha256:')}",
+                "--build-arg",
+                f"EVALUATOR_RUNTIME={runtime_profile}",
                 "--tag",
                 image_tag,
                 "-",
@@ -246,6 +276,7 @@ def main(argv: list[str] | None = None) -> int:
                 "org.invarlock.example.evaluator": "lm-evaluation-harness",
                 "org.invarlock.example.evaluator-version": "0.4.12+invarlock.nocache.1",
                 "org.invarlock.example.evaluator-lock-sha256": lock_sha256,
+                "org.invarlock.example.evaluator-runtime": runtime_profile,
             },
             expected_entrypoint=[
                 "python",
@@ -303,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
 
         prepared = workspace / "prepared"
         status(
-            "Preparing the pinned Qwen3-0.6B checkpoints and "
+            "Preparing the pinned model checkpoints and "
             f"{args.corpus_profile} corpus..."
         )
         prepare_command = [
@@ -316,13 +347,6 @@ def main(argv: list[str] | None = None) -> int:
             "--corpus-profile",
             args.corpus_profile,
         ]
-        if args.benchmark_source is not None:
-            prepare_command.extend(
-                [
-                    "--benchmark-source",
-                    str(Path(os.path.abspath(args.benchmark_source.expanduser()))),
-                ]
-            )
         run(prepare_command, cwd=repository)
         status(
             "Running the Harness in the inspected image and independently verifying "
@@ -341,6 +365,8 @@ def main(argv: list[str] | None = None) -> int:
                 image_id,
                 "--container-engine",
                 args.container_engine,
+                "--device",
+                device,
                 "--evidence-signing-key",
                 str(Path(os.path.abspath(args.evidence_signing_key.expanduser()))),
                 "--verifier-signing-key",
@@ -357,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
                 base_id,
                 "--build-attestation",
                 str(build / "evaluator-build-attestation.json"),
+                *(["--allow-policy-fail"] if args.allow_policy_fail else []),
             ],
             cwd=repository,
         )

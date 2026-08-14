@@ -1,0 +1,33 @@
+{
+  "base_image_id": "sha256:5e10b68deca6f41d8977ca7c7c1d2c64a7af3a6c20969fdcd1236696527b06cb",
+  "entrypoint": [
+    "python",
+    "-m",
+    "evaluator_transaction.cli",
+    "worker"
+  ],
+  "evaluator_version": "0.3.254",
+  "executed_on": "2026-08-13",
+  "format": "invarlock/retained-evaluator-transaction-v1",
+  "lock_sha256": "sha256:f4b895cd8e2971077f80a648beada4adb5d2df1036d46a774f89a508feb15223",
+  "profile_id": "inspect-ai",
+  "runtime_image_id": "sha256:93182589aa60c27b94699719eea857bcc6f48530390fce4215dd73a0cbe48a74",
+  "source_bundle_sha256": "sha256:78a4e1ff890e5224b58520f434e6e307bdc03852c0456c2a22019a4b8b935f10",
+  "source_commit": "6d13c16b665eab34432a7ced10a7592474c2a50a",
+  "verification": {
+    "artifact_digests": {
+      "baseline": "sha256:ffe098c4bf61c488ca671517cb664d8b696b6bdfaef2f66a403caf8e9e730368",
+      "subject": "sha256:ff5ef00defc37d2eadb80496b45986e75a221e3cc0d6b6f0e19e48ac47d60747"
+    },
+    "evidence_signer_fingerprint": "sha256:716f3964a45a79f6f22c8701a12784ec7995731794762d1ed7fec8384c58aa66",
+    "policy_verdict": "fail",
+    "runtime_digests": {
+      "baseline": "sha256:93182589aa60c27b94699719eea857bcc6f48530390fce4215dd73a0cbe48a74",
+      "subject": "sha256:93182589aa60c27b94699719eea857bcc6f48530390fce4215dd73a0cbe48a74"
+    },
+    "schedule_digest": "sha256:2288cba19abc46e39e86569a4eceabe2a06b54b9167f6b10c7291cd50596ca74",
+    "trust_profile_digest": "sha256:3986429acac8d0bd9700f5dc1b8f63c7e83a58cb5bcd38257795d17374eec20e",
+    "verifier_fingerprint": "sha256:8fce6fe202d170429bdd3e614215045ae2764f87f9009f1210ae09dbc009b98c",
+    "verifier_identity": "invarlock-example/inspect-ai-verifier"
+  }
+}

@@ -21,7 +21,7 @@ def _module() -> ModuleType:
     return module
 
 
-def test_measurements_replay_both_real_signed_transactions(tmp_path: Path) -> None:
+def test_measurements_replay_current_model_signed_transactions(tmp_path: Path) -> None:
     module = _module()
 
     result = module.measure_all(root=ROOT, runs=2)
@@ -29,7 +29,9 @@ def test_measurements_replay_both_real_signed_transactions(tmp_path: Path) -> No
     assert result["format"] == module.FORMAT
     assert result["runs"] == 2
     transactions = result["transactions"]
-    assert [item["profile_id"] for item in transactions] == list(module.PROFILE_IDS)
+    assert [item["transaction_id"] for item in transactions] == list(
+        module.TRANSACTION_IDS
+    )
     for item in transactions:
         assert item["record_count"] == 400
         assert item["evidence_files"] > 20
@@ -41,7 +43,7 @@ def test_measurements_replay_both_real_signed_transactions(tmp_path: Path) -> No
 
 def test_measurement_sizes_match_the_retained_directories() -> None:
     module = _module()
-    transaction = TRANSACTIONS / "inspect-ai"
+    transaction = TRANSACTIONS / "qwen35-inspect-ai"
     files, total = module._tree_stats(transaction)
 
     expected = [path for path in transaction.rglob("*") if path.is_file()]
@@ -51,8 +53,8 @@ def test_measurement_sizes_match_the_retained_directories() -> None:
 
 def test_public_cost_table_records_exact_sizes_and_claim_boundary() -> None:
     module = _module()
-    for profile_id in module.PROFILE_IDS:
-        _files, size = module._tree_stats(TRANSACTIONS / profile_id / "evidence")
+    for transaction_id in module.TRANSACTION_IDS:
+        _files, size = module._tree_stats(TRANSACTIONS / transaction_id / "evidence")
         assert f"{size:,}" in README
     assert "complete semantic evidence replay" in README
     assert "not a performance guarantee" in README
@@ -97,7 +99,7 @@ def test_measurement_rejects_invalid_record_and_transaction_metadata(
     transaction.joinpath("transaction.json").write_text(
         '{"profile_id":"unknown"}', encoding="utf-8"
     )
-    with pytest.raises(module.MeasurementError, match="retained flagship"):
+    with pytest.raises(module.MeasurementError, match="is not retained"):
         module.measure_transaction(transaction, runs=1, temporary_root=tmp_path)
 
     with pytest.raises(module.MeasurementError, match="verification anchors"):
@@ -106,13 +108,71 @@ def test_measurement_rejects_invalid_record_and_transaction_metadata(
 
 def test_measurement_rejects_a_retained_receipt_outside_its_trust_roots() -> None:
     module = _module()
-    transaction_root = TRANSACTIONS / "inspect-ai"
+    transaction_root = TRANSACTIONS / "qwen35-inspect-ai"
     transaction = json.loads(transaction_root.joinpath("transaction.json").read_bytes())
     verification = dict(transaction["verification"])
     verification["verifier_fingerprint"] = "sha256:" + "0" * 64
 
     with pytest.raises(module.MeasurementError, match="retained receipt verification"):
-        module._verify_retained_receipt(transaction_root, verification)
+        module._verify_retained_receipt(
+            transaction_root,
+            verification,
+            expected_policy_verdict="fail",
+        )
+
+
+def test_measurement_rejects_wrong_verification_failure_and_unexpected_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    verification = {
+        "artifact_digests": {"baseline": "baseline", "subject": "subject"},
+        "evidence_signer_fingerprint": "signer",
+        "runtime_digests": {"baseline": "baseline", "subject": "subject"},
+        "schedule_digest": "schedule",
+        "trust_profile_digest": "trust-profile",
+    }
+
+    def integrity_failure(*_args: object, **_kwargs: object) -> None:
+        raise module.EvidenceVerificationError("integrity failure", exit_code=2)
+
+    monkeypatch.setattr(module, "verify_evidence", integrity_failure)
+    with pytest.raises(module.EvidenceVerificationError, match="integrity failure"):
+        module._verify_and_issue_receipt(
+            tmp_path,
+            verification,
+            receipt=tmp_path / "receipt.json",
+            verifier_key=b"key",
+            expected_policy_verdict="fail",
+        )
+
+    monkeypatch.setattr(module, "verify_evidence", lambda *_args, **_kwargs: None)
+    with pytest.raises(module.MeasurementError, match="outcome changed unexpectedly"):
+        module._verify_and_issue_receipt(
+            tmp_path,
+            verification,
+            receipt=tmp_path / "receipt.json",
+            verifier_key=b"key",
+            expected_policy_verdict="fail",
+        )
+
+
+def test_measurement_rejects_an_unrecognized_policy_verdict(tmp_path: Path) -> None:
+    module = _module()
+    transaction = tmp_path / "transaction"
+    transaction.mkdir()
+    transaction.joinpath("transaction.json").write_text(
+        json.dumps(
+            {
+                "profile_id": "inspect-ai",
+                "verification": {"policy_verdict": "unknown"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.MeasurementError, match="policy verdict is invalid"):
+        module.measure_transaction(transaction, runs=1, temporary_root=tmp_path)
 
 
 def test_measurement_runs_one_untimed_warmup_before_every_sample() -> None:

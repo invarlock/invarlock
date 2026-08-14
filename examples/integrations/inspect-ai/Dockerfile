@@ -5,6 +5,7 @@ ARG BASE_IMAGE_ID
 ARG SOURCE_COMMIT
 ARG SOURCE_BUNDLE_SHA256
 ARG EVALUATOR_LOCK_SHA256
+ARG EVALUATOR_RUNTIME=cpu
 
 LABEL org.invarlock.example.base-image-id="${BASE_IMAGE_ID}"
 LABEL org.invarlock.example.source-commit="${SOURCE_COMMIT}"
@@ -12,13 +13,20 @@ LABEL org.invarlock.example.source-bundle-sha256="${SOURCE_BUNDLE_SHA256}"
 LABEL org.invarlock.example.evaluator="inspect-ai"
 LABEL org.invarlock.example.evaluator-version="0.3.254"
 LABEL org.invarlock.example.evaluator-lock-sha256="sha256:${EVALUATOR_LOCK_SHA256}"
+LABEL org.invarlock.example.evaluator-runtime="${EVALUATOR_RUNTIME}"
 
 # Inspect AI is deliberately scoped to this integration image. The resulting
 # image is inspected after this layer is built and that immutable ID is carried
 # into both runtime receipts.
 COPY requirements/workflows/inspect-ai-runtime-py312.txt \
-    /opt/invarlock/evaluator-locks/inspect-ai-runtime-requirements.txt
-RUN python -m pip install \
+    /tmp/inspect-ai-runtime-cpu.txt
+COPY requirements/workflows/inspect-ai-runtime-py312-cu129.txt \
+    /tmp/inspect-ai-runtime-cu129.txt
+RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
+    && install -d /opt/invarlock/evaluator-locks \
+    && install -m 0644 "/tmp/inspect-ai-runtime-${EVALUATOR_RUNTIME}.txt" \
+      /opt/invarlock/evaluator-locks/inspect-ai-runtime-requirements.txt \
+    && python -m pip install \
       --no-compile \
       --no-deps \
       --require-hashes \

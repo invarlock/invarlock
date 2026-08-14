@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import threading
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -56,6 +57,14 @@ def _model_inputs_module() -> ModuleType:
 
 def _digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def test_flagship_harness_profile_isolates_each_inference_record() -> None:
+    module = _module()
+    config = module.execution_config(module.corpus_profile("flagship"))
+
+    assert config["batch_size"] == 1
+    assert config["model_profile"] == "qwen35-9b-base-to-post-trained-bf16-singleton-v1"
 
 
 def _complete_kwargs(tmp_path: Path, module: ModuleType) -> dict[str, object]:
@@ -127,6 +136,19 @@ def _stub_completion_workers(
     monkeypatch: pytest.MonkeyPatch, module: ModuleType, prepared: Path
 ) -> None:
     monkeypatch.setattr(module, "_inspect_runtime_image", lambda *_a, **_k: None)
+    quick_models = module.model_profile("quick")
+    relaxed_models = replace(
+        quick_models,
+        snapshots=tuple(
+            replace(
+                snapshot,
+                checkpoint_tree_sha256=None,
+                tokenizer_contract_sha256=None,
+            )
+            for snapshot in quick_models.snapshots
+        ),
+    )
+    monkeypatch.setattr(module, "model_profile", lambda _key: relaxed_models)
 
     def copy_worker(*, role: str, output: Path, **_kwargs: object) -> None:
         shutil.copytree(prepared / "harness" / role, output)
@@ -319,14 +341,6 @@ def _prepare_test_transaction(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
-    module.EXPECTED_MODEL_ARTIFACTS = {
-        role: {
-            "path": f"models/{role}",
-            "model_id": f"test/{role}",
-            "locator": f"generated://test/{role}",
-        }
-        for role in ("baseline", "subject")
-    }
     policy = {
         "resolved_policy": {
             "metrics": {
@@ -347,11 +361,7 @@ def _prepare_test_transaction(
 
     def side(role: str) -> dict[str, object]:
         return {
-            "artifact": {
-                "path": f"models/{role}",
-                "model_id": f"test/{role}",
-                "locator": f"generated://test/{role}",
-            },
+            "artifact": module._model_artifacts(module.model_profile("quick"))[role],
             "runtime": {"provider": "hf_transformers", "settings": settings[role]},
         }
 
@@ -390,12 +400,33 @@ def test_adapter_writes_schedule_bound_records(tmp_path: Path) -> None:
     destination = tmp_path / "records.jsonl"
     _write_jsonl(samples, _sample())
 
-    module.adapt(samples, _schedule(), destination)
+    bindings = module.adapt(samples, _schedule(), destination)
 
     record = json.loads(destination.read_text(encoding="utf-8"))
     assert record["record_id"] == "stable-1"
     assert record["output_text"] == "Answer"
     assert "exact_match" not in record
+    assert bindings == [
+        {
+            "doc_sha256": _sample()["doc_hash"],
+            "output_sha256": _digest(b"Answer"),
+            "prompt_sha256": _digest(b"Prompt"),
+            "record_id": "stable-1",
+            "target_sha256": _digest(b"Answer"),
+        }
+    ]
+    assert "Prompt" not in json.dumps(bindings)
+
+
+def test_compact_provenance_has_a_headroom_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+
+    assert module._compact_provenance_bytes({"format": "test"}).endswith(b"\n")
+    monkeypatch.setattr(module, "MAX_PROVENANCE_BYTES", 4)
+    with pytest.raises(module.BridgeError, match="provenance exceeds"):
+        module._compact_provenance_bytes({"format": "test"})
 
 
 def test_worker_runs_the_pinned_harness_and_binds_official_samples(
@@ -785,12 +816,12 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
         )
         == 0
     )
-    completed_paths: list[tuple[Path, Path]] = []
+    completed_paths: list[tuple[Path, Path, bool]] = []
 
     def fake_complete(
         root: Path, prepared: Path, *_args: object, **_kwargs: object
     ) -> tuple[Path, Path, Path]:
-        completed_paths.append((root, prepared))
+        completed_paths.append((root, prepared, bool(_kwargs.get("allow_policy_fail"))))
         return (
             tmp_path / "evidence",
             tmp_path / "receipt.json",
@@ -823,6 +854,7 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
                 "sha256:" + "b" * 64,
                 "--build-attestation",
                 str(completion_keys["build_attestation"]),
+                "--allow-policy-fail",
             ]
         )
         == 0
@@ -832,6 +864,7 @@ def test_bridge_main_dispatches_worker_complete_and_reports_failures(
         (
             (tmp_path / "transaction").absolute(),
             (tmp_path / "prepared").absolute(),
+            True,
         )
     ]
     assert "Evidence:" in capsys.readouterr().out
@@ -906,6 +939,10 @@ def test_complete_replays_real_import_transaction(
         "max_gen_toks": module.MAX_GENERATION_TOKENS,
         "until": ["\n"],
     }
+    assert all(
+        "samples" not in run and len(run["sample_bindings"]) == 102
+        for run in provenance["runs"].values()
+    )
     for role in ("baseline", "subject"):
         provider_receipt = json.loads(
             (evidence / f"providers/{role}/runtime-provider.receipt.json").read_text(
@@ -1054,6 +1091,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
                     ROOT / "requirements/workflows/lm-evaluation-harness-py312.txt"
                 ).read_bytes()
             ).hexdigest(),
+            "org.invarlock.example.evaluator-runtime": "cpu",
         },
     }
     commands: list[list[str]] = []
@@ -1128,6 +1166,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
             [
                 "--workspace",
                 str(tmp_path / "journey"),
+                "--allow-policy-fail",
                 *_launcher_args(tmp_path, module),
             ]
         )
@@ -1142,6 +1181,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
     )
     assert "--source-commit" in completion
     assert "--base-image-id" in completion
+    assert "--allow-policy-fail" in completion
     build = next(command for command in commands if command[:2] == ["docker", "build"])
     base_argument = next(
         argument for argument in build if argument.startswith("BASE_IMAGE=")
@@ -1221,6 +1261,15 @@ def test_harness_bounded_command_captures_failures_and_start_errors(
             timeout_seconds=10,
             label="test command",
         )
+
+
+def test_harness_accepts_only_an_explicit_policy_rejection_status() -> None:
+    module = _module()
+
+    assert module._transaction_command_succeeded(0, allow_policy_failure=False)
+    assert not module._transaction_command_succeeded(7, allow_policy_failure=False)
+    assert module._transaction_command_succeeded(7, allow_policy_failure=True)
+    assert not module._transaction_command_succeeded(6, allow_policy_failure=True)
 
 
 def test_harness_workers_mount_role_private_output_parents(
@@ -1311,8 +1360,8 @@ def test_model_inputs_direct_script_bootstraps_the_repository(
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert "--corpus-profile {quick,flagship}" in completed.stdout
-    assert "--benchmark-source BENCHMARK_SOURCE" in completed.stdout
+    assert "--corpus-profile {quick,flagship,portability}" in completed.stdout
+    assert "--benchmark-source" not in completed.stdout
 
 
 def test_model_inputs_do_not_mask_an_unrelated_import_failure(
@@ -1348,7 +1397,7 @@ def test_model_input_download_accepts_only_the_pinned_bytes(
     item = module.SnapshotFile(
         "model.bin", len(payload), hashlib.sha256(payload).hexdigest()
     )
-    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, (item,))
+    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, "qwen3", (item,))
 
     class Response:
         def __init__(self) -> None:
@@ -1396,7 +1445,7 @@ def test_model_input_download_rejects_invalid_streams_and_removes_partial_file(
 ) -> None:
     module = _model_inputs_module()
     item = module.SnapshotFile("model.bin", byte_length, "0" * 64)
-    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, (item,))
+    snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, "qwen3", (item,))
 
     class Response:
         def __init__(self) -> None:
@@ -1424,14 +1473,16 @@ def test_model_input_download_rejects_invalid_streams_and_removes_partial_file(
     assert not destination.with_suffix(".bin.partial").exists()
 
 
-def test_model_input_snapshot_staging_validates_qwen3_and_cleans_failures(
+def test_model_input_snapshot_staging_validates_architecture_and_cleans_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _model_inputs_module()
     item = module.SnapshotFile("config.json", 1, "0" * 64)
 
     def stage(payload: str) -> tuple[Path, object]:
-        snapshot = module.Snapshot("baseline", "Qwen/example", "a" * 40, (item,))
+        snapshot = module.Snapshot(
+            "baseline", "Qwen/example", "a" * 40, "qwen3", (item,)
+        )
         root = tmp_path / ("valid" if "qwen3" in payload else "invalid")
         root.mkdir()
 
@@ -1449,7 +1500,7 @@ def test_model_input_snapshot_staging_validates_qwen3_and_cleans_failures(
     )
 
     root, snapshot = stage('{"model_type":"other"}')
-    with pytest.raises(RuntimeError, match="is not a Qwen3 checkpoint"):
+    with pytest.raises(RuntimeError, match="architecture is not pinned"):
         module.stage_snapshot(root, snapshot)
     assert not (root / "baseline").exists()
 
@@ -1459,8 +1510,8 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
 ) -> None:
     module = _model_inputs_module()
     snapshots = (
-        module.Snapshot("baseline", "Qwen/base", "a" * 40, ()),
-        module.Snapshot("subject", "Qwen/subject", "b" * 40, ()),
+        module.Snapshot("baseline", "Qwen/base", "a" * 40, "qwen3", ()),
+        module.Snapshot("subject", "Qwen/subject", "b" * 40, "qwen3", ()),
     )
     observed: list[str] = []
     rendezvous = threading.Barrier(2, timeout=5)
@@ -1470,7 +1521,9 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
         rendezvous.wait()
         return root / snapshot.role
 
-    monkeypatch.setattr(module, "SNAPSHOTS", snapshots)
+    monkeypatch.setattr(
+        module, "model_profile", lambda _key: SimpleNamespace(snapshots=snapshots)
+    )
     monkeypatch.setattr(module, "stage_snapshot", stage)
 
     staged = module.stage_snapshots(tmp_path / "models")
@@ -1482,75 +1535,61 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
     assert sorted(observed) == ["baseline", "subject"]
 
 
-@pytest.mark.parametrize(
-    "records",
-    [
-        [],
-        ["not-an-object"] * 102,
-        [{"id": "same", "prompt": "Prompt", "expected": "Answer"}] * 102,
-    ],
-)
-def test_model_input_records_reject_bad_count_shape_and_duplicate_ids(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    records: list[object],
-) -> None:
+def test_model_input_records_render_the_closed_semantic_corpus_per_family() -> None:
     module = _model_inputs_module()
-    records_path = tmp_path / "records.json"
-    records_path.write_text(json.dumps(records), encoding="utf-8")
-    monkeypatch.setattr(module, "RECORDS", records_path)
+    quick = module._records(module.corpus_profile("quick"))
+    flagship = module._records(module.corpus_profile("flagship"))
+    portability = module._records(module.corpus_profile("portability"))
 
-    with pytest.raises(RuntimeError, match="records|record IDs"):
-        module._records()
-
-
-def test_model_input_flagship_records_require_and_receive_closed_inputs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    module = _model_inputs_module()
-    profile = SimpleNamespace(key="flagship")
-
-    with pytest.raises(RuntimeError, match="requires its pinned source"):
-        module._records(profile)
-
-    baseline_tokenizer = object()
-    subject_tokenizer = object()
-    source_payload = b"pinned benchmark source"
-    expected = [{"id": "record-1", "prompt": "Prompt", "expected": " answer"}]
-    observed: list[tuple[bytes, tuple[object, object]]] = []
-
-    def select_records(
-        payload: bytes, tokenizers: tuple[object, object]
-    ) -> list[dict[str, str]]:
-        observed.append((payload, tokenizers))
-        return expected
-
-    monkeypatch.setattr(module, "flagship_records", select_records)
-
-    assert (
-        module._records(
-            profile,
-            tokenizers=(baseline_tokenizer, subject_tokenizer),
-            source_payload=source_payload,
-        )
-        == expected
+    assert len(quick) == 102
+    assert len(flagship) == 400
+    assert len(portability) == 400
+    assert [record["id"] for record in portability] == [
+        record["id"] for record in flagship
+    ]
+    assert {record["expected"] for record in flagship} == set("ABCDEFGHIJ")
+    assert all(
+        record["prompt"].startswith("<|im_start|>system\n") for record in flagship
     )
-    assert observed == [(source_payload, (baseline_tokenizer, subject_tokenizer))]
+    assert all(
+        record["prompt"].startswith("<bos><|turn>system\n") for record in portability
+    )
 
 
-def test_model_input_prepare_rejects_benchmark_source_for_quick_profile(
-    tmp_path: Path,
-) -> None:
+def test_model_input_tokenization_enforces_target_and_context_bounds() -> None:
     module = _model_inputs_module()
+    record = {"id": "one", "prompt": "prompt", "expected": "A"}
 
-    with pytest.raises(RuntimeError, match="only valid for the flagship corpus"):
-        module.prepare(
-            tmp_path / "prepared",
-            "sha256:" + "a" * 64,
-            benchmark_source=tmp_path / "benchmark.jsonl",
+    class Tokenizer:
+        target_ids = [3]
+        decoded = "A"
+
+        def __call__(self, text: str, **_kwargs: object) -> dict[str, list[int]]:
+            return {"input_ids": [1, 2] if text == "prompt" else self.target_ids}
+
+        def decode(self, _ids: list[int], **_kwargs: object) -> str:
+            return self.decoded
+
+    tokenizer = Tokenizer()
+    module._validate_record_tokenization(
+        [record], tokenizer, role="baseline", context_length=3
+    )
+
+    with pytest.raises(RuntimeError, match="context length"):
+        module._validate_record_tokenization(
+            [record], tokenizer, role="baseline", context_length=2
         )
-
-    assert not (tmp_path / "prepared").exists()
+    tokenizer.target_ids = [3, 4]
+    with pytest.raises(RuntimeError, match="generation bound"):
+        module._validate_record_tokenization(
+            [record], tokenizer, role="baseline", context_length=4
+        )
+    tokenizer.target_ids = [3]
+    tokenizer.decoded = "B"
+    with pytest.raises(RuntimeError, match="generation bound"):
+        module._validate_record_tokenization(
+            [record], tokenizer, role="baseline", context_length=3
+        )
 
 
 def test_model_input_prepare_rejects_unpinned_derived_corpus(
@@ -1564,7 +1603,7 @@ def test_model_input_prepare_rejects_unpinned_derived_corpus(
     }
 
     monkeypatch.setattr(module, "corpus_profile", lambda _key: profile)
-    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root, _profile: models)
     monkeypatch.setattr(
         module.AutoTokenizer,
         "from_pretrained",
@@ -1595,7 +1634,7 @@ def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
         (path / "config.json").write_text('{"model_type":"qwen3"}\n')
         models[snapshot.role] = path
 
-    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root, _profile: models)
 
     class BoundTokenizer:
         last_text = ""
@@ -1665,7 +1704,7 @@ def test_model_input_authoring_rejects_existing_workspace_and_unsafe_targets(
             '{"model_type":"qwen3"}\n', encoding="utf-8"
         )
         models[snapshot.role] = checkpoint
-    monkeypatch.setattr(module, "stage_snapshots", lambda _root: models)
+    monkeypatch.setattr(module, "stage_snapshots", lambda _root, _profile: models)
 
     class OversizeTokenizer:
         def __call__(self, _text: str, **_kwargs: object) -> dict[str, list[int]]:
@@ -1723,14 +1762,13 @@ def test_model_input_main_resolves_workspace_and_dispatches(
     assert not missing.exists()
 
 
-def test_model_input_main_forwards_flagship_profile_and_source(
+def test_model_input_main_forwards_the_flagship_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _model_inputs_module()
     workspace = tmp_path / "parent/../prepared"
-    benchmark_source = tmp_path / "source/../benchmark.jsonl"
     image = "sha256:" + "d" * 64
-    observed: list[tuple[Path, str, str, Path | None]] = []
+    observed: list[tuple[Path, str, str]] = []
     monkeypatch.setattr(
         module.argparse.ArgumentParser,
         "parse_args",
@@ -1738,26 +1776,18 @@ def test_model_input_main_forwards_flagship_profile_and_source(
             workspace=workspace,
             runtime_image=image,
             corpus_profile="flagship",
-            benchmark_source=benchmark_source,
         ),
     )
     monkeypatch.setattr(
         module,
         "prepare",
-        lambda root, runtime_image, *, corpus_profile_key, benchmark_source: (
-            observed.append((root, runtime_image, corpus_profile_key, benchmark_source))
+        lambda root, runtime_image, *, corpus_profile_key: observed.append(
+            (root, runtime_image, corpus_profile_key)
         ),
     )
 
     assert module.main() == 0
-    assert observed == [
-        (
-            workspace.expanduser().resolve(),
-            image,
-            "flagship",
-            benchmark_source.expanduser().resolve(),
-        )
-    ]
+    assert observed == [(workspace.expanduser().resolve(), image, "flagship")]
 
 
 def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) -> None:
@@ -1789,6 +1819,7 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
                         "integrity_ok": True,
                         "ok": True,
                         "policy_verdict": "pass",
+                        "verification_status": 0,
                     }
                 },
             }
@@ -1798,16 +1829,37 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
     module.validate_completed_outputs(evidence, receipt, rendered)
 
     value = json.loads(receipt.read_text(encoding="utf-8"))
-    value["statement"]["verdict"]["policy_verdict"] = "fail"
-    receipt.write_text(json.dumps(value), encoding="utf-8")
-    with pytest.raises(module.BridgeError, match="did not verify a passing"):
-        module.validate_completed_outputs(evidence, receipt, rendered)
-
-    value["statement"]["verdict"]["policy_verdict"] = "pass"
-    receipt.write_text(json.dumps(value), encoding="utf-8")
     evaluation = json.loads(
         (reports / "evaluation.report.json").read_text(encoding="utf-8")
     )
+    evaluation["verdict"] = "fail"
+    (reports / "evaluation.report.json").write_text(
+        json.dumps(evaluation), encoding="utf-8"
+    )
+    value["statement"]["verdict"]["ok"] = False
+    value["statement"]["verdict"]["policy_verdict"] = "fail"
+    value["statement"]["verdict"]["verification_status"] = 7
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(module.BridgeError, match="did not verify a passing"):
+        module.validate_completed_outputs(evidence, receipt, rendered)
+    module.validate_completed_outputs(
+        evidence, receipt, rendered, require_policy_pass=False
+    )
+    value["statement"]["verdict"]["verification_status"] = 0
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(module.BridgeError, match="coherent result"):
+        module.validate_completed_outputs(
+            evidence, receipt, rendered, require_policy_pass=False
+        )
+
+    evaluation["verdict"] = "pass"
+    (reports / "evaluation.report.json").write_text(
+        json.dumps(evaluation), encoding="utf-8"
+    )
+    value["statement"]["verdict"]["ok"] = True
+    value["statement"]["verdict"]["policy_verdict"] = "pass"
+    value["statement"]["verdict"]["verification_status"] = 0
+    receipt.write_text(json.dumps(value), encoding="utf-8")
     evaluation["baseline"]["mean_score"] = 0.19
     (reports / "evaluation.report.json").write_text(
         json.dumps(evaluation), encoding="utf-8"
@@ -1819,7 +1871,7 @@ def test_completed_outputs_require_passing_report_and_receipt(tmp_path: Path) ->
     (reports / "evaluation.report.json").write_text(
         json.dumps(evaluation), encoding="utf-8"
     )
-    with pytest.raises(module.BridgeError, match="did not verify a passing"):
+    with pytest.raises(module.BridgeError, match="coherent result"):
         module.validate_completed_outputs(evidence, receipt, rendered)
 
     receipt.unlink()

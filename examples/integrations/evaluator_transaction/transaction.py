@@ -10,7 +10,6 @@ import json
 import os
 import re
 import stat
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,6 +62,7 @@ from invarlock.core.schedule_preparation import (
 from invarlock.evaluation_oci import OciEvaluationError
 from invarlock.evidence_pack_contract import canonical_json_bytes, sha256_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
+from invarlock.evidence_pack_support import EvidencePackStatus
 from invarlock.runtime_import_authoring import (
     load_external_scoring_records_jsonl,
     write_runtime_import_paired_records,
@@ -72,12 +72,9 @@ from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
 from . import adapters
 from .config import (
-    BATCH_SIZE,
     EVALUATORS,
-    EXPECTED_MODEL_ARTIFACTS,
-    EXPECTED_MODEL_TREE_DIGESTS,
-    EXPECTED_TOKENIZER_DIGESTS,
     MAX_GENERATION_TOKENS,
+    MAX_PROVENANCE_BYTES,
     MAX_WORKER_ARTIFACT_BYTES,
     PER_RECORD_TIMEOUT_SECONDS,
     RUN_FIELDS,
@@ -87,6 +84,7 @@ from .config import (
     BridgeError,
     evaluator_id,
     execution_config,
+    model_artifacts,
     task_config,
     worker_timeout_seconds,
 )
@@ -97,6 +95,7 @@ from .corpora import (
     profile_for_dataset,
     profile_for_descriptor,
 )
+from .model_profiles import model_profile
 
 try:
     from examples.integrations.evaluator_transaction.worker import (
@@ -124,6 +123,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 def digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _compact_provenance_bytes(value: dict[str, object]) -> bytes:
+    payload = canonical_json_bytes(value)
+    if len(payload) > MAX_PROVENANCE_BYTES:
+        raise BridgeError("compact evaluator provenance exceeds its size limit")
+    return payload
 
 
 def _read_regular_file(
@@ -174,9 +180,21 @@ def _read_regular_file(
         os.close(descriptor)
 
 
-def evaluator_lock_digest(selected: str, *, container: bool = False) -> str:
+def evaluator_lock_digest(
+    selected: str,
+    *,
+    container: bool = False,
+    profile: CorpusProfile | None = None,
+) -> str:
     package = EVALUATORS[selected]
-    path = Path(package["container_lock"] if container else package["lock"])
+    lock_key = (
+        "container_lock"
+        if container
+        else "cuda_lock"
+        if profile is not None and model_profile(profile.key).device == "cuda"
+        else "lock"
+    )
+    path = Path(package[lock_key])
     if not container:
         path = REPOSITORY_ROOT / path
     return (
@@ -272,25 +290,27 @@ def _inspect_runtime_image(
         ) from exc
 
 
-def _run_local_cli(command: list[str]) -> str:
+def _run_local_cli(command: list[str], *, allow_policy_failure: bool = False) -> str:
     """Run one completion CLI with bounded diagnostics and a hard deadline."""
     try:
         completed = run_bounded_command(
             command,
             capture_output=True,
-            check=True,
+            check=False,
             timeout_seconds=WORKER_TIMEOUT_SECONDS,
             stdout_limit=4 * 1024 * 1024,
             stderr_limit=256 * 1024,
             label="evaluator completion command",
         )
-    except subprocess.CalledProcessError as exc:
-        diagnostic = (exc.stderr or exc.output or "").strip()
-        raise BridgeError(
-            diagnostic or f"command exited with status {exc.returncode}"
-        ) from exc
     except RuntimeError as exc:
         raise BridgeError(str(exc)) from exc
+    if completed.returncode != 0 and not (
+        allow_policy_failure and completed.returncode == int(EvidencePackStatus.REPORTS)
+    ):
+        diagnostic = (completed.stderr or completed.stdout or "").strip()
+        raise BridgeError(
+            diagnostic or f"command exited with status {completed.returncode}"
+        )
     return completed.stdout or ""
 
 
@@ -358,7 +378,7 @@ def worker(role: str, model: Path, dataset: Path, output: Path) -> None:
         or digest(_read_regular_file(dataset, label="worker dataset")) != dataset_digest
     ):
         raise BridgeError("model or dataset changed during evaluator execution")
-    execution = execution_config(selected)
+    execution = execution_config(selected, profile)
     manifest = {
         "format": "invarlock/evaluator-run-v1",
         "role": role,
@@ -407,6 +427,7 @@ def _run_verified_worker(
     output: Path,
     lock_digest: str,
     profile: CorpusProfile | None = None,
+    device: str = "cpu",
 ) -> None:
     """Re-run the evaluator in the inspected image for this transaction.
 
@@ -462,6 +483,7 @@ def _run_verified_worker(
                 ),
             },
             timeout_seconds=worker_timeout_seconds(profile or corpus_profile("quick")),
+            device=device,
         )
     except OciEvaluationError as exc:
         raise BridgeError(
@@ -503,10 +525,15 @@ def load_run(
         or IMAGE_ID.fullmatch(run["evaluator_lock_sha256"]) is None
         or IMAGE_ID.fullmatch(run["runtime_image_digest"]) is None
         or run["evaluator_lock_sha256"]
-        != evaluator_lock_digest(selected, container=False)
+        != evaluator_lock_digest(
+            selected,
+            container=False,
+            profile=profile or corpus_profile("quick"),
+        )
         or run["task_config"] != task_config("/records.jsonl", selected)
         or run["task_config_sha256"] != digest(canonical_json_bytes(run["task_config"]))
-        or run["execution_config"] != execution_config(selected)
+        or run["execution_config"]
+        != execution_config(selected, profile or corpus_profile("quick"))
         or run["execution_config_sha256"]
         != digest(canonical_json_bytes(run["execution_config"]))
     ):
@@ -527,7 +554,7 @@ def load_run(
 
 
 def load_canonical_samples(sample_bytes: bytes, *, role: str) -> list[dict[str, Any]]:
-    """Decode the exact upstream JSONL snapshot for signed provenance."""
+    """Decode canonical upstream JSONL before adaptation."""
 
     samples: list[dict[str, Any]] = []
     for index, raw in enumerate(sample_bytes.splitlines(), 1):
@@ -544,7 +571,9 @@ def load_canonical_samples(sample_bytes: bytes, *, role: str) -> list[dict[str, 
     return samples
 
 
-def adapt(samples: Path | bytes, schedule: Any, destination: Path) -> None:
+def adapt(
+    samples: Path | bytes, schedule: Any, destination: Path
+) -> list[dict[str, object]]:
     sample_bytes = (
         _read_regular_file(samples, label="evaluator samples")
         if isinstance(samples, Path)
@@ -552,14 +581,14 @@ def adapt(samples: Path | bytes, schedule: Any, destination: Path) -> None:
     )
     if not isinstance(sample_bytes, bytes):
         raise BridgeError("evaluator samples must be bytes or a regular file")
-    lines = sample_bytes.splitlines()
-    if len(lines) != len(schedule.records):
+    samples_values = load_canonical_samples(sample_bytes, role="transaction")
+    if len(samples_values) != len(schedule.records):
         raise BridgeError("one evaluator sample is required for every schedule record")
     output: list[dict[str, object]] = []
-    for index, (raw, expected) in enumerate(
-        zip(lines, schedule.records, strict=True), 1
+    bindings: list[dict[str, object]] = []
+    for index, (sample, expected) in enumerate(
+        zip(samples_values, schedule.records, strict=True), 1
     ):
-        sample = json.loads(raw)
         if not isinstance(sample, dict) or not SAMPLE_FIELDS.issubset(sample):
             raise BridgeError(f"sample {index} lacks complete per-record facts")
         if any(
@@ -594,8 +623,19 @@ def adapt(samples: Path | bytes, schedule: Any, destination: Path) -> None:
                 "output_sha256": sample["output_sha256"],
             }
         )
+        bindings.append(
+            {
+                "record_id": expected.record_id,
+                "input_sha256": sample["input_sha256"],
+                "target_sha256": sample["target_sha256"],
+                "output_sha256": sample["output_sha256"],
+                "reported_score": float(reported),
+                "status": "ok",
+            }
+        )
     destination.write_bytes(b"".join(canonical_json_bytes(item) for item in output))
     load_external_scoring_records_jsonl(destination, schedule=schedule)
+    return bindings
 
 
 def imported(role: str) -> dict[str, str]:
@@ -613,7 +653,13 @@ def imported(role: str) -> dict[str, str]:
     }
 
 
-def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> None:
+def validate_completed_outputs(
+    evidence: Path,
+    receipt: Path,
+    report: Path,
+    *,
+    require_policy_pass: bool = True,
+) -> None:
     try:
         evaluation = json.loads(
             _read_regular_file(
@@ -628,16 +674,32 @@ def validate_completed_outputs(evidence: Path, receipt: Path, report: Path) -> N
         ) from exc
     statement = signed.get("statement") if isinstance(signed, dict) else None
     verdict = statement.get("verdict") if isinstance(statement, dict) else None
+    policy_verdict = (
+        verdict.get("policy_verdict") if isinstance(verdict, dict) else None
+    )
+    evaluation_verdict = (
+        evaluation.get("verdict") if isinstance(evaluation, dict) else None
+    )
+    expected_status = (
+        int(EvidencePackStatus.OK)
+        if policy_verdict == "pass"
+        else int(EvidencePackStatus.REPORTS)
+    )
     if (
         not isinstance(evaluation, dict)
-        or evaluation.get("verdict") != "pass"
+        or evaluation_verdict not in {"pass", "fail"}
         or evaluation.get("metric") != "exact_match"
         or not isinstance(verdict, dict)
-        or verdict.get("ok") is not True
         or verdict.get("integrity_ok") is not True
-        or verdict.get("policy_verdict") != "pass"
+        or policy_verdict != evaluation_verdict
+        or verdict.get("ok") is not (policy_verdict == "pass")
+        or type(verdict.get("verification_status")) is not int
+        or verdict.get("verification_status") != expected_status
         or not report.is_file()
+        or report.is_symlink()
     ):
+        raise BridgeError("the completed transaction did not verify a coherent result")
+    if require_policy_pass and policy_verdict != "pass":
         raise BridgeError("the completed transaction did not verify a passing result")
 
 
@@ -673,6 +735,16 @@ def _validate_completion_paths(
             raise BridgeError(f"{label} must remain outside the transaction")
 
 
+def _worker_device(profile: CorpusProfile, requested: str | None) -> str:
+    selected_models = model_profile(profile.key)
+    device = requested or selected_models.device
+    if selected_models.device == "cpu" and device != "cpu":
+        raise BridgeError("the quick evaluator profile requires a CPU worker")
+    if selected_models.device == "cuda" and not device.startswith("cuda"):
+        raise BridgeError("the selected evaluator profile requires a CUDA worker")
+    return device
+
+
 def complete(
     root: Path,
     prepared: Path,
@@ -687,6 +759,8 @@ def complete(
     base_image_id: str | None = None,
     build_attestation: Path | None = None,
     builder_public_key: Path | None = None,
+    device: str | None = None,
+    allow_policy_fail: bool = False,
 ) -> tuple[Path, Path, Path]:
     """Author strict import inputs and execute evaluate, verify, and report."""
 
@@ -729,7 +803,14 @@ def complete(
         builder_public_key, label="builder public key"
     )
     _require_distinct_signers(evidence_key, verifier_key, builder_key)
-    lock_digest = evaluator_lock_digest(selected)
+    early_dataset = _read_regular_file(
+        prepared / "evaluation/inputs/records.jsonl", label="prepared dataset"
+    )
+    try:
+        early_profile = profile_for_dataset(early_dataset)
+    except ValueError as exc:
+        raise BridgeError(str(exc)) from exc
+    lock_digest = evaluator_lock_digest(selected, profile=early_profile)
     _inspect_runtime_image(
         container_engine,
         image,
@@ -788,6 +869,8 @@ def complete(
         raise BridgeError("prepared corpus profile is invalid") from exc
     if prepared_corpus_provenance != corpus_provenance(profile):
         raise BridgeError("prepared corpus provenance does not match the dataset")
+    selected_models = model_profile(profile.key)
+    device_selector = _worker_device(profile, device)
     schedule = prepare_local_evaluation_schedule_bytes(
         LocalDatasetRequest(
             path=dataset0,
@@ -826,6 +909,7 @@ def complete(
             output=output,
             lock_digest=lock_digest,
             profile=profile,
+            device=device_selector,
         )
     runs = {
         role: load_run(
@@ -855,7 +939,11 @@ def complete(
             "fresh worker runs are not bound to the inspected image, lock, and dataset"
         )
     (root / "inputs/acceptance.json").write_bytes(policy)
-    provenance = canonical_json_bytes(
+    sample_bindings: dict[str, list[dict[str, object]]] = {}
+    for role in ("baseline", "subject"):
+        records_path = root / f"imports/{role}-records.jsonl"
+        sample_bindings[role] = adapt(runs[role][1], schedule, records_path)
+    provenance = _compact_provenance_bytes(
         {
             "format": "invarlock/evaluator-provenance-v1",
             "evaluator": selected,
@@ -871,7 +959,7 @@ def complete(
             "runs": {
                 role: {
                     "manifest": runs[role][0],
-                    "samples": load_canonical_samples(runs[role][1], role=role),
+                    "sample_bindings": sample_bindings[role],
                 }
                 for role in ("baseline", "subject")
             },
@@ -881,36 +969,38 @@ def complete(
     provider = HFTransformersProvider()
     sides: dict[str, Any] = {}
     anchors: dict[str, str] = {}
+    expected_artifacts = model_artifacts(selected_models)
     for role in ("baseline", "subject"):
         records_path = root / f"imports/{role}-records.jsonl"
-        adapt(runs[role][1], schedule, records_path)
         original = comparison0[role]
         if (
             not isinstance(original, dict)
-            or original.get("artifact") != EXPECTED_MODEL_ARTIFACTS[role]
+            or original.get("artifact") != expected_artifacts[role]
             or not isinstance(original.get("runtime"), dict)
             or original["runtime"].get("provider") != "hf_transformers"
             or set(original["runtime"]) != {"provider", "settings"}
         ):
-            raise BridgeError(f"{role} is not the canonical pinned Qwen3 model")
+            raise BridgeError(f"{role} is not the canonical pinned model")
         settings = original["runtime"]["settings"]
         if not isinstance(settings, dict):
             raise BridgeError(f"{role} runtime settings are not canonical")
+        checkpoint = prepared / f"evaluation/models/{role}"
+        observed_tree_digest = checkpoint_tree_sha256(checkpoint)
+        snapshot = selected_models.snapshot(role)
+        if (
+            snapshot.checkpoint_tree_sha256 is not None
+            and observed_tree_digest != snapshot.checkpoint_tree_sha256
+        ):
+            raise BridgeError(f"{role} checkpoint tree does not match its pinned model")
         expected_settings = {
-            "batch_size": BATCH_SIZE,
-            "checkpoint_tree_sha256": EXPECTED_MODEL_TREE_DIGESTS[role],
+            "batch_size": selected_models.batch_size,
+            "checkpoint_tree_sha256": observed_tree_digest,
             "context_length": profile.context_length,
             "max_output_tokens": MAX_GENERATION_TOKENS,
             "offline": True,
             "seed": SEED,
             "timeout_seconds": PER_RECORD_TIMEOUT_SECONDS,
-            "tokenizer_metadata_sha256": EXPECTED_TOKENIZER_DIGESTS[role],
         }
-        if set(settings) != set(expected_settings) or any(
-            settings.get(key) != value for key, value in expected_settings.items()
-        ):
-            raise BridgeError(f"{role} runtime settings are not canonical")
-        checkpoint = prepared / f"evaluation/models/{role}"
         if (checkpoint / "generation_config.json").exists() or (
             checkpoint / "generation_config.json"
         ).is_symlink():
@@ -932,10 +1022,16 @@ def complete(
             raise BridgeError(
                 f"{role} tokenizer identity could not be authenticated"
             ) from exc
-        if settings["tokenizer_metadata_sha256"] != observed_tokenizer_digest:
-            raise BridgeError(
-                f"{role} tokenizer identity does not match the checkpoint"
-            )
+        if (
+            snapshot.tokenizer_contract_sha256 is not None
+            and observed_tokenizer_digest != snapshot.tokenizer_contract_sha256
+        ):
+            raise BridgeError(f"{role} tokenizer does not match its pinned contract")
+        expected_settings["tokenizer_metadata_sha256"] = observed_tokenizer_digest
+        if set(settings) != set(expected_settings) or any(
+            settings.get(key) != value for key, value in expected_settings.items()
+        ):
+            raise BridgeError(f"{role} runtime settings are not canonical")
         identity = provider.authenticate_artifact(
             ModelRuntimeSpec(
                 "hf_transformers", original["artifact"]["model_id"], settings
@@ -1083,8 +1179,13 @@ def complete(
         ["report", str(evidence), "--html", str(report)],
     ]
     for arguments in commands:
-        _run_local_cli([sys.executable, "-m", "invarlock", *arguments])
-    validate_completed_outputs(evidence, receipt, report)
+        _run_local_cli(
+            [sys.executable, "-m", "invarlock", *arguments],
+            allow_policy_failure=(allow_policy_fail and arguments[0] == "verify"),
+        )
+    validate_completed_outputs(
+        evidence, receipt, report, require_policy_pass=not allow_policy_fail
+    )
     return evidence, receipt, report
 
 
@@ -1111,6 +1212,12 @@ def main(argv: list[str] | None = None) -> int:
     bridge_parser.add_argument("--source-commit", required=True)
     bridge_parser.add_argument("--base-image-id", required=True)
     bridge_parser.add_argument("--build-attestation", type=Path, required=True)
+    bridge_parser.add_argument("--device")
+    bridge_parser.add_argument(
+        "--allow-policy-fail",
+        action="store_true",
+        help="retain a verified policy rejection as a completed evidence transaction",
+    )
     args = parser.parse_args(argv)
     try:
         if args.command == "worker":
@@ -1139,6 +1246,8 @@ def main(argv: list[str] | None = None) -> int:
                     if args.build_attestation is not None
                     else None
                 ),
+                device=args.device,
+                allow_policy_fail=args.allow_policy_fail,
             )
             print(f"Evidence: {evidence}\nReceipt: {receipt}\nReport: {report}")
     except (BridgeError, OSError, RuntimeError, TypeError, ValueError) as exc:

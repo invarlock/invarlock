@@ -55,7 +55,7 @@ def test_gitleaks_allowlists_require_the_complete_detected_field_match() -> None
         for pattern in digest_rule["paths"]
     )
     for path in (
-        "examples/evaluator-qualification/signed-transactions/inspect-ai/"
+        "examples/evaluator-qualification/signed-transactions/qwen35-inspect-ai/"
         "evidence/request.json",
         "tests/fixtures/compatibility/v0.13.0/package/evidence/request.json",
     ):
@@ -84,7 +84,7 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
 
     for path in (
         "public_evidence/evidence/example/manifest.json",
-        "examples/evaluator-qualification/signed-transactions/inspect-ai/"
+        "examples/evaluator-qualification/signed-transactions/qwen35-inspect-ai/"
         "build-attestation.json",
         "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
     ):
