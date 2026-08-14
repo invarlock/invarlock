@@ -19,7 +19,8 @@ _QUALIFICATION_PROFILES = _ROOT / "qualification_profiles.json"
 _QUALIFICATION_MANIFEST = (
     _REPOSITORY / "docs/reference/qualification-suites.manifest.json"
 )
-PROFILE_KEYS = ("quick", "flagship", "portability")
+_DEPLOYMENT_DATASET_BYTES = 408_546
+PROFILE_KEYS = ("quick", "deployment", "flagship", "portability")
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +112,23 @@ def _quick_profile() -> CorpusProfile:
     )
 
 
+def _deployment_profile() -> CorpusProfile:
+    return CorpusProfile(
+        key="deployment",
+        profile_id="mmlu-pro-qwen35-0.8b-deployment-400-v1",
+        dataset_name="TIGER-Lab/MMLU-Pro/qwen35-0.8b-deployment",
+        split="test-balanced-400",
+        record_count=400,
+        dataset_sha256=(
+            "fb409a8b6f0d5932436a29efb80185f986dacadf9efdfbf7f109d13d4b28250a"
+        ),
+        context_length=1024,
+        minimum_side_accuracy=0.05,
+        maximum_interval_width_pp=10.0,
+        delta_min_pp=-20.0,
+    )
+
+
 def _qualification_profile(key: str) -> CorpusProfile:
     manifest = _manifest()
     declared = manifest["profiles"][key]
@@ -133,6 +151,7 @@ def _qualification_profile(key: str) -> CorpusProfile:
 def corpus_profile(key: str) -> CorpusProfile:
     profiles = {
         "quick": _quick_profile(),
+        "deployment": _deployment_profile(),
         "flagship": _qualification_profile("flagship"),
         "portability": _qualification_profile("portability"),
     }
@@ -143,7 +162,9 @@ def corpus_profile(key: str) -> CorpusProfile:
 
 
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
-    return records_jsonl(values, compact=profile.key in {"flagship", "portability"})
+    return records_jsonl(
+        values, compact=profile.key in {"deployment", "flagship", "portability"}
+    )
 
 
 def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
@@ -198,7 +219,9 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         artifact_name = manifest["qualification_suite"]["semantic_artifact"]
         artifact = qualification["artifacts"][artifact_name]
         records = qualification_records(profile)
-        declared = manifest["profiles"][profile.key]
+        declared = manifest["profiles"][
+            "flagship" if profile.key == "deployment" else profile.key
+        ]
         if (
             artifact["sha256"] != manifest["qualification_suite"]["semantic_sha256"]
             or qualification["record_count"] != profile.record_count
@@ -212,8 +235,19 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
             {
                 "source": manifest["source"],
                 "qualification_suite": manifest["qualification_suite"],
-                "rendering": declared["rendering"],
-                "model_profile": declared["model_profile"],
+                "rendering": (
+                    {
+                        "algorithm": "qwen-chatml-disable-thinking-answer-prefix-v1",
+                        "suffix": "<think>\n\n</think>\n\nAnswer: ",
+                    }
+                    if profile.key == "deployment"
+                    else declared["rendering"]
+                ),
+                "model_profile": (
+                    "qwen35-0.8b-base-to-post-trained-bf16-v1"
+                    if profile.key == "deployment"
+                    else declared["model_profile"]
+                ),
             }
         )
     return value
@@ -294,6 +328,13 @@ def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, 
             f"<|im_start|>user\n{body}\n{instruction}<|im_end|>\n"
             "<|im_start|>assistant\n<think>\n\n</think>\n\n"
         )
+    elif profile.key == "deployment":
+        prompt = (
+            "<|im_start|>system\nYou answer multiple-choice questions and follow "
+            "the requested output format exactly.<|im_end|>\n"
+            f"<|im_start|>user\n{body}\n{instruction}<|im_end|>\n"
+            "<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer: "
+        )
     elif profile.key == "portability":
         prompt = (
             "<bos><|turn>system\nYou answer multiple-choice questions and follow "
@@ -311,13 +352,17 @@ def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, 
 
 
 def qualification_records(profile: CorpusProfile) -> list[dict[str, str]]:
-    if profile.key not in {"flagship", "portability"}:
+    if profile.key not in {"deployment", "flagship", "portability"}:
         raise ValueError("qualification records require a maintained GPU profile")
     records = [_render_record(record, profile) for record in _semantic_records()]
     payload = records_jsonl(records, compact=True)
+    expected_length = (
+        _DEPLOYMENT_DATASET_BYTES
+        if profile.key == "deployment"
+        else _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
+    )
     if (
-        len(payload)
-        != _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
+        len(payload) != expected_length
         or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
     ):
         raise RuntimeError(

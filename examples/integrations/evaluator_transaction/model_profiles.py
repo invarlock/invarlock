@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +149,14 @@ _QUICK = ModelProfile(
             ),
         ),
     ),
+)
+
+_DEPLOYMENT = replace(
+    _QUICK,
+    key="deployment",
+    profile_id="qwen35-0.8b-base-to-post-trained-bf16-v1",
+    device="cuda",
+    dtype="bfloat16",
 )
 
 _QWEN35_SHARED = (
@@ -379,6 +387,7 @@ def model_profile(key: str) -> ModelProfile:
     try:
         return {
             "quick": _QUICK,
+            "deployment": _DEPLOYMENT,
             "flagship": _FLAGSHIP,
             "portability": _PORTABILITY,
         }[key]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute one pinned evaluator transaction over two Qwen3 sides."""
+"""Execute one pinned evaluator transaction over two model sides."""
 
 from __future__ import annotations
 

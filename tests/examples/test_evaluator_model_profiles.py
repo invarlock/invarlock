@@ -118,6 +118,19 @@ def test_flagship_profile_is_the_immutable_qwen35_9b_cuda_comparison() -> None:
         ) == expected_identities[snapshot.role]
 
 
+def test_deployment_profile_runs_the_compact_pair_on_cuda_bfloat16() -> None:
+    profile = model_profiles.model_profile("deployment")
+
+    assert profile.profile_id == "qwen35-0.8b-base-to-post-trained-bf16-v1"
+    assert profile.device == "cuda"
+    assert profile.dtype == "bfloat16"
+    assert profile.batch_size == 8
+    assert [snapshot.repository for snapshot in profile.snapshots] == [
+        "Qwen/Qwen3.5-0.8B-Base",
+        "Qwen/Qwen3.5-0.8B",
+    ]
+
+
 def test_model_profile_lookup_rejects_unmaintained_profiles() -> None:
     try:
         model_profiles.model_profile("large")

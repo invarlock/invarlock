@@ -69,6 +69,34 @@ def test_flagship_profile_freezes_the_balanced_400_record_suite() -> None:
     assert corpora.profile_for_dataset(payload) == profile
 
 
+def test_deployment_profile_renders_a_distinct_compact_400_record_suite() -> None:
+    profile = corpora.corpus_profile("deployment")
+    records = corpora.qualification_records(profile)
+    payload = corpora.records_jsonl(records, compact=True)
+
+    assert profile.profile_id == "mmlu-pro-qwen35-0.8b-deployment-400-v1"
+    assert profile.record_count == 400
+    assert profile.context_length == 1024
+    assert profile.dataset_sha256 == (
+        "fb409a8b6f0d5932436a29efb80185f986dacadf9efdfbf7f109d13d4b28250a"
+    )
+    assert profile.dataset_sha256 == hashlib.sha256(payload).hexdigest()
+    assert all(record["prompt"].endswith("</think>\n\nAnswer: ") for record in records)
+    assert [record["id"] for record in records] == [
+        record["id"]
+        for record in corpora.qualification_records(corpora.corpus_profile("flagship"))
+    ]
+    assert corpora.profile_for_dataset(payload) == profile
+    assert profile.acceptance_policy()["resolved_policy"]["metrics"][
+        "exact_match"
+    ] == {
+        "delta_min_pp": -20.0,
+        "maximum_interval_width_pp": 10.0,
+        "minimum_record_count": 400,
+        "minimum_side_accuracy": 0.05,
+    }
+
+
 def test_portability_profile_renders_the_same_semantic_ids_for_gemma() -> None:
     qwen = corpora.qualification_records(corpora.corpus_profile("flagship"))
     profile = corpora.corpus_profile("portability")
