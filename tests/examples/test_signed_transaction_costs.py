@@ -51,6 +51,39 @@ def test_measurement_sizes_match_the_retained_directories() -> None:
     assert total == sum(path.stat().st_size for path in expected)
 
 
+def test_deployment_package_uses_qwen35_08b() -> None:
+    root = TRANSACTIONS / "deployment-approval-inspect-ai"
+    transaction = json.loads((root / "transaction.json").read_text(encoding="utf-8"))
+    baseline = json.loads(
+        (root / "evidence/providers/baseline/model-artifact.identity.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    subject = json.loads(
+        (root / "evidence/providers/subject/model-artifact.identity.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    request = json.loads((root / "evidence/request.json").read_text(encoding="utf-8"))
+
+    assert transaction["verification"]["policy_verdict"] == "pass"
+    assert [baseline["model_id"], subject["model_id"]] == [
+        "Qwen/Qwen3.5-0.8B-Base",
+        "Qwen/Qwen3.5-0.8B",
+    ]
+    assert [baseline["checkpoint_tree_sha256"], subject["checkpoint_tree_sha256"]] == [
+        "d9a7f63f71b0a8825121c1d5fb6531f4e334b0b6b889f3bd223b551fc545d25f",
+        "d6866dbe2ec16212b927ca14045a2caefe6bc2a272958506678eefbb809a4b9a",
+    ]
+    assert [
+        request["comparison"][role]["artifact"]["locator"]
+        for role in ("baseline", "subject")
+    ] == [
+        "hf://Qwen/Qwen3.5-0.8B-Base@dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68",
+        "hf://Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17",
+    ]
+
+
 def test_public_cost_table_records_exact_sizes_and_claim_boundary() -> None:
     module = _module()
     for transaction_id in module.TRANSACTION_IDS:

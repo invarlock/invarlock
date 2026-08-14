@@ -1,17 +1,17 @@
 {
   "artifact_digests": {
-    "baseline": "sha256:05150beac8c0312c2ce8c474cb0b6d2c7c0a22adff5d60a234a241393f9d2ddd",
-    "subject": "sha256:6dcb18c7dafa4b0c36063bb7346452b24609c199205b5d8ed984c9059b0129fe"
+    "baseline": "sha256:b969ebb911ae434f45e1089f96f2cf2b2f067ff942603c6e3b044aefdee1e900",
+    "subject": "sha256:9f6abb62debb5f9cb9c65d0955b8a60364f46e7a9e8d3c3287d87e318d4b5787"
   },
-  "evidence_signer_fingerprint": "sha256:66893f55d2e78f88441d5284c431ba080f400ecad6366f996f1c57290d045cf1",
+  "evidence_signer_fingerprint": "sha256:51251f0ec555fe9b63e7310e3efc87b703e29ee734709a2a1e1188d6b90a8aa7",
   "format": "invarlock/deployment-approval-inputs-v1",
   "policy_sha256": "sha256:4f93b9a49be6fe59035eec6b346efe790d8eb6d2a10bdf4bce6e1dc3d833a34f",
   "runtime_digests": {
-    "baseline": "sha256:b1b11b823e75643be90162b95ce8ab6d74fd8bfd2ec053d83d725b28f0462b2d",
-    "subject": "sha256:b1b11b823e75643be90162b95ce8ab6d74fd8bfd2ec053d83d725b28f0462b2d"
+    "baseline": "sha256:a75bf951f0528db6465511b3eed4ea35cfedb97fd551fe7802b7b8939828b443",
+    "subject": "sha256:a75bf951f0528db6465511b3eed4ea35cfedb97fd551fe7802b7b8939828b443"
   },
-  "schedule_digest": "sha256:2773bb9dfe88250f6a1d5d551cc415732e22db0950ba27838a37216fdb9a5ee5",
-  "trust_profile_digest": "sha256:08fd37b12ca53a1da6da1cc0ebb70c6761b052cb330c5541d619a04b19e09d58",
-  "verifier_fingerprint": "sha256:c14c0346de159ec38c5b21cbe65c9f5a6f3db284a77737829225b77c6a3e7023",
+  "schedule_digest": "sha256:776faa1f3084b77ef32671c6179e469acd17a82afc90242e513434d4aa62531f",
+  "trust_profile_digest": "sha256:0941bfb69d187952a9a71ce71a7ad1f4bfef7e9acec76ea36e318cb2bd8ba070",
+  "verifier_fingerprint": "sha256:4e930946dcd7d1f20e77340c11a14570005890c6bb04fb2f46dc3b34d8750e57",
   "verifier_identity": "invarlock-example/inspect-ai-verifier"
 }

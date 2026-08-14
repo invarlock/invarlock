@@ -40,7 +40,7 @@
           "role": "flagship"
         },
         {
-          "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
+          "dataset_name": "lambada-openai-qwen35-0.8b-one-token-400-v1",
           "package_id": "deployment-approval-inspect-ai",
           "record_count": 400,
           "role": "deployment_approval"

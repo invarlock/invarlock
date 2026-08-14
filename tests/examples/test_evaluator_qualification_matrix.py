@@ -515,7 +515,7 @@ def test_retained_transaction_claim_is_verified_against_signed_dataset() -> None
         module.verify_signed_transaction(
             "inspect-ai",
             {
-                "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
+                "dataset_name": "lambada-openai-qwen35-0.8b-one-token-400-v1",
                 "package_id": "deployment-approval-inspect-ai",
                 "record_count": 401,
                 "role": "deployment_approval",
