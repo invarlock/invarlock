@@ -569,6 +569,9 @@ class LlamaCppSessionConfig:
     backend_source_sha256: str
     backend_version: str
     execution_settings: RuntimeExecutionSettings
+    cpu_threads: int
+    prompt_batch_size: int
+    prompt_microbatch_size: int
     capabilities: RuntimeProviderCapabilities
     plugin: RuntimeProviderPluginIdentity
     device: RuntimeDeviceFacts
@@ -653,15 +656,15 @@ class LlamaCppSession:
             "--ctx-size",
             str(settings.context_length),
             "--batch-size",
-            str(settings.batch_size),
+            str(self._config.prompt_batch_size),
             "--ubatch-size",
-            str(min(settings.batch_size, 512)),
+            str(self._config.prompt_microbatch_size),
             "--n-predict",
             str(settings.max_output_tokens),
             "--threads",
-            "1",
+            str(self._config.cpu_threads),
             "--threads-batch",
-            "1",
+            str(self._config.cpu_threads),
             "--temp",
             "0",
             "--device",

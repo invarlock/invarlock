@@ -320,7 +320,10 @@ def _bare_session() -> session.LlamaCppSession:
             batch_size=1,
             max_output_tokens=8,
             timeout_seconds=2,
-        )
+        ),
+        cpu_threads=2,
+        prompt_batch_size=16,
+        prompt_microbatch_size=8,
     )
     return candidate
 

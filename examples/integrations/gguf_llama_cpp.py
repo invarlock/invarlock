@@ -386,6 +386,9 @@ def _inspect_spec(
     seed: int = 0,
     context_length: int = 64,
     batch_size: int = 1,
+    cpu_threads: int = 1,
+    prompt_batch_size: int = 32,
+    prompt_microbatch_size: int = 32,
     max_output_tokens: int = 1,
     timeout_seconds: int = 30,
 ) -> dict[str, object]:
@@ -398,6 +401,8 @@ def _inspect_spec(
         "source_archive_path=Path('/opt/llama.cpp/source/llama.cpp-b10015.tar.gz')); "
         "spec=LlamaCppProvider().inspect_runtime_spec(binding,"
         f"seed={seed},context_length={context_length},batch_size={batch_size},"
+        f"cpu_threads={cpu_threads},prompt_batch_size={prompt_batch_size},"
+        f"prompt_microbatch_size={prompt_microbatch_size},"
         f"max_output_tokens={max_output_tokens},timeout_seconds={timeout_seconds}); "
         "print(json.dumps({'model_id':spec.model_id,'settings':dict(spec.settings)},"
         "sort_keys=True,separators=(',',':')))"

@@ -78,6 +78,9 @@ _LLAMA_SOURCE_SHA256 = (
 )
 _SEED = 20_260_716
 _TIMEOUT_SECONDS = 300
+_SUBJECT_CPU_THREADS = 4
+_SUBJECT_PROMPT_BATCH_SIZE = 32
+_SUBJECT_PROMPT_MICROBATCH_SIZE = 32
 _VERIFIER_IDENTITY = "invarlock-example/gguf-deployment-verifier"
 
 
@@ -496,7 +499,11 @@ def _validate_runtime_spec_bindings(
         or subject_settings.get("artifact_byte_length") != subject_byte_length
         or subject_settings.get("batch_size") != 1
         or subject_settings.get("context_length") != profile.corpus.context_length
+        or subject_settings.get("cpu_threads") != _SUBJECT_CPU_THREADS
         or subject_settings.get("max_output_tokens") != 1
+        or subject_settings.get("prompt_batch_size") != _SUBJECT_PROMPT_BATCH_SIZE
+        or subject_settings.get("prompt_microbatch_size")
+        != _SUBJECT_PROMPT_MICROBATCH_SIZE
         or subject_settings.get("seed") != _SEED
         or subject_settings.get("timeout_seconds") != _TIMEOUT_SECONDS
     ):
@@ -1056,6 +1063,9 @@ def main(argv: list[str] | None = None) -> int:
             seed=_SEED,
             context_length=profile.corpus.context_length,
             batch_size=1,
+            cpu_threads=_SUBJECT_CPU_THREADS,
+            prompt_batch_size=_SUBJECT_PROMPT_BATCH_SIZE,
+            prompt_microbatch_size=_SUBJECT_PROMPT_MICROBATCH_SIZE,
             max_output_tokens=1,
             timeout_seconds=_TIMEOUT_SECONDS,
         )

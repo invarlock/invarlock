@@ -81,6 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Separated llama.cpp prompt batching and CPU thread controls from InvarLock's
+  record batch size, and bound those backend controls into the closed GGUF
+  runtime request profile while preserving verification of previously signed
+  GGUF profiles.
 - Bound temporary container tags and worker cleanup to immutable engine IDs,
   preserved no-follow validation for caller-owned key and workspace paths,
   and removed partial streamed output after bounded command failures.

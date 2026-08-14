@@ -7,6 +7,11 @@ same contracts to reconcile those requests with authenticated receipts.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+LLAMA_CPP_MAX_CPU_THREADS = 256
+LLAMA_CPP_MAX_PROMPT_BATCH_SIZE = 4096
+
 RUNTIME_EXECUTION_REQUEST_SETTINGS = frozenset(
     {
         "batch_size",
@@ -51,7 +56,7 @@ HF_VISION_TEXT_REQUIRED_REQUEST_SETTINGS = frozenset(
     }
 )
 
-LLAMA_CPP_REQUEST_SETTINGS = frozenset(
+LLAMA_CPP_REQUEST_SETTINGS_V1 = frozenset(
     {
         *RUNTIME_EXECUTION_REQUEST_SETTINGS,
         "artifact_byte_length",
@@ -64,6 +69,60 @@ LLAMA_CPP_REQUEST_SETTINGS = frozenset(
         "tokenizer_metadata_sha256",
     }
 )
+LLAMA_CPP_REQUEST_SETTINGS = frozenset(
+    {
+        *LLAMA_CPP_REQUEST_SETTINGS_V1,
+        "cpu_threads",
+        "prompt_batch_size",
+        "prompt_microbatch_size",
+    }
+)
+LLAMA_CPP_VERIFIABLE_REQUEST_SETTING_SETS = frozenset(
+    {LLAMA_CPP_REQUEST_SETTINGS_V1, LLAMA_CPP_REQUEST_SETTINGS}
+)
+
+
+def llama_cpp_execution_profile_errors(
+    settings: Mapping[str, object],
+) -> tuple[str, ...]:
+    """Validate llama.cpp controls whose semantics differ from record batching."""
+
+    errors: list[str] = []
+
+    def positive_integer(name: str) -> int | None:
+        value = settings.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            errors.append(
+                f"llama_cpp request setting {name!r} must be a positive integer"
+            )
+            return None
+        return value
+
+    context_length = positive_integer("context_length")
+    cpu_threads = positive_integer("cpu_threads")
+    prompt_batch_size = positive_integer("prompt_batch_size")
+    prompt_microbatch_size = positive_integer("prompt_microbatch_size")
+    if cpu_threads is not None and cpu_threads > LLAMA_CPP_MAX_CPU_THREADS:
+        errors.append("llama_cpp request cpu_threads exceeds the supported limit")
+    if (
+        context_length is not None
+        and prompt_batch_size is not None
+        and prompt_batch_size > min(context_length, LLAMA_CPP_MAX_PROMPT_BATCH_SIZE)
+    ):
+        errors.append(
+            "llama_cpp request prompt_batch_size must not exceed "
+            "context_length or the supported limit"
+        )
+    if (
+        prompt_batch_size is not None
+        and prompt_microbatch_size is not None
+        and prompt_microbatch_size > prompt_batch_size
+    ):
+        errors.append(
+            "llama_cpp request prompt_microbatch_size must not exceed prompt_batch_size"
+        )
+    return tuple(errors)
+
 
 TENSORRT_LLM_ARTIFACT_REQUEST_BINDINGS = (
     ("builder_config_sha256", "builder_config_sha256"),
@@ -92,7 +151,12 @@ __all__ = [
     "HF_TRANSFORMERS_REQUIRED_REQUEST_SETTINGS",
     "HF_VISION_TEXT_REQUEST_SETTINGS",
     "HF_VISION_TEXT_REQUIRED_REQUEST_SETTINGS",
+    "LLAMA_CPP_MAX_CPU_THREADS",
+    "LLAMA_CPP_MAX_PROMPT_BATCH_SIZE",
     "LLAMA_CPP_REQUEST_SETTINGS",
+    "LLAMA_CPP_REQUEST_SETTINGS_V1",
+    "LLAMA_CPP_VERIFIABLE_REQUEST_SETTING_SETS",
+    "llama_cpp_execution_profile_errors",
     "RUNTIME_EXECUTION_REQUEST_SETTINGS",
     "TENSORRT_LLM_ARTIFACT_REQUEST_BINDINGS",
     "TENSORRT_LLM_BACKEND_REQUEST_BINDINGS",

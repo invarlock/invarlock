@@ -42,10 +42,12 @@ from invarlock.core.runtime_provider.request_bindings import (
     HF_VISION_TEXT_REQUEST_SETTINGS,
     HF_VISION_TEXT_REQUIRED_REQUEST_SETTINGS,
     LLAMA_CPP_REQUEST_SETTINGS,
+    LLAMA_CPP_VERIFIABLE_REQUEST_SETTING_SETS,
     RUNTIME_EXECUTION_REQUEST_SETTINGS,
     TENSORRT_LLM_ARTIFACT_REQUEST_BINDINGS,
     TENSORRT_LLM_BACKEND_REQUEST_BINDINGS,
     TENSORRT_LLM_REQUEST_SETTINGS,
+    llama_cpp_execution_profile_errors,
 )
 from invarlock.core.runtime_provider.types import (
     ArtifactFormat,
@@ -597,9 +599,12 @@ def runtime_request_binding_errors(
         errors.append("llama_cpp request and GGUF artifact identity do not agree")
         return tuple(errors)
 
-    if frozenset(settings) != LLAMA_CPP_REQUEST_SETTINGS:
+    setting_names = frozenset(settings)
+    if setting_names not in LLAMA_CPP_VERIFIABLE_REQUEST_SETTING_SETS:
         errors.append("llama_cpp request settings are not the closed supported set")
         return tuple(errors)
+    if setting_names == LLAMA_CPP_REQUEST_SETTINGS:
+        errors.extend(llama_cpp_execution_profile_errors(settings))
     expected_settings: dict[str, object] = {
         "artifact_byte_length": artifact_identity.byte_length,
         "artifact_sha256": artifact_identity.sha256,

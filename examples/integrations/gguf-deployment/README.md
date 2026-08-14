@@ -17,7 +17,8 @@ Both sides use the ordered 400-record balanced MMLU-Pro Qwen schedule already
 used by the current-model evaluator transactions. The policy is fixed before
 execution: at least 20% accuracy on each side, a paired interval no wider than
 10 percentage points, and a subject-minus-baseline paired interval whose lower
-bound is at least −2 percentage points.
+bound is at least −2 percentage points. The subject request separately pins
+record batching, llama.cpp prompt and micro-batch sizes, and CPU thread count.
 
 ## Compute and storage
 
@@ -66,5 +67,5 @@ make example-gguf-deployment EXAMPLE_ARGS="\
 ```
 
 This transaction demonstrates a current model's concrete deployment-format
-and runtime change. The retained Gemma 4 transaction provides the separate
-model-family portability check.
+and runtime change. Other retained transactions exercise Gemma and Mistral
+families independently of this deployment-format journey.
