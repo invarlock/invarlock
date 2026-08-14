@@ -118,14 +118,15 @@ def _quick_profile() -> CorpusProfile:
 
 
 def _deployment_profile() -> CorpusProfile:
-    dataset = _deployment_manifest()["derived_dataset"]
     return CorpusProfile(
         key="deployment",
         profile_id="lambada-openai-qwen35-0.8b-400-v1",
-        dataset_name=dataset["name"],
-        split=dataset["split"],
-        record_count=dataset["record_count"],
-        dataset_sha256=dataset["sha256"],
+        dataset_name="lambada-openai-qwen35-0.8b-one-token-400-v1",
+        split="test-stratified-400",
+        record_count=400,
+        dataset_sha256=(
+            "e4a0e431b8b64130cbbf6e8fb3ed7b5769744d18ca6499d2088f2e1b3fb36dda"
+        ),
         context_length=256,
         minimum_side_accuracy=0.05,
         maximum_interval_width_pp=10.0,
@@ -153,16 +154,17 @@ def _qualification_profile(key: str) -> CorpusProfile:
 
 
 def corpus_profile(key: str) -> CorpusProfile:
-    profiles = {
-        "quick": _quick_profile(),
-        "deployment": _deployment_profile(),
-        "flagship": _qualification_profile("flagship"),
-        "portability": _qualification_profile("portability"),
+    factories = {
+        "quick": _quick_profile,
+        "deployment": _deployment_profile,
+        "flagship": lambda: _qualification_profile("flagship"),
+        "portability": lambda: _qualification_profile("portability"),
     }
     try:
-        return profiles[key]
+        factory = factories[key]
     except KeyError as exc:
         raise ValueError(f"unknown corpus profile: {key}") from exc
+    return factory()
 
 
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:

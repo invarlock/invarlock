@@ -192,6 +192,19 @@ def test_profile_lookup_rejects_unknown_and_tampered_material() -> None:
         corpora.profile_for_descriptor({"sha256": "0" * 64})
 
 
+def test_profile_metadata_does_not_load_deployment_material(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_loaded() -> dict[str, object]:
+        raise AssertionError("deployment manifest was loaded")
+
+    monkeypatch.setattr(corpora, "_deployment_manifest", fail_if_loaded)
+
+    assert corpora.corpus_profile("quick").key == "quick"
+    assert corpora.corpus_profile("deployment").key == "deployment"
+    assert corpora.corpus_profile("flagship").key == "flagship"
+
+
 def test_dataset_validation_rejects_malformed_duplicate_and_noncanonical_rows() -> None:
     profile = _profile(record_count=2)
     records = [

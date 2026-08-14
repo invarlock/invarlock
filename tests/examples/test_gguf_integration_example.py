@@ -19,6 +19,18 @@ def _completed(
     return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
 
+def _pending_trust() -> example.PendingTrust:
+    return example.PendingTrust(
+        anchors={"schedule_digest": "sha256:" + "2" * 64},
+        policy_bytes=b"{}\n",
+        external=False,
+        trust_root=None,
+        verifier_key_bytes=None,
+        evidence_fingerprint="sha256:" + "3" * 64,
+        verifier_fingerprint="sha256:" + "4" * 64,
+    )
+
+
 def test_records_are_closed_unique_and_sufficient() -> None:
     records = example._load_records()
 
@@ -420,6 +432,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
         runtime_root=runtime,
         container_engine="docker",
         image_id=image_id,
+        pending_trust=_pending_trust(),
     )
 
     assert [command[3] for command in commands] == [
@@ -450,6 +463,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             runtime_root=runtime,
             container_engine="docker",
             image_id=image_id,
+            pending_trust=_pending_trust(),
         )
 
     report.write_text(
@@ -471,6 +485,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             runtime_root=runtime,
             container_engine="docker",
             image_id=image_id,
+            pending_trust=_pending_trust(),
         )
 
 
@@ -603,6 +618,7 @@ def test_execute_rejects_false_green_outputs(
             runtime_root=tmp_path / "runtime",
             container_engine="docker",
             image_id="sha256:" + "f" * 64,
+            pending_trust=_pending_trust(),
         )
 
 
@@ -854,4 +870,5 @@ def test_execute_rejects_non_object_transaction_outputs(
             runtime_root=tmp_path / "runtime",
             container_engine="docker",
             image_id="sha256:" + "a" * 64,
+            pending_trust=_pending_trust(),
         )

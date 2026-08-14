@@ -718,7 +718,7 @@ def _execute(
     runtime_root: Path,
     container_engine: str,
     image_id: str,
-    pending_trust: PendingTrust | None = None,
+    pending_trust: PendingTrust,
 ) -> None:
     bindings = {
         "INVARLOCK_GGUF_RESOURCE_ROOT": str(runtime_root),
@@ -761,19 +761,7 @@ def _execute(
         or len(request_digest) != 71
     ):
         raise RuntimeError("GGUF preflight returned an invalid request identity")
-    if pending_trust is not None:
-        _materialize_trust(paths, pending_trust, request_digest)
-    else:
-        try:
-            trust_profile = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
-            anchors = trust_profile["anchors"]
-            paths.trusted_inputs.relative_to(paths.root)
-        except (KeyError, TypeError, json.JSONDecodeError, OSError, ValueError) as exc:
-            raise RuntimeError("GGUF trust profile anchors are invalid") from exc
-        if not isinstance(anchors, dict):
-            raise RuntimeError("GGUF trust profile anchors are invalid")
-        anchors["request_digest"] = request_digest
-        paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
+    _materialize_trust(paths, pending_trust, request_digest)
     launch._run(evaluation, cwd=repository, environment=environment)
     launch._run(
         [
