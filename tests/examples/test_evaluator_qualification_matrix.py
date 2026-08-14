@@ -716,6 +716,7 @@ def test_line_coverage_exemptions_are_exactly_the_isolated_execution_surface() -
             "examples/integrations/evaluator_transaction/transaction.py",
             "examples/integrations/evaluator_transaction/build_attestation.py",
             "examples/integrations/evaluator_transaction/worker.py",
+            "examples/integrations/gguf_deployment.py",
             "examples/integrations/gguf_llama_cpp.py",
             "examples/integrations/hf_vision_text.py",
             "examples/integrations/inspect-ai/launch.py",
