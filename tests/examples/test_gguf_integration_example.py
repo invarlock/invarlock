@@ -4,6 +4,7 @@ import io
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -305,13 +306,15 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         for role, path in models.items()
     }
     image_id = "sha256:" + "f" * 64
-    paths = example._prepare_transaction(
+    paths, pending_trust = example._prepare_transaction(
         root,
         runtime_root=runtime,
         models=models,
         specs=specs,
         image_id=image_id,
     )
+    request_digest = "sha256:" + "1" * 64
+    example._materialize_trust(paths, pending_trust, request_digest)
 
     request = yaml.safe_load(paths.request.read_text(encoding="utf-8"))
     trust = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
@@ -343,6 +346,7 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         != trust["anchors"]["subject_artifact_digest"]
     )
     assert trust["anchors"]["baseline_runtime_digest"] == image_id
+    assert trust["anchors"]["request_digest"] == request_digest
     assert paths.evidence_key.stat().st_mode & 0o777 == 0o600
     assert paths.verifier_key.stat().st_mode & 0o777 == 0o600
 
@@ -470,6 +474,44 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             container_engine="docker",
             image_id=image_id,
         )
+
+
+def test_external_trust_is_created_only_after_binding_the_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "transaction"
+    root.mkdir()
+    trust_root = tmp_path / "trust"
+    paths = example._paths(
+        root,
+        evidence_key=tmp_path / "evidence.pem",
+        trust_root=trust_root,
+    )
+    pending = example.PendingTrust(
+        anchors={"schedule_digest": "sha256:" + "2" * 64},
+        policy_bytes=b"{}\n",
+        external=True,
+        trust_root=trust_root,
+        verifier_key_bytes=b"verifier-key",
+        evidence_fingerprint="sha256:" + "3" * 64,
+        verifier_fingerprint="sha256:" + "4" * 64,
+    )
+    captured: dict[str, object] = {}
+
+    def create(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(trusted_inputs=paths.trusted_inputs)
+
+    monkeypatch.setattr(example, "create_trust_material", create)
+    request_digest = "sha256:" + "1" * 64
+
+    example._materialize_trust(paths, pending, request_digest)
+
+    assert captured["trust_root"] == trust_root
+    assert captured["anchors"] == {
+        "schedule_digest": "sha256:" + "2" * 64,
+        "request_digest": request_digest,
+    }
 
 
 @pytest.mark.parametrize(
@@ -639,7 +681,7 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
     monkeypatch.setattr(
         example,
         "_prepare_transaction",
-        lambda *_args, **_kwargs: observed.append("prepare") or paths,
+        lambda *_args, **_kwargs: observed.append("prepare") or (paths, object()),
     )
     monkeypatch.setattr(
         example,

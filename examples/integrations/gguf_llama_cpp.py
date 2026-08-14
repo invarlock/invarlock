@@ -28,7 +28,7 @@ from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
 )
-from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.evidence_pack_contract import canonical_json_bytes, normalize_digest
 from invarlock.runtime_providers.gguf_identity import read_gguf_artifact_identity
 
 _MODEL_REPOSITORY = "ggml-org/Qwen3.5-0.8B-GGUF"
@@ -103,6 +103,19 @@ class ModelDownload:
             f"https://huggingface.co/{_MODEL_REPOSITORY}/resolve/"
             f"{_MODEL_REVISION}/{self.filename}"
         )
+
+
+@dataclass(frozen=True, slots=True)
+class PendingTrust:
+    """Trust inputs waiting for the independently checked request identity."""
+
+    anchors: Mapping[str, str]
+    policy_bytes: bytes
+    external: bool
+    trust_root: Path | None
+    verifier_key_bytes: bytes | None
+    evidence_fingerprint: str
+    verifier_fingerprint: str
 
 
 _OFFICIAL_MODEL = ModelDownload(
@@ -442,7 +455,7 @@ def _prepare_transaction(
     verifier_signing_key: Path | None = None,
     trust_root: Path | None = None,
     ephemeral_trust_root: bool = True,
-) -> ExamplePaths:
+) -> tuple[ExamplePaths, PendingTrust]:
     external_trust = any(
         value is not None
         for value in (evidence_signing_key, verifier_signing_key, trust_root)
@@ -645,39 +658,57 @@ def _prepare_transaction(
         "subject_runtime_digest": image_id,
         "evidence_signer_fingerprint": evidence_signer,
     }
-    if external_trust:
-        assert trust_root is not None
+    if runtime_root != models["baseline"].parents[1]:
+        raise RuntimeError("GGUF runtime resources do not share one closed root")
+    return paths, PendingTrust(
+        anchors=anchors,
+        policy_bytes=policy_bytes,
+        external=external_trust,
+        trust_root=trust_root,
+        verifier_key_bytes=verifier_key_bytes,
+        evidence_fingerprint=evidence_signer,
+        verifier_fingerprint=verifier,
+    )
+
+
+def _materialize_trust(
+    paths: ExamplePaths, pending: PendingTrust, request_digest: str
+) -> None:
+    anchored_request = normalize_digest(
+        request_digest, label="independent request anchor"
+    )
+    anchors = {**pending.anchors, "request_digest": anchored_request}
+    if pending.external:
+        if pending.trust_root is None or pending.verifier_key_bytes is None:
+            raise RuntimeError("external GGUF trust material is incomplete")
         material = create_trust_material(
-            transaction_root=root,
+            transaction_root=paths.root,
             evidence_key=paths.evidence_key,
-            verifier_key_bytes=verifier_key_bytes,
-            evidence_fingerprint=evidence_signer,
-            verifier_fingerprint=verifier,
-            trust_root=trust_root,
-            policy_bytes=policy_bytes,
+            verifier_key_bytes=pending.verifier_key_bytes,
+            evidence_fingerprint=pending.evidence_fingerprint,
+            verifier_fingerprint=pending.verifier_fingerprint,
+            trust_root=pending.trust_root,
+            policy_bytes=pending.policy_bytes,
             verifier_identity="invarlock-example/gguf-llama-cpp-verifier",
             anchors=anchors,
         )
         if material.trusted_inputs != paths.trusted_inputs:
             raise ValueError("external trust material resolved to an unexpected root")
-    else:
-        paths.trusted_inputs.write_bytes(
-            canonical_json_bytes(
-                {
-                    "format": "invarlock/trust-inputs-v1",
-                    "policy": {"path": "policy/acceptance.json"},
-                    "anchors": anchors,
-                    "verifier": {
-                        "identity": "invarlock-example/gguf-llama-cpp-verifier",
-                        "signing_key_path": "keys/verifier.pem",
-                    },
-                    "allow_installed_scorers": False,
-                }
-            )
+        return
+    paths.trusted_inputs.write_bytes(
+        canonical_json_bytes(
+            {
+                "format": "invarlock/trust-inputs-v1",
+                "policy": {"path": "policy/acceptance.json"},
+                "anchors": anchors,
+                "verifier": {
+                    "identity": "invarlock-example/gguf-llama-cpp-verifier",
+                    "signing_key_path": "keys/verifier.pem",
+                },
+                "allow_installed_scorers": False,
+            }
         )
-    if runtime_root != models["baseline"].parents[1]:
-        raise RuntimeError("GGUF runtime resources do not share one closed root")
-    return paths
+    )
 
 
 def _execute(
@@ -687,6 +718,7 @@ def _execute(
     runtime_root: Path,
     container_engine: str,
     image_id: str,
+    pending_trust: PendingTrust | None = None,
 ) -> None:
     bindings = {
         "INVARLOCK_GGUF_RESOURCE_ROOT": str(runtime_root),
@@ -721,9 +753,7 @@ def _execute(
     try:
         preflight_result = json.loads(preflight.stdout)
         request_digest = preflight_result["request_digest"]
-        trust_profile = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
-        anchors = trust_profile["anchors"]
-    except (KeyError, TypeError, json.JSONDecodeError, OSError) as exc:
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise RuntimeError("GGUF preflight did not return a request identity") from exc
     if (
         not isinstance(request_digest, str)
@@ -731,16 +761,20 @@ def _execute(
         or len(request_digest) != 71
     ):
         raise RuntimeError("GGUF preflight returned an invalid request identity")
-    if not isinstance(anchors, dict):
-        raise RuntimeError("GGUF trust profile anchors are invalid")
-    anchors["request_digest"] = request_digest
-    try:
-        paths.trusted_inputs.relative_to(paths.root)
-    except ValueError:
-        # Caller-owned trust profiles are immutable; their static anchors are
-        # sufficient for verification and must not receive transaction output.
-        pass
+    if pending_trust is not None:
+        _materialize_trust(paths, pending_trust, request_digest)
     else:
+        try:
+            trust_profile = json.loads(
+                paths.trusted_inputs.read_text(encoding="utf-8")
+            )
+            anchors = trust_profile["anchors"]
+            paths.trusted_inputs.relative_to(paths.root)
+        except (KeyError, TypeError, json.JSONDecodeError, OSError, ValueError) as exc:
+            raise RuntimeError("GGUF trust profile anchors are invalid") from exc
+        if not isinstance(anchors, dict):
+            raise RuntimeError("GGUF trust profile anchors are invalid")
+        anchors["request_digest"] = request_digest
         paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
     launch._run(evaluation, cwd=repository, environment=environment)
     launch._run(
@@ -917,7 +951,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             for role, model in models.items()
         }
-        paths = _prepare_transaction(
+        paths, pending_trust = _prepare_transaction(
             transaction,
             runtime_root=runtime_root,
             models=models,
@@ -934,6 +968,7 @@ def main(argv: list[str] | None = None) -> int:
             runtime_root=runtime_root,
             container_engine=arguments.container_engine,
             image_id=image_id,
+            pending_trust=pending_trust,
         )
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)
