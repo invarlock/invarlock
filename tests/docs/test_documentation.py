@@ -284,7 +284,8 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         assert distribution in notices
     assert "EleutherAI/LAMBADA OpenAI" in notices
     assert "Software Copyright (c) 2019 OpenAI" in notices
-    assert "flagship evaluator corpus descriptor" in notices
+    assert "evaluator qualification profiles" in notices
+    assert "shared MMLU-Pro semantic artifact" in notices
 
     core_section = notices.split("## Core distribution", maxsplit=1)[1].split(
         "## Hugging Face extra", maxsplit=1
@@ -742,10 +743,10 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     assert "every retained independently replayable import" in normalized
     assert "102-record" in text
     assert "102 shared outputs" in text
-    assert "Retained (400 native records)" in text
-    assert "98.5% of baseline scores" in text
+    assert "Retained (2 signed transactions, 400 records each)" in text
+    assert "agree on every baseline and subject output" in text
     assert "does not assign one cumulative" in text
-    assert "retained CPU-only signed OCI journeys" in normalized
+    assert "retained current-model OCI journeys" in normalized
     assert "without claiming a native signed journey" in normalized
     assert "maximum 10-percentage-point paired interval width" in normalized
     assert "600 records" not in normalized

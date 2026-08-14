@@ -14,15 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versioned example files outside the installed package.
 - Added an exact-match `minimum_side_accuracy` policy control and a versioned
   comparison-report v3 field that records both side results.
-- Added retained CPU-only signed OCI transactions for LM Evaluation Harness and
-  Inspect AI, including 400 paired LAMBADA-derived records, native evaluator
-  provenance, independently signed verification receipts, policies, and
-  builder-signed image attestations.
+- Added retained signed OCI transactions for Qwen3.5 9B through LM Evaluation
+  Harness and Inspect AI, plus a Gemma 4 12B instruction-to-unquantized-QAT
+  transaction through LM Evaluation Harness. Each package includes 400 paired
+  MMLU-Pro records, native evaluator provenance, an independently signed
+  verification receipt, policy, and builder-signed image attestation.
 - Added reproducible CPU verification-time, report-rendering-time, and retained
-  artifact-size measurements for both 400-record flagship transactions.
+  artifact-size measurements for the current-model signed transactions.
 - Added a retained cross-evaluator comparison that confirms the shared ordered
-  schedule and reports native per-record agreement without creating a second
-  acceptance verdict.
+  Qwen3.5 schedule and exact native agreement across all 800 baseline and
+  subject records without creating a second acceptance verdict.
 - Added an example-layer evaluator transaction framework with source-specific
   native adapters, source-bound image construction, caller-owned signing and
   trust inputs, and cleanup of temporary container images.
@@ -43,10 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserved retained OCI build attestations in their original signed format;
   current transaction writers emit only the evaluator-named format while the
   offline verifier strictly reads both versions.
-- Distinguished the retained 400-record native signed transactions for LM
-  Evaluation Harness and Inspect AI from the wider 102-record shared-output
-  qualification matrix, with adapter support, replay authority, signed corpus,
-  and signed-journey record count reported independently.
+- Distinguished current-model native signed transactions from the wider
+  102-record shared-output qualification matrix, with adapter support, replay
+  authority, model-family portability, signed corpus, and signed-journey record
+  count reported independently.
 - Kept evaluator-specific SDKs, parsers, launchers, and image-build logic in the
   example layer; the installed engine continues to expose evaluator-neutral
   qualification and runtime-import contracts.
@@ -55,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.18.0.
 - Reframed the public project overview around independently replayable signed
   evaluation evidence, with a clear decision boundary and assurance limits plus
-  a flagship proof map connecting evaluator output, qualification, evidence,
+  a retained proof map connecting evaluator output, qualification, evidence,
   receipts, attestations, and runnable integrations.
 - Expanded documentation checks to discover every tracked Markdown file and
   reject machine-specific paths, credential-like values, and review-process

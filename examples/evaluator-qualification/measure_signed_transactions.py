@@ -19,10 +19,16 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock.evidence_receipt import verify_signed_verification_receipt
 from invarlock.evidence_reporting import render_evidence
-from invarlock.evidence_verification import verify_evidence
+from invarlock.evidence_verification import EvidenceVerificationError, verify_evidence
 
 FORMAT = "invarlock/signed-transaction-costs-v1"
-PROFILE_IDS = ("lm-evaluation-harness", "inspect-ai")
+TRANSACTION_IDS = (
+    "deployment-approval-inspect-ai",
+    "gemma4-lm-evaluation-harness",
+    "qwen35-inspect-ai",
+    "qwen35-lm-evaluation-harness",
+)
+PROFILE_IDS = {"lm-evaluation-harness", "inspect-ai"}
 
 
 class MeasurementError(RuntimeError):
@@ -66,7 +72,10 @@ def _verification_anchors(transaction: dict[str, Any]) -> dict[str, Any]:
 
 
 def _verify_retained_receipt(
-    transaction_root: Path, verification: dict[str, Any]
+    transaction_root: Path,
+    verification: dict[str, Any],
+    *,
+    expected_policy_verdict: str,
 ) -> None:
     result = verify_signed_verification_receipt(
         transaction_root / "verification.receipt.json",
@@ -80,7 +89,16 @@ def _verify_retained_receipt(
         expected_verifier_fingerprint=verification["verifier_fingerprint"],
         expected_trust_profile_digest=verification["trust_profile_digest"],
     )
-    if not result.ok:
+    verdict = (
+        result.statement.get("verdict") if isinstance(result.statement, dict) else None
+    )
+    if (
+        not result.ok
+        or not isinstance(verdict, dict)
+        or verdict.get("integrity_ok") is not True
+        or verdict.get("policy_verdict") != expected_policy_verdict
+        or verdict.get("ok") is not (expected_policy_verdict == "pass")
+    ):
         raise MeasurementError(
             "retained receipt verification failed: " + "; ".join(result.errors)
         )
@@ -92,23 +110,29 @@ def _verify_and_issue_receipt(
     *,
     receipt: Path,
     verifier_key: bytes,
+    expected_policy_verdict: str,
 ) -> None:
-    verify_evidence(
-        transaction_root / "evidence",
-        policy_path=transaction_root / "policy.json",
-        expected_baseline_artifact=verification["artifact_digests"]["baseline"],
-        expected_subject_artifact=verification["artifact_digests"]["subject"],
-        expected_schedule=verification["schedule_digest"],
-        expected_baseline_runtime=verification["runtime_digests"]["baseline"],
-        expected_subject_runtime=verification["runtime_digests"]["subject"],
-        expected_signer=verification["evidence_signer_fingerprint"],
-        receipt_path=receipt,
-        verifier_signing_key_bytes=verifier_key,
-        verifier_identity="operational-measurement-verifier",
-        trust_profile_digest=verification["trust_profile_digest"],
-    )
-    # A successful return is the contract: verify_evidence raises before
-    # returning when semantic replay or policy evaluation fails.
+    try:
+        verify_evidence(
+            transaction_root / "evidence",
+            policy_path=transaction_root / "policy.json",
+            expected_baseline_artifact=verification["artifact_digests"]["baseline"],
+            expected_subject_artifact=verification["artifact_digests"]["subject"],
+            expected_schedule=verification["schedule_digest"],
+            expected_baseline_runtime=verification["runtime_digests"]["baseline"],
+            expected_subject_runtime=verification["runtime_digests"]["subject"],
+            expected_signer=verification["evidence_signer_fingerprint"],
+            receipt_path=receipt,
+            verifier_signing_key_bytes=verifier_key,
+            verifier_identity="operational-measurement-verifier",
+            trust_profile_digest=verification["trust_profile_digest"],
+        )
+    except EvidenceVerificationError as exc:
+        if expected_policy_verdict != "fail" or exc.exit_code != 7:
+            raise
+    else:
+        if expected_policy_verdict != "pass":
+            raise MeasurementError("retained policy outcome changed unexpectedly")
 
 
 def _timings(operation: Callable[[int], None], *, runs: int) -> list[float]:
@@ -131,10 +155,18 @@ def measure_transaction(
     )
     profile_id = transaction.get("profile_id")
     if profile_id not in PROFILE_IDS:
-        raise MeasurementError("transaction profile is not a retained flagship")
+        raise MeasurementError("transaction profile is not retained")
     evidence = transaction_root / "evidence"
     verification = _verification_anchors(transaction)
-    _verify_retained_receipt(transaction_root, verification)
+    expected_policy_verdict = verification.get("policy_verdict")
+    if expected_policy_verdict not in {"pass", "fail"}:
+        raise MeasurementError("transaction policy verdict is invalid")
+    assert isinstance(expected_policy_verdict, str)
+    _verify_retained_receipt(
+        transaction_root,
+        verification,
+        expected_policy_verdict=expected_policy_verdict,
+    )
     evidence_files, evidence_bytes = _tree_stats(evidence)
     package_files, package_bytes = _tree_stats(transaction_root)
     verifier_key = ed25519.Ed25519PrivateKey.generate().private_bytes(
@@ -152,6 +184,7 @@ def measure_transaction(
                 verification,
                 receipt=rendered / f"receipt-{index}.json",
                 verifier_key=verifier_key,
+                expected_policy_verdict=expected_policy_verdict,
             ),
             runs=runs,
         )
@@ -168,9 +201,11 @@ def measure_transaction(
         "evidence_files": evidence_files,
         "package_bytes": package_bytes,
         "package_files": package_files,
+        "policy_verdict": expected_policy_verdict,
         "profile_id": profile_id,
         "record_count": _record_count(evidence),
         "report_render_median_ms": round(statistics.median(report_ms), 3),
+        "transaction_id": transaction_root.name,
         "verification_and_receipt_median_ms": round(
             statistics.median(verification_ms), 3
         ),
@@ -178,18 +213,18 @@ def measure_transaction(
 
 
 def measure_all(*, root: Path, runs: int) -> dict[str, object]:
-    """Measure both retained flagship transactions."""
+    """Measure the current-model retained transactions."""
 
     if not 1 <= runs <= 100:
         raise MeasurementError("runs must be between 1 and 100")
     transaction_parent = root / "examples/evaluator-qualification/signed-transactions"
     results = [
         measure_transaction(
-            transaction_parent / profile_id,
+            transaction_parent / transaction_id,
             runs=runs,
             temporary_root=root,
         )
-        for profile_id in PROFILE_IDS
+        for transaction_id in TRANSACTION_IDS
     ]
     return {
         "environment": {

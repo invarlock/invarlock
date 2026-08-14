@@ -20,8 +20,8 @@ The checked-in behavioral example consumes the retained Inspect AI evidence
 pack and signed verification receipt. Its separate example recipient anchors
 live in
 [`inspect-ai-deployment-approval-inputs.json`](standalone-consumer/review/inspect-ai-deployment-approval-inputs.json),
-outside the submitted evidence. The fixture makes the flagship evaluator path
-concrete; production deployments must obtain the same classes of anchors
+outside the submitted evidence. The fixture makes a passing signed evaluator
+approval concrete; production deployments must obtain the same classes of anchors
 through recipient-controlled channels.
 
 `standalone-consumer/review/verify_deployment_receipt.py` accepts an
@@ -58,9 +58,9 @@ Or exercise the retained Inspect transaction directly:
 ```bash
 python examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
   --approval-inputs examples/ci/standalone-consumer/review/inspect-ai-deployment-approval-inputs.json \
-  --evidence examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+  --evidence examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
   --policy examples/ci/standalone-consumer/review/policy/acceptance.json \
-  --receipt examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json
+  --receipt examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json
 ```
 
 The tests also change verifier and policy anchors to prove that artifact

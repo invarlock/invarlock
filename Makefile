@@ -637,8 +637,8 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		approval_root="$$smoke_venv/deployment-consumer"; \
 		cp -R examples/ci/standalone-consumer "$$approval_root"; \
 		mkdir "$$approval_root/incoming"; \
-		cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence "$$approval_root/incoming/evidence"; \
-		cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json "$$approval_root/incoming/verification.receipt.json"; \
+		cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence "$$approval_root/incoming/evidence"; \
+		cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json "$$approval_root/incoming/verification.receipt.json"; \
 		( cd "$$approval_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
 			"$$smoke_venv/bin/python" review/verify_deployment_receipt.py \
 			--approval-inputs review/inspect-ai-deployment-approval-inputs.json \

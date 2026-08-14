@@ -410,7 +410,7 @@ def test_matrix_rejects_invalid_control_documents(
         ("level", "demonstration status is invalid"),
         ("focus", "release-focus profile is missing"),
         ("focus-authority", "release-focus profile is not replayable"),
-        ("focus-retained", "lacks a retained signed transaction"),
+        ("focus-retained", "exactly one retained flagship transaction"),
         ("profile", "profile is stale"),
         ("result", "qualification result is stale"),
         ("format", "raw output format is invalid"),
@@ -433,7 +433,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     selection = matrix.selection_policy()
     levels = {
         profile["profile_id"]: {
-            "retained_signed_transaction": None,
+            "retained_signed_transactions": [],
         }
         for profile in profiles
     }

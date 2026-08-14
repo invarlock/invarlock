@@ -1,92 +1,104 @@
-# Retained flagship evaluator transactions
+# Retained evaluator transactions
 
-This directory retains the compact release evidence for LM Evaluation Harness
-and Inspect AI. Each package contains:
+This directory retains compact, independently replayable evidence for LM
+Evaluation Harness and Inspect AI. Each transaction package contains:
 
-- the complete signed evidence pack with 400 paired records and native
-  evaluator provenance;
-- the independently signed verifier receipt;
-- the independent evaluated policy;
-- the builder-signed OCI image attestation and builder public key; and
-- `transaction.json`, which records the independently supplied verification
-  anchors and exact build identities.
+- a complete signed evidence pack with 400 paired records and native evaluator
+  provenance;
+- an independently signed verifier receipt and the evaluated policy;
+- a builder-signed OCI image attestation and builder public key; and
+- `transaction.json`, which records external verification anchors, the expected
+  policy outcome, evaluator identity, and exact build identities.
 
 Model snapshots, runtime images, private keys, temporary paths, and generated
-HTML are deliberately excluded. The model and image identities remain bound by
-the signed evidence and build attestation. HTML can be regenerated from the
-evidence pack.
+HTML are excluded. Signed evidence binds the model and runtime identities, and
+HTML can be regenerated offline. Fixture signing keys demonstrate the format;
+production acceptance requires recipient-owned keys, policies, and anchors.
 
-The signing keys used for these public fixtures are demonstration material,
-not production trust roots. The packages prove the retained transaction and
-support offline replay; production acceptance requires recipient-owned keys,
-policies, and anchors.
+## Retained set
 
-The build attestations remain in the exact signed format emitted by their
-recorded OCI runs. Offline verification accepts that retained format without
-rewriting or re-signing it; newly executed transactions emit only the current
-evaluator-named format.
+| Package | Evaluator | Model comparison | Purpose | Signed outcome |
+| --- | --- | --- | --- | --- |
+| [`qwen35-lm-evaluation-harness`](qwen35-lm-evaluation-harness/) | LM Evaluation Harness | Qwen3.5 9B Base → post-trained | Current-model flagship | Integrity valid; policy rejected |
+| [`qwen35-inspect-ai`](qwen35-inspect-ai/) | Inspect AI | Qwen3.5 9B Base → post-trained | Independent flagship evaluator | Integrity valid; policy rejected |
+| [`gemma4-lm-evaluation-harness`](gemma4-lm-evaluation-harness/) | LM Evaluation Harness | Gemma 4 12B IT → official unquantized QAT-Q4 | Cross-family portability | Integrity valid; policy rejected |
+| [`deployment-approval-inspect-ai`](deployment-approval-inspect-ai/) | Inspect AI | Qwen3 0.6B Base → post-trained | Passing CI approval example | Policy passed |
 
-## Flagship proof map
+A rejected policy outcome is not an integrity failure. The retained receipt
+authenticates `integrity_ok: true`, the exact `policy_verdict`, and verification
+status. Offline verification requires each package to reproduce the declared
+outcome; it rejects outcome drift, bad signatures, changed records, or changed
+trust anchors.
 
-For each flagship, the map connects three complementary demonstrations: the
-small upstream conformance qualification, the 102-record shared-output import
-replay, and the separately executed 400-record signed OCI journey. They share
-the reviewed profile and evaluator-neutral contracts; the retained conformance
-output is not claimed as the source of the signed evidence pack.
+## Proof map
+
+The generic qualification evidence remains separate from model-running signed
+transactions. For each evaluator, it binds the maintained adapter and upstream
+entry point, then demonstrates deterministic replay over 102 shared model
+outputs:
 
 ### Inspect AI
 
-1. [Qualification profile](../artifacts/inspect-ai/profile.json) binds the
-   maintained adapter, upstream package, runner, and dependency declaration.
-2. [Retained upstream output](../artifacts/inspect-ai/upstream-output.json) is
-   normalized into the [qualification export](../artifacts/inspect-ai/export.json)
-   and independently checked in the
+1. [Qualification profile](../artifacts/inspect-ai/profile.json),
+   [retained upstream output](../artifacts/inspect-ai/upstream-output.json),
+   [qualification export](../artifacts/inspect-ai/export.json), and
    [qualification result](../artifacts/inspect-ai/qualification-result.json).
-3. The [102-record shared-output import replay](../authoritative/artifacts/inspect-ai/import-replay.json)
-   demonstrates verdict-authoritative replay over retained model outputs.
-4. The signed journey retains the [evidence manifest](inspect-ai/evidence/manifest.json),
-   [verification receipt](inspect-ai/verification.receipt.json),
-   [builder attestation](inspect-ai/build-attestation.json), and
-   [transaction anchors](inspect-ai/transaction.json).
+2. [Shared-output import replay](../authoritative/artifacts/inspect-ai/import-replay.json).
+3. Qwen3.5 [evidence manifest](qwen35-inspect-ai/evidence/manifest.json),
+   [verification receipt](qwen35-inspect-ai/verification.receipt.json),
+   [builder attestation](qwen35-inspect-ai/build-attestation.json), and
+   [transaction anchors](qwen35-inspect-ai/transaction.json).
+4. Deployment-approval [evidence manifest](deployment-approval-inspect-ai/evidence/manifest.json),
+   [verification receipt](deployment-approval-inspect-ai/verification.receipt.json),
+   [builder attestation](deployment-approval-inspect-ai/build-attestation.json),
+   and [transaction anchors](deployment-approval-inspect-ai/transaction.json).
 5. The [runnable integration](../../integrations/inspect-ai/README.md) produces
-   the transaction, and the [deployment approval example](../../ci/README.md)
-   consumes its signed receipt under separate recipient-controlled anchors.
+   new transactions, and the [CI example](../../ci/README.md) consumes the
+   passing receipt under separate recipient-controlled anchors.
 
 ### LM Evaluation Harness
 
-1. [Qualification profile](../artifacts/lm-evaluation-harness/profile.json)
-   binds the maintained adapter, upstream package, runner, and dependency
-   declaration.
-2. [Retained upstream output](../artifacts/lm-evaluation-harness/upstream-output.json)
-   is normalized into the
-   [qualification export](../artifacts/lm-evaluation-harness/export.json) and
-   independently checked in the
+1. [Qualification profile](../artifacts/lm-evaluation-harness/profile.json),
+   [retained upstream output](../artifacts/lm-evaluation-harness/upstream-output.json),
+   [qualification export](../artifacts/lm-evaluation-harness/export.json), and
    [qualification result](../artifacts/lm-evaluation-harness/qualification-result.json).
-3. The [102-record shared-output import replay](../authoritative/artifacts/lm-evaluation-harness/import-replay.json)
-   demonstrates verdict-authoritative replay over retained model outputs.
-4. The signed journey retains the
-   [evidence manifest](lm-evaluation-harness/evidence/manifest.json),
-   [verification receipt](lm-evaluation-harness/verification.receipt.json),
-   [builder attestation](lm-evaluation-harness/build-attestation.json), and
-   [transaction anchors](lm-evaluation-harness/transaction.json).
+2. [Shared-output import replay](../authoritative/artifacts/lm-evaluation-harness/import-replay.json).
+3. Qwen3.5 [evidence manifest](qwen35-lm-evaluation-harness/evidence/manifest.json),
+   [verification receipt](qwen35-lm-evaluation-harness/verification.receipt.json),
+   [builder attestation](qwen35-lm-evaluation-harness/build-attestation.json),
+   and [transaction anchors](qwen35-lm-evaluation-harness/transaction.json).
+4. Gemma 4 [evidence manifest](gemma4-lm-evaluation-harness/evidence/manifest.json),
+   [verification receipt](gemma4-lm-evaluation-harness/verification.receipt.json),
+   [builder attestation](gemma4-lm-evaluation-harness/build-attestation.json),
+   and [transaction anchors](gemma4-lm-evaluation-harness/transaction.json).
 5. The [runnable integration](../../integrations/lm-evaluation-harness/README.md)
-   produces the transaction.
+   produces both current-model profiles.
 
 The [qualification matrix](../../../docs/reference/evaluator-qualification.md#qualification-matrix)
-records adapter support, replay authority, and retained signed-journey maturity
-as independent properties. None of these demonstrations generalizes beyond the
-pinned exact-match workflow.
+reports adapter support, replay authority, and retained transactions as
+independent properties. These demonstrations are scoped to the pinned
+exact-match workflows.
 
-The [flagship comparison](flagship-comparison.json) confirms that both signed
-journeys used the same ordered 400-record schedule and reports their native
-agreement without assigning another verdict. LM Evaluation Harness and Inspect
-AI agreed on 394 of 400 baseline scores (98.5%) and 397 of 400 subject scores
-(99.25%). The remaining differences are retained rather than normalized away:
-the signed journeys exercise each framework's native model path, while the
-102-record replay isolates evaluator scoring over identical precomputed model
-outputs.
+## Current-model results
 
-Run the offline verification through:
+The Qwen3.5 transactions used the same ordered 400-record schedule. LM
+Evaluation Harness and Inspect AI produced identical normalized record digests
+and scores for all 400 baseline and all 400 subject records. The
+[flagship comparison](flagship-comparison.json) records that agreement without
+assigning an additional acceptance decision.
+
+| Transaction | Baseline | Subject | Point change | Paired 95% interval | Width | Policy |
+| --- | ---: | ---: | ---: | --- | ---: | --- |
+| Qwen3.5 / LM Evaluation Harness | 55.5% | 53.0% | −2.5 pp | [−6.42, 1.43] pp | 7.85 pp | Reject |
+| Qwen3.5 / Inspect AI | 55.5% | 53.0% | −2.5 pp | [−6.42, 1.43] pp | 7.85 pp | Reject |
+| Gemma 4 / LM Evaluation Harness | 44.0% | 42.5% | −1.5 pp | [−3.84, 0.84] pp | 4.68 pp | Reject |
+
+All three current-model packs passed integrity, record-count, interval-width,
+and side-accuracy checks. Their conservative regression rule requires the
+confidence lower bound to be at least −2 percentage points, so each authentic
+transaction was correctly rejected.
+
+Run complete offline verification with:
 
 ```bash
 make evaluator-qualification
@@ -94,20 +106,26 @@ make evaluator-qualification
 
 ## Operational footprint
 
-The retained transactions are compact and their independent CPU verification
-does not execute either evaluator or model. This reference measurement used
-seven measured runs after one warmup on arm64 macOS with Python 3.12.13:
+Independent CPU verification does not execute an evaluator or model. Reference
+measurements use seven measured runs after one warmup and report exact package
+sizes for the committed artifacts:
 
-| Transaction | Records | Evidence bytes | Complete package bytes | Verify and issue receipt, median | Render HTML, median |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| LM Evaluation Harness | 400 | 1,697,002 | 1,703,418 | 248.6 ms | 104.6 ms |
-| Inspect AI | 400 | 1,320,166 | 1,326,305 | 238.5 ms | 66.8 ms |
+<!-- signed-transaction-costs:start -->
+Measured on arm64 macOS with Python 3.12.13:
+
+| Transaction | Evidence bytes | Package bytes | Verify and issue receipt | Render HTML |
+| --- | ---: | ---: | ---: | ---: |
+| Deployment approval / Inspect AI | 1,320,166 | 1,326,335 | 467.699 ms | 125.297 ms |
+| Gemma 4 / LM Evaluation Harness | 1,194,453 | 1,200,972 | 478.270 ms | 68.112 ms |
+| Qwen3.5 / Inspect AI | 1,163,736 | 1,169,978 | 438.673 ms | 71.554 ms |
+| Qwen3.5 / LM Evaluation Harness | 1,199,597 | 1,206,116 | 256.628 ms | 47.250 ms |
+<!-- signed-transaction-costs:end -->
 
 `Verify and issue receipt` performs complete semantic evidence replay against
 independent anchors and writes a fresh Ed25519-signed receipt. `Render HTML`
-authenticates the evidence and writes the self-contained report. Model
-execution, evaluator execution, container construction, package installation,
-and network access are not included.
+authenticates the evidence and writes a self-contained report. Model execution,
+evaluator execution, container construction, package installation, and network
+access are excluded.
 
 Reproduce the measurement from a source checkout with:
 
@@ -116,7 +134,6 @@ PYTHONPATH=src python \
   examples/evaluator-qualification/measure_signed_transactions.py --runs 7
 ```
 
-The byte counts are exact for the committed packages. Timings describe this
-reference environment and are not a performance guarantee; compare results
-only when the machine, Python version, package version, and run count are also
-recorded.
+Timings describe the recorded environment and are not a performance guarantee;
+compare them only when the machine, Python version, package version, and run
+count are also recorded.
