@@ -98,8 +98,8 @@ All four current-model packs passed integrity, record-count, interval-width,
 and side-accuracy checks. The three MMLU-Pro packs use a conservative
 regression rule that requires the confidence lower bound to be at least −2
 percentage points, so each authentic transaction was correctly rejected. The deployment pack uses a separate
-tokenizer-qualified 400-record LAMBADA corpus and its predeclared −20-point
-lower-bound floor passed.
+tokenizer-qualified 400-record LAMBADA corpus and its −20-point lower-bound
+floor, declared before execution, passed.
 
 Run complete offline verification with:
 

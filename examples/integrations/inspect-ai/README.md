@@ -79,7 +79,7 @@ The separate deployment profile deterministically selects 400 records from a
 revision- and hash-pinned EleutherAI LAMBADA source. Every target is one
 lossless token under both Qwen3.5 0.8B tokenizers, prompts fit the 256-token
 ceiling, and four prompt-length strata contribute 100 records each. Its
-predeclared policy requires 400 records, at least 5% accuracy on each side, an
+policy declared in advance requires 400 records, at least 5% accuracy on each side, an
 interval no wider than 10 percentage points, and a lower bound of at least
 −20 percentage points. The retained transaction measured 49.25% baseline and
 43.50% subject accuracy, a −5.75-point estimate, and a 6.52-point interval
