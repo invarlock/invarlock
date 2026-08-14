@@ -643,8 +643,17 @@ def test_default_workspace_is_canonical_before_source_build(
     alias.symlink_to(real, target_is_directory=True)
     observed: list[Path] = []
     monkeypatch.setattr(example.tempfile, "mkdtemp", lambda **_kwargs: str(alias))
+    monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
 
-    def stop(_repository: Path, build_root: Path, *, container_engine: str) -> str:
+    def stop(
+        _repository: Path,
+        build_root: Path,
+        *,
+        container_engine: str,
+        image_tag: str | None = None,
+    ) -> str:
         observed.append(build_root)
         raise RuntimeError("stop after canonical workspace check")
 
@@ -718,9 +727,83 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
     assert observed == ["image", "models", "backend", "prepare", "execute"]
 
 
+def test_main_removes_only_the_temporary_image_tag_it_built(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = "sha256:" + "a" * 64
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
+    monkeypatch.setattr(
+        example,
+        "temporary_image_tag",
+        lambda prefix, commit: "invarlock-example-gguf:owned",
+    )
+    monkeypatch.setattr(
+        example,
+        "_build_runtime_image",
+        lambda *_args, **kwargs: (
+            observed.update({"build_tag": kwargs["image_tag"]}),
+            digest,
+        )[1],
+    )
+    owned = example.OwnedImageTag("invarlock-example-gguf:owned", digest)
+    monkeypatch.setattr(example, "record_owned_image_tag", lambda *_args: owned)
+    monkeypatch.setattr(
+        example,
+        "remove_owned_image_tags",
+        lambda _run, _engine, _repository, tags: observed.update(
+            {"cleanup": list(tags)}
+        ),
+    )
+
+    def stage_models(
+        _repository: Path, model_root: Path, **_kwargs: object
+    ) -> dict[str, Path]:
+        model_root.mkdir(parents=True)
+        paths = {role: model_root / f"{role}.gguf" for role in ("baseline", "subject")}
+        for role, path in paths.items():
+            path.write_bytes(role.encode())
+        return paths
+
+    monkeypatch.setattr(example, "_stage_models", stage_models)
+    monkeypatch.setattr(example, "_stage_backend", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        example,
+        "_inspect_spec",
+        lambda _repository, model, **_kwargs: {
+            "model_id": model.stem,
+            "settings": {},
+        },
+    )
+    monkeypatch.setattr(
+        example, "_prepare_transaction", lambda *_args, **_kwargs: (object(), object())
+    )
+    monkeypatch.setattr(example, "_execute", lambda *_args, **_kwargs: None)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(tmp_path / "workspace"),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 0
+    )
+    assert observed == {
+        "build_tag": "invarlock-example-gguf:owned",
+        "cleanup": [owned],
+    }
+
+
 def test_main_reports_runtime_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
     monkeypatch.setattr(
         example,
         "_build_runtime_image",
