@@ -292,12 +292,12 @@ def _stage_source_checkpoint(destination_root: Path, snapshot: Snapshot) -> Path
         config = json.loads((staged / "config.json").read_text(encoding="utf-8"))
         if config.get("model_type") != staged_snapshot.model_type:
             raise RuntimeError("staged source checkpoint architecture is not pinned")
+        observed_tree = checkpoint_tree_sha256(staged)
+        if observed_tree != snapshot.checkpoint_tree_sha256:
+            raise RuntimeError("staged source checkpoint tree is not pinned")
     except Exception:
         shutil.rmtree(staged)
         raise
-    observed_tree = checkpoint_tree_sha256(staged)
-    if observed_tree != snapshot.checkpoint_tree_sha256:
-        raise RuntimeError("staged source checkpoint tree is not pinned")
     return staged
 
 

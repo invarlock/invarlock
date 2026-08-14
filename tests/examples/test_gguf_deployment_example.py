@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 import yaml
 
 from examples.integrations import gguf_deployment as example
+from examples.integrations.evaluator_transaction.model_profiles import SnapshotFile
 from examples.integrations.gguf_llama_cpp import PendingTrust
 
 
@@ -153,6 +157,35 @@ def test_conversion_rejects_missing_or_unchanged_outputs(
             gguf_image_id="sha256:" + "b" * 64,
         )
     assert not (output / example._INTERMEDIATE_NAME).exists()
+
+
+def test_checkpoint_staging_removes_a_tree_that_fails_final_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = b'{"model_type":"qwen3_5"}'
+    snapshot = replace(
+        example.deployment_profile().source,
+        files=(
+            SnapshotFile(
+                name="config.json",
+                byte_length=len(config),
+                sha256=hashlib.sha256(config).hexdigest(),
+            ),
+        ),
+        checkpoint_tree_sha256="sha256:" + "0" * 64,
+    )
+    models = tmp_path / "models"
+    models.mkdir()
+    monkeypatch.setattr(
+        example.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: io.BytesIO(config),
+    )
+
+    with pytest.raises(RuntimeError, match="tree is not pinned"):
+        example._stage_source_checkpoint(models, snapshot)
+
+    assert not (models / "source").exists()
 
 
 def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
