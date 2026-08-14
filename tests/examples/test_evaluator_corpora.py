@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -196,3 +198,125 @@ def test_flagship_provenance_rejects_qualification_manifest_drift(
 
     with pytest.raises(ValueError, match="pinned digest"):
         corpora.corpus_provenance(corpora.corpus_profile("flagship"))
+
+
+def test_json_manifest_loader_rejects_unreadable_and_nonobject_payloads(
+    tmp_path: Path,
+) -> None:
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text("{", encoding="utf-8")
+    sequence = tmp_path / "sequence.json"
+    sequence.write_text("[]\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="test manifest is unavailable or invalid"):
+        corpora._json(malformed, label="test manifest")
+    with pytest.raises(ValueError, match="test manifest must contain an object"):
+        corpora._json(sequence, label="test manifest")
+
+
+def test_flagship_provenance_rejects_suite_metadata_disagreement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = corpora.corpus_profile("flagship")
+    records = corpora.qualification_records(profile)
+    qualification = corpora._qualification_manifest()
+    changed = json.loads(json.dumps(qualification))
+    changed["selected_ids"]["text"][0] = "substituted-record"
+    monkeypatch.setattr(corpora, "qualification_records", lambda _profile: records)
+    monkeypatch.setattr(corpora, "_qualification_manifest", lambda: changed)
+
+    with pytest.raises(ValueError, match="disagrees with its qualification suite"):
+        corpora.corpus_provenance(profile)
+
+
+def test_secure_corpus_reader_requires_nofollow_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "records.jsonl"
+    source.write_bytes(b"{}\n")
+    monkeypatch.delattr(corpora.os, "O_NOFOLLOW", raising=False)
+
+    with pytest.raises(RuntimeError, match="secure bundled corpus loading"):
+        corpora._read_regular_file(source, expected_bytes=3)
+
+
+def test_secure_corpus_reader_reads_exact_bytes_and_detects_substitution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "records.jsonl"
+    payload = b'{"id":"one"}\n'
+    source.write_bytes(payload)
+
+    assert corpora._read_regular_file(source, expected_bytes=len(payload)) == payload
+
+    original_fstat = corpora.os.fstat
+    calls = 0
+
+    def changed_fstat(descriptor: int) -> object:
+        nonlocal calls
+        calls += 1
+        observed = original_fstat(descriptor)
+        if calls == 1:
+            return observed
+        return SimpleNamespace(
+            st_mode=observed.st_mode,
+            st_size=observed.st_size,
+            st_dev=observed.st_dev,
+            st_ino=observed.st_ino,
+            st_mtime_ns=observed.st_mtime_ns + 1,
+            st_ctime_ns=observed.st_ctime_ns,
+        )
+
+    monkeypatch.setattr(corpora.os, "fstat", changed_fstat)
+    with pytest.raises(RuntimeError, match="changed while being read"):
+        corpora._read_regular_file(source, expected_bytes=len(payload))
+
+
+def test_semantic_corpus_rejects_digest_and_shape_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(corpora, "_read_regular_file", lambda *_args, **_kwargs: b"")
+    with pytest.raises(RuntimeError, match="pinned identity"):
+        corpora._semantic_records()
+
+    payload = b'{"id":"incomplete"}\n'
+    manifest = corpora._manifest()
+    changed = json.loads(json.dumps(manifest))
+    changed["qualification_suite"]["semantic_byte_length"] = len(payload)
+    changed["qualification_suite"]["semantic_sha256"] = hashlib.sha256(
+        payload
+    ).hexdigest()
+    monkeypatch.setattr(corpora, "_manifest", lambda: changed)
+    monkeypatch.setattr(
+        corpora, "_read_regular_file", lambda *_args, **_kwargs: payload
+    )
+    with pytest.raises(RuntimeError, match="semantic corpus is incomplete"):
+        corpora._semantic_records()
+
+
+def test_semantic_rendering_rejects_invalid_choices_and_profile_use(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invalid = {
+        "answer": "A",
+        "id": "one",
+        "options": ["only choice"],
+        "question": "Invalid?",
+    }
+    with pytest.raises(RuntimeError, match="invalid choices"):
+        corpora._question_body(invalid)
+
+    valid = {**invalid, "options": ["first", "second"]}
+    with pytest.raises(ValueError, match="does not use the semantic corpus"):
+        corpora._render_record(valid, _profile(record_count=1))
+    with pytest.raises(ValueError, match="maintained GPU profile"):
+        corpora.qualification_records(corpora.corpus_profile("quick"))
+
+    mismatched = replace(
+        corpora.corpus_profile("flagship"),
+        record_count=1,
+        dataset_sha256="0" * 64,
+    )
+    monkeypatch.setattr(corpora, "_semantic_records", lambda: [valid])
+    with pytest.raises(RuntimeError, match="pinned identity"):
+        corpora.qualification_records(mismatched)
