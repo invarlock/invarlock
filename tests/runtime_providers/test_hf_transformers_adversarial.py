@@ -549,6 +549,7 @@ def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
         set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
         live_state={"model.weight": object()},
         model=model,
+        authenticated_config=model.config,
     ) == set(_EXPECTED_QWEN3_5_MTP_KEYS)
 
 
@@ -559,6 +560,7 @@ def test_qwen3_5_multimodal_exact_mtp_inventory_is_explicitly_non_executing() ->
         set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
         live_state={"model.weight": object()},
         model=model,
+        authenticated_config=model.config,
     ) == set(_EXPECTED_QWEN3_5_MTP_KEYS)
 
 
@@ -582,6 +584,7 @@ def test_qwen3_5_mtp_exception_rejects_forged_partial_or_live_state(
             keys,
             live_state=live_state,
             model=model,
+            authenticated_config=model.config,
         )
 
 
@@ -658,6 +661,118 @@ def test_real_qwen_multimodal_checkpoint_accepts_exact_nonexecuting_mtp(
         model=model,
         authenticated_config=_authenticated_qwen_config(tmp_path),
     )
+
+
+def test_real_qwen_multimodal_checkpoint_authenticates_causal_projection(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for index, key in enumerate(sorted(_EXPECTED_QWEN3_5_MTP_KEYS)):
+        tensors[key] = torch.tensor([float(index)])
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    assert type(model) is transformers.Qwen3_5ForCausalLM
+    assert model.config.model_type == "qwen3_5_text"
+    authenticated_config = hf._require_model_config_match(tmp_path, model=model)
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=authenticated_config,
+    )
+
+
+def test_qwen_multimodal_causal_projection_authenticates_native_bfloat16_cast(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    config_path = tmp_path / "config.json"
+    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    config_payload.pop("dtype", None)
+    config_path.write_text(
+        json.dumps(config_payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for key in (
+        "model.language_model.layers.0.linear_attn.A_log",
+        "model.language_model.layers.0.linear_attn.norm.weight",
+    ):
+        tensors[key] = tensors[key].to(torch.float32)
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+    authenticated_config = hf._require_model_config_match(tmp_path, model=model)
+
+    assert model.config.dtype == torch.bfloat16
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=authenticated_config,
+    )
+
+
+def test_qwen_multimodal_causal_projection_rejects_top_level_profile_drift(
+    tmp_path: Path,
+) -> None:
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    config_path = tmp_path / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["architectures"] = ["Qwen3_5ForCausalLM"]
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Qwen3.5 causal projection"):
+        hf._require_model_config_match(tmp_path, model=model)
+
+
+def test_qwen_multimodal_causal_projection_rejects_live_text_config_drift(
+    tmp_path: Path,
+) -> None:
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.config.hidden_size += 1
+
+    with pytest.raises(ValueError, match="does not match"):
+        hf._require_model_config_match(tmp_path, model=model)
 
 
 def test_real_qwen_multimodal_checkpoint_accepts_exact_native_bfloat16_cast(
