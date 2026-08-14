@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added a signed Qwen3.5 9B deployment journey that compares one pinned BF16
-  Transformers checkpoint with its source-derived Q5_K_M GGUF under separate
-  immutable runtime images and the balanced 400-record MMLU-Pro policy.
+  Transformers text-causal component with its source-derived Q5_K_M GGUF under
+  separate immutable runtime images and the balanced 400-record MMLU-Pro
+  policy.
 
 - Added a five-minute CPU-only wheel-user workflow that verifies retained
   signed evidence, issues a fresh verifier receipt, renders HTML, and runs from

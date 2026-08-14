@@ -7,6 +7,12 @@ with a pinned llama.cpp source revision, quantizes the resulting BF16 GGUF to
 Q5_K_M, and executes the derived artifact through the optional llama.cpp
 provider.
 
+The execution scope is the checkpoint's text-causal component. Transformers
+loads the exact native Qwen3.5 causal projection from the authenticated
+multimodal checkpoint, while the stored vision and MTP tensors remain bound to
+the source identity and are verified as outside this transaction's live model
+state. This gives both sides the same language-model behavior boundary.
+
 Both sides use the ordered 400-record balanced MMLU-Pro Qwen schedule already
 used by the current-model evaluator transactions. The policy is fixed before
 execution: at least 20% accuracy on each side, a paired interval no wider than
@@ -18,10 +24,10 @@ bound is at least −2 percentage points.
 The maintained run uses Linux, Docker, one CUDA-capable GPU with at least 24 GB
 of memory for the BF16 baseline, 64 GB of system memory, and about 70 GB of free
 disk space while conversion is active. The llama.cpp subject uses CPU because
-that provider's qualified execution profile is CPU-bound. On a recent server,
-allow roughly one to three hours for image construction, conversion,
-quantization, and the 400-record transaction. Cached image layers reduce later
-runs.
+that provider's qualified execution profile is CPU-bound. Budget roughly four
+to six hours for image construction, conversion, quantization, and the
+400-record transaction on a recent server; the CPU subject dominates elapsed
+time. Cached image layers reduce later runs.
 
 Network access is used only while building the pinned images and downloading
 the exact checkpoint files. The conversion, quantization, and model-execution
