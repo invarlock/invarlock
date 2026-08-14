@@ -459,6 +459,38 @@ def _validate_transformation_binding(
         raise RuntimeError("deployment transformation subject identity is invalid")
 
 
+def _validate_runtime_spec_bindings(
+    *,
+    profile: DeploymentProfile,
+    baseline_spec: Mapping[str, object],
+    subject_spec: Mapping[str, object],
+    subject_sha256: str,
+    subject_byte_length: int,
+) -> None:
+    baseline_settings = baseline_spec.get("settings")
+    if (
+        baseline_spec.get("model_id") != profile.source.repository
+        or not isinstance(baseline_settings, dict)
+        or baseline_settings.get("checkpoint_tree_sha256")
+        != profile.source.checkpoint_tree_sha256
+        or baseline_settings.get("immutable_revision") != profile.source.revision
+        or baseline_settings.get("tokenizer_metadata_sha256")
+        != profile.source.tokenizer_contract_sha256
+    ):
+        raise RuntimeError("deployment baseline runtime specification is not pinned")
+
+    subject_settings = subject_spec.get("settings")
+    if (
+        subject_spec.get("model_id") != f"gguf-sha256-{subject_sha256}.gguf"
+        or not isinstance(subject_settings, dict)
+        or subject_settings.get("artifact_sha256") != subject_sha256
+        or subject_settings.get("artifact_byte_length") != subject_byte_length
+    ):
+        raise RuntimeError(
+            "deployment subject runtime specification is not bound to the GGUF bytes"
+        )
+
+
 def _artifact_anchor(
     provider_name: str,
     model_id: str,
@@ -502,6 +534,13 @@ def _prepare_transaction(
     profile = deployment_profile()
     _new_nonempty_file(subject, label="Q5_K_M GGUF")
     subject_sha256 = _sha256_file(subject)
+    _validate_runtime_spec_bindings(
+        profile=profile,
+        baseline_spec=baseline_spec,
+        subject_spec=subject_spec,
+        subject_sha256=subject_sha256,
+        subject_byte_length=subject.stat().st_size,
+    )
     _validate_transformation_binding(
         transformation,
         profile=profile,
