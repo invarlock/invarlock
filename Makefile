@@ -354,7 +354,7 @@ example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 		--with ./addins/gguf python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
 
 example-gguf-deployment:  ## Compare Qwen3.5 9B BF16 with a source-derived Q5_K_M GGUF
-	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
+	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with '.[hf]' \
 		--with ./addins/gguf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
 
 example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output

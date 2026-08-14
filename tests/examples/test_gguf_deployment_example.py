@@ -29,6 +29,17 @@ def _pending_trust() -> PendingTrust:
     )
 
 
+def test_make_target_installs_the_hf_runtime_and_gguf_addin() -> None:
+    makefile = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
+        encoding="utf-8"
+    )
+    target = makefile.split("example-gguf-deployment:", 1)[1].split("\n\n", 1)[0]
+
+    assert "--with '.[hf]'" in target
+    assert "--with ./addins/gguf" in target
+    assert "examples.integrations.gguf_deployment" in target
+
+
 def test_profile_uses_one_pinned_post_trained_9b_source_and_flagship_corpus() -> None:
     profile = example.deployment_profile()
 
