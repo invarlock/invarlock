@@ -5,16 +5,60 @@ import pytest
 from examples.integrations.evaluator_transaction import model_profiles
 
 
-def test_quick_profile_remains_the_small_cpu_ci_path() -> None:
+def test_quick_profile_uses_the_immutable_qwen35_08b_pair() -> None:
     profile = model_profiles.model_profile("quick")
 
+    assert profile.profile_id == "qwen35-0.8b-base-to-post-trained-cpu-v1"
     assert profile.device == "cpu"
     assert profile.dtype == "float32"
     assert profile.batch_size == 8
-    assert [snapshot.repository for snapshot in profile.snapshots] == [
-        "Qwen/Qwen3-0.6B-Base",
-        "Qwen/Qwen3-0.6B",
+    assert [
+        (snapshot.role, snapshot.repository, snapshot.revision, snapshot.model_type)
+        for snapshot in profile.snapshots
+    ] == [
+        (
+            "baseline",
+            "Qwen/Qwen3.5-0.8B-Base",
+            "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68",
+            "qwen3_5",
+        ),
+        (
+            "subject",
+            "Qwen/Qwen3.5-0.8B",
+            "2fc06364715b967f1860aea9cf38778875588b17",
+            "qwen3_5",
+        ),
     ]
+    assert {
+        snapshot.role: (
+            snapshot.checkpoint_tree_sha256,
+            snapshot.tokenizer_contract_sha256,
+        )
+        for snapshot in profile.snapshots
+    } == {
+        "baseline": (
+            "sha256:d9a7f63f71b0a8825121c1d5fb6531f4e334b0b6b889f3bd223b551fc545d25f",
+            "7ada77f663f15f6943662b56a8dcea510f475dfd48d31418781b0a5e938066f0",
+        ),
+        "subject": (
+            "sha256:d6866dbe2ec16212b927ca14045a2caefe6bc2a272958506678eefbb809a4b9a",
+            "d2404e21ad9a6346678434df047fa1a4dc2b37b0a88e2b9aaecdfe38bd6ca284",
+        ),
+    }
+    for snapshot in profile.snapshots:
+        assert all(
+            item.byte_length > 0 and len(item.sha256) == 64
+            for item in snapshot.files
+        )
+        assert {
+            "config.json",
+            "merges.txt",
+            "model.safetensors.index.json",
+            "model.safetensors-00001-of-00001.safetensors",
+            "tokenizer.json",
+            "tokenizer_config.json",
+            "vocab.json",
+        } <= {item.name for item in snapshot.files}
 
 
 def test_flagship_profile_is_the_immutable_qwen35_9b_cuda_comparison() -> None:

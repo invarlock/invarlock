@@ -47,22 +47,27 @@ class ModelProfile:
         raise ValueError(f"unknown evaluator model role: {role}")
 
 
-_QWEN3_SHARED = (
+_QWEN35_08B_SHARED = (
+    SnapshotFile(
+        "config.json",
+        2_907,
+        "b90b86f35c8e6925ef74ee04d0e758f0a845c83a42089ad82bbaa948de9b4204",
+    ),
     SnapshotFile(
         "merges.txt",
-        1_671_853,
-        "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        3_353_259,
+        "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
     ),
     SnapshotFile(
         "vocab.json",
-        2_776_833,
-        "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        6_722_759,
+        "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
     ),
 )
 
 _QUICK = ModelProfile(
     key="quick",
-    profile_id="qwen3-0.6b-base-to-post-trained-cpu-v1",
+    profile_id="qwen35-0.8b-base-to-post-trained-cpu-v1",
     device="cpu",
     dtype="float32",
     batch_size=8,
@@ -70,72 +75,77 @@ _QUICK = ModelProfile(
     snapshots=(
         Snapshot(
             role="baseline",
-            repository="Qwen/Qwen3-0.6B-Base",
-            revision="da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
-            model_type="qwen3",
+            repository="Qwen/Qwen3.5-0.8B-Base",
+            revision="dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68",
+            model_type="qwen3_5",
             files=(
+                *_QWEN35_08B_SHARED,
                 SnapshotFile(
-                    "config.json",
-                    727,
-                    "504a6b58c4271583724e66584b6b7698aea18450209df6b2f7582df0e89cee59",
+                    "model.safetensors.index.json",
+                    50_900,
+                    "ce9a885efdf27d3664fdef5d512ad365216f1074051ef840c7cd8e5431495d0a",
                 ),
-                *_QWEN3_SHARED,
                 SnapshotFile(
-                    "model.safetensors",
-                    1_192_135_096,
-                    "cd2a512003e2f9f3cd3c32a9c3573f820bb28c940f73c57b1ddaa983d9223eba",
+                    "model.safetensors-00001-of-00001.safetensors",
+                    1_746_942_600,
+                    "c2b1e5a17d9c1e27685d92ed9b382911ebb99955ecd89052d1721241adfbab6c",
                 ),
                 SnapshotFile(
                     "tokenizer.json",
-                    7_031_645,
-                    "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+                    12_807_196,
+                    "fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927",
                 ),
                 SnapshotFile(
                     "tokenizer_config.json",
-                    9_678,
-                    "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
+                    16_712,
+                    "e611fbccc7c29ef3b1cafb1cb7ea548d189968632901d678fd62be68c47885de",
                 ),
             ),
             checkpoint_tree_sha256=(
-                "sha256:eddb974cecb32ecf6bfaec2a19ecfbb32c73be9f7c38c7b54d551cd8ef66bd75"
+                "sha256:d9a7f63f71b0a8825121c1d5fb6531f4e334b0b6b889f3bd223b551fc545d25f"
             ),
             tokenizer_contract_sha256=(
-                "c5f0898f912c7d953302779f61c86026b3cea05561a9520b6209e82b9d650581"
+                "7ada77f663f15f6943662b56a8dcea510f475dfd48d31418781b0a5e938066f0"
             ),
         ),
         Snapshot(
             role="subject",
-            repository="Qwen/Qwen3-0.6B",
-            revision="c1899de289a04d12100db370d81485cdf75e47ca",
-            model_type="qwen3",
+            repository="Qwen/Qwen3.5-0.8B",
+            revision="2fc06364715b967f1860aea9cf38778875588b17",
+            model_type="qwen3_5",
             files=(
                 SnapshotFile(
-                    "config.json",
-                    726,
-                    "660db3b73d788119c04535e48cf9be5f55bc3100841a718637ae695b442f27dd",
+                    "chat_template.jinja",
+                    7_755,
+                    "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
                 ),
-                *_QWEN3_SHARED,
+                *_QWEN35_08B_SHARED,
                 SnapshotFile(
-                    "model.safetensors",
-                    1_503_300_328,
-                    "f47f71177f32bcd101b7573ec9171e6a57f4f4d31148d38e382306f42996874b",
+                    "model.safetensors.index.json",
+                    50_900,
+                    "d8a08838a613b025eb7952ed9db11696213e57e76a375661ef5c12f9dd5dcf4e",
+                ),
+                SnapshotFile(
+                    "model.safetensors-00001-of-00001.safetensors",
+                    1_746_942_600,
+                    "04b1c301231dd422b8860db31311ab2721511346a32cb1e079c4c4e5f1fe4696",
                 ),
                 SnapshotFile(
                     "tokenizer.json",
-                    11_422_654,
-                    "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+                    12_807_982,
+                    "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
                 ),
                 SnapshotFile(
                     "tokenizer_config.json",
-                    9_732,
-                    "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+                    16_709,
+                    "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
                 ),
             ),
             checkpoint_tree_sha256=(
-                "sha256:f97b7ac0717847938aed654bf671a93a28cf13413e37d29040ebad85564f6346"
+                "sha256:d6866dbe2ec16212b927ca14045a2caefe6bc2a272958506678eefbb809a4b9a"
             ),
             tokenizer_contract_sha256=(
-                "ddf5fc73d604adf713f3d2fa98a9229c9dc05abb0881b33e636d15a5616dcd02"
+                "d2404e21ad9a6346678434df047fa1a4dc2b37b0a88e2b9aaecdfe38bd6ca284"
             ),
         ),
     ),

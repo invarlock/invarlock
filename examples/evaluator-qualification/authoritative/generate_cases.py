@@ -29,32 +29,40 @@ ROOT = Path(__file__).resolve().parent
 SOURCE_RECORDS = (
     ROOT.parents[1] / "integrations" / "lm-evaluation-harness" / "records.json"
 )
-MODEL_ID = "Qwen/Qwen3-0.6B"
-MODEL_REVISION = "c1899de289a04d12100db370d81485cdf75e47ca"
+MODEL_ID = "Qwen/Qwen3.5-0.8B"
+MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
 MODEL_FILES = {
+    "chat_template.jinja": (
+        7_755,
+        "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    ),
     "config.json": (
-        726,
-        "660db3b73d788119c04535e48cf9be5f55bc3100841a718637ae695b442f27dd",
+        2_907,
+        "b90b86f35c8e6925ef74ee04d0e758f0a845c83a42089ad82bbaa948de9b4204",
     ),
     "merges.txt": (
-        1_671_853,
-        "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        3_353_259,
+        "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
     ),
-    "model.safetensors": (
-        1_503_300_328,
-        "f47f71177f32bcd101b7573ec9171e6a57f4f4d31148d38e382306f42996874b",
+    "model.safetensors.index.json": (
+        50_900,
+        "d8a08838a613b025eb7952ed9db11696213e57e76a375661ef5c12f9dd5dcf4e",
+    ),
+    "model.safetensors-00001-of-00001.safetensors": (
+        1_746_942_600,
+        "04b1c301231dd422b8860db31311ab2721511346a32cb1e079c4c4e5f1fe4696",
     ),
     "tokenizer.json": (
-        11_422_654,
-        "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        12_807_982,
+        "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
     ),
     "tokenizer_config.json": (
-        9_732,
-        "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+        16_709,
+        "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
     ),
     "vocab.json": (
-        2_776_833,
-        "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        6_722_759,
+        "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
     ),
 }
 GENERATION = {
@@ -134,7 +142,7 @@ def _qualification_schedule(runtime_schedule: Any) -> dict[str, object]:
             }
             for record in runtime_schedule.records
         ],
-        "schedule_id": "qwen3-0.6b-102-record-authoritative-import",
+        "schedule_id": "qwen35-0.8b-102-record-authoritative-import",
     }
 
 
@@ -145,7 +153,7 @@ def generate(*, local_files_only: bool) -> dict[str, bytes]:
         path=ROOT / "dataset.jsonl",
         sha256=hashlib.sha256(dataset).hexdigest(),
         format="jsonl",
-        name="qwen3-0.6b-authoritative-evaluator-import",
+        name="qwen35-0.8b-authoritative-evaluator-import",
         split="validation",
         input_field="prompt",
         expected_output_field="expected",
