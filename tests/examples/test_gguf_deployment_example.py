@@ -46,7 +46,7 @@ def _baseline_spec() -> dict[str, object]:
             "max_output_tokens": 1,
             "offline": True,
             "seed": example._SEED,
-            "timeout_seconds": example._TIMEOUT_SECONDS,
+            "timeout_seconds": example._BASELINE_TIMEOUT_SECONDS,
             "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
         },
     }
@@ -71,7 +71,7 @@ def _subject_spec(subject: Path) -> dict[str, object]:
             "prompt_microbatch_size": example._SUBJECT_PROMPT_MICROBATCH_SIZE,
             "seed": example._SEED,
             "tensor_inventory_sha256": "5" * 64,
-            "timeout_seconds": example._TIMEOUT_SECONDS,
+            "timeout_seconds": example._SUBJECT_TIMEOUT_SECONDS,
             "tokenizer_metadata_sha256": "6" * 64,
         },
     }
@@ -568,6 +568,7 @@ def test_execute_selects_independent_images_and_devices(
     )
     assert evaluate[evaluate.index("--baseline-runtime-device") + 1] == "cuda"
     assert evaluate[evaluate.index("--subject-runtime-device") + 1] == "cpu"
+    assert evaluate[evaluate.index("--runtime-cpus") + 1] == example._WORKER_CPUS
 
 
 def test_execute_can_retain_an_independently_verified_policy_rejection(

@@ -77,10 +77,12 @@ _LLAMA_SOURCE_SHA256 = (
     "5ab75e394f4c71425ecce64a213dab3b8e3e9cfe0f19d0dcda4d5a4f7733da83"
 )
 _SEED = 20_260_716
-_TIMEOUT_SECONDS = 300
-_SUBJECT_CPU_THREADS = 4
-_SUBJECT_PROMPT_BATCH_SIZE = 32
-_SUBJECT_PROMPT_MICROBATCH_SIZE = 32
+_BASELINE_TIMEOUT_SECONDS = 300
+_SUBJECT_TIMEOUT_SECONDS = 600
+_WORKER_CPUS = "16"
+_SUBJECT_CPU_THREADS = 16
+_SUBJECT_PROMPT_BATCH_SIZE = 512
+_SUBJECT_PROMPT_MICROBATCH_SIZE = 512
 _VERIFIER_IDENTITY = "invarlock-example/gguf-deployment-verifier"
 
 
@@ -336,7 +338,7 @@ def _baseline_spec(
             "max_output_tokens": 1,
             "offline": True,
             "seed": _SEED,
-            "timeout_seconds": _TIMEOUT_SECONDS,
+            "timeout_seconds": _BASELINE_TIMEOUT_SECONDS,
             "tokenizer_metadata_sha256": tokenizer_digest,
         },
     }
@@ -482,7 +484,7 @@ def _validate_runtime_spec_bindings(
         "max_output_tokens": 1,
         "offline": True,
         "seed": _SEED,
-        "timeout_seconds": _TIMEOUT_SECONDS,
+        "timeout_seconds": _BASELINE_TIMEOUT_SECONDS,
         "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
     }
     if baseline_spec.get("model_id") != profile.source.repository or (
@@ -505,7 +507,7 @@ def _validate_runtime_spec_bindings(
         or subject_settings.get("prompt_microbatch_size")
         != _SUBJECT_PROMPT_MICROBATCH_SIZE
         or subject_settings.get("seed") != _SEED
-        or subject_settings.get("timeout_seconds") != _TIMEOUT_SECONDS
+        or subject_settings.get("timeout_seconds") != _SUBJECT_TIMEOUT_SECONDS
     ):
         raise RuntimeError(
             "deployment subject runtime specification is not bound to the GGUF bytes"
@@ -805,6 +807,8 @@ def _execute(
         subject_image_id,
         "--subject-runtime-device",
         "cpu",
+        "--runtime-cpus",
+        _WORKER_CPUS,
         "--json",
     ]
     preflight = launch._run(
@@ -1067,7 +1071,7 @@ def main(argv: list[str] | None = None) -> int:
             prompt_batch_size=_SUBJECT_PROMPT_BATCH_SIZE,
             prompt_microbatch_size=_SUBJECT_PROMPT_MICROBATCH_SIZE,
             max_output_tokens=1,
-            timeout_seconds=_TIMEOUT_SECONDS,
+            timeout_seconds=_SUBJECT_TIMEOUT_SECONDS,
         )
         transformation = _transformation_document(
             profile=profile,

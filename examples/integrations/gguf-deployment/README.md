@@ -17,16 +17,17 @@ Both sides use the ordered 400-record balanced MMLU-Pro Qwen schedule already
 used by the current-model evaluator transactions. The policy is fixed before
 execution: at least 20% accuracy on each side, a paired interval no wider than
 10 percentage points, and a subject-minus-baseline paired interval whose lower
-bound is at least −2 percentage points. The subject request separately pins
-record batching, llama.cpp prompt and micro-batch sizes, and CPU thread count.
+bound is at least −2 percentage points. The signed subject request separately
+pins record batching, llama.cpp prompt and micro-batch sizes, and CPU thread
+count; the journey fixes the corresponding worker CPU limit.
 
 ## Compute and storage
 
 The maintained run uses Linux, Docker, one CUDA-capable GPU with at least 24 GB
 of memory for the BF16 baseline, 64 GB of system memory, and about 70 GB of free
 disk space while conversion is active. The llama.cpp subject uses CPU because
-that provider's qualified execution profile is CPU-bound. Budget roughly four
-to six hours for image construction, conversion, quantization, and the
+that provider's qualified execution profile is CPU-bound. Budget roughly eight
+to twelve hours for image construction, conversion, quantization, and the
 400-record transaction on a recent server; the CPU subject dominates elapsed
 time. Cached image layers reduce later runs.
 
