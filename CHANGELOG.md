@@ -30,11 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a standalone protected CI deployment-consumer fixture that
   reauthenticates the retained Inspect AI receipt against separately supplied
   recipient anchors before an exact candidate can be deployed.
+- Added a retained passing Inspect AI deployment-approval transaction for
+  Qwen3.5 0.8B over a deterministic, tokenizer-qualified 400-record LAMBADA
+  corpus with independently pinned source, selection, policy, and trust anchors.
 - Added one bounded examples-layer command runner with timeout, output-limit,
   cleanup, and nonzero-exit handling across maintained integration commands.
 
 ### Changed
 
+- Migrated the compact Hugging Face, PEFT, TorchAO, llama.cpp, evaluator, and
+  OpenAI Evals examples from Qwen3 0.6B to revision-pinned Qwen3.5 0.8B. The
+  TensorRT-LLM 1.2.1 showcase remains an explicitly scoped Qwen3 compatibility
+  fixture because that runtime does not provide a Qwen3.5 adapter.
 - Kept generic receipt signing role-neutral while high-assurance evaluator
   transactions continue to require separate evidence, verifier, and builder
   keys.

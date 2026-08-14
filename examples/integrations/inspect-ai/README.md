@@ -6,8 +6,10 @@ its exact-match scorer over two pinned model evaluations, then completes
 recomputes the paired result from every imported record instead of trusting the
 evaluator aggregate.
 
-The default `quick` profile compares Qwen3 0.6B Base with its post-trained
-checkpoint over 102 local records on CPU. The retained `flagship` profile
+The default `quick` profile compares Qwen3.5 0.8B Base with its post-trained
+checkpoint over 102 local records on CPU. The retained `deployment` profile
+uses the same checkpoints with a tokenizer-qualified 400-record LAMBADA
+completion corpus on CUDA. The retained `flagship` profile
 compares revision-pinned Qwen3.5 9B Base and post-trained checkpoints over 400
 balanced MMLU-Pro records on CUDA. Every required snapshot file, tokenizer
 contract, task setting, evaluator version, runtime image, and per-record output
@@ -25,6 +27,12 @@ Select the current-model flagship with:
 
 ```bash
 make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+```
+
+Run the compact deployment-approval profile with:
+
+```bash
+make example-inspect-ai EXAMPLE_ARGS="--corpus-profile deployment --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
 ```
 
 The shared `portability` profile can also run the Gemma 4 12B instruction and
@@ -66,6 +74,16 @@ subject accuracy, with a −2.5-point estimate and a 7.85-point interval width.
 Its evidence and receipt passed integrity verification, while the regression
 policy rejected the comparison because the confidence lower bound crossed the
 declared floor.
+
+The separate deployment profile deterministically selects 400 records from a
+revision- and hash-pinned EleutherAI LAMBADA source. Every target is one
+lossless token under both Qwen3.5 0.8B tokenizers, prompts fit the 256-token
+ceiling, and four prompt-length strata contribute 100 records each. Its
+predeclared policy requires 400 records, at least 5% accuracy on each side, an
+interval no wider than 10 percentage points, and a lower bound of at least
+−20 percentage points. The retained transaction measured 49.25% baseline and
+43.50% subject accuracy, a −5.75-point estimate, and a 6.52-point interval
+width; its signed policy verdict passed.
 
 LM Evaluation Harness and Inspect AI produced identical ordered output records
 for all 400 baseline and all 400 subject examples under the singleton profile.

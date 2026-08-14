@@ -106,7 +106,7 @@ def _quick_profile() -> CorpusProfile:
     return CorpusProfile(
         key="quick",
         profile_id="causal-cloze-102-v1",
-        dataset_name="qwen3-0.6b-base-to-post-trained",
+        dataset_name="qwen35-0.8b-base-to-post-trained",
         split="validation",
         record_count=102,
         dataset_sha256="d80e81ba17fb93b9b8a46f9817f9841f5f9c2858c9d703b3ce28847b2eaeb57c",

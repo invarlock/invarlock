@@ -148,6 +148,9 @@ make example-evidence-handoff
 The TensorRT-LLM showcase downloads one pinned Qwen3-0.6B revision and builds
 BF16 and ModelOpt-calibrated FP8 engines on separate H100 GPUs before
 completing the signed transaction.
+It remains a backend-compatibility fixture because the pinned TensorRT-LLM
+1.2.1 runtime supports Qwen3 but does not provide a Qwen3.5 adapter; the other
+compact examples use Qwen3.5 0.8B.
 Its README also documents the lower-level command for qualified,
 caller-prepared engines. Both paths bind the observed engine identities rather
 than assuming independently compiled engine bytes will be identical. Optional

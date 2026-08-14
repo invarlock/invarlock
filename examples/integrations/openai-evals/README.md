@@ -1,15 +1,15 @@
 # OpenAI Evals
 
 This example runs the pinned OpenAI Evals `basic.Match` evaluator over two real,
-locally generated Qwen3 evaluations, then runs `invarlock evaluate`,
+locally generated Qwen3.5 evaluations, then runs `invarlock evaluate`,
 `invarlock verify`, and `invarlock report`. InvarLock recomputes the exact-match
 comparison from the paired records and does not trust the evaluator aggregate
 score. The end-to-end qualification row remains pending until a clean OCI run
 is retained.
 
 The maintained journey compares the public, revision-pinned
-`Qwen/Qwen3-0.6B-Base` checkpoint with the public post-trained
-`Qwen/Qwen3-0.6B` checkpoint. Every snapshot file is checked against a fixed
+`Qwen/Qwen3.5-0.8B-Base` checkpoint with the public post-trained
+`Qwen/Qwen3.5-0.8B` checkpoint. Every snapshot file is checked against a fixed
 byte length and SHA-256 before execution. The 102-record schedule carries stable
 IDs and fixed prompts and targets; both upstream runs execute offline after the
 snapshot and image downloads.
@@ -33,7 +33,7 @@ outside the transaction; the trust root is created outside the transaction.
 
 The command builds the source-authenticated CPU runtime and adds a hash-pinned
 OpenAI Evals environment. It needs roughly 7 GB of temporary disk for the two
-Qwen3 snapshots, runtime images, and outputs. Both model runs execute without
+Qwen3.5 snapshots, runtime images, and outputs. Both model runs execute without
 network access inside the inspected image. The immutable image ID is bound into
 both runtime receipts before the import transaction is signed.
 

@@ -14,8 +14,8 @@ make example-torchao-int8 \
 
 The command:
 
-1. downloads the official Apache-2.0 `Qwen/Qwen3-0.6B` checkpoint at immutable
-   revision `c1899de289a04d12100db370d81485cdf75e47ca`;
+1. downloads the official Apache-2.0 `Qwen/Qwen3.5-0.8B` checkpoint at immutable
+   revision `2fc06364715b967f1860aea9cf38778875588b17`;
 2. applies TorchAO's `Int8WeightOnlyConfig(version=2)` transformation;
 3. confirms that TorchAO created quantized tensor subclasses while preserving
    Qwen's tied output projection;

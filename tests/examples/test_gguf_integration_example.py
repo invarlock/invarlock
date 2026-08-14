@@ -318,7 +318,7 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
     assert request["comparison"]["metric"] == "exact_match"
     assert request["comparison"]["baseline"]["runtime"]["provider"] == "llama_cpp"
     assert request["comparison"]["subject"]["runtime"]["provider"] == "llama_cpp"
-    assert request["comparison"]["dataset"]["name"] == "qwen3-0.6b-q8-to-q5"
+    assert request["comparison"]["dataset"]["name"] == "qwen35-0.8b-q8-to-q5"
     assert request["comparison"]["baseline"]["artifact"]["locator"].startswith(
         "hf://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )

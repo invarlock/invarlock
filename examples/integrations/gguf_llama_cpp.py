@@ -513,7 +513,7 @@ def _prepare_transaction(
         LocalDatasetRequest(
             path=dataset,
             sha256=dataset_sha256,
-            name="qwen3-0.6b-q8-to-q5",
+            name="qwen35-0.8b-q8-to-q5",
             split="validation",
             input_field="prompt",
             expected_output_field="expected",
@@ -575,7 +575,7 @@ def _prepare_transaction(
                 "path": "inputs/records.jsonl",
                 "sha256": dataset_sha256,
                 "format": "jsonl",
-                "name": "qwen3-0.6b-q8-to-q5",
+                "name": "qwen35-0.8b-q8-to-q5",
                 "split": "validation",
                 "input_field": "prompt",
                 "expected_output_field": "expected",

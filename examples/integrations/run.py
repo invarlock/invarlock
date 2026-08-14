@@ -229,7 +229,7 @@ def _target_row_derivative(
     model.eval()
     backbone = getattr(model, str(model.base_model_prefix), None)
     if backbone is None:
-        raise RuntimeError("the Qwen3 model does not expose its causal backbone")
+        raise RuntimeError("the Qwen3.5 model does not expose its causal backbone")
     with torch.inference_mode():
         hidden_states = backbone(
             input_ids=batch["input_ids"],
@@ -261,7 +261,7 @@ def _target_row_derivative(
             .item()
         )
     if margin <= 0.0:
-        raise RuntimeError("the Qwen3 subject transformation missed a prompt")
+        raise RuntimeError("the Qwen3.5 subject transformation missed a prompt")
     return target_id, margin
 
 
@@ -293,10 +293,12 @@ def _create_hf_checkpoints(
     subject = paths.evaluation / "models" / "subject"
     observed_digest = compact_model_profile.save_checkpoint(model, tokenizer, subject)
     if observed_digest != tokenizer_digest:
-        raise RuntimeError("the Qwen3 baseline and subject tokenizers do not match")
+        raise RuntimeError("the Qwen3.5 baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
     if baseline_digest == subject_digest:
-        raise RuntimeError("the transformed Qwen3 subject is identical to its baseline")
+        raise RuntimeError(
+            "the transformed Qwen3.5 subject is identical to its baseline"
+        )
     (paths.evaluation / "inputs" / "subject-transformation.json").write_bytes(
         canonical_json_bytes(
             {
@@ -953,7 +955,7 @@ def _run(command: list[str]) -> None:
     completed = run_bounded_command(
         command,
         capture_output=True,
-        label="Qwen3 integration command",
+        label="compact-model integration command",
     )
     if completed.stdout:
         print(completed.stdout, end="")

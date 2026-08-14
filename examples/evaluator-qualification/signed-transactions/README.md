@@ -72,7 +72,7 @@ outputs:
    [builder attestation](gemma4-lm-evaluation-harness/build-attestation.json),
    and [transaction anchors](gemma4-lm-evaluation-harness/transaction.json).
 5. The [runnable integration](../../integrations/lm-evaluation-harness/README.md)
-   produces both current-model profiles.
+   produces the quick, deployment, flagship, and portability profiles.
 
 The [qualification matrix](../../../docs/reference/evaluator-qualification.md#qualification-matrix)
 reports adapter support, replay authority, and retained transactions as
@@ -81,7 +81,7 @@ exact-match workflows.
 
 ## Current-model results
 
-The Qwen3.5 transactions used the same ordered 400-record schedule. LM
+The Qwen3.5 9B flagship transactions used the same ordered 400-record schedule. LM
 Evaluation Harness and Inspect AI produced identical normalized record digests
 and scores for all 400 baseline and all 400 subject records. The
 [flagship comparison](flagship-comparison.json) records that agreement without
@@ -95,9 +95,9 @@ assigning an additional acceptance decision.
 | Qwen3.5 0.8B deployment / Inspect AI | 49.25% | 43.50% | −5.75 pp | [−8.99, −2.47] pp | 6.52 pp | Pass |
 
 All four current-model packs passed integrity, record-count, interval-width,
-and side-accuracy checks. The three MMLU-Pro packs use a conservative regression rule that requires the
-confidence lower bound to be at least −2 percentage points, so each authentic
-transaction was correctly rejected. The deployment pack uses a separate
+and side-accuracy checks. The three MMLU-Pro packs use a conservative
+regression rule that requires the confidence lower bound to be at least −2
+percentage points, so each authentic transaction was correctly rejected. The deployment pack uses a separate
 tokenizer-qualified 400-record LAMBADA corpus and its predeclared −20-point
 lower-bound floor passed.
 
