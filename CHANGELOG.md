@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an exact-match `minimum_side_accuracy` policy control and a versioned
   comparison-report v3 field that records both side results.
 - Added retained signed OCI transactions for Qwen3.5 9B through LM Evaluation
-  Harness and Inspect AI, plus a Gemma 4 12B instruction-to-unquantized-QAT
-  transaction through LM Evaluation Harness. Each package includes 400 paired
+  Harness and Inspect AI, plus a Gemma 4 12B instruction-to-QAT transaction
+  through LM Evaluation Harness. Each package includes 400 paired
   MMLU-Pro records, native evaluator provenance, an independently signed
   verification receipt, policy, and builder-signed image attestation.
 - Added reproducible CPU verification-time, report-rendering-time, and retained

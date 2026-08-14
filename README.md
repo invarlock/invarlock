@@ -228,8 +228,7 @@ retained output from a pinned real model evaluation, passes through a
 source-shaped adapter, and completes the closed import replay. LM Evaluation
 Harness and Inspect AI additionally include retained 400-record native signed
 OCI transactions for Qwen3.5 9B over a shared balanced MMLU-Pro schedule. LM
-Evaluation Harness also retains a Gemma 4 12B instruction-to-unquantized-QAT
-transaction
+Evaluation Harness also retains a Gemma 4 12B instruction-to-QAT transaction
 to demonstrate a second model family. Their adapters and profiles are
 example-owned; new profiles extend the same evaluator-neutral engine contract.
 The retained

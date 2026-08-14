@@ -21,7 +21,7 @@ production acceptance requires recipient-owned keys, policies, and anchors.
 | --- | --- | --- | --- | --- |
 | [`qwen35-lm-evaluation-harness`](qwen35-lm-evaluation-harness/) | LM Evaluation Harness | Qwen3.5 9B Base → post-trained | Current-model flagship | Integrity valid; policy rejected |
 | [`qwen35-inspect-ai`](qwen35-inspect-ai/) | Inspect AI | Qwen3.5 9B Base → post-trained | Independent flagship evaluator | Integrity valid; policy rejected |
-| [`gemma4-lm-evaluation-harness`](gemma4-lm-evaluation-harness/) | LM Evaluation Harness | Gemma 4 12B IT → official unquantized QAT-Q4 | Cross-family portability | Integrity valid; policy rejected |
+| [`gemma4-lm-evaluation-harness`](gemma4-lm-evaluation-harness/) | LM Evaluation Harness | Gemma 4 12B IT → official QAT-Q4 source checkpoint | Cross-family portability | Integrity valid; policy rejected |
 | [`deployment-approval-inspect-ai`](deployment-approval-inspect-ai/) | Inspect AI | Qwen3 0.6B Base → post-trained | Passing CI approval example | Policy passed |
 
 A rejected policy outcome is not an integrity failure. The retained receipt

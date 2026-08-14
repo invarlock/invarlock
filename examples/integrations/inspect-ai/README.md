@@ -28,13 +28,13 @@ make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --evidence-signi
 ```
 
 The shared `portability` profile can also run the Gemma 4 12B instruction and
-official unquantized QAT-Q4 checkpoints through Inspect AI. The compact retained
+official QAT-Q4 source checkpoints through Inspect AI. The compact retained
 Gemma transaction uses LM Evaluation Harness; the retained Qwen3.5 transactions
 use both evaluators and therefore isolate cross-evaluator agreement separately
 from cross-family portability.
 
 The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
-at a time. A 32 GB GPU is a practical minimum for the bfloat16 singleton runs.
+at a time. A 32 GB GPU is a practical minimum for the BF16 singleton runs.
 Pass `EXAMPLE_ARGS="--workspace PATH"` to retain the complete transaction at a
 new path. Signing keys and the trust root remain caller-owned and outside the
 transaction.

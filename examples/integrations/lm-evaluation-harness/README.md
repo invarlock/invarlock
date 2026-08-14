@@ -10,8 +10,8 @@ Three profiles serve different purposes:
 | Profile | Models | Records | Runtime | Purpose |
 | --- | --- | ---: | --- | --- |
 | `quick` | Qwen3 0.6B Base → post-trained | 102 local records | CPU/float32, batch 8 | Short local workflow |
-| `flagship` | Qwen3.5 9B Base → post-trained | 400 balanced MMLU-Pro records | CUDA/bfloat16, batch 1 | Current-model evaluator comparison |
-| `portability` | Gemma 4 12B IT → official unquantized QAT-Q4 checkpoint | The same 400 semantic MMLU-Pro items | CUDA/bfloat16, batch 1 | Cross-family deployment-change evidence |
+| `flagship` | Qwen3.5 9B Base → post-trained | 400 balanced MMLU-Pro records | CUDA/BF16, batch 1 | Current-model evaluator comparison |
+| `portability` | Gemma 4 12B IT → official QAT-Q4 source checkpoint | The same 400 semantic MMLU-Pro items | CUDA/BF16, batch 1 | Cross-family deployment-change evidence |
 
 Every model revision and required snapshot file is bound by byte length and
 SHA-256. Each run records its model tree, tokenizer contract, evaluator and
@@ -41,7 +41,7 @@ make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile portability --
 ```
 
 The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
-at a time. A 32 GB GPU is a practical minimum for these bfloat16 singleton
+at a time. A 32 GB GPU is a practical minimum for these BF16 singleton
 runs. Allow roughly 50 GB of workspace disk per prepared profile, plus model
 cache and container-image storage.
 

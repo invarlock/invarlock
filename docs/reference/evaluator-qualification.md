@@ -55,10 +55,9 @@ execution. The rows cover distinct evaluator ecosystems and workflows;
 LM Evaluation Harness and Inspect AI additionally have independently
 replayable 102-record shared-output imports. Their retained current-model OCI
 journeys execute Qwen3.5 9B over the same ordered 400-record MMLU-Pro schedule.
-LM Evaluation Harness also retains a Gemma 4 12B
-instruction-to-unquantized-QAT portability transaction. The other rows retain
-qualification and compatibility evidence without claiming a native signed
-journey.
+LM Evaluation Harness also retains a Gemma 4 12B instruction-to-QAT portability
+transaction. The other rows retain qualification and compatibility evidence
+without claiming a native signed journey.
 
 The compact evidence packs, signed verifier receipts, independent policies,
 and builder-signed OCI attestations are retained under
