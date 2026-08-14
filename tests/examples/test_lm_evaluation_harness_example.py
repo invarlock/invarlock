@@ -1553,10 +1553,8 @@ def test_model_input_records_render_the_closed_semantic_corpus_per_family() -> N
         record["id"] for record in flagship
     ]
     assert {record["expected"] for record in flagship} == set("ABCDEFGHIJ")
-    assert all(
-        record["prompt"].endswith("</think>\n\nAnswer: ")
-        for record in deployment
-    )
+    assert all(record["id"].startswith("lambada-openai-") for record in deployment)
+    assert all(record["expected"].startswith(" ") for record in deployment)
     assert all(
         record["prompt"].startswith("<|im_start|>system\n") for record in flagship
     )

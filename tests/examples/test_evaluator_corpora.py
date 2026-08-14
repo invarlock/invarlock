@@ -69,23 +69,21 @@ def test_flagship_profile_freezes_the_balanced_400_record_suite() -> None:
     assert corpora.profile_for_dataset(payload) == profile
 
 
-def test_deployment_profile_renders_a_distinct_compact_400_record_suite() -> None:
+def test_deployment_profile_freezes_a_tokenizer_qualified_400_record_suite() -> None:
     profile = corpora.corpus_profile("deployment")
     records = corpora.qualification_records(profile)
-    payload = corpora.records_jsonl(records, compact=True)
+    payload = corpora.records_jsonl(records)
 
-    assert profile.profile_id == "mmlu-pro-qwen35-0.8b-deployment-400-v1"
+    assert profile.profile_id == "lambada-openai-qwen35-0.8b-400-v1"
     assert profile.record_count == 400
-    assert profile.context_length == 1024
+    assert profile.context_length == 256
     assert profile.dataset_sha256 == (
-        "fb409a8b6f0d5932436a29efb80185f986dacadf9efdfbf7f109d13d4b28250a"
+        "e4a0e431b8b64130cbbf6e8fb3ed7b5769744d18ca6499d2088f2e1b3fb36dda"
     )
     assert profile.dataset_sha256 == hashlib.sha256(payload).hexdigest()
-    assert all(record["prompt"].endswith("</think>\n\nAnswer: ") for record in records)
-    assert [record["id"] for record in records] == [
-        record["id"]
-        for record in corpora.qualification_records(corpora.corpus_profile("flagship"))
-    ]
+    assert all(record["id"].startswith("lambada-openai-") for record in records)
+    assert all(record["expected"].startswith(" ") for record in records)
+    assert len({record["id"] for record in records}) == 400
     assert corpora.profile_for_dataset(payload) == profile
     assert profile.acceptance_policy()["resolved_policy"]["metrics"][
         "exact_match"
@@ -95,6 +93,31 @@ def test_deployment_profile_renders_a_distinct_compact_400_record_suite() -> Non
         "minimum_record_count": 400,
         "minimum_side_accuracy": 0.05,
     }
+
+
+def test_deployment_provenance_binds_source_selection_and_manifest() -> None:
+    provenance = corpora.corpus_provenance(corpora.corpus_profile("deployment"))
+
+    assert provenance["source"] == {
+        "repository": "EleutherAI/lambada_openai",
+        "revision": "900124bf3b8235c6daf21033af9948b3f07346c4",
+        "path": "data/lambada_test.jsonl",
+        "license": "MIT",
+        "byte_length": 1819752,
+        "record_count": 5153,
+        "sha256": "4aa8d02cd17c719165fc8a7887fddd641f43fcafa4b1c806ca8abc31fabdb226",
+    }
+    assert provenance["selection"]["algorithm"] == "stratified-sha256-v1"
+    assert provenance["selection"]["eligible_record_count"] == 4052
+    assert len(provenance["selection"]["indices"]) == 400
+    assert provenance["selection_manifest"] == {
+        "path": "deployment_corpus.json",
+        "byte_length": 6644,
+        "sha256": "a774b4369658d6f6c4910b03968008c59e55a3cd04b3737c34373074f583df77",
+    }
+    assert provenance["model_profile"] == (
+        "qwen35-0.8b-base-to-post-trained-bf16-v1"
+    )
 
 
 def test_portability_profile_renders_the_same_semantic_ids_for_gemma() -> None:
@@ -298,6 +321,43 @@ def test_secure_corpus_reader_reads_exact_bytes_and_detects_substitution(
     monkeypatch.setattr(corpora.os, "fstat", changed_fstat)
     with pytest.raises(RuntimeError, match="changed while being read"):
         corpora._read_regular_file(source, expected_bytes=len(payload))
+
+
+def test_deployment_manifest_and_records_reject_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(corpora, "_read_regular_file", lambda *_args, **_kwargs: b"{}")
+    with pytest.raises(RuntimeError, match="manifest does not match"):
+        corpora._deployment_manifest()
+
+    manifest = json.loads(
+        (
+            ROOT
+            / "examples/integrations/evaluator_transaction/deployment_corpus.json"
+        ).read_text(encoding="utf-8")
+    )
+    monkeypatch.setattr(corpora, "_deployment_manifest", lambda: manifest)
+    with pytest.raises(RuntimeError, match="corpus does not match"):
+        corpora.deployment_records()
+
+
+def test_deployment_records_reject_selection_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = corpora._deployment_manifest()
+    records = corpora.deployment_records()
+    records[0]["id"] = "lambada-openai-substituted"
+    payload = corpora.records_jsonl(records)
+    changed = json.loads(json.dumps(manifest))
+    changed["derived_dataset"]["byte_length"] = len(payload)
+    changed["derived_dataset"]["sha256"] = hashlib.sha256(payload).hexdigest()
+    monkeypatch.setattr(corpora, "_deployment_manifest", lambda: changed)
+    monkeypatch.setattr(
+        corpora, "_read_regular_file", lambda *_args, **_kwargs: payload
+    )
+
+    with pytest.raises(RuntimeError, match="selected source rows"):
+        corpora.deployment_records()
 
 
 def test_semantic_corpus_rejects_digest_and_shape_drift(
