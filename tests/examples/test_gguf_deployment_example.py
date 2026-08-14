@@ -198,11 +198,20 @@ def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
     (source / "config.json").write_text("{}", encoding="utf-8")
     subject = runtime_root / "models" / example._SUBJECT_NAME
     subject.write_bytes(b"GGUF-subject")
-    transformation = {
-        "format": example._TRANSFORMATION_FORMAT,
-        "source": {"checkpoint_tree_sha256": "sha256:" + "1" * 64},
-        "subject": {"sha256": "2" * 64},
-    }
+    baseline_image_id = "sha256:" + "c" * 64
+    subject_image_id = "sha256:" + "d" * 64
+    transformation = example._transformation_document(
+        profile=example.deployment_profile(),
+        conversion=example.ConversionResult(
+            subject=subject,
+            intermediate_sha256="1" * 64,
+            intermediate_byte_length=18_407_320_864,
+            subject_sha256=hashlib.sha256(subject.read_bytes()).hexdigest(),
+            subject_byte_length=subject.stat().st_size,
+        ),
+        conversion_image_id=baseline_image_id,
+        gguf_image_id=subject_image_id,
+    )
     baseline_spec = {
         "model_id": "Qwen/Qwen3.5-9B",
         "settings": {
@@ -233,8 +242,8 @@ def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
         baseline_spec=baseline_spec,
         subject_spec=subject_spec,
         transformation=transformation,
-        baseline_image_id="sha256:" + "c" * 64,
-        subject_image_id="sha256:" + "d" * 64,
+        baseline_image_id=baseline_image_id,
+        subject_image_id=subject_image_id,
     )
 
     request = yaml.safe_load(paths.request.read_text(encoding="utf-8"))
@@ -262,6 +271,70 @@ def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
     )
     assert observation == transformation
     assert request["observations"][0]["scope"] == "subject"
+
+
+def test_transaction_rejects_a_transformation_not_bound_to_the_current_subject(
+    tmp_path: Path,
+) -> None:
+    profile = example.deployment_profile()
+    runtime_root = tmp_path / "runtime"
+    source = runtime_root / "models/source"
+    source.mkdir(parents=True)
+    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject.write_bytes(b"original-subject")
+    baseline_image_id = "sha256:" + "a" * 64
+    subject_image_id = "sha256:" + "b" * 64
+    transformation = example._transformation_document(
+        profile=profile,
+        conversion=example.ConversionResult(
+            subject=subject,
+            intermediate_sha256="1" * 64,
+            intermediate_byte_length=18_407_320_864,
+            subject_sha256=hashlib.sha256(subject.read_bytes()).hexdigest(),
+            subject_byte_length=subject.stat().st_size,
+        ),
+        conversion_image_id=baseline_image_id,
+        gguf_image_id=subject_image_id,
+    )
+    subject.write_bytes(b"replaced-subject")
+
+    with pytest.raises(RuntimeError, match="transformation subject identity"):
+        example._prepare_transaction(
+            tmp_path / "transaction",
+            runtime_root=runtime_root,
+            source_checkpoint=source,
+            subject=subject,
+            baseline_spec={},
+            subject_spec={},
+            transformation=transformation,
+            baseline_image_id=baseline_image_id,
+            subject_image_id=subject_image_id,
+        )
+
+
+def test_transaction_rejects_a_symlinked_subject_before_hashing(
+    tmp_path: Path,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    source = runtime_root / "models/source"
+    source.mkdir(parents=True)
+    target = tmp_path / "outside.gguf"
+    target.write_bytes(b"outside-subject")
+    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject.symlink_to(target)
+
+    with pytest.raises(RuntimeError, match="Q5_K_M GGUF"):
+        example._prepare_transaction(
+            tmp_path / "transaction",
+            runtime_root=runtime_root,
+            source_checkpoint=source,
+            subject=subject,
+            baseline_spec={},
+            subject_spec={},
+            transformation={},
+            baseline_image_id="sha256:" + "a" * 64,
+            subject_image_id="sha256:" + "b" * 64,
+        )
 
 
 def test_execute_selects_independent_images_and_devices(

@@ -379,6 +379,86 @@ def _transformation_document(
     }
 
 
+def _is_sha256_hex(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _validate_transformation_binding(
+    transformation: Mapping[str, object],
+    *,
+    profile: DeploymentProfile,
+    subject: Path,
+    subject_sha256: str,
+    baseline_image_id: str,
+    subject_image_id: str,
+) -> None:
+    if (
+        set(transformation)
+        != {
+            "conversion",
+            "format",
+            "quantization",
+            "source",
+            "subject",
+        }
+        or transformation.get("format") != _TRANSFORMATION_FORMAT
+    ):
+        raise RuntimeError("deployment transformation document is invalid")
+    if transformation.get("source") != {
+        "repository": profile.source.repository,
+        "revision": profile.source.revision,
+        "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
+        "tokenizer_contract_sha256": profile.source.tokenizer_contract_sha256,
+    }:
+        raise RuntimeError("deployment transformation source identity is invalid")
+
+    conversion = transformation.get("conversion")
+    if not isinstance(conversion, dict) or set(conversion) != {
+        "output",
+        "runtime_image_digest",
+        "tool",
+    }:
+        raise RuntimeError("deployment transformation conversion is invalid")
+    if conversion.get("runtime_image_digest") != baseline_image_id or conversion.get(
+        "tool"
+    ) != {
+        "name": "llama.cpp/convert_hf_to_gguf.py",
+        "source_commit": _LLAMA_SOURCE_COMMIT,
+        "source_sha256": _LLAMA_SOURCE_SHA256,
+        "source_tag": "b10015",
+    }:
+        raise RuntimeError("deployment transformation conversion identity is invalid")
+    intermediate = conversion.get("output")
+    if (
+        not isinstance(intermediate, dict)
+        or set(intermediate) != {"byte_length", "filename", "sha256", "type"}
+        or intermediate.get("filename") != _INTERMEDIATE_NAME
+        or intermediate.get("type") != "BF16"
+        or not _is_sha256_hex(intermediate.get("sha256"))
+        or isinstance(intermediate.get("byte_length"), bool)
+        or not isinstance(intermediate.get("byte_length"), int)
+        or intermediate["byte_length"] <= 0
+    ):
+        raise RuntimeError("deployment transformation intermediate identity is invalid")
+
+    if transformation.get("quantization") != {
+        "runtime_image_digest": subject_image_id,
+        "tool": "llama-quantize",
+        "type": profile.quantization,
+    }:
+        raise RuntimeError("deployment transformation quantization identity is invalid")
+    if transformation.get("subject") != {
+        "filename": subject.name,
+        "sha256": subject_sha256,
+        "byte_length": subject.stat().st_size,
+    }:
+        raise RuntimeError("deployment transformation subject identity is invalid")
+
+
 def _artifact_anchor(
     provider_name: str,
     model_id: str,
@@ -420,6 +500,16 @@ def _prepare_transaction(
     ephemeral_trust_root: bool = True,
 ) -> tuple[ExamplePaths, PendingTrust]:
     profile = deployment_profile()
+    _new_nonempty_file(subject, label="Q5_K_M GGUF")
+    subject_sha256 = _sha256_file(subject)
+    _validate_transformation_binding(
+        transformation,
+        profile=profile,
+        subject=subject,
+        subject_sha256=subject_sha256,
+        baseline_image_id=baseline_image_id,
+        subject_image_id=subject_image_id,
+    )
     external_trust = any(
         value is not None
         for value in (evidence_signing_key, verifier_signing_key, trust_root)
@@ -538,7 +628,7 @@ def _prepare_transaction(
                 locator=(
                     f"derived://{profile.source.repository}@{profile.source.revision}#"
                     f"llama.cpp-b10015-{profile.quantization.lower()}@sha256:"
-                    f"{_sha256_file(subject)}"
+                    f"{subject_sha256}"
                 ),
             ),
             "dataset": profile.corpus.dataset_descriptor(),
