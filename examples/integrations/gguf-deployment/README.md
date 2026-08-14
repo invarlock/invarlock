@@ -24,8 +24,9 @@ quantization, and the 400-record transaction. Cached image layers reduce later
 runs.
 
 Network access is used only while building the pinned images and downloading
-the exact checkpoint files. Conversion, quantization, model execution, and
-verification run with networking disabled.
+the exact checkpoint files. The conversion, quantization, and model-execution
+containers run with networking disabled. Verification is a local operation and
+does not require network access.
 
 ## Run the signed journey
 

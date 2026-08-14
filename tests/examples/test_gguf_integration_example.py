@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import stat
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -725,6 +726,7 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
         == 0
     )
     assert observed == ["image", "models", "backend", "prepare", "execute"]
+    assert stat.S_IMODE(workspace.stat().st_mode) == 0o700
 
 
 def test_main_removes_only_the_temporary_image_tag_it_built(

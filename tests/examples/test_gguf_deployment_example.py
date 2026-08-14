@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import stat
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -33,6 +34,46 @@ def _pending_trust() -> PendingTrust:
     )
 
 
+def _baseline_spec() -> dict[str, object]:
+    profile = example.deployment_profile()
+    return {
+        "model_id": profile.source.repository,
+        "settings": {
+            "batch_size": 1,
+            "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
+            "context_length": profile.corpus.context_length,
+            "immutable_revision": profile.source.revision,
+            "max_output_tokens": 1,
+            "offline": True,
+            "seed": example._SEED,
+            "timeout_seconds": example._TIMEOUT_SECONDS,
+            "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
+        },
+    }
+
+
+def _subject_spec(subject: Path) -> dict[str, object]:
+    digest = hashlib.sha256(subject.read_bytes()).hexdigest()
+    return {
+        "model_id": f"gguf-sha256-{digest}.gguf",
+        "settings": {
+            "artifact_byte_length": subject.stat().st_size,
+            "artifact_sha256": digest,
+            "backend_binary_sha256": "2" * 64,
+            "backend_source_sha256": "3" * 64,
+            "backend_version": "b10015 (12127def)",
+            "batch_size": 1,
+            "context_length": example.deployment_profile().corpus.context_length,
+            "gguf_metadata_sha256": "4" * 64,
+            "max_output_tokens": 1,
+            "seed": example._SEED,
+            "tensor_inventory_sha256": "5" * 64,
+            "timeout_seconds": example._TIMEOUT_SECONDS,
+            "tokenizer_metadata_sha256": "6" * 64,
+        },
+    }
+
+
 def test_make_target_installs_the_hf_runtime_and_gguf_addin() -> None:
     makefile = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
         encoding="utf-8"
@@ -42,6 +83,31 @@ def test_make_target_installs_the_hf_runtime_and_gguf_addin() -> None:
     assert "--with '.[hf]'" in target
     assert "--with ./addins/gguf" in target
     assert "examples.integrations.gguf_deployment" in target
+
+
+def test_requested_workspace_is_owner_only_before_any_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    observed: list[int] = []
+
+    def stop() -> example.DeploymentProfile:
+        observed.append(stat.S_IMODE(workspace.stat().st_mode))
+        raise RuntimeError("stop after workspace check")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert observed == [0o700]
 
 
 def test_profile_uses_one_pinned_post_trained_9b_source_and_flagship_corpus() -> None:
@@ -213,28 +279,8 @@ def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
         conversion_image_id=baseline_image_id,
         gguf_image_id=subject_image_id,
     )
-    baseline_spec = {
-        "model_id": "Qwen/Qwen3.5-9B",
-        "settings": {
-            "batch_size": 1,
-            "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
-            "context_length": 1024,
-            "immutable_revision": profile.source.revision,
-            "max_output_tokens": 1,
-            "offline": True,
-            "seed": 20_260_716,
-            "timeout_seconds": 300,
-            "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
-        },
-    }
-    subject_sha256 = hashlib.sha256(subject.read_bytes()).hexdigest()
-    subject_spec = {
-        "model_id": f"gguf-sha256-{subject_sha256}.gguf",
-        "settings": {
-            "artifact_byte_length": subject.stat().st_size,
-            "artifact_sha256": subject_sha256,
-        },
-    }
+    baseline_spec = _baseline_spec()
+    subject_spec = _subject_spec(subject)
     monkeypatch.setattr(
         example,
         "_artifact_anchor",
@@ -306,7 +352,6 @@ def test_transaction_rejects_a_transformation_not_bound_to_the_current_subject(
         gguf_image_id=subject_image_id,
     )
     subject.write_bytes(b"replaced-subject")
-    replacement_sha256 = hashlib.sha256(subject.read_bytes()).hexdigest()
 
     with pytest.raises(RuntimeError, match="transformation subject identity"):
         example._prepare_transaction(
@@ -314,21 +359,8 @@ def test_transaction_rejects_a_transformation_not_bound_to_the_current_subject(
             runtime_root=runtime_root,
             source_checkpoint=source,
             subject=subject,
-            baseline_spec={
-                "model_id": profile.source.repository,
-                "settings": {
-                    "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
-                    "immutable_revision": profile.source.revision,
-                    "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
-                },
-            },
-            subject_spec={
-                "model_id": f"gguf-sha256-{replacement_sha256}.gguf",
-                "settings": {
-                    "artifact_byte_length": subject.stat().st_size,
-                    "artifact_sha256": replacement_sha256,
-                },
-            },
+            baseline_spec=_baseline_spec(),
+            subject_spec=_subject_spec(subject),
             transformation=transformation,
             baseline_image_id=baseline_image_id,
             subject_image_id=subject_image_id,
@@ -366,21 +398,68 @@ def test_transaction_rejects_a_runtime_spec_not_bound_to_the_subject_bytes(
             runtime_root=runtime_root,
             source_checkpoint=source,
             subject=subject,
-            baseline_spec={
-                "model_id": profile.source.repository,
-                "settings": {
-                    "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
-                    "immutable_revision": profile.source.revision,
-                    "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
-                },
-            },
+            baseline_spec=_baseline_spec(),
             subject_spec={
+                **_subject_spec(subject),
                 "model_id": "gguf-sha256-" + "0" * 64 + ".gguf",
-                "settings": {
-                    "artifact_byte_length": subject.stat().st_size,
-                    "artifact_sha256": "0" * 64,
-                },
             },
+            transformation=transformation,
+            baseline_image_id=baseline_image_id,
+            subject_image_id=subject_image_id,
+        )
+
+
+@pytest.mark.parametrize(
+    ("side", "setting", "replacement", "message"),
+    (
+        ("baseline", "seed", 7, "baseline runtime specification"),
+        ("baseline", "offline", False, "baseline runtime specification"),
+        ("subject", "context_length", 512, "subject runtime specification"),
+        ("subject", "timeout_seconds", 30, "subject runtime specification"),
+    ),
+)
+def test_transaction_rejects_execution_settings_outside_the_closed_profile(
+    tmp_path: Path,
+    side: str,
+    setting: str,
+    replacement: object,
+    message: str,
+) -> None:
+    profile = example.deployment_profile()
+    runtime_root = tmp_path / "runtime"
+    source = runtime_root / "models/source"
+    source.mkdir(parents=True)
+    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject.write_bytes(b"GGUF-subject")
+    baseline_image_id = "sha256:" + "a" * 64
+    subject_image_id = "sha256:" + "b" * 64
+    transformation = example._transformation_document(
+        profile=profile,
+        conversion=example.ConversionResult(
+            subject=subject,
+            intermediate_sha256="1" * 64,
+            intermediate_byte_length=18_407_320_864,
+            subject_sha256=hashlib.sha256(subject.read_bytes()).hexdigest(),
+            subject_byte_length=subject.stat().st_size,
+        ),
+        conversion_image_id=baseline_image_id,
+        gguf_image_id=subject_image_id,
+    )
+    baseline_spec = _baseline_spec()
+    subject_spec = _subject_spec(subject)
+    selected = baseline_spec if side == "baseline" else subject_spec
+    settings = selected["settings"]
+    assert isinstance(settings, dict)
+    settings[setting] = replacement
+
+    with pytest.raises(RuntimeError, match=message):
+        example._prepare_transaction(
+            tmp_path / "transaction",
+            runtime_root=runtime_root,
+            source_checkpoint=source,
+            subject=subject,
+            baseline_spec=baseline_spec,
+            subject_spec=subject_spec,
             transformation=transformation,
             baseline_image_id=baseline_image_id,
             subject_image_id=subject_image_id,

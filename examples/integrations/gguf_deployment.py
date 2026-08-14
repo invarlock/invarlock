@@ -54,6 +54,9 @@ from examples.integrations.trust_material import (
 )
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import ModelRuntimeSpec, artifact_identity_sha256
+from invarlock.core.runtime_provider.request_bindings import (
+    LLAMA_CPP_REQUEST_SETTINGS,
+)
 from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
@@ -468,14 +471,19 @@ def _validate_runtime_spec_bindings(
     subject_byte_length: int,
 ) -> None:
     baseline_settings = baseline_spec.get("settings")
-    if (
-        baseline_spec.get("model_id") != profile.source.repository
-        or not isinstance(baseline_settings, dict)
-        or baseline_settings.get("checkpoint_tree_sha256")
-        != profile.source.checkpoint_tree_sha256
-        or baseline_settings.get("immutable_revision") != profile.source.revision
-        or baseline_settings.get("tokenizer_metadata_sha256")
-        != profile.source.tokenizer_contract_sha256
+    expected_baseline_settings = {
+        "batch_size": 1,
+        "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
+        "context_length": profile.corpus.context_length,
+        "immutable_revision": profile.source.revision,
+        "max_output_tokens": 1,
+        "offline": True,
+        "seed": _SEED,
+        "timeout_seconds": _TIMEOUT_SECONDS,
+        "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
+    }
+    if baseline_spec.get("model_id") != profile.source.repository or (
+        baseline_settings != expected_baseline_settings
     ):
         raise RuntimeError("deployment baseline runtime specification is not pinned")
 
@@ -483,8 +491,14 @@ def _validate_runtime_spec_bindings(
     if (
         subject_spec.get("model_id") != f"gguf-sha256-{subject_sha256}.gguf"
         or not isinstance(subject_settings, dict)
+        or set(subject_settings) != LLAMA_CPP_REQUEST_SETTINGS
         or subject_settings.get("artifact_sha256") != subject_sha256
         or subject_settings.get("artifact_byte_length") != subject_byte_length
+        or subject_settings.get("batch_size") != 1
+        or subject_settings.get("context_length") != profile.corpus.context_length
+        or subject_settings.get("max_output_tokens") != 1
+        or subject_settings.get("seed") != _SEED
+        or subject_settings.get("timeout_seconds") != _TIMEOUT_SECONDS
     ):
         raise RuntimeError(
             "deployment subject runtime specification is not bound to the GGUF bytes"
@@ -952,7 +966,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2
         workspace.parent.mkdir(parents=True, exist_ok=True)
-        workspace.mkdir()
+        workspace.mkdir(mode=0o700)
     cleanup_tags: list[OwnedImageTag] = []
     result = 2
     try:

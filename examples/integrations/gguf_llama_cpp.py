@@ -921,7 +921,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2
         workspace.parent.mkdir(parents=True, exist_ok=True)
-        workspace.mkdir()
+        workspace.mkdir(mode=0o700)
     cleanup_tags: list[OwnedImageTag] = []
     result = 2
     try:
