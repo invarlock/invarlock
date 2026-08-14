@@ -10,8 +10,8 @@ provider.
 Both sides use the ordered 400-record balanced MMLU-Pro Qwen schedule already
 used by the current-model evaluator transactions. The policy is fixed before
 execution: at least 20% accuracy on each side, a paired interval no wider than
-10 percentage points, and a subject-minus-baseline delta of at least −2
-percentage points.
+10 percentage points, and a subject-minus-baseline paired interval whose lower
+bound is at least −2 percentage points.
 
 ## Compute and storage
 
