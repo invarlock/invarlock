@@ -1361,8 +1361,7 @@ def test_model_inputs_direct_script_bootstraps_the_repository(
 
     assert completed.returncode == 0, completed.stderr
     assert (
-        "--corpus-profile {quick,deployment,flagship,portability}"
-        in completed.stdout
+        "--corpus-profile {quick,deployment,flagship,portability}" in completed.stdout
     )
     assert "--benchmark-source" not in completed.stdout
 
@@ -1671,7 +1670,7 @@ def test_model_input_authoring_binds_qwen35_ids_and_fixed_policy(
     comparison = request["comparison"]
     assert comparison["dataset"]["name"] == module.DATASET_NAME
     assert comparison["baseline"]["artifact"]["locator"].startswith(
-            "hf://Qwen/Qwen3.5-0.8B-Base@"
+        "hf://Qwen/Qwen3.5-0.8B-Base@"
     )
     assert comparison["subject"]["artifact"]["locator"].startswith(
         "hf://Qwen/Qwen3.5-0.8B@"

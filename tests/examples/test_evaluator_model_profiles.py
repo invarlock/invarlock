@@ -47,8 +47,7 @@ def test_quick_profile_uses_the_immutable_qwen35_08b_pair() -> None:
     }
     for snapshot in profile.snapshots:
         assert all(
-            item.byte_length > 0 and len(item.sha256) == 64
-            for item in snapshot.files
+            item.byte_length > 0 and len(item.sha256) == 64 for item in snapshot.files
         )
         assert {
             "config.json",

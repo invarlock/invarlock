@@ -85,9 +85,7 @@ def test_deployment_profile_freezes_a_tokenizer_qualified_400_record_suite() -> 
     assert all(record["expected"].startswith(" ") for record in records)
     assert len({record["id"] for record in records}) == 400
     assert corpora.profile_for_dataset(payload) == profile
-    assert profile.acceptance_policy()["resolved_policy"]["metrics"][
-        "exact_match"
-    ] == {
+    assert profile.acceptance_policy()["resolved_policy"]["metrics"]["exact_match"] == {
         "delta_min_pp": -20.0,
         "maximum_interval_width_pp": 10.0,
         "minimum_record_count": 400,
@@ -115,9 +113,7 @@ def test_deployment_provenance_binds_source_selection_and_manifest() -> None:
         "byte_length": 6644,
         "sha256": "a774b4369658d6f6c4910b03968008c59e55a3cd04b3737c34373074f583df77",
     }
-    assert provenance["model_profile"] == (
-        "qwen35-0.8b-base-to-post-trained-bf16-v1"
-    )
+    assert provenance["model_profile"] == ("qwen35-0.8b-base-to-post-trained-bf16-v1")
 
 
 def test_portability_profile_renders_the_same_semantic_ids_for_gemma() -> None:
@@ -332,8 +328,7 @@ def test_deployment_manifest_and_records_reject_identity_drift(
 
     manifest = json.loads(
         (
-            ROOT
-            / "examples/integrations/evaluator_transaction/deployment_corpus.json"
+            ROOT / "examples/integrations/evaluator_transaction/deployment_corpus.json"
         ).read_text(encoding="utf-8")
     )
     monkeypatch.setattr(corpora, "_deployment_manifest", lambda: manifest)

@@ -166,9 +166,7 @@ def corpus_profile(key: str) -> CorpusProfile:
 
 
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
-    return records_jsonl(
-        values, compact=profile.key in {"flagship", "portability"}
-    )
+    return records_jsonl(values, compact=profile.key in {"flagship", "portability"})
 
 
 def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
@@ -221,8 +219,7 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         manifest = _deployment_manifest()
         records = deployment_records()
         expected_ids = [
-            f"lambada-openai-{index:04d}"
-            for index in manifest["selection"]["indices"]
+            f"lambada-openai-{index:04d}" for index in manifest["selection"]["indices"]
         ]
         if (
             manifest["profile_id"] != profile.profile_id
@@ -332,7 +329,9 @@ def deployment_records() -> list[dict[str, str]]:
         _DEPLOYMENT_RECORDS, expected_bytes=dataset["byte_length"]
     )
     if hashlib.sha256(payload).hexdigest() != dataset["sha256"]:
-        raise RuntimeError("bundled deployment corpus does not match its pinned identity")
+        raise RuntimeError(
+            "bundled deployment corpus does not match its pinned identity"
+        )
     profile = _deployment_profile()
     validate_dataset_records(payload, profile)
     records = cast(

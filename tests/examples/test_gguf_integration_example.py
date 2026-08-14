@@ -125,9 +125,7 @@ def test_stage_models_derives_q5_with_the_pinned_networkless_quantizer(
         "_run",
         lambda command, **_kwargs: (
             commands.append(command),
-            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(
-                b"derived-q5"
-            ),
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(b"derived-q5"),
             _completed(command),
         )[-1],
     )

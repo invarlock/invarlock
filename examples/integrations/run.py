@@ -305,7 +305,9 @@ def _create_hf_checkpoints(
                 "format": "invarlock/example-hf-transformers-summary-v1",
                 "library": "transformers",
                 "library_version": str(transformers.__version__),
-                **compact_model_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "method": "causal-output-row-fit",
                 "expected_output": expected_output,
                 "target_token_id": target_id,
@@ -416,7 +418,9 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
     )
     subject_model = reloaded.merge_and_unload().to("cpu")
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = compact_model_profile.save_checkpoint(subject_model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(
+        subject_model, tokenizer, subject
+    )
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the PEFT baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
@@ -428,7 +432,9 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
                 "format": "invarlock/example-peft-summary-v1",
                 "library": "peft",
                 "library_version": str(peft.__version__),
-                **compact_model_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "target_modules": list(compact_model_profile.PEFT_TARGET_MODULES),
                 "training_record_count": len(_example_records()),
                 "training_steps": 12,
@@ -582,7 +588,9 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
         materialized_digest.update(payload)
 
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = compact_model_profile.save_checkpoint(subject_model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(
+        subject_model, tokenizer, subject
+    )
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the TorchAO baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
@@ -616,7 +624,9 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
                 "library_version": str(torchao.__version__),
                 "torch_version": str(torch.__version__),
                 "transformers_version": str(transformers.__version__),
-                **compact_model_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "quantization": {
                     "configuration": "Int8WeightOnlyConfig(version=2)",
                     "excluded_modules": ["lm_head"],

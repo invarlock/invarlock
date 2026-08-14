@@ -765,9 +765,7 @@ def _execute(
         _materialize_trust(paths, pending_trust, request_digest)
     else:
         try:
-            trust_profile = json.loads(
-                paths.trusted_inputs.read_text(encoding="utf-8")
-            )
+            trust_profile = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
             anchors = trust_profile["anchors"]
             paths.trusted_inputs.relative_to(paths.root)
         except (KeyError, TypeError, json.JSONDecodeError, OSError, ValueError) as exc:
