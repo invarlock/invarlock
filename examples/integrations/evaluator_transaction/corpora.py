@@ -14,12 +14,18 @@ from typing import Any, cast
 _ROOT = Path(__file__).resolve().parent
 _REPOSITORY = _ROOT.parents[2]
 _QUICK_RECORDS = _ROOT.parent / "lm-evaluation-harness" / "records.json"
+_DEPLOYMENT_RECORDS = _ROOT / "lambada_qwen35_deployment_400.jsonl"
+_DEPLOYMENT_MANIFEST = _ROOT / "deployment_corpus.json"
 _SEMANTIC_RECORDS = _ROOT / "mmlu_pro_semantic_400.jsonl"
 _QUALIFICATION_PROFILES = _ROOT / "qualification_profiles.json"
 _QUALIFICATION_MANIFEST = (
     _REPOSITORY / "docs/reference/qualification-suites.manifest.json"
 )
-PROFILE_KEYS = ("quick", "flagship", "portability")
+_DEPLOYMENT_MANIFEST_BYTES = 6_644
+_DEPLOYMENT_MANIFEST_SHA256 = (
+    "a774b4369658d6f6c4910b03968008c59e55a3cd04b3737c34373074f583df77"
+)
+PROFILE_KEYS = ("quick", "deployment", "flagship", "portability")
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,13 +106,30 @@ def _quick_profile() -> CorpusProfile:
     return CorpusProfile(
         key="quick",
         profile_id="causal-cloze-102-v1",
-        dataset_name="qwen3-0.6b-base-to-post-trained",
+        dataset_name="qwen35-0.8b-base-to-post-trained",
         split="validation",
         record_count=102,
         dataset_sha256="d80e81ba17fb93b9b8a46f9817f9841f5f9c2858c9d703b3ce28847b2eaeb57c",
         context_length=64,
         minimum_side_accuracy=0.20,
         maximum_interval_width_pp=20.0,
+        delta_min_pp=-20.0,
+    )
+
+
+def _deployment_profile() -> CorpusProfile:
+    return CorpusProfile(
+        key="deployment",
+        profile_id="lambada-openai-qwen35-0.8b-400-v1",
+        dataset_name="lambada-openai-qwen35-0.8b-one-token-400-v1",
+        split="test-stratified-400",
+        record_count=400,
+        dataset_sha256=(
+            "e4a0e431b8b64130cbbf6e8fb3ed7b5769744d18ca6499d2088f2e1b3fb36dda"
+        ),
+        context_length=256,
+        minimum_side_accuracy=0.05,
+        maximum_interval_width_pp=10.0,
         delta_min_pp=-20.0,
     )
 
@@ -131,15 +154,17 @@ def _qualification_profile(key: str) -> CorpusProfile:
 
 
 def corpus_profile(key: str) -> CorpusProfile:
-    profiles = {
-        "quick": _quick_profile(),
-        "flagship": _qualification_profile("flagship"),
-        "portability": _qualification_profile("portability"),
+    factories = {
+        "quick": _quick_profile,
+        "deployment": _deployment_profile,
+        "flagship": lambda: _qualification_profile("flagship"),
+        "portability": lambda: _qualification_profile("portability"),
     }
     try:
-        return profiles[key]
+        factory = factories[key]
     except KeyError as exc:
         raise ValueError(f"unknown corpus profile: {key}") from exc
+    return factory()
 
 
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
@@ -192,7 +217,33 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         "dataset_sha256": profile.dataset_sha256,
         "record_count": profile.record_count,
     }
-    if profile.key != "quick":
+    if profile.key == "deployment":
+        manifest = _deployment_manifest()
+        records = deployment_records()
+        expected_ids = [
+            f"lambada-openai-{index:04d}" for index in manifest["selection"]["indices"]
+        ]
+        if (
+            manifest["profile_id"] != profile.profile_id
+            or manifest["derived_dataset"]["sha256"] != profile.dataset_sha256
+            or expected_ids != [record["id"] for record in records]
+        ):
+            raise ValueError(
+                "deployment corpus disagrees with its pinned selection manifest"
+            )
+        value.update(
+            {
+                "source": manifest["source"],
+                "selection": manifest["selection"],
+                "selection_manifest": {
+                    "path": _DEPLOYMENT_MANIFEST.name,
+                    "byte_length": _DEPLOYMENT_MANIFEST_BYTES,
+                    "sha256": _DEPLOYMENT_MANIFEST_SHA256,
+                },
+                "model_profile": "qwen35-0.8b-base-to-post-trained-bf16-v1",
+            }
+        )
+    elif profile.key != "quick":
         manifest = _manifest()
         qualification = _qualification_manifest()
         artifact_name = manifest["qualification_suite"]["semantic_artifact"]
@@ -256,6 +307,46 @@ def _read_regular_file(path: Path, *, expected_bytes: int) -> bytes:
         os.close(descriptor)
 
 
+def _deployment_manifest() -> dict[str, Any]:
+    payload = _read_regular_file(
+        _DEPLOYMENT_MANIFEST, expected_bytes=_DEPLOYMENT_MANIFEST_BYTES
+    )
+    if hashlib.sha256(payload).hexdigest() != _DEPLOYMENT_MANIFEST_SHA256:
+        raise RuntimeError(
+            "deployment corpus manifest does not match its pinned identity"
+        )
+    try:
+        value = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("deployment corpus manifest is invalid") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("deployment corpus manifest must contain an object")
+    return value
+
+
+def deployment_records() -> list[dict[str, str]]:
+    manifest = _deployment_manifest()
+    dataset = manifest["derived_dataset"]
+    payload = _read_regular_file(
+        _DEPLOYMENT_RECORDS, expected_bytes=dataset["byte_length"]
+    )
+    if hashlib.sha256(payload).hexdigest() != dataset["sha256"]:
+        raise RuntimeError(
+            "bundled deployment corpus does not match its pinned identity"
+        )
+    profile = _deployment_profile()
+    validate_dataset_records(payload, profile)
+    records = cast(
+        list[dict[str, str]], [json.loads(line) for line in payload.splitlines()]
+    )
+    expected_ids = [
+        f"lambada-openai-{index:04d}" for index in manifest["selection"]["indices"]
+    ]
+    if [record["id"] for record in records] != expected_ids:
+        raise RuntimeError("deployment corpus does not match its selected source rows")
+    return records
+
+
 def _semantic_records() -> list[dict[str, Any]]:
     suite = _manifest()["qualification_suite"]
     payload = _read_regular_file(
@@ -311,13 +402,17 @@ def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, 
 
 
 def qualification_records(profile: CorpusProfile) -> list[dict[str, str]]:
+    if profile.key == "deployment":
+        return deployment_records()
     if profile.key not in {"flagship", "portability"}:
         raise ValueError("qualification records require a maintained GPU profile")
     records = [_render_record(record, profile) for record in _semantic_records()]
     payload = records_jsonl(records, compact=True)
+    expected_length = _manifest()["profiles"][profile.key]["derived_dataset"][
+        "byte_length"
+    ]
     if (
-        len(payload)
-        != _manifest()["profiles"][profile.key]["derived_dataset"]["byte_length"]
+        len(payload) != expected_length
         or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
     ):
         raise RuntimeError(
@@ -343,6 +438,7 @@ __all__ = [
     "PROFILE_KEYS",
     "corpus_profile",
     "corpus_provenance",
+    "deployment_records",
     "flagship_records",
     "qualification_records",
     "profile_for_dataset",

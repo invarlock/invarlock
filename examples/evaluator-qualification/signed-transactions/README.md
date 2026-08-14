@@ -22,7 +22,7 @@ production acceptance requires recipient-owned keys, policies, and anchors.
 | [`qwen35-lm-evaluation-harness`](qwen35-lm-evaluation-harness/) | LM Evaluation Harness | Qwen3.5 9B Base → post-trained | Current-model flagship | Integrity valid; policy rejected |
 | [`qwen35-inspect-ai`](qwen35-inspect-ai/) | Inspect AI | Qwen3.5 9B Base → post-trained | Independent flagship evaluator | Integrity valid; policy rejected |
 | [`gemma4-lm-evaluation-harness`](gemma4-lm-evaluation-harness/) | LM Evaluation Harness | Gemma 4 12B IT → official QAT-Q4 source checkpoint | Cross-family portability | Integrity valid; policy rejected |
-| [`deployment-approval-inspect-ai`](deployment-approval-inspect-ai/) | Inspect AI | Qwen3 0.6B Base → post-trained | Passing CI approval example | Policy passed |
+| [`deployment-approval-inspect-ai`](deployment-approval-inspect-ai/) | Inspect AI | Qwen3.5 0.8B Base → post-trained | Passing CI approval example | Policy passed |
 
 A rejected policy outcome is not an integrity failure. The retained receipt
 authenticates `integrity_ok: true`, the exact `policy_verdict`, and verification
@@ -72,7 +72,7 @@ outputs:
    [builder attestation](gemma4-lm-evaluation-harness/build-attestation.json),
    and [transaction anchors](gemma4-lm-evaluation-harness/transaction.json).
 5. The [runnable integration](../../integrations/lm-evaluation-harness/README.md)
-   produces both current-model profiles.
+   produces the quick, deployment, flagship, and portability profiles.
 
 The [qualification matrix](../../../docs/reference/evaluator-qualification.md#qualification-matrix)
 reports adapter support, replay authority, and retained transactions as
@@ -81,7 +81,7 @@ exact-match workflows.
 
 ## Current-model results
 
-The Qwen3.5 transactions used the same ordered 400-record schedule. LM
+The Qwen3.5 9B flagship transactions used the same ordered 400-record schedule. LM
 Evaluation Harness and Inspect AI produced identical normalized record digests
 and scores for all 400 baseline and all 400 subject records. The
 [flagship comparison](flagship-comparison.json) records that agreement without
@@ -92,11 +92,14 @@ assigning an additional acceptance decision.
 | Qwen3.5 / LM Evaluation Harness | 55.5% | 53.0% | −2.5 pp | [−6.42, 1.43] pp | 7.85 pp | Reject |
 | Qwen3.5 / Inspect AI | 55.5% | 53.0% | −2.5 pp | [−6.42, 1.43] pp | 7.85 pp | Reject |
 | Gemma 4 / LM Evaluation Harness | 44.0% | 42.5% | −1.5 pp | [−3.84, 0.84] pp | 4.68 pp | Reject |
+| Qwen3.5 0.8B deployment / Inspect AI | 49.25% | 43.50% | −5.75 pp | [−8.99, −2.47] pp | 6.52 pp | Pass |
 
-All three current-model packs passed integrity, record-count, interval-width,
-and side-accuracy checks. Their conservative regression rule requires the
-confidence lower bound to be at least −2 percentage points, so each authentic
-transaction was correctly rejected.
+All four current-model packs passed integrity, record-count, interval-width,
+and side-accuracy checks. The three MMLU-Pro packs use a conservative
+regression rule that requires the confidence lower bound to be at least −2
+percentage points, so each authentic transaction was correctly rejected. The deployment pack uses a separate
+tokenizer-qualified 400-record LAMBADA corpus and its −20-point lower-bound
+floor, declared before execution, passed.
 
 Run complete offline verification with:
 
@@ -115,10 +118,10 @@ Measured on arm64 macOS with Python 3.12.13:
 
 | Transaction | Evidence bytes | Package bytes | Verify and issue receipt | Render HTML |
 | --- | ---: | ---: | ---: | ---: |
-| Deployment approval / Inspect AI | 1,320,166 | 1,326,335 | 467.699 ms | 125.297 ms |
-| Gemma 4 / LM Evaluation Harness | 1,194,453 | 1,200,972 | 478.270 ms | 68.112 ms |
-| Qwen3.5 / Inspect AI | 1,163,736 | 1,169,978 | 438.673 ms | 71.554 ms |
-| Qwen3.5 / LM Evaluation Harness | 1,199,597 | 1,206,116 | 256.628 ms | 47.250 ms |
+| Deployment approval / Inspect AI | 941,363 | 947,606 | 240.855 ms | 43.914 ms |
+| Gemma 4 / LM Evaluation Harness | 1,194,453 | 1,200,972 | 242.291 ms | 42.475 ms |
+| Qwen3.5 / Inspect AI | 1,163,736 | 1,169,978 | 239.664 ms | 43.544 ms |
+| Qwen3.5 / LM Evaluation Harness | 1,199,597 | 1,206,116 | 240.818 ms | 42.793 ms |
 <!-- signed-transaction-costs:end -->
 
 `Verify and issue receipt` performs complete semantic evidence replay against

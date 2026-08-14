@@ -350,7 +350,7 @@ def main(evaluator: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--builder-public-key", type=Path, required=True)
     parser.add_argument(
         "--corpus-profile",
-        choices=("quick", "flagship", "portability"),
+        choices=("quick", "deployment", "flagship", "portability"),
         default="quick",
     )
     parser.add_argument("--device")

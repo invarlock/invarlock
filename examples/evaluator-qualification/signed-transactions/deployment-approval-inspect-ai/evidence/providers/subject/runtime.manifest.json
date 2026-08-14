@@ -1,37 +1,37 @@
 {
   "config": {
     "path": "run.yaml",
-    "sha256": "987b1978913836766fd2b3716acabfef91fbe04288bb13ece70d8913d5b25c53",
+    "sha256": "89e84ce079fba3f3a722669eb3f53da201a500236910b6980db49f14166b1dda",
     "source": "file"
   },
   "execution_mode": "container",
-  "generated_at_utc": "2026-08-13T03:50:37.718420+00:00",
+  "generated_at_utc": "2026-08-14T02:57:37.709188+00:00",
   "manifest_version": 1,
   "outer_container": {
     "allow_network": false,
     "allow_remote_code": false,
     "allow_third_party_plugins": false,
     "container_execution": true,
-    "image_digest": "sha256:b1b11b823e75643be90162b95ce8ab6d74fd8bfd2ec053d83d725b28f0462b2d",
-    "image_ref": "sha256:b1b11b823e75643be90162b95ce8ab6d74fd8bfd2ec053d83d725b28f0462b2d"
+    "image_digest": "sha256:a75bf951f0528db6465511b3eed4ea35cfedb97fd551fe7802b7b8939828b443",
+    "image_ref": "sha256:a75bf951f0528db6465511b3eed4ea35cfedb97fd551fe7802b7b8939828b443"
   },
   "report": {
     "filename": "report.json",
     "path": "report.json",
-    "sha256": "eefb8fc1e44ffa7dd82abd42226e900110e26ec99879cae8771972819d3abfdb"
+    "sha256": "66f226b3f4766a8ed0fe1ec005b79047b73837c1d6d2727bbe72e4c44b0b2376"
   },
   "runtime_provider": {
     "artifact_identity": {
       "filename": "model-artifact.identity.json",
-      "sha256": "6dcb18c7dafa4b0c36063bb7346452b24609c199205b5d8ed984c9059b0129fe"
+      "sha256": "9f6abb62debb5f9cb9c65d0955b8a60364f46e7a9e8d3c3287d87e318d4b5787"
     },
     "receipt": {
       "filename": "runtime-provider.receipt.json",
-      "sha256": "40b7330a808b7f6bdc4ca7c456e9c13a9c837f157dd85409819ebac090b33441"
+      "sha256": "f47b73762a06244b20ae86e7a38c721efc801bda6845634de93e87517a68a8cc"
     },
     "scoring_observation": {
       "filename": "runtime-scoring.observation.json",
-      "sha256": "4b6f766f4144f29f669e982df1e9ca4831bacd1735189951b780959812fe6bb9"
+      "sha256": "ad591d8041398f621346d3236f75f986ce4adc1df3a547105229c6aa6e4288f3"
     }
   },
   "verifier_contract_version": "runtime-manifest-v1"

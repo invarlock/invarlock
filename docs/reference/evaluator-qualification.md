@@ -42,8 +42,8 @@ mismatch. It proves every maintained upstream entry point and both authority
 modes without downloading a model or calling a hosted evaluator.
 
 The independently replayable rows also execute against a retained 102-record
-evaluation produced by the immutable `Qwen/Qwen3-0.6B` revision recorded in the
-corpus. The model produced 52 exact matches and 50 mismatches. Each evaluator
+evaluation produced by the immutable `Qwen/Qwen3.5-0.8B` revision recorded in
+the corpus. The model produced 61 exact matches and 41 mismatches. Each evaluator
 scores all 102 model outputs through its real upstream entry point. InvarLock
 then recomputes every score and replays all 102 normalized records through the
 runtime-import authoring boundary.

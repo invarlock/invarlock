@@ -4,6 +4,7 @@ import io
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -16,6 +17,18 @@ def _completed(
     command: list[str], stdout: str = ""
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+
+def _pending_trust() -> example.PendingTrust:
+    return example.PendingTrust(
+        anchors={"schedule_digest": "sha256:" + "2" * 64},
+        policy_bytes=b"{}\n",
+        external=False,
+        trust_root=None,
+        verifier_key_bytes=None,
+        evidence_fingerprint="sha256:" + "3" * 64,
+        verifier_fingerprint="sha256:" + "4" * 64,
+    )
 
 
 def test_records_are_closed_unique_and_sufficient() -> None:
@@ -31,11 +44,11 @@ def test_records_are_closed_unique_and_sufficient() -> None:
         for record in records
     )
     assert {record["expected"] for record in records} == set(
-        example._PINNED_QWEN3_ONE_TOKEN_TARGET_IDS
+        example._PINNED_COMPACT_ONE_TOKEN_TARGET_IDS
     )
     assert all(
         isinstance(token_id, int) and token_id > 0
-        for token_id in example._PINNED_QWEN3_ONE_TOKEN_TARGET_IDS.values()
+        for token_id in example._PINNED_COMPACT_ONE_TOKEN_TARGET_IDS.values()
     )
 
 
@@ -52,13 +65,13 @@ def test_records_reject_unreviewed_target_token_changes(
         example._load_records()
 
 
-def test_official_qwen3_source_and_pinned_quantizer_are_part_of_the_journey() -> None:
-    assert example._MODEL_REPOSITORY == "Qwen/Qwen3-0.6B-GGUF"
-    assert example._MODEL_REVISION == "23749fefcc72300e3a2ad315e1317431b06b590a"
-    assert example._OFFICIAL_MODEL.filename == "Qwen3-0.6B-Q8_0.gguf"
-    assert example._OFFICIAL_MODEL.byte_length == 639_446_688
+def test_official_qwen35_08b_gguf_identity() -> None:
+    assert example._MODEL_REPOSITORY == "ggml-org/Qwen3.5-0.8B-GGUF"
+    assert example._MODEL_REVISION == "8fea620810c4afa23dd6443f999a48574c1611a3"
+    assert example._OFFICIAL_MODEL.filename == "Qwen3.5-0.8B-Q8_0.gguf"
+    assert example._OFFICIAL_MODEL.byte_length == 833_592_096
     assert example._OFFICIAL_MODEL.sha256 == (
-        "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031"
+        "37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f"
     )
     dockerfile = (
         Path(__file__).resolve().parents[2] / "addins/gguf/runtime/Dockerfile"
@@ -124,7 +137,7 @@ def test_stage_models_derives_q5_with_the_pinned_networkless_quantizer(
         "_run",
         lambda command, **_kwargs: (
             commands.append(command),
-            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(b"derived-q5"),
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(b"derived-q5"),
             _completed(command),
         )[-1],
     )
@@ -303,25 +316,27 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         for role, path in models.items()
     }
     image_id = "sha256:" + "f" * 64
-    paths = example._prepare_transaction(
+    paths, pending_trust = example._prepare_transaction(
         root,
         runtime_root=runtime,
         models=models,
         specs=specs,
         image_id=image_id,
     )
+    request_digest = "sha256:" + "1" * 64
+    example._materialize_trust(paths, pending_trust, request_digest)
 
     request = yaml.safe_load(paths.request.read_text(encoding="utf-8"))
     trust = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
     assert request["comparison"]["metric"] == "exact_match"
     assert request["comparison"]["baseline"]["runtime"]["provider"] == "llama_cpp"
     assert request["comparison"]["subject"]["runtime"]["provider"] == "llama_cpp"
-    assert request["comparison"]["dataset"]["name"] == "qwen3-0.6b-q8-to-q5"
+    assert request["comparison"]["dataset"]["name"] == "qwen35-0.8b-q8-to-q5"
     assert request["comparison"]["baseline"]["artifact"]["locator"].startswith(
-        "hf://Qwen/Qwen3-0.6B-GGUF@23749fef"
+        "hf://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )
     assert request["comparison"]["subject"]["artifact"]["locator"].startswith(
-        "derived://Qwen/Qwen3-0.6B-GGUF@23749fef"
+        "derived://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )
     assert request["observations"][0]["path"] == ("inputs/subject-transformation.json")
     transformation = json.loads(
@@ -341,6 +356,7 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         != trust["anchors"]["subject_artifact_digest"]
     )
     assert trust["anchors"]["baseline_runtime_digest"] == image_id
+    assert trust["anchors"]["request_digest"] == request_digest
     assert paths.evidence_key.stat().st_mode & 0o777 == 0o600
     assert paths.verifier_key.stat().st_mode & 0o777 == 0o600
 
@@ -416,6 +432,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
         runtime_root=runtime,
         container_engine="docker",
         image_id=image_id,
+        pending_trust=_pending_trust(),
     )
 
     assert [command[3] for command in commands] == [
@@ -446,6 +463,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             runtime_root=runtime,
             container_engine="docker",
             image_id=image_id,
+            pending_trust=_pending_trust(),
         )
 
     report.write_text(
@@ -467,7 +485,46 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             runtime_root=runtime,
             container_engine="docker",
             image_id=image_id,
+            pending_trust=_pending_trust(),
         )
+
+
+def test_external_trust_is_created_only_after_binding_the_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "transaction"
+    root.mkdir()
+    trust_root = tmp_path / "trust"
+    paths = example._paths(
+        root,
+        evidence_key=tmp_path / "evidence.pem",
+        trust_root=trust_root,
+    )
+    pending = example.PendingTrust(
+        anchors={"schedule_digest": "sha256:" + "2" * 64},
+        policy_bytes=b"{}\n",
+        external=True,
+        trust_root=trust_root,
+        verifier_key_bytes=b"verifier-key",
+        evidence_fingerprint="sha256:" + "3" * 64,
+        verifier_fingerprint="sha256:" + "4" * 64,
+    )
+    captured: dict[str, object] = {}
+
+    def create(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(trusted_inputs=paths.trusted_inputs)
+
+    monkeypatch.setattr(example, "create_trust_material", create)
+    request_digest = "sha256:" + "1" * 64
+
+    example._materialize_trust(paths, pending, request_digest)
+
+    assert captured["trust_root"] == trust_root
+    assert captured["anchors"] == {
+        "schedule_digest": "sha256:" + "2" * 64,
+        "request_digest": request_digest,
+    }
 
 
 @pytest.mark.parametrize(
@@ -561,6 +618,7 @@ def test_execute_rejects_false_green_outputs(
             runtime_root=tmp_path / "runtime",
             container_engine="docker",
             image_id="sha256:" + "f" * 64,
+            pending_trust=_pending_trust(),
         )
 
 
@@ -637,7 +695,7 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
     monkeypatch.setattr(
         example,
         "_prepare_transaction",
-        lambda *_args, **_kwargs: observed.append("prepare") or paths,
+        lambda *_args, **_kwargs: observed.append("prepare") or (paths, object()),
     )
     monkeypatch.setattr(
         example,
@@ -746,7 +804,7 @@ def test_quantization_requires_a_distinct_created_subject(
 
     def quantize(command: list[str], **_kwargs: object) -> object:
         if artifact == "identical":
-            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(payload)
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(payload)
         return _completed(command)
 
     monkeypatch.setattr(example.launch, "_run", quantize)
@@ -812,4 +870,5 @@ def test_execute_rejects_non_object_transaction_outputs(
             runtime_root=tmp_path / "runtime",
             container_engine="docker",
             image_id="sha256:" + "a" * 64,
+            pending_trust=_pending_trust(),
         )

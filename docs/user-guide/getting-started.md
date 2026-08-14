@@ -71,7 +71,7 @@ Pass its commit, path, and digest to the build target shown below.
 The CUDA device flag only exposes a GPU to a CUDA-capable image. It does not
 add CUDA libraries to the CPU image.
 
-For a complete journey that compares a pinned Qwen3-0.6B checkpoint with an
+For a complete journey that compares a pinned Qwen3.5-0.8B checkpoint with an
 explicit behavioral derivative and derives all verifier inputs independently,
 run the checked-in
 [Hugging Face example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/hf-transformers).

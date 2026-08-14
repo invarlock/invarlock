@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare an official Qwen3 Q8 GGUF with a pinned llama.cpp Q5 derivative."""
+"""Compare an official compact Q8 GGUF with a pinned llama.cpp Q5 derivative."""
 
 from __future__ import annotations
 
@@ -28,65 +28,65 @@ from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
 )
-from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.evidence_pack_contract import canonical_json_bytes, normalize_digest
 from invarlock.runtime_providers.gguf_identity import read_gguf_artifact_identity
 
-_MODEL_REPOSITORY = "Qwen/Qwen3-0.6B-GGUF"
-_MODEL_REVISION = "23749fefcc72300e3a2ad315e1317431b06b590a"
+_MODEL_REPOSITORY = "ggml-org/Qwen3.5-0.8B-GGUF"
+_MODEL_REVISION = "8fea620810c4afa23dd6443f999a48574c1611a3"
 _APT_SNAPSHOT = "20260701T000000Z"
-_MAX_DOWNLOAD_BYTES = 700 * 1024 * 1024
+_MAX_DOWNLOAD_BYTES = 900 * 1024 * 1024
 _QUANTIZATION = "Q5_K_M"
 _RECORDS = Path(__file__).with_name("gguf-llama-cpp") / "records.json"
 _MINIMUM_SIDE_ACCURACY = 0.40
-_PINNED_QWEN3_ONE_TOKEN_TARGET_IDS = {
-    " Africa": 10174,
-    " Asia": 13622,
-    " Atlantic": 22375,
-    " Berlin": 19846,
-    " Cairo": 52550,
-    " Canberra": 68790,
-    " English": 6364,
-    " Europe": 4505,
-    " Everest": 86478,
-    " Jupiter": 49689,
-    " Lisbon": 80701,
-    " Madrid": 24081,
-    " Mars": 21048,
-    " May": 3217,
-    " Nairobi": 96525,
-    " Nile": 76190,
-    " Ottawa": 32166,
-    " Pacific": 16462,
-    " Paris": 12095,
-    " Rome": 21718,
-    " Tokyo": 26194,
-    " blue": 6303,
-    " book": 2311,
-    " carbon": 12499,
-    " child": 1682,
-    " closed": 7877,
-    " cold": 9255,
-    " eight": 8063,
-    " energy": 4802,
-    " euro": 17672,
-    " fifty": 32417,
-    " four": 3040,
-    " freezing": 42218,
-    " gold": 6623,
-    " gravity": 23249,
-    " hundred": 7739,
-    " night": 3729,
-    " nine": 11627,
-    " oxygen": 23552,
-    " seven": 8094,
-    " six": 4743,
-    " slow": 6301,
-    " small": 2613,
-    " ten": 5779,
-    " twelve": 29235,
-    " vapor": 37652,
-    " water": 3015,
-    " yen": 57340,
+_PINNED_COMPACT_ONE_TOKEN_TARGET_IDS = {
+    " Africa": 9871,
+    " Asia": 13229,
+    " Atlantic": 21678,
+    " Berlin": 19241,
+    " Cairo": 50779,
+    " Canberra": 66463,
+    " English": 6163,
+    " Europe": 4357,
+    " Everest": 83489,
+    " Jupiter": 48017,
+    " Lisbon": 77916,
+    " Madrid": 23327,
+    " Mars": 20403,
+    " May": 3114,
+    " Nairobi": 93190,
+    " Nile": 73583,
+    " Ottawa": 31106,
+    " Pacific": 15979,
+    " Paris": 11751,
+    " Rome": 21047,
+    " Tokyo": 25358,
+    " blue": 6105,
+    " book": 2236,
+    " carbon": 12141,
+    " child": 1623,
+    " closed": 7629,
+    " cold": 8981,
+    " eight": 7810,
+    " energy": 4649,
+    " euro": 17146,
+    " fifty": 31347,
+    " four": 2943,
+    " freezing": 40818,
+    " gold": 6414,
+    " gravity": 22525,
+    " hundred": 7493,
+    " night": 3603,
+    " nine": 11292,
+    " oxygen": 22817,
+    " seven": 7840,
+    " six": 4590,
+    " slow": 6103,
+    " small": 2526,
+    " ten": 5600,
+    " twelve": 28279,
+    " vapor": 36405,
+    " water": 2919,
+    " yen": 55421,
 }
 
 
@@ -105,11 +105,24 @@ class ModelDownload:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class PendingTrust:
+    """Trust inputs waiting for the independently checked request identity."""
+
+    anchors: Mapping[str, str]
+    policy_bytes: bytes
+    external: bool
+    trust_root: Path | None
+    verifier_key_bytes: bytes | None
+    evidence_fingerprint: str
+    verifier_fingerprint: str
+
+
 _OFFICIAL_MODEL = ModelDownload(
     role="baseline",
-    filename="Qwen3-0.6B-Q8_0.gguf",
-    byte_length=639_446_688,
-    sha256="9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+    filename="Qwen3.5-0.8B-Q8_0.gguf",
+    byte_length=833_592_096,
+    sha256="37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f",
 )
 
 
@@ -212,7 +225,7 @@ def _stage_models(
     model_root.mkdir(parents=True)
     baseline = model_root / _OFFICIAL_MODEL.filename
     _download_model(baseline, _OFFICIAL_MODEL)
-    subject = model_root / "Qwen3-0.6B-Q5_K_M.gguf"
+    subject = model_root / "Qwen3.5-0.8B-Q5_K_M.gguf"
     uid = os.getuid() if hasattr(os, "getuid") else 65532
     gid = os.getgid() if hasattr(os, "getgid") else 65532
     launch._run(
@@ -421,7 +434,7 @@ def _load_records() -> list[dict[str, str]]:
             not record["expected"].startswith(" ")
             or record["expected"].strip() != record["expected"][1:]
             or any(character.isspace() for character in record["expected"][1:])
-            or record["expected"] not in _PINNED_QWEN3_ONE_TOKEN_TARGET_IDS
+            or record["expected"] not in _PINNED_COMPACT_ONE_TOKEN_TARGET_IDS
         ):
             raise RuntimeError(
                 f"GGUF example record {index} must use one maintained target word"
@@ -442,7 +455,7 @@ def _prepare_transaction(
     verifier_signing_key: Path | None = None,
     trust_root: Path | None = None,
     ephemeral_trust_root: bool = True,
-) -> ExamplePaths:
+) -> tuple[ExamplePaths, PendingTrust]:
     external_trust = any(
         value is not None
         for value in (evidence_signing_key, verifier_signing_key, trust_root)
@@ -513,7 +526,7 @@ def _prepare_transaction(
         LocalDatasetRequest(
             path=dataset,
             sha256=dataset_sha256,
-            name="qwen3-0.6b-q8-to-q5",
+            name="qwen35-0.8b-q8-to-q5",
             split="validation",
             input_field="prompt",
             expected_output_field="expected",
@@ -575,7 +588,7 @@ def _prepare_transaction(
                 "path": "inputs/records.jsonl",
                 "sha256": dataset_sha256,
                 "format": "jsonl",
-                "name": "qwen3-0.6b-q8-to-q5",
+                "name": "qwen35-0.8b-q8-to-q5",
                 "split": "validation",
                 "input_field": "prompt",
                 "expected_output_field": "expected",
@@ -645,39 +658,57 @@ def _prepare_transaction(
         "subject_runtime_digest": image_id,
         "evidence_signer_fingerprint": evidence_signer,
     }
-    if external_trust:
-        assert trust_root is not None
+    if runtime_root != models["baseline"].parents[1]:
+        raise RuntimeError("GGUF runtime resources do not share one closed root")
+    return paths, PendingTrust(
+        anchors=anchors,
+        policy_bytes=policy_bytes,
+        external=external_trust,
+        trust_root=trust_root,
+        verifier_key_bytes=verifier_key_bytes,
+        evidence_fingerprint=evidence_signer,
+        verifier_fingerprint=verifier,
+    )
+
+
+def _materialize_trust(
+    paths: ExamplePaths, pending: PendingTrust, request_digest: str
+) -> None:
+    anchored_request = normalize_digest(
+        request_digest, label="independent request anchor"
+    )
+    anchors = {**pending.anchors, "request_digest": anchored_request}
+    if pending.external:
+        if pending.trust_root is None or pending.verifier_key_bytes is None:
+            raise RuntimeError("external GGUF trust material is incomplete")
         material = create_trust_material(
-            transaction_root=root,
+            transaction_root=paths.root,
             evidence_key=paths.evidence_key,
-            verifier_key_bytes=verifier_key_bytes,
-            evidence_fingerprint=evidence_signer,
-            verifier_fingerprint=verifier,
-            trust_root=trust_root,
-            policy_bytes=policy_bytes,
+            verifier_key_bytes=pending.verifier_key_bytes,
+            evidence_fingerprint=pending.evidence_fingerprint,
+            verifier_fingerprint=pending.verifier_fingerprint,
+            trust_root=pending.trust_root,
+            policy_bytes=pending.policy_bytes,
             verifier_identity="invarlock-example/gguf-llama-cpp-verifier",
             anchors=anchors,
         )
         if material.trusted_inputs != paths.trusted_inputs:
             raise ValueError("external trust material resolved to an unexpected root")
-    else:
-        paths.trusted_inputs.write_bytes(
-            canonical_json_bytes(
-                {
-                    "format": "invarlock/trust-inputs-v1",
-                    "policy": {"path": "policy/acceptance.json"},
-                    "anchors": anchors,
-                    "verifier": {
-                        "identity": "invarlock-example/gguf-llama-cpp-verifier",
-                        "signing_key_path": "keys/verifier.pem",
-                    },
-                    "allow_installed_scorers": False,
-                }
-            )
+        return
+    paths.trusted_inputs.write_bytes(
+        canonical_json_bytes(
+            {
+                "format": "invarlock/trust-inputs-v1",
+                "policy": {"path": "policy/acceptance.json"},
+                "anchors": anchors,
+                "verifier": {
+                    "identity": "invarlock-example/gguf-llama-cpp-verifier",
+                    "signing_key_path": "keys/verifier.pem",
+                },
+                "allow_installed_scorers": False,
+            }
         )
-    if runtime_root != models["baseline"].parents[1]:
-        raise RuntimeError("GGUF runtime resources do not share one closed root")
-    return paths
+    )
 
 
 def _execute(
@@ -687,6 +718,7 @@ def _execute(
     runtime_root: Path,
     container_engine: str,
     image_id: str,
+    pending_trust: PendingTrust,
 ) -> None:
     bindings = {
         "INVARLOCK_GGUF_RESOURCE_ROOT": str(runtime_root),
@@ -721,9 +753,7 @@ def _execute(
     try:
         preflight_result = json.loads(preflight.stdout)
         request_digest = preflight_result["request_digest"]
-        trust_profile = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
-        anchors = trust_profile["anchors"]
-    except (KeyError, TypeError, json.JSONDecodeError, OSError) as exc:
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise RuntimeError("GGUF preflight did not return a request identity") from exc
     if (
         not isinstance(request_digest, str)
@@ -731,17 +761,7 @@ def _execute(
         or len(request_digest) != 71
     ):
         raise RuntimeError("GGUF preflight returned an invalid request identity")
-    if not isinstance(anchors, dict):
-        raise RuntimeError("GGUF trust profile anchors are invalid")
-    anchors["request_digest"] = request_digest
-    try:
-        paths.trusted_inputs.relative_to(paths.root)
-    except ValueError:
-        # Caller-owned trust profiles are immutable; their static anchors are
-        # sufficient for verification and must not receive transaction output.
-        pass
-    else:
-        paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
+    _materialize_trust(paths, pending_trust, request_digest)
     launch._run(evaluation, cwd=repository, environment=environment)
     launch._run(
         [
@@ -917,7 +937,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             for role, model in models.items()
         }
-        paths = _prepare_transaction(
+        paths, pending_trust = _prepare_transaction(
             transaction,
             runtime_root=runtime_root,
             models=models,
@@ -934,6 +954,7 @@ def main(argv: list[str] | None = None) -> int:
             runtime_root=runtime_root,
             container_engine=arguments.container_engine,
             image_id=image_id,
+            pending_trust=pending_trust,
         )
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)

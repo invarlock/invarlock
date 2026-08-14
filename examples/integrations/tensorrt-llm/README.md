@@ -7,6 +7,11 @@ compares them through InvarLock's public `evaluate`, `verify`, and `report`
 commands. Both engine builds run concurrently on separate GPUs; evaluation
 also runs the baseline and subject workers concurrently.
 
+This is an intentional backend-compatibility fixture, not the repository's
+default compact model. The other compact integrations use Qwen3.5 0.8B; the
+pinned TensorRT-LLM 1.2.1 runtime supports the Qwen3 architecture used here but
+does not provide a Qwen3.5 model adapter.
+
 ## Prerequisites
 
 The maintained showcase requires Linux, Docker with two visible H100 GPUs,

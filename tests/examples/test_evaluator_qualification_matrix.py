@@ -515,7 +515,7 @@ def test_retained_transaction_claim_is_verified_against_signed_dataset() -> None
         module.verify_signed_transaction(
             "inspect-ai",
             {
-                "dataset_name": "lambada-openai-qwen3-one-token-400-v1",
+                "dataset_name": "lambada-openai-qwen35-0.8b-one-token-400-v1",
                 "package_id": "deployment-approval-inspect-ai",
                 "record_count": 401,
                 "role": "deployment_approval",
@@ -745,7 +745,7 @@ def test_authoritative_corpus_is_real_pinned_model_execution() -> None:
 
     assert cases["format"] == "invarlock/evaluator-authoritative-cases-v1"
     assert source_evaluation["kind"] == "model_execution"
-    assert model["model_id"] == "Qwen/Qwen3-0.6B"
+    assert model["model_id"] == "Qwen/Qwen3.5-0.8B"
     assert re.fullmatch("[0-9a-f]{40}", model["immutable_revision"])
     assert re.fullmatch("sha256:[0-9a-f]{64}", model["snapshot_tree_sha256"])
     assert source_evaluation["generation"] == {
@@ -790,13 +790,13 @@ def test_retained_independently_replayable_imports_replay_offline() -> None:
         assert result["outcome"] == "qualified_for_import"
         assert result["authority"] == "verdict_authority"
         assert result["record_count"] == 102
-        assert result["scores"].count(1.0) == 52
-        assert result["scores"].count(0.0) == 50
+        assert result["scores"].count(1.0) == 61
+        assert result["scores"].count(0.0) == 41
         assert len(records) == 102
         assert replay["record_count"] == 102
         assert replay["profile_id"] == profile_id
         assert replay["source_kind"] == "model_execution"
-        assert raw["source_evaluation"]["model"]["model_id"] == "Qwen/Qwen3-0.6B"
+        assert raw["source_evaluation"]["model"]["model_id"] == "Qwen/Qwen3.5-0.8B"
         assert len(raw["records"]) == 102
         assert raw["entrypoint"] != "precomputed"
 

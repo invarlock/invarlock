@@ -1,13 +1,13 @@
 # Hugging Face Transformers integration
 
-This example downloads the official Apache-2.0 `Qwen/Qwen3-0.6B` checkpoint at
-immutable revision `c1899de289a04d12100db370d81485cdf75e47ca`. It saves that
+This example downloads the official Apache-2.0 `Qwen/Qwen3.5-0.8B` checkpoint at
+immutable revision `2fc06364715b967f1860aea9cf38778875588b17`. It saves that
 checkpoint as the baseline and creates a distinct subject by fitting one causal
 output row to favor the expected continuation across 50 paired records. The
 source model, revision, baseline checkpoint identity, transformation, and
 subject identity are authenticated in the resulting evidence.
 
-A passing normalized-NLL decision comes from executing and scoring both Qwen3
+A passing normalized-NLL decision comes from executing and scoring both Qwen3.5
 checkpoints. The report also derives a token-weighted perplexity ratio when the
 authenticated tokenizer and target-token counts are comparable; that derived
 value does not control acceptance.
@@ -51,6 +51,6 @@ the generated `invarlock/trust-inputs-v1` profile to `invarlock verify`.
 
 The first run downloads the pinned checkpoint and needs several gigabytes of
 cache and workspace capacity. The 50 records and fitted subject intentionally
-form a compact integration demonstration. They demonstrate real Qwen3 scoring,
+form a compact integration demonstration. They demonstrate real Qwen3.5 scoring,
 isolation, and trust bindings; they are not a benchmark or a model-quality
 claim.

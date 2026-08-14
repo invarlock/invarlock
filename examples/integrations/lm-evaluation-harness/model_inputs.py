@@ -172,7 +172,9 @@ def prepare(
     }
     records = _records(selected)
     records_path = inputs / "records.jsonl"
-    records_path.write_bytes(records_jsonl(records, compact=selected.key != "quick"))
+    records_path.write_bytes(
+        records_jsonl(records, compact=selected.key in {"flagship", "portability"})
+    )
     dataset_sha256 = hashlib.sha256(records_path.read_bytes()).hexdigest()
     if dataset_sha256 != selected.dataset_sha256:
         raise RuntimeError("prepared corpus does not match its pinned profile")

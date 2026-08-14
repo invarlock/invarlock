@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run one maintained Qwen3 Hugging Face ecosystem integration journey.
+"""Run one maintained compact-model Hugging Face ecosystem integration journey.
 
-Every journey starts from one official revision-pinned Qwen3 checkpoint. The
+Every journey starts from one official revision-pinned compact checkpoint. The
 Transformers journey creates an explicit behavioral derivative, the PEFT
 journey trains, saves, reloads, and merges a LoRA adapter, and the TorchAO
 journey applies INT8 weight-only quantization before materializing a portable
@@ -33,14 +33,14 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
     from bounded_command import run_bounded_command  # type: ignore[no-redef]
 
 try:
-    from examples.integrations import qwen3_profile
+    from examples.integrations import compact_model_profile
 except ModuleNotFoundError as exc:
     if exc.name != "examples":
         raise
     # Direct script execution places this directory, rather than the repository
     # root, on sys.path. Keep the maintained one-command entry point usable with
     # the same PYTHONPATH=src boundary as an installed core package.
-    import qwen3_profile  # type: ignore[no-redef]
+    import compact_model_profile  # type: ignore[no-redef]
 try:
     from examples.integrations.trust_material import (
         create_trust_material,
@@ -155,7 +155,7 @@ def _single_target_id(tokenizer: Any, expected_output: str) -> int:
     token_ids = encoded["input_ids"]
     if not isinstance(token_ids, list) or len(token_ids) != 1:
         raise RuntimeError(
-            "the pinned Qwen3 profile requires a one-token expected continuation"
+            "the pinned compact profile requires a one-token expected continuation"
         )
     return int(token_ids[0])
 
@@ -171,7 +171,7 @@ def _prompt_batch(
         return_tensors="pt",
     )
     if not hasattr(encoded["input_ids"], "shape"):
-        raise RuntimeError("the pinned Qwen3 tokenizer did not return tensors")
+        raise RuntimeError("the pinned compact tokenizer did not return tensors")
     target_id = _single_target_id(tokenizer, expected_output)
     targets = torch.full((len(records), 1), target_id, dtype=encoded["input_ids"].dtype)
     return {
@@ -193,7 +193,7 @@ def _continuation_training_batch(
     for record in _example_records(expected_output=expected_output):
         prompt_ids = tokenizer(record["prompt"], add_special_tokens=True)["input_ids"]
         if not isinstance(prompt_ids, list) or not prompt_ids:
-            raise RuntimeError("the pinned Qwen3 tokenizer returned an empty prompt")
+            raise RuntimeError("the pinned compact tokenizer returned an empty prompt")
         prompt_lengths.append(len(prompt_ids))
         sequences.append([int(value) for value in prompt_ids] + [target_id])
     width = max(len(sequence) for sequence in sequences)
@@ -229,7 +229,7 @@ def _target_row_derivative(
     model.eval()
     backbone = getattr(model, str(model.base_model_prefix), None)
     if backbone is None:
-        raise RuntimeError("the Qwen3 model does not expose its causal backbone")
+        raise RuntimeError("the Qwen3.5 model does not expose its causal backbone")
     with torch.inference_mode():
         hidden_states = backbone(
             input_ids=batch["input_ids"],
@@ -261,7 +261,7 @@ def _target_row_derivative(
             .item()
         )
     if margin <= 0.0:
-        raise RuntimeError("the Qwen3 subject transformation missed a prompt")
+        raise RuntimeError("the Qwen3.5 subject transformation missed a prompt")
     return target_id, margin
 
 
@@ -278,11 +278,11 @@ def _create_hf_checkpoints(
         ) from exc
 
     torch.manual_seed(_SEED)
-    model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch, transformers=transformers
     )
     baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = qwen3_profile.save_checkpoint(model, tokenizer, baseline)
+    tokenizer_digest = compact_model_profile.save_checkpoint(model, tokenizer, baseline)
     baseline_digest = checkpoint_tree_sha256(baseline)
     target_id, margin = _target_row_derivative(
         model,
@@ -291,19 +291,23 @@ def _create_hf_checkpoints(
         expected_output=expected_output,
     )
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = qwen3_profile.save_checkpoint(model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(model, tokenizer, subject)
     if observed_digest != tokenizer_digest:
-        raise RuntimeError("the Qwen3 baseline and subject tokenizers do not match")
+        raise RuntimeError("the Qwen3.5 baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
     if baseline_digest == subject_digest:
-        raise RuntimeError("the transformed Qwen3 subject is identical to its baseline")
+        raise RuntimeError(
+            "the transformed Qwen3.5 subject is identical to its baseline"
+        )
     (paths.evaluation / "inputs" / "subject-transformation.json").write_bytes(
         canonical_json_bytes(
             {
                 "format": "invarlock/example-hf-transformers-summary-v1",
                 "library": "transformers",
                 "library_version": str(transformers.__version__),
-                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "method": "causal-output-row-fit",
                 "expected_output": expected_output,
                 "target_token_id": target_id,
@@ -329,11 +333,11 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
 
     torch.manual_seed(_SEED)
     torch.cuda.manual_seed_all(_SEED)
-    baseline_model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    baseline_model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch, transformers=transformers
     )
     baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = qwen3_profile.save_checkpoint(
+    tokenizer_digest = compact_model_profile.save_checkpoint(
         baseline_model, tokenizer, baseline
     )
     baseline_digest = checkpoint_tree_sha256(baseline)
@@ -347,7 +351,7 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
             r=4,
             lora_alpha=8,
             lora_dropout=0.0,
-            target_modules=list(qwen3_profile.PEFT_TARGET_MODULES),
+            target_modules=list(compact_model_profile.PEFT_TARGET_MODULES),
             bias="none",
         ),
     )
@@ -414,7 +418,9 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
     )
     subject_model = reloaded.merge_and_unload().to("cpu")
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = qwen3_profile.save_checkpoint(subject_model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(
+        subject_model, tokenizer, subject
+    )
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the PEFT baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
@@ -426,8 +432,10 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
                 "format": "invarlock/example-peft-summary-v1",
                 "library": "peft",
                 "library_version": str(peft.__version__),
-                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
-                "target_modules": list(qwen3_profile.PEFT_TARGET_MODULES),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
+                "target_modules": list(compact_model_profile.PEFT_TARGET_MODULES),
                 "training_record_count": len(_example_records()),
                 "training_steps": 12,
                 "training_device": device.type,
@@ -455,11 +463,11 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
         ) from exc
 
     torch.manual_seed(_SEED)
-    baseline_model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    baseline_model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch, transformers=transformers
     )
     baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = qwen3_profile.save_checkpoint(
+    tokenizer_digest = compact_model_profile.save_checkpoint(
         baseline_model, tokenizer, baseline
     )
     baseline_digest = checkpoint_tree_sha256(baseline)
@@ -580,7 +588,9 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
         materialized_digest.update(payload)
 
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = qwen3_profile.save_checkpoint(subject_model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(
+        subject_model, tokenizer, subject
+    )
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the TorchAO baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
@@ -614,7 +624,9 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
                 "library_version": str(torchao.__version__),
                 "torch_version": str(torch.__version__),
                 "transformers_version": str(transformers.__version__),
-                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "quantization": {
                     "configuration": "Int8WeightOnlyConfig(version=2)",
                     "excluded_modules": ["lm_head"],
@@ -821,7 +833,7 @@ def _prepare_workspace(
             model_id = f"invarlock-example/{integration}-{role}"
             artifact_digest = settings[role]["checkpoint_tree_sha256"]
             locator = (
-                f"hf://{qwen3_profile.MODEL_ID}@{qwen3_profile.MODEL_REVISION}"
+                f"hf://{compact_model_profile.MODEL_ID}@{compact_model_profile.MODEL_REVISION}"
                 f"#checkpoint-tree-sha256:{artifact_digest}"
                 if role == "baseline"
                 else f"generated://{model_id}@sha256:{artifact_digest}"
@@ -953,7 +965,7 @@ def _run(command: list[str]) -> None:
     completed = run_bounded_command(
         command,
         capture_output=True,
-        label="Qwen3 integration command",
+        label="compact-model integration command",
     )
     if completed.stdout:
         print(completed.stdout, end="")

@@ -1310,7 +1310,7 @@ def test_harness_workers_mount_role_private_output_parents(
     assert all(call["output"].name == "result" for call in commands)
 
 
-def test_model_inputs_pin_public_qwen3_snapshots_and_closed_records() -> None:
+def test_model_inputs_pin_public_qwen35_snapshots_and_closed_records() -> None:
     module = _model_inputs_module()
 
     assert [
@@ -1319,13 +1319,13 @@ def test_model_inputs_pin_public_qwen3_snapshots_and_closed_records() -> None:
     ] == [
         (
             "baseline",
-            "Qwen/Qwen3-0.6B-Base",
-            "da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
+            "Qwen/Qwen3.5-0.8B-Base",
+            "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68",
         ),
         (
             "subject",
-            "Qwen/Qwen3-0.6B",
-            "c1899de289a04d12100db370d81485cdf75e47ca",
+            "Qwen/Qwen3.5-0.8B",
+            "2fc06364715b967f1860aea9cf38778875588b17",
         ),
     ]
     assert all(
@@ -1360,7 +1360,9 @@ def test_model_inputs_direct_script_bootstraps_the_repository(
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert "--corpus-profile {quick,flagship,portability}" in completed.stdout
+    assert (
+        "--corpus-profile {quick,deployment,flagship,portability}" in completed.stdout
+    )
     assert "--benchmark-source" not in completed.stdout
 
 
@@ -1538,16 +1540,20 @@ def test_model_input_snapshot_pair_is_staged_concurrently(
 def test_model_input_records_render_the_closed_semantic_corpus_per_family() -> None:
     module = _model_inputs_module()
     quick = module._records(module.corpus_profile("quick"))
+    deployment = module._records(module.corpus_profile("deployment"))
     flagship = module._records(module.corpus_profile("flagship"))
     portability = module._records(module.corpus_profile("portability"))
 
     assert len(quick) == 102
+    assert len(deployment) == 400
     assert len(flagship) == 400
     assert len(portability) == 400
     assert [record["id"] for record in portability] == [
         record["id"] for record in flagship
     ]
     assert {record["expected"] for record in flagship} == set("ABCDEFGHIJ")
+    assert all(record["id"].startswith("lambada-openai-") for record in deployment)
+    assert all(record["expected"].startswith(" ") for record in deployment)
     assert all(
         record["prompt"].startswith("<|im_start|>system\n") for record in flagship
     )
@@ -1621,7 +1627,7 @@ def test_model_input_prepare_rejects_unpinned_derived_corpus(
         module.prepare(tmp_path / "prepared", "sha256:" + "a" * 64)
 
 
-def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
+def test_model_input_authoring_binds_qwen35_ids_and_fixed_policy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _model_inputs_module()
@@ -1664,10 +1670,10 @@ def test_model_input_authoring_binds_qwen3_ids_and_fixed_policy(
     comparison = request["comparison"]
     assert comparison["dataset"]["name"] == module.DATASET_NAME
     assert comparison["baseline"]["artifact"]["locator"].startswith(
-        "hf://Qwen/Qwen3-0.6B-Base@"
+        "hf://Qwen/Qwen3.5-0.8B-Base@"
     )
     assert comparison["subject"]["artifact"]["locator"].startswith(
-        "hf://Qwen/Qwen3-0.6B@"
+        "hf://Qwen/Qwen3.5-0.8B@"
     )
     assert comparison["baseline"]["runtime"]["settings"]["batch_size"] == 8
     assert comparison["subject"]["runtime"]["settings"]["batch_size"] == 8

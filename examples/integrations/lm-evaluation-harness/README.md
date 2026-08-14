@@ -5,11 +5,12 @@ over two pinned checkpoints, imports every output, and completes `invarlock
 evaluate`, `invarlock verify`, and `invarlock report`. InvarLock recomputes the
 paired exact-match result instead of trusting the Harness aggregate.
 
-Three profiles serve different purposes:
+Four profiles serve different purposes:
 
 | Profile | Models | Records | Runtime | Purpose |
 | --- | --- | ---: | --- | --- |
-| `quick` | Qwen3 0.6B Base → post-trained | 102 local records | CPU/float32, batch 8 | Short local workflow |
+| `quick` | Qwen3.5 0.8B Base → post-trained | 102 local records | CPU/float32, batch 8 | Short local workflow |
+| `deployment` | Qwen3.5 0.8B Base → post-trained | 400 tokenizer-qualified LAMBADA records | CUDA/BF16, batch 8 | Compact deployment-approval workflow |
 | `flagship` | Qwen3.5 9B Base → post-trained | 400 balanced MMLU-Pro records | CUDA/BF16, batch 1 | Current-model evaluator comparison |
 | `portability` | Gemma 4 12B IT → official QAT-Q4 source checkpoint | The same 400 semantic MMLU-Pro items | CUDA/BF16, batch 1 | Cross-family deployment-change evidence |
 
@@ -32,6 +33,12 @@ Select the Qwen3.5 flagship with:
 
 ```bash
 make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+```
+
+Select the compact deployment profile with:
+
+```bash
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile deployment --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
 ```
 
 Select the Gemma 4 portability profile with:
@@ -70,6 +77,15 @@ records, at least 20% accuracy on each side, a paired 95% interval no wider than
 percentage points. A verified policy rejection is retained only when the
 caller explicitly supplies `--allow-policy-fail`; integrity failures remain
 errors.
+
+The deployment profile instead uses a deterministic, revision- and hash-pinned
+400-record selection from EleutherAI LAMBADA. It requires a lossless one-token
+target under both Qwen3.5 0.8B tokenizers, a 256-token prompt ceiling, and 100
+records from each of four prompt-length strata. Its independent policy uses a
+5% side-accuracy floor, a 10-point maximum interval width, and a −20-point
+lower-bound floor. The repository retains the passing Inspect AI transaction
+for this profile; the Harness command is runnable but is not represented as a
+second retained deployment decision.
 
 The retained Qwen3.5 transaction measured 55.5% baseline accuracy and 53.0%
 subject accuracy, with a −2.5-point estimate and a 7.85-point interval width.
