@@ -12,15 +12,20 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from examples.integrations import launch, local_registry, qwen3_profile, trust_material
+from examples.integrations import (
+    compact_model_profile,
+    launch,
+    local_registry,
+    trust_material,
+)
 from examples.integrations import run as integration
 
 ZERO_DIGEST = "sha256:" + ("0" * 64)
-REAL_QWEN3_LOADER = qwen3_profile.load_model_and_tokenizer
+REAL_COMPACT_LOADER = compact_model_profile.load_model_and_tokenizer
 
 
 @pytest.fixture(autouse=True)
-def tiny_qwen3_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+def tiny_compact_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep focused tests offline while production uses the pinned checkpoint."""
 
     def load_model_and_tokenizer(
@@ -68,7 +73,7 @@ def tiny_qwen3_profile(monkeypatch: pytest.MonkeyPatch) -> None:
         return transformers.Qwen3ForCausalLM(config), tokenizer  # type: ignore[attr-defined]
 
     monkeypatch.setattr(
-        qwen3_profile, "load_model_and_tokenizer", load_model_and_tokenizer
+        compact_model_profile, "load_model_and_tokenizer", load_model_and_tokenizer
     )
 
 
@@ -114,7 +119,7 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
     baseline_locator = request["comparison"]["baseline"]["artifact"]["locator"]
     subject_locator = request["comparison"]["subject"]["artifact"]["locator"]
     assert baseline_locator.startswith(
-        f"hf://{qwen3_profile.MODEL_ID}@{qwen3_profile.MODEL_REVISION}#"
+        f"hf://{compact_model_profile.MODEL_ID}@{compact_model_profile.MODEL_REVISION}#"
     )
     assert subject_locator.startswith(
         "generated://invarlock-example/hf-transformers-subject@sha256:"
@@ -124,8 +129,8 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
             encoding="utf-8"
         )
     )
-    assert summary["source_model_id"] == qwen3_profile.MODEL_ID
-    assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
+    assert summary["source_model_id"] == compact_model_profile.MODEL_ID
+    assert summary["source_model_revision"] == compact_model_profile.MODEL_REVISION
     assert summary["method"] == "causal-output-row-fit"
     assert anchors["baseline_artifact_digest"] != anchors["subject_artifact_digest"]
     assert anchors["baseline_runtime_digest"] == ZERO_DIGEST
@@ -314,8 +319,8 @@ def test_peft_preparation_trains_serializes_reloads_and_merges(tmp_path: Path) -
     )
     assert summary["library"] == "peft"
     assert summary["library_version"] == "0.20.0"
-    assert summary["source_model_id"] == qwen3_profile.MODEL_ID
-    assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
+    assert summary["source_model_id"] == compact_model_profile.MODEL_ID
+    assert summary["source_model_revision"] == compact_model_profile.MODEL_REVISION
     assert summary["target_modules"] == ["q_proj", "v_proj"]
     assert summary["training_record_count"] == 50
     assert summary["training_steps"] == 12
@@ -336,7 +341,7 @@ def test_peft_preparation_trains_serializes_reloads_and_merges(tmp_path: Path) -
 def test_torchao_preparation_quantizes_and_materializes_subject(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tiny_loader = qwen3_profile.load_model_and_tokenizer
+    tiny_loader = compact_model_profile.load_model_and_tokenizer
 
     def load_bfloat16_model(
         *, torch: object, transformers: object
@@ -344,7 +349,9 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
         model, tokenizer = tiny_loader(torch=torch, transformers=transformers)
         return model.to(dtype=torch.bfloat16), tokenizer  # type: ignore[attr-defined]
 
-    monkeypatch.setattr(qwen3_profile, "load_model_and_tokenizer", load_bfloat16_model)
+    monkeypatch.setattr(
+        compact_model_profile, "load_model_and_tokenizer", load_bfloat16_model
+    )
     paths, anchors = integration._prepare_workspace(
         tmp_path / "torchao",
         integration="torchao-int8",
@@ -361,8 +368,8 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
     )
     assert summary["library"] == "torchao"
     assert summary["library_version"] == "0.18.0"
-    assert summary["source_model_id"] == qwen3_profile.MODEL_ID
-    assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
+    assert summary["source_model_id"] == compact_model_profile.MODEL_ID
+    assert summary["source_model_revision"] == compact_model_profile.MODEL_REVISION
     assert summary["quantization"] == {
         "configuration": "Int8WeightOnlyConfig(version=2)",
         "excluded_modules": ["lm_head"],
@@ -424,7 +431,7 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
 def test_torchao_preparation_rejects_nonfinite_materialization(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tiny_loader = qwen3_profile.load_model_and_tokenizer
+    tiny_loader = compact_model_profile.load_model_and_tokenizer
 
     def load_nonfinite_model(
         *, torch: object, transformers: object
@@ -434,7 +441,9 @@ def test_torchao_preparation_rejects_nonfinite_materialization(
             model.model.embed_tokens.weight[0, 0] = float("nan")
         return model, tokenizer
 
-    monkeypatch.setattr(qwen3_profile, "load_model_and_tokenizer", load_nonfinite_model)
+    monkeypatch.setattr(
+        compact_model_profile, "load_model_and_tokenizer", load_nonfinite_model
+    )
     with pytest.raises(RuntimeError, match="produced a non-finite tensor"):
         integration._prepare_workspace(
             tmp_path / "torchao-nonfinite",
@@ -458,7 +467,7 @@ def test_hf_checkpoint_authoring_rejects_identity_inconsistencies(
 ) -> None:
     paths = integration._paths(tmp_path / case)
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "load_model_and_tokenizer",
         lambda **_kwargs: (object(), object()),
     )
@@ -466,7 +475,7 @@ def test_hf_checkpoint_authoring_rejects_identity_inconsistencies(
         ("tokenizer-a", "tokenizer-b" if case == "tokenizer" else "tokenizer-a")
     )
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "save_checkpoint",
         lambda *_args: next(tokenizer_digests),
     )
@@ -576,7 +585,7 @@ def test_peft_checkpoint_authoring_rejects_training_and_identity_failures(
 
     training_model = TrainingModel()
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "load_model_and_tokenizer",
         lambda **_kwargs: (BaselineModel(), object()),
     )
@@ -584,7 +593,7 @@ def test_peft_checkpoint_authoring_rejects_training_and_identity_failures(
         ("tokenizer-a", "tokenizer-b" if case == "tokenizer" else "tokenizer-a")
     )
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "save_checkpoint",
         lambda *_args: next(tokenizer_digests),
     )
@@ -698,7 +707,7 @@ def test_torchao_checkpoint_authoring_rejects_post_materialization_drift(
     import transformers
 
     if case == "tokenizer":
-        save_checkpoint = qwen3_profile.save_checkpoint
+        save_checkpoint = compact_model_profile.save_checkpoint
         save_count = 0
 
         def save_with_tokenizer_drift(*args: object, **kwargs: object) -> str:
@@ -708,7 +717,7 @@ def test_torchao_checkpoint_authoring_rejects_post_materialization_drift(
             return digest if save_count == 1 else "changed-tokenizer"
 
         monkeypatch.setattr(
-            qwen3_profile,
+            compact_model_profile,
             "save_checkpoint",
             save_with_tokenizer_drift,
         )
@@ -854,7 +863,7 @@ def test_hf_subject_transformation_rejects_a_nonpositive_margin(
     import torch
     import transformers
 
-    model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch,
         transformers=transformers,
     )
@@ -1845,13 +1854,44 @@ def test_runtime_image_requires_source_bundle_digest(
         )
 
 
-def test_qwen3_profile_uses_an_immutable_official_revision() -> None:
-    assert qwen3_profile.MODEL_ID == "Qwen/Qwen3-0.6B"
-    assert qwen3_profile.MODEL_REVISION == ("c1899de289a04d12100db370d81485cdf75e47ca")
-    assert qwen3_profile.PEFT_TARGET_MODULES == ("q_proj", "v_proj")
+def test_compact_profile_pins_qwen35_08b() -> None:
+    assert compact_model_profile.MODEL_ID == "Qwen/Qwen3.5-0.8B"
+    assert compact_model_profile.MODEL_REVISION == (
+        "2fc06364715b967f1860aea9cf38778875588b17"
+    )
+    assert compact_model_profile.PEFT_TARGET_MODULES == ("q_proj", "v_proj")
 
 
-def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
+def test_qwen35_compact_loader_rejects_wrong_architecture() -> None:
+    class WrongConfig:
+        model_type = "qwen3"
+        architectures = ["Qwen3ForCausalLM"]
+
+    class AutoConfig:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> WrongConfig:
+            return WrongConfig()
+
+    class NotCalled:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> object:
+            raise AssertionError("loader continued after architecture mismatch")
+
+    transformers = type(
+        "Transformers",
+        (),
+        {
+            "AutoConfig": AutoConfig,
+            "AutoModelForCausalLM": NotCalled,
+            "AutoTokenizer": NotCalled,
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Qwen3.5 text architecture"):
+        REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
+
+
+def test_compact_loader_passes_the_pin_to_config_model_and_tokenizer() -> None:
     calls: list[tuple[str, str, dict[str, object]]] = []
 
     class Tokenizer:
@@ -1859,10 +1899,21 @@ def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
         eos_token_id = 2
 
     class Config:
+        model_type = "qwen3_5_text"
         use_cache = True
 
     class Model:
         config = Config()
+
+    class ModelConfig:
+        model_type = "qwen3_5"
+        architectures = ["Qwen3_5ForConditionalGeneration"]
+
+    class AutoConfig:
+        @staticmethod
+        def from_pretrained(model_id: str, **kwargs: object) -> ModelConfig:
+            calls.append(("config", model_id, kwargs))
+            return ModelConfig()
 
     class AutoTokenizer:
         @staticmethod
@@ -1879,21 +1930,28 @@ def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
     Transformers = type(
         "Transformers",
         (),
-        {"AutoTokenizer": AutoTokenizer, "AutoModelForCausalLM": AutoModel},
+        {
+            "AutoConfig": AutoConfig,
+            "AutoTokenizer": AutoTokenizer,
+            "AutoModelForCausalLM": AutoModel,
+        },
     )
 
-    model, _tokenizer = REAL_QWEN3_LOADER(torch=object(), transformers=Transformers)
+    model, _tokenizer = REAL_COMPACT_LOADER(torch=object(), transformers=Transformers)
     assert model.config.use_cache is False
-    assert [call[0] for call in calls] == ["tokenizer", "model"]
-    assert all(call[1] == qwen3_profile.MODEL_ID for call in calls)
-    assert all(call[2]["revision"] == qwen3_profile.MODEL_REVISION for call in calls)
+    assert [call[0] for call in calls] == ["config", "tokenizer", "model"]
+    assert all(call[1] == compact_model_profile.MODEL_ID for call in calls)
+    assert all(
+        call[2]["revision"] == compact_model_profile.MODEL_REVISION for call in calls
+    )
     assert all(call[2]["trust_remote_code"] is False for call in calls)
-    assert calls[1][2]["use_safetensors"] is True
-    assert calls[1][2]["dtype"] == "auto"
+    assert calls[2][2]["use_safetensors"] is True
+    assert calls[2][2]["dtype"] == "auto"
 
 
-def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
+def test_compact_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
     class Config:
+        model_type = "qwen3_5_text"
         use_cache = True
 
     class Model:
@@ -1911,10 +1969,27 @@ def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
         eos_token = "</s>"
 
     tokenizer = Tokenizer()
+    model_config = type(
+        "ModelConfig",
+        (),
+        {
+            "model_type": "qwen3_5",
+            "architectures": ["Qwen3_5ForConditionalGeneration"],
+        },
+    )()
     transformers = type(
         "Transformers",
         (),
         {
+            "AutoConfig": type(
+                "AutoConfig",
+                (),
+                {
+                    "from_pretrained": staticmethod(
+                        lambda *_args, **_kwargs: model_config
+                    )
+                },
+            ),
             "AutoTokenizer": type(
                 "AutoTokenizer",
                 (),
@@ -1923,9 +1998,9 @@ def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
             "AutoModelForCausalLM": AutoModel,
         },
     )
-    _model, observed = REAL_QWEN3_LOADER(torch=object(), transformers=transformers)
+    _model, observed = REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
     assert observed.pad_token == "</s>"
 
     tokenizer.eos_token_id = None
     with pytest.raises(RuntimeError, match="no padding token"):
-        REAL_QWEN3_LOADER(torch=object(), transformers=transformers)
+        REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
