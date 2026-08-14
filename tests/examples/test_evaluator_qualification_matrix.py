@@ -308,6 +308,30 @@ def test_flagship_comparison_reports_native_agreement_without_a_new_verdict() ->
     assert "verdict" not in retained
 
 
+def test_flagship_comparison_identifies_score_and_record_digest_disagreement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _matrix_module()
+    _comparison_fixture(tmp_path)
+    _mutate_json(
+        tmp_path / "right/evidence/records/paired-records.json",
+        lambda value: (
+            value["records"][0]["baseline"].update(score=0.0),
+            value["records"][0]["subject"].update(
+                observation_record_digest="sha256:" + "e" * 64
+            ),
+        ),
+    )
+    monkeypatch.setattr(module, "SIGNED_TRANSACTIONS", tmp_path)
+
+    comparison = module.flagship_comparison_document(["left", "right"])
+
+    assert comparison["sides"]["baseline"]["score_agreement"] == 0.0
+    assert comparison["sides"]["baseline"]["score_mismatch_ids"] == ["record-1"]
+    assert comparison["sides"]["subject"]["record_digest_agreement"] == 0.0
+    assert comparison["sides"]["subject"]["record_digest_mismatch_ids"] == ["record-1"]
+
+
 @pytest.mark.parametrize(
     "value",
     [

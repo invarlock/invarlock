@@ -107,6 +107,19 @@ def test_renderer_formats_versions_authority_and_markdown_cells(
             [
                 {
                     "dataset_name": "fixed-corpus",
+                    "package_id": "deployment-approval",
+                    "record_count": 102,
+                    "role": "deployment_approval",
+                }
+            ]
+        )
+        == "Retained (1 signed transaction, 102 records)"
+    )
+    assert (
+        module.retained_transactions(
+            [
+                {
+                    "dataset_name": "fixed-corpus",
                     "package_id": "flagship-a",
                     "record_count": 400,
                     "role": "flagship",

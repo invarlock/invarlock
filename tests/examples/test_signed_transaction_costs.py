@@ -121,6 +121,60 @@ def test_measurement_rejects_a_retained_receipt_outside_its_trust_roots() -> Non
         )
 
 
+def test_measurement_rejects_wrong_verification_failure_and_unexpected_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    verification = {
+        "artifact_digests": {"baseline": "baseline", "subject": "subject"},
+        "evidence_signer_fingerprint": "signer",
+        "runtime_digests": {"baseline": "baseline", "subject": "subject"},
+        "schedule_digest": "schedule",
+        "trust_profile_digest": "trust-profile",
+    }
+
+    def integrity_failure(*_args: object, **_kwargs: object) -> None:
+        raise module.EvidenceVerificationError("integrity failure", exit_code=2)
+
+    monkeypatch.setattr(module, "verify_evidence", integrity_failure)
+    with pytest.raises(module.EvidenceVerificationError, match="integrity failure"):
+        module._verify_and_issue_receipt(
+            tmp_path,
+            verification,
+            receipt=tmp_path / "receipt.json",
+            verifier_key=b"key",
+            expected_policy_verdict="fail",
+        )
+
+    monkeypatch.setattr(module, "verify_evidence", lambda *_args, **_kwargs: None)
+    with pytest.raises(module.MeasurementError, match="outcome changed unexpectedly"):
+        module._verify_and_issue_receipt(
+            tmp_path,
+            verification,
+            receipt=tmp_path / "receipt.json",
+            verifier_key=b"key",
+            expected_policy_verdict="fail",
+        )
+
+
+def test_measurement_rejects_an_unrecognized_policy_verdict(tmp_path: Path) -> None:
+    module = _module()
+    transaction = tmp_path / "transaction"
+    transaction.mkdir()
+    transaction.joinpath("transaction.json").write_text(
+        json.dumps(
+            {
+                "profile_id": "inspect-ai",
+                "verification": {"policy_verdict": "unknown"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.MeasurementError, match="policy verdict is invalid"):
+        module.measure_transaction(transaction, runs=1, temporary_root=tmp_path)
+
+
 def test_measurement_runs_one_untimed_warmup_before_every_sample() -> None:
     module = _module()
     observed: list[int] = []

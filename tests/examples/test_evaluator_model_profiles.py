@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from examples.integrations.evaluator_transaction import model_profiles
 
 
@@ -79,6 +81,13 @@ def test_model_profile_lookup_rejects_unmaintained_profiles() -> None:
         assert str(exc) == "unknown evaluator model profile: large"
     else:  # pragma: no cover - assertion branch
         raise AssertionError("an unknown profile was accepted")
+
+
+def test_model_profile_rejects_an_unknown_snapshot_role() -> None:
+    profile = model_profiles.model_profile("quick")
+
+    with pytest.raises(ValueError, match="unknown evaluator model role: candidate"):
+        profile.snapshot("candidate")
 
 
 def test_portability_profile_is_the_recent_gemma4_12b_qat_comparison() -> None:
