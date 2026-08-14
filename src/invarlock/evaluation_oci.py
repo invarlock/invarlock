@@ -11,7 +11,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -95,6 +95,8 @@ _CONTAINER_STOP_SECONDS = 5
 _CONTAINER_CONTROL_TIMEOUT_SECONDS = 10
 _WORKER_DRAIN_JOIN_SECONDS = 0.5
 _WORKER_DRAIN_POLL_SECONDS = 0.01
+_WORKER_CANCELLATION_POLL_SECONDS = 0.1
+_WORKER_CANCELLED_STATUS = 125
 _DEFAULT_WORKER_TMPFS_GIB = 4
 _MAX_WORKER_TMPFS_GIB = 64
 _TENSORRT_ENGINE_COPY_FACTOR = 2
@@ -1106,6 +1108,7 @@ def run_side_worker(
     command: Sequence[str],
     *,
     timeout_seconds: int,
+    cancellation_event: threading.Event | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run one precomposed worker with bounded logs and a hard outer deadline."""
 
@@ -1116,6 +1119,14 @@ def run_side_worker(
         or timeout_seconds > _MAX_OUTER_WORKER_TIMEOUT_SECONDS
     ):
         raise OciEvaluationError("worker outer timeout is invalid")
+
+    if cancellation_event is not None and cancellation_event.is_set():
+        return subprocess.CompletedProcess(
+            list(command),
+            _WORKER_CANCELLED_STATUS,
+            "",
+            "worker cancelled after paired side failure",
+        )
 
     cidfile = _worker_cidfile(command)
     try:
@@ -1151,9 +1162,33 @@ def run_side_worker(
     for drain in drains:
         drain.start()
     timed_out = False
+    cancelled = False
     try:
         try:
-            returncode = process.wait(timeout=timeout_seconds)
+            if cancellation_event is None:
+                returncode = process.wait(timeout=timeout_seconds)
+            else:
+                deadline = time.monotonic() + timeout_seconds
+                while True:
+                    observed = process.poll()
+                    if observed is not None:
+                        returncode = observed
+                        break
+                    if cancellation_event.is_set():
+                        cancelled = True
+                        _terminate_worker(process, command, cidfile)
+                        returncode = _WORKER_CANCELLED_STATUS
+                        break
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, timeout_seconds)
+                    try:
+                        returncode = process.wait(
+                            timeout=min(_WORKER_CANCELLATION_POLL_SECONDS, remaining)
+                        )
+                        break
+                    except subprocess.TimeoutExpired:
+                        continue
         except subprocess.TimeoutExpired:
             timed_out = True
             _terminate_worker(process, command, cidfile)
@@ -1174,6 +1209,10 @@ def run_side_worker(
         if stderr:
             stderr.extend(b"\n")
         stderr.extend(diagnostic.encode("utf-8"))
+    elif cancelled:
+        if stderr:
+            stderr.extend(b"\n")
+        stderr.extend(b"worker cancelled after paired side failure")
     return subprocess.CompletedProcess(
         list(command),
         returncode,
@@ -1332,24 +1371,46 @@ class OciRuntimeExecutor:
 
             completed: dict[RuntimeSideRole, subprocess.CompletedProcess[str]] = {}
             if _workers_may_run_parallel(self.launch):
+                cancellation_event = threading.Event()
+                primary_error: BaseException | None = None
                 with ThreadPoolExecutor(
                     max_workers=2, thread_name_prefix="invarlock-side"
                 ) as pool:
                     futures = {
-                        role: pool.submit(
+                        pool.submit(
                             run_side_worker,
                             command,
                             timeout_seconds=timeouts[role],
-                        )
+                            cancellation_event=cancellation_event,
+                        ): role
                         for role, command in commands.items()
                     }
-                    for role in _ROLES:
-                        completed[role] = futures[role].result()
+                    for future in as_completed(futures):
+                        role = futures[future]
+                        try:
+                            result = future.result()
+                        except BaseException as exc:
+                            if primary_error is None:
+                                primary_error = exc
+                            cancellation_event.set()
+                            continue
+                        completed[role] = result
+                        if result.returncode != 0:
+                            cancellation_event.set()
+                if primary_error is not None:
+                    raise primary_error
             else:
                 for role in _ROLES:
-                    completed[role] = run_side_worker(
+                    result = run_side_worker(
                         commands[role], timeout_seconds=timeouts[role]
                     )
+                    completed[role] = result
+                    if result.returncode != 0:
+                        diagnostic = result.stderr.strip() or "no diagnostic"
+                        raise OciEvaluationError(
+                            f"{role} worker exited with status {result.returncode}: "
+                            f"{diagnostic}"
+                        )
             failures = [
                 f"{role} worker exited with status {completed[role].returncode}: "
                 + (completed[role].stderr.strip() or "no diagnostic")
