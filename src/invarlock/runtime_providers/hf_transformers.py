@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import json
 import math
 import re
 import time
@@ -55,6 +56,7 @@ from invarlock.core.runtime_provider.types import (
     RuntimeScorer,
     evaluation_input_parts_sha256,
 )
+from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
 from invarlock.runtime_providers._hf_safetensors_identity import (
     HFSafetensorsIdentityError,
     safetensors_storage_keys,
@@ -692,6 +694,79 @@ def load_hf_model_with_strict_loading_info(
             "mismatched, or invalid model tensors"
         )
     return model
+
+
+def _text_generation_model_loader(
+    transformers: object,
+    checkpoint: Path,
+) -> Callable[..., object]:
+    """Select a local auto-model class that accepts text-only causal inputs."""
+
+    auto_config = getattr(transformers, "AutoConfig", None)
+    config_loader = getattr(auto_config, "from_pretrained", None)
+    if not callable(config_loader):
+        raise RuntimeError("transformers AutoConfig is unavailable")
+    try:
+        config = config_loader(
+            str(checkpoint),
+            local_files_only=True,
+            trust_remote_code=False,
+        )
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "transformers checkpoint configuration is unavailable"
+        ) from exc
+
+    for auto_model_name in (
+        "AutoModelForCausalLM",
+        "AutoModelForImageTextToText",
+    ):
+        auto_model = getattr(transformers, auto_model_name, None)
+        model_loader = getattr(auto_model, "from_pretrained", None)
+        model_mapping = getattr(auto_model, "_model_mapping", None)
+        if not callable(model_loader) or model_mapping is None:
+            continue
+        try:
+            supported = config.__class__ in model_mapping
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                "transformers text-generation model mapping is unavailable"
+            ) from exc
+        if supported:
+            return model_loader
+    raise ValueError(
+        "transformers checkpoint architecture does not support text generation"
+    )
+
+
+def load_hf_text_tokenizer(
+    loader: Callable[..., object],
+    checkpoint: Path,
+) -> object:
+    """Load one offline tokenizer with architecture-scoped compatibility options."""
+
+    try:
+        config = json.loads(
+            read_regular_file_bytes(
+                checkpoint / "config.json",
+                label="HF checkpoint configuration",
+                max_bytes=1024 * 1024,
+            )
+        )
+    except (json.JSONDecodeError, StrictJsonError, UnicodeDecodeError) as exc:
+        raise RuntimeError("HF checkpoint configuration is unavailable") from exc
+    if not isinstance(config, Mapping):
+        raise RuntimeError("HF checkpoint configuration is invalid")
+    model_type = config.get("model_type")
+    if not isinstance(model_type, str) or not model_type:
+        raise RuntimeError("HF checkpoint model type is unavailable")
+    options: dict[str, object] = {
+        "local_files_only": True,
+        "trust_remote_code": False,
+    }
+    if model_type == "mistral3":
+        options["fix_mistral_regex"] = True
+    return loader(str(checkpoint), **options)
 
 
 def _bind_authenticated_live_tensors(
@@ -1805,16 +1880,12 @@ class HFTransformersProvider:
         transformers = importlib.import_module("transformers")
         auto_tokenizer = getattr(transformers, "AutoTokenizer", None)
         tokenizer_from_pretrained = getattr(auto_tokenizer, "from_pretrained", None)
-        auto_model = getattr(transformers, "AutoModelForCausalLM", None)
-        model_from_pretrained = getattr(auto_model, "from_pretrained", None)
         if not callable(tokenizer_from_pretrained):
             raise RuntimeError("transformers AutoTokenizer is unavailable")
-        if not callable(model_from_pretrained):
-            raise RuntimeError("transformers AutoModelForCausalLM is unavailable")
-        tokenizer = tokenizer_from_pretrained(
-            str(checkpoint),
-            local_files_only=True,
-            trust_remote_code=False,
+        tokenizer = load_hf_text_tokenizer(tokenizer_from_pretrained, checkpoint)
+        model_from_pretrained = _text_generation_model_loader(
+            transformers,
+            checkpoint,
         )
         model = load_hf_model_with_strict_loading_info(
             model_from_pretrained,
@@ -1934,5 +2005,6 @@ __all__ = [
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
     "hf_tokenizer_contract_sha256",
     "load_hf_model_with_strict_loading_info",
+    "load_hf_text_tokenizer",
     "require_loaded_hf_checkpoint_binding",
 ]
