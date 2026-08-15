@@ -1392,6 +1392,110 @@ def test_parallel_executor_cancels_sibling_when_worker_raises(
     assert subject_cancelled.is_set()
 
 
+@pytest.mark.parametrize(
+    "control_error",
+    [
+        pytest.param(KeyboardInterrupt(), id="keyboard-interrupt"),
+        pytest.param(SystemExit(17), id="system-exit"),
+    ],
+)
+def test_parallel_executor_does_not_mask_worker_control_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    control_error: BaseException,
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    launch = replace(
+        _launch(),
+        subject=replace(_launch().subject, device="cpu"),
+    )
+    subject_observed_cancellation = threading.Event()
+
+    def run(
+        command: list[str],
+        *,
+        timeout_seconds: int,
+        cancellation_event: threading.Event,
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        if launch.baseline.image_ref in command:
+            raise RuntimeError("launcher failed first")
+        assert cancellation_event.wait(timeout=2)
+        subject_observed_cancellation.set()
+        raise control_error
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+
+    with pytest.raises(type(control_error)) as raised:
+        OciRuntimeExecutor(launch, environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    if isinstance(control_error, SystemExit):
+        assert raised.value.code == 17
+    assert subject_observed_cancellation.is_set()
+
+
+def test_parallel_executor_cancels_workers_when_collection_is_interrupted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    launch = replace(
+        _launch(),
+        subject=replace(_launch().subject, device="cpu"),
+    )
+    worker_started = (threading.Event(), threading.Event())
+    worker_cancelled = (threading.Event(), threading.Event())
+
+    def run(
+        command: list[str],
+        *,
+        timeout_seconds: int,
+        cancellation_event: threading.Event,
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        index = 0 if launch.baseline.image_ref in command else 1
+        worker_started[index].set()
+        assert cancellation_event.wait(timeout=2)
+        worker_cancelled[index].set()
+        return subprocess.CompletedProcess(
+            command,
+            evaluation_oci._WORKER_CANCELLED_STATUS,  # noqa: SLF001
+            stdout="",
+            stderr="worker cancelled after paired side failure",
+        )
+
+    def interrupt_collection(_futures: object) -> None:
+        assert all(started.wait(timeout=2) for started in worker_started)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+    monkeypatch.setattr(evaluation_oci, "as_completed", interrupt_collection)
+
+    with pytest.raises(KeyboardInterrupt):
+        OciRuntimeExecutor(launch, environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    assert all(cancelled.is_set() for cancelled in worker_cancelled)
+
+
 def test_six_file_loader_rejects_partial_or_mixed_output(tmp_path: Path) -> None:
     output = tmp_path / "output"
     output.mkdir()

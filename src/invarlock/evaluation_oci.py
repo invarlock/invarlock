@@ -1372,7 +1372,7 @@ class OciRuntimeExecutor:
             completed: dict[RuntimeSideRole, subprocess.CompletedProcess[str]] = {}
             if _workers_may_run_parallel(self.launch):
                 cancellation_event = threading.Event()
-                primary_error: BaseException | None = None
+                primary_error: Exception | None = None
                 with ThreadPoolExecutor(
                     max_workers=2, thread_name_prefix="invarlock-side"
                 ) as pool:
@@ -1385,18 +1385,22 @@ class OciRuntimeExecutor:
                         ): role
                         for role, command in commands.items()
                     }
-                    for future in as_completed(futures):
-                        role = futures[future]
-                        try:
-                            result = future.result()
-                        except BaseException as exc:
-                            if primary_error is None:
-                                primary_error = exc
-                            cancellation_event.set()
-                            continue
-                        completed[role] = result
-                        if result.returncode != 0:
-                            cancellation_event.set()
+                    try:
+                        for future in as_completed(futures):
+                            role = futures[future]
+                            try:
+                                result = future.result()
+                            except Exception as exc:
+                                if primary_error is None:
+                                    primary_error = exc
+                                cancellation_event.set()
+                                continue
+                            completed[role] = result
+                            if result.returncode != 0:
+                                cancellation_event.set()
+                    except (KeyboardInterrupt, SystemExit):
+                        cancellation_event.set()
+                        raise
                 if primary_error is not None:
                     raise primary_error
             else:
