@@ -14,6 +14,7 @@ trust anchors and signing key.
 | PEFT LoRA merge | `make example-peft-lora` | Real adapter training, save, reload, merge, model scoring, verification, and reporting |
 | TorchAO INT8 | `make example-torchao-int8` | Real weight-only quantization, exact dense-state materialization, authenticated live-kernel observations, and checkpoint comparison |
 | GGUF with llama.cpp | `make example-gguf-llama-cpp` | An official Qwen3.5-0.8B Q8 GGUF and its authenticated Q5 derivative executed through a source-bound llama.cpp image |
+| BF16-to-GGUF deployment | `make example-gguf-deployment` | One pinned Qwen3.5 9B text-causal component executed as BF16 with Transformers and as a source-derived Q5_K_M GGUF with llama.cpp |
 | LM Evaluation Harness | `make example-lm-evaluation-harness` | Real upstream per-record runs imported through a configuration- and sample-bound adapter; aggregate scores are ignored |
 | TensorRT-LLM | `make example-tensorrt-llm` | A pinned-runtime Qwen3-0.6B compatibility fixture that builds BF16 and calibrated FP8 engines on two H100 GPUs |
 | Evidence handoff | `make example-evidence-handoff` | Imported paired records, separate evidence and verifier keys, policy rejection, and byte-tamper rejection |

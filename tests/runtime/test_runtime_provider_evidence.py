@@ -169,8 +169,11 @@ def _llama_cpp_settings(
         "backend_version": receipt.backend.version,
         "batch_size": execution.batch_size,
         "context_length": execution.context_length,
+        "cpu_threads": 4,
         "gguf_metadata_sha256": artifact.gguf_metadata_sha256,
         "max_output_tokens": execution.max_output_tokens,
+        "prompt_batch_size": 32,
+        "prompt_microbatch_size": 16,
         "seed": execution.seed,
         "tensor_inventory_sha256": artifact.tensor_inventory_sha256,
         "timeout_seconds": execution.timeout_seconds,
@@ -381,6 +384,24 @@ def test_gguf_request_binding_authenticates_backend_artifact_and_execution() -> 
     assert errors == (
         "llama_cpp provider receipt does not match request setting "
         "'backend_binary_sha256'",
+    )
+
+
+def test_gguf_request_binding_preserves_closed_v1_evidence_replay() -> None:
+    artifact, _observation_value, receipt = _bundle_values()
+    receipt = replace(receipt, backend=replace(receipt.backend, build_sha256=None))
+    settings = _llama_cpp_settings(artifact, receipt)
+    for field in ("cpu_threads", "prompt_batch_size", "prompt_microbatch_size"):
+        del settings[field]
+
+    assert (
+        runtime_request_binding_errors(
+            provider_name="llama_cpp",
+            settings=settings,
+            artifact_identity=artifact,
+            receipt=receipt,
+        )
+        == ()
     )
 
 
@@ -750,6 +771,39 @@ def test_gguf_request_binding_rejects_open_settings_and_runtime_substitution() -
         "llama_cpp provider receipt backend name is invalid",
         "llama_cpp provider receipt backend build digest must be null",
         "llama_cpp provider receipt must disable network access",
+    )
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"cpu_threads": True}, "'cpu_threads' must be a positive integer"),
+        ({"cpu_threads": 257}, "cpu_threads exceeds the supported limit"),
+        (
+            {"prompt_batch_size": 4097},
+            "prompt_batch_size must not exceed context_length",
+        ),
+        (
+            {"prompt_microbatch_size": 33},
+            "prompt_microbatch_size must not exceed prompt_batch_size",
+        ),
+    ],
+)
+def test_gguf_request_binding_rejects_invalid_backend_execution_profile(
+    updates: dict[str, object], message: str
+) -> None:
+    artifact, _observation_value, receipt = _bundle_values()
+    receipt = replace(receipt, backend=replace(receipt.backend, build_sha256=None))
+    settings = {**_llama_cpp_settings(artifact, receipt), **updates}
+
+    assert any(
+        message in error
+        for error in runtime_request_binding_errors(
+            provider_name="llama_cpp",
+            settings=settings,
+            artifact_identity=artifact,
+            receipt=receipt,
+        )
     )
 
 

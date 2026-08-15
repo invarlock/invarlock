@@ -37,6 +37,9 @@ from invarlock.core.runtime_provider import (
 from invarlock.core.runtime_provider.request_bindings import (
     LLAMA_CPP_REQUEST_SETTINGS as _ALLOWED_SETTINGS,
 )
+from invarlock.core.runtime_provider.request_bindings import (
+    llama_cpp_execution_profile_errors,
+)
 from invarlock.core.runtime_provider.types import JSONScalar
 from invarlock.runtime_providers.gguf_identity import read_gguf_artifact_identity
 from invarlock.runtime_security_helpers import (
@@ -83,7 +86,10 @@ _POSITIVE_INTEGER_SETTINGS = frozenset(
         "artifact_byte_length",
         "batch_size",
         "context_length",
+        "cpu_threads",
         "max_output_tokens",
+        "prompt_batch_size",
+        "prompt_microbatch_size",
         "timeout_seconds",
     }
 )
@@ -334,6 +340,9 @@ class LlamaCppProvider:
         for name in _POSITIVE_INTEGER_SETTINGS:
             _required_integer(spec.settings, name, positive=True)
         _required_integer(spec.settings, "seed", positive=False)
+        profile_errors = llama_cpp_execution_profile_errors(spec.settings)
+        if profile_errors:
+            raise ValueError(profile_errors[0])
         validate_llama_cpp_backend_version(
             _required_text(spec.settings, "backend_version")
         )
@@ -362,6 +371,9 @@ class LlamaCppProvider:
         seed: int,
         context_length: int,
         batch_size: int,
+        cpu_threads: int,
+        prompt_batch_size: int,
+        prompt_microbatch_size: int,
         max_output_tokens: int,
         timeout_seconds: int,
     ) -> ModelRuntimeSpec:
@@ -385,8 +397,11 @@ class LlamaCppProvider:
                 "backend_version": backend.version,
                 "batch_size": batch_size,
                 "context_length": context_length,
+                "cpu_threads": cpu_threads,
                 "gguf_metadata_sha256": identity.gguf_metadata_sha256,
                 "max_output_tokens": max_output_tokens,
+                "prompt_batch_size": prompt_batch_size,
+                "prompt_microbatch_size": prompt_microbatch_size,
                 "seed": seed,
                 "tensor_inventory_sha256": identity.tensor_inventory_sha256,
                 "timeout_seconds": timeout_seconds,
@@ -543,6 +558,15 @@ class LlamaCppProvider:
                 ),
                 backend_version=_required_text(spec.settings, "backend_version"),
                 execution_settings=execution_settings,
+                cpu_threads=_required_integer(
+                    spec.settings, "cpu_threads", positive=True
+                ),
+                prompt_batch_size=_required_integer(
+                    spec.settings, "prompt_batch_size", positive=True
+                ),
+                prompt_microbatch_size=_required_integer(
+                    spec.settings, "prompt_microbatch_size", positive=True
+                ),
                 capabilities=self.capabilities(),
                 plugin=RuntimeProviderPluginIdentity(
                     name=self.name,

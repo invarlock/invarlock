@@ -3,8 +3,8 @@
 Public evidence is a curated index of immutable `invarlock/evidence-pack-v1`
 directories and independently signed verification receipts. Every current
 entry uses a 400-record paired schedule selected from a pinned public dataset.
-The index spans the built-in Hugging Face text runtime and first-party
-vision-text and TensorRT-LLM runtime packages. A comparison remains
+The index spans the built-in Hugging Face text runtime and first-party GGUF,
+vision-text, and TensorRT-LLM runtime packages. A comparison remains
 **Evidence not yet created** until its pack and receipt pass strict verification
 and disclosure review.
 
@@ -20,6 +20,7 @@ and disclosure review.
 | --- | --- | ---: | --- |
 | Mistral 7B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 400 | Normalized NLL per expected UTF-8 byte |
 | Qwen2.5 14B checkpoint and authenticated 0.99-scaled derivative | Hugging Face Transformers | 400 | Normalized NLL per expected UTF-8 byte |
+| Qwen3.5 9B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
 | Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 400 | Exact match |
 | Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 400 | Exact match |
 
@@ -36,14 +37,20 @@ bindings over the authenticated finite schedules. The normalized-NLL entries
 quantify expected-continuation likelihood. Mistral 7B records a subject/baseline
 ratio of 0.9979 with a 95% paired interval from 0.9970 to 0.9988;
 Qwen2.5 14B records 0.9985 with an interval from 0.9955 to 1.0015. Both remain
-within the authenticated maximum ratio of 1.05. The Qwen2-VL comparison records
-a paired 11 percentage-point
+within the authenticated maximum ratio of 1.05. The Qwen3.5 deployment records
+53.0% BF16 accuracy and 54.75% Q5_K_M accuracy. Its +1.75 percentage-point
+paired effect has a 95% interval from -0.83 to 4.32 percentage points, satisfying
+the authenticated -2 percentage-point lower-bound floor, 10 percentage-point
+maximum width, and 20% side-accuracy floors. The Qwen2-VL comparison records a
+paired 11 percentage-point
 exact-match improvement on its MMMU-Pro schedule, with a 95% paired interval
 from 6.34 to 15.67 percentage points. The TinyLlama engines both score zero on
 the MMLU-Pro schedule, and no relative exact-match difference is observed. Its
 supported conclusion is the signed finite-schedule non-regression decision and
 TensorRT-LLM runtime-path qualification, not model capability or output parity.
-Broader model-quality conclusions require broader, task-specific evidence.
+The Qwen3.5 result likewise qualifies the finite-schedule deployment change,
+not general output equivalence. Broader model-quality conclusions require
+broader, task-specific evidence.
 
 ## Evidence not yet created
 

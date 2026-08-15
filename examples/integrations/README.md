@@ -20,6 +20,7 @@ after the journey, including when a retained workspace is requested.
 | [Hugging Face PEFT](peft-lora/) | `make example-peft-lora` | Qwen3.5-0.8B LoRA training, save/reload, and merge |
 | [TorchAO](torchao-int8/) | `make example-torchao-int8` | Qwen3.5-0.8B INT8 weight-only quantization and a materialized checkpoint |
 | [GGUF with llama.cpp](gguf-llama-cpp/) | `make example-gguf-llama-cpp` | Official Qwen3.5-0.8B Q8 GGUF and an authenticated Q5 derivative |
+| [BF16-to-GGUF deployment](gguf-deployment/) | `make example-gguf-deployment` | One pinned Qwen3.5 9B text-causal component executed through Transformers/CUDA and a derived Q5_K_M GGUF through llama.cpp/CPU |
 | [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | Real upstream per-record output across compact CPU and retained CUDA profiles |
 | [Inspect AI](inspect-ai/) | `make example-inspect-ai` | Native Inspect Task/scorer execution across compact CPU and retained CUDA profiles |
 | [OpenAI Evals](openai-evals/) | `make example-openai-evals` | CPU, maintained native OpenAI Evals Match adapter; signed journey not yet retained |

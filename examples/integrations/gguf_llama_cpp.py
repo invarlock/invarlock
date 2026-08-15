@@ -17,6 +17,12 @@ from pathlib import Path
 import yaml
 
 from examples.integrations import launch
+from examples.integrations.evaluator_transaction.image_cleanup import (
+    OwnedImageTag,
+    record_owned_image_tag,
+    remove_owned_image_tags,
+    temporary_image_tag,
+)
 from examples.integrations.run import ExamplePaths, _paths, _write_private_key
 from examples.integrations.trust_material import (
     create_trust_material,
@@ -274,7 +280,11 @@ def _inspect_image_id(repository: Path, *, container_engine: str, image: str) ->
 
 
 def _build_runtime_image(
-    repository: Path, build_root: Path, *, container_engine: str
+    repository: Path,
+    build_root: Path,
+    *,
+    container_engine: str,
+    image_tag: str | None = None,
 ) -> str:
     commit = launch._require_committed_checkout(repository)
     source_bundle = build_root / "source.tar"
@@ -297,7 +307,7 @@ def _build_runtime_image(
     if not isinstance(source_digest, str):
         raise RuntimeError("source-bundle creation did not return its digest")
     epoch = launch._git(repository, "show", "-s", "--format=%ct", commit)
-    image = f"invarlock-example-gguf:{commit[:12]}"
+    image = image_tag or f"invarlock-example-gguf:{commit[:12]}"
     launch._run(
         [
             "make",
@@ -373,6 +383,14 @@ def _inspect_spec(
     *,
     container_engine: str,
     image_id: str,
+    seed: int = 0,
+    context_length: int = 64,
+    batch_size: int = 1,
+    cpu_threads: int = 1,
+    prompt_batch_size: int = 32,
+    prompt_microbatch_size: int = 32,
+    max_output_tokens: int = 1,
+    timeout_seconds: int = 30,
 ) -> dict[str, object]:
     code = (
         "from pathlib import Path; import json; "
@@ -381,8 +399,11 @@ def _inspect_spec(
         "binding=LlamaCppRuntimeBindings(gguf_path=Path('/inputs/model.gguf'),"
         "executable_path=Path('/opt/llama.cpp/llama-completion'),"
         "source_archive_path=Path('/opt/llama.cpp/source/llama.cpp-b10015.tar.gz')); "
-        "spec=LlamaCppProvider().inspect_runtime_spec(binding,seed=0,"
-        "context_length=64,batch_size=1,max_output_tokens=1,timeout_seconds=30); "
+        "spec=LlamaCppProvider().inspect_runtime_spec(binding,"
+        f"seed={seed},context_length={context_length},batch_size={batch_size},"
+        f"cpu_threads={cpu_threads},prompt_batch_size={prompt_batch_size},"
+        f"prompt_microbatch_size={prompt_microbatch_size},"
+        f"max_output_tokens={max_output_tokens},timeout_seconds={timeout_seconds}); "
         "print(json.dumps({'model_id':spec.model_id,'settings':dict(spec.settings)},"
         "sort_keys=True,separators=(',',':')))"
     )
@@ -672,7 +693,11 @@ def _prepare_transaction(
 
 
 def _materialize_trust(
-    paths: ExamplePaths, pending: PendingTrust, request_digest: str
+    paths: ExamplePaths,
+    pending: PendingTrust,
+    request_digest: str,
+    *,
+    verifier_identity: str = "invarlock-example/gguf-llama-cpp-verifier",
 ) -> None:
     anchored_request = normalize_digest(
         request_digest, label="independent request anchor"
@@ -689,7 +714,7 @@ def _materialize_trust(
             verifier_fingerprint=pending.verifier_fingerprint,
             trust_root=pending.trust_root,
             policy_bytes=pending.policy_bytes,
-            verifier_identity="invarlock-example/gguf-llama-cpp-verifier",
+            verifier_identity=verifier_identity,
             anchors=anchors,
         )
         if material.trusted_inputs != paths.trusted_inputs:
@@ -702,7 +727,7 @@ def _materialize_trust(
                 "policy": {"path": "policy/acceptance.json"},
                 "anchors": anchors,
                 "verifier": {
-                    "identity": "invarlock-example/gguf-llama-cpp-verifier",
+                    "identity": verifier_identity,
                     "signing_key_path": "keys/verifier.pem",
                 },
                 "allow_installed_scorers": False,
@@ -855,6 +880,11 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _image_runner(command: list[str], *, cwd: Path) -> str:
+    completed = launch._run(command, cwd=cwd, capture_output=True)
+    return completed.stdout or ""
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     trust_values = (
@@ -896,15 +926,29 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2
         workspace.parent.mkdir(parents=True, exist_ok=True)
-        workspace.mkdir()
+        workspace.mkdir(mode=0o700)
+    cleanup_tags: list[OwnedImageTag] = []
+    result = 2
     try:
         build_root = workspace / "build"
         build_root.mkdir()
         if arguments.runtime_image is None:
+            commit = launch._require_committed_checkout(repository)
+            image_tag = temporary_image_tag("invarlock-example-gguf", commit)
             image_id = _build_runtime_image(
                 repository,
                 build_root,
                 container_engine=arguments.container_engine,
+                image_tag=image_tag,
+            )
+            cleanup_tags.append(
+                record_owned_image_tag(
+                    _image_runner,
+                    arguments.container_engine,
+                    image_tag,
+                    image_id,
+                    repository,
+                )
             )
         else:
             image_id = _inspect_image_id(
@@ -958,9 +1002,22 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)
-        return 2
-    print(f"Complete GGUF integration workspace: {workspace}")
-    return 0
+    else:
+        result = 0
+    finally:
+        try:
+            remove_owned_image_tags(
+                _image_runner,
+                arguments.container_engine,
+                repository,
+                cleanup_tags,
+            )
+        except RuntimeError as exc:
+            print(f"FAIL {exc}", file=sys.stderr)
+            result = 2
+    if result == 0:
+        print(f"Complete GGUF integration workspace: {workspace}")
+    return result
 
 
 if __name__ == "__main__":

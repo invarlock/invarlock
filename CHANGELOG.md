@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a signed Qwen3.5 9B deployment journey that compares one pinned BF16
+  Transformers text-causal component with its source-derived Q5_K_M GGUF under
+  separate immutable runtime images and the balanced 400-record MMLU-Pro
+  policy. Its published evidence records 53.0% baseline accuracy, 54.75%
+  subject accuracy, and a 95% paired interval from -0.83 to 4.32 percentage
+  points under an independently signed passing receipt.
+
 - Added a five-minute CPU-only wheel-user workflow that verifies retained
   signed evidence, issues a fresh verifier receipt, renders HTML, and runs from
   versioned example files outside the installed package.
@@ -76,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Separated llama.cpp prompt batching and CPU thread controls from InvarLock's
+  record batch size, and bound those backend controls into the closed GGUF
+  runtime request profile while preserving verification of previously signed
+  GGUF profiles.
 - Bound temporary container tags and worker cleanup to immutable engine IDs,
   preserved no-follow validation for caller-owned key and workspace paths,
   and removed partial streamed output after bounded command failures.
