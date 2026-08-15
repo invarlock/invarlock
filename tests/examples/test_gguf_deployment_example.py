@@ -281,7 +281,53 @@ def test_independent_canary_pins_ministral3_without_expanding_the_matrix() -> No
         and not record["prompt"].startswith("<s>")
         for record in records
     )
-    assert example.deployment_profile_keys() == ("qwen35-9b", "ministral3-8b")
+    assert "ministral3-8b" in example.deployment_profile_keys()
+
+
+def test_qwen38_profile_pins_official_27b_and_reuses_frozen_rendering() -> None:
+    profile = example.deployment_profile("qwen38-27b")
+    records = example.deployment_records(profile)
+
+    assert profile.source.repository == "Qwen/Qwen3.8-27B"
+    assert profile.source.revision == "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    assert profile.source.model_type == "qwen3_5"
+    assert profile.source.checkpoint_tree_sha256 == (
+        "sha256:2556be511aff126ec5cb1c0d1be9776cc958bc312e859705cb7e2f6d1eb97e7a"
+    )
+    assert profile.source.tokenizer_contract_sha256 == (
+        "3b6e697fdb642963dd8dd07ffe7e5e60b4e3710b252d0a5511488adb8cc8e0ea"
+    )
+    assert len(profile.source.files) == 25
+    assert sum(item.byte_length for item in profile.source.files) == 55_586_035_522
+    assert (
+        len(
+            [
+                item
+                for item in profile.source.files
+                if item.name.endswith(".safetensors")
+            ]
+        )
+        == 18
+    )
+    assert {item.name for item in profile.source.files} >= {
+        "chat_template.jinja",
+        "config.json",
+        "model.safetensors.index.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+    }
+    assert profile.corpus.key == "qwen38-27b"
+    assert profile.corpus.dataset_name == "TIGER-Lab/MMLU-Pro/qwen38-no-think"
+    assert profile.corpus.dataset_sha256 == (
+        example.deployment_profile().corpus.dataset_sha256
+    )
+    assert profile.corpus.record_count == 400
+    assert records == example.deployment_records(example.deployment_profile())
+    assert example.deployment_profile_keys() == (
+        "qwen35-9b",
+        "qwen38-27b",
+        "ministral3-8b",
+    )
 
 
 def test_deployment_profile_rejects_an_unregistered_model_family() -> None:
