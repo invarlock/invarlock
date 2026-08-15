@@ -29,7 +29,7 @@ request separately pins record batching, llama.cpp prompt and micro-batch
 sizes, and CPU thread count; the journey fixes the corresponding worker CPU
 limit.
 
-## Retained result
+## Retained results
 
 The [published signed transaction](../../../public_evidence/evidence/qwen3.5-9b-bf16-to-q5-k-m-gguf/)
 records 212 of 400 exact matches for BF16 and 219 of 400 for Q5_K_M. The paired
@@ -38,6 +38,15 @@ from -0.83 to 4.32 percentage points. The interval width is 5.15 percentage
 points, and both side accuracies exceed the 20% floor, so the frozen policy
 passes. This is a finite-schedule deployment non-regression result, not a claim
 of general output equivalence or broader model quality.
+
+The [independent-family signed transaction](../../../public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf/)
+records 179 of 400 exact matches for Ministral 3 BF16 and 181 of 400 for its
+Q5_K_M GGUF. The paired subject-minus-baseline effect is +0.50 percentage
+points, with a 95% interval from -1.12 to 2.12 percentage points. Its 3.24
+percentage-point interval width and both side accuracies satisfy the same
+frozen policy. This result exercises the deployment architecture with an
+independent model family; it remains a bounded canary outside the evaluator
+qualification matrix.
 
 ## Compute and storage
 

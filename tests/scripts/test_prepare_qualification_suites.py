@@ -13,6 +13,8 @@ from PIL import Image
 
 from examples.integrations.evaluator_transaction.corpora import (
     corpus_profile,
+    independent_canary_corpus_profile,
+    independent_canary_records,
     qualification_records,
     records_jsonl,
 )
@@ -705,9 +707,16 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
             "task": "vision_text_generation",
         },
     }
-    for profile_key in ("flagship", "portability"):
-        profile = corpus_profile(profile_key)
-        records = qualification_records(profile)
+    profiles = [
+        (profile, qualification_records(profile))
+        for profile in (
+            corpus_profile("flagship"),
+            corpus_profile("portability"),
+        )
+    ]
+    canary_profile = independent_canary_corpus_profile()
+    profiles.append((canary_profile, independent_canary_records()))
+    for profile, records in profiles:
         payload = records_jsonl(records, compact=True)
         expected_schedule = prepare_local_evaluation_schedule_bytes(
             LocalDatasetRequest(
