@@ -92,6 +92,41 @@ class ConversionResult:
     subject_byte_length: int
 
 
+def _load_external_trust_material(
+    *,
+    evidence_signing_key: Path,
+    verifier_signing_key: Path,
+    trust_root: Path,
+    transaction_root: Path,
+) -> tuple[Path, Path, bytes, str, bytes, str]:
+    """Authenticate all caller-owned trust inputs without creating new state."""
+
+    validated_trust_root = validate_new_trust_root(
+        trust_root,
+        transaction_root=transaction_root,
+    )
+    evidence_key_path, evidence_key_bytes, evidence_signer = load_external_key(
+        evidence_signing_key,
+        transaction_root=transaction_root,
+        label="evidence signing key",
+    )
+    _verifier_key_path, verifier_key_bytes, verifier = load_external_key(
+        verifier_signing_key,
+        transaction_root=transaction_root,
+        label="verifier signing key",
+    )
+    if evidence_signer == verifier:
+        raise ValueError("evidence and verifier signing keys must be distinct")
+    return (
+        validated_trust_root,
+        evidence_key_path,
+        evidence_key_bytes,
+        evidence_signer,
+        verifier_key_bytes,
+        verifier,
+    )
+
+
 def _conversion_command(
     profile: DeploymentProfile,
     engine: str,
@@ -588,19 +623,19 @@ def _prepare_transaction(
         assert evidence_signing_key is not None
         assert verifier_signing_key is not None
         assert trust_root is not None
-        trust_root = validate_new_trust_root(trust_root, transaction_root=root)
-        evidence_key_path, evidence_key_bytes, evidence_signer = load_external_key(
-            evidence_signing_key,
+        (
+            trust_root,
+            evidence_key_path,
+            evidence_key_bytes,
+            evidence_signer,
+            verifier_key_bytes,
+            verifier,
+        ) = _load_external_trust_material(
+            evidence_signing_key=evidence_signing_key,
+            verifier_signing_key=verifier_signing_key,
+            trust_root=trust_root,
             transaction_root=root,
-            label="evidence signing key",
         )
-        _verifier_key_path, verifier_key_bytes, verifier = load_external_key(
-            verifier_signing_key,
-            transaction_root=root,
-            label="verifier signing key",
-        )
-        if evidence_signer == verifier:
-            raise ValueError("evidence and verifier signing keys must be distinct")
         paths = _paths(root, evidence_key=evidence_key_path, trust_root=trust_root)
     else:
         paths.independent_policy.parent.mkdir(parents=True)
@@ -969,9 +1004,13 @@ def main(argv: list[str] | None = None) -> int:
         transaction = workspace / "transaction"
         transaction.mkdir()
         if external_trust:
+            assert arguments.evidence_signing_key is not None
+            assert arguments.verifier_signing_key is not None
             assert arguments.trust_root is not None
-            validate_new_trust_root(
-                arguments.trust_root,
+            _load_external_trust_material(
+                evidence_signing_key=arguments.evidence_signing_key,
+                verifier_signing_key=arguments.verifier_signing_key,
+                trust_root=arguments.trust_root,
                 transaction_root=transaction,
             )
         profile = deployment_profile(arguments.profile)

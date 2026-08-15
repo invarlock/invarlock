@@ -733,7 +733,7 @@ def _text_generation_model_loader(
                 "transformers text-generation model mapping is unavailable"
             ) from exc
         if supported:
-            return model_loader
+            return cast(Callable[..., object], model_loader)
     raise ValueError(
         "transformers checkpoint architecture does not support text generation"
     )

@@ -147,6 +147,74 @@ def test_existing_external_trust_root_fails_before_model_work(
     assert (workspace / "transaction").is_dir()
 
 
+def test_invalid_external_key_fails_before_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    evidence_key = tmp_path / "evidence.pem"
+    evidence_key.write_text("not a private key", encoding="utf-8")
+    verifier_key = tmp_path / "verifier.pem"
+    example._write_private_key(verifier_key)
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("model work must not start")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--evidence-signing-key",
+                str(evidence_key),
+                "--verifier-signing-key",
+                str(verifier_key),
+                "--trust-root",
+                str(tmp_path / "new-trust"),
+            ]
+        )
+        == 2
+    )
+    assert observed == []
+    assert (workspace / "transaction").is_dir()
+
+
+def test_duplicate_external_keys_fail_before_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    signing_key = tmp_path / "signing.pem"
+    example._write_private_key(signing_key)
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("model work must not start")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--evidence-signing-key",
+                str(signing_key),
+                "--verifier-signing-key",
+                str(signing_key),
+                "--trust-root",
+                str(tmp_path / "new-trust"),
+            ]
+        )
+        == 2
+    )
+    assert observed == []
+    assert (workspace / "transaction").is_dir()
+
+
 def test_main_forwards_the_selected_independent_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
