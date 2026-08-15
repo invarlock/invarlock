@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   policy. Its published evidence records 53.0% baseline accuracy, 54.75%
   subject accuracy, and a 95% paired interval from -0.83 to 4.32 percentage
   points under an independently signed passing receipt.
+- Added an independent-family Ministral 3 8B deployment canary under the same
+  frozen 400-record policy. Its published evidence records 44.75% BF16
+  accuracy, 45.25% Q5_K_M accuracy, and a 95% paired interval from -1.12 to
+  2.12 percentage points under an independently signed passing receipt.
 
 - Added a five-minute CPU-only wheel-user workflow that verifies retained
   signed evidence, issues a fresh verifier receipt, renders HTML, and runs from

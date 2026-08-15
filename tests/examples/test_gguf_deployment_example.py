@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from examples.integrations import gguf_deployment as example
+from examples.integrations import gguf_deployment_profiles as profiles
 from examples.integrations.evaluator_transaction.model_profiles import SnapshotFile
 from examples.integrations.gguf_llama_cpp import PendingTrust
 
@@ -94,7 +95,7 @@ def test_requested_workspace_is_owner_only_before_any_model_work(
     workspace = tmp_path / "retained"
     observed: list[int] = []
 
-    def stop() -> example.DeploymentProfile:
+    def stop(_key: str) -> example.DeploymentProfile:
         observed.append(stat.S_IMODE(workspace.stat().st_mode))
         raise RuntimeError("stop after workspace check")
 
@@ -113,6 +114,133 @@ def test_requested_workspace_is_owner_only_before_any_model_work(
     assert observed == [0o700]
 
 
+def test_existing_external_trust_root_fails_before_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    trust_root = tmp_path / "existing-trust"
+    trust_root.mkdir()
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("model work must not start")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--evidence-signing-key",
+                str(tmp_path / "evidence.pem"),
+                "--verifier-signing-key",
+                str(tmp_path / "verifier.pem"),
+                "--trust-root",
+                str(trust_root),
+            ]
+        )
+        == 2
+    )
+    assert observed == []
+    assert (workspace / "transaction").is_dir()
+
+
+def test_invalid_external_key_fails_before_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    evidence_key = tmp_path / "evidence.pem"
+    evidence_key.write_text("not a private key", encoding="utf-8")
+    verifier_key = tmp_path / "verifier.pem"
+    example._write_private_key(verifier_key)
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("model work must not start")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--evidence-signing-key",
+                str(evidence_key),
+                "--verifier-signing-key",
+                str(verifier_key),
+                "--trust-root",
+                str(tmp_path / "new-trust"),
+            ]
+        )
+        == 2
+    )
+    assert observed == []
+    assert (workspace / "transaction").is_dir()
+
+
+def test_duplicate_external_keys_fail_before_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    signing_key = tmp_path / "signing.pem"
+    example._write_private_key(signing_key)
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("model work must not start")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--evidence-signing-key",
+                str(signing_key),
+                "--verifier-signing-key",
+                str(signing_key),
+                "--trust-root",
+                str(tmp_path / "new-trust"),
+            ]
+        )
+        == 2
+    )
+    assert observed == []
+    assert (workspace / "transaction").is_dir()
+
+
+def test_main_forwards_the_selected_independent_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("stop after profile selection")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--profile",
+                "ministral3-8b",
+                "--workspace",
+                str(tmp_path / "canary"),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert observed == ["ministral3-8b"]
+
+
 def test_profile_uses_one_pinned_post_trained_9b_source_and_flagship_corpus() -> None:
     profile = example.deployment_profile()
 
@@ -128,9 +256,126 @@ def test_profile_uses_one_pinned_post_trained_9b_source_and_flagship_corpus() ->
     assert profile.subject_device == "cpu"
 
 
+def test_independent_canary_pins_ministral3_without_expanding_the_matrix() -> None:
+    profile = example.deployment_profile("ministral3-8b")
+    records = example.deployment_records(profile)
+
+    assert profile.source.repository == ("mistralai/Ministral-3-8B-Instruct-2512-BF16")
+    assert profile.source.revision == "f6fae9795746f63c9be8344932f01275f3c63734"
+    assert profile.source.model_type == "mistral3"
+    assert profile.source.checkpoint_tree_sha256 == (
+        "sha256:6cbddcebc289550569cc3f6a93676a8f4f605d8574b8aec8448d61594a283996"
+    )
+    assert profile.source.tokenizer_contract_sha256 == (
+        "b9e3906504b6235b5c289fe9d3f7a86512f968dfe300771ec660080924615dbc"
+    )
+    assert profile.corpus.key == "independent-canary"
+    assert profile.corpus.record_count == 400
+    assert profile.corpus.dataset_sha256 == (
+        "c3d83209d6f36023f0a5aef5ee9be895891cc66ecc1b7196e83227558a38fade"
+    )
+    assert len(records) == 400
+    assert all(
+        record["prompt"].startswith("[SYSTEM_PROMPT]")
+        and record["prompt"].endswith("[/INST]")
+        and not record["prompt"].startswith("<s>")
+        for record in records
+    )
+    assert example.deployment_profile_keys() == ("qwen35-9b", "ministral3-8b")
+
+
+def test_deployment_profile_rejects_an_unregistered_model_family() -> None:
+    with pytest.raises(ValueError, match="unknown GGUF deployment profile"):
+        example.deployment_profile("unregistered")
+
+
+def test_deployment_profile_rejects_drift_in_a_registered_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    valid = profiles.deployment_profile("ministral3-8b")
+    monkeypatch.setattr(
+        profiles,
+        "_ministral3_profile",
+        lambda: replace(valid, quantization="Q4_K_M"),
+    )
+
+    with pytest.raises(RuntimeError, match="profile invariants"):
+        profiles.deployment_profile("ministral3-8b")
+
+
+def test_deployment_records_reject_an_unregistered_profile() -> None:
+    profile = replace(profiles.deployment_profile(), key="unregistered")
+
+    with pytest.raises(ValueError, match="deployment record profile"):
+        profiles.deployment_records(profile)
+
+
+def test_baseline_spec_uses_the_shared_tokenizer_loader_and_closed_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile = example.deployment_profile("ministral3-8b")
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    observed: list[Path] = []
+
+    class Tokenizer:
+        def __call__(
+            self, text: str, *, add_special_tokens: bool
+        ) -> dict[str, list[int]]:
+            if add_special_tokens:
+                assert text == "[INST]question[/INST]"
+                return {"input_ids": [1, 2, 3]}
+            assert text == "A"
+            return {"input_ids": [4]}
+
+    def load_tokenizer(_loader: object, path: Path) -> Tokenizer:
+        observed.append(path)
+        return Tokenizer()
+
+    monkeypatch.setattr(example, "load_hf_text_tokenizer", load_tokenizer)
+    monkeypatch.setattr(
+        example,
+        "hf_tokenizer_contract_sha256",
+        lambda _tokenizer: profile.source.tokenizer_contract_sha256,
+    )
+    monkeypatch.setattr(
+        example,
+        "checkpoint_tree_sha256",
+        lambda _path: profile.source.checkpoint_tree_sha256,
+    )
+    monkeypatch.setattr(
+        example,
+        "deployment_records",
+        lambda _profile: [
+            {
+                "id": "record-1",
+                "prompt": "[INST]question[/INST]",
+                "expected": "A",
+            }
+        ],
+    )
+
+    spec = example._baseline_spec(checkpoint, profile)
+
+    assert observed == [checkpoint]
+    assert spec["model_id"] == profile.source.repository
+    assert spec["settings"] == {
+        "batch_size": 1,
+        "checkpoint_tree_sha256": profile.source.checkpoint_tree_sha256,
+        "context_length": profile.corpus.context_length,
+        "immutable_revision": profile.source.revision,
+        "max_output_tokens": 1,
+        "offline": True,
+        "seed": example._SEED,
+        "timeout_seconds": example._BASELINE_TIMEOUT_SECONDS,
+        "tokenizer_metadata_sha256": profile.source.tokenizer_contract_sha256,
+    }
+
+
 def test_conversion_and_quantization_commands_are_immutable_and_networkless(
     tmp_path: Path,
 ) -> None:
+    profile = example.deployment_profile()
     source = tmp_path / "source-model"
     source.mkdir()
     archive = tmp_path / "llama.cpp.tar.gz"
@@ -140,6 +385,7 @@ def test_conversion_and_quantization_commands_are_immutable_and_networkless(
     image = "sha256:" + "a" * 64
 
     conversion = example._conversion_command(
+        profile,
         "docker",
         image,
         source_checkpoint=source,
@@ -155,8 +401,9 @@ def test_conversion_and_quantization_commands_are_immutable_and_networkless(
     assert "--outtype" in conversion[-1]
     assert "bf16" in conversion[-1]
 
-    intermediate = output / example._INTERMEDIATE_NAME
+    intermediate = output / profile.intermediate_name
     quantization = example._quantization_command(
+        profile,
         "docker",
         image,
         intermediate=intermediate,
@@ -170,9 +417,44 @@ def test_conversion_and_quantization_commands_are_immutable_and_networkless(
     assert "--allow-requantize" not in quantization
 
 
+def test_independent_profile_controls_both_conversion_output_names(
+    tmp_path: Path,
+) -> None:
+    profile = example.deployment_profile("ministral3-8b")
+    source = tmp_path / "source-model"
+    source.mkdir()
+    archive = tmp_path / "llama.cpp.tar.gz"
+    archive.write_bytes(b"source")
+    output = tmp_path / "output"
+    output.mkdir()
+    image = "sha256:" + "a" * 64
+
+    conversion = example._conversion_command(
+        profile,
+        "docker",
+        image,
+        source_checkpoint=source,
+        source_archive=archive,
+        output_root=output,
+    )
+    quantization = example._quantization_command(
+        profile,
+        "docker",
+        image,
+        intermediate=output / profile.intermediate_name,
+        output_root=output,
+    )
+
+    assert f"/output/{profile.intermediate_name}" in conversion[-1]
+    assert quantization[-2] == f"/output/{profile.subject_name}"
+    assert "Qwen" not in conversion[-1]
+    assert all("Qwen" not in argument for argument in quantization)
+
+
 def test_conversion_rejects_missing_or_unchanged_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile = example.deployment_profile()
     source = tmp_path / "source"
     source.mkdir()
     archive = tmp_path / "llama.cpp.tar.gz"
@@ -194,6 +476,7 @@ def test_conversion_rejects_missing_or_unchanged_outputs(
     with pytest.raises(RuntimeError, match="BF16 GGUF"):
         example._convert_and_quantize(
             tmp_path,
+            profile=profile,
             source_checkpoint=source,
             source_archive=archive,
             output_root=output,
@@ -208,9 +491,9 @@ def test_conversion_rejects_missing_or_unchanged_outputs(
     ) -> subprocess.CompletedProcess[str]:
         commands.append(command)
         if len(commands) == 1:
-            (output / example._INTERMEDIATE_NAME).write_bytes(b"same")
+            (output / profile.intermediate_name).write_bytes(b"same")
         else:
-            (output / example._SUBJECT_NAME).write_bytes(b"same")
+            (output / profile.subject_name).write_bytes(b"same")
         return _completed(command)
 
     commands.clear()
@@ -218,6 +501,7 @@ def test_conversion_rejects_missing_or_unchanged_outputs(
     with pytest.raises(RuntimeError, match="distinct GGUF"):
         example._convert_and_quantize(
             tmp_path,
+            profile=profile,
             source_checkpoint=source,
             source_archive=archive,
             output_root=output,
@@ -225,7 +509,7 @@ def test_conversion_rejects_missing_or_unchanged_outputs(
             conversion_image_id="sha256:" + "a" * 64,
             gguf_image_id="sha256:" + "b" * 64,
         )
-    assert not (output / example._INTERMEDIATE_NAME).exists()
+    assert not (output / profile.intermediate_name).exists()
 
 
 def test_checkpoint_staging_removes_a_tree_that_fails_final_identity(
@@ -265,9 +549,9 @@ def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
     source = runtime_root / "models" / "source"
     source.mkdir(parents=True)
     (source / "config.json").write_text("{}", encoding="utf-8")
-    subject = runtime_root / "models" / example._SUBJECT_NAME
-    subject.write_bytes(b"GGUF-subject")
     profile = example.deployment_profile()
+    subject = runtime_root / "models" / profile.subject_name
+    subject.write_bytes(b"GGUF-subject")
     baseline_image_id = "sha256:" + "c" * 64
     subject_image_id = "sha256:" + "d" * 64
     transformation = example._transformation_document(
@@ -294,6 +578,7 @@ def test_transaction_binds_cross_runtime_source_lineage_and_predeclared_policy(
 
     paths, _pending = example._prepare_transaction(
         root,
+        profile=profile,
         runtime_root=runtime_root,
         source_checkpoint=source,
         subject=subject,
@@ -338,7 +623,7 @@ def test_transaction_rejects_a_transformation_not_bound_to_the_current_subject(
     runtime_root = tmp_path / "runtime"
     source = runtime_root / "models/source"
     source.mkdir(parents=True)
-    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject = runtime_root / "models" / profile.subject_name
     subject.write_bytes(b"original-subject")
     baseline_image_id = "sha256:" + "a" * 64
     subject_image_id = "sha256:" + "b" * 64
@@ -359,6 +644,7 @@ def test_transaction_rejects_a_transformation_not_bound_to_the_current_subject(
     with pytest.raises(RuntimeError, match="transformation subject identity"):
         example._prepare_transaction(
             tmp_path / "transaction",
+            profile=profile,
             runtime_root=runtime_root,
             source_checkpoint=source,
             subject=subject,
@@ -377,7 +663,7 @@ def test_transaction_rejects_a_runtime_spec_not_bound_to_the_subject_bytes(
     runtime_root = tmp_path / "runtime"
     source = runtime_root / "models/source"
     source.mkdir(parents=True)
-    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject = runtime_root / "models" / profile.subject_name
     subject.write_bytes(b"GGUF-subject")
     subject_sha256 = hashlib.sha256(subject.read_bytes()).hexdigest()
     baseline_image_id = "sha256:" + "a" * 64
@@ -398,6 +684,7 @@ def test_transaction_rejects_a_runtime_spec_not_bound_to_the_subject_bytes(
     with pytest.raises(RuntimeError, match="subject runtime specification"):
         example._prepare_transaction(
             tmp_path / "transaction",
+            profile=profile,
             runtime_root=runtime_root,
             source_checkpoint=source,
             subject=subject,
@@ -432,7 +719,7 @@ def test_transaction_rejects_execution_settings_outside_the_closed_profile(
     runtime_root = tmp_path / "runtime"
     source = runtime_root / "models/source"
     source.mkdir(parents=True)
-    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject = runtime_root / "models" / profile.subject_name
     subject.write_bytes(b"GGUF-subject")
     baseline_image_id = "sha256:" + "a" * 64
     subject_image_id = "sha256:" + "b" * 64
@@ -458,6 +745,7 @@ def test_transaction_rejects_execution_settings_outside_the_closed_profile(
     with pytest.raises(RuntimeError, match=message):
         example._prepare_transaction(
             tmp_path / "transaction",
+            profile=profile,
             runtime_root=runtime_root,
             source_checkpoint=source,
             subject=subject,
@@ -472,17 +760,19 @@ def test_transaction_rejects_execution_settings_outside_the_closed_profile(
 def test_transaction_rejects_a_symlinked_subject_before_hashing(
     tmp_path: Path,
 ) -> None:
+    profile = example.deployment_profile()
     runtime_root = tmp_path / "runtime"
     source = runtime_root / "models/source"
     source.mkdir(parents=True)
     target = tmp_path / "outside.gguf"
     target.write_bytes(b"outside-subject")
-    subject = runtime_root / "models" / example._SUBJECT_NAME
+    subject = runtime_root / "models" / profile.subject_name
     subject.symlink_to(target)
 
     with pytest.raises(RuntimeError, match="Q5_K_M GGUF"):
         example._prepare_transaction(
             tmp_path / "transaction",
+            profile=profile,
             runtime_root=runtime_root,
             source_checkpoint=source,
             subject=subject,
@@ -552,6 +842,7 @@ def test_execute_selects_independent_images_and_devices(
     example._execute(
         tmp_path,
         paths,
+        profile=example.deployment_profile(),
         runtime_root=tmp_path / "runtime",
         container_engine="docker",
         baseline_image_id="sha256:" + "a" * 64,
@@ -632,6 +923,7 @@ def test_execute_can_retain_an_independently_verified_policy_rejection(
     example._execute(
         tmp_path,
         paths,
+        profile=example.deployment_profile(),
         runtime_root=tmp_path / "runtime",
         container_engine="docker",
         baseline_image_id="sha256:" + "a" * 64,

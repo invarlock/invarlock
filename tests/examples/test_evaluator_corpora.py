@@ -136,6 +136,59 @@ def test_portability_profile_renders_the_same_semantic_ids_for_gemma() -> None:
     assert corpora.profile_for_dataset(payload) == profile
 
 
+def test_independent_canary_reuses_semantics_without_expanding_the_matrix() -> None:
+    flagship = corpora.qualification_records(corpora.corpus_profile("flagship"))
+    profile = corpora.independent_canary_corpus_profile()
+    canary = corpora.independent_canary_records()
+    payload = corpora.records_jsonl(canary, compact=True)
+
+    assert profile.key == "independent-canary"
+    assert profile.record_count == 400
+    assert profile.dataset_name == "TIGER-Lab/MMLU-Pro/ministral3-instruct"
+    assert profile.dataset_sha256 == hashlib.sha256(payload).hexdigest()
+    assert [record["id"] for record in canary] == [record["id"] for record in flagship]
+    assert [record["expected"] for record in canary] == [
+        record["expected"] for record in flagship
+    ]
+    assert all(
+        record["prompt"].startswith("[SYSTEM_PROMPT]")
+        and record["prompt"].endswith("[/INST]")
+        and not record["prompt"].startswith("<s>")
+        and "<think>" not in record["prompt"]
+        for record in canary
+    )
+    assert "independent-canary" not in corpora.PROFILE_KEYS
+    with pytest.raises(ValueError, match="not a pinned evaluator corpus"):
+        corpora.profile_for_dataset(payload)
+
+
+def test_independent_canary_provenance_binds_shared_semantics_and_rendering() -> None:
+    provenance = corpora.corpus_provenance(corpora.independent_canary_corpus_profile())
+
+    assert provenance["rendering"] == {
+        "algorithm": "mistral3-instruct-v1",
+        "bos": "runtime-added",
+        "suffix": "[/INST]",
+    }
+    assert provenance["model_profile"] == ("ministral3-8b-instruct-bf16-to-q5-k-m-v1")
+    assert provenance["qualification_suite"]["semantic_sha256"] == (
+        "18a88db999d8157ef051fee0eac4ad48b291853c970a5dc709d40b35e2da4430"
+    )
+
+
+def test_independent_canary_rejects_rendering_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        corpora,
+        "_INDEPENDENT_CANARY_BYTES",
+        corpora._INDEPENDENT_CANARY_BYTES + 1,
+    )
+
+    with pytest.raises(RuntimeError, match="independent-canary corpus"):
+        corpora.independent_canary_records()
+
+
 def test_flagship_policy_is_frozen_before_model_execution() -> None:
     policy = corpora.corpus_profile("flagship").acceptance_policy()
 
@@ -190,6 +243,12 @@ def test_profile_lookup_rejects_unknown_and_tampered_material() -> None:
         corpora.profile_for_dataset(b"{}\n")
     with pytest.raises(ValueError, match="not a pinned evaluator corpus"):
         corpora.profile_for_descriptor({"sha256": "0" * 64})
+
+
+def test_pinned_descriptor_resolves_to_its_profile() -> None:
+    profile = corpora.corpus_profile("flagship")
+
+    assert corpora.profile_for_descriptor(profile.dataset_descriptor()) == profile
 
 
 def test_profile_metadata_does_not_load_deployment_material(

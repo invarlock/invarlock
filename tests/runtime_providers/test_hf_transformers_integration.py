@@ -206,6 +206,129 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
         session.runtime_receipt()
 
 
+def test_hf_provider_executes_text_through_a_real_tiny_image_text_model(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    tokenizers = pytest.importorskip("tokenizers")
+    monkeypatch.setattr(
+        hf_transformers, "_installed_backend_identity", _REAL_BACKEND_IDENTITY
+    )
+    monkeypatch.setattr(hf_transformers, "_observed_device_facts", _REAL_DEVICE_FACTS)
+    monkeypatch.setattr(
+        hf_transformers,
+        "_require_strict_execution_binding",
+        _REAL_STRICT_EXECUTION_BINDING,
+    )
+    torch.manual_seed(23)
+    rope = {
+        "beta_fast": 32.0,
+        "beta_slow": 1.0,
+        "factor": 2.0,
+        "llama_4_scaling_beta": 0.1,
+        "mscale": 1.0,
+        "mscale_all_dim": 1.0,
+        "original_max_position_embeddings": 16,
+        "rope_theta": 10_000.0,
+        "rope_type": "yarn",
+    }
+    config = transformers.Mistral3Config(
+        text_config={
+            "model_type": "ministral3",
+            "vocab_size": 32,
+            "hidden_size": 8,
+            "intermediate_size": 16,
+            "num_hidden_layers": 1,
+            "num_attention_heads": 1,
+            "num_key_value_heads": 1,
+            "head_dim": 8,
+            "max_position_embeddings": 32,
+            "rope_parameters": rope,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "pad_token_id": 0,
+        },
+        vision_config={
+            "model_type": "pixtral",
+            "hidden_size": 8,
+            "intermediate_size": 16,
+            "num_hidden_layers": 1,
+            "num_attention_heads": 1,
+            "head_dim": 8,
+            "image_size": 4,
+            "patch_size": 2,
+            "num_channels": 3,
+        },
+        image_token_index=10,
+    )
+    model = transformers.Mistral3ForConditionalGeneration(config).eval()
+    checkpoint = tmp_path / "tiny-image-text-hf"
+    model.save_pretrained(checkpoint, safe_serialization=True)
+    vocab = {
+        "<pad>": 0,
+        "<bos>": 1,
+        "<eos>": 2,
+        "<unk>": 3,
+        **{f"token-{index}": index + 4 for index in range(28)},
+    }
+    tokenizer_backend = tokenizers.Tokenizer(
+        tokenizers.models.WordLevel(vocab, unk_token="<unk>")
+    )
+    tokenizer_backend.pre_tokenizer = tokenizers.pre_tokenizers.WhitespaceSplit()
+    tokenizer = transformers.PreTrainedTokenizerFast(
+        tokenizer_object=tokenizer_backend,
+        bos_token="<bos>",
+        eos_token="<eos>",
+        pad_token="<pad>",
+        unk_token="<unk>",
+    )
+    tokenizer.save_pretrained(checkpoint)
+    tree_sha256 = checkpoint_tree_sha256(checkpoint)
+    tokenizer_sha256 = hf_tokenizer_contract_sha256(tokenizer)
+    spec = ModelRuntimeSpec(
+        provider_name="hf_transformers",
+        model_id=str(checkpoint),
+        settings={
+            "batch_size": 1,
+            "checkpoint_tree_sha256": tree_sha256,
+            "context_length": 8,
+            "max_output_tokens": 1,
+            "offline": True,
+            "seed": 23,
+            "timeout_seconds": 30,
+            "tokenizer_metadata_sha256": tokenizer_sha256,
+        },
+    )
+    input_text = "token-1 token-2 token-3"
+    batch = EvaluationBatch(
+        schedule_sha256=hashlib.sha256(b"tiny-image-text-schedule").hexdigest(),
+        records=(
+            EvaluationRecord(
+                record_id="tiny-image-text-1",
+                input_text=input_text,
+                input_sha256=hashlib.sha256(input_text.encode()).hexdigest(),
+                expected_output="token-23",
+            ),
+        ),
+    )
+
+    context = HFTransformersProvider().prepare_execution(
+        spec,
+        RuntimeArtifactResources(
+            root=tmp_path,
+            primary_artifact=checkpoint.name,
+            support_resources={},
+            device_kind="cpu",
+            container_image_digest=_IMAGE_DIGEST,
+        ),
+    )
+    observation = HFTransformersProvider().open(spec, context).score(batch)
+
+    assert observation.records[0].status == "ok"
+    assert observation.records[0].output_text == "token-23"
+
+
 def test_hf_strict_open_rejects_loaded_weights_from_another_checkpoint(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

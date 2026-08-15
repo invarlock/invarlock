@@ -26,6 +26,11 @@ _DEPLOYMENT_MANIFEST_SHA256 = (
     "a774b4369658d6f6c4910b03968008c59e55a3cd04b3737c34373074f583df77"
 )
 PROFILE_KEYS = ("quick", "deployment", "flagship", "portability")
+_INDEPENDENT_CANARY_KEY = "independent-canary"
+_INDEPENDENT_CANARY_BYTES = 379_746
+_INDEPENDENT_CANARY_SHA256 = (
+    "c3d83209d6f36023f0a5aef5ee9be895891cc66ecc1b7196e83227558a38fade"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,8 +172,37 @@ def corpus_profile(key: str) -> CorpusProfile:
     return factory()
 
 
+def independent_canary_corpus_profile() -> CorpusProfile:
+    """Return the closed Mistral rendering used by the deployment canary.
+
+    The profile intentionally stays outside ``PROFILE_KEYS``: it is a
+    deployment-format canary, not another evaluator-qualification matrix lane.
+    It reuses the same selected semantic records and frozen acceptance policy as
+    the maintained GPU profiles.
+    """
+
+    manifest = _manifest()
+    qualification = _qualification_manifest()
+    policy = manifest["acceptance_policy"]
+    return CorpusProfile(
+        key=_INDEPENDENT_CANARY_KEY,
+        profile_id="mmlu-pro-ministral3-instruct-400-v1",
+        dataset_name="TIGER-Lab/MMLU-Pro/ministral3-instruct",
+        split="test-balanced-400",
+        record_count=qualification["record_count"],
+        dataset_sha256=_INDEPENDENT_CANARY_SHA256,
+        context_length=1024,
+        minimum_side_accuracy=policy["minimum_side_accuracy"],
+        maximum_interval_width_pp=policy["maximum_interval_width_pp"],
+        delta_min_pp=policy["delta_min_pp"],
+    )
+
+
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
-    return records_jsonl(values, compact=profile.key in {"flagship", "portability"})
+    return records_jsonl(
+        values,
+        compact=profile.key in {"flagship", "portability", _INDEPENDENT_CANARY_KEY},
+    )
 
 
 def validate_dataset_records(payload: bytes, profile: CorpusProfile) -> None:
@@ -248,8 +282,19 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
         qualification = _qualification_manifest()
         artifact_name = manifest["qualification_suite"]["semantic_artifact"]
         artifact = qualification["artifacts"][artifact_name]
-        records = qualification_records(profile)
-        declared = manifest["profiles"][profile.key]
+        if profile.key == _INDEPENDENT_CANARY_KEY:
+            records = independent_canary_records()
+            rendering = {
+                "algorithm": "mistral3-instruct-v1",
+                "bos": "runtime-added",
+                "suffix": "[/INST]",
+            }
+            model_profile_id = "ministral3-8b-instruct-bf16-to-q5-k-m-v1"
+        else:
+            records = qualification_records(profile)
+            declared = manifest["profiles"][profile.key]
+            rendering = declared["rendering"]
+            model_profile_id = declared["model_profile"]
         if (
             artifact["sha256"] != manifest["qualification_suite"]["semantic_sha256"]
             or qualification["record_count"] != profile.record_count
@@ -263,8 +308,8 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
             {
                 "source": manifest["source"],
                 "qualification_suite": manifest["qualification_suite"],
-                "rendering": declared["rendering"],
-                "model_profile": declared["model_profile"],
+                "rendering": rendering,
+                "model_profile": model_profile_id,
             }
         )
     return value
@@ -385,6 +430,12 @@ def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, 
             f"<|im_start|>user\n{body}\n{instruction}<|im_end|>\n"
             "<|im_start|>assistant\n<think>\n\n</think>\n\n"
         )
+    elif profile.key == _INDEPENDENT_CANARY_KEY:
+        prompt = (
+            "[SYSTEM_PROMPT]You answer multiple-choice questions and follow "
+            "the requested output format exactly.[/SYSTEM_PROMPT]"
+            f"[INST]{body}\n{instruction}[/INST]"
+        )
     elif profile.key == "portability":
         prompt = (
             "<bos><|turn>system\nYou answer multiple-choice questions and follow "
@@ -422,6 +473,23 @@ def qualification_records(profile: CorpusProfile) -> list[dict[str, str]]:
     return records
 
 
+def independent_canary_records() -> list[dict[str, str]]:
+    """Render the shared semantic suite through the closed Mistral canary form."""
+
+    profile = independent_canary_corpus_profile()
+    records = [_render_record(record, profile) for record in _semantic_records()]
+    payload = records_jsonl(records, compact=True)
+    if (
+        len(payload) != _INDEPENDENT_CANARY_BYTES
+        or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
+    ):
+        raise RuntimeError(
+            "rendered independent-canary corpus does not match its pinned identity"
+        )
+    validate_dataset_records(payload, profile)
+    return records
+
+
 def flagship_records() -> list[dict[str, str]]:
     return qualification_records(corpus_profile("flagship"))
 
@@ -440,6 +508,8 @@ __all__ = [
     "corpus_provenance",
     "deployment_records",
     "flagship_records",
+    "independent_canary_corpus_profile",
+    "independent_canary_records",
     "qualification_records",
     "profile_for_dataset",
     "profile_for_descriptor",

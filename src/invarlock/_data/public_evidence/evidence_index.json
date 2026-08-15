@@ -7,6 +7,31 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
+            "checksums.sha256": "sha256:726e76debedaf065b375f8639119ea6b30097c2de19851229448c1aa9edc28db",
+            "manifest.json": "sha256:b13a75a2f645e4e730f14abca8d76fcd6fb1852fce77d3c6da648663fcf486ca",
+            "manifest.signature.json": "sha256:5ae41826d72d8439b4764c9888f2c558b220f3eb7962a23b816a50fa8fd70f8d"
+          },
+          "file_count": 26,
+          "kind": "directory",
+          "path": "public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf/evidence",
+          "size_bytes": 883667
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf/verification.receipt.json",
+          "sha256": "sha256:fb5b8f847daf3926d3d75278b90c2e173fe8c646310150a4e94047893cd71070",
+          "size_bytes": 1645
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf",
+      "slug": "ministral3-8b-bf16-to-q5-k-m-gguf",
+      "summary": "Strictly verified Ministral 3 8B text-causal comparison of an authenticated BF16 checkpoint and its source-derived Q5_K_M GGUF deployment over a balanced 400-record MMLU-Pro exact-match schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
             "checksums.sha256": "sha256:3003ec6176c6bd97bb1fc79aa5532929d9d2a80e5c520357ce0e8a4102fcaee5",
             "manifest.json": "sha256:c6072084720867a75502fb29159b597e4ee35577e0b2e6c9406cba2482f12c14",
             "manifest.signature.json": "sha256:a83054e7fd24729e3a118707b828149aeaba6fcef16bb08565c2e915c88bcdff"
@@ -129,9 +154,9 @@
       "summary": "Strictly verified TensorRT-LLM comparison of two authenticated TinyLlama 1.1B checkpoint engines over a balanced 400-record MMLU-Pro exact-match schedule"
     }
   ],
-  "evidence_count": 5,
-  "evidence_file_count": 131,
-  "evidence_size_bytes": 3923509,
+  "evidence_count": 6,
+  "evidence_file_count": 158,
+  "evidence_size_bytes": 4808821,
   "format_version": "invarlock/public-evidence-index-v1",
   "status": "available",
   "status_label": "Evidence available"
