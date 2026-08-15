@@ -542,6 +542,41 @@ def _authenticated_qwen_config(checkpoint: Path) -> object:
     )
 
 
+def test_qwen_causal_projection_requires_authenticated_configuration() -> None:
+    with pytest.raises(RuntimeError, match="configuration is unavailable"):
+        hf._authenticated_behavior_config(
+            None,
+            model=object(),
+            live_config=SimpleNamespace(model_type="qwen3_5_text"),
+        )
+
+
+def test_qwen_causal_projection_rejects_unrecognized_config_classes() -> None:
+    authenticated_type = type(
+        "UnsupportedAuthenticatedConfig", (), {"model_type": "unsupported"}
+    )
+    live_type = type("UnsupportedLiveConfig", (), {"model_type": "unsupported"})
+
+    with pytest.raises(ValueError, match="config class does not match"):
+        hf._authenticated_behavior_config(
+            authenticated_type(),
+            model=object(),
+            live_config=live_type(),
+        )
+
+
+def test_qwen_text_checkpoint_cannot_hide_visual_tensor_inventory() -> None:
+    model = _qwen3_5_test_model()
+
+    with pytest.raises(ValueError, match="unsupported non-executing"):
+        hf._qwen3_5_non_executing_checkpoint_keys(
+            {"model.visual.forged.weight", "model.weight"},
+            live_state={"model.weight": object()},
+            model=model,
+            authenticated_config=model.config,
+        )
+
+
 def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
     model = _qwen3_5_test_model()
 
