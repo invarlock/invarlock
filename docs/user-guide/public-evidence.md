@@ -67,7 +67,6 @@ independent-receipt, and disclosure-review path.
 | --- | --- | --- |
 | Gemma 4 12B vision-text checkpoint and authenticated derivative | Hugging Face vision-text add-in | Evidence not yet created |
 | Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints | Hugging Face vision-text add-in | Evidence not yet created |
-| Ministral 3 8B Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | Evidence not yet created |
 | Qwen2.5 0.5B Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | Evidence not yet created |
 
 ## Publication boundary
