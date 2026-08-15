@@ -11,7 +11,16 @@ from types import ModuleType
 import pytest
 from PIL import Image
 
+from examples.integrations.evaluator_transaction.corpora import (
+    corpus_profile,
+    qualification_records,
+    records_jsonl,
+)
 from invarlock.core.runtime_provider import build_runtime_behavioral_schedule
+from invarlock.core.schedule_preparation import (
+    LocalDatasetRequest,
+    prepare_local_evaluation_schedule_bytes,
+)
 from scripts import prepare_qualification_suites as suites
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -696,6 +705,27 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
             "task": "vision_text_generation",
         },
     }
+    for profile_key in ("flagship", "portability"):
+        profile = corpus_profile(profile_key)
+        records = qualification_records(profile)
+        payload = records_jsonl(records, compact=True)
+        expected_schedule = prepare_local_evaluation_schedule_bytes(
+            LocalDatasetRequest(
+                path=Path("records.jsonl"),
+                sha256=profile.dataset_sha256,
+                name=profile.dataset_name,
+                split=profile.split,
+                input_field="prompt",
+                expected_output_field="expected",
+                id_field="id",
+            ),
+            payload,
+        )
+        qualified_suites[profile.dataset_sha256] = {
+            "record_ids": [record["id"] for record in records],
+            "schedule_sha256": expected_schedule.schedule_sha256,
+            "task": "text_causal",
+        }
 
     assert index["evidence_count"] == len(index["entries"])
     assert index["entries"]

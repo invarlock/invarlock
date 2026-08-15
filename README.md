@@ -123,9 +123,9 @@ also builds fixture evidence and exercises ten fail-closed recipient scenarios.
 ## Inspect published evidence
 
 The repository carries strictly verified signed evidence packs across the
-built-in text runtime and first-party vision-text and TensorRT-LLM runtimes.
-Each uses a pinned public qualification suite and includes an independently
-signed verification receipt.
+built-in text runtime and first-party GGUF/llama.cpp, vision-text, and
+TensorRT-LLM runtimes. Each uses a pinned public qualification suite and
+includes an independently signed verification receipt.
 
 ```bash
 make public-evidence-audit

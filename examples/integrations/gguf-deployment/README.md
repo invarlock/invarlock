@@ -21,6 +21,16 @@ bound is at least −2 percentage points. The signed subject request separately
 pins record batching, llama.cpp prompt and micro-batch sizes, and CPU thread
 count; the journey fixes the corresponding worker CPU limit.
 
+## Retained result
+
+The [published signed transaction](../../../public_evidence/evidence/qwen3.5-9b-bf16-to-q5-k-m-gguf/)
+records 212 of 400 exact matches for BF16 and 219 of 400 for Q5_K_M. The paired
+subject-minus-baseline effect is +1.75 percentage points, with a 95% interval
+from -0.83 to 4.32 percentage points. The interval width is 5.15 percentage
+points, and both side accuracies exceed the 20% floor, so the frozen policy
+passes. This is a finite-schedule deployment non-regression result, not a claim
+of general output equivalence or broader model quality.
+
 ## Compute and storage
 
 The maintained run uses Linux, Docker, one CUDA-capable GPU with at least 24 GB
