@@ -114,6 +114,39 @@ def test_requested_workspace_is_owner_only_before_any_model_work(
     assert observed == [0o700]
 
 
+def test_existing_external_trust_root_fails_before_model_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "retained"
+    trust_root = tmp_path / "existing-trust"
+    trust_root.mkdir()
+    observed: list[str] = []
+
+    def stop(key: str) -> example.DeploymentProfile:
+        observed.append(key)
+        raise RuntimeError("model work must not start")
+
+    monkeypatch.setattr(example, "deployment_profile", stop)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--evidence-signing-key",
+                str(tmp_path / "evidence.pem"),
+                "--verifier-signing-key",
+                str(tmp_path / "verifier.pem"),
+                "--trust-root",
+                str(trust_root),
+            ]
+        )
+        == 2
+    )
+    assert observed == []
+    assert (workspace / "transaction").is_dir()
+
+
 def test_main_forwards_the_selected_independent_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -966,6 +966,14 @@ def main(argv: list[str] | None = None) -> int:
     cleanup_tags: list[OwnedImageTag] = []
     result = 2
     try:
+        transaction = workspace / "transaction"
+        transaction.mkdir()
+        if external_trust:
+            assert arguments.trust_root is not None
+            validate_new_trust_root(
+                arguments.trust_root,
+                transaction_root=transaction,
+            )
         profile = deployment_profile(arguments.profile)
         commit = launch._require_committed_checkout(repository)
         build_root = workspace / "build"
@@ -1022,8 +1030,6 @@ def main(argv: list[str] | None = None) -> int:
                 container_engine=arguments.container_engine,
                 image=arguments.subject_runtime_image,
             )
-        transaction = workspace / "transaction"
-        transaction.mkdir()
         runtime_root = transaction / "evaluation/runtime"
         model_root = runtime_root / "models"
         model_root.mkdir(parents=True)
