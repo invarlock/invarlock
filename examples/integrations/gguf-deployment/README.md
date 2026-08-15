@@ -1,25 +1,33 @@
 # BF16-to-GGUF deployment comparison
 
-This journey starts from one revision- and byte-pinned post-trained
-`Qwen/Qwen3.5-9B` checkpoint. It executes that source checkpoint in BF16 through
-the built-in Hugging Face Transformers provider, converts the same checkpoint
-with a pinned llama.cpp source revision, quantizes the resulting BF16 GGUF to
-Q5_K_M, and executes the derived artifact through the optional llama.cpp
-provider.
+This journey selects one closed, revision- and byte-pinned deployment profile.
+It executes the source checkpoint in BF16 through the built-in Hugging Face
+Transformers provider, converts the same checkpoint with a pinned llama.cpp
+source revision, quantizes the resulting BF16 GGUF to Q5_K_M, and executes the
+derived artifact through the optional llama.cpp provider.
 
-The execution scope is the checkpoint's text-causal component. Transformers
-loads the exact native Qwen3.5 causal projection from the authenticated
-multimodal checkpoint, while the stored vision and MTP tensors remain bound to
-the source identity and are verified as outside this transaction's live model
-state. This gives both sides the same language-model behavior boundary.
+| Profile | Source | Purpose |
+| --- | --- | --- |
+| `qwen35-9b` (default) | `Qwen/Qwen3.5-9B` | Maintained deployment non-regression result for the Qwen3.5 text-causal projection |
+| `ministral3-8b` | `mistralai/Ministral-3-8B-Instruct-2512-BF16` | Independent-family, text-only canary over a multimodal-backed checkpoint |
 
-Both sides use the ordered 400-record balanced MMLU-Pro Qwen schedule already
-used by the current-model evaluator transactions. The policy is fixed before
-execution: at least 20% accuracy on each side, a paired interval no wider than
-10 percentage points, and a subject-minus-baseline paired interval whose lower
-bound is at least −2 percentage points. The signed subject request separately
-pins record batching, llama.cpp prompt and micro-batch sizes, and CPU thread
-count; the journey fixes the corresponding worker CPU limit.
+The execution scope is the checkpoint's text-causal component. For Qwen3.5,
+Transformers loads the exact native causal projection from the authenticated
+multimodal checkpoint while the stored vision and MTP tensors remain bound to
+the source identity and verified outside the live model state. For Ministral
+3, Transformers authenticates and loads the complete checkpoint but receives
+text-only inputs, while llama.cpp converts and executes its language-model
+component. Each profile gives its BF16 and GGUF sides the same text behavior
+boundary.
+
+Both sides use the same ordered 400-record balanced MMLU-Pro semantic
+selection, rendered through the selected model's pinned chat format. The policy
+is fixed before execution: at least 20% accuracy on each side, a paired interval
+no wider than 10 percentage points, and a subject-minus-baseline paired
+interval whose lower bound is at least −2 percentage points. The signed subject
+request separately pins record batching, llama.cpp prompt and micro-batch
+sizes, and CPU thread count; the journey fixes the corresponding worker CPU
+limit.
 
 ## Retained result
 
@@ -58,6 +66,16 @@ make example-gguf-deployment EXAMPLE_ARGS="\
   --trust-root /secure/trust/gguf-deployment"
 ```
 
+Select the independent-family canary with `--profile ministral3-8b`:
+
+```bash
+make example-gguf-deployment EXAMPLE_ARGS="\
+  --profile ministral3-8b \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/gguf-deployment-ministral3"
+```
+
 The command builds source-bound baseline and subject images, stages the exact
 checkpoint, records the intermediate and final GGUF identities, writes one
 mixed-provider request, runs `evaluate`, independently runs `verify`, renders
@@ -77,6 +95,6 @@ make example-gguf-deployment EXAMPLE_ARGS="\
   --trust-root /secure/trust/gguf-deployment"
 ```
 
-This transaction demonstrates a current model's concrete deployment-format
-and runtime change. Other retained transactions exercise Gemma and Mistral
-families independently of this deployment-format journey.
+These profiles demonstrate concrete deployment-format and runtime changes
+across independent model families. Other retained transactions exercise Gemma
+and additional evaluator and runtime paths.

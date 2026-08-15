@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare Qwen3.5 9B BF16 with its source-derived Q5_K_M GGUF deployment."""
+"""Compare a pinned BF16 checkpoint with its source-derived Q5_K_M GGUF."""
 
 from __future__ import annotations
 
@@ -20,21 +20,20 @@ import yaml
 
 from examples.integrations import launch
 from examples.integrations.bounded_command import run_bounded_command
-from examples.integrations.evaluator_transaction.corpora import (
-    CorpusProfile,
-    corpus_profile,
-    qualification_records,
-    records_jsonl,
-)
+from examples.integrations.evaluator_transaction.corpora import records_jsonl
 from examples.integrations.evaluator_transaction.image_cleanup import (
     OwnedImageTag,
     record_owned_image_tag,
     remove_owned_image_tags,
     temporary_image_tag,
 )
-from examples.integrations.evaluator_transaction.model_profiles import (
-    Snapshot,
-    model_profile,
+from examples.integrations.evaluator_transaction.model_profiles import Snapshot
+from examples.integrations.gguf_deployment_profiles import (
+    DEFAULT_DEPLOYMENT_PROFILE,
+    DeploymentProfile,
+    deployment_profile,
+    deployment_profile_keys,
+    deployment_records,
 )
 from examples.integrations.gguf_llama_cpp import (
     PendingTrust,
@@ -66,11 +65,9 @@ from invarlock.evidence_pack_support import EvidencePackStatus
 from invarlock.runtime_providers.hf_transformers import (
     HFTransformersProvider,
     hf_tokenizer_contract_sha256,
+    load_hf_text_tokenizer,
 )
 
-_QUANTIZATION = "Q5_K_M"
-_INTERMEDIATE_NAME = "Qwen3.5-9B-BF16.gguf"
-_SUBJECT_NAME = "Qwen3.5-9B-Q5_K_M.gguf"
 _TRANSFORMATION_FORMAT = "invarlock/example-gguf-deployment-transformation-v1"
 _LLAMA_SOURCE_COMMIT = "12127defda4f41b7679cb2477a4b0d65ee6a0c8f"
 _LLAMA_SOURCE_SHA256 = (
@@ -87,15 +84,6 @@ _VERIFIER_IDENTITY = "invarlock-example/gguf-deployment-verifier"
 
 
 @dataclass(frozen=True, slots=True)
-class DeploymentProfile:
-    source: Snapshot
-    corpus: CorpusProfile
-    quantization: str = _QUANTIZATION
-    baseline_device: str = "cuda"
-    subject_device: str = "cpu"
-
-
-@dataclass(frozen=True, slots=True)
 class ConversionResult:
     subject: Path
     intermediate_sha256: str
@@ -104,23 +92,8 @@ class ConversionResult:
     subject_byte_length: int
 
 
-def deployment_profile() -> DeploymentProfile:
-    """Return the closed model, corpus, quantization, and device profile."""
-
-    selected_models = model_profile("flagship")
-    selected_corpus = corpus_profile("flagship")
-    source = selected_models.snapshot("subject")
-    if (
-        source.repository != "Qwen/Qwen3.5-9B"
-        or source.checkpoint_tree_sha256 is None
-        or source.tokenizer_contract_sha256 is None
-        or selected_corpus.record_count != 400
-    ):
-        raise RuntimeError("the GGUF deployment profile is not the pinned flagship")
-    return DeploymentProfile(source=source, corpus=selected_corpus)
-
-
 def _conversion_command(
+    profile: DeploymentProfile,
     engine: str,
     image_id: str,
     *,
@@ -143,7 +116,7 @@ sys.argv = [
     'convert_hf_to_gguf.py',
     '/inputs/model',
     '--outfile',
-    '/output/{_INTERMEDIATE_NAME}',
+    '/output/{profile.intermediate_name}',
     '--outtype',
     'bf16',
 ]
@@ -168,6 +141,7 @@ runpy.run_path(source + '/convert_hf_to_gguf.py', run_name='__main__')
 
 
 def _quantization_command(
+    profile: DeploymentProfile,
     engine: str,
     image_id: str,
     *,
@@ -186,8 +160,8 @@ def _quantization_command(
             ),
         ),
         "/inputs/source.gguf",
-        f"/output/{_SUBJECT_NAME}",
-        _QUANTIZATION,
+        f"/output/{profile.subject_name}",
+        profile.quantization,
     ]
 
 
@@ -199,6 +173,7 @@ def _new_nonempty_file(path: Path, *, label: str) -> None:
 def _convert_and_quantize(
     repository: Path,
     *,
+    profile: DeploymentProfile,
     source_checkpoint: Path,
     source_archive: Path,
     output_root: Path,
@@ -206,8 +181,8 @@ def _convert_and_quantize(
     conversion_image_id: str,
     gguf_image_id: str,
 ) -> ConversionResult:
-    intermediate = output_root / _INTERMEDIATE_NAME
-    subject = output_root / _SUBJECT_NAME
+    intermediate = output_root / profile.intermediate_name
+    subject = output_root / profile.subject_name
     for path in (intermediate, subject):
         if path.exists() or path.is_symlink():
             raise RuntimeError("GGUF conversion destinations must be new")
@@ -218,6 +193,7 @@ def _convert_and_quantize(
     try:
         launch._run(
             _conversion_command(
+                profile,
                 container_engine,
                 conversion_image_id,
                 source_checkpoint=source_checkpoint,
@@ -231,6 +207,7 @@ def _convert_and_quantize(
         intermediate_byte_length = intermediate.stat().st_size
         launch._run(
             _quantization_command(
+                profile,
                 container_engine,
                 gguf_image_id,
                 intermediate=intermediate,
@@ -314,8 +291,9 @@ def _baseline_spec(
 ) -> dict[str, object]:
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        source_checkpoint, local_files_only=True, trust_remote_code=False
+    tokenizer = load_hf_text_tokenizer(
+        AutoTokenizer.from_pretrained,
+        source_checkpoint,
     )
     tokenizer_digest = hf_tokenizer_contract_sha256(tokenizer)
     if tokenizer_digest != profile.source.tokenizer_contract_sha256:
@@ -323,7 +301,7 @@ def _baseline_spec(
     tree = checkpoint_tree_sha256(source_checkpoint)
     if tree != profile.source.checkpoint_tree_sha256:
         raise RuntimeError("staged source checkpoint tree is not pinned")
-    for record in qualification_records(profile.corpus):
+    for record in deployment_records(profile):
         target = tokenizer(record["expected"], add_special_tokens=False)["input_ids"]
         prompt = tokenizer(record["prompt"], add_special_tokens=True)["input_ids"]
         if len(target) != 1 or len(prompt) + 1 > profile.corpus.context_length:
@@ -368,7 +346,7 @@ def _transformation_document(
                 "source_tag": "b10015",
             },
             "output": {
-                "filename": _INTERMEDIATE_NAME,
+                "filename": profile.intermediate_name,
                 "sha256": conversion.intermediate_sha256,
                 "byte_length": conversion.intermediate_byte_length,
                 "type": "BF16",
@@ -444,7 +422,7 @@ def _validate_transformation_binding(
     if (
         not isinstance(intermediate, dict)
         or set(intermediate) != {"byte_length", "filename", "sha256", "type"}
-        or intermediate.get("filename") != _INTERMEDIATE_NAME
+        or intermediate.get("filename") != profile.intermediate_name
         or intermediate.get("type") != "BF16"
         or not _is_sha256_hex(intermediate.get("sha256"))
         or isinstance(intermediate.get("byte_length"), bool)
@@ -541,6 +519,7 @@ def _artifact_anchor(
 def _prepare_transaction(
     root: Path,
     *,
+    profile: DeploymentProfile,
     runtime_root: Path,
     source_checkpoint: Path,
     subject: Path,
@@ -554,7 +533,6 @@ def _prepare_transaction(
     trust_root: Path | None = None,
     ephemeral_trust_root: bool = True,
 ) -> tuple[ExamplePaths, PendingTrust]:
-    profile = deployment_profile()
     _new_nonempty_file(subject, label="Q5_K_M GGUF")
     subject_sha256 = _sha256_file(subject)
     _validate_runtime_spec_bindings(
@@ -630,7 +608,7 @@ def _prepare_transaction(
         paths.verifier_key.parent.mkdir(parents=True)
     paths.receipt.parent.mkdir(parents=True, exist_ok=True)
 
-    records = qualification_records(profile.corpus)
+    records = deployment_records(profile)
     dataset_bytes = records_jsonl(records, compact=True)
     dataset_sha256 = hashlib.sha256(dataset_bytes).hexdigest()
     if dataset_sha256 != profile.corpus.dataset_sha256:
@@ -701,7 +679,7 @@ def _prepare_transaction(
         "execution": {"mode": "run"},
         "observations": [
             {
-                "id": "qwen35-9b-bf16-to-gguf-q5-k-m",
+                "id": profile.observation_id,
                 "kind": "artifact_transformation",
                 "scope": "subject",
                 "path": "inputs/subject-transformation.json",
@@ -771,6 +749,7 @@ def _execute(
     repository: Path,
     paths: ExamplePaths,
     *,
+    profile: DeploymentProfile,
     runtime_root: Path,
     container_engine: str,
     baseline_image_id: str,
@@ -800,13 +779,13 @@ def _execute(
         "--baseline-runtime-image-digest",
         baseline_image_id,
         "--baseline-runtime-device",
-        "cuda",
+        profile.baseline_device,
         "--subject-runtime-image",
         subject_image_id,
         "--subject-runtime-image-digest",
         subject_image_id,
         "--subject-runtime-device",
-        "cpu",
+        profile.subject_device,
         "--runtime-cpus",
         _WORKER_CPUS,
         "--json",
@@ -920,6 +899,12 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument(
+        "--profile",
+        choices=deployment_profile_keys(),
+        default=DEFAULT_DEPLOYMENT_PROFILE,
+        help="Closed source checkpoint and corpus profile.",
+    )
+    parser.add_argument(
         "--container-engine", choices=("docker", "podman"), default="docker"
     )
     parser.add_argument("--baseline-runtime-image")
@@ -981,7 +966,7 @@ def main(argv: list[str] | None = None) -> int:
     cleanup_tags: list[OwnedImageTag] = []
     result = 2
     try:
-        profile = deployment_profile()
+        profile = deployment_profile(arguments.profile)
         commit = launch._require_committed_checkout(repository)
         build_root = workspace / "build"
         build_root.mkdir()
@@ -1051,6 +1036,7 @@ def main(argv: list[str] | None = None) -> int:
         source_checkpoint = _stage_source_checkpoint(model_root, profile.source)
         conversion = _convert_and_quantize(
             repository,
+            profile=profile,
             source_checkpoint=source_checkpoint,
             source_archive=runtime_root / "backend/llama.cpp-b10015.tar.gz",
             output_root=model_root,
@@ -1081,6 +1067,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         paths, pending = _prepare_transaction(
             transaction,
+            profile=profile,
             runtime_root=runtime_root,
             source_checkpoint=source_checkpoint,
             subject=conversion.subject,
@@ -1097,6 +1084,7 @@ def main(argv: list[str] | None = None) -> int:
         _execute(
             repository,
             paths,
+            profile=profile,
             runtime_root=runtime_root,
             container_engine=arguments.container_engine,
             baseline_image_id=baseline_image_id,
