@@ -86,7 +86,8 @@ The source tree has two carriers:
 Installed wheels contain only `evidence_index.json`. They do not silently
 embed full packs. The index is a discovery and transport-integrity surface; it
 does not replace `invarlock verify` or the caller's independent artifact,
-schedule, policy, runtime, evidence-signer, and verifier anchors.
+schedule, policy, runtime, evidence-signer, and verifier anchors, including the
+normalized-request anchor required for GGUF evidence.
 
 ## Prepare a local entry
 
@@ -157,7 +158,8 @@ The generated entry records:
 This repository audit validates publication structure, local carrier bytes,
 the receipt's Ed25519 signature and embedded verifier-key fingerprint, and the
 receipt-to-manifest binding. Authorization remains with independently managed
-artifact, schedule, policy, runtime, evidence-signer, and verifier anchors.
+artifact, schedule, policy, runtime, evidence-signer, and verifier anchors,
+including the normalized-request anchor required for GGUF evidence.
 Perform strict verification and independently anchored receipt validation
 before indexing, and retain those review inputs outside the submitted pack.
 

@@ -119,6 +119,9 @@ spec = LlamaCppProvider().inspect_runtime_spec(
     seed=0,
     context_length=2048,
     batch_size=1,
+    cpu_threads=16,
+    prompt_batch_size=512,
+    prompt_microbatch_size=512,
     max_output_tokens=64,
     timeout_seconds=300,
 )

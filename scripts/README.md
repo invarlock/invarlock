@@ -51,8 +51,9 @@ packaging, and security gates. The Makefile composes those established tools.
 index, carrier layout, local byte summaries, the receipt's Ed25519 signature
 and embedded verifier-key fingerprint, and the receipt-to-manifest binding. It
 does not substitute for cryptographic `invarlock verify` or signed-receipt
-authorization against independent policy, runtime, evidence-signer, and verifier
-anchors. An empty index is valid only when it uses the status label
+authorization against independent policy, runtime, evidence-signer, verifier,
+and, for GGUF evidence, normalized-request anchors. An empty index is valid
+only when it uses the status label
 `Evidence not yet created`. The wheel contains a compact index; evidence may
 be carried separately as a release asset.
 

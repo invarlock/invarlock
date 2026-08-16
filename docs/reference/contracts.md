@@ -341,9 +341,9 @@ first parse cannot be replaced with a symbolic link unnoticed.
 The built-in comparison metrics are `exact_match` and
 `normalized_nll_per_utf8_byte`. Exact-match reports include paired outcome
 counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
-95% interval whose lower bound controls policy. New v2 reports use the
-continuity-corrected method; strict verification preserves the original v1
-method for legacy v1 reports. Normalized-NLL reports include the
+95% interval whose lower bound controls policy. Current v3 reports and
+historical v2 reports use the continuity-corrected method; strict verification
+preserves the original method for legacy v1 reports. Normalized-NLL reports include the
 fixed 2,048-replicate `paired_percentile_bootstrap_sha256_v1` interval over the
 authenticated schedule and apply the policy ceiling to its upper bound. A
 scorer-extension comparison uses the same fixed paired-resampling method over
@@ -351,11 +351,14 @@ unit-interval record values and applies `delta_min_pp` to the lower bound.
 [Decision semantics](../assurance/decision-semantics.md) defines the exact
 arithmetic.
 
-Every metric policy may contain only its threshold, or its threshold plus the
-coupled `minimum_record_count` and maximum-width fields. Exact match and scorer
+Every metric policy contains its threshold and may also contain the coupled
+`minimum_record_count` and maximum-width fields. Exact match and scorer
 extensions use `maximum_interval_width_pp`; normalized NLL uses
-`maximum_interval_width_ratio`. A v2 report with those controls passes only
-when the threshold, count, and width checks all pass.
+`maximum_interval_width_ratio`. Exact match may independently add
+`minimum_side_accuracy`, a finite value from `0` through `1` that both side
+means must meet. A v3 report passes only when the metric-bound check and every
+configured sample-qualification and side-accuracy check pass. Historical v2
+reports have no side-accuracy section and retain their original semantics.
 
 ## Provider document field map
 
@@ -369,7 +372,7 @@ conditional rules. This map makes every top-level contract field discoverable:
 | Scoring observation | `format_version`, `provider_name`, `artifact_identity_sha256`, `schedule_sha256`, `records`, `aggregate_source_sha256` |
 | Provider receipt | `format_version`, `plugin`, `backend`, `capabilities`, `artifact_identity`, `execution_settings`, `device`, `outer_image_digest`, `scoring_observation_sha256` |
 | Runtime manifest | `manifest_version`, `generated_at_utc`, `verifier_contract_version`, `report`, `config`, `execution_mode`, `outer_container`, `runtime_provider` |
-| Behavioral schedule | `format_version`, `dataset_identity`, `records` |
+| Behavioral schedule | `format_version`, `task`, `dataset_identity`, `records` |
 
 Nested provider-receipt groups are closed:
 
@@ -476,8 +479,8 @@ Schema validity is only the first layer. The verifier also recomputes:
   and scorer-extension deltas;
 - derived perplexity facts when tokenizer and paired token counts are
   comparable;
-- comparison means, threshold arithmetic, optional count/interval-width
-  qualification, and policy verdict; and
+- comparison means, threshold arithmetic, optional count/interval-width and
+  exact-match side-accuracy qualification, and policy verdict; and
 - evidence signer and verifier signature bindings.
 
 A custom reader that performs schema validation alone is not equivalent to
@@ -490,10 +493,10 @@ are not silently accepted by closed objects. A breaking artifact change requires
 a new format identifier and explicit reader behavior. Runtime providers must
 also match ABI `1` exactly.
 
-The v2 comparison report is the current writer format. Strict verification
-continues to reconstruct a v1 report with the v1 exact-match method when a
-signed legacy pack identifies that format; it never applies v2 arithmetic and
-then relabels the result as v1.
+The v3 comparison report is the current writer format. Strict verification
+continues to reconstruct v2 and v1 reports under their original shapes and
+arithmetic when signed historical packs identify those formats; it never
+relabels a reconstructed report as another version.
 
 Receipt v1 remains valid for existing evidence whose runtime does not require a
 request-level executable binding. A supplied request digest selects receipt v2.

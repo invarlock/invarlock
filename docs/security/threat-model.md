@@ -30,8 +30,8 @@ verifier can detect from claims that require controls outside InvarLock.
 | Bundle integrity | Every accepted file is inventoried, checksummed, path-safe, and transitively bound by the signed manifest. |
 | Evidence signer authenticity | The manifest signature verifies under the independently expected evidence-signer fingerprint. |
 | Input and runtime binding | Request, artifact, schedule, provider, observation, and runtime identities agree across all contract layers. |
-| Replay correctness | Pairing, built-in scores or explicitly authorized scorer results, comparison arithmetic, paired interval, optional count/width qualification, and policy verdict are reconstructed from lower-level facts. |
-| Independent acceptance | Policy, artifact, schedule, runtime, and evidence-signer anchors are controlled outside the submitted evidence path. |
+| Replay correctness | Pairing, built-in scores or explicitly authorized scorer results, comparison arithmetic, paired interval, optional count/width and exact-match side-accuracy qualification, and policy verdict are reconstructed from lower-level facts. |
+| Independent acceptance | Policy, artifact, schedule, runtime, evidence-signer, and GGUF normalized-request anchors are controlled outside the submitted evidence path. |
 | Receipt accountability | The verdict and exact anchors are bound to a separately recorded verifier identity and key. |
 | Recipient-controlled transport acceptance | The recipient independently authorizes both the DSSE envelope signer and technical receipt verifier, binds the exact subject, and applies current freshness and contract policy. |
 | Fail-closed handling | Missing, malformed, unknown, partial, extra, or inconsistent material cannot become accepted evidence. |

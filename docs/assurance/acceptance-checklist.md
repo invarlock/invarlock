@@ -47,14 +47,16 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] Obtain the policy bytes, baseline and subject artifact-identity digests,
       canonical schedule digest, baseline and subject runtime digests, and
       expected evidence-signer fingerprint from independently maintained sources.
+- [ ] When either side uses `llama_cpp`, obtain the normalized-request digest
+      from an independently maintained source rather than the submitted pack.
 - [ ] Run `invarlock verify` with every required anchor, a distinct verifier
       key and identity, and a receipt path outside the evidence directory.
 - [ ] Confirm exit code `0`, `ok: true`, `integrity_ok: true`,
       `policy_verdict: pass`, and evidence-signer authenticity `pinned` in JSON output.
 - [ ] Confirm the receipt names the expected manifest digest, policy digest,
       baseline and subject artifact-identity digests, canonical schedule digest,
-      runtime digests, evidence-signer fingerprint, verifier identity, and
-      verifier fingerprint.
+      runtime digests, evidence-signer fingerprint, the GGUF request digest
+      when applicable, verifier identity, and verifier fingerprint.
 - [ ] Confirm evidence signer and verifier fingerprints are currently authorized and
       not subject to an unresolved compromise or revocation event.
 - [ ] Preserve the immutable evidence directory and signed receipt together.
@@ -75,10 +77,11 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] If a perplexity ratio is displayed, confirm it is verifier-derived from
       comparable tokenizer and token-count facts and treat it as interpretation
       without policy authority.
-- [ ] For exact match, confirm a current v2 report uses
+- [ ] For exact match, confirm a current v3 report uses
       `newcombe_hybrid_score_paired_v2`, interval mass `0.95`, and the
-      paired-binary-outcomes scope. For legacy v1 evidence, require exact replay
-      with `newcombe_hybrid_score_paired_v1` instead.
+      paired-binary-outcomes scope. Historical v2 reports use that same method
+      without side-accuracy qualification. For legacy v1 evidence, require
+      exact replay with `newcombe_hybrid_score_paired_v1` instead.
 - [ ] For normalized NLL, confirm the paired interval uses
       `paired_percentile_bootstrap_sha256_v1`, interval mass `0.95`, `2048`
       replicates, and the authenticated-schedule scope.
@@ -93,6 +96,9 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] If sample qualification is present, confirm its minimum and maximum match
       the independently reviewed policy, the units match the selected metric,
       and the count, width, and combined checks all pass.
+- [ ] If exact-match `side_accuracy` is present, confirm its minimum matches the
+      independently reviewed `minimum_side_accuracy` and both observed side
+      means and the combined check pass.
 - [ ] Treat the result as a finite-schedule decision. The paired interval
       describes schedule-composition sensitivity; it does not establish
       population coverage or representativeness.

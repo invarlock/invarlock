@@ -298,7 +298,9 @@ when the schedule-resampling interval's upper bound meets `ratio_max`.
 If the policy enables sample qualification, the observed record count must also
 meet `minimum_record_count` and the observed width must not exceed the matching
 maximum-width field. Inspect `sample_qualification` before changing the metric
-threshold.
+threshold. If exact-match policy sets `minimum_side_accuracy`, both observed
+side means must also meet that floor; inspect `side_accuracy` before changing
+the policy.
 Review the authenticated schedule, interval method, and record-level variation.
 Changing the threshold or schedule requires a new evidence transaction.
 

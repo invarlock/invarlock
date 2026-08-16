@@ -206,6 +206,7 @@ verify_evidence(
     expected_baseline_runtime: str | None,
     expected_subject_runtime: str | None,
     expected_signer: str | None,
+    expected_request_digest: str | None = None,
     receipt_path: Path | None = None,
     verifier_signing_key_path: Path | None = None,
     verifier_identity: str | None = None,

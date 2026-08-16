@@ -103,9 +103,10 @@ The verifier supplies all acceptance authority from outside the evidence:
 5. expected baseline runtime digest;
 6. expected subject runtime digest;
 7. expected evidence-signer fingerprint;
-8. a new receipt destination;
-9. an independent Ed25519 verifier key; and
-10. a stable verifier identity.
+8. expected normalized-request digest when either side uses `llama_cpp`;
+9. a new receipt destination;
+10. an independent Ed25519 verifier key; and
+11. a stable verifier identity.
 
 Example:
 
@@ -164,7 +165,7 @@ The verifier:
 - re-derives every built-in paired score from typed observation facts or,
   when selected, replays an explicitly authorized deterministic scorer twice;
 - recomputes the metric, its paired interval, threshold comparison, optional
-  count/width qualification, and report; and
+  count/width and exact-match side-accuracy qualification, and report; and
 - signs the complete result and caller-supplied anchors with the verifier key.
 
 Multiple verifiers may independently obtain the same policy bytes bound into
@@ -212,6 +213,7 @@ The receipt is canonical JSON containing:
 - external policy digest;
 - baseline and subject runtime anchors;
 - expected evidence-signer fingerprint;
+- the normalized-request anchor when either side uses `llama_cpp`;
 - verifier identity and verifier-key fingerprint;
 - integrity and policy verdicts; and
 - an Ed25519 signature plus the verifier public key.
@@ -270,12 +272,14 @@ signature before rendering. It shows:
   Newcombe 95% interval when exact match is selected;
 - sample qualification showing the required and observed paired count and
   interval width when the policy enables those coupled controls;
+- side-accuracy qualification showing the required floor and both observed
+  exact-match means when the policy enables that independent control;
 - a token-weighted perplexity interpretation when normalized-NLL tokenizer and
   token-count facts are comparable;
 - the scorer binding and deterministic per-side replay when a scorer extension
   is selected;
 - policy limit and the verdict formed from the conservative bound plus any
-  configured count and precision requirements;
+  configured count, precision, and side-accuracy requirements;
 - policy digest; and
 - evidence-signer fingerprint.
 
@@ -324,6 +328,7 @@ The verifier obtains elsewhere:
 - the policy file;
 - expected baseline and subject runtime digests;
 - expected evidence-signer fingerprint;
+- expected normalized-request digest when either side uses `llama_cpp`;
 - its own identity and private key; and
 - a new receipt destination.
 

@@ -35,7 +35,7 @@ invarlock report evidence/
 
 | Transaction | Reads | Writes | Result |
 | --- | --- | --- | --- |
-| `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample qualification, and evaluation-time policy verdict |
+| `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample and side-accuracy qualification, and evaluation-time policy verdict |
 | `verify` | Untrusted evidence plus independent artifact, schedule, policy, runtime, and signer anchors; verifier identity; and verifier key | One no-clobber signed receipt outside the bundle | Independent replay and acceptance/rejection record |
 | `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Human view of the canonical comparison |
 
@@ -268,6 +268,7 @@ The verifier must obtain these values through its own trusted channel:
 - the expected canonical schedule digest;
 - expected baseline and subject runtime-image digests;
 - expected evidence-signer fingerprint;
+- expected normalized-request digest when either side uses `llama_cpp`;
 - its verifier identity and private key.
 
 ```bash
@@ -318,7 +319,7 @@ Every current `invarlock/comparison-report-v3` report records:
 - optional baseline and subject accuracy qualification for exact match when the
   policy binds `minimum_side_accuracy`; and
 - a verdict controlled by the conservative interval bound and any configured
-  sample qualification.
+  sample and side-accuracy qualification.
 
 For exact match, the lower bound must clear the percentage-point floor. For
 byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its

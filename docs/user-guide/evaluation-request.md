@@ -215,7 +215,7 @@ delta_pp = 100 * (subject_mean - baseline_mean)
 The report also records baseline-pass to subject-fail regressions,
 baseline-fail to subject-pass improvements, both-pass and both-fail counts, and
 the exact two-sided McNemar probability. The metric-bound check passes only
-when the current v2 continuity-corrected paired Newcombe 95% effect-size
+when the current v3 report's continuity-corrected paired Newcombe 95% effect-size
 interval's lower bound is at least
 `policy.metrics.exact_match.delta_min_pp`.
 
@@ -367,9 +367,12 @@ that crosses the policy limit.
 Each metric policy may optionally add a coupled record-count and interval-width
 requirement. Exact match and scorer extensions pair `minimum_record_count` with
 `maximum_interval_width_pp`; normalized NLL pairs it with
-`maximum_interval_width_ratio`. The final v2 report passes only when the metric
-bound, minimum count, and maximum width all pass. Preflight can validate the
-count but marks interval width pending until execution.
+`maximum_interval_width_ratio`. Exact match may independently add
+`minimum_side_accuracy`, a finite floor from `0` through `1` that both baseline
+and subject means must meet. The final v3 report passes only when the metric
+bound and every configured count, width, and side-accuracy check pass.
+Preflight can validate the count but marks interval width and side accuracy
+pending until execution.
 
 This is a deterministic resampling interval over the authenticated finite
 schedule. It is not a population confidence interval, proof of dataset

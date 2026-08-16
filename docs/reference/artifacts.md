@@ -60,7 +60,7 @@ records, and canonical report are separate payloads referenced by the manifest.
 | `providers/{side}/*` | Five per side | Artifact, observation, provider, configuration, and runtime provenance |
 | `runs/{side}/report.json` | One per side | Minimal side-to-observation binding |
 | `records/paired-records.json` | One | Verifier-reproducible record scores; not an accepted aggregate |
-| `reports/evaluation.report.json` | One | Canonical means, comparison, paired interval, threshold, optional sample qualification, and verdict reproduced by verification |
+| `reports/evaluation.report.json` | One | Canonical means, comparison, paired interval, threshold, optional sample and side-accuracy qualification, and verdict reproduced by verification |
 | `observations/*.json` | Zero to 64 | Authenticated typed context; descriptive only and excluded from policy replay |
 | `checksums.sha256` | One | Exact payload-byte inventory |
 | `manifest.json` and signature | One each | Closed references and signer authentication |
@@ -212,11 +212,16 @@ authenticated-schedule resampling interval. An authorized scorer extension
 uses the lower bound of the same fixed paired-resampling method against
 `metrics.scorer_extension.delta_min_pp`.
 
-When the policy supplies the coupled sample controls, the v2 report also
+When the policy supplies the coupled sample controls, a v2 or v3 report also
 contains `sample_qualification`. It records the minimum and observed paired
 count, maximum and observed interval width, units, each check's result, and the
 combined result. The final verdict is the conjunction of that result and the
 metric-bound result.
+
+When a v3 exact-match policy supplies `minimum_side_accuracy`, the report also
+contains `side_accuracy`. It records the minimum, both observed means, each
+side's result, and the combined result. The final verdict additionally requires
+that combined result to pass. Historical v2 reports have no such section.
 
 ## Provider sidecars
 
@@ -256,8 +261,9 @@ bundle so the bundle can stay byte-identical.
 Multiple verifiers can issue separate receipts for the same immutable manifest.
 They can use distinct verifier identities and keys. Each must independently
 supply the expected artifact, schedule, policy, runtime, and evidence-signer
-anchors. The policy bytes must match the policy material already bound by the
-pack; a different policy requires a newly evaluated evidence bundle.
+anchors, plus the normalized-request anchor required for GGUF evidence. The
+policy bytes must match the policy material already bound by the pack; a
+different policy requires a newly evaluated evidence bundle.
 
 ## Related documentation
 

@@ -41,6 +41,7 @@ def test_action_exposes_only_the_evidence_gate_inputs() -> None:
         "expected-baseline-runtime",
         "expected-subject-runtime",
         "expected-signer",
+        "expected-request-digest",
         "verifier-signing-key",
         "verifier-identity",
         "python",
@@ -63,6 +64,7 @@ def test_action_exposes_only_the_evidence_gate_inputs() -> None:
         "verifier-identity",
     ):
         assert inputs[required]["required"] is True
+    assert inputs["expected-request-digest"]["required"] is False
 
     text = ACTION_PATH.read_text(encoding="utf-8")
     for retired in (
@@ -101,12 +103,19 @@ def test_action_calls_current_verify_and_report_transactions() -> None:
         "--expected-baseline-runtime",
         "--expected-subject-runtime",
         "--expected-signer",
+        "--expected-request-digest",
         "--receipt",
         "--verifier-signing-key",
         "--verifier-identity",
         "--json",
     ):
         assert option in verify
+
+    verify_step = _step(action, "Verify InvarLock evidence")
+    assert verify_step["env"]["INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST"] == (
+        "${{ inputs.expected-request-digest }}"
+    )
+    assert '[[ -n "$INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST" ]]' in verify
 
     assert "-m invarlock report" in report
     assert "--html" in report
@@ -408,6 +417,7 @@ def _consumer_environment(root: Path) -> dict[str, str]:
                 "subject"
             ],
             "INVARLOCK_ACTION_EXPECTED_SIGNER": anchors["evidence_signer_fingerprint"],
+            "INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST": "",
             "INVARLOCK_ACTION_VERIFIER_SIGNING_KEY": ("review/verifier.private.pem"),
             "INVARLOCK_ACTION_VERIFIER_IDENTITY": "consumer-verifier",
             "INVARLOCK_ACTION_RECEIPT_OUTPUT": (
