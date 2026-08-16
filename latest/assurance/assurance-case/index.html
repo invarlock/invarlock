@@ -2026,12 +2026,16 @@ review domains.</p>
 <td>Independently authorized evidence-signer public-key fingerprint</td>
 </tr>
 <tr>
+<td><span class="arithmatex">\(d_{\mathcal Q}\)</span></td>
+<td>Independently supplied normalized-request digest, required when either side uses <code>llama_cpp</code></td>
+</tr>
+<tr>
 <td><span class="arithmatex">\(K_V, I_V\)</span></td>
 <td>Verifier key fingerprint and stable verifier identity</td>
 </tr>
 <tr>
 <td><span class="arithmatex">\(D(E,A_v)\)</span></td>
-<td>Deterministic replay result for evidence <span class="arithmatex">\(E\)</span> under verifier anchors <span class="arithmatex">\(A_v=(\pi_v,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E)\)</span></td>
+<td>Deterministic replay result for evidence <span class="arithmatex">\(E\)</span> under base anchors <span class="arithmatex">\(A_v^0=(\pi_v,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E)\)</span> plus <span class="arithmatex">\(d_{\mathcal Q}\)</span> for <code>llama_cpp</code> evidence</td>
 </tr>
 </tbody>
 </table>
@@ -2088,8 +2092,8 @@ row succeeds.</p>
 </tr>
 <tr>
 <td>The decision follows the declared arithmetic.</td>
-<td>The bundle contains runtime facts, verifier-derived paired scores, the canonical comparison report, its metric-specific paired interval, optional sample qualification, the exact policy digest, and scorer replay results when selected.</td>
-<td>Verification reconstructs every built-in score or replays an explicitly authorized scorer twice, then reconstructs each paired statistic or interval replicate, comparison, optional count/width checks, and verdict from the bound records and independently supplied policy. See <a href="../decision-semantics/">Decision semantics</a>.</td>
+<td>The bundle contains runtime facts, verifier-derived paired scores, the canonical comparison report, its metric-specific paired interval, optional sample and exact-match side-accuracy qualification, the exact policy digest, and scorer replay results when selected.</td>
+<td>Verification reconstructs every built-in score or replays an explicitly authorized scorer twice, then reconstructs each paired statistic or interval replicate, comparison, optional count/width and side-accuracy checks, and verdict from the bound records and independently supplied policy. See <a href="../decision-semantics/">Decision semantics</a>.</td>
 </tr>
 <tr>
 <td>The published evidence has not changed.</td>
@@ -2098,7 +2102,7 @@ row succeeds.</p>
 </tr>
 <tr>
 <td>Acceptance uses an independent trust decision.</td>
-<td>The verifier supplies the policy bytes, expected artifact identities, canonical schedule, runtime digests, evidence-signer fingerprint, verifier identity, and verifier key outside the bundle.</td>
+<td>The verifier supplies the policy bytes, expected artifact identities, canonical schedule, runtime digests, evidence-signer fingerprint, normalized-request digest for GGUF evidence, verifier identity, and verifier key outside the bundle.</td>
 <td><code>invarlock verify</code> replays the bundle under those anchors and writes a signed receipt outside the immutable evidence directory.</td>
 </tr>
 <tr>
@@ -2132,7 +2136,7 @@ and
 </tr>
 <tr>
 <td>Verifier anchors are controlled outside the evidence submission path.</td>
-<td>Otherwise the evidence signer can choose the expected policy, artifacts, schedule, runtimes, and signer.</td>
+<td>Otherwise the evidence signer can choose the expected policy, artifacts, schedule, runtimes, signer, and GGUF request.</td>
 <td>Anchors parsed from the bundle or supplied by the same actor without independent review.</td>
 </tr>
 <tr>
@@ -2191,11 +2195,12 @@ contract does not re-evaluate one existing pack under different policy bytes.</p
   independently expected;</li>
 <li>the bundle inventory, checksums, input bindings, runtime-integration bindings,
   schedule, paired records, runtime manifests, comparison arithmetic, paired
-  interval, and optional sample qualification replayed without error;</li>
+  interval, and optional sample and side-accuracy qualification replayed without error;</li>
 <li>the independently supplied policy, artifact-identity, schedule, and runtime
   digests matched the bound identities; and</li>
 <li>the replayed finite-schedule decision passed that policy using the required
-  conservative interval bound and any configured count and width controls.</li>
+  conservative interval bound and any configured count, width, and side-
+  accuracy controls.</li>
 </ul>
 <p>The receipt also identifies the verifier key and verifier identity that made
 that statement. It does not silently upgrade the statement beyond those
@@ -2282,12 +2287,15 @@ invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span cl
 <span class="w">  </span>--expected-baseline-runtime<span class="w"> </span>sha256:BASELINE_RUNTIME_DIGEST<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--expected-subject-runtime<span class="w"> </span>sha256:SUBJECT_RUNTIME_DIGEST<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--expected-signer<span class="w"> </span>sha256:EVIDENCE_SIGNER_KEY_FINGERPRINT<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-request-digest<span class="w"> </span>sha256:NORMALIZED_REQUEST_DIGEST<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--receipt<span class="w"> </span>verification.receipt.json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--verifier-signing-key<span class="w"> </span>verifier.pem<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--verifier-identity<span class="w"> </span>release-verifier
 invarlock<span class="w"> </span>report<span class="w"> </span>evidence/<span class="w"> </span>--html<span class="w"> </span>evidence.html<span class="w"> </span>--explain
 </code></pre></div>
 
+<p>Omit <code>--expected-request-digest</code> only when neither side uses <code>llama_cpp</code> and
+the verifier has not approved an optional request anchor.</p>
 <p>Use the <a href="../acceptance-checklist/">acceptance checklist</a> before relying on the
 receipt.</p>
 <h2 id="standards-context">Standards context<a class="headerlink" href="#standards-context" title="Permanent link">&para;</a></h2>

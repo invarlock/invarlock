@@ -2093,6 +2093,12 @@
 deterministically prepared schedule, applies a release-regression policy to the
 selected paired interval, publishes signed evidence, and lets a separate
 verifier replay the result.</p>
+<p>For a first useful result without a model or container engine, run the
+<a href="https://github.com/invarlock/invarlock/tree/main/examples/quickstart">five-minute signed-evidence check</a>.
+It installs the core wheel, verifies retained evidence against independent
+anchors, issues a new verifier-signed receipt, and renders HTML on a regular
+CPU. Continue here when you are ready to produce evidence from your own model
+artifacts.</p>
 <div class="codehilite"><pre><span></span><code>invarlock evaluate request.yaml
 invarlock verify evidence/ ... --receipt verification.receipt.json
 invarlock report evidence/
@@ -2124,7 +2130,7 @@ keys.</p>
 <td><code>evaluate</code></td>
 <td>Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key</td>
 <td>One no-clobber signed evidence directory</td>
-<td>Paired comparison, interval, optional sample qualification, and evaluation-time policy verdict</td>
+<td>Paired comparison, interval, optional sample and side-accuracy qualification, and evaluation-time policy verdict</td>
 </tr>
 <tr>
 <td><code>verify</code></td>
@@ -2181,7 +2187,7 @@ Pass its commit, path, and digest to the build target shown below.</p>
 </table>
 <p>The CUDA device flag only exposes a GPU to a CUDA-capable image. It does not
 add CUDA libraries to the CPU image.</p>
-<p>For a complete journey that compares a pinned Qwen3-0.6B checkpoint with an
+<p>For a complete journey that compares a pinned Qwen3.5-0.8B checkpoint with an
 explicit behavioral derivative and derives all verifier inputs independently,
 run the checked-in
 <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/hf-transformers">Hugging Face example</a>.
@@ -2347,6 +2353,7 @@ evidence signature.</p>
 <li>the expected canonical schedule digest;</li>
 <li>expected baseline and subject runtime-image digests;</li>
 <li>expected evidence-signer fingerprint;</li>
+<li>expected normalized-request digest when either side uses <code>llama_cpp</code>;</li>
 <li>its verifier identity and private key.</li>
 </ul>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>release-check/evidence/release-001/<span class="w"> </span><span class="se">\</span>
@@ -2379,7 +2386,7 @@ interval, threshold, and canonical verdict. <code>report</code> checks the embed
 evidence signature and bundle integrity before rendering, but it does not use
 the independent verifier anchors or replace the signed receipt.</p>
 <h2 id="interpret-the-result">Interpret the result<a class="headerlink" href="#interpret-the-result" title="Permanent link">&para;</a></h2>
-<p>Every current <code>invarlock/comparison-report-v2</code> report records:</p>
+<p>Every current <code>invarlock/comparison-report-v3</code> report records:</p>
 <ul>
 <li>a point estimate over all authenticated records;</li>
 <li>a paired Newcombe 95% interval plus regression/improvement counts and an
@@ -2387,9 +2394,11 @@ the independent verifier anchors or replace the signed receipt.</p>
   <code>paired_percentile_bootstrap_sha256_v1</code> interval for normalized NLL;</li>
 <li>the selected policy limit; and</li>
 <li>optional record-count and interval-width qualification when the policy binds
-  those coupled requirements; and</li>
+  those coupled requirements;</li>
+<li>optional baseline and subject accuracy qualification for exact match when the
+  policy binds <code>minimum_side_accuracy</code>; and</li>
 <li>a verdict controlled by the conservative interval bound and any configured
-  sample qualification.</li>
+  sample and side-accuracy qualification.</li>
 </ul>
 <p>For exact match, the lower bound must clear the percentage-point floor. For
 byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its
@@ -2397,8 +2406,8 @@ interval resamples paired schedule positions, so each baseline observation
 stays coupled to its subject observation.</p>
 <p>Preflight can establish that the authenticated schedule meets a configured
 minimum count, but interval width remains pending until execution. Strict
-verification also preserves exact replay of legacy
-<code>invarlock/comparison-report-v1</code> evidence with its original exact-match method.</p>
+verification also preserves v2 reports without side-accuracy qualification and
+v1 evidence with its original exact-match method.</p>
 <p>Normalized NLL is teacher-forced expected-continuation likelihood regression,
 not a general model-quality measure. A displayed token-weighted perplexity
 ratio is derived interpretation only; it has no policy, interval, or verdict

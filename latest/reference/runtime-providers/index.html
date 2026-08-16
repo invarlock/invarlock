@@ -1450,6 +1450,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#hf_vision_text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hf_vision_text
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llama_cpp" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1993,6 +2004,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#hf_vision_text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hf_vision_text
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llama_cpp" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2413,12 +2435,83 @@ tokenizer contract against the declared digests. Hugging Face documents the
 underlying library's <a href="https://huggingface.co/docs/transformers/installation#offline-mode">offline-mode
 controls</a>;
 InvarLock additionally binds its own strict runtime and receipt conditions.</p>
+<h3 id="hf_vision_text"><code>hf_vision_text</code><a class="headerlink" href="#hf_vision_text" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Requirement</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>immutable_revision</code></td>
+<td>Required when the artifact identity includes it</td>
+<td>Immutable upstream revision</td>
+</tr>
+<tr>
+<td><code>checkpoint_tree_sha256</code></td>
+<td>Required</td>
+<td>Authenticated checkpoint-directory tree digest</td>
+</tr>
+<tr>
+<td><code>tokenizer_metadata_sha256</code></td>
+<td>Required</td>
+<td>Authenticated tokenizer contract digest</td>
+</tr>
+<tr>
+<td><code>processor_metadata_sha256</code></td>
+<td>Required</td>
+<td>Authenticated multimodal processor contract digest</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>Required for strict receipt; must be <code>1</code></td>
+<td>Scoring batch size</td>
+</tr>
+<tr>
+<td><code>context_length</code></td>
+<td>Required, positive integer</td>
+<td>Maximum input context</td>
+</tr>
+<tr>
+<td><code>max_output_tokens</code></td>
+<td>Required, positive integer</td>
+<td>Maximum generated output</td>
+</tr>
+<tr>
+<td><code>offline</code></td>
+<td>Required and <code>true</code></td>
+<td>Backend offline intent</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>Required, non-negative integer</td>
+<td>Deterministic seed</td>
+</tr>
+<tr>
+<td><code>timeout_seconds</code></td>
+<td>Required, positive integer</td>
+<td>Per-call timeout</td>
+</tr>
+</tbody>
+</table>
+<p>The closed set is the Hugging Face text contract plus
+<code>processor_metadata_sha256</code>, with <code>checkpoint_tree_sha256</code> mandatory for every
+vision-text request. The provider authenticates the checkpoint, tokenizer, and
+processor before execution and resolves image bytes through the caller-owned
+content store described in the user guide.</p>
 <h3 id="llama_cpp"><code>llama_cpp</code><a class="headerlink" href="#llama_cpp" title="Permanent link">&para;</a></h3>
-<p>Every key is required: <code>artifact_byte_length</code>, <code>artifact_sha256</code>,
+<p>Newly inspected specifications use the current closed set and require every
+key: <code>artifact_byte_length</code>, <code>artifact_sha256</code>,
 <code>backend_binary_sha256</code>, <code>backend_source_sha256</code>, <code>backend_version</code>,
-<code>batch_size</code>, <code>context_length</code>, <code>gguf_metadata_sha256</code>, <code>max_output_tokens</code>,
-<code>seed</code>, <code>tensor_inventory_sha256</code>, <code>timeout_seconds</code>, and
-<code>tokenizer_metadata_sha256</code>. Digest values are lowercase bare SHA-256 values.
+<code>batch_size</code>, <code>context_length</code>, <code>cpu_threads</code>, <code>gguf_metadata_sha256</code>,
+<code>max_output_tokens</code>, <code>prompt_batch_size</code>, <code>prompt_microbatch_size</code>, <code>seed</code>,
+<code>tensor_inventory_sha256</code>, <code>timeout_seconds</code>, and <code>tokenizer_metadata_sha256</code>.
+Digest values are lowercase bare SHA-256 values. Strict verification also
+accepts historical GGUF request profiles that predate the three backend
+execution controls; current inspection never emits that legacy set.
 The provider authenticates the GGUF bytes, typed metadata and tensor inventory,
 tokenizer metadata, and the pinned <code>llama.cpp</code> executable and source tree.
 Independent verification also requires the normalized-request digest from the

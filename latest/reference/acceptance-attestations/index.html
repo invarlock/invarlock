@@ -1248,10 +1248,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authoritative-receipt-and-v013-wrapping" class="md-nav__link">
+  <a href="#authoritative-receipt-and-contract-set-labeling" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Authoritative receipt and v0.13 wrapping
+        Authoritative receipt and contract-set labeling
       
     </span>
   </a>
@@ -1837,10 +1837,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authoritative-receipt-and-v013-wrapping" class="md-nav__link">
+  <a href="#authoritative-receipt-and-contract-set-labeling" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Authoritative receipt and v0.13 wrapping
+        Authoritative receipt and contract-set labeling
       
     </span>
   </a>
@@ -1959,7 +1959,7 @@ content digest. The predicate repeats that exact binding and carries:</p>
 <p>The closed source schema is
 <code>contracts/acceptance_predicate.schema.json</code>; the byte-identical packaged copy
 ships with the core wheel.</p>
-<h2 id="authoritative-receipt-and-v013-wrapping">Authoritative receipt and v0.13 wrapping<a class="headerlink" href="#authoritative-receipt-and-v013-wrapping" title="Permanent link">&para;</a></h2>
+<h2 id="authoritative-receipt-and-contract-set-labeling">Authoritative receipt and contract-set labeling<a class="headerlink" href="#authoritative-receipt-and-contract-set-labeling" title="Permanent link">&para;</a></h2>
 <p>Version 2 uses <code>receipt.representation: embedded</code>. The embedded signed
 InvarLock receipt is the authoritative replayable technical result.
 <code>receipt.raw_base64</code> preserves the exact supplied receipt-file bytes, and
@@ -1970,7 +1970,10 @@ the authenticated receipt.</p>
 <p>Existing v0.13 receipt formats are wrapped without modification or relabeling.
 Their original bytes are recoverable byte-for-byte from <code>receipt.raw_base64</code>,
 and their original format remains in <code>contracts.receipt</code> and the parsed
-receipt. Because v0.13 receipts did not authenticate an issuance time,
+receipt. The envelope labels the complete supported contract tuple: evidence
+pack v1 with comparison-report v1 or v2 remains contract release <code>0.13.0</code>,
+while comparison-report v3 is contract release <code>0.15.0</code>. Because these receipt
+formats did not authenticate an issuance time,
 <code>timestamps.receipt_issued_at</code> remains <code>null</code>; the wrapper rejects any attempt
 to manufacture that historical metadata. <code>evaluation_completed_at</code> is
 wrapper-supplied context, not an authoritative freshness input.

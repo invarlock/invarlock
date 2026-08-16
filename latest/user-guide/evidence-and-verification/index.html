@@ -2199,6 +2199,7 @@ trusted key registry or authenticated handoff, never from the submitted bundle.<
 <li>expected baseline runtime digest;</li>
 <li>expected subject runtime digest;</li>
 <li>expected evidence-signer fingerprint;</li>
+<li>expected normalized-request digest when either side uses <code>llama_cpp</code>;</li>
 <li>a new receipt destination;</li>
 <li>an independent Ed25519 verifier key; and</li>
 <li>a stable verifier identity.</li>
@@ -2285,7 +2286,7 @@ it as one transaction.</p>
 <li>re-derives every built-in paired score from typed observation facts or,
   when selected, replays an explicitly authorized deterministic scorer twice;</li>
 <li>recomputes the metric, its paired interval, threshold comparison, optional
-  count/width qualification, and report; and</li>
+  count/width and exact-match side-accuracy qualification, and report; and</li>
 <li>signs the complete result and caller-supplied anchors with the verifier key.</li>
 </ul>
 <p>Multiple verifiers may independently obtain the same policy bytes bound into
@@ -2355,6 +2356,7 @@ details. Treat the example as a field guide, not a replacement schema.</p>
 <li>external policy digest;</li>
 <li>baseline and subject runtime anchors;</li>
 <li>expected evidence-signer fingerprint;</li>
+<li>the normalized-request anchor when either side uses <code>llama_cpp</code>;</li>
 <li>verifier identity and verifier-key fingerprint;</li>
 <li>integrity and policy verdicts; and</li>
 <li>an Ed25519 signature plus the verifier public key.</li>
@@ -2406,12 +2408,14 @@ signature before rendering. It shows:</p>
   Newcombe 95% interval when exact match is selected;</li>
 <li>sample qualification showing the required and observed paired count and
   interval width when the policy enables those coupled controls;</li>
+<li>side-accuracy qualification showing the required floor and both observed
+  exact-match means when the policy enables that independent control;</li>
 <li>a token-weighted perplexity interpretation when normalized-NLL tokenizer and
   token-count facts are comparable;</li>
 <li>the scorer binding and deterministic per-side replay when a scorer extension
   is selected;</li>
 <li>policy limit and the verdict formed from the conservative bound plus any
-  configured count and precision requirements;</li>
+  configured count, precision, and side-accuracy requirements;</li>
 <li>policy digest; and</li>
 <li>evidence-signer fingerprint.</li>
 </ul>
@@ -2453,6 +2457,7 @@ InvarLock's internal verification.</p>
 <li>the policy file;</li>
 <li>expected baseline and subject runtime digests;</li>
 <li>expected evidence-signer fingerprint;</li>
+<li>expected normalized-request digest when either side uses <code>llama_cpp</code>;</li>
 <li>its own identity and private key; and</li>
 <li>a new receipt destination.</li>
 </ul>

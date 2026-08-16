@@ -2171,10 +2171,14 @@ a proposed reliance decision.</p>
 <span class="arithmatex">\(\pi_V\)</span> the independently supplied policy, <span class="arithmatex">\(A_B\)</span> and <span class="arithmatex">\(A_S\)</span> the expected
 artifact-identity digests, <span class="arithmatex">\(d_{\mathcal S}\)</span> the expected canonical schedule
 digest, <span class="arithmatex">\(R_B\)</span> and <span class="arithmatex">\(R_S\)</span> the expected runtime digests, and <span class="arithmatex">\(K_E\)</span> the expected
-evidence-signer fingerprint. Define the verifier anchor set as:</p>
+evidence-signer fingerprint. Let <span class="arithmatex">\(d_{\mathcal Q}\)</span> be the independently
+approved normalized-request digest required when either side uses
+<code>llama_cpp</code>. Define the base verifier anchor set as:</p>
 <div class="arithmatex">\[
-A_V=(\pi_V,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E).
+A_V^0=(\pi_V,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E).
 \]</div>
+<p>For non-GGUF evidence, <span class="arithmatex">\(A_V=A_V^0\)</span>. When either side uses <code>llama_cpp</code>,
+<span class="arithmatex">\(A_V=(A_V^0,d_{\mathcal Q})\)</span>.</p>
 <p>Let <span class="arithmatex">\(V(E,A_V)\)</span> be the replay result and <span class="arithmatex">\(Q\)</span> the signed receipt statement. The
 cryptographic checks establish:</p>
 <div class="arithmatex">\[
@@ -2214,7 +2218,7 @@ policy. A valid outer signature cannot authorize the inner receipt signer.</p>
 </tr>
 <tr>
 <td>Verifier</td>
-<td>Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, explicitly authorized scorer registry when selected, verifier identity, and verifier key</td>
+<td>Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, normalized-request digest for GGUF evidence, explicitly authorized scorer registry when selected, verifier identity, and verifier key</td>
 <td>External signed verification receipt</td>
 <td>Authorized to make the scoped acceptance statement under independently managed anchors and scorer authorization</td>
 </tr>
@@ -2240,8 +2244,8 @@ policy. A valid outer signature cannot authorize the inner receipt signer.</p>
 </table>
 <p>The verifier must not derive an expected value from the evidence field that the
 value is intended to check. Copying the policy, artifact identities, schedule
-digest, runtime digests, or evidence-signer fingerprint from the submitted
-bundle makes the check circular.</p>
+digest, runtime digests, evidence-signer fingerprint, or GGUF normalized-
+request digest from the submitted bundle makes the check circular.</p>
 <h2 id="trust-anchor-matrix">Trust-anchor matrix<a class="headerlink" href="#trust-anchor-matrix" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2300,6 +2304,12 @@ bundle makes the check circular.</p>
 <td>Pinned image/build record</td>
 <td>The subject evidence declares the expected image identity</td>
 <td>The image executed</td>
+</tr>
+<tr>
+<td>Normalized-request digest</td>
+<td>Approved deployment request or signed release configuration; required for <code>llama_cpp</code> evidence</td>
+<td>The evidence carries the exact approved canonical request, including bound GGUF execution controls</td>
+<td>The declared runtime executed or the request is scientifically sufficient</td>
 </tr>
 <tr>
 <td>Verifier identity/fingerprint</td>
@@ -2366,15 +2376,15 @@ verification succeeds. The verifier checks canonical JSON, safe paths, bounded
 files, the exact inventory, checksums, signatures, versioned schemas, input
 identities, provider cross-bindings, schedule order, per-record scores, report
 arithmetic, the selected paired interval, optional count/width qualification,
-and the policy result.</p>
+optional exact-match side-accuracy qualification, and the policy result.</p>
 <p>A scorer binding inside the submitted request or evidence is also untrusted.
 It identifies requested code and configuration but cannot authorize either.</p>
 <h3 id="independent-anchors">Independent anchors<a class="headerlink" href="#independent-anchors" title="Permanent link">&para;</a></h3>
 <p>The verifier's policy bytes, baseline and subject artifact-identity digests,
 canonical schedule digest, runtime digests, evidence-signer fingerprint,
-verifier identity, and verifier key are outside the submitted evidence. Their
-source, review, authorization, rotation, and revocation are operational
-controls.
+GGUF normalized-request digest when applicable, verifier identity, and
+verifier key are outside the submitted evidence. Their source, review,
+authorization, rotation, and revocation are operational controls.
 InvarLock records them; it does not operate a public-key infrastructure or
 policy distribution service.</p>
 <p>For portable acceptance, the recipient additionally supplies current policy,
@@ -2441,6 +2451,7 @@ keys. It binds:</p>
 <li>the canonical schedule digest;</li>
 <li>baseline and subject runtime digests;</li>
 <li>the expected evidence-signer fingerprint;</li>
+<li>the normalized-request digest when either side uses <code>llama_cpp</code>;</li>
 <li>verifier identity and verifier fingerprint; and</li>
 <li>integrity, policy, and overall verdicts.</li>
 </ul>

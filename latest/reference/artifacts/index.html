@@ -2036,7 +2036,7 @@ records, and canonical report are separate payloads referenced by the manifest.<
 <tr>
 <td><code>reports/evaluation.report.json</code></td>
 <td>One</td>
-<td>Canonical means, comparison, paired interval, threshold, optional sample qualification, and verdict reproduced by verification</td>
+<td>Canonical means, comparison, paired interval, threshold, optional sample and side-accuracy qualification, and verdict reproduced by verification</td>
 </tr>
 <tr>
 <td><code>observations/*.json</code></td>
@@ -2199,19 +2199,23 @@ no policy, interval, or verdict authority; an unavailable interpretation does
 not invalidate the byte-normalized NLL comparison.</p>
 <p>The canonical report adds the metric-specific paired interval to the two side
 means and point comparison. New reports use
-<code>invarlock/comparison-report-v2</code>; the verifier also replays existing
-<code>invarlock/comparison-report-v1</code> packs under their original arithmetic. Exact
+<code>invarlock/comparison-report-v3</code>; the verifier also replays existing v2 and
+<code>invarlock/comparison-report-v1</code> packs under their original semantics. Exact
 match records paired regression and improvement counts, an exact two-sided
 McNemar probability, and the paired Newcombe 95% effect-size interval whose
 lower bound controls policy. Normalized NLL uses the upper bound of its
 authenticated-schedule resampling interval. An authorized scorer extension
 uses the lower bound of the same fixed paired-resampling method against
 <code>metrics.scorer_extension.delta_min_pp</code>.</p>
-<p>When the policy supplies the coupled sample controls, the v2 report also
+<p>When the policy supplies the coupled sample controls, a v2 or v3 report also
 contains <code>sample_qualification</code>. It records the minimum and observed paired
 count, maximum and observed interval width, units, each check's result, and the
 combined result. The final verdict is the conjunction of that result and the
 metric-bound result.</p>
+<p>When a v3 exact-match policy supplies <code>minimum_side_accuracy</code>, the report also
+contains <code>side_accuracy</code>. It records the minimum, both observed means, each
+side's result, and the combined result. The final verdict additionally requires
+that combined result to pass. Historical v2 reports have no such section.</p>
 <h2 id="provider-sidecars">Provider sidecars<a class="headerlink" href="#provider-sidecars" title="Permanent link">&para;</a></h2>
 <p>Each comparison side includes:</p>
 <table>
@@ -2292,8 +2296,9 @@ bundle so the bundle can stay byte-identical.</p>
 <p>Multiple verifiers can issue separate receipts for the same immutable manifest.
 They can use distinct verifier identities and keys. Each must independently
 supply the expected artifact, schedule, policy, runtime, and evidence-signer
-anchors. The policy bytes must match the policy material already bound by the
-pack; a different policy requires a newly evaluated evidence bundle.</p>
+anchors, plus the normalized-request anchor required for GGUF evidence. The
+policy bytes must match the policy material already bound by the pack; a
+different policy requires a newly evaluated evidence bundle.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../contracts/">Public contracts</a> defines the manifest schema, canonical JSON,

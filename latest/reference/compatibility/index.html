@@ -1884,8 +1884,9 @@ change the recorded result; it distinguishes historical technical verification
 from present-day acceptability.</p>
 <h2 id="release-blocking-evidence">Release-blocking evidence<a class="headerlink" href="#release-blocking-evidence" title="Permanent link">&para;</a></h2>
 <p>The committed v0.13 corpus lives at
-<code>tests/fixtures/compatibility/v0.13.0/corpus.json</code> and points only to tracked
-files under <code>examples/acceptance-handoff/golden/</code>. <code>make compatibility-test</code>
+<code>tests/fixtures/compatibility/v0.13.0/corpus.json</code> and points only to the
+immutable package beside it. Current public examples have their own generated
+fixtures and cannot silently rewrite this historical corpus. <code>make compatibility-test</code>
 checks immutable fixture digests, original-semantic replay, signed-receipt
 verification, tamper rejection, semantic inconsistency rejection, and
 protection against contract relabeling.</p>

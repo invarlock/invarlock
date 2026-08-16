@@ -2107,7 +2107,7 @@ independent acceptance record.</p>
 </tbody>
 </table>
 <p>Exact match uses the continuity-corrected paired Newcombe 95% effect-size
-interval emitted by <code>invarlock/comparison-report-v2</code>. Normalized NLL
+interval emitted by <code>invarlock/comparison-report-v3</code>. Normalized NLL
 uses the deterministic <code>paired_percentile_bootstrap_sha256_v1</code> method with
 2,048 replicates over the authenticated finite schedule. The selected policy
 reads the conservative bound of the corresponding interval.</p>
@@ -2115,7 +2115,10 @@ reads the conservative bound of the corresponding interval.</p>
 maximum interval-width field. The two fields are supplied together. When they
 are present, the metric bound, record count, and precision width must all pass;
 the canonical report records each result. Preflight can qualify record count
-but leaves interval width pending until execution produces paired outcomes.</p>
+but leaves interval width pending until execution produces paired outcomes.
+Exact match may also bind <code>minimum_side_accuracy</code>; both baseline and subject
+accuracy must meet that floor, preventing an apparently acceptable delta
+between two unusably inaccurate models.</p>
 <p>Normalized NLL measures expected-continuation likelihood under teacher forcing,
 not general model quality. If tokenizer contracts and paired token counts are
 comparable, the report also includes a verifier-derived token-weighted

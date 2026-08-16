@@ -1411,6 +1411,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#side-accuracy-qualification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Side-accuracy qualification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#normalized-nll-per-utf-8-byte" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1943,6 +1954,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#side-accuracy-qualification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Side-accuracy qualification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#normalized-nll-per-utf-8-byte" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2099,10 +2121,11 @@ receipt, observation, artifact identity, and runtime manifest. The verifier
 reconstructs the runtime-side object exactly.</p>
 <h2 id="canonical-comparison-report">Canonical comparison report<a class="headerlink" href="#canonical-comparison-report" title="Permanent link">&para;</a></h2>
 <p>New evaluations write <code>reports/evaluation.report.json</code> as an
-<code>invarlock/comparison-report-v2</code> object. Strict verification also accepts a
-signed <code>invarlock/comparison-report-v1</code> object and reconstructs it with the
-legacy v1 exact-match interval method. A verifier never silently upgrades the
-arithmetic of an existing pack.</p>
+<code>invarlock/comparison-report-v3</code> object. Strict verification also accepts
+signed <code>invarlock/comparison-report-v2</code> and <code>invarlock/comparison-report-v1</code>
+objects. Version 2 omits side-accuracy qualification; version 1 additionally
+uses the legacy exact-match interval method. A verifier never silently upgrades
+the arithmetic or policy meaning of an existing pack.</p>
 <p>The current report contains:</p>
 <ul>
 <li><code>comparison_id</code>, <code>metric</code>, and <code>record_count</code>;</li>
@@ -2113,7 +2136,9 @@ arithmetic of an existing pack.</p>
   or <code>scorer_extension</code> and <code>scorer_replay</code> for an authorized extension;</li>
 <li><code>policy_digest</code>;</li>
 <li>optional <code>sample_qualification</code> when the policy binds count and precision
-  requirements; and</li>
+  requirements;</li>
+<li>optional <code>side_accuracy</code> when exact-match policy binds a minimum accuracy for
+  both sides; and</li>
 <li><code>verdict</code>, either <code>pass</code> or <code>fail</code>.</li>
 </ul>
 <p>A complete exact-match report has this shape:</p>
@@ -2125,7 +2150,7 @@ arithmetic of an existing pack.</p>
 <span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">5.0</span>
 <span class="w">  </span><span class="p">},</span>
 <span class="w">  </span><span class="nt">&quot;comparison_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cmp-example&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/comparison-report-v2&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/comparison-report-v3&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;metric&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exact_match&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;policy_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:0000000000000000000000000000000000000000000000000000000000000000&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span>
@@ -2180,7 +2205,9 @@ point comparison, interval bounds, threshold, or verdict.</p>
 <p><code>value = 100 * (subject_mean - baseline_mean)</code>. The metric-bound check passes when
 <code>uncertainty.lower &gt;= comparison.minimum</code>, where <code>minimum</code> comes from
 <code>resolved_policy.metrics.exact_match.delta_min_pp</code>. If sample qualification is
-present, the final report passes only when its count and width checks also pass.</p>
+present, its count and width checks must also pass. If side-accuracy
+qualification is present, both side means must meet its minimum. The final
+verdict is the conjunction of all applicable checks.</p>
 <p>For this metric, baseline and subject <code>mean_score</code> are literal exact-match
 accuracies between <code>0</code> and <code>1</code>. Comparison and interval bounds are percentage
 points between <code>-100</code> and <code>100</code>.</p>
@@ -2189,8 +2216,8 @@ baseline-fail to subject-pass improvements, both-pass and both-fail counts, the
 number of discordant pairs, and the exact two-sided McNemar probability. Its
 effect size is the same subject-minus-baseline percentage-point delta. The
 continuity-corrected paired Newcombe hybrid-score 95% interval is repeated as
-the canonical <code>uncertainty</code> object in a v2 report. The policy uses its lower
-bound; the McNemar probability does not control the verdict. A v1 report keeps
+the canonical <code>uncertainty</code> object in a v2 or v3 report. The policy uses its
+lower bound; the McNemar probability does not control the verdict. A v1 report keeps
 method <code>newcombe_hybrid_score_paired_v1</code> and is replayed only with that original
 method.</p>
 <h3 id="sample-and-precision-qualification">Sample and precision qualification<a class="headerlink" href="#sample-and-precision-qualification" title="Permanent link">&para;</a></h3>
@@ -2213,6 +2240,13 @@ and observed interval width &lt;= maximum interval width
 
 <p>The report therefore distinguishes a metric rejection from insufficient count
 or precision without allowing a favorable point value to bypass either gate.</p>
+<h3 id="side-accuracy-qualification">Side-accuracy qualification<a class="headerlink" href="#side-accuracy-qualification" title="Permanent link">&para;</a></h3>
+<p>An exact-match policy may independently set <code>minimum_side_accuracy</code> from <code>0</code>
+through <code>1</code>. A v3 report then includes <code>side_accuracy</code> with the configured
+minimum, each side's observed exact-match mean and pass result, and a combined
+<code>passed</code> result. Both sides must meet the inclusive floor. This check is
+independent of the coupled sample controls, and the final verdict also requires
+it to pass. Historical v2 reports do not contain this section.</p>
 <h3 id="normalized-nll-per-utf-8-byte">Normalized NLL per UTF-8 byte<a class="headerlink" href="#normalized-nll-per-utf-8-byte" title="Permanent link">&para;</a></h3>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;normalized_nll_ratio&quot;</span><span class="p">,</span>
@@ -2487,7 +2521,9 @@ or standalone HTML. Rendering never changes bundle bytes.</p>
 <p>The exact-match rendering also lists regression and improvement counts, the
 discordant-pair count, and the exact two-sided McNemar probability. When the
 policy includes sample qualification, console and HTML render the observed and
-required record count, interval width, and combined qualification result.</p>
+required record count, interval width, and combined qualification result.
+When exact-match policy includes side-accuracy qualification, both renderings
+also show the minimum, each observed side mean, and the combined result.</p>
 <p>The human view states what it is: a rendering of signature-authenticated
 evidence. Independent acceptance comes from <code>invarlock verify</code> and its signed
 receipt. Automation should parse verified JSON or validate a receipt, never

@@ -2008,8 +2008,8 @@ command implementation imports a runtime backend.</p>
 preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
-applies any coupled count and width controls, and atomically publishes the
-evidence directory named by the request.</p>
+applies any coupled count and width controls and exact-match side-accuracy
+floor, and atomically publishes the evidence directory named by the request.</p>
 <p><code>--preflight</code> returns after that mandatory validation instead of continuing to
 execution and publication. It validates the
 request and every referenced path, prepares or authenticates the schedule,
@@ -2408,7 +2408,8 @@ evidence references; the normalized request and schedule; runtime manifests
 and provider sidecars; for GGUF, the caller-approved request digest and its
 artifact/backend/execution bindings; record ordering and input digests; derived paired
 scores; the canonical comparison report; and the policy verdict. A policy
-verdict includes any configured record-count and interval-width qualification.
+verdict includes any configured record-count, interval-width, and exact-match
+side-accuracy qualification.
 A verdict of <code>fail</code> is a valid, integrity-checked result but is not command
 success.</p>
 <p>An installed scorer is executable code. The flag does not authorize an
@@ -2426,7 +2427,7 @@ signed and internally consistent pack can have <code>integrity_ok: true</code>,
 <code>policy_verdict: "fail"</code>, and <code>ok: false</code>. See <a href="../reports/#verification-result">Reports and
 receipts</a> for the complete field matrix.</p>
 <h2 id="report"><code>report</code><a class="headerlink" href="#report" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code>invarlock report EVIDENCE [--html report.html] [--explain]
+<div class="codehilite"><pre><span></span><code>invarlock report EVIDENCE [--html report.html] [--explain] [--json]
 </code></pre></div>
 
 <p><code>report</code> verifies the bundle's closed inventory, checksums, reference digests,
@@ -2456,11 +2457,18 @@ canonical JSON, and embedded evidence signature before rendering
 <td>No</td>
 <td>Add a concise explanation of the decision and evidence bindings</td>
 </tr>
+<tr>
+<td><code>--json</code></td>
+<td>No</td>
+<td>Emit one compact machine-readable rendering result instead of the text view</td>
+</tr>
 </tbody>
 </table>
-<p><code>--html</code> refuses to overwrite an existing file. <code>report</code> always emits the text
-view to standard output; when HTML is requested it also prints the written
-path.</p>
+<p><code>--html</code> refuses to overwrite an existing file. By default, <code>report</code> emits the
+text view to standard output and prints the written path when HTML is
+requested. With <code>--json</code>, it instead emits one compact
+<code>invarlock/evidence-report-v1</code> object containing <code>ok</code>, the pack-manifest digest,
+and the optional HTML path.</p>
 <p>Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
 safe renderer, not a substitute for <code>invarlock verify</code>.</p>

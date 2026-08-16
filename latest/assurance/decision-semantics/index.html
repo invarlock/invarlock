@@ -2027,9 +2027,10 @@
 <p class="admonition-title">Assurance note</p>
 <p><strong>In plain language:</strong> InvarLock recomputes every score from authenticated
 paired records, derives the metric's paired interval, and applies the policy
-to the conservative bound. When the policy qualifies sample size and
-precision, those checks must pass too. A favorable point value cannot
-override a threshold, count, or width failure.</p>
+to the conservative bound. When the policy qualifies sample size,
+precision, or exact-match side accuracy, those checks must pass too. A
+favorable point value cannot override a threshold, count, width, or side-
+accuracy failure.</p>
 <p><strong>Question:</strong> How are a built-in metric or authorized deterministic scorer
 converted into a reproducible policy verdict?</p>
 <p><strong>Decision use:</strong> Use these definitions to review thresholds, reproduce
@@ -2044,10 +2045,10 @@ It reports a point comparison and a verifier-replayed paired interval. Exact
 match uses a paired Newcombe 95% effect-size interval. Normalized NLL and an
 authorized scorer extension use deterministic paired resampling over the
 authenticated schedule.</p>
-<p>New evaluations emit <code>invarlock/comparison-report-v2</code>. Strict verification
-continues to replay <code>invarlock/comparison-report-v1</code> with its original
-exact-match interval method, so signed legacy evidence keeps its original
-meaning.</p>
+<p>New evaluations emit <code>invarlock/comparison-report-v3</code>. Strict verification
+continues to replay v2 reports without side-accuracy qualification and v1
+reports with their original exact-match interval method, so signed historical
+evidence keeps its original meaning.</p>
 <h2 id="notation">Notation<a class="headerlink" href="#notation" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2100,6 +2101,10 @@ meaning.</p>
 <tr>
 <td><span class="arithmatex">\(\tau_{\Delta}\)</span></td>
 <td>Policy floor <code>exact_match.delta_min_pp</code></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\tau_A\)</span></td>
+<td>Optional exact-match floor <code>minimum_side_accuracy</code> for each side mean</td>
 </tr>
 <tr>
 <td><span class="arithmatex">\(\tau_{N}\)</span></td>
@@ -2165,7 +2170,8 @@ case-fold, normalize, parse an answer, or compare token sequences.</p>
 <span class="w">      </span><span class="nt">&quot;exact_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nt">&quot;delta_min_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">-2.0</span><span class="p">,</span>
 <span class="w">        </span><span class="nt">&quot;maximum_interval_width_pp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400</span>
+<span class="w">        </span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;minimum_side_accuracy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span>
 <span class="w">      </span><span class="p">}</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">}</span>
@@ -2177,12 +2183,18 @@ case-fold, normalize, parse an answer, or compare token sequences.</p>
 \operatorname{pass}_{\mathrm{EM}}
 \iff q_L \ge \tau_{\Delta}
 \land n \ge n_{\min}
-\land (q_U-q_L) \le w_{\max}.
+\land (q_U-q_L) \le w_{\max}
+\land \bar{x}_B \ge \tau_A
+\land \bar{x}_S \ge \tau_A.
 \]</div>
 <p>The boundary is inclusive. <code>delta_min_pp</code> is an absolute percentage-point floor,
 not a relative percentage and not a floor applied only to the point estimate.
 The count and width terms apply only when the policy supplies both coupled
-fields; without them, the threshold-only policy remains valid.</p>
+fields; without them, the threshold-only policy remains valid.
+The two side-accuracy terms apply only when <code>minimum_side_accuracy</code> is present.
+That optional finite value lies from 0 through 1 and prevents a passing
+relative comparison between two sides whose absolute exact-match accuracy is
+below the policy floor.</p>
 <p>For every pair, InvarLock also classifies the two binary outcomes:</p>
 <ul>
 <li>baseline pass and subject fail: a regression;</li>
@@ -2197,7 +2209,7 @@ conditional on those discordant pairs. The McNemar result describes evidence
 of asymmetry between regressions and improvements; it does not control the
 acceptance verdict.</p>
 <p>The exact-match interval is a paired Newcombe hybrid-score 95% interval for
-the subject-minus-baseline effect. The current v2 report uses the
+the subject-minus-baseline effect. Current v3 reports use the
 continuity-corrected method:</p>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;newcombe_hybrid_score_paired_v2&quot;</span><span class="p">,</span>
@@ -2404,7 +2416,7 @@ authenticated observations, but observations do not enter acceptance.</p>
 match and scorer extensions use <code>maximum_interval_width_pp</code>, whose value must
 be positive and no greater than 200. Normalized NLL uses positive
 <code>maximum_interval_width_ratio</code>. <code>minimum_record_count</code> is an integer from 1
-through 10,000. The canonical v2 report records the minimum, maximum, observed
+through 10,000. The canonical v3 report records the minimum, maximum, observed
 values, units, individual results, and combined <code>sample_qualification.passed</code>.</p>
 <h2 id="verifier-owned-replay">Verifier-owned replay<a class="headerlink" href="#verifier-owned-replay" title="Permanent link">&para;</a></h2>
 <p>The evidence signer cannot supply an accepted aggregate directly. Verification:</p>
@@ -2419,7 +2431,8 @@ values, units, individual results, and combined <code>sample_qualification.passe
   are comparable;</li>
 <li>reconstructs canonical paired records;</li>
 <li>recomputes side means, point comparison, the selected interval, threshold
-  application, optional count/width qualification, and verdict; and</li>
+  application, optional count/width and exact-match side-accuracy
+  qualification, and verdict; and</li>
 <li>requires canonical equality with the stored report.</li>
 </ul>
 <p>The implementation is in
@@ -2428,8 +2441,8 @@ and independent replay is in
 <a href="https://github.com/invarlock/invarlock/blob/main/src/invarlock/evidence_pack_verification.py"><code>verify_comparison_evidence</code></a>.</p>
 <h2 id="finite-schedule-interpretation">Finite-schedule interpretation<a class="headerlink" href="#finite-schedule-interpretation" title="Permanent link">&para;</a></h2>
 <p>A pass means that the policy's conservative bound cleared its threshold and
-any configured count and width requirements passed for the authenticated
-records and runtime configuration. It does not establish:</p>
+any configured count, width, and exact-match side-accuracy requirements passed
+for the authenticated records and runtime configuration. It does not establish:</p>
 <ul>
 <li>equality, equivalence, or non-inferiority in a broader population;</li>
 <li>representativeness of the selected prompts or targets;</li>

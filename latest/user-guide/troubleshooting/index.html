@@ -2548,7 +2548,9 @@ when the schedule-resampling interval's upper bound meets <code>ratio_max</code>
 If the policy enables sample qualification, the observed record count must also
 meet <code>minimum_record_count</code> and the observed width must not exceed the matching
 maximum-width field. Inspect <code>sample_qualification</code> before changing the metric
-threshold.
+threshold. If exact-match policy sets <code>minimum_side_accuracy</code>, both observed
+side means must also meet that floor; inspect <code>side_accuracy</code> before changing
+the policy.
 Review the authenticated schedule, interval method, and record-level variation.
 Changing the threshold or schedule requires a new evidence transaction.</p>
 <h2 id="report-rejects-an-otherwise-visible-directory">Report rejects an otherwise visible directory<a class="headerlink" href="#report-rejects-an-otherwise-visible-directory" title="Permanent link">&para;</a></h2>

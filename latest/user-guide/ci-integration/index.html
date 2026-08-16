@@ -762,6 +762,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#protected-deployment-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protected deployment approval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outputs-and-status" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1815,6 +1826,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#protected-deployment-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protected deployment approval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outputs-and-status" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1875,7 +1897,8 @@ available to the job without being stored in the evidence artifact.</p>
 <ol>
 <li><code>invarlock verify EVIDENCE</code> authenticates and replays the bundle using the
    supplied artifact identities, schedule, policy, runtime digests, and
-   evidence-signer fingerprint, then writes a verifier-signed receipt.</li>
+   evidence-signer fingerprint plus the normalized-request digest required for
+   GGUF evidence, then writes a verifier-signed receipt.</li>
 <li><code>invarlock report EVIDENCE --html PATH --explain</code> authenticates the bundle
    and writes a human view without changing the evidence.</li>
 <li>The action uploads the evidence directory, verification JSON, signed
@@ -1932,6 +1955,11 @@ from the submitted evidence directory.</p>
 <td><code>expected-signer</code></td>
 <td>Yes</td>
 <td>Authorized Ed25519 evidence-signer fingerprint</td>
+</tr>
+<tr>
+<td><code>expected-request-digest</code></td>
+<td>For GGUF</td>
+<td>Approved normalized-request digest; required when either side uses <code>llama_cpp</code></td>
 </tr>
 <tr>
 <td><code>verifier-signing-key</code></td>
@@ -2052,6 +2080,7 @@ Replace <code>PINNED_INVARLOCK_COMMIT</code> with its full commit SHA.</p>
 <span class="w">          </span><span class="nt">expected-baseline-runtime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_BASELINE_RUNTIME_DIGEST }}</span>
 <span class="w">          </span><span class="nt">expected-subject-runtime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_SUBJECT_RUNTIME_DIGEST }}</span>
 <span class="w">          </span><span class="nt">expected-signer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_EVIDENCE_SIGNER_FINGERPRINT }}</span>
+<span class="w">          </span><span class="nt">expected-request-digest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_REQUEST_DIGEST }}</span>
 <span class="w">          </span><span class="nt">verifier-signing-key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ runner.temp }}/invarlock-verifier.pem</span>
 <span class="w">          </span><span class="nt">verifier-identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-verifier</span>
 <span class="w">          </span><span class="nt">receipt-output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reports/invarlock/verification.receipt.json</span>
@@ -2066,7 +2095,39 @@ version constraint alone is not a supply-chain identity. For a released action,
 use that release's pinned immutable commit SHA. A tag is easier to read but a
 full commit pin makes action-source substitution visible in review.
 <code>INVARLOCK_POLICY_SHA256</code> must likewise be a protected verifier-owned digest,
-not a value read from the submitted checkout.</p>
+not a value read from the submitted checkout.
+<code>INVARLOCK_REQUEST_DIGEST</code> is required when either evidence side uses
+<code>llama_cpp</code>; omit <code>expected-request-digest</code> for a non-GGUF workflow that does
+not maintain this additional anchor.</p>
+<h2 id="protected-deployment-approval">Protected deployment approval<a class="headerlink" href="#protected-deployment-approval" title="Permanent link">&para;</a></h2>
+<p>A successful verification job is necessary but is not, by itself, a portable
+deployment authorization. The deployment job must consume the uploaded signed
+receipt, reauthenticate it against production-owned verifier and policy
+anchors, and deploy only the exact candidate bound by that receipt.</p>
+<p>The maintained
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/ci/standalone-consumer/.github/workflows/deployment-approval.yml"><code>deployment-approval.yml</code></a>
+example implements that separation:</p>
+<ol>
+<li><code>verify-evidence</code> runs in the protected <code>release-review</code> environment and
+   uploads the evidence plus its signed verifier receipt.</li>
+<li><code>deploy-candidate</code> depends on that successful job and enters a separate
+   protected <code>production</code> environment.</li>
+<li>The deployment job downloads the artifact and runs
+   <code>review/verify_deployment_receipt.py</code> against production-owned approval
+   inputs. The helper authenticates the receipt signature, verifier identity
+   and fingerprint, evidence signer, artifact identities, schedule, runtimes,
+   and policy digest.</li>
+<li>The production-owned deployment adapter resolves or recomputes the candidate
+   identity and requires it to equal <code>artifact_digests.subject</code> in the emitted
+   <code>invarlock/deployment-approval-v1</code> record. Only then does the workflow invoke
+   the deployment command with that same record.</li>
+</ol>
+<p>The complete approval-input JSON is materialized from protected production
+configuration. It must not be generated from the downloaded evidence, receipt,
+or verification job outputs. The checked-in test exercises the accepted path
+and rejects changed verifier and policy anchors. A mutable candidate path or
+tag is not enough: the deployment adapter must enforce the approved InvarLock
+artifact identity to close the time-of-check/time-of-use boundary.</p>
 <h2 id="outputs-and-status">Outputs and status<a class="headerlink" href="#outputs-and-status" title="Permanent link">&para;</a></h2>
 <p>The default action outputs are:</p>
 <div class="codehilite"><pre><span></span><code>reports/invarlock/
@@ -2116,6 +2177,8 @@ receipt through the
 <h2 id="trust-and-secret-handling">Trust and secret handling<a class="headerlink" href="#trust-and-secret-handling" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Never derive <code>expected-signer</code> from <code>manifest.signature.json</code> in the pack.</li>
+<li>For GGUF evidence, never derive <code>expected-request-digest</code> from the submitted
+  normalized request.</li>
 <li>Never copy either expected runtime digest from the submitted runtime
   manifests.</li>
 <li>Do not upload or cache the verifier private key.</li>
@@ -2125,6 +2188,9 @@ receipt through the
   report paths for a retry.</li>
 <li>Validate a received receipt against the expected verifier identity and
   fingerprint before another system relies on it.</li>
+<li>Reauthenticate the signed receipt in the deployment environment; do not
+  treat job dependency, artifact presence, HTML, or unsigned verification JSON
+  as deployment authority.</li>
 </ul>
 <p>Continue with <a href="../evidence-and-verification/">Evidence and verification</a> for the
 handoff and receipt verifier rules and <a href="../key-management/">Key management</a> for

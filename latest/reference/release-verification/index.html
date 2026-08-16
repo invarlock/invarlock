@@ -2108,7 +2108,10 @@ repository workflow:</p>
 <li>builds one wheel and source distribution for the core and every first-party
    add-in;</li>
 <li>validates every archive against the exact checkout and runs the release
-   preflight again from a clean detached checkout;</li>
+   preflight again from a clean detached checkout, including full replay of
+   all seven retained public signed evidence packs and all four retained
+   evaluator-qualification transactions through the isolated candidate-wheel
+   CLI;</li>
 <li>runs <code>twine check</code> on every distribution;</li>
 <li>installs the built wheels together in a clean environment;</li>
 <li>exercises the public CLI, all provider conformance commands, diagnostics,
@@ -2160,8 +2163,21 @@ The smoke selects the maintained Python 3.12 or 3.13 lock for the invoking
 interpreter and fails closed when no matching lock exists.
 The read-only preflight then inspects the core wheel and source distribution
 against a separately generated <code>sha256sum</code>-format manifest, installs the
-candidate wheel in isolation, exercises its runtime surface, and reruns the
-public-evidence audit:</p>
+candidate wheel in isolation, exercises its runtime surface, replays all eleven
+retained release-evidence packs through <code>verify</code> and <code>report</code>, and reruns the
+public-evidence audit. Separate closed reference sets must exactly cover the
+seven public-evidence directories and four evaluator-qualification transaction
+directories, so adding or removing a carrier requires an explicit
+release-compatibility update. The evaluator replay must preserve the exact
+declared outcome: one policy pass and three integrity-valid policy rejections.</p>
+<p>The designated Qwen3.8 reference can be exercised directly against the current
+source-tree verifier with <code>make release-reference-journey</code>. Use
+<code>make release-public-evidence-compatibility</code> for the seven public packs,
+<code>make release-evaluator-qualification-compatibility</code> for the four evaluator
+transactions, or <code>make release-retained-evidence-compatibility</code> for both closed
+sets. The release preflight remains authoritative for the isolated
+candidate-wheel path.</p>
+<p>Run the local release gates with:</p>
 <div class="codehilite"><pre><span></span><code>make<span class="w"> </span>addins-install-smoke
 
 <span class="nv">HASH_MANIFEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>mktemp<span class="k">)</span><span class="s2">&quot;</span>
@@ -2184,10 +2200,17 @@ files as well as modified files. The manifest must contain only the two core
 artifacts by base name. <code>X.Y.Z</code> is
 the candidate version without a leading <code>v</code>; preflight rejects a dirty checkout,
 a different <code>HEAD</code>, unexpected artifacts, metadata/content mismatch, or a hash
-change. A passing result is release-candidate evidence, not authorization to
-tag or publish. Run the non-publishing branch workflow after these local checks
-to exercise the same release surface on the hosted Linux runner before creating
-a release tag.</p>
+change. Each retained replay supplies a fresh verifier key and an external,
+digest-pinned policy and trust profile. It requires the expected artifact,
+runtime, schedule, request, and evidence-signer anchors, a freshly signed
+receipt, and byte-identical repeated HTML reports. The machine-readable result
+records every pack-manifest digest plus its fresh receipt and deterministic
+report digests. It does not rewrite checked-in evidence or receipts, rerun model
+or evaluator inference or conversion, or generalize any retained transaction
+to other artifacts or policies. A passing result is release-candidate
+compatibility evidence, not recipient authorization to deploy. Run the
+non-publishing branch workflow after these local checks to exercise the same
+release surface on the hosted Linux runner before creating a release tag.</p>
 <p>The local preflight intentionally validates the core pair in depth while
 <code>make dist-check</code> validates every archive against its checkout source and
 <code>make addins-install-smoke</code> plus the release workflow validate the coordinated

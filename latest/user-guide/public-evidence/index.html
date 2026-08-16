@@ -1970,8 +1970,8 @@
 <p>Public evidence is a curated index of immutable <code>invarlock/evidence-pack-v1</code>
 directories and independently signed verification receipts. Every current
 entry uses a 400-record paired schedule selected from a pinned public dataset.
-The index spans the built-in Hugging Face text runtime and first-party
-vision-text and TensorRT-LLM runtime packages. A comparison remains
+The index spans the built-in Hugging Face text runtime and first-party GGUF,
+vision-text, and TensorRT-LLM runtime packages. A comparison remains
 <strong>Evidence not yet created</strong> until its pack and receipt pass strict verification
 and disclosure review.</p>
 <div class="admonition tip">
@@ -2004,6 +2004,24 @@ and disclosure review.</p>
 <td>Normalized NLL per expected UTF-8 byte</td>
 </tr>
 <tr>
+<td>Qwen3.5 9B BF16 checkpoint and source-derived Q5_K_M GGUF</td>
+<td>Hugging Face Transformers and GGUF/llama.cpp</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td>Qwen3.8 27B BF16 checkpoint and source-derived Q5_K_M GGUF</td>
+<td>Hugging Face Transformers and GGUF/llama.cpp</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td>Ministral 3 8B BF16 checkpoint and source-derived Q5_K_M GGUF</td>
+<td>Hugging Face Transformers and GGUF/llama.cpp</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
 <td>Qwen2-VL 2B and 7B vision-text checkpoints</td>
 <td>Hugging Face vision-text add-in</td>
 <td style="text-align: right;">400</td>
@@ -2029,14 +2047,28 @@ bindings over the authenticated finite schedules. The normalized-NLL entries
 quantify expected-continuation likelihood. Mistral 7B records a subject/baseline
 ratio of 0.9979 with a 95% paired interval from 0.9970 to 0.9988;
 Qwen2.5 14B records 0.9985 with an interval from 0.9955 to 1.0015. Both remain
-within the authenticated maximum ratio of 1.05. The Qwen2-VL comparison records
-a paired 11 percentage-point
+within the authenticated maximum ratio of 1.05. The Qwen3.5 deployment records
+53.0% BF16 accuracy and 54.75% Q5_K_M accuracy. Its +1.75 percentage-point
+paired effect has a 95% interval from -0.83 to 4.32 percentage points, satisfying
+the authenticated -2 percentage-point lower-bound floor, 10 percentage-point
+maximum width, and 20% side-accuracy floors. The Qwen3.8 deployment records
+63.0% BF16 accuracy and 64.5% Q5_K_M accuracy. Its +1.50 percentage-point
+paired effect has a 95% interval from -0.74 to 3.75 percentage points and
+satisfies the same policy. The independent-family Ministral 3 deployment
+records 44.75% BF16 accuracy and 45.25% Q5_K_M accuracy. Its +0.50
+percentage-point paired effect has a 95% interval from -1.12 to 2.12 percentage
+points and satisfies the same policy. The Qwen2-VL comparison records a
+paired 11 percentage-point
 exact-match improvement on its MMMU-Pro schedule, with a 95% paired interval
 from 6.34 to 15.67 percentage points. The TinyLlama engines both score zero on
 the MMLU-Pro schedule, and no relative exact-match difference is observed. Its
 supported conclusion is the signed finite-schedule non-regression decision and
 TensorRT-LLM runtime-path qualification, not model capability or output parity.
-Broader model-quality conclusions require broader, task-specific evidence.</p>
+The Qwen3.5, Qwen3.8, and Ministral results likewise qualify their
+finite-schedule deployment changes, not general output equivalence. The
+Ministral entry is an independent-family canary outside the evaluator
+qualification matrix. Broader model-quality conclusions require broader,
+task-specific evidence.</p>
 <h2 id="evidence-not-yet-created">Evidence not yet created<a class="headerlink" href="#evidence-not-yet-created" title="Permanent link">&para;</a></h2>
 <p>The following comparisons have no pack in the current index. They may be added
 when a 400-record evaluation completes the same strict verification,
@@ -2058,11 +2090,6 @@ independent-receipt, and disclosure-review path.</p>
 <tr>
 <td>Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints</td>
 <td>Hugging Face vision-text add-in</td>
-<td>Evidence not yet created</td>
-</tr>
-<tr>
-<td>Ministral 3 8B Q8_0 and Q4_K_M artifacts</td>
-<td>GGUF/llama.cpp add-in</td>
 <td>Evidence not yet created</td>
 </tr>
 <tr>
@@ -2098,7 +2125,8 @@ independent-receipt, and disclosure-review path.</p>
 <p>Installed wheels contain only <code>evidence_index.json</code>. They do not silently
 embed full packs. The index is a discovery and transport-integrity surface; it
 does not replace <code>invarlock verify</code> or the caller's independent artifact,
-schedule, policy, runtime, evidence-signer, and verifier anchors.</p>
+schedule, policy, runtime, evidence-signer, and verifier anchors, including the
+normalized-request anchor required for GGUF evidence.</p>
 <h2 id="prepare-a-local-entry">Prepare a local entry<a class="headerlink" href="#prepare-a-local-entry" title="Permanent link">&para;</a></h2>
 <p>Choose a stable, portable slug and stage exactly three objects:</p>
 <div class="codehilite"><pre><span></span><code>public_evidence/evidence/example-comparison/
@@ -2156,7 +2184,8 @@ make<span class="w"> </span>public-evidence-audit
 <p>This repository audit validates publication structure, local carrier bytes,
 the receipt's Ed25519 signature and embedded verifier-key fingerprint, and the
 receipt-to-manifest binding. Authorization remains with independently managed
-artifact, schedule, policy, runtime, evidence-signer, and verifier anchors.
+artifact, schedule, policy, runtime, evidence-signer, and verifier anchors,
+including the normalized-request anchor required for GGUF evidence.
 Perform strict verification and independently anchored receipt validation
 before indexing, and retain those review inputs outside the submitted pack.</p>
 <p>The synchronizer rebuilds the source index from local metadata, preserves

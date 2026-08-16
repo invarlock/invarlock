@@ -2211,6 +2211,28 @@ cannot substitute a different schema.</p>
 <p>The acceptance predicate and recipient policy are described in
 <a href="../acceptance-attestations/">Acceptance attestations</a>. The detailed InvarLock
 receipt remains the authoritative replayable result.</p>
+<p>Evaluator qualification has two stable wire classifications:</p>
+<table>
+<thead>
+<tr>
+<th>Qualification result</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>outcome: qualified_for_import</code>, <code>authority: verdict_authority</code></td>
+<td>Complete ordered facts passed deterministic recomputation and are independently replayable</td>
+</tr>
+<tr>
+<td><code>outcome: observation_only</code>, <code>authority: observation_only</code></td>
+<td>Authenticated context was retained but cannot contribute imported verdict facts</td>
+</tr>
+</tbody>
+</table>
+<p>These fields do not express adapter maintenance or signed-journey maturity.
+Those independent axes belong to the examples-layer qualification catalog, so
+an export cannot promote itself by claiming support or demonstration status.</p>
 <h2 id="provider-contracts">Provider contracts<a class="headerlink" href="#provider-contracts" title="Permanent link">&para;</a></h2>
 <p>The provider ABI uses these schema-backed documents:</p>
 <table>
@@ -2621,20 +2643,23 @@ first parse cannot be replaced with a symbolic link unnoticed.</p>
 <p>The built-in comparison metrics are <code>exact_match</code> and
 <code>normalized_nll_per_utf8_byte</code>. Exact-match reports include paired outcome
 counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
-95% interval whose lower bound controls policy. New v2 reports use the
-continuity-corrected method; strict verification preserves the original v1
-method for legacy v1 reports. Normalized-NLL reports include the
+95% interval whose lower bound controls policy. Current v3 reports and
+historical v2 reports use the continuity-corrected method; strict verification
+preserves the original method for legacy v1 reports. Normalized-NLL reports include the
 fixed 2,048-replicate <code>paired_percentile_bootstrap_sha256_v1</code> interval over the
 authenticated schedule and apply the policy ceiling to its upper bound. A
 scorer-extension comparison uses the same fixed paired-resampling method over
 unit-interval record values and applies <code>delta_min_pp</code> to the lower bound.
 <a href="../../assurance/decision-semantics/">Decision semantics</a> defines the exact
 arithmetic.</p>
-<p>Every metric policy may contain only its threshold, or its threshold plus the
-coupled <code>minimum_record_count</code> and maximum-width fields. Exact match and scorer
+<p>Every metric policy contains its threshold and may also contain the coupled
+<code>minimum_record_count</code> and maximum-width fields. Exact match and scorer
 extensions use <code>maximum_interval_width_pp</code>; normalized NLL uses
-<code>maximum_interval_width_ratio</code>. A v2 report with those controls passes only
-when the threshold, count, and width checks all pass.</p>
+<code>maximum_interval_width_ratio</code>. Exact match may independently add
+<code>minimum_side_accuracy</code>, a finite value from <code>0</code> through <code>1</code> that both side
+means must meet. A v3 report passes only when the metric-bound check and every
+configured sample-qualification and side-accuracy check pass. Historical v2
+reports have no side-accuracy section and retain their original semantics.</p>
 <h2 id="provider-document-field-map">Provider document field map<a class="headerlink" href="#provider-document-field-map" title="Permanent link">&para;</a></h2>
 <p>The schemas remain authoritative for types, patterns, nullability, and nested
 conditional rules. This map makes every top-level contract field discoverable:</p>
@@ -2668,7 +2693,7 @@ conditional rules. This map makes every top-level contract field discoverable:</
 </tr>
 <tr>
 <td>Behavioral schedule</td>
-<td><code>format_version</code>, <code>dataset_identity</code>, <code>records</code></td>
+<td><code>format_version</code>, <code>task</code>, <code>dataset_identity</code>, <code>records</code></td>
 </tr>
 </tbody>
 </table>
@@ -2756,8 +2781,12 @@ separate JSON Schema file:</p>
 <td>Ordered unit-interval record results and core-owned arithmetic mean from replay</td>
 </tr>
 <tr>
+<td><code>invarlock/comparison-report-v3</code></td>
+<td>Current canonical means, point comparison, metric-specific paired interval, optional sample and exact-match side-accuracy qualification, threshold, and verdict</td>
+</tr>
+<tr>
 <td><code>invarlock/comparison-report-v2</code></td>
-<td>Current canonical means, point comparison, metric-specific paired interval, optional sample qualification, threshold, and verdict</td>
+<td>Historical canonical report without side-accuracy qualification; accepted for backward verification, not emitted for new evaluations</td>
 </tr>
 <tr>
 <td><code>invarlock/comparison-report-v1</code></td>
@@ -2833,8 +2862,8 @@ those acceptance anchors.</p>
   and scorer-extension deltas;</li>
 <li>derived perplexity facts when tokenizer and paired token counts are
   comparable;</li>
-<li>comparison means, threshold arithmetic, optional count/interval-width
-  qualification, and policy verdict; and</li>
+<li>comparison means, threshold arithmetic, optional count/interval-width and
+  exact-match side-accuracy qualification, and policy verdict; and</li>
 <li>evidence signer and verifier signature bindings.</li>
 </ul>
 <p>A custom reader that performs schema validation alone is not equivalent to
@@ -2844,10 +2873,10 @@ those acceptance anchors.</p>
 are not silently accepted by closed objects. A breaking artifact change requires
 a new format identifier and explicit reader behavior. Runtime providers must
 also match ABI <code>1</code> exactly.</p>
-<p>The v2 comparison report is the current writer format. Strict verification
-continues to reconstruct a v1 report with the v1 exact-match method when a
-signed legacy pack identifies that format; it never applies v2 arithmetic and
-then relabels the result as v1.</p>
+<p>The v3 comparison report is the current writer format. Strict verification
+continues to reconstruct v2 and v1 reports under their original shapes and
+arithmetic when signed historical packs identify those formats; it never
+relabels a reconstructed report as another version.</p>
 <p>Receipt v1 remains valid for existing evidence whose runtime does not require a
 request-level executable binding. A supplied request digest selects receipt v2.
 GGUF verification requires that external request anchor because the normalized

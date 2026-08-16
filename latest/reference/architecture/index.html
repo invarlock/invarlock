@@ -1966,9 +1966,9 @@ bundle.</p>
 </tr>
 <tr>
 <td><code>verify</code></td>
-<td>Untrusted evidence directory plus independent artifact/schedule/policy/runtime/signer anchors</td>
+<td>Untrusted evidence directory plus independent artifact/schedule/policy/runtime/signer anchors and the request anchor required for GGUF</td>
 <td>One signed receipt outside the pack</td>
-<td>Expected artifacts, schedule, policy, runtimes, evidence signer, verifier identity, and private key</td>
+<td>Expected artifacts, schedule, policy, runtimes, evidence signer, GGUF request when applicable, verifier identity, and private key</td>
 <td>Yes, for the exact bound comparison</td>
 </tr>
 <tr>
@@ -2001,7 +2001,7 @@ authorities without changing a byte in the evidence directory.</p>
 </tr>
 <tr>
 <td>Paired transaction</td>
-<td>Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width controls</td>
+<td>Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width and exact-match side-accuracy controls</td>
 </tr>
 <tr>
 <td>Canonical bundle</td>
@@ -2026,7 +2026,8 @@ are not selected by the bundle:</p>
 <li>the expected baseline and subject artifact-identity digests;</li>
 <li>the expected canonical schedule digest;</li>
 <li>expected baseline and subject runtime image digests; and</li>
-<li>the expected evidence-signer fingerprint.</li>
+<li>the expected evidence-signer fingerprint; and</li>
+<li>for GGUF evidence, the expected normalized-request digest.</li>
 </ul>
 <p>The verifier signs those anchors, the pack-manifest digest, and its verdict
 with a separate key. Keeping the verification receipt outside the bundle lets
@@ -2064,7 +2065,7 @@ sourced copies of the policy bytes bound into that bundle.</p>
 <tr>
 <td>What score and threshold apply</td>
 <td>Paired records, policy, scorer binding when selected, and canonical report</td>
-<td>Re-derive scores, means, comparison, paired interval, threshold, optional count/width qualification, and verdict; require independently authorized scorer code when selected</td>
+<td>Re-derive scores, means, comparison, paired interval, threshold, optional count/width and exact-match side-accuracy qualification, and verdict; require independently authorized scorer code when selected</td>
 </tr>
 <tr>
 <td>Who signed the pack</td>

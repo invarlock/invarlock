@@ -2449,7 +2449,7 @@ case-fold, normalize Unicode, or extract an answer. The point comparison is:</p>
 <p>The report also records baseline-pass to subject-fail regressions,
 baseline-fail to subject-pass improvements, both-pass and both-fail counts, and
 the exact two-sided McNemar probability. The metric-bound check passes only
-when the current v2 continuity-corrected paired Newcombe 95% effect-size
+when the current v3 report's continuity-corrected paired Newcombe 95% effect-size
 interval's lower bound is at least
 <code>policy.metrics.exact_match.delta_min_pp</code>.</p>
 <h3 id="normalized_nll_per_utf8_byte"><code>normalized_nll_per_utf8_byte</code><a class="headerlink" href="#normalized_nll_per_utf8_byte" title="Permanent link">&para;</a></h3>
@@ -2548,9 +2548,14 @@ verification replays those bindings, and the human report renders the payload
 in a separate context section.</p>
 <p>Observations are authenticated context. The selected paired comparison, its
 paired interval, and policy are the complete acceptance calculation. Adding,
-removing, or changing an observation cannot alter the verdict; any byte change
+removing, or changing an observation changes the request-bound comparison ID
+and therefore creates a different signed transaction, but cannot alter the
+paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
-variance summaries from <code>invarlock-diagnostics</code> use this path.</p>
+variance summaries from <code>invarlock-diagnostics</code> use this path. The
+<a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation">SPDX 3.0.1 AI observation example</a>
+shows how to retain an external document, its exact source digest, validation
+status, and an artifact cross-binding without granting it acceptance authority.</p>
 <h2 id="interval-and-sample-controlled-verdict">Interval and sample-controlled verdict<a class="headerlink" href="#interval-and-sample-controlled-verdict" title="Permanent link">&para;</a></h2>
 <p>New exact-match reports use <code>newcombe_hybrid_score_paired_v2</code>, scope
 <code>paired_binary_outcomes</code>, and interval mass <code>0.95</code>. The lower bound controls the
@@ -2574,9 +2579,12 @@ that crosses the policy limit.</p>
 <p>Each metric policy may optionally add a coupled record-count and interval-width
 requirement. Exact match and scorer extensions pair <code>minimum_record_count</code> with
 <code>maximum_interval_width_pp</code>; normalized NLL pairs it with
-<code>maximum_interval_width_ratio</code>. The final v2 report passes only when the metric
-bound, minimum count, and maximum width all pass. Preflight can validate the
-count but marks interval width pending until execution.</p>
+<code>maximum_interval_width_ratio</code>. Exact match may independently add
+<code>minimum_side_accuracy</code>, a finite floor from <code>0</code> through <code>1</code> that both baseline
+and subject means must meet. The final v3 report passes only when the metric
+bound and every configured count, width, and side-accuracy check pass.
+Preflight can validate the count but marks interval width and side accuracy
+pending until execution.</p>
 <p>This is a deterministic resampling interval over the authenticated finite
 schedule. It is not a population confidence interval, proof of dataset
 representativeness, or general model-quality claim.</p>

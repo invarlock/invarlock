@@ -2225,7 +2225,7 @@ execution is rejected.</p>
 <p>These are governance and sampling controls outside the schema. A valid but
 biased schedule remains biased.</p>
 <h2 id="metric-specific-paired-intervals">Metric-specific paired intervals<a class="headerlink" href="#metric-specific-paired-intervals" title="Permanent link">&para;</a></h2>
-<p>New <code>invarlock/comparison-report-v2</code> reports use the continuity-corrected
+<p>New <code>invarlock/comparison-report-v3</code> reports use the continuity-corrected
 paired Newcombe hybrid-score 95% interval over the subject-minus-baseline
 binary effect. The report also records baseline-pass to
 subject-fail regressions, baseline-fail to subject-pass improvements, both-pass
@@ -2237,6 +2237,11 @@ paired evidence rather than an acceptance control.</p>
 <code>invarlock/comparison-report-v1</code> packs. New reports use
 <code>newcombe_hybrid_score_paired_v2</code>; existing evidence is not relabeled or
 reinterpreted.</p>
+<p>For exact match, policy may also set <code>minimum_side_accuracy</code> to a finite value
+from 0 through 1. Both arithmetic side means must meet the floor. The v3 report
+records each observed mean and result in <code>side_accuracy</code>; this requirement is
+combined with the paired-delta bound and any sample qualification. V1 and v2
+reports cannot carry this field.</p>
 <p>Normalized NLL uses the following deterministic schedule-resampling object:</p>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;paired_percentile_bootstrap_sha256_v1&quot;</span><span class="p">,</span>

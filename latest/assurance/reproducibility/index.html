@@ -2144,7 +2144,7 @@ either declared execution occurred.</p>
 </tr>
 <tr>
 <td>Decision</td>
-<td>Per-record observations, derived pairs, built-in metric or scorer binding, policy bytes and digest, report arithmetic, selected paired interval, optional sample qualification, and verdict</td>
+<td>Per-record observations, derived pairs, built-in metric or scorer binding, policy bytes and digest, report arithmetic, selected paired interval, optional sample and exact-match side-accuracy qualification, and verdict</td>
 </tr>
 <tr>
 <td>Actors</td>
@@ -2178,9 +2178,10 @@ different <strong>declared</strong> image, but it cannot observe execution.</p>
 <h2 id="independent-verification-anchors">Independent verification anchors<a class="headerlink" href="#independent-verification-anchors" title="Permanent link">&para;</a></h2>
 <p>During verification, the caller supplies baseline and subject artifact-identity
 digests, the canonical schedule digest, and separate baseline and subject
-runtime digests. Obtain them from pinned artifact, schedule, build, or
-deployment configuration through a channel the evaluation environment cannot
-rewrite with the evidence.</p>
+runtime digests. GGUF evidence also requires an independently approved
+normalized-request digest. Obtain them from pinned artifact, schedule, build,
+or deployment configuration through a channel the evaluation environment
+cannot rewrite with the evidence.</p>
 <p>The verifier checks each external value against the corresponding:</p>
 <ul>
 <li>provider artifact identity and authenticated material binding;</li>
@@ -2270,7 +2271,9 @@ same canonical result twice. Exact replay does not make independently rerun
 model outputs deterministic across all hardware.</p>
 <p>When the policy enables sample qualification, replay also recomputes the
 observed count, interval width, individual checks, and their conjunction with
-the metric-bound decision.</p>
+the metric-bound decision. When exact-match policy enables side-accuracy
+qualification, replay also checks each side mean and its conjunction with the
+other verdict terms.</p>
 <p>Even with matching recorded controls, floating-point kernels, accelerator
 generations, drivers, compiler choices, thread scheduling, and hidden backend
 state can change scores or generated text. Exact match can change on a single
