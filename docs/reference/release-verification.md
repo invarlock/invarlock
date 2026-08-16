@@ -42,7 +42,8 @@ repository workflow:
 5. builds one wheel and source distribution for the core and every first-party
    add-in;
 6. validates every archive against the exact checkout and runs the release
-   preflight again from a clean detached checkout;
+   preflight again from a clean detached checkout, including a retained signed
+   evidence replay through the isolated candidate-wheel CLI;
 7. runs `twine check` on every distribution;
 8. installs the built wheels together in a clean environment;
 9. exercises the public CLI, all provider conformance commands, diagnostics,
@@ -99,8 +100,15 @@ The smoke selects the maintained Python 3.12 or 3.13 lock for the invoking
 interpreter and fails closed when no matching lock exists.
 The read-only preflight then inspects the core wheel and source distribution
 against a separately generated `sha256sum`-format manifest, installs the
-candidate wheel in isolation, exercises its runtime surface, and reruns the
-public-evidence audit:
+candidate wheel in isolation, exercises its runtime surface, replays the
+pinned Qwen3.8 27B signed evidence pack through `verify` and `report`, and
+reruns the public-evidence audit.
+
+The retained replay can also be exercised directly against the current
+source-tree verifier with `make release-reference-journey`. The release
+preflight remains authoritative for the isolated candidate-wheel path.
+
+Run the local release gates with:
 
 ```bash
 make addins-install-smoke
@@ -125,10 +133,15 @@ files as well as modified files. The manifest must contain only the two core
 artifacts by base name. `X.Y.Z` is
 the candidate version without a leading `v`; preflight rejects a dirty checkout,
 a different `HEAD`, unexpected artifacts, metadata/content mismatch, or a hash
-change. A passing result is release-candidate evidence, not authorization to
-tag or publish. Run the non-publishing branch workflow after these local checks
-to exercise the same release surface on the hosted Linux runner before creating
-a release tag.
+change. The retained replay supplies a fresh verifier key and an external,
+digest-pinned policy and trust profile. It requires the expected artifact,
+runtime, schedule, request, and evidence-signer anchors, an independently
+verified receipt, and byte-identical repeated HTML reports. It does not rerun
+model inference or conversion and does not generalize the retained transaction
+to other artifacts or policies. A passing result is release-candidate evidence,
+not authorization to tag or publish. Run the non-publishing branch workflow
+after these local checks to exercise the same release surface on the hosted
+Linux runner before creating a release tag.
 
 The local preflight intentionally validates the core pair in depth while
 `make dist-check` validates every archive against its checkout source and

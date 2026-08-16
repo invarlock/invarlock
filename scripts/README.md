@@ -56,6 +56,19 @@ anchors. An empty index is valid only when it uses the status label
 `Evidence not yet created`. The wheel contains a compact index; evidence may
 be carried separately as a release asset.
 
+Replay the retained release-reference pack through the current source-tree
+verifier and renderer with:
+
+```bash
+make release-reference-journey
+```
+
+This creates a fresh verifier key and external trust profile, checks the pinned
+Qwen3.8 27B evidence signature, integrity, acceptance verdict, and trust
+anchors, and requires two separately rendered HTML reports to be
+byte-identical. It does not rerun model inference or conversion and is not a
+production trust decision.
+
 Refresh the byte-identical source and packaged indexes, then check both with:
 
 ```bash
@@ -79,7 +92,9 @@ make release-preflight RELEASE_PREFLIGHT_ARGS="\
 `COMMIT_SHA` must be the lowercase 40-character SHA of the clean checkout. The
 hash manifest uses `sha256sum` format and lists exactly the core wheel and sdist
 from `dist/` by base name. Pass `--json` when machine-readable output is
-required. Preflight does not approve or publish a release.
+required. Preflight performs the same retained-evidence journey through the
+isolated candidate-wheel CLI without exposing the checkout as Python source.
+Preflight does not approve or publish a release.
 
 GGUF, TensorRT-LLM, and Hugging Face vision-text conformance commands are
 shipped by their optional first-party distributions under `addins/`. The

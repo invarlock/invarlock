@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a clean-consumer release-reference journey that reauthenticates the
+  retained Qwen3.8 27B signed evidence with the isolated candidate wheel,
+  issues an independent receipt, and requires deterministic report rendering.
 - Added a signed Qwen3.8 27B deployment journey that compares one pinned BF16
   Transformers checkpoint with its source-derived Q5_K_M GGUF under separate
   immutable runtime images and the frozen balanced 400-record MMLU-Pro policy.
