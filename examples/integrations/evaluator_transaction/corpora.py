@@ -31,6 +31,9 @@ _INDEPENDENT_CANARY_BYTES = 379_746
 _INDEPENDENT_CANARY_SHA256 = (
     "c3d83209d6f36023f0a5aef5ee9be895891cc66ecc1b7196e83227558a38fade"
 )
+_QWEN38_27B_KEY = "qwen38-27b"
+_QWEN38_27B_BYTES = 405_346
+_QWEN38_27B_SHA256 = "c3f083ae0443648dc749f16df5bb1f5cd4531e0227903d3e86f8b853f54bd6cb"
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,10 +201,41 @@ def independent_canary_corpus_profile() -> CorpusProfile:
     )
 
 
+def qwen38_27b_corpus_profile() -> CorpusProfile:
+    """Return the closed Qwen3.8 rendering used by its deployment profile.
+
+    Qwen3.8 uses the same authenticated no-thinking ChatML rendering as the
+    maintained Qwen3.5 profile. It remains deployment-only and is not returned
+    by ``PROFILE_KEYS``.
+    """
+
+    manifest = _manifest()
+    qualification = _qualification_manifest()
+    policy = manifest["acceptance_policy"]
+    return CorpusProfile(
+        key=_QWEN38_27B_KEY,
+        profile_id="mmlu-pro-qwen38-no-think-400-v1",
+        dataset_name="TIGER-Lab/MMLU-Pro/qwen38-no-think",
+        split="test-balanced-400",
+        record_count=qualification["record_count"],
+        dataset_sha256=_QWEN38_27B_SHA256,
+        context_length=1024,
+        minimum_side_accuracy=policy["minimum_side_accuracy"],
+        maximum_interval_width_pp=policy["maximum_interval_width_pp"],
+        delta_min_pp=policy["delta_min_pp"],
+    )
+
+
 def _canonical_payload(values: list[dict[str, str]], profile: CorpusProfile) -> bytes:
     return records_jsonl(
         values,
-        compact=profile.key in {"flagship", "portability", _INDEPENDENT_CANARY_KEY},
+        compact=profile.key
+        in {
+            "flagship",
+            "portability",
+            _INDEPENDENT_CANARY_KEY,
+            _QWEN38_27B_KEY,
+        },
     )
 
 
@@ -290,6 +324,13 @@ def corpus_provenance(profile: CorpusProfile) -> dict[str, Any]:
                 "suffix": "[/INST]",
             }
             model_profile_id = "ministral3-8b-instruct-bf16-to-q5-k-m-v1"
+        elif profile.key == _QWEN38_27B_KEY:
+            records = qwen38_27b_records()
+            rendering = {
+                "algorithm": "qwen-chatml-disable-thinking-v1",
+                "suffix": "<think>\n\n</think>\n\n",
+            }
+            model_profile_id = "qwen38-27b-bf16-to-q5-k-m-v1"
         else:
             records = qualification_records(profile)
             declared = manifest["profiles"][profile.key]
@@ -423,7 +464,7 @@ def _question_body(record: dict[str, Any]) -> str:
 def _render_record(record: dict[str, Any], profile: CorpusProfile) -> dict[str, str]:
     body = _question_body(record)
     instruction = "Reply with exactly one uppercase option letter and no other text."
-    if profile.key == "flagship":
+    if profile.key in {"flagship", _QWEN38_27B_KEY}:
         prompt = (
             "<|im_start|>system\nYou answer multiple-choice questions and follow "
             "the requested output format exactly.<|im_end|>\n"
@@ -490,6 +531,21 @@ def independent_canary_records() -> list[dict[str, str]]:
     return records
 
 
+def qwen38_27b_records() -> list[dict[str, str]]:
+    """Render the shared semantic suite through the closed Qwen3.8 format."""
+
+    profile = qwen38_27b_corpus_profile()
+    records = [_render_record(record, profile) for record in _semantic_records()]
+    payload = records_jsonl(records, compact=True)
+    if (
+        len(payload) != _QWEN38_27B_BYTES
+        or hashlib.sha256(payload).hexdigest() != profile.dataset_sha256
+    ):
+        raise RuntimeError("rendered Qwen3.8 27B corpus does not match its identity")
+    validate_dataset_records(payload, profile)
+    return records
+
+
 def flagship_records() -> list[dict[str, str]]:
     return qualification_records(corpus_profile("flagship"))
 
@@ -514,6 +570,8 @@ __all__ = [
     "profile_for_dataset",
     "profile_for_descriptor",
     "quick_records",
+    "qwen38_27b_corpus_profile",
+    "qwen38_27b_records",
     "records_jsonl",
     "validate_dataset_records",
 ]

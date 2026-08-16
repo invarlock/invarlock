@@ -16,6 +16,8 @@ from examples.integrations.evaluator_transaction.corpora import (
     independent_canary_corpus_profile,
     independent_canary_records,
     qualification_records,
+    qwen38_27b_corpus_profile,
+    qwen38_27b_records,
     records_jsonl,
 )
 from invarlock.core.runtime_provider import build_runtime_behavioral_schedule
@@ -694,14 +696,22 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
     manifest = json.loads(PUBLIC_MANIFEST.read_bytes())
     index = json.loads(PUBLIC_EVIDENCE_INDEX.read_bytes())
     qualified_suites = {
-        manifest["artifacts"]["text_raw_causal"]["sha256"]: {
+        (
+            manifest["artifacts"]["text_raw_causal"]["sha256"],
+            "mmlu-pro-raw-causal",
+            "qualification",
+        ): {
             "record_ids": manifest["selected_ids"]["text"],
             "schedule_sha256": manifest["artifacts"]["text_raw_causal"][
                 "schedule_sha256"
             ],
             "task": "text_causal",
         },
-        manifest["artifacts"]["multimodal"]["sha256"]: {
+        (
+            manifest["artifacts"]["multimodal"]["sha256"],
+            "mmmu-pro-vision",
+            "qualification",
+        ): {
             "record_ids": None,
             "schedule_sha256": manifest["artifacts"]["multimodal"]["schedule_sha256"],
             "task": "vision_text_generation",
@@ -716,6 +726,8 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
     ]
     canary_profile = independent_canary_corpus_profile()
     profiles.append((canary_profile, independent_canary_records()))
+    qwen38_profile = qwen38_27b_corpus_profile()
+    profiles.append((qwen38_profile, qwen38_27b_records()))
     for profile, records in profiles:
         payload = records_jsonl(records, compact=True)
         expected_schedule = prepare_local_evaluation_schedule_bytes(
@@ -730,7 +742,9 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
             ),
             payload,
         )
-        qualified_suites[profile.dataset_sha256] = {
+        qualified_suites[
+            (profile.dataset_sha256, profile.dataset_name, profile.split)
+        ] = {
             "record_ids": [record["id"] for record in records],
             "schedule_sha256": expected_schedule.schedule_sha256,
             "task": "text_causal",
@@ -748,7 +762,14 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
         )
         report = json.loads((pack / "reports" / "evaluation.report.json").read_bytes())
 
-        suite = qualified_suites[schedule["dataset_identity"]["revision"]]
+        dataset_identity = schedule["dataset_identity"]
+        suite = qualified_suites[
+            (
+                dataset_identity["revision"],
+                dataset_identity["dataset_name"],
+                dataset_identity["split"],
+            )
+        ]
         canonical_schedule = build_runtime_behavioral_schedule(schedule)
         assert schedule["task"] == suite["task"]
         assert len(schedule["records"]) == manifest["record_count"]

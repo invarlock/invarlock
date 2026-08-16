@@ -176,6 +176,30 @@ def test_independent_canary_provenance_binds_shared_semantics_and_rendering() ->
     )
 
 
+def test_qwen38_profile_reuses_semantics_without_joining_the_matrix() -> None:
+    flagship = corpora.qualification_records(corpora.corpus_profile("flagship"))
+    profile = corpora.qwen38_27b_corpus_profile()
+    records = corpora.qwen38_27b_records()
+    provenance = corpora.corpus_provenance(profile)
+    payload = corpora.records_jsonl(records, compact=True)
+
+    assert profile.key == "qwen38-27b"
+    assert profile.profile_id == "mmlu-pro-qwen38-no-think-400-v1"
+    assert profile.dataset_name == "TIGER-Lab/MMLU-Pro/qwen38-no-think"
+    assert profile.record_count == 400
+    assert profile.dataset_sha256 == (
+        "c3f083ae0443648dc749f16df5bb1f5cd4531e0227903d3e86f8b853f54bd6cb"
+    )
+    assert profile.key not in corpora.PROFILE_KEYS
+    assert records == flagship
+    assert corpora.profile_for_dataset(payload) == corpora.corpus_profile("flagship")
+    assert provenance["rendering"] == {
+        "algorithm": "qwen-chatml-disable-thinking-v1",
+        "suffix": "<think>\n\n</think>\n\n",
+    }
+    assert provenance["model_profile"] == "qwen38-27b-bf16-to-q5-k-m-v1"
+
+
 def test_independent_canary_rejects_rendering_identity_drift(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -187,6 +211,15 @@ def test_independent_canary_rejects_rendering_identity_drift(
 
     with pytest.raises(RuntimeError, match="independent-canary corpus"):
         corpora.independent_canary_records()
+
+
+def test_qwen38_records_reject_rendering_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(corpora, "_QWEN38_27B_BYTES", corpora._QWEN38_27B_BYTES + 1)
+
+    with pytest.raises(RuntimeError, match="Qwen3.8 27B corpus"):
+        corpora.qwen38_27b_records()
 
 
 def test_flagship_policy_is_frozen_before_model_execution() -> None:
