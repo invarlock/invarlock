@@ -5,6 +5,13 @@ deterministically prepared schedule, applies a release-regression policy to the
 selected paired interval, publishes signed evidence, and lets a separate
 verifier replay the result.
 
+For a first useful result without a model or container engine, run the
+[five-minute signed-evidence check](https://github.com/invarlock/invarlock/tree/main/examples/quickstart).
+It installs the core wheel, verifies retained evidence against independent
+anchors, issues a new verifier-signed receipt, and renders HTML on a regular
+CPU. Continue here when you are ready to produce evidence from your own model
+artifacts.
+
 ```text
 invarlock evaluate request.yaml
 invarlock verify evidence/ ... --receipt verification.receipt.json
@@ -28,7 +35,7 @@ invarlock report evidence/
 
 | Transaction | Reads | Writes | Result |
 | --- | --- | --- | --- |
-| `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample qualification, and evaluation-time policy verdict |
+| `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample and side-accuracy qualification, and evaluation-time policy verdict |
 | `verify` | Untrusted evidence plus independent artifact, schedule, policy, runtime, and signer anchors; verifier identity; and verifier key | One no-clobber signed receipt outside the bundle | Independent replay and acceptance/rejection record |
 | `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Human view of the canonical comparison |
 
@@ -64,7 +71,7 @@ Pass its commit, path, and digest to the build target shown below.
 The CUDA device flag only exposes a GPU to a CUDA-capable image. It does not
 add CUDA libraries to the CPU image.
 
-For a complete journey that compares a pinned Qwen3-0.6B checkpoint with an
+For a complete journey that compares a pinned Qwen3.5-0.8B checkpoint with an
 explicit behavioral derivative and derives all verifier inputs independently,
 run the checked-in
 [Hugging Face example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/hf-transformers).
@@ -261,6 +268,7 @@ The verifier must obtain these values through its own trusted channel:
 - the expected canonical schedule digest;
 - expected baseline and subject runtime-image digests;
 - expected evidence-signer fingerprint;
+- expected normalized-request digest when either side uses `llama_cpp`;
 - its verifier identity and private key.
 
 ```bash
@@ -299,7 +307,7 @@ the independent verifier anchors or replace the signed receipt.
 
 ## Interpret the result
 
-Every current `invarlock/comparison-report-v2` report records:
+Every current `invarlock/comparison-report-v3` report records:
 
 - a point estimate over all authenticated records;
 - a paired Newcombe 95% interval plus regression/improvement counts and an
@@ -307,9 +315,11 @@ Every current `invarlock/comparison-report-v2` report records:
   `paired_percentile_bootstrap_sha256_v1` interval for normalized NLL;
 - the selected policy limit; and
 - optional record-count and interval-width qualification when the policy binds
-  those coupled requirements; and
+  those coupled requirements;
+- optional baseline and subject accuracy qualification for exact match when the
+  policy binds `minimum_side_accuracy`; and
 - a verdict controlled by the conservative interval bound and any configured
-  sample qualification.
+  sample and side-accuracy qualification.
 
 For exact match, the lower bound must clear the percentage-point floor. For
 byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its
@@ -318,8 +328,8 @@ stays coupled to its subject observation.
 
 Preflight can establish that the authenticated schedule meets a configured
 minimum count, but interval width remains pending until execution. Strict
-verification also preserves exact replay of legacy
-`invarlock/comparison-report-v1` evidence with its original exact-match method.
+verification also preserves v2 reports without side-accuracy qualification and
+v1 evidence with its original exact-match method.
 
 Normalized NLL is teacher-forced expected-continuation likelihood regression,
 not a general model-quality measure. A displayed token-weighted perplexity

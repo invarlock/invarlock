@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -8,9 +10,12 @@ from typing import Any
 
 import pytest
 import yaml
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTION_PATH = REPO_ROOT / ".github/actions/invarlock-report-gate/action.yml"
+QUICKSTART_FIXTURE = REPO_ROOT / "examples/acceptance-handoff/golden"
 
 
 def _action() -> dict[str, Any]:
@@ -36,6 +41,7 @@ def test_action_exposes_only_the_evidence_gate_inputs() -> None:
         "expected-baseline-runtime",
         "expected-subject-runtime",
         "expected-signer",
+        "expected-request-digest",
         "verifier-signing-key",
         "verifier-identity",
         "python",
@@ -58,6 +64,7 @@ def test_action_exposes_only_the_evidence_gate_inputs() -> None:
         "verifier-identity",
     ):
         assert inputs[required]["required"] is True
+    assert inputs["expected-request-digest"]["required"] is False
 
     text = ACTION_PATH.read_text(encoding="utf-8")
     for retired in (
@@ -96,12 +103,19 @@ def test_action_calls_current_verify_and_report_transactions() -> None:
         "--expected-baseline-runtime",
         "--expected-subject-runtime",
         "--expected-signer",
+        "--expected-request-digest",
         "--receipt",
         "--verifier-signing-key",
         "--verifier-identity",
         "--json",
     ):
         assert option in verify
+
+    verify_step = _step(action, "Verify InvarLock evidence")
+    assert verify_step["env"]["INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST"] == (
+        "${{ inputs.expected-request-digest }}"
+    )
+    assert '[[ -n "$INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST" ]]' in verify
 
     assert "-m invarlock report" in report
     assert "--html" in report
@@ -366,3 +380,141 @@ def test_action_enforcement_is_closed_and_validates_control_inputs(
     )
 
     assert completed.returncode == expected
+
+
+def _consumer_environment(root: Path) -> dict[str, str]:
+    anchors = json.loads(
+        (root / "review/technical-anchors.json").read_text(encoding="utf-8")
+    )
+    key_path = root / "review/verifier.private.pem"
+    key_path.write_bytes(
+        ed25519.Ed25519PrivateKey.generate().private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    key_path.chmod(0o600)
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
+    environment.update(
+        {
+            "GITHUB_ENV": str(root / "github.env"),
+            "INVARLOCK_ACTION_PYTHON": sys.executable,
+            "INVARLOCK_ACTION_EVIDENCE": "incoming/evidence",
+            "INVARLOCK_ACTION_POLICY": "review/evaluated-policy.json",
+            "INVARLOCK_ACTION_EXPECTED_BASELINE_ARTIFACT": anchors["artifact_digests"][
+                "baseline"
+            ],
+            "INVARLOCK_ACTION_EXPECTED_SUBJECT_ARTIFACT": anchors["artifact_digests"][
+                "subject"
+            ],
+            "INVARLOCK_ACTION_EXPECTED_SCHEDULE": anchors["schedule_digest"],
+            "INVARLOCK_ACTION_EXPECTED_BASELINE_RUNTIME": anchors["runtime_digests"][
+                "baseline"
+            ],
+            "INVARLOCK_ACTION_EXPECTED_SUBJECT_RUNTIME": anchors["runtime_digests"][
+                "subject"
+            ],
+            "INVARLOCK_ACTION_EXPECTED_SIGNER": anchors["evidence_signer_fingerprint"],
+            "INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST": "",
+            "INVARLOCK_ACTION_VERIFIER_SIGNING_KEY": ("review/verifier.private.pem"),
+            "INVARLOCK_ACTION_VERIFIER_IDENTITY": "consumer-verifier",
+            "INVARLOCK_ACTION_RECEIPT_OUTPUT": (
+                "reports/invarlock/verification.receipt.json"
+            ),
+            "INVARLOCK_ACTION_VERIFY_OUTPUT": (
+                "reports/invarlock/verification.result.json"
+            ),
+            "INVARLOCK_ACTION_HTML_OUTPUT": "reports/invarlock/evidence.html",
+            "INVARLOCK_ACTION_ARTIFACT_NAME": "candidate-invarlock-evidence",
+            "INVARLOCK_ACTION_FAIL_ON_VERIFY": "true",
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONSAFEPATH": "1",
+        }
+    )
+    return environment
+
+
+def _load_github_environment(environment: dict[str, str]) -> None:
+    for line in (
+        Path(environment["GITHUB_ENV"]).read_text(encoding="utf-8").splitlines()
+    ):
+        name, value = line.split("=", 1)
+        environment[name] = value
+
+
+@pytest.mark.parametrize("tampered", [False, True])
+def test_action_runs_from_an_isolated_consumer_and_rejects_tampering(
+    tmp_path: Path, tampered: bool
+) -> None:
+    action = _action()
+    consumer = tmp_path / "consumer"
+    evidence = consumer / "incoming/evidence"
+    review = consumer / "review"
+    review.mkdir(parents=True)
+    shutil.copytree(QUICKSTART_FIXTURE / "evidence", evidence)
+    shutil.copy2(
+        QUICKSTART_FIXTURE / "evaluated-policy.json",
+        review / "evaluated-policy.json",
+    )
+    shutil.copy2(
+        QUICKSTART_FIXTURE / "technical-anchors.json",
+        review / "technical-anchors.json",
+    )
+    if tampered:
+        report = evidence / "reports/evaluation.report.json"
+        report.write_bytes(report.read_bytes() + b"\n")
+    environment = _consumer_environment(consumer)
+
+    for name in (
+        "Prepare InvarLock output directories",
+        "Verify InvarLock evidence",
+    ):
+        completed = subprocess.run(
+            ["bash", "-c", _step(action, name)["run"]],
+            cwd=consumer,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr or completed.stdout
+        _load_github_environment(environment)
+
+    result = json.loads(
+        (consumer / "reports/invarlock/verification.result.json").read_bytes()
+    )
+    enforce = subprocess.run(
+        [
+            "bash",
+            "-c",
+            _step(action, "Enforce InvarLock verification result")["run"],
+        ],
+        cwd=consumer,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if tampered:
+        assert result["ok"] is False
+        assert environment["INVARLOCK_VERIFY_EXIT_CODE"] != "0"
+        assert enforce.returncode != 0
+        assert not (consumer / "reports/invarlock/evidence.html").exists()
+    else:
+        rendered = subprocess.run(
+            ["bash", "-c", _step(action, "Render InvarLock HTML report")["run"]],
+            cwd=consumer,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert rendered.returncode == 0, rendered.stderr or rendered.stdout
+        assert result["ok"] is True
+        assert result["policy_verdict"] == "pass"
+        assert environment["INVARLOCK_VERIFY_EXIT_CODE"] == "0"
+        assert enforce.returncode == 0
+        assert (consumer / "reports/invarlock/verification.receipt.json").is_file()
+        assert (consumer / "reports/invarlock/evidence.html").is_file()

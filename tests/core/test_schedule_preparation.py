@@ -766,3 +766,45 @@ def test_field_mappings_must_be_distinct_and_top_level(tmp_path: Path) -> None:
             expected_output_field="answer",
             id_field=None,
         )
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"format": "csv"}, "dataset format"),
+        ({"sha256": "A" * 64}, "lowercase SHA-256"),
+        ({"limit": 0}, "dataset limit"),
+    ],
+)
+def test_local_dataset_request_rejects_invalid_source_contract_fields(
+    tmp_path: Path,
+    override: dict[str, object],
+    message: str,
+) -> None:
+    payload = _jsonl({"example_id": "one", "prompt": "One", "continuation": "A"})
+
+    with pytest.raises(ValueError, match=message):
+        _source(tmp_path / "records.jsonl", payload, **override)
+
+
+def test_schedule_preparation_requires_bytes_at_the_owned_boundary(
+    tmp_path: Path,
+) -> None:
+    payload = b"{}\n"
+
+    with pytest.raises(TypeError, match="payload must be bytes"):
+        prepare_local_evaluation_schedule_bytes(
+            _source(tmp_path / "records.jsonl", payload),
+            "{}\n",  # type: ignore[arg-type]
+        )
+
+
+def test_schedule_preparation_rejects_empty_authenticated_dataset(
+    tmp_path: Path,
+) -> None:
+    payload = b""
+
+    with pytest.raises(ValueError, match="at least one record"):
+        prepare_local_evaluation_schedule_bytes(
+            _source(tmp_path / "records.jsonl", payload), payload
+        )

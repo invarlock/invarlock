@@ -7,25 +7,24 @@ import tomllib
 from collections import Counter
 from pathlib import Path
 
+from tests._support_repository_contracts import MakefileContract
+
 ROOT = Path(__file__).resolve().parents[2]
-MAKEFILE = (ROOT / "Makefile").read_text(encoding="utf-8")
+MAKE = MakefileContract.read(ROOT / "Makefile")
+MAKEFILE = MAKE.text
 QUALIFICATION_COVERAGE_CONFIG = (
     ROOT / "scripts" / "qualification.coveragerc"
 ).read_text(encoding="utf-8")
 
 
-def _target(name: str, next_name: str) -> str:
-    return MAKEFILE.split(f"{name}:", 1)[1].split(f"{next_name}:", 1)[0]
-
-
 def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
-    block = _target("coverage", "coverage-addins")
+    block = MAKE.target("coverage").text
     assert "--cov=src/invarlock" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "check_coverage_thresholds.py" not in MAKEFILE
     assert "scripts/evidence_packs" not in MAKEFILE
     assert "--fail-under=80" not in MAKEFILE
@@ -33,7 +32,7 @@ def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
 
 
 def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
-    block = _target("coverage-addins", "coverage-qualification")
+    block = MAKE.target("coverage-addins").text
     config = (ROOT / "scripts" / "addins.coveragerc").read_text(encoding="utf-8")
     for package in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
         assert f"--include='addins/{package}/src/*'" in block
@@ -41,19 +40,23 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     assert "source =\n    addins" in config
     assert "addins/*/tests/*" in config
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
-    assert block.count("--fail-under=90") == 5
+    assert "--cov-fail-under=95" in block
+    assert block.count("--fail-under=95") == 5
     assert "git ls-files 'addins/*/src/**/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "ADDIN_COVERAGE_MIN" not in MAKEFILE
     assert "coverage-addins: coverage-linux-check" in MAKEFILE
     assert 'test "$$(uname -s)" = Linux' in MAKEFILE
     assert "COVERAGE_FILE=$(COVERAGE_ADDINS_FILE)" in block
+    assert (
+        "PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:"
+        "addins/multimodal/src:addins/tensorrt_llm/src:."
+    ) in block
 
 
 def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-qualification", "coverage-release")
+    block = MAKE.target("coverage-qualification").text
     for script in (
         "authenticated_runtime_build.py",
         "qualification_candidate_wheels.py",
@@ -64,52 +67,69 @@ def test_qualification_scripts_have_an_individual_branch_coverage_ratchet() -> N
         "runtime_qualification.py",
         "tensorrt_llm_canary_preflight.py",
     ):
-        assert f"--include='scripts/{script}' --fail-under=90" in block
+        assert f"--include='scripts/{script}' --fail-under=95" in block
         assert f"scripts/{script}" in QUALIFICATION_COVERAGE_CONFIG
     assert "addins/tensorrt_llm/tests/test_tensorrt_llm_canary_preflight.py" in block
     assert "PYTHONPATH=src:addins/tensorrt_llm/src" in block
     assert "--cov-config=scripts/qualification.coveragerc" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE)" in block
 
 
 def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-release", "coverage-examples")
+    block = MAKE.target("coverage-release").text
     for script in (
         "first_party_distribution_validation.py",
         "release_distribution_validation.py",
         "release_preflight.py",
+        "release_reference_journey.py",
         "tagged_release_candidate.py",
         "verify_hosted_distributions.py",
     ):
-        assert f"--include='scripts/release/{script}' --fail-under=90" in block
+        assert f"--include='scripts/release/{script}' --fail-under=95" in block
     assert "--cov-config=scripts/release.coveragerc" in block
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_RELEASE_FILE)" in block
 
 
 def test_example_launchers_have_an_individual_branch_coverage_ratchet() -> None:
-    block = _target("coverage-examples", "coverage-maintenance")
+    block = MAKE.target("coverage-examples").text
     assert "tests/examples" in block
     assert "--cov=examples" in block
+    assert "--cov-config=scripts/examples.coveragerc" in block
+    config = (ROOT / "scripts" / "examples.coveragerc").read_text(encoding="utf-8")
+    assert "source =\n    examples" in config
+    assert "if __name__ == .__main__.:" in config
+    assert "fail_under" not in config
     assert "--cov-branch" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under" not in block
+    assert "grep -Ev '^(#|$$)' examples/coverage-exemptions.txt" in block
+    assert '--omit="$$exemptions" --fail-under=95' in block
     assert "find examples -type f -name '*.py'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "$(PYTEST_WORKER_ARGS)" in block
     assert "COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE)" in block
+    assert "RELEASE_EXAMPLE_COVERAGE_FILES" in block
+    assert '--include="$$source" --fail-under=95' in block
+    for source in (
+        "examples/ci/standalone-consumer/review/verify_deployment_receipt.py",
+        "examples/evaluator-qualification/measure_signed_transactions.py",
+        "examples/quickstart/run.py",
+    ):
+        assert source in MAKEFILE
 
 
 def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:
-    block = _target("coverage-maintenance", "coverage-enforce")
+    block = MAKE.target("coverage-maintenance").text
     config = (ROOT / "scripts" / "maintenance.coveragerc").read_text(encoding="utf-8")
     for test_file in (
         "test_coverage_branch_rate.py",
         "test_public_evidence_audit.py",
+        "test_public_text_check.py",
         "test_check_repo_cruft.py",
         "test_sync_packaged_contracts.py",
         "test_sync_packaged_public_evidence.py",
@@ -120,10 +140,10 @@ def test_maintenance_scripts_participate_in_repo_branch_coverage() -> None:
     ):
         assert test_file in block
     assert "--cov-config=scripts/maintenance.coveragerc" in block
-    assert "--cov-fail-under=90" in block
+    assert "--cov-fail-under=95" in block
     assert "COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE)" in block
     assert "git ls-files 'scripts/checks/*.py' 'scripts/security/*.py'" in block
-    assert '--include="$$source" --fail-under=90' in block
+    assert '--include="$$source" --fail-under=95' in block
     assert "scripts/checks/*.py" in config
     assert "scripts/prepare_qualification_suites.py" in config
     assert "scripts/security/*.py" in config
@@ -166,7 +186,7 @@ def test_every_maintained_script_is_assigned_to_one_coverage_surface() -> None:
 
 
 def test_every_ratchet_example_module_is_collected_for_coverage() -> None:
-    block = _target("coverage-examples", "coverage-enforce")
+    block = MAKE.target("coverage-examples").text
     selectors = set(re.findall(r"--cov=([^ \\\n]+)", block))
     maintained = sorted((ROOT / "examples").rglob("*.py"))
 
@@ -193,7 +213,7 @@ def test_coverage_configuration_is_the_core_surface() -> None:
     run = pyproject["tool"]["coverage"]["run"]
     report = pyproject["tool"]["coverage"]["report"]
     assert run["source"] == ["src/invarlock"]
-    assert report["fail_under"] == 90
+    assert report["fail_under"] == 95
     assert "include" not in report
 
 
@@ -220,15 +240,17 @@ def test_primary_verification_and_coverage_targets_default_to_parallel() -> None
     assert "scripts/checks/check_coverage_branch_rate.py" in MAKEFILE
     assert "reports/cov.xml reports/addins-cov.xml" in MAKEFILE
     assert (
-        "reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90" in MAKEFILE
+        "reports/examples-cov.xml reports/maintenance-cov.xml --minimum 95" in MAKEFILE
     )
+    assert "--class-exemptions reports/examples-cov.xml examples" in MAKEFILE
+    assert "examples/coverage-exemptions.txt" in MAKEFILE
 
 
 def test_primary_verification_runs_independent_suites_with_bounded_parallelism() -> (
     None
 ):
-    complete = _target("verify", "verify-fast")
-    fast = _target("verify-fast", "contracts-check")
+    complete = MAKE.target("verify").text
+    fast = MAKE.target("verify-fast").text
 
     for block, test_target in ((complete, "test"), (fast, "test-fast")):
         assert "$(MAKE) repo-cruft-check" in block
@@ -249,14 +271,14 @@ def test_primary_verification_runs_independent_suites_with_bounded_parallelism()
 
 
 def test_verify_fast_never_requires_a_container() -> None:
-    block = _target("verify-fast", "contracts-check")
+    block = MAKE.target("verify-fast").text
     assert "docker" not in block.lower()
     assert "podman" not in block.lower()
     assert "container-front-door-smoke" not in block
 
 
 def test_makefile_exposes_only_the_supported_cli_smoke() -> None:
-    block = _target("cli-smoke-core", "hf-provider-smoke")
+    block = MAKE.target("cli-smoke-core").text
     assert "invarlock evaluate --help" in block
     assert "invarlock verify --help" in block
     assert "invarlock report --help" in block

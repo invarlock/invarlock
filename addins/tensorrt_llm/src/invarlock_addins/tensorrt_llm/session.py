@@ -65,7 +65,6 @@ _INFO_TIMEOUT_SECONDS = 120
 _MAX_BATCH_TIMEOUT_SECONDS = 24 * 60 * 60
 _IO_CHUNK_BYTES = 64 * 1024
 _FICLONE = 0x40049409
-_ENGINE_NAME = re.compile(r"^rank(0|[1-9][0-9]*)\.engine$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _COMPUTE_CAPABILITY = re.compile(r"^(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$")
 _CUDA_RUNTIME_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
@@ -412,8 +411,6 @@ def _snapshot_bundle(source: Path, destination: Path) -> None:
             "the current TensorRT-LLM provider requires a single-rank engine"
         )
     for entry in entries:
-        if entry.name != "config.json" and _ENGINE_NAME.fullmatch(entry.name) is None:
-            raise TensorRTLLMExecutionError("engine bundle layout is not closed")
         try:
             descriptor = os.open(
                 entry,

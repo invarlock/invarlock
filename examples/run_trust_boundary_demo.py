@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import stat
 import subprocess
@@ -350,7 +351,7 @@ def main() -> None:
         parent = Path(tempfile.mkdtemp(prefix="invarlock-evidence-handoff-"))
         workspace = parent / "workspace"
     else:
-        workspace = args.workspace.resolve()
+        workspace = Path(os.path.abspath(args.workspace.expanduser()))
     run_demo(Path(__file__).resolve().parent, workspace)
 
 

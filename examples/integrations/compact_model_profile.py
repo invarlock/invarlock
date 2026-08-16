@@ -1,4 +1,4 @@
-"""Shared official Qwen3 checkpoint profile for runnable integrations."""
+"""Shared compact checkpoint profile for runnable integrations."""
 
 from __future__ import annotations
 
@@ -9,14 +9,37 @@ from invarlock.runtime_providers.hf_transformers import (
     hf_tokenizer_contract_sha256,
 )
 
-MODEL_ID = "Qwen/Qwen3-0.6B"
-MODEL_REVISION = "c1899de289a04d12100db370d81485cdf75e47ca"
+MODEL_ID = "Qwen/Qwen3.5-0.8B"
+MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
+MODEL_TYPE = "qwen3_5"
+MODEL_ARCHITECTURE = "Qwen3_5ForConditionalGeneration"
 PEFT_TARGET_MODULES = ("q_proj", "v_proj")
+
+
+def _validate_config(config: Any) -> None:
+    """Reject a changed repository architecture before loading model weights."""
+
+    architectures = getattr(config, "architectures", None)
+    if (
+        getattr(config, "model_type", None) != MODEL_TYPE
+        or not isinstance(architectures, list)
+        or MODEL_ARCHITECTURE not in architectures
+    ):
+        raise RuntimeError(
+            "the pinned compact checkpoint is not the expected Qwen3.5 text architecture"
+        )
 
 
 def load_model_and_tokenizer(*, torch: Any, transformers: Any) -> tuple[Any, Any]:
     """Load the immutable official checkpoint without executing remote code."""
 
+    del torch
+    config = transformers.AutoConfig.from_pretrained(
+        MODEL_ID,
+        revision=MODEL_REVISION,
+        trust_remote_code=False,
+    )
+    _validate_config(config)
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         MODEL_ID,
         revision=MODEL_REVISION,
@@ -24,7 +47,7 @@ def load_model_and_tokenizer(*, torch: Any, transformers: Any) -> tuple[Any, Any
     )
     if tokenizer.pad_token_id is None:
         if tokenizer.eos_token_id is None:
-            raise RuntimeError("the pinned Qwen3 tokenizer has no padding token")
+            raise RuntimeError("the pinned compact tokenizer has no padding token")
         tokenizer.pad_token = tokenizer.eos_token
     model = transformers.AutoModelForCausalLM.from_pretrained(
         MODEL_ID,
@@ -33,6 +56,10 @@ def load_model_and_tokenizer(*, torch: Any, transformers: Any) -> tuple[Any, Any
         use_safetensors=True,
         trust_remote_code=False,
     )
+    if getattr(model.config, "model_type", None) != "qwen3_5_text":
+        raise RuntimeError(
+            "the pinned compact checkpoint did not resolve to its causal text model"
+        )
     model.config.use_cache = False
     return model, tokenizer
 

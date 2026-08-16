@@ -17,6 +17,7 @@ from typing import Any
 from huggingface_hub import snapshot_download
 from transformers import AutoTokenizer
 
+from examples.integrations.bounded_command import run_bounded_command
 from examples.integrations.launch import _require_committed_checkout, _runtime_image
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
@@ -94,6 +95,9 @@ def _container_build(
     if not device.isdigit():
         raise ValueError("GPU device indices must be nonnegative integers")
     helper = Path(__file__).with_name("prepare.py").resolve(strict=True)
+    bounded_runner = (
+        Path(__file__).resolve().parents[1] / "bounded_command.py"
+    ).resolve(strict=True)
     role_work = paths.work / role
     role_work.mkdir(mode=0o700)
     runtime_uid = 65532 if os.geteuid() == 0 else os.geteuid()
@@ -137,6 +141,8 @@ def _container_build(
         f"type=bind,src={paths.resources},dst=/resources",
         "--mount",
         f"type=bind,src={helper},dst=/example/prepare.py,readonly",
+        "--mount",
+        f"type=bind,src={bounded_runner},dst=/example/bounded_command.py,readonly",
         "--entrypoint",
         "/opt/invarlock/bin/vendor-python",
         image,
@@ -159,7 +165,7 @@ def _container_build(
             f"type=bind,src={records},dst=/example/records.json,readonly",
         ]
         command.extend(["--calibration-records", "/example/records.json"])
-    subprocess.run(command, check=True)
+    run_bounded_command(command, check=True, label="TensorRT-LLM engine build")
 
 
 def _prepare_inputs(paths: Paths, *, tokenizer: Any | None = None) -> None:
@@ -211,6 +217,7 @@ def _prepare_inputs(paths: Paths, *, tokenizer: Any | None = None) -> None:
                             "delta_min_pp": -10.0,
                             "maximum_interval_width_pp": 20.0,
                             "minimum_record_count": 102,
+                            "minimum_side_accuracy": 0.40,
                         }
                     }
                 }
@@ -244,7 +251,13 @@ def _run_transaction(
     ]
     environment = dict(os.environ)
     environment["INVARLOCK_CONTAINER_ENGINE"] = container_engine
-    subprocess.run(command, check=True, cwd=paths.repository, env=environment)
+    run_bounded_command(
+        command,
+        check=True,
+        cwd=paths.repository,
+        environment=environment,
+        label="TensorRT-LLM evaluation transaction",
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

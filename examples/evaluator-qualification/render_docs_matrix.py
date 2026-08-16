@@ -33,16 +33,57 @@ def pinned_version(profile: dict[str, Any]) -> str:
     return f"`{package['name']}{separator}{package['version']}`"
 
 
-def qualification(profile: dict[str, Any]) -> str:
+def adapter_support(profile: dict[str, Any]) -> str:
+    if profile["support_status"] != "maintained_adapter":
+        raise ValueError("unsupported adapter support status")
+    return "Maintained"
+
+
+def replay_authority(profile: dict[str, Any]) -> str:
     authority = profile["authority"]
     if authority["mode"] == "deterministic_per_record":
-        return "Per-record"
+        return "Independently replayable"
     reason = str(authority["reason"]).replace("_", " ")
     return f"Observation-only: {reason}"
 
 
 def escape_cell(value: str) -> str:
     return value.replace("|", r"\|").replace("\n", " ")
+
+
+def retained_transactions(value: object) -> str:
+    if value == []:
+        return "—"
+    if not isinstance(value, list) or not value:
+        raise ValueError("retained signed transaction status is invalid")
+    counts: set[int] = set()
+    packages: set[str] = set()
+    for claim in value:
+        if (
+            not isinstance(claim, dict)
+            or set(claim) != {"dataset_name", "package_id", "record_count", "role"}
+            or not isinstance(claim.get("dataset_name"), str)
+            or not claim["dataset_name"].strip()
+            or not isinstance(claim.get("package_id"), str)
+            or not claim["package_id"].strip()
+            or claim["package_id"] in packages
+            or not isinstance(claim.get("record_count"), int)
+            or isinstance(claim.get("record_count"), bool)
+            or claim["record_count"] < 1
+            or claim.get("role")
+            not in {"deployment_approval", "flagship", "portability"}
+        ):
+            raise ValueError("retained signed transaction status is invalid")
+        packages.add(claim["package_id"])
+        counts.add(claim["record_count"])
+    count = len(value)
+    noun = "transaction" if count == 1 else "transactions"
+    record_text = (
+        f", {next(iter(counts))} records each" if len(counts) == 1 and count > 1 else ""
+    )
+    if count == 1:
+        record_text = f", {next(iter(counts))} records"
+    return f"Retained ({count} signed {noun}{record_text})"
 
 
 def render() -> str:
@@ -63,8 +104,8 @@ def render() -> str:
                 f"### {category['display_name']}",
                 "",
                 "| Upstream evaluator | Pinned version | Executed upstream entry "
-                "point | Qualification profile | Authoritative import | "
-                "End-to-end transaction |",
+                "point | Adapter support | Replay authority | "
+                "Retained signed transactions |",
                 "| --- | --- | --- | --- | --- | --- |",
             ]
         )
@@ -75,20 +116,17 @@ def render() -> str:
             profile_id = profile["profile_id"]
             levels = demonstrations[profile_id]
             raw = load(ROOT / "artifacts" / profile_id / "upstream-output.json")
-            authoritative = (
-                f"{record_count} records" if levels["authoritative_import"] else "No"
-            )
-            end_to_end = (
-                "Demonstrated"
-                if levels["end_to_end_transaction"]
-                else "Not yet demonstrated"
-            )
+            end_to_end = retained_transactions(levels["retained_signed_transactions"])
             cells = (
                 profile["display_name"],
                 pinned_version(profile),
                 f"`{raw['entrypoint']}`",
-                qualification(profile),
-                authoritative,
+                adapter_support(profile),
+                (
+                    f"Independently replayable ({record_count} shared outputs)"
+                    if profile["authority"]["mode"] == "deterministic_per_record"
+                    else replay_authority(profile)
+                ),
                 end_to_end,
             )
             lines.append(

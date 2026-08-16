@@ -7,26 +7,78 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 ARTIFACTS = ROOT / "artifacts"
 SUPPORT = ROOT / "runner_support.py"
-AUTHORITATIVE = ROOT / "authoritative"
-AUTHORITATIVE_ARTIFACTS = AUTHORITATIVE / "artifacts"
+REPLAYABLE_CORPUS = ROOT / "authoritative"
+REPLAYABLE_ARTIFACTS = REPLAYABLE_CORPUS / "artifacts"
+SIGNED_TRANSACTIONS = ROOT / "signed-transactions"
+FLAGSHIP_COMPARISON = SIGNED_TRANSACTIONS / "flagship-comparison.json"
 
+sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
-sys.path.insert(0, str(AUTHORITATIVE))
-from replay import replay as replay_authoritative_import  # noqa: E402
+sys.path.insert(0, str(REPLAYABLE_CORPUS))
+from replay import replay as replay_import  # noqa: E402
 
+from examples.integrations.evaluator_transaction.build_attestation import (  # noqa: E402
+    load_evaluator_build_attestation,
+    verify_evaluator_build_attestation,
+)
 from invarlock.evaluator_qualification import (  # noqa: E402
     qualify_evaluator_export,
 )
 from invarlock.evidence_pack_contract import canonical_json_bytes  # noqa: E402
+from invarlock.evidence_pack_json import (  # noqa: E402
+    StrictJsonError,
+    parse_json_bytes,
+    read_regular_file_bytes,
+)
+from invarlock.evidence_pack_verification import (  # noqa: E402
+    verify_comparison_evidence,
+)
+from invarlock.evidence_receipt import (  # noqa: E402
+    verify_signed_verification_receipt,
+)
+
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_PACKAGE_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_TRANSACTION_FIELDS = {
+    "base_image_id",
+    "entrypoint",
+    "evaluator_version",
+    "executed_on",
+    "format",
+    "lock_sha256",
+    "profile_id",
+    "runtime_image_id",
+    "source_bundle_sha256",
+    "source_commit",
+    "verification",
+}
+_VERIFICATION_FIELDS = {
+    "artifact_digests",
+    "evidence_signer_fingerprint",
+    "policy_verdict",
+    "runtime_digests",
+    "schedule_digest",
+    "trust_profile_digest",
+    "verifier_fingerprint",
+    "verifier_identity",
+}
+_RETAINED_CLAIM_FIELDS = {"dataset_name", "package_id", "record_count", "role"}
+_RETAINED_ROLES = {"deployment_approval", "flagship", "portability"}
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -104,23 +156,381 @@ def selection_policy() -> dict[str, Any]:
     return value
 
 
-def demonstration_levels() -> dict[str, dict[str, bool]]:
-    values = load(ROOT / "demonstrations.json").get("profiles")
-    if not isinstance(values, dict) or any(
-        not isinstance(key, str) or not isinstance(value, dict)
-        for key, value in values.items()
+def release_focus() -> list[str]:
+    value = matrix_document().get("release_focus")
+    profiles_value = value.get("flagship_profiles") if isinstance(value, dict) else None
+    if (
+        not isinstance(profiles_value, list)
+        or not profiles_value
+        or any(not isinstance(profile_id, str) for profile_id in profiles_value)
+        or len(set(profiles_value)) != len(profiles_value)
+    ):
+        raise ValueError("matrix release focus must name unique flagship profiles")
+    return profiles_value
+
+
+def demonstration_levels() -> dict[str, dict[str, object]]:
+    document = load(ROOT / "demonstrations.json")
+    values = document.get("profiles")
+    if (
+        not isinstance(values, dict)
+        or any(
+            not isinstance(key, str) or not isinstance(value, dict)
+            for key, value in values.items()
+        )
+        or document.get("format") != "invarlock/evaluator-demonstration-status-v4"
     ):
         raise ValueError("demonstration levels must be an object of profile objects")
     return values
 
 
-def authoritative_profiles() -> list[dict[str, Any]]:
-    levels = demonstration_levels()
+def retained_transactions(value: object, *, profile_id: str) -> list[dict[str, object]]:
+    """Validate every explicitly retained signed transaction for one adapter."""
+
+    if not isinstance(value, list):
+        raise ValueError(f"{profile_id}: demonstration status is invalid")
+    retained: list[dict[str, object]] = []
+    package_ids: set[str] = set()
+    roles: set[str] = set()
+    for claim in value:
+        if not isinstance(claim, dict) or set(claim) != _RETAINED_CLAIM_FIELDS:
+            raise ValueError(f"{profile_id}: demonstration status is invalid")
+        dataset_name = claim.get("dataset_name")
+        package_id = claim.get("package_id")
+        record_count = claim.get("record_count")
+        role = claim.get("role")
+        if (
+            not isinstance(dataset_name, str)
+            or not dataset_name.strip()
+            or not isinstance(package_id, str)
+            or _PACKAGE_ID.fullmatch(package_id) is None
+            or package_id in package_ids
+            or not isinstance(record_count, int)
+            or isinstance(record_count, bool)
+            or record_count < 1
+            or role not in _RETAINED_ROLES
+            or role in roles
+        ):
+            raise ValueError(f"{profile_id}: demonstration status is invalid")
+        package_ids.add(package_id)
+        assert isinstance(role, str)
+        roles.add(role)
+        retained.append(
+            {
+                "dataset_name": dataset_name,
+                "package_id": package_id,
+                "record_count": record_count,
+                "role": role,
+            }
+        )
+    return retained
+
+
+def replayable_profiles() -> list[dict[str, Any]]:
     return [
         profile
         for profile in profiles()
-        if levels[profile["profile_id"]]["authoritative_import"]
+        if profile["authority"]["mode"] == "deterministic_per_record"
     ]
+
+
+def _sha256(value: object, *, label: str) -> str:
+    if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
+        raise ValueError(f"{label} must be a sha256 digest")
+    return value
+
+
+def _side_digests(value: object, *, label: str) -> dict[str, str]:
+    if not isinstance(value, dict) or set(value) != {"baseline", "subject"}:
+        raise ValueError(f"{label} must contain exactly baseline and subject")
+    return {
+        side: _sha256(value[side], label=f"{label}.{side}")
+        for side in ("baseline", "subject")
+    }
+
+
+def load_retained_transaction(path: Path, *, profile_id: str) -> dict[str, Any]:
+    """Load strict, bounded metadata that selects retained trust inputs."""
+
+    try:
+        payload = read_regular_file_bytes(
+            path,
+            label=f"{profile_id} retained transaction metadata",
+            max_bytes=1024 * 1024,
+        )
+        value = parse_json_bytes(
+            payload, label=f"{profile_id} retained transaction metadata"
+        )
+    except StrictJsonError as exc:
+        raise ValueError(str(exc)) from exc
+    if not isinstance(value, dict) or set(value) != _TRANSACTION_FIELDS:
+        raise ValueError(f"{profile_id}: retained transaction fields are invalid")
+    if (
+        value.get("format") != "invarlock/retained-evaluator-transaction-v1"
+        or value.get("profile_id") != profile_id
+    ):
+        raise ValueError(f"{profile_id}: retained transaction metadata is invalid")
+    for field in (
+        "base_image_id",
+        "lock_sha256",
+        "runtime_image_id",
+        "source_bundle_sha256",
+    ):
+        _sha256(value.get(field), label=f"{profile_id} {field}")
+    if (
+        not isinstance(value.get("source_commit"), str)
+        or _COMMIT.fullmatch(value["source_commit"]) is None
+    ):
+        raise ValueError(f"{profile_id}: source commit is invalid")
+    if (
+        not isinstance(value.get("executed_on"), str)
+        or _DATE.fullmatch(value["executed_on"]) is None
+    ):
+        raise ValueError(f"{profile_id}: execution date is invalid")
+    if (
+        not isinstance(value.get("evaluator_version"), str)
+        or not value["evaluator_version"]
+    ):
+        raise ValueError(f"{profile_id}: evaluator version is invalid")
+    entrypoint = value.get("entrypoint")
+    if (
+        not isinstance(entrypoint, list)
+        or not entrypoint
+        or any(
+            not isinstance(part, str) or not part or "\x00" in part
+            for part in entrypoint
+        )
+    ):
+        raise ValueError(f"{profile_id}: entrypoint is invalid")
+    verification = value.get("verification")
+    if not isinstance(verification, dict) or set(verification) != _VERIFICATION_FIELDS:
+        raise ValueError(f"{profile_id}: retained verification fields are invalid")
+    _side_digests(verification.get("artifact_digests"), label="artifact digests")
+    _side_digests(verification.get("runtime_digests"), label="runtime digests")
+    for field in (
+        "evidence_signer_fingerprint",
+        "schedule_digest",
+        "trust_profile_digest",
+        "verifier_fingerprint",
+    ):
+        _sha256(verification.get(field), label=f"{profile_id} {field}")
+    if (
+        not isinstance(verification.get("verifier_identity"), str)
+        or not verification["verifier_identity"].strip()
+    ):
+        raise ValueError(f"{profile_id}: verifier identity is invalid")
+    if verification.get("policy_verdict") not in {"pass", "fail"}:
+        raise ValueError(f"{profile_id}: policy verdict is invalid")
+    return value
+
+
+def verify_signed_transaction(profile_id: str, retained: dict[str, object]) -> None:
+    package_id = retained["package_id"]
+    assert isinstance(package_id, str)
+    root = SIGNED_TRANSACTIONS / package_id
+    transaction = load_retained_transaction(
+        root / "transaction.json", profile_id=profile_id
+    )
+    verification = transaction["verification"]
+    evidence = verify_comparison_evidence(
+        root / "evidence",
+        policy_path=root / "policy.json",
+        expected_artifact_digests=verification["artifact_digests"],
+        expected_schedule_digest=verification["schedule_digest"],
+        expected_runtime_digests=verification["runtime_digests"],
+        expected_signer_fingerprint=verification["evidence_signer_fingerprint"],
+    )
+    receipt = verify_signed_verification_receipt(
+        root / "verification.receipt.json",
+        root / "evidence",
+        policy_path=root / "policy.json",
+        expected_artifact_digests=verification["artifact_digests"],
+        expected_schedule_digest=verification["schedule_digest"],
+        expected_runtime_digests=verification["runtime_digests"],
+        expected_pack_signer_fingerprint=verification["evidence_signer_fingerprint"],
+        expected_verifier_identity=verification["verifier_identity"],
+        expected_verifier_fingerprint=verification["verifier_fingerprint"],
+        expected_trust_profile_digest=verification["trust_profile_digest"],
+    )
+    public_key = serialization.load_pem_public_key(
+        read_regular_file_bytes(
+            root / "builder.public.pem",
+            label=f"{profile_id} builder public key",
+            max_bytes=64 * 1024,
+        )
+    )
+    if not isinstance(public_key, ed25519.Ed25519PublicKey):
+        raise ValueError(f"{profile_id}: builder public key is not Ed25519")
+    build = verify_evaluator_build_attestation(
+        load_evaluator_build_attestation(root / "build-attestation.json"),
+        builder_public_key=public_key,
+        evaluator=profile_id,
+        evaluator_version=transaction["evaluator_version"],
+        runtime_image_id=transaction["runtime_image_id"],
+        base_image_id=transaction["base_image_id"],
+        source_commit=transaction["source_commit"],
+        source_bundle_sha256=transaction["source_bundle_sha256"],
+        lock_sha256=transaction["lock_sha256"],
+        entrypoint=transaction["entrypoint"],
+    )
+    expected_verdict = verification["policy_verdict"]
+    expected_ok = expected_verdict == "pass"
+    expected_status = 0 if expected_ok else 7
+    receipt_verdict = (
+        receipt.statement.get("verdict")
+        if isinstance(receipt.statement, dict)
+        else None
+    )
+    if (
+        evidence.payload.get("integrity_ok") is not True
+        or evidence.payload.get("ok") is not expected_ok
+        or evidence.payload.get("policy_verdict") != expected_verdict
+        or int(evidence.status) != expected_status
+        or not receipt.ok
+        or not isinstance(receipt_verdict, dict)
+        or receipt_verdict.get("integrity_ok") is not True
+        or receipt_verdict.get("ok") is not expected_ok
+        or receipt_verdict.get("policy_verdict") != expected_verdict
+        or receipt_verdict.get("verification_status") != expected_status
+        or build.get("runtime_image_id") != transaction["runtime_image_id"]
+    ):
+        raise ValueError(
+            f"{profile_id}: retained signed transaction outcome is invalid"
+        )
+    report = load(root / "evidence/reports/evaluation.report.json")
+    schedule = load(root / "evidence/schedule/runtime-behavioral-schedule.json")
+    dataset_identity = schedule.get("dataset_identity")
+    records = schedule.get("records")
+    if (
+        report.get("record_count") != retained["record_count"]
+        or not isinstance(dataset_identity, dict)
+        or dataset_identity.get("dataset_name") != retained["dataset_name"]
+        or not isinstance(records, list)
+        or len(records) != retained["record_count"]
+    ):
+        raise ValueError(
+            f"{profile_id}: retained signed transaction does not match its "
+            "declared dataset"
+        )
+    print(f"retained signed transaction {package_id}: {expected_verdict}", flush=True)
+
+
+def _paired_records(package_id: str) -> dict[str, Any]:
+    value = load(
+        SIGNED_TRANSACTIONS / package_id / "evidence/records/paired-records.json"
+    )
+    records = value.get("records")
+    if (
+        value.get("format") != "invarlock/paired-records-v1"
+        or value.get("metric") != "exact_match"
+        or not isinstance(value.get("schedule_sha256"), str)
+        or not isinstance(records, list)
+        or not records
+        or any(not isinstance(record, dict) for record in records)
+    ):
+        raise ValueError(f"{package_id}: retained paired records are invalid")
+    return value
+
+
+def _signed_result(package_id: str) -> dict[str, object]:
+    report = load(
+        SIGNED_TRANSACTIONS / package_id / "evidence/reports/evaluation.report.json"
+    )
+    paired = report.get("paired_binary")
+    qualification = report.get("sample_qualification")
+    interval = (
+        qualification.get("interval_width") if isinstance(qualification, dict) else None
+    )
+    if (
+        report.get("verdict") not in {"pass", "fail"}
+        or not isinstance(report.get("record_count"), int)
+        or not isinstance(report.get("baseline"), dict)
+        or not isinstance(report.get("subject"), dict)
+        or not isinstance(paired, dict)
+        or not isinstance(interval, dict)
+    ):
+        raise ValueError(f"{package_id}: retained comparison report is invalid")
+    return {
+        "baseline_accuracy": report["baseline"].get("mean_score"),
+        "delta_pp": paired.get("effect_size_pp"),
+        "interval_width_pp": interval.get("observed"),
+        "record_count": report["record_count"],
+        "subject_accuracy": report["subject"].get("mean_score"),
+        "verdict": report["verdict"],
+    }
+
+
+def flagship_comparison_document(package_ids: list[str]) -> dict[str, object]:
+    """Compare two retained native journeys without assigning a new verdict."""
+
+    if len(package_ids) != 2 or len(set(package_ids)) != 2:
+        raise ValueError("flagship comparison requires exactly two profiles")
+    left_id, right_id = package_ids
+    left = _paired_records(left_id)
+    right = _paired_records(right_id)
+    left_records = left["records"]
+    right_records = right["records"]
+    if left["schedule_sha256"] != right["schedule_sha256"] or len(left_records) != len(
+        right_records
+    ):
+        raise ValueError("flagship retained schedules do not match")
+    schedule = load(
+        SIGNED_TRANSACTIONS
+        / left_id
+        / "evidence/schedule/runtime-behavioral-schedule.json"
+    )
+    other_schedule = load(
+        SIGNED_TRANSACTIONS
+        / right_id
+        / "evidence/schedule/runtime-behavioral-schedule.json"
+    )
+    if schedule != other_schedule:
+        raise ValueError("flagship retained schedules do not match")
+    dataset_identity = schedule.get("dataset_identity")
+    if not isinstance(dataset_identity, dict):
+        raise ValueError("flagship retained dataset identity is invalid")
+    sides: dict[str, dict[str, object]] = {}
+    for side in ("baseline", "subject"):
+        score_mismatches: list[str] = []
+        record_mismatches: list[str] = []
+        for left_record, right_record in zip(left_records, right_records, strict=True):
+            record_id = left_record.get("record_id")
+            if (
+                not isinstance(record_id, str)
+                or right_record.get("record_id") != record_id
+                or left_record.get("input_sha256") != right_record.get("input_sha256")
+            ):
+                raise ValueError("flagship retained record identities do not match")
+            left_side = left_record.get(side)
+            right_side = right_record.get(side)
+            if not isinstance(left_side, dict) or not isinstance(right_side, dict):
+                raise ValueError("flagship retained record sides are invalid")
+            if left_side.get("score") != right_side.get("score"):
+                score_mismatches.append(record_id)
+            if left_side.get("observation_record_digest") != right_side.get(
+                "observation_record_digest"
+            ):
+                record_mismatches.append(record_id)
+        count = len(left_records)
+        sides[side] = {
+            "matching_record_digests": count - len(record_mismatches),
+            "record_digest_agreement": (count - len(record_mismatches)) / count,
+            "record_digest_mismatch_ids": record_mismatches,
+            "matching_scores": count - len(score_mismatches),
+            "score_agreement": (count - len(score_mismatches)) / count,
+            "score_mismatch_ids": score_mismatches,
+        }
+    return {
+        "dataset_identity": dataset_identity,
+        "format": "invarlock/flagship-evaluator-comparison-v2",
+        "record_count": len(left_records),
+        "schedule_sha256": f"sha256:{left['schedule_sha256']}",
+        "sides": sides,
+        "signed_results": {
+            package_id: _signed_result(package_id) for package_id in package_ids
+        },
+        "transactions": package_ids,
+    }
 
 
 def write_profile(
@@ -184,7 +594,7 @@ def execute(selected: set[str]) -> None:
         artifacts=ARTIFACTS,
         cases=ROOT / "cases.json",
         schedule=ROOT / "schedule.json",
-        authoritative=False,
+        replayable=False,
     )
 
 
@@ -195,7 +605,7 @@ def _execute_profiles(
     artifacts: Path,
     cases: Path,
     schedule: Path,
-    authoritative: bool,
+    replayable: bool,
 ) -> None:
     environment = os.environ.copy()
     environment.setdefault("DEEPEVAL_TELEMETRY_OPT_OUT", "YES")
@@ -226,18 +636,18 @@ def _execute_profiles(
         (profile_path.parent / "qualification-result.json").write_bytes(
             canonical_json_bytes(result.as_dict())
         )
-        if authoritative:
-            replay_authoritative_import(profile["profile_id"], write=True)
+        if replayable:
+            replay_import(profile["profile_id"], write=True)
 
 
-def execute_authoritative(selected: set[str]) -> None:
+def execute_replayable(selected: set[str]) -> None:
     _execute_profiles(
-        authoritative_profiles(),
+        replayable_profiles(),
         selected=selected,
-        artifacts=AUTHORITATIVE_ARTIFACTS,
-        cases=AUTHORITATIVE / "cases.json",
-        schedule=AUTHORITATIVE / "schedule.json",
-        authoritative=True,
+        artifacts=REPLAYABLE_ARTIFACTS,
+        cases=REPLAYABLE_CORPUS / "cases.json",
+        schedule=REPLAYABLE_CORPUS / "schedule.json",
+        replayable=True,
     )
 
 
@@ -259,16 +669,15 @@ def qualify(
 def verify() -> None:
     matrix_profiles = profiles()
     identifiers = [profile["profile_id"] for profile in matrix_profiles]
-    if len(identifiers) < 12 or len(set(identifiers)) != len(identifiers):
-        raise ValueError(
-            "the representative matrix must contain at least 12 unique "
-            "profile identifiers"
-        )
+    if not identifiers or len(set(identifiers)) != len(identifiers):
+        raise ValueError("the matrix must contain unique profile identifiers")
     category_ids = categories()
     for profile in matrix_profiles:
         category = profile.get("category")
         if not isinstance(category, str) or category not in category_ids:
             raise ValueError(f"{profile['profile_id']}: category is invalid")
+        if profile.get("support_status") != "maintained_adapter":
+            raise ValueError(f"{profile['profile_id']}: support status is invalid")
     selection = selection_policy()
     if (
         not isinstance(selection.get("reviewed_on"), str)
@@ -276,15 +685,39 @@ def verify() -> None:
         or selection["minimum_activity_window_months"] < 1
     ):
         raise ValueError("matrix selection review metadata is invalid")
-    verdict_count = sum(
-        profile["authority"]["mode"] == "deterministic_per_record"
-        for profile in matrix_profiles
-    )
-    if verdict_count < 10:
-        raise ValueError("the matrix must retain at least ten per-record profiles")
+    authority_modes = {profile["authority"]["mode"] for profile in matrix_profiles}
+    if authority_modes != {"deterministic_per_record", "observation_only"}:
+        raise ValueError(
+            "the catalog must demonstrate replayable and observation-only authority"
+        )
     levels = demonstration_levels()
     if set(levels) != set(identifiers):
         raise ValueError("demonstration levels must cover exactly the matrix profiles")
+    retained_claims: dict[str, list[dict[str, object]]] = {}
+    for profile_id, status in levels.items():
+        if set(status) != {"retained_signed_transactions"}:
+            raise ValueError(f"{profile_id}: demonstration status is invalid")
+        retained_claims[profile_id] = retained_transactions(
+            status["retained_signed_transactions"], profile_id=profile_id
+        )
+    profiles_by_id = {profile["profile_id"]: profile for profile in matrix_profiles}
+    focus = release_focus()
+    for profile_id in focus:
+        profile = profiles_by_id.get(profile_id)
+        if profile is None:
+            raise ValueError(f"release-focus profile is missing: {profile_id}")
+        if profile["authority"]["mode"] != "deterministic_per_record":
+            raise ValueError(f"release-focus profile is not replayable: {profile_id}")
+        flagship_claims = [
+            claim
+            for claim in retained_claims[profile_id]
+            if claim["role"] == "flagship"
+        ]
+        if len(flagship_claims) != 1:
+            raise ValueError(
+                "release-focus profile must have exactly one retained flagship "
+                f"transaction: {profile_id}"
+            )
     for profile in matrix_profiles:
         artifact = ARTIFACTS / profile["profile_id"]
         expected_profile = canonical_json_bytes(qualification_profile(profile))
@@ -303,10 +736,46 @@ def verify() -> None:
             f"verified {profile['profile_id']}: {result.outcome}",
             flush=True,
         )
+    retained_packages = {
+        str(claim["package_id"])
+        for claims in retained_claims.values()
+        for claim in claims
+    }
+    retained_directories = {
+        path.name for path in SIGNED_TRANSACTIONS.iterdir() if path.is_dir()
+    }
+    if retained_directories != retained_packages:
+        raise ValueError(
+            "retained signed transaction packages do not match demonstration status"
+        )
+    for profile_id, claims in sorted(retained_claims.items()):
+        for claim in claims:
+            verify_signed_transaction(profile_id, claim)
+    if len(focus) == 2:
+        flagship_packages = [
+            str(
+                next(
+                    claim["package_id"]
+                    for claim in retained_claims[profile_id]
+                    if claim["role"] == "flagship"
+                )
+            )
+            for profile_id in focus
+        ]
+        expected_comparison = canonical_json_bytes(
+            flagship_comparison_document(flagship_packages)
+        )
+        retained_comparison = read_regular_file_bytes(
+            FLAGSHIP_COMPARISON,
+            label="retained flagship comparison",
+            max_bytes=1024 * 1024,
+        )
+        if retained_comparison != expected_comparison:
+            raise ValueError("flagship retained comparison is stale")
 
 
-def verify_authoritative() -> None:
-    cases = load(AUTHORITATIVE / "cases.json")
+def verify_replayable() -> None:
+    cases = load(REPLAYABLE_CORPUS / "cases.json")
     records = cases.get("records")
     source_evaluation = cases.get("source_evaluation")
     if (
@@ -316,17 +785,15 @@ def verify_authoritative() -> None:
         or not isinstance(source_evaluation, dict)
         or source_evaluation.get("kind") != "model_execution"
     ):
-        raise ValueError(
-            "authoritative corpus must bind one 102-record model execution"
-        )
-    matrix_profiles = authoritative_profiles()
-    if len(matrix_profiles) < 10:
-        raise ValueError("at least ten profiles must demonstrate authoritative import")
+        raise ValueError("replayable corpus must bind one 102-record model execution")
+    matrix_profiles = replayable_profiles()
+    if not matrix_profiles:
+        raise ValueError("at least one independently replayable profile is required")
     for profile in matrix_profiles:
-        artifact = AUTHORITATIVE_ARTIFACTS / profile["profile_id"]
+        artifact = REPLAYABLE_ARTIFACTS / profile["profile_id"]
         expected_profile = canonical_json_bytes(qualification_profile(profile))
         if (artifact / "profile.json").read_bytes() != expected_profile:
-            raise ValueError(f"{profile['profile_id']}: authoritative profile is stale")
+            raise ValueError(f"{profile['profile_id']}: replayable profile is stale")
         raw = load(artifact / "upstream-output.json")
         if raw.get("source_evaluation") != source_evaluation:
             raise ValueError(
@@ -334,17 +801,17 @@ def verify_authoritative() -> None:
             )
         result = qualify(
             profile,
-            artifacts=AUTHORITATIVE_ARTIFACTS,
-            schedule=AUTHORITATIVE / "schedule.json",
+            artifacts=REPLAYABLE_ARTIFACTS,
+            schedule=REPLAYABLE_CORPUS / "schedule.json",
         )
         retained = (artifact / "qualification-result.json").read_bytes()
         if retained != canonical_json_bytes(result.as_dict()):
             raise ValueError(
-                f"{profile['profile_id']}: authoritative qualification is stale"
+                f"{profile['profile_id']}: replayable qualification is stale"
             )
-        replay_authoritative_import(profile["profile_id"], write=False)
+        replay_import(profile["profile_id"], write=False)
         print(
-            f"verified authoritative import {profile['profile_id']}",
+            f"verified independently replayable import {profile['profile_id']}",
             flush=True,
         )
 
@@ -354,10 +821,11 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
     execute_parser = subparsers.add_parser("execute")
     execute_parser.add_argument("profiles", nargs="*")
-    authoritative_parser = subparsers.add_parser("execute-authoritative")
-    authoritative_parser.add_argument("profiles", nargs="*")
+    replayable_parser = subparsers.add_parser("execute-replayable")
+    replayable_parser.add_argument("profiles", nargs="*")
     subparsers.add_parser("verify")
-    subparsers.add_parser("verify-authoritative")
+    subparsers.add_parser("verify-replayable")
+    subparsers.add_parser("write-flagship-comparison")
     return parser.parse_args()
 
 
@@ -365,10 +833,33 @@ def main() -> None:
     args = parse_args()
     if args.command == "execute":
         execute(set(args.profiles))
-    elif args.command == "execute-authoritative":
-        execute_authoritative(set(args.profiles))
-    elif args.command == "verify-authoritative":
-        verify_authoritative()
+    elif args.command == "execute-replayable":
+        execute_replayable(set(args.profiles))
+    elif args.command == "verify-replayable":
+        verify_replayable()
+    elif args.command == "write-flagship-comparison":
+        focus = release_focus()
+        if len(focus) != 2:
+            raise ValueError("flagship comparison requires exactly two profiles")
+        levels = demonstration_levels()
+        packages: list[str] = []
+        for profile_id in focus:
+            claims = retained_transactions(
+                levels[profile_id]["retained_signed_transactions"],
+                profile_id=profile_id,
+            )
+            flagship = [claim for claim in claims if claim["role"] == "flagship"]
+            if len(flagship) != 1:
+                raise ValueError(
+                    "release-focus profile must have exactly one retained flagship "
+                    "transaction: "
+                    f"{profile_id}"
+                )
+            verify_signed_transaction(profile_id, flagship[0])
+            packages.append(str(flagship[0]["package_id"]))
+        FLAGSHIP_COMPARISON.write_bytes(
+            canonical_json_bytes(flagship_comparison_document(packages))
+        )
     else:
         verify()
 

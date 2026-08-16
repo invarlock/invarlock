@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.runtime_provider_evidence as evidence_module
 from invarlock.core.runtime_provider import (
     GGUFArtifactIdentity,
     HFSnapshotArtifactIdentity,
@@ -168,8 +169,11 @@ def _llama_cpp_settings(
         "backend_version": receipt.backend.version,
         "batch_size": execution.batch_size,
         "context_length": execution.context_length,
+        "cpu_threads": 4,
         "gguf_metadata_sha256": artifact.gguf_metadata_sha256,
         "max_output_tokens": execution.max_output_tokens,
+        "prompt_batch_size": 32,
+        "prompt_microbatch_size": 16,
         "seed": execution.seed,
         "tensor_inventory_sha256": artifact.tensor_inventory_sha256,
         "timeout_seconds": execution.timeout_seconds,
@@ -380,6 +384,24 @@ def test_gguf_request_binding_authenticates_backend_artifact_and_execution() -> 
     assert errors == (
         "llama_cpp provider receipt does not match request setting "
         "'backend_binary_sha256'",
+    )
+
+
+def test_gguf_request_binding_preserves_closed_v1_evidence_replay() -> None:
+    artifact, _observation_value, receipt = _bundle_values()
+    receipt = replace(receipt, backend=replace(receipt.backend, build_sha256=None))
+    settings = _llama_cpp_settings(artifact, receipt)
+    for field in ("cpu_threads", "prompt_batch_size", "prompt_microbatch_size"):
+        del settings[field]
+
+    assert (
+        runtime_request_binding_errors(
+            provider_name="llama_cpp",
+            settings=settings,
+            artifact_identity=artifact,
+            receipt=receipt,
+        )
+        == ()
     )
 
 
@@ -753,6 +775,39 @@ def test_gguf_request_binding_rejects_open_settings_and_runtime_substitution() -
 
 
 @pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"cpu_threads": True}, "'cpu_threads' must be a positive integer"),
+        ({"cpu_threads": 257}, "cpu_threads exceeds the supported limit"),
+        (
+            {"prompt_batch_size": 4097},
+            "prompt_batch_size must not exceed context_length",
+        ),
+        (
+            {"prompt_microbatch_size": 33},
+            "prompt_microbatch_size must not exceed prompt_batch_size",
+        ),
+    ],
+)
+def test_gguf_request_binding_rejects_invalid_backend_execution_profile(
+    updates: dict[str, object], message: str
+) -> None:
+    artifact, _observation_value, receipt = _bundle_values()
+    receipt = replace(receipt, backend=replace(receipt.backend, build_sha256=None))
+    settings = {**_llama_cpp_settings(artifact, receipt), **updates}
+
+    assert any(
+        message in error
+        for error in runtime_request_binding_errors(
+            provider_name="llama_cpp",
+            settings=settings,
+            artifact_identity=artifact,
+            receipt=receipt,
+        )
+    )
+
+
+@pytest.mark.parametrize(
     "identity",
     [
         HFSnapshotArtifactIdentity(
@@ -784,6 +839,37 @@ def test_artifact_identity_codec_reconstructs_every_supported_type(
     assert encoded == canonical_artifact_identity_json(identity)
     assert decode_artifact_identity(encoded) == identity
     assert type(decode_artifact_identity(encoded)) is type(identity)
+
+
+def test_artifact_identity_dispatch_rejects_unknown_internal_format() -> None:
+    with pytest.raises(RuntimeProviderEvidenceError, match="unsupported artifact"):
+        evidence_module._artifact_from_payload({"artifact_format": "future"})
+
+
+def test_typed_decoder_enforces_sidecar_bound_before_json_parsing() -> None:
+    oversized = b"{" + b" " * MAX_RUNTIME_PROVIDER_SIDECAR_BYTES + b"}"
+
+    with pytest.raises(RuntimeProviderEvidenceError, match="size limit"):
+        decode_artifact_identity(oversized)
+
+
+def test_unknown_provider_cannot_claim_a_gguf_artifact_contract() -> None:
+    artifact, _observation_value, receipt = _bundle_values()
+    receipt = replace(
+        receipt,
+        plugin=replace(receipt.plugin, name="future_provider"),
+        capabilities=replace(
+            receipt.capabilities,
+            provider_name="future_provider",
+        ),
+    )
+
+    assert runtime_request_binding_errors(
+        provider_name="future_provider",
+        settings={},
+        artifact_identity=artifact,
+        receipt=receipt,
+    ) == ("llama_cpp request and GGUF artifact identity do not agree",)
 
 
 def test_write_and_reload_produces_cross_bound_canonical_sidecars(

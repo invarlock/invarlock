@@ -4,6 +4,7 @@ import hashlib
 import os
 import socket
 import struct
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -206,6 +207,41 @@ def test_gguf_identity_rejects_truncated_and_unsupported_metadata(
         path.write_bytes(payload)
         with pytest.raises(gguf_identity.GGUFIdentityError):
             gguf_identity.read_gguf_artifact_identity(path)
+
+
+def test_header_reader_rejects_descriptor_truncation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reader = gguf_identity._HeaderReader(0, file_size=4)
+    monkeypatch.setattr(gguf_identity.os, "read", lambda *_args: b"")
+
+    with pytest.raises(gguf_identity.GGUFIdentityError, match="truncated GGUF"):
+        reader.read_exact(1, label="fixture")
+
+
+def test_metadata_array_depth_is_bounded_before_reading() -> None:
+    reader = gguf_identity._HeaderReader(0, file_size=0)
+
+    with pytest.raises(gguf_identity.GGUFIdentityError, match="nesting"):
+        gguf_identity._read_metadata_value(
+            reader,
+            9,
+            budget=gguf_identity._ParseBudget(),
+            depth=gguf_identity._MAX_ARRAY_DEPTH + 1,
+        )
+
+
+def test_general_alignment_requires_authenticated_uint32(tmp_path: Path) -> None:
+    payload = (
+        b"GGUF"
+        + struct.pack("<IQQ", 3, 0, 1)
+        + _metadata("general.alignment", 8, _string_value("32"))
+    )
+    path = tmp_path / "string-alignment.gguf"
+    path.write_bytes(payload)
+
+    with pytest.raises(gguf_identity.GGUFIdentityError, match="must be uint32"):
+        gguf_identity.read_gguf_artifact_identity(path)
 
 
 def test_gguf_identity_rejects_duplicate_metadata_and_tensor_names(
@@ -420,19 +456,18 @@ def test_gguf_identity_rejects_non_regular_and_symlink_inputs(tmp_path: Path) ->
 
 
 def test_gguf_identity_rejects_socket_input() -> None:
-    socket_path = Path.cwd() / f".invarlock-gguf-{os.getpid()}.sock"
-    socket_path.unlink(missing_ok=True)
-    unix_socket = socket.socket(socket.AF_UNIX)
-    try:
+    with tempfile.TemporaryDirectory(prefix="ivl-gguf-") as temp_dir:
+        socket_path = Path(temp_dir) / "input.sock"
+        unix_socket = socket.socket(socket.AF_UNIX)
         try:
-            unix_socket.bind(str(socket_path))
-        except PermissionError:
-            pytest.skip("sandbox does not permit creating Unix-domain sockets")
-        with pytest.raises(gguf_identity.GGUFIdentityError):
-            gguf_identity.read_gguf_artifact_identity(socket_path)
-    finally:
-        unix_socket.close()
-        socket_path.unlink(missing_ok=True)
+            try:
+                unix_socket.bind(str(socket_path))
+            except PermissionError:
+                pytest.skip("sandbox does not permit creating Unix-domain sockets")
+            with pytest.raises(gguf_identity.GGUFIdentityError):
+                gguf_identity.read_gguf_artifact_identity(socket_path)
+        finally:
+            unix_socket.close()
 
 
 def test_gguf_identity_rejects_symlinked_parent_directory(tmp_path: Path) -> None:

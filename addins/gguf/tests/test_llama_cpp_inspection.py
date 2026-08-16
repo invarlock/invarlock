@@ -84,7 +84,10 @@ def _runtime_inputs(tmp_path: Path) -> tuple[ModelRuntimeSpec, LlamaCppRuntimeBi
             "seed": 7,
             "context_length": 256,
             "batch_size": 32,
+            "cpu_threads": 4,
             "max_output_tokens": 16,
+            "prompt_batch_size": 32,
+            "prompt_microbatch_size": 16,
             "timeout_seconds": 1,
         },
     )
@@ -110,6 +113,9 @@ def test_inspection_derives_complete_path_free_spec(
         seed=7,
         context_length=256,
         batch_size=32,
+        cpu_threads=4,
+        prompt_batch_size=32,
+        prompt_microbatch_size=16,
         max_output_tokens=16,
         timeout_seconds=1,
     )
@@ -150,6 +156,9 @@ def test_inspection_rejects_artifact_changed_during_probe(
             seed=7,
             context_length=256,
             batch_size=1,
+            cpu_threads=4,
+            prompt_batch_size=32,
+            prompt_microbatch_size=16,
             max_output_tokens=16,
             timeout_seconds=1,
         )
@@ -173,6 +182,9 @@ def test_inspection_rejects_host_execution_before_version_probe(
             seed=7,
             context_length=256,
             batch_size=1,
+            cpu_threads=4,
+            prompt_batch_size=32,
+            prompt_microbatch_size=16,
             max_output_tokens=16,
             timeout_seconds=1,
         )

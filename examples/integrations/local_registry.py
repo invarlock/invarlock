@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import secrets
 import subprocess
@@ -11,6 +10,15 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+try:
+    from examples.integrations.bounded_command import run_bounded_command
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if not exc.name or not exc.name.startswith("examples"):
+        raise
+    from bounded_command import run_bounded_command  # type: ignore[no-redef]
+
+_COMMAND_TIMEOUT_SECONDS = 10 * 60
+_COMMAND_OUTPUT_LIMIT = 4 * 1024 * 1024
 _IMAGE_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
 _REGISTRY_ENDPOINT = re.compile(r"^127\.0\.0\.1:([1-9][0-9]{0,4})$")
@@ -22,21 +30,32 @@ REGISTRY_IMAGE = (
 def _run(
     command: list[str], *, cwd: Path, capture_output: bool = False
 ) -> subprocess.CompletedProcess[str]:
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        check=False,
-        capture_output=capture_output,
-        text=True,
-        env=os.environ.copy(),
-    )
-    if completed.returncode != 0:
-        diagnostic = (completed.stderr or completed.stdout or "").strip()
-        raise RuntimeError(
-            f"command exited with status {completed.returncode}: {' '.join(command)}"
-            + (f"\n{diagnostic}" if diagnostic else "")
+    try:
+        completed = run_bounded_command(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            check=True,
+            timeout_seconds=_COMMAND_TIMEOUT_SECONDS,
+            stdout_limit=_COMMAND_OUTPUT_LIMIT,
+            stderr_limit=_COMMAND_OUTPUT_LIMIT,
+            label="local registry command",
         )
-    return completed
+    except (RuntimeError, subprocess.CalledProcessError) as exc:
+        if isinstance(exc, subprocess.CalledProcessError):
+            diagnostic = (exc.stderr or exc.output or "").strip()
+            detail = f"\n{diagnostic}" if diagnostic else ""
+            raise RuntimeError(
+                f"command exited with status {exc.returncode}: {' '.join(command)}"
+                f"{detail}"
+            ) from exc
+        raise
+    return subprocess.CompletedProcess(
+        command,
+        completed.returncode,
+        completed.stdout if capture_output else None,
+        completed.stderr if capture_output else None,
+    )
 
 
 def _cleanup_command(command: list[str], *, cwd: Path) -> None:

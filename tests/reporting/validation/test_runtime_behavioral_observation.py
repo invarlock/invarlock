@@ -8,7 +8,11 @@ from typing import cast
 
 import pytest
 
-from invarlock.core.runtime_provider import EvaluationBatch, EvaluationRecord
+from invarlock.core.runtime_provider import (
+    EvaluationBatch,
+    EvaluationRecord,
+    behavioral_observation,
+)
 from invarlock.core.runtime_provider.behavioral_observation import (
     RuntimeBehavioralObservationError,
     verify_runtime_behavioral_observation,
@@ -287,6 +291,17 @@ def test_verifier_rejects_output_hash_tampering() -> None:
             expected_artifact_identity_sha256=_sha256("artifact"),
             expected_batch=_batch(),
             metric="exact_match",
+        )
+
+
+def test_record_fact_boundary_rejects_nontext_output_before_hashing() -> None:
+    records = cast(list[dict[str, object]], copy.deepcopy(_payload()["records"]))
+    records[0]["output_text"] = 7
+
+    with pytest.raises(RuntimeBehavioralObservationError, match="invalid output text"):
+        behavioral_observation._require_authentic_record_facts(  # noqa: SLF001
+            records,
+            aggregate_source_sha256=_records_sha256(records),
         )
 
 

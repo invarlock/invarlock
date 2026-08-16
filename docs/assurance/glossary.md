@@ -23,7 +23,9 @@
 : A value controlled by the verifier rather than selected from submitted
   evidence. InvarLock verification requires policy bytes, baseline and subject
   artifact-identity digests, the canonical schedule digest, both runtime
-  digests, and the expected evidence-signer fingerprint as anchors.
+  digests, and the expected evidence-signer fingerprint as anchors. When
+  either side uses `llama_cpp`, it also requires an independently approved
+  normalized-request digest.
 
 **Assurance claim**
 : A scoped statement supported by evidence, enforcement, and explicit
@@ -49,11 +51,12 @@
   It identifies one closed comparison; it is not a human authorization.
 
 **Comparison report**
-: The current `invarlock/comparison-report-v2` document derived from paired
+: The current `invarlock/comparison-report-v3` document derived from paired
   records and policy. It contains the baseline mean, subject mean, comparison
   value, metric-specific paired interval, threshold, optional sample
-  qualification, and finite-schedule verdict. Strict verification also replays
-  signed v1 reports under their original method.
+  qualification, optional exact-match side-accuracy qualification, and
+  finite-schedule verdict. Strict verification also preserves signed v1 and v2
+  report semantics.
 
 **Evidence pack**
 : The immutable `invarlock/evidence-pack-v1` directory containing the request,
@@ -102,10 +105,11 @@
   upper bound controls the metric threshold. An authorized scorer extension
   uses the same deterministic paired-resampling method over its unit-interval
   record values, with the lower bound controlling its percentage-point delta
-  threshold. Optional sample qualification adds count and width requirements.
+  threshold. Optional sample qualification adds count and width requirements;
+  v3 exact-match reports may independently add a floor for both side means.
 
 **Sample qualification**
-: Optional v2 report section derived from coupled policy fields. It records the
+: Optional v2/v3 report section derived from coupled policy fields. It records the
   required and observed paired-record count, the allowed and observed interval
   width, their units and individual results, and their combined result. It
   qualifies this authenticated finite schedule; it does not establish

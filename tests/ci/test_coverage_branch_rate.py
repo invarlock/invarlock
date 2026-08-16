@@ -120,6 +120,69 @@ def test_internal_branch_totals_must_match_root_totals(
     assert "branch totals do not match report contents" in capsys.readouterr().err
 
 
+def test_condition_and_class_branch_counts_are_independently_validated(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_module()
+    invalid_condition = tmp_path / "invalid-condition.xml"
+    _report(invalid_condition, covered=1, valid=2)
+    invalid_condition.write_text(
+        invalid_condition.read_text(encoding="utf-8").replace(
+            'condition-coverage="50.00% (1/2)"',
+            'condition-coverage="100% (2/1)"',
+        ),
+        encoding="utf-8",
+    )
+    assert module.main([str(invalid_condition)]) == 2
+    assert "invalid condition counts" in capsys.readouterr().err
+
+    mismatched_classes = tmp_path / "mismatched-classes.xml"
+    mismatched_classes.write_text(
+        '<coverage branches-covered="2" branches-valid="3">'
+        "<packages><package><classes>"
+        '<class name="branchless" filename="branchless.py"><lines>'
+        '<line number="1" hits="1"/>'
+        "</lines></class>"
+        '<class name="partial" filename="partial.py"><lines>'
+        '<line number="1" hits="1" branch="true" '
+        'condition-coverage="50% (1/2)"/>'
+        "</lines></class>"
+        "</classes>"
+        '<line number="2" hits="1" branch="true" '
+        'condition-coverage="100% (1/1)"/>'
+        "</package></packages></coverage>",
+        encoding="utf-8",
+    )
+    assert module.main([str(mismatched_classes)]) == 2
+    assert "class contents" in capsys.readouterr().err
+
+
+def test_unreadable_exemption_manifest_fails_closed(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_module()
+    report = tmp_path / "coverage.xml"
+    _report(report, covered=2, valid=2)
+    unreadable_manifest = tmp_path / "manifest-directory"
+    unreadable_manifest.mkdir()
+
+    assert (
+        module.main(
+            [
+                str(report),
+                "--class-exemptions",
+                str(report),
+                "examples",
+                str(unreadable_manifest),
+            ]
+        )
+        == 2
+    )
+    assert "cannot read class exemptions" in capsys.readouterr().err
+
+
 def test_class_branch_rate_fails_even_when_aggregate_rate_passes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -144,6 +207,163 @@ def test_class_branch_rate_fails_even_when_aggregate_rate_passes(
     output = capsys.readouterr()
     assert "weak.py: 80.00% branch coverage (8/10)" in output.err
     assert "coverage.xml: 90.00% branch coverage (18/20)" in output.out
+
+
+def test_report_scoped_class_exemption_removes_alternate_gated_code_from_aggregate(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    report = tmp_path / "coverage.xml"
+    report.write_text(
+        '<coverage branches-covered="18" branches-valid="20">'
+        "<packages><package><classes>"
+        '<class name="weak" filename="weak.py"><lines>'
+        '<line number="1" hits="1" branch="true" '
+        'condition-coverage="80% (8/10)"/>'
+        "</lines></class>"
+        '<class name="strong" filename="strong.py"><lines>'
+        '<line number="1" hits="1" branch="true" '
+        'condition-coverage="100% (10/10)"/>'
+        "</lines></class>"
+        "</classes></package></packages></coverage>",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "exemptions.txt"
+    source_root = tmp_path / "examples"
+    source_root.mkdir()
+    source_root.joinpath("unreported.py").write_text("pass\n", encoding="utf-8")
+    manifest.write_text(
+        "examples/weak.py\nexamples/unreported.py\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert (
+        module.main(
+            [
+                str(report),
+                "--minimum",
+                "90",
+                "--class-exemptions",
+                str(report),
+                "examples",
+                str(manifest),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr()
+    assert "aggregate branch coverage: 100.00% (10/10)" in output.out
+    assert output.err == ""
+
+
+def test_class_exemption_cannot_remove_every_enforced_branch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _load_module()
+    report = tmp_path / "coverage.xml"
+    _report(report, covered=8, valid=10)
+    manifest = tmp_path / "exemptions.txt"
+    manifest.write_text("examples/module.py\n", encoding="utf-8")
+
+    assert (
+        module.main(
+            [
+                str(report),
+                "--minimum",
+                "90",
+                "--class-exemptions",
+                str(report),
+                "examples",
+                str(manifest),
+            ]
+        )
+        == 2
+    )
+    output = capsys.readouterr()
+    assert "module.py: 80.00%" not in output.err
+    assert "ERROR: no enforceable branch coverage remains" in output.err
+
+
+@pytest.mark.parametrize(
+    ("contents", "message"),
+    [
+        ("examples/missing.py\n", "does not match a class"),
+        ("outside/module.py\n", "outside source root"),
+        (
+            "examples/module.py\nexamples/module.py\n",
+            "duplicate class exemption",
+        ),
+        ("../module.py\n", "invalid class exemption"),
+    ],
+)
+def test_invalid_class_exemption_manifests_fail_closed(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    contents: str,
+    message: str,
+) -> None:
+    module = _load_module()
+    report = tmp_path / "coverage.xml"
+    _report(report, covered=9, valid=10)
+    manifest = tmp_path / "exemptions.txt"
+    manifest.write_text(contents, encoding="utf-8")
+
+    assert (
+        module.main(
+            [
+                str(report),
+                "--class-exemptions",
+                str(report),
+                "examples",
+                str(manifest),
+            ]
+        )
+        == 2
+    )
+    assert message in capsys.readouterr().err
+
+
+def test_class_exemptions_must_bind_once_to_an_input_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _load_module()
+    report = tmp_path / "coverage.xml"
+    other = tmp_path / "other.xml"
+    _report(report, covered=9, valid=10)
+    manifest = tmp_path / "exemptions.txt"
+    manifest.write_text("examples/module.py\n", encoding="utf-8")
+
+    assert (
+        module.main(
+            [
+                str(report),
+                "--class-exemptions",
+                str(other),
+                "examples",
+                str(manifest),
+            ]
+        )
+        == 2
+    )
+    assert "not an input" in capsys.readouterr().err
+
+    binding = [str(report), "examples", str(manifest)]
+    assert (
+        module.main(
+            [
+                str(report),
+                "--class-exemptions",
+                *binding,
+                "--class-exemptions",
+                *binding,
+            ]
+        )
+        == 2
+    )
+    assert "duplicate class-exemption binding" in capsys.readouterr().err
 
 
 def test_duplicate_resolved_report_paths_fail_closed(

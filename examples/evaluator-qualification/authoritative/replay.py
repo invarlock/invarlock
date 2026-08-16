@@ -64,7 +64,7 @@ def replay(profile_id: str, *, write: bool) -> dict[str, object]:
     )
     if result.authority != "verdict_authority":
         raise ValueError(
-            f"{profile_id}: authoritative replay requires verdict authority"
+            f"{profile_id}: independently replayable import requires verdict authority"
         )
     cases = _load(ROOT / "cases.json")
     source_evaluation = cases.get("source_evaluation")
@@ -121,7 +121,7 @@ def main() -> None:
     parser.add_argument("profile_id")
     args = parser.parse_args()
     replay(args.profile_id, write=args.command == "write")
-    print(f"{args.command} authoritative import {args.profile_id}")
+    print(f"{args.command} independently replayable import {args.profile_id}")
 
 
 if __name__ == "__main__":

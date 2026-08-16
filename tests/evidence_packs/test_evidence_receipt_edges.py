@@ -79,6 +79,30 @@ def test_receipt_no_clobber_race_never_removes_the_other_writer_file(
     assert receipt.read_bytes() == b"other writer"
 
 
+def test_receipt_writer_allows_caller_managed_signer_roles(
+    tmp_path: Path,
+) -> None:
+    pack, policy, runtimes, _pack_signer = _inputs(tmp_path)
+    verifier_key, verifier_fingerprint = _key(tmp_path, "same-signer")
+    receipt = tmp_path / "receipt.json"
+    result = _result(pack, policy, runtimes, verifier_fingerprint)
+
+    written = write_signed_verification_receipt(
+        pack,
+        result,
+        receipt,
+        policy_path=policy,
+        **_input_anchor_kwargs(),
+        expected_runtime_digests=runtimes,
+        expected_pack_signer_fingerprint=verifier_fingerprint,
+        verifier_identity="invarlock-verifier/release",
+        verifier_signing_key_path=verifier_key,
+    )
+
+    assert written == verifier_fingerprint
+    assert receipt.is_file()
+
+
 def test_receipt_writer_removes_partial_file_after_durable_write_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -450,6 +474,55 @@ def test_receipt_writer_rejects_request_anchor_disagreement_with_result(
             expected_runtime_digests=runtimes,
             expected_pack_signer_fingerprint=pack_signer,
             expected_request_digest=expected_request,
+            verifier_identity="invarlock-verifier/release",
+            verifier_signing_key_path=key,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "message"),
+    [
+        ("policy_digest", _digest("0"), "policy anchor"),
+        (
+            "artifact_digests",
+            {"baseline": _digest("0"), "subject": _digest("e")},
+            "artifact anchors",
+        ),
+        ("schedule_digest", _digest("0"), "schedule anchor"),
+        ("signer_fingerprint", _digest("0"), "signer anchor"),
+        (
+            "runtime_digests",
+            {"baseline": _digest("0"), "subject": _digest("b")},
+            "runtime anchors",
+        ),
+    ],
+)
+def test_receipt_writer_rejects_result_anchor_drift(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+    message: str,
+) -> None:
+    pack, policy, runtimes, pack_signer = _inputs(tmp_path)
+    key, _verifier = _key(tmp_path, "verifier")
+    original = _result(pack, policy, runtimes, pack_signer)
+    anchors = dict(original.payload["anchors"])
+    anchors[field] = replacement
+    drifted = EvidencePackResult(
+        payload={**original.payload, "anchors": anchors},
+        status=original.status,
+        manifest_digest=original.manifest_digest,
+    )
+
+    with pytest.raises(EvidenceReceiptError, match=message):
+        write_signed_verification_receipt(
+            pack,
+            drifted,
+            tmp_path / "receipt.json",
+            policy_path=policy,
+            **_input_anchor_kwargs(),
+            expected_runtime_digests=runtimes,
+            expected_pack_signer_fingerprint=pack_signer,
             verifier_identity="invarlock-verifier/release",
             verifier_signing_key_path=key,
         )

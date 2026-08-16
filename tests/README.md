@@ -83,14 +83,18 @@ make coverage-enforce
 make verify
 ```
 
-`make coverage-enforce` requires at least 90% branch coverage for every
+`make coverage-enforce` requires at least 95% branch coverage for every
 branch-bearing maintained module and for the repository-wide aggregate across
 the core, add-ins, examples, qualification/release helpers, and repository
-check/security scripts. It also requires at least 90% combined
+check/security scripts. It also requires at least 95% combined
 statement-and-branch coverage for each module and aggregate suite, so a
 well-covered distribution cannot mask a local gap. Each suite uses isolated
 coverage data to prevent concurrent or stale runs from inflating a result. The
-complete add-in gate is Linux-authoritative because GGUF executes its pinned
+examples exemption manifest is limited to dependency-isolated or containerized
+journeys with explicit alternate execution gates; those classes are excluded
+from per-module and aggregate branch-coverage calculations instead of being
+hidden by unrelated modules.
+The complete add-in gate is Linux-authoritative because GGUF executes its pinned
 backend through Linux descriptor paths. CI runs that exact gate on Linux; run
 it through a Linux checkout or container when developing on another host
 operating system.
@@ -101,6 +105,26 @@ Set `PYTEST_WORKERS=0` for an explicit sequential diagnostic run.
 
 Tests must execute production behavior and assert meaningful outcomes. A test
 that merely restates fixture contents does not validate the user journey.
+
+Use the narrowest boundary that can prove the contract:
+
+- Prefer public APIs and complete transaction boundaries. Test a private helper
+  directly when it owns a security or resource-limit invariant that cannot be
+  observed precisely through a broader call.
+- Acceptance tests that pass by not raising must execute a concrete validator,
+  parser, or runtime boundary. Reaching the end of an otherwise inert test is
+  not a meaningful outcome.
+- Source and configuration assertions are appropriate for declarative surfaces
+  such as workflow permissions, package metadata, and Make target composition.
+  Parse structured formats and shared target definitions instead of slicing
+  neighboring text. Pair executable shell or Python snippets with a behavioral
+  test where practical.
+- Keep environment and module mutation local to the test through pytest
+  fixtures. Avoid blanket automatically applied repair fixtures that can hide
+  leaked state or import failures.
+- Coverage locates untested behavior; it does not justify tests written only to
+  execute a line. Every added case should name the accepted result, rejected
+  boundary, cleanup guarantee, or externally visible side effect it proves.
 
 The evaluation evidence destination comes from `output.evidence` in the
 request. Verification receipts and HTML reports use the explicit destinations

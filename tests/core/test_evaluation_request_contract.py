@@ -43,6 +43,64 @@ def test_strict_request_yaml_rejects_ambiguous_scalar_and_merge_syntax(
         yaml.load(payload, Loader=evaluation_request._StrictRequestYamlLoader)
 
 
+def test_strict_request_yaml_preserves_canonical_json_scalar_semantics() -> None:
+    """Accepted scalars must retain their JSON value and type."""
+
+    loaded = yaml.load(
+        "enabled: true\ncount: -2\nratio: 1.25\nvalue: null\n",
+        Loader=evaluation_request._StrictRequestYamlLoader,
+    )
+
+    assert loaded == {
+        "enabled": True,
+        "count": -2,
+        "ratio": 1.25,
+        "value": None,
+    }
+
+
+@pytest.mark.parametrize("reference", ["/absolute", "safe/../escape"])
+def test_reference_parser_rejects_unsafe_paths_at_owned_boundary(
+    reference: str,
+) -> None:
+    """Root confinement must hold even when schema validation is bypassed."""
+
+    with pytest.raises(EvaluationRequestError, match="safe relative reference"):
+        evaluation_request._reference_parts(reference, label="artifact")
+
+
+def test_existing_file_reference_rejects_directory_at_owned_boundary(
+    tmp_path: Path,
+) -> None:
+    """The descriptor-based resolver must enforce the requested file type."""
+
+    (tmp_path / "directory").mkdir()
+
+    with pytest.raises(EvaluationRequestError, match="regular file"):
+        evaluation_request._resolve_existing_reference(
+            tmp_path,
+            "directory",
+            label="policy",
+            expected="file",
+        )
+
+
+def test_output_reference_accepts_missing_leaf_below_existing_ancestors(
+    tmp_path: Path,
+) -> None:
+    """A safe nested destination remains creatable after descriptor traversal."""
+
+    (tmp_path / "artifacts" / "nested").mkdir(parents=True)
+
+    resolved = evaluation_request._resolve_output_reference(
+        tmp_path,
+        "artifacts/nested/evidence",
+        label="output.evidence",
+    )
+
+    assert resolved == tmp_path / "artifacts/nested/evidence"
+
+
 def _sha(character: str) -> str:
     return character * 64
 

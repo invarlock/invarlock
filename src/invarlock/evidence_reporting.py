@@ -21,6 +21,7 @@ from invarlock.core.scorer_extension import (
 )
 from invarlock.evidence_pack_contract import (
     COMPARISON_REPORT_FORMAT,
+    COMPARISON_REPORT_FORMATS,
     LEGACY_COMPARISON_REPORT_FORMAT,
     EvidencePackError,
     canonical_json_bytes,
@@ -682,9 +683,68 @@ def _validate_sample_qualification(
     return qualified
 
 
+def _validate_side_accuracy(
+    value: object,
+    *,
+    metric: str,
+    side_means: dict[str, float],
+) -> bool:
+    """Replay the signed per-side accuracy floor for exact-match reports."""
+
+    if (
+        metric != "exact_match"
+        or not isinstance(value, dict)
+        or set(value)
+        != {
+            "minimum",
+            "baseline",
+            "subject",
+            "passed",
+        }
+    ):
+        raise EvidenceReportError("canonical report side_accuracy is invalid")
+    minimum = _number(value.get("minimum"), field="side_accuracy.minimum")
+    if not 0.0 <= minimum <= 1.0:
+        raise EvidenceReportError("canonical report side_accuracy minimum is invalid")
+    recorded: dict[str, bool] = {}
+    for side in ("baseline", "subject"):
+        qualification = value.get(side)
+        if not isinstance(qualification, dict) or set(qualification) != {
+            "observed",
+            "passed",
+        }:
+            raise EvidenceReportError(
+                f"canonical report side_accuracy {side} is invalid"
+            )
+        observed = _number(
+            qualification.get("observed"),
+            field=f"side_accuracy.{side}.observed",
+        )
+        expected = side_means[side]
+        passed = expected >= minimum
+        recorded_passed = qualification.get("passed")
+        if (
+            not math.isclose(observed, expected, rel_tol=1e-12, abs_tol=1e-12)
+            or not isinstance(recorded_passed, bool)
+            or recorded_passed != passed
+        ):
+            raise EvidenceReportError(
+                f"canonical report side_accuracy {side} values are invalid"
+            )
+        recorded[side] = passed
+    qualified = recorded["baseline"] and recorded["subject"]
+    recorded_qualified = value.get("passed")
+    if not isinstance(recorded_qualified, bool) or recorded_qualified != qualified:
+        raise EvidenceReportError("canonical report side_accuracy verdict is invalid")
+    return qualified
+
+
 def _comparison_report_shape(
     report: dict[str, Any],
 ) -> tuple[str, str, int, dict[str, float], dict[str, Any], str, float, float]:
+    report_format = report.get("format")
+    if report_format not in COMPARISON_REPORT_FORMATS:
+        raise EvidenceReportError("canonical comparison report format is invalid")
     expected = {
         "format",
         "comparison_id",
@@ -706,14 +766,14 @@ def _comparison_report_shape(
         expected.update({"scorer_extension", "scorer_replay"})
     if "sample_qualification" in report:
         expected.add("sample_qualification")
+    if report_format == COMPARISON_REPORT_FORMAT and "side_accuracy" in report:
+        expected.add("side_accuracy")
+    elif "side_accuracy" in report:
+        raise EvidenceReportError(
+            "canonical report side_accuracy requires comparison-report-v3"
+        )
     if set(report) != expected:
         raise EvidenceReportError("canonical comparison report fields are invalid")
-    report_format = report.get("format")
-    if report_format not in {
-        LEGACY_COMPARISON_REPORT_FORMAT,
-        COMPARISON_REPORT_FORMAT,
-    }:
-        raise EvidenceReportError("canonical comparison report format is invalid")
     for field in ("comparison_id", "metric", "policy_digest"):
         if not isinstance(report.get(field), str) or not report[field]:
             raise EvidenceReportError(f"canonical report {field} is invalid")
@@ -915,6 +975,10 @@ def _comparison_acceptance(
             interval_lower=lower,
             interval_upper=upper,
         )
+    if "side_accuracy" in report:
+        passed = passed and _validate_side_accuracy(
+            report["side_accuracy"], metric=metric, side_means=side_means
+        )
     return passed
 
 
@@ -1065,6 +1129,30 @@ def _render_markdown(
                 + f"{_format_number(width_qualification['observed'])} | "
                 + f"≤ {_format_number(width_qualification['maximum'])} | "
                 + f"{'pass' if width_qualification['passed'] else 'fail'} |",
+            ]
+        )
+    side_accuracy = report.get("side_accuracy")
+    if isinstance(side_accuracy, dict):
+        baseline_accuracy = cast(dict[str, Any], side_accuracy["baseline"])
+        subject_accuracy = cast(dict[str, Any], side_accuracy["subject"])
+        lines.extend(
+            [
+                "",
+                "## Side accuracy qualification",
+                "",
+                "The authenticated policy requires each side to meet an absolute "
+                + "exact-match accuracy floor in addition to the paired comparison.",
+                "",
+                "| Side | Observed | Required | Result |",
+                "| --- | ---: | ---: | --- |",
+                "| Baseline | "
+                + f"{_format_number(baseline_accuracy['observed'])} | "
+                + f"≥ {_format_number(side_accuracy['minimum'])} | "
+                + f"{'pass' if baseline_accuracy['passed'] else 'fail'} |",
+                "| Subject | "
+                + f"{_format_number(subject_accuracy['observed'])} | "
+                + f"≥ {_format_number(side_accuracy['minimum'])} | "
+                + f"{'pass' if subject_accuracy['passed'] else 'fail'} |",
             ]
         )
     derived = report.get("derived_measurements")

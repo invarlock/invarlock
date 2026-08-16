@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.14.0"
+version = "0.15.0"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
     "typer>=0.24.1",
     "click>=8.3.3",
-    "cryptography>=48.0.1",
+    "cryptography>=50.0.0",
     "rich>=13.0",
     "pyyaml>=6.0.3",
     "jsonschema>=4.0",
@@ -38,9 +38,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.14.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.15.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.14.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.15.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate
@@ -61,7 +61,7 @@ dev = [
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
-  "ruff==0.16.0",
+  "ruff==0.16.2",
   "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
@@ -73,8 +73,8 @@ dev = [
   "build>=0.10.0",
   "wheel>=0.47.0",
   "twine>=4.0.0",
-  "peft==0.19.1",
-  "torchao==0.17.0",
+  "peft==0.20.0",
+  "torchao==0.18.0",
 ]
 
 ci = [
@@ -84,14 +84,14 @@ ci = [
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
   "hypothesis>=6.98",
-  "ruff==0.16.0",
+  "ruff==0.16.2",
   "mypy==2.3.0",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
   "wheel>=0.47.0",
   "twine>=4.0.0",
-  "peft==0.19.1",
-  "torchao==0.17.0",
+  "peft==0.20.0",
+  "torchao==0.18.0",
 ]
 
 docs-ci = [
@@ -123,10 +123,10 @@ security-ci = [
 
 [dependency-groups]
 example-peft = [
-  "peft==0.19.1",
+  "peft==0.20.0",
 ]
 example-torchao = [
-  "torchao==0.17.0",
+  "torchao==0.18.0",
 ]
 
 [project.entry-points."invarlock.runtime_providers"]
@@ -246,7 +246,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 precision = 2
-fail_under = 90
+fail_under = 95
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

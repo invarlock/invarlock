@@ -166,6 +166,7 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     readme = _read("README.md")
     headings = (
         "## Evidence paths",
+        "## Decision boundary",
         "## Try the signed handoff locally",
         "## Inspect published evidence",
         "## Run, verify, and report",
@@ -178,23 +179,33 @@ def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
     positions = [readme.index(heading) for heading in headings]
 
     assert positions == sorted(positions)
-    evidence_paths = readme[
-        positions[0] : readme.index("## Try the signed handoff locally")
-    ]
+    evidence_paths = readme[positions[0] : positions[1]]
     for phrase in (
         "Native execution",
-        "Qualified import",
-        "Authenticated observation",
-        "core exposes evaluator-neutral contracts",
+        "Adapter support",
+        "Replay authority",
+        "Signed-journey maturity",
+        "evaluator-neutral contracts",
     ):
         assert phrase in evidence_paths
     assert evidence_paths.index("evaluation-verification-flow.svg") < (
-        evidence_paths.index("| Path |")
+        evidence_paths.index("| Axis |")
     )
 
     introduction = readme[: positions[0]]
     assert "in-toto/DSSE" not in introduction
-    acceptance = readme[positions[6] : positions[7]]
+    decision_boundary = " ".join(readme[positions[1] : positions[2]].split())
+    for phrase in (
+        "one precise question",
+        "authenticated evidence and independently supplied trust anchors",
+        "reproducible, portable, and suitable for recipient-controlled approval",
+        "Broader deployment, safety, compliance, and organizational decisions",
+        "complete claim boundary and assumptions",
+    ):
+        assert phrase in decision_boundary
+    assert "## Scope and non-goals" not in readme
+
+    acceptance = readme[positions[7] : positions[8]]
     assert "in-toto/DSSE" in acceptance
     assert "**Compatibility note:**" in acceptance
 
@@ -204,9 +215,12 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
     makefile = _read("Makefile")
     evidence_root = REPO_ROOT / "public_evidence/evidence/mistral-7b-weight-scale-hf"
 
-    assert "make example-acceptance-handoff" in readme
-    assert "\nexample-acceptance-handoff:" in makefile
-    assert REPO_ROOT.joinpath("examples/run_acceptance_handoff.py").is_file()
+    assert "python run.py --fixture golden" in readme
+    assert "\nexample-quickstart:" in makefile
+    assert REPO_ROOT.joinpath("examples/quickstart/run.py").is_file()
+    assert REPO_ROOT.joinpath(
+        "examples/acceptance-handoff/golden/technical-anchors.json"
+    ).is_file()
 
     report_path = "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence"
     receipt_path = (
@@ -268,6 +282,10 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
     for distribution in distributions:
         assert distribution in workflows
         assert distribution in notices
+    assert "EleutherAI/LAMBADA OpenAI" in notices
+    assert "Software Copyright (c) 2019 OpenAI" in notices
+    assert "evaluator qualification profiles" in notices
+    assert "shared MMLU-Pro semantic artifact" in notices
 
     core_section = notices.split("## Core distribution", maxsplit=1)[1].split(
         "## Hugging Face extra", maxsplit=1
@@ -327,28 +345,44 @@ def test_runtime_qualification_docs_use_authenticated_candidate_wheels() -> None
         assert wheel in text
 
 
-def test_documentation_lint_covers_maintained_markdown_surfaces() -> None:
+def test_runtime_and_report_references_track_current_closed_contracts() -> None:
+    runtime_reference = _read("docs/reference/runtime-providers.md")
+    for setting in (
+        "cpu_threads",
+        "prompt_batch_size",
+        "prompt_microbatch_size",
+        "processor_metadata_sha256",
+    ):
+        assert f"`{setting}`" in runtime_reference
+
+    gguf_addin = _read("addins/gguf/README.md")
+    gguf_guide = _read("docs/user-guide/runtime-providers.md")
+    for fragment in (
+        "cpu_threads=16",
+        "prompt_batch_size=512",
+        "prompt_microbatch_size=512",
+    ):
+        assert fragment in gguf_addin
+        assert fragment in gguf_guide
+
+    contracts = _read("docs/reference/contracts.md")
+    assert "The v3 comparison report is the current writer format" in contracts
+    assert "| Behavioral schedule | `format_version`, `task`," in contracts
+    assert "`minimum_side_accuracy`" in contracts
+
+    cli = _read("docs/reference/cli.md")
+    assert "[--json]" in cli.split("## `report`", maxsplit=1)[1]
+    assert "invarlock/evidence-report-v1" in cli
+
+    api = _read("docs/reference/api-guide.md")
+    assert "expected_request_digest: str | None = None" in api
+
+
+def test_documentation_lint_discovers_maintained_markdown_surfaces() -> None:
     makefile = _read("Makefile")
-    workflow = _read(".github/workflows/docs-ci.yml")
-    for pattern in (
-        "CODE_OF_CONDUCT.md",
-        "SUPPORT.md",
-        "THIRD_PARTY_NOTICES.md",
-        '".github/**/*.md"',
-        '"examples/**/*.md"',
-        '"requirements/**/*.md"',
-        '"tests/README.md"',
-    ):
-        assert makefile.count(pattern) == 2
-    for pattern in (
-        "- '*.md'",
-        "- '.github/**/*.md'",
-        "- 'examples/**/*.md'",
-        "- 'requirements/**/*.md'",
-        "- 'tests/README.md'",
-        "- 'tests/docs/**'",
-    ):
-        assert workflow.count(pattern) == 2
+    assert makefile.count("git ls-files -z -- ':(icase,glob)**/*.md'") == 2
+    assert makefile.count("xargs -0") == 2
+    assert "scripts/checks/check_public_text.py" in makefile
 
 
 def test_docs_describe_the_narrow_engine_and_embedding_facade() -> None:
@@ -628,10 +662,13 @@ def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:
         "paired-records-v1",
         "comparison-report-v1",
         "comparison-report-v2",
+        "comparison-report-v3",
         "runtime-side-report-v1",
         "minimum_record_count",
+        "minimum_side_accuracy",
         "maximum_interval_width_pp",
         "maximum_interval_width_ratio",
+        "normalized-request digest",
         "verification receipt",
     ):
         assert phrase in text
@@ -687,6 +724,7 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
     for fragment in (
         "make dist-check",
         "make release-preflight",
+        "make release-reference-journey",
         '--hash-manifest "$HASH_MANIFEST"',
         "scripts/release/make_offline_bundle.sh",
         "fix forward under a new version",
@@ -704,27 +742,26 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
 
 def test_latest_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
-    unreleased, remainder = changelog.split("## [0.14.0]", maxsplit=1)
-    release, remainder = remainder.split("## [0.13.0]", maxsplit=1)
-    previous_release = remainder.split("## [0.12.1]", maxsplit=1)[0]
+    unreleased, remainder = changelog.split("## [0.15.0]", maxsplit=1)
+    release, remainder = remainder.split("## [0.14.0]", maxsplit=1)
+    previous_release = remainder.split("## [0.13.0]", maxsplit=1)[0]
     normalized = " ".join(release.split())
     previous_normalized = " ".join(previous_release.split())
+    assert "independently replayable deployment evidence" not in unreleased
+    assert "independently replayable deployment evidence" in normalized
+    assert "Comparison-report v3" in normalized
+    assert "minimum-side accuracy" in normalized
+    assert "BF16, GGUF, QAT, and OCI" in normalized
+    assert "clean-consumer candidate-wheel replay" in normalized
+    assert "SPDX 3.0.1 AI observation" in normalized
+    assert "without expanding core contracts" in normalized
     assert "evaluator-neutral qualification" not in unreleased
-    assert "evaluator-neutral qualification" in normalized
-    assert "recipient-controlled acceptance handoff" in normalized
-    assert "observation-only" in normalized
-    assert "canonical in-toto/DSSE acceptance envelope" in normalized
-    assert "OPA/Rego and CUE" in normalized
-    assert "clean-checkout v0.13 compatibility corpus" in normalized
-    assert "paired model release-regression evaluation" not in unreleased
-    assert "paired model release-regression evaluation" in previous_normalized
-    assert "exact two-sided McNemar" in previous_normalized
-    assert "perplexity ratio as a verifier-derived likelihood" in previous_normalized
-    assert "paired schedule-resampling interval" in previous_release
-    assert "host-to-OCI" in previous_release
-    assert "canonical evidence bundles" in previous_release
-    assert "invarlock.engine" in previous_release
-    assert "invarlock-diagnostics" in previous_release
+    assert "evaluator-neutral qualification" in previous_normalized
+    assert "recipient-controlled acceptance handoff" in previous_normalized
+    assert "observation-only" in previous_normalized
+    assert "canonical in-toto/DSSE acceptance envelope" in previous_normalized
+    assert "OPA/Rego and CUE" in previous_normalized
+    assert "clean-checkout v0.13 compatibility corpus" in previous_normalized
     for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
         assert heading in unreleased
         assert heading in release
@@ -735,15 +772,20 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
     text = _read("docs/reference/evaluator-qualification.md")
     normalized = " ".join(text.split())
 
-    assert "Qualification profile" in text
-    assert "Authoritative import adapter" in text
-    assert "End-to-end release-assurance journey" in text
+    assert "Adapter support" in text
+    assert "Replay authority" in text
+    assert "Signed-journey maturity" in text
     assert "LM Evaluation Harness" in text
-    assert "every retained authoritative import" in normalized
+    assert "every retained independently replayable import" in normalized
     assert "102-record" in text
-    assert "cumulative claims" in text
-    assert "not permanent evaluator classes" in text
-    assert "Profiles can advance" in text
+    assert "102 shared outputs" in text
+    assert "Retained (2 signed transactions, 400 records each)" in text
+    assert "agree on every baseline and subject output" in text
+    assert "does not assign one cumulative" in text
+    assert "retained current-model OCI journeys" in normalized
+    assert "without claiming a native signed journey" in normalized
+    assert "maximum 10-percentage-point paired interval width" in normalized
+    assert "600 records" not in normalized
     assert "Benchmark harnesses" in text
     assert "Application evaluation SDKs" in text
     assert "Evaluation and observability platforms" in text

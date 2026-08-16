@@ -20,6 +20,143 @@ _BARE_DIGEST = "a" * 64
 _IMAGE_DIGEST = "sha256:" + "b" * 64
 
 
+class _CausalConfig:
+    pass
+
+
+class _ImageTextConfig:
+    pass
+
+
+def _auto_model(loader: object, *config_classes: type[object]) -> SimpleNamespace:
+    return SimpleNamespace(
+        _model_mapping=dict.fromkeys(config_classes, object),
+        from_pretrained=loader,
+    )
+
+
+def test_text_generation_loader_prefers_the_native_causal_mapping(
+    tmp_path: Path,
+) -> None:
+    def causal_loader(*_args: object, **_kwargs: object) -> object:
+        return object()
+
+    def image_text_loader(*_args: object, **_kwargs: object) -> object:
+        return object()
+
+    transformers = SimpleNamespace(
+        AutoConfig=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: _CausalConfig()
+        ),
+        AutoModelForCausalLM=_auto_model(causal_loader, _CausalConfig),
+        AutoModelForImageTextToText=_auto_model(image_text_loader, _CausalConfig),
+    )
+
+    assert hf._text_generation_model_loader(transformers, tmp_path) is causal_loader
+
+
+def test_text_generation_loader_accepts_a_text_capable_image_model_mapping(
+    tmp_path: Path,
+) -> None:
+    def image_text_loader(*_args: object, **_kwargs: object) -> object:
+        return object()
+
+    transformers = SimpleNamespace(
+        AutoConfig=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: _ImageTextConfig()
+        ),
+        AutoModelForCausalLM=_auto_model(
+            lambda *_args, **_kwargs: object(), _CausalConfig
+        ),
+        AutoModelForImageTextToText=_auto_model(image_text_loader, _ImageTextConfig),
+    )
+
+    assert hf._text_generation_model_loader(transformers, tmp_path) is image_text_loader
+
+
+def test_text_generation_loader_rejects_unavailable_or_unsupported_mappings(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(RuntimeError, match="AutoConfig"):
+        hf._text_generation_model_loader(SimpleNamespace(), tmp_path)
+
+    transformers = SimpleNamespace(
+        AutoConfig=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: _ImageTextConfig()
+        ),
+        AutoModelForCausalLM=_auto_model(
+            lambda *_args, **_kwargs: object(), _CausalConfig
+        ),
+        AutoModelForImageTextToText=_auto_model(
+            lambda *_args, **_kwargs: object(), _CausalConfig
+        ),
+    )
+    with pytest.raises(ValueError, match="text generation"):
+        hf._text_generation_model_loader(transformers, tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("model_type", "extra_options"),
+    [
+        ("mistral3", {"fix_mistral_regex": True}),
+        ("qwen3_5", {}),
+    ],
+)
+def test_text_tokenizer_loader_scopes_the_mistral_regex_correction(
+    tmp_path: Path,
+    model_type: str,
+    extra_options: dict[str, object],
+) -> None:
+    observed: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    tokenizer = object()
+    (tmp_path / "config.json").write_text(
+        json.dumps({"model_type": model_type}),
+        encoding="utf-8",
+    )
+
+    def loader(*args: object, **kwargs: object) -> object:
+        observed.append((args, kwargs))
+        return tokenizer
+
+    assert hf.load_hf_text_tokenizer(loader, tmp_path) is tokenizer
+    assert observed == [
+        (
+            (str(tmp_path),),
+            {
+                "local_files_only": True,
+                "trust_remote_code": False,
+                **extra_options,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ("[]", "configuration is invalid"),
+        ("{}", "model type is unavailable"),
+        ("{", "configuration is unavailable"),
+    ],
+)
+def test_text_tokenizer_loader_rejects_ambiguous_checkpoint_configuration(
+    tmp_path: Path,
+    payload: str,
+    message: str,
+) -> None:
+    (tmp_path / "config.json").write_text(payload, encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match=message):
+        hf.load_hf_text_tokenizer(lambda *_args, **_kwargs: object(), tmp_path)
+
+
+def test_text_tokenizer_loader_rejects_a_missing_checkpoint_configuration(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(RuntimeError, match="configuration is unavailable"):
+        hf.load_hf_text_tokenizer(lambda *_args, **_kwargs: object(), tmp_path)
+
+
 @pytest.mark.parametrize("value", [7, "", " value"])
 def test_optional_text_rejects_non_string_empty_or_untrimmed_values(
     value: object,
@@ -542,6 +679,41 @@ def _authenticated_qwen_config(checkpoint: Path) -> object:
     )
 
 
+def test_qwen_causal_projection_requires_authenticated_configuration() -> None:
+    with pytest.raises(RuntimeError, match="configuration is unavailable"):
+        hf._authenticated_behavior_config(
+            None,
+            model=object(),
+            live_config=SimpleNamespace(model_type="qwen3_5_text"),
+        )
+
+
+def test_qwen_causal_projection_rejects_unrecognized_config_classes() -> None:
+    authenticated_type = type(
+        "UnsupportedAuthenticatedConfig", (), {"model_type": "unsupported"}
+    )
+    live_type = type("UnsupportedLiveConfig", (), {"model_type": "unsupported"})
+
+    with pytest.raises(ValueError, match="config class does not match"):
+        hf._authenticated_behavior_config(
+            authenticated_type(),
+            model=object(),
+            live_config=live_type(),
+        )
+
+
+def test_qwen_text_checkpoint_cannot_hide_visual_tensor_inventory() -> None:
+    model = _qwen3_5_test_model()
+
+    with pytest.raises(ValueError, match="unsupported non-executing"):
+        hf._qwen3_5_non_executing_checkpoint_keys(
+            {"model.visual.forged.weight", "model.weight"},
+            live_state={"model.weight": object()},
+            model=model,
+            authenticated_config=model.config,
+        )
+
+
 def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
     model = _qwen3_5_test_model()
 
@@ -549,6 +721,7 @@ def test_qwen3_5_exact_mtp_inventory_is_explicitly_non_executing() -> None:
         set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
         live_state={"model.weight": object()},
         model=model,
+        authenticated_config=model.config,
     ) == set(_EXPECTED_QWEN3_5_MTP_KEYS)
 
 
@@ -559,6 +732,7 @@ def test_qwen3_5_multimodal_exact_mtp_inventory_is_explicitly_non_executing() ->
         set(_EXPECTED_QWEN3_5_MTP_KEYS) | {"model.weight"},
         live_state={"model.weight": object()},
         model=model,
+        authenticated_config=model.config,
     ) == set(_EXPECTED_QWEN3_5_MTP_KEYS)
 
 
@@ -582,6 +756,7 @@ def test_qwen3_5_mtp_exception_rejects_forged_partial_or_live_state(
             keys,
             live_state=live_state,
             model=model,
+            authenticated_config=model.config,
         )
 
 
@@ -658,6 +833,118 @@ def test_real_qwen_multimodal_checkpoint_accepts_exact_nonexecuting_mtp(
         model=model,
         authenticated_config=_authenticated_qwen_config(tmp_path),
     )
+
+
+def test_real_qwen_multimodal_checkpoint_authenticates_causal_projection(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for index, key in enumerate(sorted(_EXPECTED_QWEN3_5_MTP_KEYS)):
+        tensors[key] = torch.tensor([float(index)])
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+
+    assert type(model) is transformers.Qwen3_5ForCausalLM
+    assert model.config.model_type == "qwen3_5_text"
+    authenticated_config = hf._require_model_config_match(tmp_path, model=model)
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=authenticated_config,
+    )
+
+
+def test_qwen_multimodal_causal_projection_authenticates_native_bfloat16_cast(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_linear_multimodal_test_model().to(torch.bfloat16).save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    config_path = tmp_path / "config.json"
+    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    config_payload.pop("dtype", None)
+    config_path.write_text(
+        json.dumps(config_payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    shard = tmp_path / "model.safetensors"
+    tensors = safetensors_torch.load_file(shard)
+    for key in (
+        "model.language_model.layers.0.linear_attn.A_log",
+        "model.language_model.layers.0.linear_attn.norm.weight",
+    ):
+        tensors[key] = tensors[key].to(torch.float32)
+    safetensors_torch.save_file(tensors, shard, metadata={"format": "pt"})
+
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.eval()
+    authenticated_config = hf._require_model_config_match(tmp_path, model=model)
+
+    assert model.config.dtype == torch.bfloat16
+    hf._require_safetensors_match(
+        tmp_path,
+        model=model,
+        authenticated_config=authenticated_config,
+    )
+
+
+def test_qwen_multimodal_causal_projection_rejects_top_level_profile_drift(
+    tmp_path: Path,
+) -> None:
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    config_path = tmp_path / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["architectures"] = ["Qwen3_5ForCausalLM"]
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Qwen3.5 causal projection"):
+        hf._require_model_config_match(tmp_path, model=model)
+
+
+def test_qwen_multimodal_causal_projection_rejects_live_text_config_drift(
+    tmp_path: Path,
+) -> None:
+    transformers = pytest.importorskip("transformers")
+    _qwen3_5_multimodal_test_model().save_pretrained(
+        tmp_path,
+        safe_serialization=True,
+    )
+    model = hf.load_hf_model_with_strict_loading_info(
+        transformers.AutoModelForCausalLM.from_pretrained,
+        tmp_path,
+    )
+    model.config.hidden_size += 1
+
+    with pytest.raises(ValueError, match="does not match"):
+        hf._require_model_config_match(tmp_path, model=model)
 
 
 def test_real_qwen_multimodal_checkpoint_accepts_exact_native_bfloat16_cast(
@@ -944,6 +1231,12 @@ def test_model_config_binding_requires_loader_and_mapping_payloads(
         lambda _name: SimpleNamespace(AutoConfig=loader),
     )
     with pytest.raises(RuntimeError, match="configuration is unavailable"):
+        hf._require_model_config_match(
+            tmp_path, model=SimpleNamespace(config=Config({}))
+        )
+
+    loader.from_pretrained = lambda *_args, **_kwargs: object()
+    with pytest.raises(RuntimeError, match="could not be authenticated"):
         hf._require_model_config_match(
             tmp_path, model=SimpleNamespace(config=Config({}))
         )

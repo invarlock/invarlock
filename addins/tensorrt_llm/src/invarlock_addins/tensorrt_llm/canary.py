@@ -279,7 +279,7 @@ def qualify_candidate(
             raise TensorRTLLMCanaryError("candidate provider score did not complete")
         output_text = observation.records[0].output_text
         if output_text is None:
-            raise TensorRTLLMCanaryError("candidate provider score has no output")
+            raise TensorRTLLMCanaryError("candidate provider score has no text output")
         if hashlib.sha256(output_text.encode("utf-8")).hexdigest() != (
             expected_output_sha256
         ):
@@ -311,16 +311,8 @@ def qualify_candidate(
             )
         return observation, receipt, observation_bytes, receipt_bytes
 
-    first_observation, first_receipt, first_observation_bytes, first_receipt_bytes = (
-        score_once()
-    )
-    second_observation, _, second_observation_bytes, second_receipt_bytes = score_once()
-    if first_observation.records[0].output_text != (
-        second_observation.records[0].output_text
-    ):
-        raise TensorRTLLMCanaryError(
-            "candidate provider output is not byte-identical across sessions"
-        )
+    _, first_receipt, first_observation_bytes, first_receipt_bytes = score_once()
+    _, _, second_observation_bytes, second_receipt_bytes = score_once()
     if first_observation_bytes != second_observation_bytes:
         raise TensorRTLLMCanaryError(
             "candidate provider observation is not deterministic across sessions"

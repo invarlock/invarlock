@@ -69,8 +69,10 @@ def _example_module() -> Any:
     return module
 
 
-def _install_tiny_qwen3_profile(example: Any, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Exercise the real Qwen3 code path with a small offline test fixture."""
+def _install_tiny_compact_profile(
+    example: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise the real compact-model path with a small offline fixture."""
 
     def load_model_and_tokenizer(*, torch: Any, transformers: Any) -> tuple[Any, Any]:
         import tokenizers
@@ -115,7 +117,9 @@ def _install_tiny_qwen3_profile(example: Any, monkeypatch: pytest.MonkeyPatch) -
         return transformers.Qwen3ForCausalLM(config), tokenizer
 
     monkeypatch.setattr(
-        example.qwen3_profile, "load_model_and_tokenizer", load_model_and_tokenizer
+        example.compact_model_profile,
+        "load_model_and_tokenizer",
+        load_model_and_tokenizer,
     )
 
 
@@ -166,7 +170,7 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
     pytest.importorskip("safetensors")
 
     example = _example_module()
-    _install_tiny_qwen3_profile(example, monkeypatch)
+    _install_tiny_compact_profile(example, monkeypatch)
     workspace = tmp_path / "hf-run"
     arguments = [
         "hf-transformers",
@@ -174,6 +178,7 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
         str(workspace),
         "--runtime-image-digest",
         IMAGE_DIGEST,
+        "--ephemeral-trust-root",
         "--prepare-only",
     ]
     assert example.main(arguments) == 0

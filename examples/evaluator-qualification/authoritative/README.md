@@ -1,4 +1,4 @@
-# Authoritative evaluator imports
+# Independently replayable evaluator imports
 
 This directory retains one real 102-record model evaluation and complete
 per-record imports for every maintained deterministic evaluator profile. It
@@ -6,10 +6,10 @@ demonstrates a deeper evidence level than the small qualification corpus. The
 demonstration-level manifest identifies profiles that also maintain an
 end-to-end signed transaction over the same evaluator-neutral boundary.
 
-The corpus was produced by the immutable `Qwen/Qwen3-0.6B` revision and fixed
+The corpus was produced by the immutable `Qwen/Qwen3.5-0.8B` revision and fixed
 one-token, greedy CPU generation settings recorded in `cases.json`. The source
 dataset has 102 fixed causal-completion records. The retained model outputs contain
-52 exact matches and 50 mismatches.
+61 exact matches and 41 mismatches.
 
 For each deterministic evaluator,
 `artifacts/<profile-id>/` contains:
@@ -24,7 +24,7 @@ For each deterministic evaluator,
 Run the network-free verification:
 
 ```bash
-make evaluator-authoritative-imports
+make evaluator-replayable-imports
 ```
 
 Re-execute the evaluator packages and CLIs:
@@ -37,11 +37,11 @@ Regenerate the model outputs with the repository's locked Hugging Face
 dependencies and compare them with the retained corpus:
 
 ```bash
-make evaluator-authoritative-corpus
+make evaluator-replayable-corpus
 ```
 
 This layer demonstrates complete replayable exact-match imports. It does not
-claim coverage of every evaluator capability or imply that authoritative import
+claim coverage of every evaluator capability or imply that replayable import
 alone completes a signed InvarLock transaction. End-to-end status is recorded
 separately as evidence maturity, not an architectural limitation on other
 profiles.

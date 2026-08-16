@@ -236,6 +236,7 @@ def test_qualification_precheck_expands_referenced_policy_and_verifier_key(
     (
         ({"ok": False}, "not successful"),
         ({"artifact_digests": None}, "artifact digests are missing"),
+        ({"providers": None}, "runtime providers are invalid"),
         ({"runtime_image_digests": None}, "runtime image digests are missing"),
     ),
 )

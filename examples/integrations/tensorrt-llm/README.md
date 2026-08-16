@@ -7,6 +7,11 @@ compares them through InvarLock's public `evaluate`, `verify`, and `report`
 commands. Both engine builds run concurrently on separate GPUs; evaluation
 also runs the baseline and subject workers concurrently.
 
+This is an intentional backend-compatibility fixture, not the repository's
+default compact model. The other compact integrations use Qwen3.5 0.8B; the
+pinned TensorRT-LLM 1.2.1 runtime supports the Qwen3 architecture used here but
+does not provide a Qwen3.5 model adapter.
+
 ## Prerequisites
 
 The maintained showcase requires Linux, Docker with two visible H100 GPUs,
@@ -17,7 +22,10 @@ contract. The maintained 102-record schedule is also the FP8 calibration
 input. Run it from a committed checkout:
 
 ```bash
-make example-tensorrt-llm
+make example-tensorrt-llm \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/tensorrt-llm"
 ```
 
 Use `EXAMPLE_ARGS="--workspace /new/path"` to choose a new output directory.
@@ -58,16 +66,19 @@ make example-tensorrt-llm-prepared EXAMPLE_ARGS="\
   --baseline-locator 'hf://owner/baseline@REVISION#tensorrt-llm-engine' \
   --subject-locator 'hf://owner/subject@REVISION#tensorrt-llm-engine' \
   --baseline-device cuda:0 \
-  --subject-device cuda:1"
+  --subject-device cuda:1 \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/tensorrt-llm"
 ```
 
 Both commands inspect the engines in the authenticated image with
 networking disabled. They then create a request and separate trust profile,
 run execution-free preflight, evaluate both engines, strictly verify the
 signed evidence, and render an HTML report. Existing request, evidence, or
-verifier-output paths are never overwritten. For a real acceptance decision,
-the verifier owner should supply and retain its own trust anchors and signing
-key.
+verifier-output paths are never overwritten. The prepared workflow requires
+the caller-owned keys and trust root shown above; those materials are never
+generated inside the transaction workspace.
 
 The 102-record schedule covers factual, numeric, temporal, spatial, and common
 language completions. Its policy, selected before execution, requires all 102

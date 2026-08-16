@@ -4,9 +4,9 @@
   "cases": [
     {
       "name": "acceptance-handoff-accepted-v013",
-      "evidence": "examples/acceptance-handoff/golden/evidence",
-      "receipt": "examples/acceptance-handoff/golden/verification.receipt.json",
-      "policy": "examples/acceptance-handoff/golden/evaluated-policy.json",
+      "evidence": "tests/fixtures/compatibility/v0.13.0/package/evidence",
+      "receipt": "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
+      "policy": "tests/fixtures/compatibility/v0.13.0/package/evaluated-policy.json",
       "sha256": {
         "manifest": "7db6254589b8c0f225af934a69b2744080624e563d8636c84c84bcb128cf014f",
         "receipt": "6f4a37d3b7fe0457eb6f3d51b2595a4c43c48024e8177aadf7cb5584b9cad62b",

@@ -1,100 +1,88 @@
 {
-  "format": "invarlock/evaluator-demonstration-levels-v1",
+  "format": "invarlock/evaluator-demonstration-status-v4",
   "profiles": {
     "arize-phoenix-evals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "autoevals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "azure-ai-evaluation": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "deepeval": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "evidently": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "garak": {
-      "authoritative_import": false,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "langfuse": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "hugging-face-evaluate": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "openai-evals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "opik": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "inspect-ai": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": [
+        {
+          "dataset_name": "TIGER-Lab/MMLU-Pro/qwen35-no-think",
+          "package_id": "qwen35-inspect-ai",
+          "record_count": 400,
+          "role": "flagship"
+        },
+        {
+          "dataset_name": "lambada-openai-qwen35-0.8b-one-token-400-v1",
+          "package_id": "deployment-approval-inspect-ai",
+          "record_count": 400,
+          "role": "deployment_approval"
+        }
+      ]
     },
     "lighteval": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "lm-evaluation-harness": {
-      "authoritative_import": true,
-      "end_to_end_transaction": true,
-      "qualification_profile": true
+      "retained_signed_transactions": [
+        {
+          "dataset_name": "TIGER-Lab/MMLU-Pro/qwen35-no-think",
+          "package_id": "qwen35-lm-evaluation-harness",
+          "record_count": 400,
+          "role": "flagship"
+        },
+        {
+          "dataset_name": "TIGER-Lab/MMLU-Pro/gemma4-12b-no-think",
+          "package_id": "gemma4-lm-evaluation-harness",
+          "record_count": 400,
+          "role": "portability"
+        }
+      ]
     },
     "mlflow": {
-      "authoritative_import": false,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "openevals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "promptfoo": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "pydantic-evals": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "ragas": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     },
     "trulens": {
-      "authoritative_import": true,
-      "end_to_end_transaction": false,
-      "qualification_profile": true
+      "retained_signed_transactions": []
     }
   }
 }

@@ -320,7 +320,10 @@ def _bare_session() -> session.LlamaCppSession:
             batch_size=1,
             max_output_tokens=8,
             timeout_seconds=2,
-        )
+        ),
+        cpu_threads=2,
+        prompt_batch_size=16,
+        prompt_microbatch_size=8,
     )
     return candidate
 
@@ -351,6 +354,13 @@ def test_record_execution_reports_input_process_and_stderr_failures(
     )
     with pytest.raises(session.LlamaCppExecutionError, match="unexpected stderr"):
         candidate._execute_record(record)  # noqa: SLF001
+
+    monkeypatch.setattr(
+        session,
+        "_run_bounded_process",
+        lambda **_kwargs: (0, b"answer\n\n", b""),
+    )
+    assert candidate._execute_record(record) == "answer"  # noqa: SLF001
 
 
 def test_session_score_rejects_wrong_batch_shape_and_pairing(

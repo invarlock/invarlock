@@ -299,14 +299,16 @@ def test_docker_build_disables_nondeterministic_default_provenance(
     bundle, digest = _bundle(tmp_path, repository, commit, "source.tar")
     engine = _fake_engine(tmp_path, "docker")
 
+    command = _command(
+        repository=repository,
+        commit=commit,
+        bundle=bundle,
+        digest=digest,
+        engine=engine,
+    )
+    command.extend(("--platform", "linux/amd64"))
     completed = subprocess.run(
-        _command(
-            repository=repository,
-            commit=commit,
-            bundle=bundle,
-            digest=digest,
-            engine=engine,
-        ),
+        command,
         check=False,
         capture_output=True,
         text=True,
@@ -316,6 +318,7 @@ def test_docker_build_disables_nondeterministic_default_provenance(
     assert completed.returncode == 0, completed.stderr
     arguments = json.loads((tmp_path / "arguments.json").read_text(encoding="utf-8"))
     assert arguments[:3] == ["build", "--provenance=false", "--iidfile"]
+    assert arguments[arguments.index("--platform") + 1] == "linux/amd64"
 
 
 def test_containerd_manifest_identity_is_bound_to_the_recorded_config_digest(
@@ -788,6 +791,12 @@ def test_image_inspection_parser_rejects_ambiguous_payloads(
         authenticated_runtime_build._inspect_payload(raw)
 
 
+def test_image_inspection_parser_accepts_a_single_object() -> None:
+    assert authenticated_runtime_build._inspect_payload(b'{"Id":"image"}') == {
+        "Id": "image"
+    }
+
+
 def _inspect_payload(**updates: object) -> dict[str, object]:
     digest = "sha256:" + "a" * 64
     payload: dict[str, object] = {
@@ -845,6 +854,45 @@ def test_image_metadata_rejects_malformed_engine_inventory(
     )
     with pytest.raises(SystemExit, match=message):
         authenticated_runtime_build._image_metadata("engine", "image")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        _inspect_payload(
+            Descriptor={"digest": "sha256:" + "a" * 64},
+        ),
+        _inspect_payload(
+            Descriptor={
+                "digest": "sha256:" + "a" * 64,
+                "annotations": {},
+            },
+        ),
+        _inspect_payload(RootFS=None),
+    ),
+)
+def test_image_metadata_accepts_optional_descriptor_and_rootfs_shapes(
+    payload: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        authenticated_runtime_build.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(payload).encode(),
+            stderr=b"",
+        ),
+    )
+
+    identity, build_identities, labels, layers = (
+        authenticated_runtime_build._image_metadata("engine", "image")
+    )
+
+    assert identity == "sha256:" + "a" * 64
+    assert identity in build_identities
+    assert labels == {"label": "value"}
+    assert isinstance(layers, tuple)
 
 
 @pytest.mark.parametrize("payload", (b"", b"not-a-digest", b"\xff", b"x" * 129))

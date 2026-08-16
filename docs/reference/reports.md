@@ -36,10 +36,11 @@ reconstructs the runtime-side object exactly.
 ## Canonical comparison report
 
 New evaluations write `reports/evaluation.report.json` as an
-`invarlock/comparison-report-v2` object. Strict verification also accepts a
-signed `invarlock/comparison-report-v1` object and reconstructs it with the
-legacy v1 exact-match interval method. A verifier never silently upgrades the
-arithmetic of an existing pack.
+`invarlock/comparison-report-v3` object. Strict verification also accepts
+signed `invarlock/comparison-report-v2` and `invarlock/comparison-report-v1`
+objects. Version 2 omits side-accuracy qualification; version 1 additionally
+uses the legacy exact-match interval method. A verifier never silently upgrades
+the arithmetic or policy meaning of an existing pack.
 
 The current report contains:
 
@@ -51,7 +52,9 @@ The current report contains:
   or `scorer_extension` and `scorer_replay` for an authorized extension;
 - `policy_digest`;
 - optional `sample_qualification` when the policy binds count and precision
-  requirements; and
+  requirements;
+- optional `side_accuracy` when exact-match policy binds a minimum accuracy for
+  both sides; and
 - `verdict`, either `pass` or `fail`.
 
 A complete exact-match report has this shape:
@@ -65,7 +68,7 @@ A complete exact-match report has this shape:
     "value": 5.0
   },
   "comparison_id": "cmp-example",
-  "format": "invarlock/comparison-report-v2",
+  "format": "invarlock/comparison-report-v3",
   "metric": "exact_match",
   "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "record_count": 20,
@@ -123,7 +126,9 @@ point comparison, interval bounds, threshold, or verdict.
 `value = 100 * (subject_mean - baseline_mean)`. The metric-bound check passes when
 `uncertainty.lower >= comparison.minimum`, where `minimum` comes from
 `resolved_policy.metrics.exact_match.delta_min_pp`. If sample qualification is
-present, the final report passes only when its count and width checks also pass.
+present, its count and width checks must also pass. If side-accuracy
+qualification is present, both side means must meet its minimum. The final
+verdict is the conjunction of all applicable checks.
 
 For this metric, baseline and subject `mean_score` are literal exact-match
 accuracies between `0` and `1`. Comparison and interval bounds are percentage
@@ -134,8 +139,8 @@ baseline-fail to subject-pass improvements, both-pass and both-fail counts, the
 number of discordant pairs, and the exact two-sided McNemar probability. Its
 effect size is the same subject-minus-baseline percentage-point delta. The
 continuity-corrected paired Newcombe hybrid-score 95% interval is repeated as
-the canonical `uncertainty` object in a v2 report. The policy uses its lower
-bound; the McNemar probability does not control the verdict. A v1 report keeps
+the canonical `uncertainty` object in a v2 or v3 report. The policy uses its
+lower bound; the McNemar probability does not control the verdict. A v1 report keeps
 method `newcombe_hybrid_score_paired_v1` and is replayed only with that original
 method.
 
@@ -162,6 +167,15 @@ and observed interval width <= maximum interval width
 
 The report therefore distinguishes a metric rejection from insufficient count
 or precision without allowing a favorable point value to bypass either gate.
+
+### Side-accuracy qualification
+
+An exact-match policy may independently set `minimum_side_accuracy` from `0`
+through `1`. A v3 report then includes `side_accuracy` with the configured
+minimum, each side's observed exact-match mean and pass result, and a combined
+`passed` result. Both sides must meet the inclusive floor. This check is
+independent of the coupled sample controls, and the final verdict also requires
+it to pass. Historical v2 reports do not contain this section.
 
 ### Normalized NLL per UTF-8 byte
 
@@ -400,6 +414,8 @@ The exact-match rendering also lists regression and improvement counts, the
 discordant-pair count, and the exact two-sided McNemar probability. When the
 policy includes sample qualification, console and HTML render the observed and
 required record count, interval width, and combined qualification result.
+When exact-match policy includes side-accuracy qualification, both renderings
+also show the minimum, each observed side mean, and the combined result.
 
 The human view states what it is: a rendering of signature-authenticated
 evidence. Independent acceptance comes from `invarlock verify` and its signed

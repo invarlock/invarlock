@@ -1,7 +1,7 @@
-# llama.cpp Qwen3 GGUF quantization comparison
+# llama.cpp Qwen3.5 GGUF quantization comparison
 
 This one-command example downloads the official revision-pinned
-`Qwen/Qwen3-0.6B-GGUF` Q8 artifact and verifies its published byte length and
+`ggml-org/Qwen3.5-0.8B-GGUF` Q8 artifact and verifies its published byte length and
 SHA-256 digest. It builds the maintained, source-pinned llama.cpp runtime,
 converts that authenticated Q8 source to Q5_K_M offline with the pinned
 quantizer, and compares the two artifacts through:
@@ -13,7 +13,10 @@ invarlock evaluate -> invarlock verify -> invarlock report
 Run it from the repository root:
 
 ```bash
-make example-gguf-llama-cpp
+make example-gguf-llama-cpp \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/gguf-llama-cpp"
 ```
 
 Docker or Podman, network access for the pinned download and image build, and
@@ -26,7 +29,7 @@ workspace contains the distinct GGUF files, authenticated backend resources,
 signed evidence, a separately signed strict-verification receipt, and an HTML
 report.
 
-The 50-record schedule uses losslessly decoded, single-token Qwen3 targets. Its
+The 50-record schedule uses losslessly decoded, single-token Qwen3.5 targets. Its
 illustrative policy requires at least 50 records, a paired interval no wider
 than 20 percentage points, and a lower confidence bound above -15 percentage
 points. The command also requires both models to solve at least 40% of those

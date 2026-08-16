@@ -210,6 +210,20 @@ def _passing_import(module: ModuleType) -> object:
     )
 
 
+def _passing_compatibility() -> dict[str, object]:
+    return {
+        "format": "invarlock/release-retained-evidence-compatibility-result-v1",
+        "ok": True,
+        "pack_count": 11,
+        "public_evidence": {"ok": True, "pack_count": 7},
+        "evaluator_qualification": {"ok": True, "pack_count": 4},
+    }
+
+
+def _passing_probe(module: ModuleType) -> tuple[object, dict[str, object]]:
+    return _passing_import(module), _passing_compatibility()
+
+
 def test_release_preflight_runs_all_independent_gates(
     module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -224,7 +238,7 @@ def test_release_preflight_runs_all_independent_gates(
         assert received == config
         assert wheel == next(config.dist_dir.glob("*.whl"))
         calls.append("installed-wheel")
-        return _passing_import(module)
+        return _passing_probe(module)
 
     def fake_public_evidence_audit(received: object) -> None:
         assert received == config
@@ -254,6 +268,10 @@ def test_release_preflight_runs_all_independent_gates(
     ]
     assert summary["ok"] is True
     assert summary["installed_wheel_import"] == "isolated_venv_from_candidate_wheel"
+    assert (
+        summary["installed_wheel_retained_evidence_compatibility"]
+        == _passing_compatibility()
+    )
     assert summary["installed_wheel_runtime_surface"] == "passed"
     assert summary["current_public_evidence"] == "passed"
 
@@ -460,6 +478,7 @@ def test_candidate_wheel_is_installed_in_a_disposable_isolated_environment(
     config = _config(module, tmp_path)
     artifacts = module.validate_distributions(config)
     smoke_calls: list[tuple[Path, Path]] = []
+    compatibility_calls: list[tuple[Path, Path]] = []
     monkeypatch.setattr(
         module,
         "_smoke_installed_wheel_cli",
@@ -488,8 +507,17 @@ print(json.dumps({
 """,
     )
     monkeypatch.setattr(module, "_PROBED_INVARLOCK_MODULES", frozenset({"invarlock"}))
+    monkeypatch.setattr(
+        module,
+        "_run_installed_wheel_retained_evidence_compatibility",
+        lambda received, cli, *, cwd: (
+            compatibility_calls.append((cli, cwd)) or _passing_compatibility()
+            if received == config
+            else pytest.fail("unexpected release configuration")
+        ),
+    )
 
-    imported = module._probe_installed_wheel(config, artifacts.wheel)
+    imported, compatibility = module._probe_installed_wheel(config, artifacts.wheel)
 
     assert imported.module_version == _VERSION
     assert imported.distribution_version == _VERSION
@@ -498,6 +526,8 @@ print(json.dumps({
     assert len(smoke_calls) == 1
     assert smoke_calls[0][0].name == "invarlock"
     assert not module._is_within(smoke_calls[0][1], config.repo_root)
+    assert compatibility == _passing_compatibility()
+    assert compatibility_calls == smoke_calls
 
 
 def test_public_evidence_audit_is_pinned_to_canonical_checkout_tree(
@@ -540,6 +570,61 @@ def test_make_release_preflight_is_distinct_from_artifact_shape_check() -> None:
     assert "RELEASE_PREFLIGHT_ARGS is required" in preflight
     assert "evidence_contracts.py" not in preflight
     assert ".PHONY: release-preflight" in text
+    assert ".PHONY: release-preflight release-reference-journey" in text
+
+    reference = text.split("release-reference-journey:", 1)[1].split(
+        "\n\n##@ Runtime image", 1
+    )[0]
+    assert "scripts/release/release_reference_journey.py" in reference
+    assert "--repo-root . --json" in reference
+
+
+def test_installed_wheel_retained_evidence_replay_uses_candidate_only(
+    module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _config(module, tmp_path)
+    cli = tmp_path / "installed" / "bin" / "invarlock"
+    cwd = tmp_path / "consumer"
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        module,
+        "run_retained_evidence_compatibility",
+        lambda **kwargs: calls.append(kwargs) or {"ok": True},
+    )
+
+    result = module._run_installed_wheel_retained_evidence_compatibility(
+        config, cli, cwd=cwd
+    )
+
+    assert result == {"ok": True}
+    assert calls == [
+        {
+            "repo_root": config.repo_root,
+            "command": (str(cli),),
+            "workspace": cwd / "release-retained-evidence-compatibility",
+            "allow_checkout_source": False,
+        }
+    ]
+
+
+def test_installed_wheel_retained_evidence_replay_fails_preflight_closed(
+    module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _config(module, tmp_path)
+
+    def reject(**_kwargs: object) -> None:
+        raise module.ReleaseReferenceJourneyError("rejected")
+
+    monkeypatch.setattr(module, "run_retained_evidence_compatibility", reject)
+
+    with pytest.raises(
+        module.ReleasePreflightError, match="compatibility replay failed"
+    ):
+        module._run_installed_wheel_retained_evidence_compatibility(
+            config,
+            tmp_path / "invarlock",
+            cwd=tmp_path / "consumer",
+        )
 
 
 def test_post_gate_checkout_recheck_rejects_source_toctou(
@@ -557,7 +642,7 @@ def test_post_gate_checkout_recheck_rejects_source_toctou(
 
     monkeypatch.setattr(module, "_git_output", fake_git)
     monkeypatch.setattr(
-        module, "_probe_installed_wheel", lambda *_: _passing_import(module)
+        module, "_probe_installed_wheel", lambda *_: _passing_probe(module)
     )
     monkeypatch.setattr(
         module, "validate_first_party_addin_distributions", lambda **_: []
@@ -596,7 +681,7 @@ def test_preflight_summary_has_no_checkout_paths(
         lambda _root, *args: _SHA if args[0] == "rev-parse" else "",
     )
     monkeypatch.setattr(
-        module, "_probe_installed_wheel", lambda *_: _passing_import(module)
+        module, "_probe_installed_wheel", lambda *_: _passing_probe(module)
     )
     monkeypatch.setattr(
         module, "validate_first_party_addin_distributions", lambda **_: []

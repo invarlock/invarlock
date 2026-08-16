@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the v0.13 compatibility inventory from the committed handoff."""
+"""Generate the v0.13 compatibility inventory from its immutable package."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 FIXTURE_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = FIXTURE_ROOT.parents[3]
-GOLDEN = REPO_ROOT / "examples/acceptance-handoff/golden"
+PACKAGE = FIXTURE_ROOT / "package"
 CORPUS = FIXTURE_ROOT / "corpus.json"
 
 
@@ -27,12 +27,12 @@ def _sha256(path: Path) -> str:
 
 
 def generate() -> bytes:
-    evidence = GOLDEN / "evidence"
-    receipt_path = GOLDEN / "verification.receipt.json"
+    evidence = PACKAGE / "evidence"
+    receipt_path = PACKAGE / "verification.receipt.json"
     report_path = evidence / "reports/evaluation.report.json"
     schedule_path = evidence / "schedule/runtime-behavioral-schedule.json"
     manifest_path = evidence / "manifest.json"
-    anchors = _object(GOLDEN / "technical-anchors.json")
+    anchors = _object(PACKAGE / "technical-anchors.json")
     receipt = _object(receipt_path)
     report = _object(report_path)
     manifest = _object(manifest_path)
@@ -42,11 +42,14 @@ def generate() -> bytes:
         "cases": [
             {
                 "name": "acceptance-handoff-accepted-v013",
-                "evidence": "examples/acceptance-handoff/golden/evidence",
+                "evidence": ("tests/fixtures/compatibility/v0.13.0/package/evidence"),
                 "receipt": (
-                    "examples/acceptance-handoff/golden/verification.receipt.json"
+                    "tests/fixtures/compatibility/v0.13.0/package/"
+                    "verification.receipt.json"
                 ),
-                "policy": ("examples/acceptance-handoff/golden/evaluated-policy.json"),
+                "policy": (
+                    "tests/fixtures/compatibility/v0.13.0/package/evaluated-policy.json"
+                ),
                 "sha256": {
                     "manifest": _sha256(manifest_path),
                     "receipt": _sha256(receipt_path),

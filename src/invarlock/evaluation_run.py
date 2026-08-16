@@ -16,6 +16,8 @@ from invarlock.core.runtime_provider import (
 )
 from invarlock.evaluation_runtime import RuntimeResourceResolver, RuntimeSideRole
 from invarlock.evidence_pack import RuntimeSideEvidence
+from invarlock.evidence_pack_contract import MAX_EVIDENCE_BYTES
+from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
 from invarlock.runtime_behavior.transaction import run_evidence_side
 from invarlock.runtime_provider_evidence import RuntimeProviderEvidencePaths
 
@@ -44,10 +46,20 @@ class RuntimeComparisonExecutor(Protocol):
 
 
 def _runtime_side_evidence(bundle) -> RuntimeSideEvidence:
+    def read(path: Path, label: str) -> bytes:
+        try:
+            return read_regular_file_bytes(
+                path,
+                label=label,
+                max_bytes=MAX_EVIDENCE_BYTES,
+            )
+        except StrictJsonError as exc:
+            raise ValueError(str(exc)) from exc
+
     return RuntimeSideEvidence(
-        run_report=bundle.report_path.read_bytes(),
-        runtime_manifest=bundle.manifest_path.read_bytes(),
-        runtime_config=bundle.config_path.read_bytes(),
+        run_report=read(bundle.report_path, "runtime side report"),
+        runtime_manifest=read(bundle.manifest_path, "runtime side manifest"),
+        runtime_config=read(bundle.config_path, "runtime side configuration"),
         artifact_identity=bundle.evidence.artifact_identity_bytes,
         provider_receipt=bundle.evidence.receipt_bytes,
         scoring_observation=bundle.evidence.scoring_observation_bytes,
@@ -87,7 +99,14 @@ def load_runtime_side_evidence(directory: Path) -> RuntimeSideEvidence:
     for label, path in expected.items():
         if path.is_symlink() or not path.is_file():
             raise ValueError(f"runtime side {label} must be a regular file")
-        payloads[label] = path.read_bytes()
+        try:
+            payloads[label] = read_regular_file_bytes(
+                path,
+                label=f"runtime side {label}",
+                max_bytes=MAX_EVIDENCE_BYTES,
+            )
+        except StrictJsonError as exc:
+            raise ValueError(str(exc)) from exc
     return RuntimeSideEvidence(
         run_report=payloads["run report"],
         runtime_manifest=payloads["runtime manifest"],

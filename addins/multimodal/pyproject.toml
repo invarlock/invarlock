@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock-runtime-hf-vision-text"
-version = "0.14.0"
+version = "0.15.0"
 description = "First-party Hugging Face vision-text runtime provider for InvarLock"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["invarlock==0.14.0", "pillow>=11.3,<13"]
+dependencies = ["invarlock==0.15.0", "pillow>=11.3,<13"]
 
 [project.optional-dependencies]
 runtime = [

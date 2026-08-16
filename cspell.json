@@ -176,6 +176,7 @@
     "quantizer",
     "DSSE",
     "SLSA",
+    "SHACL",
     "Arithmatex",
     "Sbornik",
     "Silverstein",
@@ -202,6 +203,24 @@
     "Triaging",
     "replayable",
     "unindexed",
-    "upgraders"
+    "upgraders",
+    "dataclass",
+    "kwargs",
+    "loadability",
+    "logomark",
+    "MBART",
+    "monkeypatch",
+    "preflights",
+    "Pushgateway",
+    "quickstarts",
+    "reauthenticates",
+    "requalified",
+    "retargeted",
+    "retuned",
+    "scikit",
+    "subsampling",
+    "thresholded",
+    "underprovisioned",
+    "unwritable"
   ]
 }

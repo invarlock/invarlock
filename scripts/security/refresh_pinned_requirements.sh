@@ -176,6 +176,13 @@ run_workflow_locks() {
     --torch-backend cu126
 
   compile_req_platform \
+    "${WORKFLOW_DIR}/runtime-image-cu129.in" \
+    "${WORKFLOW_DIR}/runtime-image-py312-cu129.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --torch-backend cu129
+
+  compile_req_platform \
     "${WORKFLOW_DIR}/multimodal-runtime.in" \
     "${WORKFLOW_DIR}/multimodal-runtime-py312.txt" \
     --python-version 3.12 \
@@ -200,6 +207,60 @@ run_workflow_locks() {
     return 1
   fi
   rm -f "${harness_full_lock}"
+
+  local harness_cuda_full_lock="${WORKFLOW_DIR}/.lm-evaluation-harness-full-py312-cu129.txt"
+  compile_req_platform \
+    "${WORKFLOW_DIR}/lm-evaluation-harness.in" \
+    "${harness_cuda_full_lock}" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints requirements/workflows/runtime-image-cu129.in \
+    --torch-backend cu129 \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_cache_free_lm_eval_wheel.py" \
+    filter-lock \
+    --input "${harness_cuda_full_lock}" \
+    --output "${WORKFLOW_DIR}/lm-evaluation-harness-py312-cu129.txt"; then
+    rm -f "${harness_cuda_full_lock}"
+    return 1
+  fi
+  rm -f "${harness_cuda_full_lock}"
+
+  compile_req_platform \
+    "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
+    "${WORKFLOW_DIR}/inspect-ai-runtime-py312.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints "${WORKFLOW_DIR}/runtime-image.in" \
+    --torch-backend cpu \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+
+  compile_req_platform \
+    "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
+    "${WORKFLOW_DIR}/inspect-ai-runtime-py312-cu129.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints "${WORKFLOW_DIR}/runtime-image-cu129.in" \
+    --torch-backend cu129 \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+
+  compile_req_platform \
+    "${WORKFLOW_DIR}/openai-evals-runtime.in" \
+    "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime.in" \
+    --torch-backend cpu \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+
+  compile_req_platform \
+    "${WORKFLOW_DIR}/openai-evals-runtime.in" \
+    "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt" \
+    --python-version 3.12 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime-cu129.in" \
+    --torch-backend cu129 \
+    --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \

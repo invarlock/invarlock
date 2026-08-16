@@ -1,0 +1,26 @@
+{
+  "anchors": {
+    "baseline_artifact_digest": "sha256:ffe098c4bf61c488ca671517cb664d8b696b6bdfaef2f66a403caf8e9e730368",
+    "baseline_runtime_digest": "sha256:101f3a37199781f93759122ff0a5d287c57c3cfa26580a08bd2819aafadb1b0d",
+    "evidence_signer_fingerprint": "sha256:716f3964a45a79f6f22c8701a12784ec7995731794762d1ed7fec8384c58aa66",
+    "request_digest": "sha256:0aa4d2df14f317ba199ce3359ab89c202dc709d08c41352446d1d9b14c129f51",
+    "schedule_digest": "sha256:2288cba19abc46e39e86569a4eceabe2a06b54b9167f6b10c7291cd50596ca74",
+    "subject_artifact_digest": "sha256:ff5ef00defc37d2eadb80496b45986e75a221e3cc0d6b6f0e19e48ac47d60747",
+    "subject_runtime_digest": "sha256:101f3a37199781f93759122ff0a5d287c57c3cfa26580a08bd2819aafadb1b0d"
+  },
+  "evidence": {
+    "comparison_id": "comparison-89b633e675212a7efa89f2fee2b24488",
+    "pack_manifest_digest": "sha256:002be64379505eef302c0f0a4e7f85caedc80a9137a1711a4cd4858f569988a9",
+    "path": "examples/evaluator-qualification/signed-transactions/qwen35-lm-evaluation-harness/evidence",
+    "reference_id": "qwen35-lm-evaluation-harness"
+  },
+  "expected": {
+    "policy_verdict": "fail",
+    "verification_scope": "paired_comparison"
+  },
+  "format": "invarlock/release-reference-journey-v1",
+  "policy": {
+    "digest": "sha256:9fde2fca084c55425b17b20c2825bdfc2701277a45e49c5e5bb0001b49ed48e2",
+    "path": "examples/evaluator-qualification/signed-transactions/qwen35-lm-evaluation-harness/policy.json"
+  }
+}

@@ -1,8 +1,8 @@
 # PEFT LoRA integration
 
 This journey invokes Hugging Face PEFT directly. It downloads the official
-Apache-2.0 `Qwen/Qwen3-0.6B` checkpoint at immutable revision
-`c1899de289a04d12100db370d81485cdf75e47ca`, trains LoRA parameters on fixed
+Apache-2.0 `Qwen/Qwen3.5-0.8B` checkpoint at immutable revision
+`2fc06364715b967f1860aea9cf38778875588b17`, trains LoRA parameters on fixed
 continuations, saves and reloads the adapter, and merges it into a standalone
 `safetensors` checkpoint. The baseline and merged subject then pass through
 InvarLock's built-in Hugging Face runtime.
@@ -10,7 +10,10 @@ InvarLock's built-in Hugging Face runtime.
 From a clean checkout with `uv` and Docker or Podman installed:
 
 ```bash
-make example-peft-lora
+make example-peft-lora \
+  EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/peft-lora"
 ```
 
 The command installs the locked PEFT example dependency, builds the
@@ -29,12 +32,15 @@ worker:
 
 ```bash
 make example-peft-lora \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs"
+  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/peft-lora"
 ```
 
 CUDA is selected when available and CPU remains supported. The first run needs
 several gigabytes of download, cache, and workspace capacity. The 50 distinct
-deterministic contexts exercise real Qwen3 adapter training and the complete
+deterministic contexts exercise real Qwen3.5 adapter training and the complete
 transaction. The authenticated transformation records the source model and
 revision, target modules, training loss, saved adapter, and merged subject
 identity. This compact journey does not measure general fine-tuning quality; a

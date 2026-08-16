@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+import stat
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -16,6 +18,18 @@ def _completed(
     command: list[str], stdout: str = ""
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+
+def _pending_trust() -> example.PendingTrust:
+    return example.PendingTrust(
+        anchors={"schedule_digest": "sha256:" + "2" * 64},
+        policy_bytes=b"{}\n",
+        external=False,
+        trust_root=None,
+        verifier_key_bytes=None,
+        evidence_fingerprint="sha256:" + "3" * 64,
+        verifier_fingerprint="sha256:" + "4" * 64,
+    )
 
 
 def test_records_are_closed_unique_and_sufficient() -> None:
@@ -31,11 +45,11 @@ def test_records_are_closed_unique_and_sufficient() -> None:
         for record in records
     )
     assert {record["expected"] for record in records} == set(
-        example._PINNED_QWEN3_ONE_TOKEN_TARGET_IDS
+        example._PINNED_COMPACT_ONE_TOKEN_TARGET_IDS
     )
     assert all(
         isinstance(token_id, int) and token_id > 0
-        for token_id in example._PINNED_QWEN3_ONE_TOKEN_TARGET_IDS.values()
+        for token_id in example._PINNED_COMPACT_ONE_TOKEN_TARGET_IDS.values()
     )
 
 
@@ -52,13 +66,13 @@ def test_records_reject_unreviewed_target_token_changes(
         example._load_records()
 
 
-def test_official_qwen3_source_and_pinned_quantizer_are_part_of_the_journey() -> None:
-    assert example._MODEL_REPOSITORY == "Qwen/Qwen3-0.6B-GGUF"
-    assert example._MODEL_REVISION == "23749fefcc72300e3a2ad315e1317431b06b590a"
-    assert example._OFFICIAL_MODEL.filename == "Qwen3-0.6B-Q8_0.gguf"
-    assert example._OFFICIAL_MODEL.byte_length == 639_446_688
+def test_official_qwen35_08b_gguf_identity() -> None:
+    assert example._MODEL_REPOSITORY == "ggml-org/Qwen3.5-0.8B-GGUF"
+    assert example._MODEL_REVISION == "8fea620810c4afa23dd6443f999a48574c1611a3"
+    assert example._OFFICIAL_MODEL.filename == "Qwen3.5-0.8B-Q8_0.gguf"
+    assert example._OFFICIAL_MODEL.byte_length == 833_592_096
     assert example._OFFICIAL_MODEL.sha256 == (
-        "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031"
+        "37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f"
     )
     dockerfile = (
         Path(__file__).resolve().parents[2] / "addins/gguf/runtime/Dockerfile"
@@ -124,7 +138,7 @@ def test_stage_models_derives_q5_with_the_pinned_networkless_quantizer(
         "_run",
         lambda command, **_kwargs: (
             commands.append(command),
-            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(b"derived-q5"),
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(b"derived-q5"),
             _completed(command),
         )[-1],
     )
@@ -186,8 +200,37 @@ def test_image_inspection_and_runtime_build_use_immutable_current_source(
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             return _completed(command, json.dumps({"source_bundle_sha256": image_id}))
+        if command[:3] == ["make", "-C", "addins/gguf"]:
+            statement_path = next(
+                Path(value.split("=", 1)[1])
+                for value in command
+                if value.startswith("BUILD_STATEMENT=")
+            )
+            statement_path.write_text(
+                json.dumps(
+                    {
+                        "base_image": None,
+                        "build_arguments": {},
+                        "dockerfile": {
+                            "path": "runtime/Dockerfile",
+                            "sha256": image_id,
+                        },
+                        "format_version": "invarlock/runtime-image-build-v1",
+                        "image": "invarlock-example-gguf:" + "c" * 12,
+                        "ok": True,
+                        "platform": None,
+                        "runtime_image_id": image_id,
+                        "source_bundle_sha256": image_id,
+                        "source_commit": "c" * 40,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return _completed(command)
         if command[1:3] == ["image", "inspect"]:
-            return _completed(command, image_id + "\n")
+            return _completed(
+                command, image_id + "\t" + ("c" * 40) + "\t" + image_id + "\n"
+            )
         return _completed(command)
 
     monkeypatch.setattr(example.launch, "_run", fake_run)
@@ -274,25 +317,27 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         for role, path in models.items()
     }
     image_id = "sha256:" + "f" * 64
-    paths = example._prepare_transaction(
+    paths, pending_trust = example._prepare_transaction(
         root,
         runtime_root=runtime,
         models=models,
         specs=specs,
         image_id=image_id,
     )
+    request_digest = "sha256:" + "1" * 64
+    example._materialize_trust(paths, pending_trust, request_digest)
 
     request = yaml.safe_load(paths.request.read_text(encoding="utf-8"))
     trust = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
     assert request["comparison"]["metric"] == "exact_match"
     assert request["comparison"]["baseline"]["runtime"]["provider"] == "llama_cpp"
     assert request["comparison"]["subject"]["runtime"]["provider"] == "llama_cpp"
-    assert request["comparison"]["dataset"]["name"] == "qwen3-0.6b-q8-to-q5"
+    assert request["comparison"]["dataset"]["name"] == "qwen35-0.8b-q8-to-q5"
     assert request["comparison"]["baseline"]["artifact"]["locator"].startswith(
-        "hf://Qwen/Qwen3-0.6B-GGUF@23749fef"
+        "hf://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )
     assert request["comparison"]["subject"]["artifact"]["locator"].startswith(
-        "derived://Qwen/Qwen3-0.6B-GGUF@23749fef"
+        "derived://ggml-org/Qwen3.5-0.8B-GGUF@8fea6208"
     )
     assert request["observations"][0]["path"] == ("inputs/subject-transformation.json")
     transformation = json.loads(
@@ -305,12 +350,14 @@ def test_transaction_binds_distinct_gguf_artifacts_schedule_policy_and_signers(
         "delta_min_pp": -15.0,
         "maximum_interval_width_pp": 20.0,
         "minimum_record_count": 50,
+        "minimum_side_accuracy": example._MINIMUM_SIDE_ACCURACY,
     }
     assert (
         trust["anchors"]["baseline_artifact_digest"]
         != trust["anchors"]["subject_artifact_digest"]
     )
     assert trust["anchors"]["baseline_runtime_digest"] == image_id
+    assert trust["anchors"]["request_digest"] == request_digest
     assert paths.evidence_key.stat().st_mode & 0o777 == 0o600
     assert paths.verifier_key.stat().st_mode & 0o777 == 0o600
 
@@ -386,6 +433,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
         runtime_root=runtime,
         container_engine="docker",
         image_id=image_id,
+        pending_trust=_pending_trust(),
     )
 
     assert [command[3] for command in commands] == [
@@ -416,6 +464,7 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             runtime_root=runtime,
             container_engine="docker",
             image_id=image_id,
+            pending_trust=_pending_trust(),
         )
 
     report.write_text(
@@ -437,7 +486,46 @@ def test_execute_uses_public_commands_and_caller_owned_backend_binding(
             runtime_root=runtime,
             container_engine="docker",
             image_id=image_id,
+            pending_trust=_pending_trust(),
         )
+
+
+def test_external_trust_is_created_only_after_binding_the_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "transaction"
+    root.mkdir()
+    trust_root = tmp_path / "trust"
+    paths = example._paths(
+        root,
+        evidence_key=tmp_path / "evidence.pem",
+        trust_root=trust_root,
+    )
+    pending = example.PendingTrust(
+        anchors={"schedule_digest": "sha256:" + "2" * 64},
+        policy_bytes=b"{}\n",
+        external=True,
+        trust_root=trust_root,
+        verifier_key_bytes=b"verifier-key",
+        evidence_fingerprint="sha256:" + "3" * 64,
+        verifier_fingerprint="sha256:" + "4" * 64,
+    )
+    captured: dict[str, object] = {}
+
+    def create(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(trusted_inputs=paths.trusted_inputs)
+
+    monkeypatch.setattr(example, "create_trust_material", create)
+    request_digest = "sha256:" + "1" * 64
+
+    example._materialize_trust(paths, pending, request_digest)
+
+    assert captured["trust_root"] == trust_root
+    assert captured["anchors"] == {
+        "schedule_digest": "sha256:" + "2" * 64,
+        "request_digest": request_digest,
+    }
 
 
 @pytest.mark.parametrize(
@@ -531,13 +619,20 @@ def test_execute_rejects_false_green_outputs(
             runtime_root=tmp_path / "runtime",
             container_engine="docker",
             image_id="sha256:" + "f" * 64,
+            pending_trust=_pending_trust(),
         )
 
 
-def test_main_rejects_existing_workspace(tmp_path: Path) -> None:
+@pytest.mark.parametrize("kind", ["directory", "symlink"])
+def test_main_rejects_existing_workspace(tmp_path: Path, kind: str) -> None:
     existing = tmp_path / "existing"
-    existing.mkdir()
-    assert example.main(["--workspace", str(existing)]) == 2
+    missing = tmp_path / "missing-workspace"
+    if kind == "directory":
+        existing.mkdir()
+    else:
+        existing.symlink_to(missing, target_is_directory=True)
+    assert example.main(["--workspace", str(existing), "--ephemeral-trust-root"]) == 2
+    assert not missing.exists()
 
 
 def test_default_workspace_is_canonical_before_source_build(
@@ -549,13 +644,22 @@ def test_default_workspace_is_canonical_before_source_build(
     alias.symlink_to(real, target_is_directory=True)
     observed: list[Path] = []
     monkeypatch.setattr(example.tempfile, "mkdtemp", lambda **_kwargs: str(alias))
+    monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
 
-    def stop(_repository: Path, build_root: Path, *, container_engine: str) -> str:
+    def stop(
+        _repository: Path,
+        build_root: Path,
+        *,
+        container_engine: str,
+        image_tag: str | None = None,
+    ) -> str:
         observed.append(build_root)
         raise RuntimeError("stop after canonical workspace check")
 
     monkeypatch.setattr(example, "_build_runtime_image", stop)
-    assert example.main([]) == 2
+    assert example.main(["--ephemeral-trust-root"]) == 2
     assert observed == [real.resolve() / "build"]
 
 
@@ -601,7 +705,7 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
     monkeypatch.setattr(
         example,
         "_prepare_transaction",
-        lambda *_args, **_kwargs: observed.append("prepare") or paths,
+        lambda *_args, **_kwargs: observed.append("prepare") or (paths, object()),
     )
     monkeypatch.setattr(
         example,
@@ -609,19 +713,114 @@ def test_main_reuses_an_immutable_image_and_completes_transaction(
         lambda *_args, **_kwargs: observed.append("execute"),
     )
 
-    assert example.main(["--workspace", str(workspace), "--runtime-image", digest]) == 0
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(workspace),
+                "--runtime-image",
+                digest,
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 0
+    )
     assert observed == ["image", "models", "backend", "prepare", "execute"]
+    assert stat.S_IMODE(workspace.stat().st_mode) == 0o700
+
+
+def test_main_removes_only_the_temporary_image_tag_it_built(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = "sha256:" + "a" * 64
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
+    monkeypatch.setattr(
+        example,
+        "temporary_image_tag",
+        lambda prefix, commit: "invarlock-example-gguf:owned",
+    )
+    monkeypatch.setattr(
+        example,
+        "_build_runtime_image",
+        lambda *_args, **kwargs: (
+            observed.update({"build_tag": kwargs["image_tag"]}),
+            digest,
+        )[1],
+    )
+    owned = example.OwnedImageTag("invarlock-example-gguf:owned", digest)
+    monkeypatch.setattr(example, "record_owned_image_tag", lambda *_args: owned)
+    monkeypatch.setattr(
+        example,
+        "remove_owned_image_tags",
+        lambda _run, _engine, _repository, tags: observed.update(
+            {"cleanup": list(tags)}
+        ),
+    )
+
+    def stage_models(
+        _repository: Path, model_root: Path, **_kwargs: object
+    ) -> dict[str, Path]:
+        model_root.mkdir(parents=True)
+        paths = {role: model_root / f"{role}.gguf" for role in ("baseline", "subject")}
+        for role, path in paths.items():
+            path.write_bytes(role.encode())
+        return paths
+
+    monkeypatch.setattr(example, "_stage_models", stage_models)
+    monkeypatch.setattr(example, "_stage_backend", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        example,
+        "_inspect_spec",
+        lambda _repository, model, **_kwargs: {
+            "model_id": model.stem,
+            "settings": {},
+        },
+    )
+    monkeypatch.setattr(
+        example, "_prepare_transaction", lambda *_args, **_kwargs: (object(), object())
+    )
+    monkeypatch.setattr(example, "_execute", lambda *_args, **_kwargs: None)
+
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(tmp_path / "workspace"),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 0
+    )
+    assert observed == {
+        "build_tag": "invarlock-example-gguf:owned",
+        "cleanup": [owned],
+    }
 
 
 def test_main_reports_runtime_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
+        example.launch, "_require_committed_checkout", lambda _root: "c" * 40
+    )
+    monkeypatch.setattr(
         example,
         "_build_runtime_image",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("build failed")),
     )
-    assert example.main(["--workspace", str(tmp_path / "workspace")]) == 2
+    assert (
+        example.main(
+            [
+                "--workspace",
+                str(tmp_path / "workspace"),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
     assert "build failed" in capsys.readouterr().err
 
 
@@ -690,7 +889,7 @@ def test_quantization_requires_a_distinct_created_subject(
 
     def quantize(command: list[str], **_kwargs: object) -> object:
         if artifact == "identical":
-            (tmp_path / "models/Qwen3-0.6B-Q5_K_M.gguf").write_bytes(payload)
+            (tmp_path / "models/Qwen3.5-0.8B-Q5_K_M.gguf").write_bytes(payload)
         return _completed(command)
 
     monkeypatch.setattr(example.launch, "_run", quantize)
@@ -756,4 +955,5 @@ def test_execute_rejects_non_object_transaction_outputs(
             runtime_root=tmp_path / "runtime",
             container_engine="docker",
             image_id="sha256:" + "a" * 64,
+            pending_trust=_pending_trust(),
         )

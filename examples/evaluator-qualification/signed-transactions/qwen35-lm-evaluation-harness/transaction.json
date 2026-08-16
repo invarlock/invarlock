@@ -1,0 +1,32 @@
+{
+  "base_image_id": "sha256:5e10b68deca6f41d8977ca7c7c1d2c64a7af3a6c20969fdcd1236696527b06cb",
+  "entrypoint": [
+    "python",
+    "/opt/invarlock/examples/lm-evaluation-harness-example.py",
+    "worker"
+  ],
+  "evaluator_version": "0.4.12+invarlock.nocache.1",
+  "executed_on": "2026-08-13",
+  "format": "invarlock/retained-evaluator-transaction-v1",
+  "lock_sha256": "sha256:56f85a86f54649bf6aeb3c828530f0ca340246266893ee8edbdfbcc6ba1e8d5f",
+  "profile_id": "lm-evaluation-harness",
+  "runtime_image_id": "sha256:101f3a37199781f93759122ff0a5d287c57c3cfa26580a08bd2819aafadb1b0d",
+  "source_bundle_sha256": "sha256:78a4e1ff890e5224b58520f434e6e307bdc03852c0456c2a22019a4b8b935f10",
+  "source_commit": "6d13c16b665eab34432a7ced10a7592474c2a50a",
+  "verification": {
+    "artifact_digests": {
+      "baseline": "sha256:ffe098c4bf61c488ca671517cb664d8b696b6bdfaef2f66a403caf8e9e730368",
+      "subject": "sha256:ff5ef00defc37d2eadb80496b45986e75a221e3cc0d6b6f0e19e48ac47d60747"
+    },
+    "evidence_signer_fingerprint": "sha256:716f3964a45a79f6f22c8701a12784ec7995731794762d1ed7fec8384c58aa66",
+    "policy_verdict": "fail",
+    "runtime_digests": {
+      "baseline": "sha256:101f3a37199781f93759122ff0a5d287c57c3cfa26580a08bd2819aafadb1b0d",
+      "subject": "sha256:101f3a37199781f93759122ff0a5d287c57c3cfa26580a08bd2819aafadb1b0d"
+    },
+    "schedule_digest": "sha256:2288cba19abc46e39e86569a4eceabe2a06b54b9167f6b10c7291cd50596ca74",
+    "trust_profile_digest": "sha256:9e79efefbd61ae37efa295c6318ed8b95523861886ede8f13f48a715cd191e45",
+    "verifier_fingerprint": "sha256:8fce6fe202d170429bdd3e614215045ae2764f87f9009f1210ae09dbc009b98c",
+    "verifier_identity": "invarlock-example/lm-evaluation-harness-verifier"
+  }
+}

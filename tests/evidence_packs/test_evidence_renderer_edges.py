@@ -74,6 +74,46 @@ def test_closed_report_renderer_covers_normalized_nll_and_html_escaping() -> Non
     assert "manifest, checksums" in html
 
 
+def test_closed_report_renderer_explains_side_accuracy_qualification() -> None:
+    report = build_comparison_report(
+        comparison_id="model-comparison",
+        paired_records={
+            "format": "invarlock/paired-records-v1",
+            "metric": "exact_match",
+            "schedule_sha256": "0" * 64,
+            "records": [
+                {
+                    "record_id": "one",
+                    "baseline": {"score": 1.0},
+                    "subject": {"score": 0.0},
+                }
+            ],
+        },
+        policy={
+            "resolved_policy": {
+                "metrics": {
+                    "exact_match": {
+                        "delta_min_pp": -100.0,
+                        "minimum_side_accuracy": 0.5,
+                    }
+                }
+            }
+        },
+        policy_digest="sha256:" + "a" * 64,
+    )
+
+    markdown = reporting._render_markdown(
+        reporting._closed_comparison_report(report),
+        explain=False,
+        evidence_signer="sha256:" + "a" * 64,
+        observations=(),
+    )
+
+    assert "Side accuracy qualification" in markdown
+    assert "| Baseline | 1 | ≥ 0.5 | pass |" in markdown
+    assert "| Subject | 0 | ≥ 0.5 | fail |" in markdown
+
+
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
@@ -424,6 +464,7 @@ def test_report_json_loader_and_manifest_path_inventory_fail_closed(
         "records/paired.json",
         "observations/kept.json",
     }
+    assert reporting._manifest_payload_paths({"paired_records": None}) == set()
 
 
 def test_observation_loader_rejects_each_untrusted_manifest_surface(
@@ -547,3 +588,45 @@ def test_reference_binding_checker_covers_identity_and_record_failures(
         "valid JSON" in error
         for error in reporting._reference_binding_errors(evidence, manifest)
     )
+
+    assert (
+        reporting._reference_binding_errors(
+            evidence,
+            {"inputs": [], "evidence": {"skip": None, "invalid": {"path": None}}},
+        )
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda value: value.clear(), "side_accuracy is invalid"),
+        (lambda value: value.update(minimum=1.1), "minimum is invalid"),
+        (lambda value: value.update(baseline=[]), "baseline is invalid"),
+        (
+            lambda value: value["baseline"].update(observed=0.25),
+            "baseline values are invalid",
+        ),
+        (lambda value: value.update(passed=False), "verdict is invalid"),
+    ],
+)
+def test_side_accuracy_replay_rejects_every_untrusted_surface(
+    mutation: object,
+    message: str,
+) -> None:
+    value: dict[str, object] = {
+        "minimum": 0.5,
+        "baseline": {"observed": 1.0, "passed": True},
+        "subject": {"observed": 1.0, "passed": True},
+        "passed": True,
+    }
+    assert callable(mutation)
+    mutation(value)
+
+    with pytest.raises(EvidenceReportError, match=message):
+        reporting._validate_side_accuracy(
+            value,
+            metric="exact_match",
+            side_means={"baseline": 1.0, "subject": 1.0},
+        )

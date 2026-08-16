@@ -5,21 +5,27 @@ import hashlib
 import json
 import math
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import yaml
 
-from examples.integrations import launch, local_registry, qwen3_profile
+from examples.integrations import (
+    compact_model_profile,
+    launch,
+    local_registry,
+    trust_material,
+)
 from examples.integrations import run as integration
 
 ZERO_DIGEST = "sha256:" + ("0" * 64)
-REAL_QWEN3_LOADER = qwen3_profile.load_model_and_tokenizer
+REAL_COMPACT_LOADER = compact_model_profile.load_model_and_tokenizer
 
 
 @pytest.fixture(autouse=True)
-def tiny_qwen3_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+def tiny_compact_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep focused tests offline while production uses the pinned checkpoint."""
 
     def load_model_and_tokenizer(
@@ -67,7 +73,7 @@ def tiny_qwen3_profile(monkeypatch: pytest.MonkeyPatch) -> None:
         return transformers.Qwen3ForCausalLM(config), tokenizer  # type: ignore[attr-defined]
 
     monkeypatch.setattr(
-        qwen3_profile, "load_model_and_tokenizer", load_model_and_tokenizer
+        compact_model_profile, "load_model_and_tokenizer", load_model_and_tokenizer
     )
 
 
@@ -113,7 +119,7 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
     baseline_locator = request["comparison"]["baseline"]["artifact"]["locator"]
     subject_locator = request["comparison"]["subject"]["artifact"]["locator"]
     assert baseline_locator.startswith(
-        f"hf://{qwen3_profile.MODEL_ID}@{qwen3_profile.MODEL_REVISION}#"
+        f"hf://{compact_model_profile.MODEL_ID}@{compact_model_profile.MODEL_REVISION}#"
     )
     assert subject_locator.startswith(
         "generated://invarlock-example/hf-transformers-subject@sha256:"
@@ -123,8 +129,8 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
             encoding="utf-8"
         )
     )
-    assert summary["source_model_id"] == qwen3_profile.MODEL_ID
-    assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
+    assert summary["source_model_id"] == compact_model_profile.MODEL_ID
+    assert summary["source_model_revision"] == compact_model_profile.MODEL_REVISION
     assert summary["method"] == "causal-output-row-fit"
     assert anchors["baseline_artifact_digest"] != anchors["subject_artifact_digest"]
     assert anchors["baseline_runtime_digest"] == ZERO_DIGEST
@@ -137,6 +143,105 @@ def test_hf_preparation_creates_closed_distinct_transaction(tmp_path: Path) -> N
             path.stat().st_mode & (0o005 if path.is_dir() else 0o004)
             for path in model_root.rglob("*")
         )
+
+
+def test_hf_preparation_uses_caller_owned_external_trust_material(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evidence_key = tmp_path / "evidence.pem"
+    verifier_key = tmp_path / "verifier.pem"
+    integration._write_private_key(evidence_key)
+    integration._write_private_key(verifier_key)
+    trust_root = tmp_path / "trust" / "hf"
+    trust_root.parent.mkdir()
+
+    paths, _anchors = integration._prepare_workspace(
+        tmp_path / "external",
+        integration="hf-transformers",
+        runtime_image_digest=ZERO_DIGEST,
+        evidence_signing_key=evidence_key,
+        verifier_signing_key=verifier_key,
+        trust_root=trust_root,
+        ephemeral_trust_root=False,
+    )
+
+    assert paths.evidence_key == evidence_key.resolve()
+    assert paths.verifier_key == trust_root / "verifier.pem"
+    assert paths.trusted_inputs == trust_root / "trusted-inputs.json"
+    assert paths.independent_policy == trust_root / "policy/acceptance.json"
+    assert not (paths.root / "keys").exists()
+    assert not (paths.root / "verifier").exists()
+    assert json.loads(paths.independent_policy.read_text()) == json.loads(
+        (paths.evaluation / "inputs/acceptance.json").read_text()
+    )
+
+    with pytest.raises(ValueError, match="trust root must be new"):
+        integration._prepare_workspace(
+            tmp_path / "existing-trust-rejected",
+            integration="hf-transformers",
+            runtime_image_digest=ZERO_DIGEST,
+            evidence_signing_key=evidence_key,
+            verifier_signing_key=verifier_key,
+            trust_root=trust_root,
+            ephemeral_trust_root=False,
+        )
+
+    monkeypatch.setattr(
+        integration,
+        "create_trust_material",
+        lambda **_kwargs: SimpleNamespace(
+            trusted_inputs=tmp_path / "unexpected-trusted-inputs.json"
+        ),
+    )
+    mismatched_trust_root = tmp_path / "trust" / "mismatched"
+    with pytest.raises(ValueError, match="unexpected root"):
+        integration._prepare_workspace(
+            tmp_path / "mismatched-trust-material",
+            integration="hf-transformers",
+            runtime_image_digest=ZERO_DIGEST,
+            evidence_signing_key=evidence_key,
+            verifier_signing_key=verifier_key,
+            trust_root=mismatched_trust_root,
+            ephemeral_trust_root=False,
+        )
+    assert not (tmp_path / "mismatched-trust-material").exists()
+
+
+def test_external_trust_material_rejects_intermediate_symlink_aliases(
+    tmp_path: Path,
+) -> None:
+    transaction = tmp_path / "transaction"
+    transaction.mkdir()
+    inside = transaction / "inside"
+    inside.mkdir()
+    key_inside = inside / "key.pem"
+    integration._write_private_key(key_inside)
+    key_alias = tmp_path / "key-alias"
+    key_alias.symlink_to(inside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Ed25519 private key"):
+        trust_material.load_external_key(
+            key_alias / key_inside.name,
+            transaction_root=transaction,
+            label="evidence signing key",
+        )
+
+    trust_alias = tmp_path / "trust-alias"
+    trust_alias.symlink_to(inside, target_is_directory=True)
+    with pytest.raises(ValueError, match="without symlinks"):
+        trust_material.create_trust_material(
+            transaction_root=transaction,
+            evidence_key=tmp_path / "evidence.pem",
+            verifier_key_bytes=b"verifier",
+            evidence_fingerprint="evidence",
+            verifier_fingerprint="verifier",
+            trust_root=trust_alias / "profile",
+            policy_bytes=b"{}\n",
+            verifier_identity="test/verifier",
+            anchors={},
+        )
+    assert not (inside / "profile").exists()
 
 
 def test_hf_preparation_can_author_an_exact_match_transaction(tmp_path: Path) -> None:
@@ -213,9 +318,9 @@ def test_peft_preparation_trains_serializes_reloads_and_merges(tmp_path: Path) -
         )
     )
     assert summary["library"] == "peft"
-    assert summary["library_version"] == "0.19.1"
-    assert summary["source_model_id"] == qwen3_profile.MODEL_ID
-    assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
+    assert summary["library_version"] == "0.20.0"
+    assert summary["source_model_id"] == compact_model_profile.MODEL_ID
+    assert summary["source_model_revision"] == compact_model_profile.MODEL_REVISION
     assert summary["target_modules"] == ["q_proj", "v_proj"]
     assert summary["training_record_count"] == 50
     assert summary["training_steps"] == 12
@@ -236,7 +341,7 @@ def test_peft_preparation_trains_serializes_reloads_and_merges(tmp_path: Path) -
 def test_torchao_preparation_quantizes_and_materializes_subject(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tiny_loader = qwen3_profile.load_model_and_tokenizer
+    tiny_loader = compact_model_profile.load_model_and_tokenizer
 
     def load_bfloat16_model(
         *, torch: object, transformers: object
@@ -244,7 +349,9 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
         model, tokenizer = tiny_loader(torch=torch, transformers=transformers)
         return model.to(dtype=torch.bfloat16), tokenizer  # type: ignore[attr-defined]
 
-    monkeypatch.setattr(qwen3_profile, "load_model_and_tokenizer", load_bfloat16_model)
+    monkeypatch.setattr(
+        compact_model_profile, "load_model_and_tokenizer", load_bfloat16_model
+    )
     paths, anchors = integration._prepare_workspace(
         tmp_path / "torchao",
         integration="torchao-int8",
@@ -260,9 +367,9 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
         (paths.evaluation / "inputs/acceptance.json").read_text(encoding="utf-8")
     )
     assert summary["library"] == "torchao"
-    assert summary["library_version"] == "0.17.0"
-    assert summary["source_model_id"] == qwen3_profile.MODEL_ID
-    assert summary["source_model_revision"] == qwen3_profile.MODEL_REVISION
+    assert summary["library_version"] == "0.18.0"
+    assert summary["source_model_id"] == compact_model_profile.MODEL_ID
+    assert summary["source_model_revision"] == compact_model_profile.MODEL_REVISION
     assert summary["quantization"] == {
         "configuration": "Int8WeightOnlyConfig(version=2)",
         "excluded_modules": ["lm_head"],
@@ -324,7 +431,7 @@ def test_torchao_preparation_quantizes_and_materializes_subject(
 def test_torchao_preparation_rejects_nonfinite_materialization(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tiny_loader = qwen3_profile.load_model_and_tokenizer
+    tiny_loader = compact_model_profile.load_model_and_tokenizer
 
     def load_nonfinite_model(
         *, torch: object, transformers: object
@@ -334,7 +441,9 @@ def test_torchao_preparation_rejects_nonfinite_materialization(
             model.model.embed_tokens.weight[0, 0] = float("nan")
         return model, tokenizer
 
-    monkeypatch.setattr(qwen3_profile, "load_model_and_tokenizer", load_nonfinite_model)
+    monkeypatch.setattr(
+        compact_model_profile, "load_model_and_tokenizer", load_nonfinite_model
+    )
     with pytest.raises(RuntimeError, match="produced a non-finite tensor"):
         integration._prepare_workspace(
             tmp_path / "torchao-nonfinite",
@@ -358,7 +467,7 @@ def test_hf_checkpoint_authoring_rejects_identity_inconsistencies(
 ) -> None:
     paths = integration._paths(tmp_path / case)
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "load_model_and_tokenizer",
         lambda **_kwargs: (object(), object()),
     )
@@ -366,7 +475,7 @@ def test_hf_checkpoint_authoring_rejects_identity_inconsistencies(
         ("tokenizer-a", "tokenizer-b" if case == "tokenizer" else "tokenizer-a")
     )
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "save_checkpoint",
         lambda *_args: next(tokenizer_digests),
     )
@@ -476,7 +585,7 @@ def test_peft_checkpoint_authoring_rejects_training_and_identity_failures(
 
     training_model = TrainingModel()
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "load_model_and_tokenizer",
         lambda **_kwargs: (BaselineModel(), object()),
     )
@@ -484,7 +593,7 @@ def test_peft_checkpoint_authoring_rejects_training_and_identity_failures(
         ("tokenizer-a", "tokenizer-b" if case == "tokenizer" else "tokenizer-a")
     )
     monkeypatch.setattr(
-        qwen3_profile,
+        compact_model_profile,
         "save_checkpoint",
         lambda *_args: next(tokenizer_digests),
     )
@@ -578,6 +687,91 @@ def test_torchao_checkpoint_authoring_rejects_invalid_materialization_state(
         integration._create_torchao_checkpoints(integration._paths(tmp_path / case))
 
 
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("tokenizer", "baseline and subject tokenizers do not match"),
+        ("identical", "subject is identical to baseline"),
+        ("nonfinite-logits", "probe produced non-finite logits"),
+        ("nonfinite-delta", "probe produced a non-finite difference"),
+        ("persisted", "saved checkpoint does not preserve TorchAO materialization"),
+    ),
+)
+def test_torchao_checkpoint_authoring_rejects_post_materialization_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    import torch
+    import transformers
+
+    if case == "tokenizer":
+        save_checkpoint = compact_model_profile.save_checkpoint
+        save_count = 0
+
+        def save_with_tokenizer_drift(*args: object, **kwargs: object) -> str:
+            nonlocal save_count
+            digest = save_checkpoint(*args, **kwargs)  # type: ignore[arg-type]
+            save_count += 1
+            return digest if save_count == 1 else "changed-tokenizer"
+
+        monkeypatch.setattr(
+            compact_model_profile,
+            "save_checkpoint",
+            save_with_tokenizer_drift,
+        )
+    elif case == "identical":
+        monkeypatch.setattr(
+            integration,
+            "checkpoint_tree_sha256",
+            lambda _path: "identical-checkpoint",
+        )
+    elif case in {"nonfinite-logits", "nonfinite-delta"}:
+        isfinite = torch.isfinite
+
+        def reject_probe_tensor(value: object) -> object:
+            tensor = value  # preserve the real tensor protocol for this boundary test
+            if case == "nonfinite-logits" and tensor.ndim == 3:  # type: ignore[attr-defined]
+                return torch.zeros_like(tensor, dtype=torch.bool)  # type: ignore[arg-type]
+            if (
+                case == "nonfinite-delta"
+                and tensor.ndim == 2  # type: ignore[attr-defined]
+                and tensor.shape[0] == 50  # type: ignore[attr-defined]
+            ):
+                return torch.zeros_like(tensor, dtype=torch.bool)  # type: ignore[arg-type]
+            return isfinite(tensor)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(torch, "isfinite", reject_probe_tensor)
+    else:
+        load_model = transformers.AutoModelForCausalLM.from_pretrained
+        load_count = 0
+
+        def load_with_persisted_drift(*args: object, **kwargs: object) -> object:
+            nonlocal load_count
+            load_count += 1
+            if load_count == 2:
+
+                class PersistedModel:
+                    def eval(self) -> PersistedModel:
+                        return self
+
+                    def state_dict(self) -> dict[str, object]:
+                        return {}
+
+                return PersistedModel()
+            return load_model(*args, **kwargs)
+
+        monkeypatch.setattr(
+            transformers.AutoModelForCausalLM,
+            "from_pretrained",
+            load_with_persisted_drift,
+        )
+
+    with pytest.raises(RuntimeError, match=message):
+        integration._create_torchao_checkpoints(integration._paths(tmp_path / case))
+
+
 def test_preparation_records_absence_of_transformation_observation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -621,6 +815,74 @@ def test_preparation_rejects_existing_and_unknown_workspace(tmp_path: Path) -> N
             integration="hf-transformers",
             runtime_image_digest=ZERO_DIGEST,
             metric="accuracy",
+        )
+
+
+def test_preparation_rejects_incoherent_trust_modes(tmp_path: Path) -> None:
+    key = tmp_path / "key.pem"
+    integration._write_private_key(key)
+    common = {
+        "integration": "hf-transformers",
+        "runtime_image_digest": ZERO_DIGEST,
+    }
+
+    with pytest.raises(ValueError, match="must be supplied together"):
+        integration._prepare_workspace(
+            tmp_path / "partial-trust",
+            evidence_signing_key=key,
+            **common,
+        )
+    with pytest.raises(ValueError, match="cannot use ephemeral mode"):
+        integration._prepare_workspace(
+            tmp_path / "mixed-trust",
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "mixed-trust-root",
+            **common,
+        )
+    with pytest.raises(ValueError, match="caller-owned"):
+        integration._prepare_workspace(
+            tmp_path / "missing-trust",
+            ephemeral_trust_root=False,
+            **common,
+        )
+    with pytest.raises(ValueError, match="must be distinct"):
+        integration._prepare_workspace(
+            tmp_path / "shared-key",
+            evidence_signing_key=key,
+            verifier_signing_key=key,
+            trust_root=tmp_path / "shared-key-trust",
+            ephemeral_trust_root=False,
+            **common,
+        )
+
+
+def test_hf_subject_transformation_rejects_a_nonpositive_margin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import torch
+    import transformers
+
+    model, tokenizer = compact_model_profile.load_model_and_tokenizer(
+        torch=torch,
+        transformers=transformers,
+    )
+    with torch.no_grad():
+        model.lm_head.weight.zero_()
+    monkeypatch.setattr(
+        torch.linalg,
+        "lstsq",
+        lambda rows, _desired: SimpleNamespace(
+            solution=torch.zeros((rows.shape[1], 1))
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="missed a prompt"):
+        integration._target_row_derivative(
+            model,
+            tokenizer,
+            torch,
+            expected_output=" target",
         )
 
 
@@ -710,8 +972,8 @@ def test_execute_invokes_public_commands_and_checks_report(
 
 def test_command_runner_surfaces_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        integration.subprocess,
-        "run",
+        integration,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 3, stdout="out\n", stderr="bad\n"
         ),
@@ -724,8 +986,8 @@ def test_command_runner_accepts_success_and_handles_empty_diagnostic(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
-        integration.subprocess,
-        "run",
+        integration,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 0, stdout="done\n", stderr=""
         ),
@@ -734,8 +996,8 @@ def test_command_runner_accepts_success_and_handles_empty_diagnostic(
     assert "done" in capsys.readouterr().out
 
     monkeypatch.setattr(
-        integration.subprocess,
-        "run",
+        integration,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 3, stdout="", stderr=""
         ),
@@ -755,6 +1017,7 @@ def test_run_main_prepare_only_and_input_errors(
             "--runtime-image-digest",
             ZERO_DIGEST,
             "--prepare-only",
+            "--ephemeral-trust-root",
         ]
     )
     assert prepared == 0
@@ -770,10 +1033,29 @@ def test_run_main_prepare_only_and_input_errors(
                 "--runtime-image-digest",
                 ZERO_DIGEST,
                 "--prepare-only",
+                "--ephemeral-trust-root",
             ]
         )
         == 2
     )
+    missing = tmp_path / "missing-prepared"
+    linked = tmp_path / "linked-prepared"
+    linked.symlink_to(missing, target_is_directory=True)
+    assert (
+        integration.main(
+            [
+                "hf-transformers",
+                "--workspace",
+                str(linked),
+                "--runtime-image-digest",
+                ZERO_DIGEST,
+                "--prepare-only",
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert not missing.exists()
     with pytest.raises(SystemExit, match="full execution requires"):
         integration.main(
             [
@@ -782,6 +1064,38 @@ def test_run_main_prepare_only_and_input_errors(
                 str(tmp_path / "missing-image"),
                 "--runtime-image-digest",
                 ZERO_DIGEST,
+                "--ephemeral-trust-root",
+            ]
+        )
+
+
+def test_run_main_rejects_incoherent_trust_arguments(tmp_path: Path) -> None:
+    common = [
+        "hf-transformers",
+        "--workspace",
+        str(tmp_path / "workspace"),
+        "--runtime-image-digest",
+        ZERO_DIGEST,
+        "--prepare-only",
+    ]
+    key = tmp_path / "key.pem"
+    trust_root = tmp_path / "trust"
+
+    with pytest.raises(SystemExit, match="must be supplied together"):
+        integration.main([*common, "--evidence-signing-key", str(key)])
+    with pytest.raises(SystemExit, match="caller-owned"):
+        integration.main(common)
+    with pytest.raises(SystemExit, match="cannot be combined"):
+        integration.main(
+            [
+                *common,
+                "--evidence-signing-key",
+                str(key),
+                "--verifier-signing-key",
+                str(key),
+                "--trust-root",
+                str(trust_root),
+                "--ephemeral-trust-root",
             ]
         )
 
@@ -806,6 +1120,7 @@ def test_run_main_executes_the_prepared_transaction(
                 "runtime@" + ZERO_DIGEST,
                 "--runtime-image-digest",
                 ZERO_DIGEST,
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -892,14 +1207,37 @@ def test_runtime_image_builds_from_authenticated_source(
     monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
     monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
 
+    def write_statement(command: list[str]) -> None:
+        statement = Path(command[command.index("--statement") + 1])
+        statement.write_text(
+            json.dumps(
+                {
+                    "base_image": None,
+                    "build_arguments": {},
+                    "dockerfile": {"path": "runtime/Dockerfile", "sha256": ZERO_DIGEST},
+                    "format_version": "invarlock/runtime-image-build-v1",
+                    "image": "custom-example:" + "c" * 12,
+                    "ok": True,
+                    "platform": None,
+                    "runtime_image_id": "sha256:" + "d" * 64,
+                    "source_bundle_sha256": ZERO_DIGEST,
+                    "source_commit": "c" * 40,
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def fake_run(
         command: list[str], *, cwd: Path, capture_output: bool = False
     ) -> subprocess.CompletedProcess[str]:
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif "authenticated_runtime_build.py" in " ".join(command):
+            write_statement(command)
+            output = ""
         elif command[1:4] == ["image", "inspect", "--format"]:
-            output = "sha256:" + ("d" * 64)
+            output = "sha256:" + ("d" * 64) + "\t" + ("c" * 40) + "\t" + ZERO_DIGEST
         else:
             output = ""
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
@@ -923,6 +1261,69 @@ def test_runtime_image_builds_from_authenticated_source(
     assert build_command[build_command.index("--statement") + 1] == str(
         build / "runtime-build.json"
     )
+    assert not any(
+        command[:4] == ["docker", "image", "inspect", "--format"]
+        and command[-1] == "custom-example:" + "c" * 12
+        for command in commands
+    )
+
+
+def test_runtime_image_rejects_source_label_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    build = tmp_path / "build"
+    build.mkdir()
+    monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
+    monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
+
+    def fake_run(
+        command: list[str], *, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        if "qualification_source.py" in " ".join(command):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps({"source_bundle_sha256": ZERO_DIGEST}),
+                stderr="",
+            )
+        if "authenticated_runtime_build.py" in " ".join(command):
+            Path(command[command.index("--statement") + 1]).write_text(
+                json.dumps(
+                    {
+                        "base_image": None,
+                        "build_arguments": {},
+                        "dockerfile": {
+                            "path": "runtime/Dockerfile",
+                            "sha256": ZERO_DIGEST,
+                        },
+                        "format_version": "invarlock/runtime-image-build-v1",
+                        "image": "invarlock-example-runtime:" + "c" * 12,
+                        "ok": True,
+                        "platform": None,
+                        "runtime_image_id": "sha256:" + "d" * 64,
+                        "source_bundle_sha256": ZERO_DIGEST,
+                        "source_commit": "c" * 40,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="sha256:" + "d" * 64 + "\t" + "e" * 40 + "\t" + ZERO_DIGEST,
+            stderr="",
+        )
+
+    monkeypatch.setattr(launch, "_run", fake_run)
+    with pytest.raises(RuntimeError, match="not bound to the source"):
+        launch._runtime_image(
+            repository=repository,
+            build_root=build,
+            container_engine="docker",
+        )
 
 
 def test_runtime_image_authenticates_a_layered_base(
@@ -937,14 +1338,37 @@ def test_runtime_image_authenticates_a_layered_base(
     monkeypatch.setattr(launch, "_require_committed_checkout", lambda _repo: "c" * 40)
     monkeypatch.setattr(launch, "_git", lambda *args: "1234567890")
 
+    def write_statement(command: list[str]) -> None:
+        statement = Path(command[command.index("--statement") + 1])
+        statement.write_text(
+            json.dumps(
+                {
+                    "base_image": base,
+                    "build_arguments": {},
+                    "dockerfile": {"path": "runtime/Dockerfile", "sha256": ZERO_DIGEST},
+                    "format_version": "invarlock/runtime-image-build-v1",
+                    "image": "invarlock-example-runtime:" + "c" * 12,
+                    "ok": True,
+                    "platform": None,
+                    "runtime_image_id": "sha256:" + "d" * 64,
+                    "source_bundle_sha256": ZERO_DIGEST,
+                    "source_commit": "c" * 40,
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def fake_run(
         command: list[str], *, cwd: Path, capture_output: bool = False
     ) -> subprocess.CompletedProcess[str]:
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif "authenticated_runtime_build.py" in " ".join(command):
+            write_statement(command)
+            output = ""
         elif command[1:4] == ["image", "inspect", "--format"]:
-            output = "sha256:" + ("d" * 64)
+            output = "sha256:" + ("d" * 64) + "\t" + ("c" * 40) + "\t" + ZERO_DIGEST
         else:
             output = ""
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
@@ -1018,24 +1442,24 @@ def test_local_image_publication_is_digest_bound_and_disposable(
 def test_local_registry_command_runner_reports_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def fake_subprocess_run(
-        command: list[str], **_kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
-        if command == ["success"]:
-            return subprocess.CompletedProcess(command, 0, stdout="ready", stderr="")
-        if command == ["stderr"]:
-            return subprocess.CompletedProcess(command, 9, stdout="", stderr="denied")
-        return subprocess.CompletedProcess(command, 7, stdout="", stderr="")
-
-    monkeypatch.setattr(local_registry.subprocess, "run", fake_subprocess_run)
+    del monkeypatch
+    success = [sys.executable, "-c", "print('ready', end='')"]
+    stderr = [
+        sys.executable,
+        "-c",
+        "import sys; print('denied', file=sys.stderr); sys.exit(9)",
+    ]
+    silent = [sys.executable, "-c", "import sys; sys.exit(7)"]
     assert (
-        local_registry._run(["success"], cwd=tmp_path, capture_output=True).stdout
+        local_registry._run(success, cwd=tmp_path, capture_output=True).stdout
         == "ready"
     )
-    with pytest.raises(RuntimeError, match=r"status 9: stderr\ndenied"):
-        local_registry._run(["stderr"], cwd=tmp_path)
-    with pytest.raises(RuntimeError, match=r"status 7: silent$"):
-        local_registry._run(["silent"], cwd=tmp_path)
+    with pytest.raises(RuntimeError, match=r"status 9: .*denied"):
+        local_registry._run(stderr, cwd=tmp_path)
+    with pytest.raises(RuntimeError, match=r"status 7:"):
+        local_registry._run(silent, cwd=tmp_path)
+    with pytest.raises(RuntimeError, match="could not start"):
+        local_registry._run([str(tmp_path / "missing-command")], cwd=tmp_path)
 
 
 def test_local_image_publication_cleans_nothing_when_volume_creation_fails(
@@ -1206,6 +1630,29 @@ def test_runtime_image_rejects_non_digest_engine_identity(
     ) -> subprocess.CompletedProcess[str]:
         if "qualification_source.py" in " ".join(command):
             output = json.dumps({"source_bundle_sha256": ZERO_DIGEST})
+        elif "authenticated_runtime_build.py" in " ".join(command):
+            statement = Path(command[command.index("--statement") + 1])
+            statement.write_text(
+                json.dumps(
+                    {
+                        "base_image": None,
+                        "build_arguments": {},
+                        "dockerfile": {
+                            "path": "runtime/Dockerfile",
+                            "sha256": ZERO_DIGEST,
+                        },
+                        "format_version": "invarlock/runtime-image-build-v1",
+                        "image": "invarlock-example-runtime:" + "c" * 12,
+                        "ok": True,
+                        "platform": None,
+                        "runtime_image_id": "not-a-digest",
+                        "source_bundle_sha256": ZERO_DIGEST,
+                        "source_commit": "c" * 40,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = ""
         elif command[1:4] == ["image", "inspect", "--format"]:
             output = "not-a-digest"
         else:
@@ -1213,7 +1660,7 @@ def test_runtime_image_rejects_non_digest_engine_identity(
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     monkeypatch.setattr(launch, "_run", invalid_inspect)
-    with pytest.raises(RuntimeError, match="sha256 image ID"):
+    with pytest.raises(RuntimeError, match="runtime build statement does not bind"):
         launch._runtime_image(
             repository=repository,
             build_root=build,
@@ -1240,6 +1687,7 @@ def test_launch_main_dispatches_prepare_and_full_runs(
                 "--prepare-only",
                 "--workspace",
                 str(tmp_path / "prepare"),
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -1253,7 +1701,10 @@ def test_launch_main_dispatches_prepare_and_full_runs(
         "mkdtemp",
         lambda *, prefix: str(disposable),
     )
-    assert launch.main(["hf-transformers", "--prepare-only"]) == 0
+    assert (
+        launch.main(["hf-transformers", "--prepare-only", "--ephemeral-trust-root"])
+        == 0
+    )
     assert commands[-1][commands[-1].index("--workspace") + 1] == str(
         disposable / "transaction"
     )
@@ -1273,6 +1724,7 @@ def test_launch_main_dispatches_prepare_and_full_runs(
                 str(tmp_path / "full"),
                 "--runtime-device",
                 "cuda:1",
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -1287,31 +1739,95 @@ def test_launch_main_dispatches_prepare_and_full_runs(
 
     existing = tmp_path / "existing"
     existing.mkdir()
-    assert launch.main(["hf-transformers", "--workspace", str(existing)]) == 2
+    assert (
+        launch.main(
+            [
+                "hf-transformers",
+                "--prepare-only",
+                "--workspace",
+                str(existing),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    assert (
+        launch.main(
+            [
+                "hf-transformers",
+                "--prepare-only",
+                "--workspace",
+                str(linked),
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert not missing.exists()
 
 
 def test_launch_runner_reports_subprocess_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        launch.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(
-            args[0], 7, stdout="", stderr="failed"
-        ),
-    )
+    del monkeypatch
+    failing = [
+        sys.executable,
+        "-c",
+        "import sys; print('failed', file=sys.stderr); sys.exit(7)",
+    ]
     with pytest.raises(RuntimeError, match="status 7"):
-        launch._run(["bad"], cwd=tmp_path)
+        launch._run(failing, cwd=tmp_path)
 
-    monkeypatch.setattr(
-        launch.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(
-            args[0], 9, stdout="", stderr=""
-        ),
-    )
-    with pytest.raises(RuntimeError, match="status 9: silent-failure$"):
-        launch._run(["silent-failure"], cwd=tmp_path)
+    silent = [sys.executable, "-c", "import sys; sys.exit(9)"]
+    with pytest.raises(RuntimeError, match="status 9:"):
+        launch._run(silent, cwd=tmp_path)
+
+
+def test_shared_and_registry_runners_bound_output_and_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(launch, "_COMMAND_STDOUT_LIMIT", 8)
+    with pytest.raises(RuntimeError, match="stdout limit exceeded"):
+        launch._run(
+            [sys.executable, "-c", "print('x' * 100)"],
+            cwd=tmp_path,
+            capture_output=True,
+        )
+    monkeypatch.setattr(launch, "_COMMAND_TIMEOUT_SECONDS", 1)
+    with pytest.raises(RuntimeError, match="timed out"):
+        launch._run([sys.executable, "-c", "import time; time.sleep(2)"], cwd=tmp_path)
+
+    monkeypatch.setattr(local_registry, "_COMMAND_OUTPUT_LIMIT", 8)
+    with pytest.raises(RuntimeError, match="stdout limit exceeded"):
+        local_registry._run(
+            [sys.executable, "-c", "print('x' * 100)"],
+            cwd=tmp_path,
+            capture_output=True,
+        )
+    monkeypatch.setattr(local_registry, "_COMMAND_TIMEOUT_SECONDS", 1)
+    with pytest.raises(RuntimeError, match="timed out"):
+        local_registry._run(
+            [sys.executable, "-c", "import time; time.sleep(2)"], cwd=tmp_path
+        )
+
+
+def test_shared_runner_success_capture_modes_and_start_failure(tmp_path: Path) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        "import sys; print('out'); print('err', file=sys.stderr)",
+    ]
+    uncaptured = launch._run(command, cwd=tmp_path)
+    assert uncaptured.returncode == 0
+    assert uncaptured.stdout is None
+    captured = launch._run(command, cwd=tmp_path, capture_output=True)
+    assert captured.stdout == "out\n"
+    assert captured.stderr == "err\n"
+    with pytest.raises(RuntimeError, match="could not start"):
+        launch._run([str(tmp_path / "missing-command")], cwd=tmp_path)
 
 
 def test_runtime_image_requires_source_bundle_digest(
@@ -1338,13 +1854,88 @@ def test_runtime_image_requires_source_bundle_digest(
         )
 
 
-def test_qwen3_profile_uses_an_immutable_official_revision() -> None:
-    assert qwen3_profile.MODEL_ID == "Qwen/Qwen3-0.6B"
-    assert qwen3_profile.MODEL_REVISION == ("c1899de289a04d12100db370d81485cdf75e47ca")
-    assert qwen3_profile.PEFT_TARGET_MODULES == ("q_proj", "v_proj")
+def test_compact_profile_pins_qwen35_08b() -> None:
+    assert compact_model_profile.MODEL_ID == "Qwen/Qwen3.5-0.8B"
+    assert compact_model_profile.MODEL_REVISION == (
+        "2fc06364715b967f1860aea9cf38778875588b17"
+    )
+    assert compact_model_profile.PEFT_TARGET_MODULES == ("q_proj", "v_proj")
 
 
-def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
+@pytest.mark.parametrize(
+    "wrong_config",
+    [
+        SimpleNamespace(
+            model_type="qwen3",
+            architectures=["Qwen3ForCausalLM"],
+        ),
+        SimpleNamespace(
+            model_type="qwen3_5",
+            architectures=("Qwen3_5ForConditionalGeneration",),
+        ),
+        SimpleNamespace(
+            model_type="qwen3_5",
+            architectures=["Qwen3_5ForCausalLM"],
+        ),
+    ],
+    ids=["wrong-model-type", "non-list-architectures", "wrong-architecture"],
+)
+def test_qwen35_compact_loader_rejects_wrong_architecture(
+    wrong_config: SimpleNamespace,
+) -> None:
+    class AutoConfig:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> SimpleNamespace:
+            return wrong_config
+
+    class NotCalled:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> object:
+            raise AssertionError("loader continued after architecture mismatch")
+
+    transformers = type(
+        "Transformers",
+        (),
+        {
+            "AutoConfig": AutoConfig,
+            "AutoModelForCausalLM": NotCalled,
+            "AutoTokenizer": NotCalled,
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Qwen3.5 text architecture"):
+        REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
+
+
+def test_qwen35_compact_loader_rejects_non_text_model_resolution() -> None:
+    class Loader:
+        @staticmethod
+        def from_pretrained(*_args: object, **_kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(
+                config=SimpleNamespace(model_type="qwen3_5", use_cache=True)
+            )
+
+    transformers = SimpleNamespace(
+        AutoConfig=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: SimpleNamespace(
+                model_type="qwen3_5",
+                architectures=["Qwen3_5ForConditionalGeneration"],
+            )
+        ),
+        AutoTokenizer=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: SimpleNamespace(
+                pad_token_id=0,
+                eos_token_id=2,
+            )
+        ),
+        AutoModelForCausalLM=Loader,
+    )
+
+    with pytest.raises(RuntimeError, match="causal text model"):
+        REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
+
+
+def test_compact_loader_passes_the_pin_to_config_model_and_tokenizer() -> None:
     calls: list[tuple[str, str, dict[str, object]]] = []
 
     class Tokenizer:
@@ -1352,10 +1943,21 @@ def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
         eos_token_id = 2
 
     class Config:
+        model_type = "qwen3_5_text"
         use_cache = True
 
     class Model:
         config = Config()
+
+    class ModelConfig:
+        model_type = "qwen3_5"
+        architectures = ["Qwen3_5ForConditionalGeneration"]
+
+    class AutoConfig:
+        @staticmethod
+        def from_pretrained(model_id: str, **kwargs: object) -> ModelConfig:
+            calls.append(("config", model_id, kwargs))
+            return ModelConfig()
 
     class AutoTokenizer:
         @staticmethod
@@ -1372,21 +1974,28 @@ def test_qwen3_loader_passes_the_pin_to_model_and_tokenizer() -> None:
     Transformers = type(
         "Transformers",
         (),
-        {"AutoTokenizer": AutoTokenizer, "AutoModelForCausalLM": AutoModel},
+        {
+            "AutoConfig": AutoConfig,
+            "AutoTokenizer": AutoTokenizer,
+            "AutoModelForCausalLM": AutoModel,
+        },
     )
 
-    model, _tokenizer = REAL_QWEN3_LOADER(torch=object(), transformers=Transformers)
+    model, _tokenizer = REAL_COMPACT_LOADER(torch=object(), transformers=Transformers)
     assert model.config.use_cache is False
-    assert [call[0] for call in calls] == ["tokenizer", "model"]
-    assert all(call[1] == qwen3_profile.MODEL_ID for call in calls)
-    assert all(call[2]["revision"] == qwen3_profile.MODEL_REVISION for call in calls)
+    assert [call[0] for call in calls] == ["config", "tokenizer", "model"]
+    assert all(call[1] == compact_model_profile.MODEL_ID for call in calls)
+    assert all(
+        call[2]["revision"] == compact_model_profile.MODEL_REVISION for call in calls
+    )
     assert all(call[2]["trust_remote_code"] is False for call in calls)
-    assert calls[1][2]["use_safetensors"] is True
-    assert calls[1][2]["dtype"] == "auto"
+    assert calls[2][2]["use_safetensors"] is True
+    assert calls[2][2]["dtype"] == "auto"
 
 
-def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
+def test_compact_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
     class Config:
+        model_type = "qwen3_5_text"
         use_cache = True
 
     class Model:
@@ -1404,10 +2013,27 @@ def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
         eos_token = "</s>"
 
     tokenizer = Tokenizer()
+    model_config = type(
+        "ModelConfig",
+        (),
+        {
+            "model_type": "qwen3_5",
+            "architectures": ["Qwen3_5ForConditionalGeneration"],
+        },
+    )()
     transformers = type(
         "Transformers",
         (),
         {
+            "AutoConfig": type(
+                "AutoConfig",
+                (),
+                {
+                    "from_pretrained": staticmethod(
+                        lambda *_args, **_kwargs: model_config
+                    )
+                },
+            ),
             "AutoTokenizer": type(
                 "AutoTokenizer",
                 (),
@@ -1416,9 +2042,9 @@ def test_qwen3_loader_uses_eos_for_padding_and_rejects_missing_tokens() -> None:
             "AutoModelForCausalLM": AutoModel,
         },
     )
-    _model, observed = REAL_QWEN3_LOADER(torch=object(), transformers=transformers)
+    _model, observed = REAL_COMPACT_LOADER(torch=object(), transformers=transformers)
     assert observed.pad_token == "</s>"
 
     tokenizer.eos_token_id = None
     with pytest.raises(RuntimeError, match="no padding token"):
-        REAL_QWEN3_LOADER(torch=object(), transformers=transformers)
+        REAL_COMPACT_LOADER(torch=object(), transformers=transformers)

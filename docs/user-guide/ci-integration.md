@@ -21,7 +21,8 @@ The action runs the same public transactions documented by the
 
 1. `invarlock verify EVIDENCE` authenticates and replays the bundle using the
    supplied artifact identities, schedule, policy, runtime digests, and
-   evidence-signer fingerprint, then writes a verifier-signed receipt.
+   evidence-signer fingerprint plus the normalized-request digest required for
+   GGUF evidence, then writes a verifier-signed receipt.
 2. `invarlock report EVIDENCE --html PATH --explain` authenticates the bundle
    and writes a human view without changing the evidence.
 3. The action uploads the evidence directory, verification JSON, signed
@@ -42,6 +43,7 @@ from the submitted evidence directory.
 | `expected-baseline-runtime` | Yes | Approved baseline outer-image digest |
 | `expected-subject-runtime` | Yes | Approved subject outer-image digest |
 | `expected-signer` | Yes | Authorized Ed25519 evidence-signer fingerprint |
+| `expected-request-digest` | For GGUF | Approved normalized-request digest; required when either side uses `llama_cpp` |
 | `verifier-signing-key` | Yes | Path to the verifier-owned private-key file |
 | `verifier-identity` | Yes | Stable identity recorded in the signed receipt |
 | `python` | No | Python executable; defaults to `python` |
@@ -133,6 +135,7 @@ jobs:
           expected-baseline-runtime: ${{ vars.INVARLOCK_BASELINE_RUNTIME_DIGEST }}
           expected-subject-runtime: ${{ vars.INVARLOCK_SUBJECT_RUNTIME_DIGEST }}
           expected-signer: ${{ vars.INVARLOCK_EVIDENCE_SIGNER_FINGERPRINT }}
+          expected-request-digest: ${{ vars.INVARLOCK_REQUEST_DIGEST }}
           verifier-signing-key: ${{ runner.temp }}/invarlock-verifier.pem
           verifier-identity: release-verifier
           receipt-output: reports/invarlock/verification.receipt.json
@@ -148,6 +151,41 @@ use that release's pinned immutable commit SHA. A tag is easier to read but a
 full commit pin makes action-source substitution visible in review.
 `INVARLOCK_POLICY_SHA256` must likewise be a protected verifier-owned digest,
 not a value read from the submitted checkout.
+`INVARLOCK_REQUEST_DIGEST` is required when either evidence side uses
+`llama_cpp`; omit `expected-request-digest` for a non-GGUF workflow that does
+not maintain this additional anchor.
+
+## Protected deployment approval
+
+A successful verification job is necessary but is not, by itself, a portable
+deployment authorization. The deployment job must consume the uploaded signed
+receipt, reauthenticate it against production-owned verifier and policy
+anchors, and deploy only the exact candidate bound by that receipt.
+
+The maintained
+[`deployment-approval.yml`](https://github.com/invarlock/invarlock/blob/main/examples/ci/standalone-consumer/.github/workflows/deployment-approval.yml)
+example implements that separation:
+
+1. `verify-evidence` runs in the protected `release-review` environment and
+   uploads the evidence plus its signed verifier receipt.
+2. `deploy-candidate` depends on that successful job and enters a separate
+   protected `production` environment.
+3. The deployment job downloads the artifact and runs
+   `review/verify_deployment_receipt.py` against production-owned approval
+   inputs. The helper authenticates the receipt signature, verifier identity
+   and fingerprint, evidence signer, artifact identities, schedule, runtimes,
+   and policy digest.
+4. The production-owned deployment adapter resolves or recomputes the candidate
+   identity and requires it to equal `artifact_digests.subject` in the emitted
+   `invarlock/deployment-approval-v1` record. Only then does the workflow invoke
+   the deployment command with that same record.
+
+The complete approval-input JSON is materialized from protected production
+configuration. It must not be generated from the downloaded evidence, receipt,
+or verification job outputs. The checked-in test exercises the accepted path
+and rejects changed verifier and policy anchors. A mutable candidate path or
+tag is not enough: the deployment adapter must enforce the approved InvarLock
+artifact identity to close the time-of-check/time-of-use boundary.
 
 ## Outputs and status
 
@@ -185,6 +223,8 @@ receipt through the
 ## Trust and secret handling
 
 - Never derive `expected-signer` from `manifest.signature.json` in the pack.
+- For GGUF evidence, never derive `expected-request-digest` from the submitted
+  normalized request.
 - Never copy either expected runtime digest from the submitted runtime
   manifests.
 - Do not upload or cache the verifier private key.
@@ -194,6 +234,9 @@ receipt through the
   report paths for a retry.
 - Validate a received receipt against the expected verifier identity and
   fingerprint before another system relies on it.
+- Reauthenticate the signed receipt in the deployment environment; do not
+  treat job dependency, artifact presence, HTML, or unsigned verification JSON
+  as deployment authority.
 
 Continue with [Evidence and verification](evidence-and-verification.md) for the
 handoff and receipt verifier rules and [Key management](key-management.md) for

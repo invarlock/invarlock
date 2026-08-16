@@ -143,6 +143,10 @@ def test_checksum_verifier_rejects_traversal_missing_symlink_and_mismatch(
     assert "checksum mismatch" in joined
     assert {"payload.bin", "missing.bin", "../outside.bin", "linked.bin"} <= covered
 
+    pack_alias = tmp_path / "pack-alias"
+    pack_alias.symlink_to(root, target_is_directory=True)
+    assert integrity._normalize_pack_path(pack_alias, "payload.bin") is None
+
 
 def test_extra_file_policy_distinguishes_strict_errors_from_diagnostics(
     tmp_path: Path,

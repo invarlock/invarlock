@@ -176,7 +176,10 @@ def test_llama_cpp_exact_match_command_honors_normal_eos() -> None:
             batch_size=1,
             max_output_tokens=16,
             timeout_seconds=30,
-        )
+        ),
+        cpu_threads=4,
+        prompt_batch_size=32,
+        prompt_microbatch_size=16,
     )
 
     arguments = session._arguments("/proc/self/fd/7")  # noqa: SLF001
@@ -232,7 +235,10 @@ def _runtime_inputs(
             "seed": 7,
             "context_length": 256,
             "batch_size": 32,
+            "cpu_threads": 4,
             "max_output_tokens": 16,
+            "prompt_batch_size": 32,
+            "prompt_microbatch_size": 16,
             "timeout_seconds": 1,
         },
     )
@@ -582,6 +588,9 @@ def test_llama_cpp_provider_rejects_invalid_inspection_and_preparation_bindings(
             seed=1,
             context_length=32,
             batch_size=1,
+            cpu_threads=1,
+            prompt_batch_size=16,
+            prompt_microbatch_size=16,
             max_output_tokens=8,
             timeout_seconds=2,
         )
@@ -638,6 +647,9 @@ def test_llama_cpp_runtime_inspection_rechecks_artifact_identity(
             seed=7,
             context_length=256,
             batch_size=32,
+            cpu_threads=4,
+            prompt_batch_size=32,
+            prompt_microbatch_size=16,
             max_output_tokens=16,
             timeout_seconds=1,
         )
@@ -655,6 +667,9 @@ def test_llama_cpp_runtime_inspection_rechecks_artifact_identity(
         ("negative", "non-negative integer"),
         ("empty_text", "non-empty trimmed printable string"),
         ("model_id", "privacy-safe full GGUF digest name"),
+        ("cpu_limit", "cpu_threads exceeds the supported limit"),
+        ("prompt_batch_limit", "prompt_batch_size must not exceed"),
+        ("microbatch_limit", "prompt_microbatch_size must not exceed"),
     ],
 )
 def test_llama_cpp_config_rejects_ambiguous_or_unbound_settings(
@@ -684,6 +699,12 @@ def test_llama_cpp_config_rejects_ambiguous_or_unbound_settings(
         settings["backend_version"] = ""
     elif mutation == "model_id":
         model_id = "private/model-name"
+    elif mutation == "cpu_limit":
+        settings["cpu_threads"] = 257
+    elif mutation == "prompt_batch_limit":
+        settings["prompt_batch_size"] = 257
+    elif mutation == "microbatch_limit":
+        settings["prompt_microbatch_size"] = 33
     invalid = ModelRuntimeSpec(
         provider_name=provider_name,
         model_id=model_id,
@@ -836,6 +857,8 @@ def test_llama_cpp_strict_open_accepts_loopback_only_network_namespace(
 ) -> None:
     spec, _bindings, context = _runtime_inputs(tmp_path)
     ipv4, ipv6 = _write_route_tables(tmp_path, ipv4_interface="lo", ipv6_interface="lo")
+    ipv4.write_text(ipv4.read_text(encoding="ascii") + "\n", encoding="ascii")
+    ipv6.write_text("\n" + ipv6.read_text(encoding="ascii"), encoding="ascii")
     monkeypatch.setattr(
         llama_cpp,
         "_require_isolated_network_namespace",
@@ -1045,13 +1068,13 @@ def test_llama_cpp_uses_fixed_argv_and_sanitized_environment(
         "--batch-size",
         "32",
         "--ubatch-size",
-        "32",
+        "16",
         "--n-predict",
         "16",
         "--threads",
-        "1",
+        "4",
         "--threads-batch",
-        "1",
+        "4",
         "--temp",
         "0",
         "--device",

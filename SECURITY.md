@@ -72,8 +72,9 @@ When using InvarLock:
    the complete environment, including optional provider runtimes.
 2. **Verify with external trust anchors**: supply the policy, baseline and
    subject artifact-identity digests, canonical schedule digest, both expected
-   runtime digests, and expected evidence-signer fingerprint independently of
-   the evidence bundle. Write and retain a separately signed verifier receipt.
+   runtime digests, expected evidence-signer fingerprint, and, for GGUF,
+   normalized-request digest independently of the evidence bundle. Write and
+   retain a separately signed verifier receipt.
 3. **Inspect authenticated evidence**: use `invarlock report` only after the
    bundle has passed independent verification.
 4. **Isolate sensitive workloads**: use virtual environments or containers and
@@ -112,8 +113,9 @@ These mechanisms authenticate claims and detect tampering; they do not attest
 actual container execution. A compromised evaluation environment can fabricate
 internally consistent evidence that names an expected digest. Use isolated
 evaluation infrastructure, protect signing keys, and obtain policies, runtime
-digests, artifact identities, schedule digests, signer fingerprints, and
-verifier trust anchors through separate release or deployment channels.
+digests, artifact identities, schedule digests, signer fingerprints,
+GGUF request digests, and verifier trust anchors through separate release or
+deployment channels.
 
 See the [security practices](docs/security/best-practices.md) for the current
 file-backed signer limitation, key custody, data retention, runtime isolation,

@@ -17,6 +17,13 @@ def _step(job: dict[str, Any], name: str) -> dict[str, Any]:
     return next(step for step in job["steps"] if step.get("name") == name)
 
 
+def _assert_core_wheel_install(job: dict[str, Any]) -> None:
+    install = _step(job, "Install dependencies")["run"]
+    assert "--require-hashes" in install
+    assert "python -m build --wheel --no-isolation" in install
+    assert "--no-deps --force-reinstall dist/*.whl" in install
+
+
 def test_ci_runs_the_repository_gates() -> None:
     workflow = _load(".github/workflows/ci.yml")
     jobs = workflow["jobs"]
@@ -49,6 +56,7 @@ def test_ci_runs_the_repository_gates() -> None:
     )
 
     fast = jobs["verify-fast"]
+    _assert_core_wheel_install(fast)
     assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(fast, "Run fast repository gates")["run"] == "make verify-fast"
     assert _step(fast, "Build, install, and validate distributions")["run"] == (
@@ -57,6 +65,7 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
     minimum = jobs["minimum-python"]
+    _assert_core_wheel_install(minimum)
     assert _step(minimum, "Set up uv")["with"]["version"] == "0.10.10"
     python = _step(minimum, "Set up Python")
     assert python["with"]["python-version"] == "3.12"
@@ -70,6 +79,7 @@ def test_ci_runs_the_repository_gates() -> None:
     assert minimum["timeout-minutes"] >= 35
 
     coverage = jobs["coverage"]
+    _assert_core_wheel_install(coverage)
     assert _step(coverage, "Enforce coverage")["run"] == "make coverage-enforce"
 
     supply_chain = jobs["supply-chain"]
@@ -85,6 +95,7 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
     workflow = _load(".github/workflows/ci.yml")
     full = workflow["jobs"]["verify-full"]
 
+    _assert_core_wheel_install(full)
     assert "workflow_dispatch" in full["if"]
     assert _step(full, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(full, "Install documentation linters")["run"] == "npm ci"
@@ -104,26 +115,30 @@ def test_ci_has_no_retired_product_workflows_or_jobs() -> None:
     assert [marker for marker in retired if marker in text] == []
 
 
-def test_docs_ci_uses_the_current_documentation_targets() -> None:
+def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     workflow = _load(".github/workflows/docs-ci.yml")
     docs = workflow["jobs"]["docs"]
 
     assert _step(docs, "Check documentation")["run"] == "make docs-check"
     assert _step(docs, "Exercise documented commands")["run"] == ("make docs-live-fast")
+    assert workflow["on"]["pull_request"] == {
+        "branches": ["main", "staging/next", "release/v*"]
+    }
 
-    paths = workflow["on"]["pull_request"]["paths"]
-    assert "docs/**" in paths
-    assert "*.md" in paths
-    for maintained_surface in (
-        ".github/**/*.md",
-        "addins/**/*.md",
-        "examples/**/*.md",
-        "public_evidence/**/*.md",
-        "requirements/**/*.md",
-        "scripts/**/*.md",
-        "tests/README.md",
+    paths = workflow["on"]["push"]["paths"]
+    expected_paths = {
+        "*.md",
+        "*.MD",
+        "**/*.md",
+        "**/*.MD",
+        "docs/**",
         "tests/docs/**",
-    ):
-        assert maintained_surface in paths
-    assert not any(path.startswith("notebooks/") for path in paths)
-    assert not any(path.startswith("scripts/docs/") for path in paths)
+        "mkdocs.yml",
+        "Makefile",
+        "package.json",
+        "package-lock.json",
+        "requirements/workflows/docs-ci-py313.txt",
+        ".github/workflows/docs-ci.yml",
+    }
+    assert len(paths) == len(expected_paths)
+    assert set(paths) == expected_paths

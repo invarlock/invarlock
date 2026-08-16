@@ -7,6 +7,31 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
+            "checksums.sha256": "sha256:726e76debedaf065b375f8639119ea6b30097c2de19851229448c1aa9edc28db",
+            "manifest.json": "sha256:b13a75a2f645e4e730f14abca8d76fcd6fb1852fce77d3c6da648663fcf486ca",
+            "manifest.signature.json": "sha256:5ae41826d72d8439b4764c9888f2c558b220f3eb7962a23b816a50fa8fd70f8d"
+          },
+          "file_count": 26,
+          "kind": "directory",
+          "path": "public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf/evidence",
+          "size_bytes": 883667
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf/verification.receipt.json",
+          "sha256": "sha256:fb5b8f847daf3926d3d75278b90c2e173fe8c646310150a4e94047893cd71070",
+          "size_bytes": 1645
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/ministral3-8b-bf16-to-q5-k-m-gguf",
+      "slug": "ministral3-8b-bf16-to-q5-k-m-gguf",
+      "summary": "Strictly verified Ministral 3 8B text-causal comparison of an authenticated BF16 checkpoint and its source-derived Q5_K_M GGUF deployment over a balanced 400-record MMLU-Pro exact-match schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
             "checksums.sha256": "sha256:3003ec6176c6bd97bb1fc79aa5532929d9d2a80e5c520357ce0e8a4102fcaee5",
             "manifest.json": "sha256:c6072084720867a75502fb29159b597e4ee35577e0b2e6c9406cba2482f12c14",
             "manifest.signature.json": "sha256:a83054e7fd24729e3a118707b828149aeaba6fcef16bb08565c2e915c88bcdff"
@@ -82,6 +107,56 @@
       "artifacts": {
         "evidence_pack": {
           "control_hashes": {
+            "checksums.sha256": "sha256:1193eb3bf11a47a196275f95314d53238509bb856c0c5f3b421ec3951804148b",
+            "manifest.json": "sha256:86fd4e650f38b457541e4af90b1dfa4a35e94f901cf89e2fab3c772f13682914",
+            "manifest.signature.json": "sha256:342db6df8a84668ed7cc2e47b8f5243e324d7f0e498b9f9e3d3f4e8f4a2360e8"
+          },
+          "file_count": 26,
+          "kind": "directory",
+          "path": "public_evidence/evidence/qwen3.5-9b-bf16-to-q5-k-m-gguf/evidence",
+          "size_bytes": 909028
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/qwen3.5-9b-bf16-to-q5-k-m-gguf/verification.receipt.json",
+          "sha256": "sha256:10edaea789c0ad9e3a0213cd825bb28f77e655ef6add5f0f11f197e1dac8aff5",
+          "size_bytes": 1645
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/qwen3.5-9b-bf16-to-q5-k-m-gguf",
+      "slug": "qwen3.5-9b-bf16-to-q5-k-m-gguf",
+      "summary": "Strictly verified Qwen3.5 9B text-causal comparison of an authenticated BF16 checkpoint and its source-derived Q5_K_M GGUF deployment over a balanced 400-record MMLU-Pro exact-match schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
+            "checksums.sha256": "sha256:9ab3b5a048c448a88431018fd9924dacf0612dcff0f788cd4288086070d734c1",
+            "manifest.json": "sha256:355ed56ce95a79faa384ce2f2de6d4e3804fba81c243b82d37cac397fd4a454d",
+            "manifest.signature.json": "sha256:2d2d57f07183c0bfe317eaf075709b122dbdc3e3bb13dcfd3a2bb5e944bdaa49"
+          },
+          "file_count": 26,
+          "kind": "directory",
+          "path": "public_evidence/evidence/qwen3.8-27b-bf16-to-q5-k-m-gguf/evidence",
+          "size_bytes": 909011
+        },
+        "verification_receipt": {
+          "kind": "file",
+          "path": "public_evidence/evidence/qwen3.8-27b-bf16-to-q5-k-m-gguf/verification.receipt.json",
+          "sha256": "sha256:ceda17170d38f8571a0a3c408f6d672603d5c75f73c587668f7d62efd8fc8205",
+          "size_bytes": 1645
+        }
+      },
+      "evidence_class": "signed_evidence_pack",
+      "path": "public_evidence/evidence/qwen3.8-27b-bf16-to-q5-k-m-gguf",
+      "slug": "qwen3.8-27b-bf16-to-q5-k-m-gguf",
+      "summary": "Strictly verified Qwen3.8 27B text-causal comparison of an authenticated BF16 checkpoint and its source-derived Q5_K_M GGUF deployment over a balanced 400-record MMLU-Pro exact-match schedule"
+    },
+    {
+      "artifacts": {
+        "evidence_pack": {
+          "control_hashes": {
             "checksums.sha256": "sha256:267a6d4894b2b378ad293f441470f0f01cb896b181d8839784811b9b59bbf287",
             "manifest.json": "sha256:3c32a46fd20d71eb5d7fa8ab719e761b302ec73ee41aeb579a4e6ffaa9705b57",
             "manifest.signature.json": "sha256:325e6697a1465729b4b769001b3ac2170f2de59dd9aae079633f0f39e3a36393"
@@ -104,9 +179,9 @@
       "summary": "Strictly verified TensorRT-LLM comparison of two authenticated TinyLlama 1.1B checkpoint engines over a balanced 400-record MMLU-Pro exact-match schedule"
     }
   ],
-  "evidence_count": 4,
-  "evidence_file_count": 104,
-  "evidence_size_bytes": 3012836,
+  "evidence_count": 7,
+  "evidence_file_count": 185,
+  "evidence_size_bytes": 5719477,
   "format_version": "invarlock/public-evidence-index-v1",
   "status": "available",
   "status_label": "Evidence available"

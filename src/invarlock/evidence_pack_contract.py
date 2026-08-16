@@ -56,9 +56,14 @@ EVIDENCE_PACK_VERIFY_FORMAT = "invarlock/evidence-pack-verify-v1"
 EVIDENCE_INPUT_IDENTITY_FORMAT = "invarlock/evidence-input-identity-v1"
 PAIRED_RECORDS_FORMAT = "invarlock/paired-records-v1"
 LEGACY_COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v1"
-COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v2"
+COMPARISON_REPORT_FORMAT_V2 = "invarlock/comparison-report-v2"
+COMPARISON_REPORT_FORMAT = "invarlock/comparison-report-v3"
 COMPARISON_REPORT_FORMATS = frozenset(
-    {LEGACY_COMPARISON_REPORT_FORMAT, COMPARISON_REPORT_FORMAT}
+    {
+        LEGACY_COMPARISON_REPORT_FORMAT,
+        COMPARISON_REPORT_FORMAT_V2,
+        COMPARISON_REPORT_FORMAT,
+    }
 )
 RUNTIME_SIDE_REPORT_FORMAT = "invarlock/runtime-side-report-v1"
 RUNTIME_SIDE_CONFIG_FORMAT = "invarlock/runtime-side-config-v1"
@@ -979,16 +984,24 @@ def _resolved_metric_policy(
         else "maximum_interval_width_pp"
     )
     sample_fields = {"minimum_record_count", interval_width_field}
+    side_accuracy_field = {"minimum_side_accuracy"}
     selected_fields = set(selected)
     if selected_fields & sample_fields and not sample_fields <= selected_fields:
         raise EvidencePackError(
             f"policy metrics.{metric_name}.minimum_record_count and "
             f"{interval_width_field} must be provided together"
         )
-    if (
-        selected_fields != expected_fields
-        and selected_fields != expected_fields | sample_fields
-    ):
+    optional_fields = set()
+    if selected_fields & sample_fields:
+        optional_fields.update(sample_fields)
+    if "minimum_side_accuracy" in selected_fields:
+        if metric != "exact_match" or scorer_binding is not None:
+            raise EvidencePackError(
+                f"policy metrics.{metric_name}.minimum_side_accuracy is only "
+                "supported for exact_match"
+            )
+        optional_fields.update(side_accuracy_field)
+    if selected_fields != expected_fields | optional_fields:
         raise EvidencePackError(
             f"policy metrics.{metric_name} must contain exactly the authorized fields"
         )
@@ -1028,6 +1041,16 @@ def _resolved_metric_policy(
             raise EvidencePackError(
                 f"policy metrics.{metric_name}.{interval_width_field} must be "
                 f"positive{suffix}"
+            )
+    if "minimum_side_accuracy" in selected:
+        minimum_side_accuracy = _finite_number(
+            selected["minimum_side_accuracy"],
+            label=f"policy metrics.{metric_name}.minimum_side_accuracy",
+        )
+        if not 0.0 <= minimum_side_accuracy <= 1.0:
+            raise EvidencePackError(
+                f"policy metrics.{metric_name}.minimum_side_accuracy must be "
+                "between 0 and 1"
             )
     return selected
 
@@ -1096,6 +1119,26 @@ def _sample_qualification(
         },
         "passed": record_count_passed and interval_width_passed,
     }
+
+
+def _side_accuracy_qualification(
+    selected_policy: Mapping[str, object],
+    *,
+    baseline_mean: float,
+    subject_mean: float,
+) -> tuple[dict[str, object] | None, bool]:
+    if "minimum_side_accuracy" not in selected_policy:
+        return None, True
+    minimum = cast(float, selected_policy["minimum_side_accuracy"])
+    baseline_passed = baseline_mean >= minimum
+    subject_passed = subject_mean >= minimum
+    qualification = {
+        "minimum": minimum,
+        "baseline": {"observed": baseline_mean, "passed": baseline_passed},
+        "subject": {"observed": subject_mean, "passed": subject_passed},
+        "passed": baseline_passed and subject_passed,
+    }
+    return qualification, baseline_passed and subject_passed
 
 
 def validated_derived_measurements(value: object) -> dict[str, object]:
@@ -1246,6 +1289,13 @@ def build_comparison_report(
     selected_policy = _resolved_metric_policy(
         policy, metric=metric, scorer_binding=scorer_binding
     )
+    if (
+        "minimum_side_accuracy" in selected_policy
+        and report_format != COMPARISON_REPORT_FORMAT
+    ):
+        raise EvidencePackError(
+            "minimum_side_accuracy requires invarlock/comparison-report-v3"
+        )
     paired_binary: dict[str, object] | None = None
     if metric == "exact_match":
         try:
@@ -1373,6 +1423,12 @@ def build_comparison_report(
     )
     if sample_qualification is not None:
         passed = passed and cast(bool, sample_qualification["passed"])
+    side_accuracy_qualification, side_accuracy_passed = _side_accuracy_qualification(
+        selected_policy,
+        baseline_mean=baseline_mean,
+        subject_mean=subject_mean,
+    )
+    passed = passed and side_accuracy_passed
     report: dict[str, object] = {
         "format": report_format,
         "comparison_id": comparison_id,
@@ -1393,6 +1449,11 @@ def build_comparison_report(
         report["paired_binary"] = paired_binary
     if sample_qualification is not None:
         report["sample_qualification"] = sample_qualification
+    report.update(
+        {"side_accuracy": side_accuracy_qualification}
+        if side_accuracy_qualification is not None
+        else {}
+    )
     if scorer_binding is not None:
         report["scorer_extension"] = scorer_binding_payload(scorer_binding)
         assert scorer_replay is not None
@@ -1409,6 +1470,7 @@ def schedule_bytes(schedule: RuntimeBehavioralSchedule) -> bytes:
 
 __all__ = [
     "COMPARISON_REPORT_FORMAT",
+    "COMPARISON_REPORT_FORMAT_V2",
     "COMPARISON_REPORT_FORMATS",
     "DERIVED_PERPLEXITY_METHOD",
     "EVIDENCE_PACK_FORMAT",

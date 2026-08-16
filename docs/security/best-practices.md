@@ -190,6 +190,7 @@ submitted pack:
 - expected baseline runtime digest;
 - expected subject runtime digest;
 - expected evidence-signer fingerprint;
+- expected normalized-request digest when either side uses `llama_cpp`;
 - verifier key authorization; and
 - verifier identity.
 

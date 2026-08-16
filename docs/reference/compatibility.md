@@ -54,8 +54,9 @@ from present-day acceptability.
 ## Release-blocking evidence
 
 The committed v0.13 corpus lives at
-`tests/fixtures/compatibility/v0.13.0/corpus.json` and points only to tracked
-files under `examples/acceptance-handoff/golden/`. `make compatibility-test`
+`tests/fixtures/compatibility/v0.13.0/corpus.json` and points only to the
+immutable package beside it. Current public examples have their own generated
+fixtures and cannot silently rewrite this historical corpus. `make compatibility-test`
 checks immutable fixture digests, original-semantic replay, signed-receipt
 verification, tamper rejection, semantic inconsistency rejection, and
 protection against contract relabeling.

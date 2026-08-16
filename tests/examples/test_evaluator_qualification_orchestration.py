@@ -271,7 +271,7 @@ def test_matrix_execution_orchestration_and_cli_branches(
     replayed = []
     monkeypatch.setattr(
         matrix,
-        "replay_authoritative_import",
+        "replay_import",
         lambda profile_id, *, write: replayed.append((profile_id, write)),
     )
     artifacts = tmp_path / "artifacts"
@@ -281,7 +281,7 @@ def test_matrix_execution_orchestration_and_cli_branches(
         artifacts=artifacts,
         cases=EXAMPLE / "cases.json",
         schedule=EXAMPLE / "schedule.json",
-        authoritative=True,
+        replayable=True,
     )
     assert len(calls) == 1
     assert replayed == [("promptfoo", True)]
@@ -293,17 +293,17 @@ def test_matrix_execution_orchestration_and_cli_branches(
     monkeypatch.setattr(matrix, "execute", lambda selected: dispatched.append(selected))
     monkeypatch.setattr(
         matrix,
-        "execute_authoritative",
+        "execute_replayable",
         lambda selected: dispatched.append(selected),
     )
     monkeypatch.setattr(
-        matrix, "verify_authoritative", lambda: dispatched.append("authoritative")
+        matrix, "verify_replayable", lambda: dispatched.append("replayable")
     )
     monkeypatch.setattr(matrix, "verify", lambda: dispatched.append("verify"))
     for namespace in (
         argparse.Namespace(command="execute", profiles=["one"]),
-        argparse.Namespace(command="execute-authoritative", profiles=["two"]),
-        argparse.Namespace(command="verify-authoritative"),
+        argparse.Namespace(command="execute-replayable", profiles=["two"]),
+        argparse.Namespace(command="verify-replayable"),
         argparse.Namespace(command="verify"),
     ):
         monkeypatch.setattr(matrix, "parse_args", lambda value=namespace: value)
@@ -311,7 +311,7 @@ def test_matrix_execution_orchestration_and_cli_branches(
     assert dispatched == [
         {"one"},
         {"two"},
-        "authoritative",
+        "replayable",
         "verify",
     ]
 
@@ -327,9 +327,9 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         lambda *args, **kwargs: calls.append((args, kwargs)),
     )
     matrix.execute({"promptfoo"})
-    matrix.execute_authoritative({"inspect-ai"})
-    assert calls[0][1]["authoritative"] is False
-    assert calls[1][1]["authoritative"] is True
+    matrix.execute_replayable({"inspect-ai"})
+    assert calls[0][1]["replayable"] is False
+    assert calls[1][1]["replayable"] is True
 
     profiles = matrix.profiles()
     observation_profiles = [
@@ -344,7 +344,7 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         for profile in profiles
     ]
     monkeypatch.setattr(matrix, "profiles", lambda: observation_profiles)
-    with pytest.raises(ValueError, match="at least ten"):
+    with pytest.raises(ValueError, match="replayable and observation-only"):
         matrix.verify()
 
     monkeypatch.setattr(matrix, "profiles", lambda: profiles)
@@ -362,7 +362,7 @@ def test_matrix_execution_wrappers_and_primary_validation_errors(
         },
     )
     with pytest.raises(ValueError, match="102-record model execution"):
-        matrix.verify_authoritative()
+        matrix.verify_replayable()
 
 
 def test_matrix_rejects_invalid_control_documents(
@@ -387,6 +387,9 @@ def test_matrix_rejects_invalid_control_documents(
     monkeypatch.setattr(matrix, "matrix_document", lambda: {"selection": []})
     with pytest.raises(ValueError, match="matrix selection"):
         matrix.selection_policy()
+    monkeypatch.setattr(matrix, "matrix_document", lambda: {"release_focus": []})
+    with pytest.raises(ValueError, match="release focus"):
+        matrix.release_focus()
 
     duplicate = matrix.load = lambda _path: {
         "profiles": [{"profile_id": "same", "authority": {"mode": "observation_only"}}]
@@ -402,11 +405,17 @@ def test_matrix_rejects_invalid_control_documents(
     ("failure", "message"),
     [
         ("category", "category is invalid"),
+        ("support", "support status is invalid"),
         ("selection", "selection review metadata is invalid"),
+        ("level", "demonstration status is invalid"),
+        ("focus", "release-focus profile is missing"),
+        ("focus-authority", "release-focus profile is not replayable"),
+        ("focus-retained", "exactly one retained flagship transaction"),
         ("profile", "profile is stale"),
         ("result", "qualification result is stale"),
         ("format", "raw output format is invalid"),
         ("upstream", "upstream identity is invalid"),
+        ("directories", "packages do not match demonstration status"),
     ],
 )
 def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
@@ -424,9 +433,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     selection = matrix.selection_policy()
     levels = {
         profile["profile_id"]: {
-            "authoritative_import": True,
-            "end_to_end_transaction": False,
-            "qualification_profile": True,
+            "retained_signed_transactions": [],
         }
         for profile in profiles
     }
@@ -466,6 +473,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     monkeypatch.setattr(matrix, "categories", lambda: categories)
     monkeypatch.setattr(matrix, "selection_policy", lambda: selection)
     monkeypatch.setattr(matrix, "demonstration_levels", lambda: levels)
+    monkeypatch.setattr(matrix, "release_focus", lambda: [])
     monkeypatch.setattr(
         matrix,
         "qualify",
@@ -476,8 +484,30 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
     first_artifact = artifacts / first["profile_id"]
     if failure == "category":
         profiles[0] = {**first, "category": "missing"}
+    elif failure == "support":
+        profiles[0] = {**first, "support_status": "unmaintained"}
     elif failure == "selection":
         monkeypatch.setattr(matrix, "selection_policy", lambda: {})
+    elif failure == "level":
+        levels[first["profile_id"]] = {"retained_signed_transaction": "yes"}
+    elif failure == "focus":
+        monkeypatch.setattr(matrix, "release_focus", lambda: ["missing"])
+    elif failure == "focus-authority":
+        profiles[0] = {
+            **first,
+            "authority": {"mode": "observation_only", "reason": "aggregate_only"},
+        }
+        monkeypatch.setattr(
+            matrix,
+            "release_focus",
+            lambda: [first["profile_id"]],
+        )
+    elif failure == "focus-retained":
+        monkeypatch.setattr(
+            matrix,
+            "release_focus",
+            lambda: [first["profile_id"]],
+        )
     elif failure == "profile":
         first_artifact.joinpath("profile.json").write_bytes(b"{}\n")
     elif failure == "result":
@@ -490,7 +520,7 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
         first_artifact.joinpath("upstream-output.json").write_bytes(
             canonical_json_bytes(document)
         )
-    else:
+    elif failure == "upstream":
         document = json.loads(
             first_artifact.joinpath("upstream-output.json").read_bytes()
         )
@@ -498,9 +528,40 @@ def test_matrix_rejects_stale_or_invalid_retained_matrix_state(
         first_artifact.joinpath("upstream-output.json").write_bytes(
             canonical_json_bytes(document)
         )
+    else:
+        signed_transactions = tmp_path / "signed-transactions"
+        signed_transactions.joinpath("undeclared-profile").mkdir(parents=True)
+        monkeypatch.setattr(matrix, "SIGNED_TRANSACTIONS", signed_transactions)
 
     with pytest.raises(ValueError, match=message):
         matrix.verify()
+
+
+def test_matrix_rejects_missing_or_stale_replayable_profiles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matrix = _module(
+        "qualification_matrix_replayable_profiles_test",
+        EXAMPLE / "matrix.py",
+    )
+    profile = matrix.profiles()[0]
+    cases = matrix.load(matrix.REPLAYABLE_CORPUS / "cases.json")
+    monkeypatch.setattr(matrix, "load", lambda _path: cases)
+    monkeypatch.setattr(matrix, "replayable_profiles", lambda: [])
+
+    with pytest.raises(ValueError, match="at least one independently replayable"):
+        matrix.verify_replayable()
+
+    artifacts = tmp_path / "artifacts"
+    profile_artifact = artifacts / profile["profile_id"]
+    profile_artifact.mkdir(parents=True)
+    profile_artifact.joinpath("profile.json").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(matrix, "REPLAYABLE_ARTIFACTS", artifacts)
+    monkeypatch.setattr(matrix, "replayable_profiles", lambda: [profile])
+
+    with pytest.raises(ValueError, match="replayable profile is stale"):
+        matrix.verify_replayable()
 
 
 def test_authoritative_replay_write_staleness_and_cli(
@@ -516,6 +577,15 @@ def test_authoritative_replay_write_staleness_and_cli(
     document = replay.replay("inspect-ai", write=True)
     assert document["record_count"] == 102
     replay.replay("inspect-ai", write=False)
+
+    cases_path = copied / "cases.json"
+    cases = json.loads(cases_path.read_bytes())
+    original_cases = cases_path.read_bytes()
+    cases["source_evaluation"] = {"kind": "model_execution", "model": "other"}
+    cases_path.write_bytes(canonical_json_bytes(cases))
+    with pytest.raises(ValueError, match="source model execution is not bound"):
+        replay.replay("inspect-ai", write=False)
+    cases_path.write_bytes(original_cases)
 
     artifact = copied / "artifacts" / "inspect-ai"
     records = artifact / "runtime-import-records.jsonl"

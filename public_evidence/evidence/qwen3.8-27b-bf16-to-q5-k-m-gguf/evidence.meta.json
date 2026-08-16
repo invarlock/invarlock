@@ -1,0 +1,1 @@
+{"artifact_paths":{"evidence_pack":"evidence","verification_receipt":"verification.receipt.json"},"format_version":"invarlock/public-evidence-meta-v1","summary":"Strictly verified Qwen3.8 27B text-causal comparison of an authenticated BF16 checkpoint and its source-derived Q5_K_M GGUF deployment over a balanced 400-record MMLU-Pro exact-match schedule"}

@@ -119,6 +119,35 @@ def test_schedule_rejects_oversized_expected_output() -> None:
         schedule_module.build_runtime_behavioral_schedule(payload)
 
 
+def test_schedule_rejects_oversized_text_input_before_digest_acceptance() -> None:
+    payload = _payload()
+    payload["records"][0]["input_parts"][0]["text"] = "x" * (
+        schedule_module.MAX_RUNTIME_BEHAVIORAL_TEXT_CHARACTERS + 1
+    )
+
+    with pytest.raises(ValueError, match="text must not exceed"):
+        schedule_module.build_runtime_behavioral_schedule(payload)
+
+
+def test_schedule_requires_at_least_one_text_part_per_record() -> None:
+    payload = _payload()
+    content_part = {
+        "kind": "content",
+        "role": "image",
+        "content_id": "image_1",
+        "media_type": "image/png",
+        "byte_length": 4,
+        "sha256": "a" * 64,
+    }
+    payload["records"][0]["input_parts"] = [content_part]
+    payload["records"][0]["input_sha256"] = hashlib.sha256(
+        json.dumps([content_part], sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+    with pytest.raises(ValueError, match="requires at least one text part"):
+        schedule_module.build_runtime_behavioral_schedule(payload)
+
+
 @pytest.mark.parametrize(
     ("payload", "message"),
     [

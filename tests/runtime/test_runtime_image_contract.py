@@ -130,7 +130,7 @@ def test_runtime_smokes_assert_the_supported_hf_stack() -> None:
         "safetensors.__version__ == '0.8.0'",
         "transformers.__version__ == '5.14.1'",
     ):
-        assert makefile.count(expected) == 2
+        assert makefile.count(expected) == 3
 
 
 def test_runtime_platform_locks_are_cpu_only_and_hash_locked() -> None:
@@ -157,7 +157,10 @@ def test_cuda_runtime_is_a_separate_minimal_hf_image() -> None:
     assert "FROM ${RUNTIME_BUILD_BASE_IMAGE} AS public-wheel" in text
     assert "FROM ${RUNTIME_BASE_IMAGE}" in text
     assert "runtime-image-py312-cu126.txt" in text
-    assert "https://download.pytorch.org/whl/cu126" in text
+    assert "runtime-image-py312-cu129.txt" in text
+    assert "https://download.pytorch.org/whl/${CUDA_PROFILE}" in text
+    assert 'case "${CUDA_PROFILE}" in cu126|cu129)' in text
+    assert 'dev.invarlock.cuda-profile="${CUDA_PROFILE}"' in text
     assert "NVIDIA_DRIVER_CAPABILITIES=compute,utility" in text
     assert "NVIDIA_VISIBLE_DEVICES=all" not in text
     assert 'test "${TARGETARCH:-amd64}" = amd64' in text
@@ -191,6 +194,21 @@ def test_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
     assert "gptqmodel==" not in text
 
 
+def test_blackwell_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
+    text = ROOT.joinpath(
+        "requirements", "workflows", "runtime-image-py312-cu129.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "torch==2.13.0+cu129" in text
+    assert "nvidia-cublas-cu12==" in text
+    assert "nvidia-cuda-runtime-cu12==" in text
+    assert "triton==" in text
+    assert "--hash=sha256:" in text
+    assert "accelerate==1.14.0" in text
+    assert "transformers==5.14.1" in text
+    assert "safetensors==0.8.0" in text
+
+
 def test_dockerignore_exposes_only_the_canonical_runtime_inputs() -> None:
     text = ROOT.joinpath(".dockerignore").read_text(encoding="utf-8")
 
@@ -203,6 +221,7 @@ def test_dockerignore_exposes_only_the_canonical_runtime_inputs() -> None:
         "!requirements/workflows/runtime-image-py312.txt",
         "!requirements/workflows/runtime-image-py312-aarch64.txt",
         "!requirements/workflows/runtime-image-py312-cu126.txt",
+        "!requirements/workflows/runtime-image-py312-cu129.txt",
         "!requirements/workflows/runtime-wheel-build-py312.txt",
         "!runtime/Dockerfile.cuda",
         "!LICENSE",
@@ -224,10 +243,15 @@ def test_make_exposes_separate_cuda_build_and_gpu_smoke_targets() -> None:
     assert '--source-bundle "$(RUNTIME_SOURCE_BUNDLE)"' in text
     assert "--platform linux/amd64" in text
     assert "runtime-smoke-cuda:" in text
+    assert "runtime-image-cuda129:" in text
+    assert '--build-arg "CUDA_PROFILE=cu129"' in text
+    assert "runtime-smoke-cuda129:" in text
     assert "$(RUNTIME_CUDA_DEVICE_ARGS)" in text
     assert "--device nvidia.com/gpu=all,--gpus all" in text
     assert "assert torch.__version__ == '2.13.0+cu126'" in text
     assert "assert torch.version.cuda == '12.6'" in text
+    assert "assert torch.__version__ == '2.13.0+cu129'" in text
+    assert "assert torch.version.cuda == '12.9'" in text
     assert "assert torch.cuda.is_available()" in text
     assert "TORCH_DISABLE_NATIVE_JIT=1" in ROOT.joinpath(
         "runtime/Dockerfile.cuda"

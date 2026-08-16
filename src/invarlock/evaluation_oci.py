@@ -11,13 +11,14 @@ import tempfile
 import threading
 import time
 from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, cast
 
+from invarlock._bounded_subprocess import communicate_bounded
 from invarlock._optional_runtime_profiles import OPTIONAL_RUNTIME_PROVIDER_PROFILES
 from invarlock.core.evaluation_request import (
     MAX_EVALUATION_REQUEST_BYTES,
@@ -94,6 +95,8 @@ _CONTAINER_STOP_SECONDS = 5
 _CONTAINER_CONTROL_TIMEOUT_SECONDS = 10
 _WORKER_DRAIN_JOIN_SECONDS = 0.5
 _WORKER_DRAIN_POLL_SECONDS = 0.01
+_WORKER_CANCELLATION_POLL_SECONDS = 0.1
+_WORKER_CANCELLED_STATUS = 125
 _DEFAULT_WORKER_TMPFS_GIB = 4
 _MAX_WORKER_TMPFS_GIB = 64
 _TENSORRT_ENGINE_COPY_FACTOR = 2
@@ -229,6 +232,68 @@ def _inspect_output_bytes(value: object, *, label: str) -> bytes:
     raise OciEvaluationError(f"runtime image inspect {label} is invalid")
 
 
+def _terminate_bounded_process(process: subprocess.Popen[bytes]) -> None:
+    """Terminate one bounded control subprocess without leaving it behind."""
+
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=_CONTAINER_STOP_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=_CONTAINER_STOP_SECONDS)
+
+
+def _run_bounded_command(
+    command: Sequence[str],
+    *,
+    timeout_seconds: int,
+    stdout_limit: int,
+    stderr_limit: int = _MAX_WORKER_DIAGNOSTIC_BYTES,
+    stdout_path: Path | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run one engine control command with bounded pipes and optional streaming."""
+
+    destination = None
+    process: subprocess.Popen[bytes] | None = None
+    completed = False
+    try:
+        if stdout_path is not None:
+            stdout_path.parent.mkdir(parents=True, exist_ok=True)
+            destination = stdout_path.open("xb")
+        process = subprocess.Popen(
+            list(command),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+        )
+        returncode, stdout, stderr = communicate_bounded(
+            process,
+            input_bytes=b"",
+            timeout_seconds=timeout_seconds,
+            stdout_limit=stdout_limit,
+            stderr_limit=stderr_limit,
+            stdout_destination=destination,
+            error_type=OciEvaluationError,
+            timeout_label="bounded engine command",
+            output_label="bounded engine command",
+            pipes_message="bounded engine command did not expose pipes",
+            terminate=_terminate_bounded_process,
+        )
+        completed = True
+        return subprocess.CompletedProcess(list(command), returncode, stdout, stderr)
+    except OciEvaluationError:
+        raise
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise OciEvaluationError("bounded engine command could not complete") from exc
+    finally:
+        if destination is not None:
+            destination.close()
+        if not completed and stdout_path is not None:
+            stdout_path.unlink(missing_ok=True)
+
+
 def _normalized_config_id(value: object) -> str:
     if not isinstance(value, str):
         raise OciEvaluationError("runtime image inspect config ID is invalid")
@@ -259,14 +324,12 @@ def _inspect_local_image(engine_path: str, image: str) -> _LocalImageInspection:
     """Read one bounded Docker- or Podman-shaped local image inspection."""
 
     try:
-        completed = subprocess.run(
+        completed = _run_bounded_command(
             [engine_path, "image", "inspect", image],
-            check=False,
-            capture_output=True,
-            shell=False,
-            timeout=30,
+            timeout_seconds=30,
+            stdout_limit=_MAX_IMAGE_INSPECT_BYTES,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except OciEvaluationError as exc:
         raise OciEvaluationError(
             "runtime image could not be inspected locally"
         ) from exc
@@ -632,8 +695,11 @@ def _assert_worker_readable(source: Path, *, user: str, label: str) -> None:
 
     def visit(path: Path, *, directory: bool) -> None:
         try:
-            entry = path.stat()
+            entry = path.lstat()
         except OSError:
+            unreadable.append(str(path.relative_to(source) if path != source else "."))
+            return
+        if stat.S_ISLNK(entry.st_mode):
             unreadable.append(str(path.relative_to(source) if path != source else "."))
             return
         if not _worker_grants_read(
@@ -987,23 +1053,29 @@ def _read_worker_container_id(cidfile: Path | None) -> str | None:
     return value if _CONTAINER_ID_RE.fullmatch(value) is not None else None
 
 
+def _worker_container_handle(
+    command: Sequence[str], cidfile: Path | None
+) -> str | None:
+    del command
+    return _read_worker_container_id(cidfile)
+
+
 def _container_control(
     engine_path: str,
     action: Literal["stop", "kill"],
-    container_id: str,
+    container_handle: str,
 ) -> None:
     command = [engine_path, action]
     if action == "stop":
         command.extend(["--time", str(_CONTAINER_STOP_SECONDS)])
-    command.append(container_id)
+    command.append(container_handle)
     try:
-        subprocess.run(
+        _run_bounded_command(
             command,
-            check=False,
-            capture_output=True,
-            timeout=_CONTAINER_CONTROL_TIMEOUT_SECONDS,
+            timeout_seconds=_CONTAINER_CONTROL_TIMEOUT_SECONDS,
+            stdout_limit=_MAX_WORKER_DIAGNOSTIC_BYTES,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except OciEvaluationError:
         return
 
 
@@ -1012,9 +1084,9 @@ def _terminate_worker(
     command: Sequence[str],
     cidfile: Path | None,
 ) -> None:
-    container_id = _read_worker_container_id(cidfile)
-    if container_id is not None and command:
-        _container_control(command[0], "stop", container_id)
+    container_handle = _worker_container_handle(command, cidfile)
+    if container_handle is not None and command:
+        _container_control(command[0], "stop", container_handle)
     if process.poll() is None:
         process.terminate()
         try:
@@ -1025,17 +1097,18 @@ def _terminate_worker(
     # The engine may create its cidfile immediately before it exits in response
     # to termination. Re-read only after reaping the launcher so cancellation
     # cannot discard the sole handle to a still-running container.
-    late_container_id = _read_worker_container_id(cidfile)
-    if late_container_id is not None and command:
-        if late_container_id != container_id:
-            _container_control(command[0], "stop", late_container_id)
-        _container_control(command[0], "kill", late_container_id)
+    late_container_handle = _worker_container_handle(command, cidfile)
+    if late_container_handle is not None and command:
+        if late_container_handle != container_handle:
+            _container_control(command[0], "stop", late_container_handle)
+        _container_control(command[0], "kill", late_container_handle)
 
 
 def run_side_worker(
     command: Sequence[str],
     *,
     timeout_seconds: int,
+    cancellation_event: threading.Event | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run one precomposed worker with bounded logs and a hard outer deadline."""
 
@@ -1046,6 +1119,14 @@ def run_side_worker(
         or timeout_seconds > _MAX_OUTER_WORKER_TIMEOUT_SECONDS
     ):
         raise OciEvaluationError("worker outer timeout is invalid")
+
+    if cancellation_event is not None and cancellation_event.is_set():
+        return subprocess.CompletedProcess(
+            list(command),
+            _WORKER_CANCELLED_STATUS,
+            "",
+            "worker cancelled after paired side failure",
+        )
 
     cidfile = _worker_cidfile(command)
     try:
@@ -1081,9 +1162,33 @@ def run_side_worker(
     for drain in drains:
         drain.start()
     timed_out = False
+    cancelled = False
     try:
         try:
-            returncode = process.wait(timeout=timeout_seconds)
+            if cancellation_event is None:
+                returncode = process.wait(timeout=timeout_seconds)
+            else:
+                deadline = time.monotonic() + timeout_seconds
+                while True:
+                    observed = process.poll()
+                    if observed is not None:
+                        returncode = observed
+                        break
+                    if cancellation_event.is_set():
+                        cancelled = True
+                        _terminate_worker(process, command, cidfile)
+                        returncode = _WORKER_CANCELLED_STATUS
+                        break
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, timeout_seconds)
+                    try:
+                        returncode = process.wait(
+                            timeout=min(_WORKER_CANCELLATION_POLL_SECONDS, remaining)
+                        )
+                        break
+                    except subprocess.TimeoutExpired:
+                        continue
         except subprocess.TimeoutExpired:
             timed_out = True
             _terminate_worker(process, command, cidfile)
@@ -1104,6 +1209,10 @@ def run_side_worker(
         if stderr:
             stderr.extend(b"\n")
         stderr.extend(diagnostic.encode("utf-8"))
+    elif cancelled:
+        if stderr:
+            stderr.extend(b"\n")
+        stderr.extend(b"worker cancelled after paired side failure")
     return subprocess.CompletedProcess(
         list(command),
         returncode,
@@ -1262,24 +1371,50 @@ class OciRuntimeExecutor:
 
             completed: dict[RuntimeSideRole, subprocess.CompletedProcess[str]] = {}
             if _workers_may_run_parallel(self.launch):
+                cancellation_event = threading.Event()
+                primary_error: Exception | None = None
                 with ThreadPoolExecutor(
                     max_workers=2, thread_name_prefix="invarlock-side"
                 ) as pool:
                     futures = {
-                        role: pool.submit(
+                        pool.submit(
                             run_side_worker,
                             command,
                             timeout_seconds=timeouts[role],
-                        )
+                            cancellation_event=cancellation_event,
+                        ): role
                         for role, command in commands.items()
                     }
-                    for role in _ROLES:
-                        completed[role] = futures[role].result()
+                    try:
+                        for future in as_completed(futures):
+                            role = futures[future]
+                            try:
+                                result = future.result()
+                            except Exception as exc:
+                                if primary_error is None:
+                                    primary_error = exc
+                                cancellation_event.set()
+                                continue
+                            completed[role] = result
+                            if result.returncode != 0:
+                                cancellation_event.set()
+                    except (KeyboardInterrupt, SystemExit):
+                        cancellation_event.set()
+                        raise
+                if primary_error is not None:
+                    raise primary_error
             else:
                 for role in _ROLES:
-                    completed[role] = run_side_worker(
+                    result = run_side_worker(
                         commands[role], timeout_seconds=timeouts[role]
                     )
+                    completed[role] = result
+                    if result.returncode != 0:
+                        diagnostic = result.stderr.strip() or "no diagnostic"
+                        raise OciEvaluationError(
+                            f"{role} worker exited with status {result.returncode}: "
+                            f"{diagnostic}"
+                        )
             failures = [
                 f"{role} worker exited with status {completed[role].returncode}: "
                 + (completed[role].stderr.strip() or "no diagnostic")

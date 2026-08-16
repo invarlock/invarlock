@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - 'release/v*'
     paths:
       - 'docs/**'
       - 'README.md'
@@ -16,10 +15,26 @@ on:
         description: "Optional docs version label override (for example: 0.8.0 or latest)"
         required: false
         type: string
+      publish_latest:
+        description: "Also publish this exact source as latest"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      docs_version:
+        description: "Version label to publish (a leading v is removed)"
+        required: true
+        type: string
+      publish_latest:
+        description: "Also publish this exact source as latest"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  group: docs-publish-${{ github.ref }}
-  cancel-in-progress: true
+  group: docs-publish
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -51,7 +66,7 @@ jobs:
       id: version
       shell: bash
       env:
-        INVARLOCK_DOCS_VERSION_OVERRIDE: ${{ github.event.inputs.docs_version }}
+        INVARLOCK_DOCS_VERSION_OVERRIDE: ${{ inputs.docs_version }}
         INVARLOCK_DOCS_REF_NAME: ${{ github.ref_name }}
       run: |
         set -euo pipefail
@@ -59,7 +74,11 @@ jobs:
         ref_name="${INVARLOCK_DOCS_REF_NAME}"
         docs_version=''
         if [ -n "${override}" ]; then
-          docs_version="${override}"
+          if [[ "${override}" =~ ^v[0-9] ]]; then
+            docs_version="${override#v}"
+          else
+            docs_version="${override}"
+          fi
         elif [ "${ref_name}" = "main" ]; then
           docs_version="latest"
         elif [[ "${ref_name}" == release/v* ]]; then
@@ -81,26 +100,43 @@ jobs:
     - name: Publish versioned site
       env:
         DOCS_VERSION: ${{ steps.version.outputs.docs_version }}
+        INVARLOCK_PUBLISH_LATEST: ${{ inputs.publish_latest }}
       shell: bash
       run: |
         set -euo pipefail
+        publish_latest="${INVARLOCK_PUBLISH_LATEST:-false}"
+        worktree_root="${RUNNER_TEMP}/invarlock-gh-pages"
+        case "${publish_latest}" in
+          true|false) ;;
+          *)
+            echo "publish_latest must be true or false" >&2
+            exit 1
+            ;;
+        esac
+
         git fetch origin gh-pages || true
         if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
-          git worktree add /tmp/invarlock-gh-pages refs/remotes/origin/gh-pages
+          git worktree add "${worktree_root}" refs/remotes/origin/gh-pages
         else
-          git worktree add -B gh-pages /tmp/invarlock-gh-pages HEAD
-          cd /tmp/invarlock-gh-pages
+          git worktree add -B gh-pages "${worktree_root}" HEAD
+          cd "${worktree_root}"
           git rm -rf . >/dev/null 2>&1 || true
           find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
         fi
 
-        cd /tmp/invarlock-gh-pages
+        cd "${worktree_root}"
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
         rm -rf "${DOCS_VERSION}"
         mkdir -p "${DOCS_VERSION}"
         cp -R "${GITHUB_WORKSPACE}/site-build/." "${DOCS_VERSION}/"
+
+        if [ "${publish_latest}" = "true" ] && [ "${DOCS_VERSION}" != "latest" ]; then
+          rm -rf latest
+          mkdir -p latest
+          cp -R "${GITHUB_WORKSPACE}/site-build/." latest/
+        fi
 
         default_target="latest/"
         if [ ! -d latest ] && [ "${DOCS_VERSION}" != "latest" ]; then
@@ -120,10 +156,11 @@ jobs:
         </html>
         EOF
 
-        stable_target="../${DOCS_VERSION}/"
-        rm -rf stable
-        mkdir -p stable
-        cat > stable/index.html <<EOF
+        if [ "${publish_latest}" = "true" ] && [ "${DOCS_VERSION}" != "latest" ]; then
+          stable_target="../${DOCS_VERSION}/"
+          rm -rf stable
+          mkdir -p stable
+          cat > stable/index.html <<EOF
         <!doctype html>
         <html lang="en">
         <head>
@@ -136,8 +173,12 @@ jobs:
         </body>
         </html>
         EOF
+        fi
 
-        git add "${DOCS_VERSION}" index.html stable
+        git add "${DOCS_VERSION}" index.html
+        if [ "${publish_latest}" = "true" ] && [ "${DOCS_VERSION}" != "latest" ]; then
+          git add latest stable
+        fi
         if git diff --cached --quiet; then
           echo "No documentation changes to publish."
           exit 0

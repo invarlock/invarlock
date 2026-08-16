@@ -4,6 +4,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -34,6 +35,109 @@ def test_execution_discriminator_and_worker_limit_edge_types(tmp_path: Path) -> 
         oci._runtime_user("4294967295:1")
 
 
+def test_execution_discriminator_rejects_non_mapping_execution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    request = tmp_path / "request.yaml"
+    request.write_text("placeholder", encoding="utf-8")
+    monkeypatch.setattr(oci, "_load_yaml", lambda _payload: {"execution": []})
+    monkeypatch.setattr(oci, "_validate_schema", lambda value: value)
+
+    assert oci.evaluation_request_execution_mode(request) is None
+
+
+def test_bounded_engine_command_streams_output_and_cleans_failed_destination(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "inspect.json"
+    completed = oci._run_bounded_command(  # noqa: SLF001
+        [sys.executable, "-c", "print('ok')"],
+        timeout_seconds=5,
+        stdout_limit=1024,
+        stdout_path=destination,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == b""
+    assert destination.read_bytes() == b"ok\n"
+
+    def fail_to_start(*_args: object, **_kwargs: object) -> subprocess.Popen[bytes]:
+        raise OSError("engine unavailable")
+
+    monkeypatch.setattr(oci.subprocess, "Popen", fail_to_start)
+    with _error("could not complete"):
+        oci._run_bounded_command(  # noqa: SLF001
+            ["docker", "version"],
+            timeout_seconds=5,
+            stdout_limit=1024,
+            stdout_path=tmp_path / "failed.json",
+        )
+    assert not (tmp_path / "failed.json").exists()
+
+
+def test_bounded_engine_termination_escalates_after_stop_timeout() -> None:
+    class HungProcess:
+        def __init__(self) -> None:
+            self.terminated = False
+            self.killed = False
+            self.waits = 0
+
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self, *, timeout: int) -> int:
+            self.waits += 1
+            if self.waits == 1:
+                raise subprocess.TimeoutExpired("docker", timeout)
+            return 0
+
+    process = HungProcess()
+    oci._terminate_bounded_process(process)  # type: ignore[arg-type]  # noqa: SLF001
+    assert process.terminated
+    assert process.killed
+    assert process.waits == 2
+
+
+def test_completed_engine_process_needs_no_termination() -> None:
+    class CompletedProcess:
+        def poll(self) -> int:
+            return 0
+
+        def terminate(self) -> None:
+            pytest.fail("completed process must not be terminated")
+
+    oci._terminate_bounded_process(CompletedProcess())  # type: ignore[arg-type]
+
+
+def test_bounded_engine_command_can_return_captured_stdout() -> None:
+    completed = oci._run_bounded_command(  # noqa: SLF001
+        [sys.executable, "-c", "print('captured')"],
+        timeout_seconds=5,
+        stdout_limit=1024,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == b"captured\n"
+
+
+def test_provider_bindings_require_complete_optional_resources(
+    tmp_path: Path,
+) -> None:
+    with _error("RESOURCE_ROOT"):
+        oci._provider_bindings(  # noqa: SLF001
+            {"INVARLOCK_HF_VISION_TEXT_CONTENT_STORE": str(tmp_path)}
+        )
+    with _error("CONTENT_STORE"):
+        oci._provider_bindings(  # noqa: SLF001
+            {"INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT": str(tmp_path)}
+        )
+
+
 def test_image_inspection_scalar_normalization_and_repository_validation() -> None:
     assert oci._inspect_output_bytes("text", label="stdout") == b"text"
     with _error("stdout is invalid"):
@@ -60,10 +164,10 @@ def test_local_image_inspection_reports_process_and_payload_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        oci.subprocess,
-        "run",
+        oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            subprocess.TimeoutExpired("docker", 1)
+            oci.OciEvaluationError("timed out")
         ),
     )
     with _error("could not be inspected locally"):
@@ -71,10 +175,10 @@ def test_local_image_inspection_reports_process_and_payload_errors(
 
     def completed(stdout: object, stderr: object = b"", returncode: int = 0):
         monkeypatch.setattr(
-            oci.subprocess,
-            "run",
-            lambda *_args, **_kwargs: SimpleNamespace(
-                stdout=stdout, stderr=stderr, returncode=returncode
+            oci,
+            "_run_bounded_command",
+            lambda *_args, **_kwargs: subprocess.CompletedProcess(
+                [], returncode, stdout, stderr
             ),
         )
 
@@ -162,6 +266,50 @@ def test_worker_readability_lists_multiple_unreadable_entries(tmp_path: Path) ->
         os.chmod(root / f"file-{index}", 0o600)
     with _error("and 2 more"):
         oci._assert_worker_readable(root, user="65532:65532", label="artifact")
+
+
+def test_worker_readability_rejects_nested_symlinks(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir(mode=0o755)
+    target = tmp_path / "target"
+    target.write_bytes(b"secret")
+    (root / "link").symlink_to(target)
+
+    with _error("not readable"):
+        oci._assert_worker_readable(root, user="65532:65532", label="artifact")
+
+
+def test_worker_readability_checks_nested_directories(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    nested = root / "private"
+    nested.mkdir(parents=True)
+    root.chmod(0o755)
+    nested.chmod(0o700)
+
+    with _error("private"):
+        oci._assert_worker_readable(root, user="65532:65532", label="artifact")
+
+
+def test_tensorrt_scratch_rejects_special_bundle_entries(tmp_path: Path) -> None:
+    engine = tmp_path / "engine"
+    engine.mkdir()
+    os.mkfifo(engine / "control.pipe")
+
+    with _error("unsupported entry"):
+        oci._worker_tmpfs_size_gib(
+            provider_name="tensorrt_llm",
+            artifact_source=engine,
+        )
+
+
+@pytest.mark.parametrize(
+    "timeout", [True, 0, oci._MAX_OUTER_WORKER_TIMEOUT_SECONDS + 1]
+)
+def test_side_worker_rejects_invalid_outer_timeout_before_launch(
+    timeout: object,
+) -> None:
+    with _error("outer timeout is invalid"):
+        oci.run_side_worker([], timeout_seconds=timeout)  # type: ignore[arg-type]
 
 
 def test_gpu_arguments_and_worker_stream_fail_closed_edges() -> None:

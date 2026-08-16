@@ -331,6 +331,24 @@ def test_trust_boundary_main_selects_a_temporary_or_explicit_workspace(
     assert calls == [(EXAMPLE_ROOT, expected.resolve())]
 
 
+def test_trust_boundary_main_preserves_explicit_symlink_for_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_trust_boundary_demo.py", "--workspace", str(linked)],
+    )
+
+    with pytest.raises(RuntimeError, match="already exists"):
+        trust_demo.main()
+    assert not missing.exists()
+
+
 def _empty_fixture_root(root: Path) -> None:
     (root / "policy").mkdir(parents=True)
     (root / "inputs").mkdir()
@@ -369,6 +387,19 @@ def test_regenerate_fixtures_matches_the_checked_in_golden_files(
     assert len(paired["records"]) == 50
     assert sum(record["subject"]["score"] for record in paired["records"]) == 50
     assert sum(record["subject"]["score"] for record in rejected["records"]) == 49
+
+
+def test_regenerate_fixtures_requires_a_complete_identity_pair(tmp_path: Path) -> None:
+    generated_root = tmp_path / "examples"
+    _empty_fixture_root(generated_root)
+
+    with pytest.raises(ValueError, match="require baseline and subject"):
+        regenerate_fixtures.regenerate(
+            generated_root,
+            identities={"baseline": object()},  # type: ignore[dict-item]
+        )
+
+    assert not (generated_root / "import").exists()
 
 
 def test_copy_generated_replaces_an_existing_destination_and_normalizes_mode(

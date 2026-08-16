@@ -15,6 +15,158 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Connected successful production publication to serialized, tagged
+  documentation publishing that atomically updates the immutable version path,
+  `latest`, and `stable`, without allowing TestPyPI or bootstrap runs to update
+  GitHub Pages.
+
+## [0.15.0] - 2026-08-16
+
+This release extends the v0.14 evaluator-neutral qualification and recipient
+handoff with independently replayable deployment evidence and stricter release
+assurance. Comparison-report v3 adds minimum-side accuracy to the bounded
+acceptance policy; retained current-model journeys authenticate evaluator,
+runtime, artifact, and conversion provenance across BF16, GGUF, QAT, and OCI
+deployments; and clean-consumer candidate-wheel replay verifies every retained
+public evidence pack and evaluator transaction before release. A bounded SPDX
+3.0.1 AI observation example
+demonstrates external metadata cross-binding without expanding core contracts
+or allowing observation-only results to drive acceptance.
+
+### Added
+
+- Added a bounded CPU-only SPDX 3.0.1 AI observation example that preserves
+  exact canonical source bytes, cross-binds the declared package SHA-256 to a
+  canonical GGUF identity, and records unperformed official schema and
+  OWL/SHACL validation as `not_evaluated` without changing core contracts or
+  acceptance semantics.
+- Added a clean-consumer release-reference journey that reauthenticates the
+  retained Qwen3.8 27B signed evidence with the isolated candidate wheel,
+  issues an independent receipt, and requires deterministic report rendering.
+- Added a signed Qwen3.8 27B deployment journey that compares one pinned BF16
+  Transformers checkpoint with its source-derived Q5_K_M GGUF under separate
+  immutable runtime images and the frozen balanced 400-record MMLU-Pro policy.
+  Its published evidence records 63.0% baseline accuracy, 64.5% subject
+  accuracy, and a 95% paired interval from -0.74 to 3.75 percentage points
+  under an independently signed passing receipt.
+- Added a signed Qwen3.5 9B deployment journey that compares one pinned BF16
+  Transformers text-causal component with its source-derived Q5_K_M GGUF under
+  separate immutable runtime images and the balanced 400-record MMLU-Pro
+  policy. Its published evidence records 53.0% baseline accuracy, 54.75%
+  subject accuracy, and a 95% paired interval from -0.83 to 4.32 percentage
+  points under an independently signed passing receipt.
+- Added an independent-family Ministral 3 8B deployment canary under the same
+  frozen 400-record policy. Its published evidence records 44.75% BF16
+  accuracy, 45.25% Q5_K_M accuracy, and a 95% paired interval from -1.12 to
+  2.12 percentage points under an independently signed passing receipt.
+- Added authenticated text-only Transformers scoring for checkpoints that
+  register through the image-text auto-model mapping, while retaining offline
+  loading, safetensors binding, and strict tensor validation. This enables the
+  text component of multimodal-backed checkpoints such as Ministral 3 without
+  broadening the request to image inputs.
+- Added a five-minute CPU-only wheel-user workflow that verifies retained
+  signed evidence, issues a fresh verifier receipt, renders HTML, and runs from
+  versioned example files outside the installed package.
+- Added an exact-match `minimum_side_accuracy` policy control and a versioned
+  comparison-report v3 field that records both side results.
+- Added retained signed OCI transactions for Qwen3.5 9B through LM Evaluation
+  Harness and Inspect AI, plus a Gemma 4 12B instruction-to-QAT transaction
+  through LM Evaluation Harness. Each package includes 400 paired
+  MMLU-Pro records, native evaluator provenance, an independently signed
+  verification receipt, policy, and builder-signed image attestation. The two
+  Qwen3.5 evaluators agree exactly, while the Qwen3.5 and Gemma transformations
+  remain integrity-valid policy rejections under their declared regression
+  floor rather than being presented as passing deployments.
+- Added reproducible CPU verification-time, report-rendering-time, and retained
+  artifact-size measurements for the current-model signed transactions.
+- Added a retained cross-evaluator comparison that confirms the shared ordered
+  Qwen3.5 schedule and exact native agreement across all 800 baseline and
+  subject records without creating a second acceptance verdict.
+- Added an example-layer evaluator transaction framework with source-specific
+  native adapters, source-bound image construction, caller-owned signing and
+  trust inputs, and cleanup of temporary container images.
+- Added a standalone protected CI deployment-consumer fixture that
+  reauthenticates the retained Inspect AI receipt against separately supplied
+  recipient anchors before an exact candidate can be deployed.
+- Added a retained passing Inspect AI deployment-approval transaction for
+  Qwen3.5 0.8B over a deterministic, tokenizer-qualified 400-record LAMBADA
+  corpus with independently pinned source, selection, policy, and trust anchors.
+- Added one bounded examples-layer command runner with timeout, output-limit,
+  cleanup, and nonzero-exit handling across maintained integration commands.
+- Added an optional `expected-request-digest` input to the composite evidence
+  gate so GGUF consumers can supply the independently approved normalized
+  request identity required by current llama.cpp evidence.
+
+### Changed
+
+- Expanded release preflight from one designated Qwen3.8 reference journey to
+  fresh full verification and deterministic rendering of all seven retained
+  public evidence packs and all four evaluator-qualification transactions
+  through the isolated candidate wheel. Historical packs and checked-in
+  receipts remain immutable; declared passing and integrity-valid rejected
+  policy outcomes must remain exact; and the compatibility replay does not
+  rerun model or evaluator inference or conversion.
+- Changed distribution validation to install and exercise the core wheel,
+  wheel-user quickstart, and standalone deployment consumer before optional
+  add-ins are installed, preserving a genuine core-only release path.
+- Migrated the compact Hugging Face, PEFT, TorchAO, llama.cpp, evaluator, and
+  OpenAI Evals examples from Qwen3 0.6B to revision-pinned Qwen3.5 0.8B. The
+  TensorRT-LLM 1.2.1 showcase remains an explicitly scoped Qwen3 compatibility
+  fixture because that runtime does not provide a Qwen3.5 adapter.
+- Kept generic receipt signing role-neutral while high-assurance evaluator
+  transactions continue to require separate evidence, verifier, and builder
+  keys.
+- Preserved previously released evidence under its original comparison-report
+  v1/v2 contract identities, while current acceptance envelopes bind
+  comparison-report v3.
+- Preserved retained OCI build attestations in their original signed format;
+  current transaction writers emit only the evaluator-named format while the
+  offline verifier strictly reads both versions.
+- Distinguished current-model native signed transactions from the wider
+  102-record shared-output qualification matrix, with adapter support, replay
+  authority, model-family portability, signed corpus, and signed-journey record
+  count reported independently.
+- Kept evaluator-specific SDKs, parsers, launchers, and image-build logic in the
+  example layer; the installed engine continues to expose evaluator-neutral
+  qualification and runtime-import contracts.
+- Refreshed hash-pinned runtime and workflow dependencies, including the
+  cryptography security baseline used by signed evidence and receipt paths,
+  Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.18.0.
+- Reframed the public project overview around independently replayable signed
+  evaluation evidence, with a clear decision boundary and assurance limits plus
+  a retained proof map connecting evaluator output, qualification, evidence,
+  receipts, attestations, and runnable integrations.
+- Expanded documentation checks to discover every tracked Markdown file and
+  reject machine-specific paths, credential-like values, and review-process
+  wording before publication.
+- Raised aggregate and per-module statement and branch coverage requirements to
+  95% across the engine, add-ins, qualification and release tooling, maintained
+  examples, and repository checks.
+
+### Removed
+
+- Removed the superseded prospective Ministral Q8_0-to-Q4_K_M comparison from
+  the public-evidence inventory after the stronger retained Ministral 3 8B
+  BF16-to-Q5_K_M deployment transaction replaced that uncreated target.
+
+### Fixed
+
+- Updated built-wheel and hosted-wheel release smokes to consume the retained
+  deployment-approval transaction at its current package path.
+- Separated llama.cpp prompt batching and CPU thread controls from InvarLock's
+  record batch size, and bound those backend controls into the closed GGUF
+  runtime request profile while preserving verification of previously signed
+  GGUF profiles.
+- Bound temporary container tags and worker cleanup to immutable engine IDs,
+  preserved no-follow validation for caller-owned key and workspace paths,
+  and removed partial streamed output after bounded command failures.
+- Bounded container-engine inspection and control output, rejected symlinked
+  worker inputs, and limited runtime-side evidence loading to size-bounded
+  regular files.
+- Required deployment-approval inputs to bind the verifier trust-profile digest
+  or its explicit absence, and required both successful receipt verification
+  and an explicit policy-pass verdict before approval.
+
 ## [0.14.0] - 2026-07-27
 
 This release extends the v0.13 signed evaluation engine with evaluator-neutral
@@ -371,9 +523,9 @@ from the same canonical JSON.
   benchmark-comparison, provenance, and appendix sections before renderer work.
 - Added seq2seq evidence-run support for FLAN-T5, including label preservation,
   shuffled split handling, T5 guard targets, and calibration preview labels.
-- Added model-evidence GPU backlog lanes, preset overrides, remote-code
-  opt-in propagation, worktree-aware remote launch handling, and GPU preflight
-  warnings for underprovisioned MoE lanes.
+- Added GPU execution profiles for model evidence, including preset overrides,
+  remote-code opt-in propagation, launch preflight checks, and warnings for
+  underprovisioned MoE models.
 - Added an offline model-candidate compatibility audit to `contracts-check` so
   named lanes and catalog candidates must have coherent adapter routes, presets,
   materialization metadata, and large-model loading hints before GPU launch.
@@ -762,6 +914,7 @@ from the same canonical JSON.
 ## [0.8.0] - 2026-04-23
 
 ### Added
+
 - Added shipped public evidence under
   `invarlock/_data/public_evidence/published_basis/...` together with matching
   repo-visible `public_evidence/published_basis/...` source copies.
@@ -791,6 +944,7 @@ from the same canonical JSON.
   runtime-verify --help` surface across docs, tests, and smoke lanes.
 
 ### Changed
+
 - Replaced the old assurance toggle with explicit
   `evaluate --execution-mode container|host` and
   `verify --runtime-provenance container|host`, and aligned the
@@ -830,11 +984,13 @@ from the same canonical JSON.
   dark-mode-aware styling without changing the underlying report content.
 
 ### Removed
+
 - Removed the standalone `invarlock-runtime-verify` console script before it
   became a supported public entry point; use `invarlock advanced
   runtime-verify` instead.
 
 ### Fixed
+
 - Fixed the evidence-pack clean-prune contract so the clean pruning lane is now
   model-tuned under the generic `prune_clean` scenario name, and retuned the
   Mistral 7B clean prune from 12% to 10% after a real H200 rerun showed that
@@ -880,6 +1036,7 @@ from the same canonical JSON.
 ## [0.7.2] - 2026-04-15
 
 ### Changed
+
 - Refactored the test tree around owner-aligned surfaces, including runtime,
   reporting, guards, CLI, integration, lint, and CI buckets, and aligned the
   Makefile and path-contract checks to the normalized layout.
@@ -892,6 +1049,7 @@ from the same canonical JSON.
   release and verification paths.
 
 ### Fixed
+
 - Refreshed the security-sensitive dependency set used by the validated
   workflow surfaces, including `pytest 9.0.3`, `pillow 12.2.0`, and
   `cryptography 46.0.7`.
@@ -902,6 +1060,7 @@ from the same canonical JSON.
 ## [0.7.1] - 2026-04-12
 
 ### Added
+
 - Clarified the minimal-install onboarding path and the exact
   `verify`/`report`/proof-pack command inputs so wheel-only users can validate
   artifacts without cloning the repository.
@@ -924,6 +1083,7 @@ from the same canonical JSON.
   interpreter fallback.
 
 ### Changed
+
 - Tightened public docs, config comments, and CLI guardrails so the published
   OSS surface stays standalone, repo-agnostic, and aligned with the canonical
   `evaluate` / `verify` / `report` / `doctor` / `advanced` command set.
@@ -965,6 +1125,7 @@ from the same canonical JSON.
   and scope Docker-only language to the local `act` workflow.
 
 ### Fixed
+
 - Fixed accuracy-confidence labeling so accuracy metrics evaluate confidence
   width in true percentage points, while non-accuracy ratio metrics keep their
   ratio-width behavior.
@@ -997,6 +1158,7 @@ from the same canonical JSON.
 ## [0.7.0] - 2026-04-09
 
 ### Added
+
 - Added first-class GPT-OSS causal support and pilot Ministral 3 8B/14B
   presets, calibration configs, and support-matrix/catalog coverage.
 - Added a CUDA-capable container runtime image path for GPU hosts, smoke-sized
@@ -1007,6 +1169,7 @@ from the same canonical JSON.
   reporting, and test owners.
 
 ### Changed
+
 - Refactored large runtime, reporting, proof-pack, and test owners into
   smaller modules with tighter shell/core boundaries and clearer ownership.
 - Reorganized the test suite around behavior-based file placement, `_support_*`
@@ -1026,6 +1189,7 @@ from the same canonical JSON.
   operating model.
 
 ### Fixed
+
 - Fixed `quant_rtn` and report-generation fail-closed behavior so noop edits,
   failed subject runs, malformed primary-metric outputs, and invalid baseline
   pairing states no longer emit misleading downstream artifacts.
@@ -1047,6 +1211,7 @@ from the same canonical JSON.
 ## [0.6.0] - 2026-04-04
 
 ### Added
+
 - Added `google/gemma-4-E2B-it` as the shipped `supported_experimental`
   Gemma 4 text lane with a causal preset, calibration config, and support-
   matrix/catalog updates.
@@ -1062,6 +1227,7 @@ from the same canonical JSON.
   the new public CLI assurance surface.
 
 ### Changed
+
 - Unified the old assurance UX under explicit host/container runtime modes
   across `evaluate`, `verify`, and `report verify`, replacing the earlier
   split between `--mode local` and the explicit unverified-provenance verify
@@ -1093,6 +1259,7 @@ from the same canonical JSON.
   the new `vision_text` image-text evaluation flow.
 
 ### Fixed
+
 - Fixed Gemma 4 causal and multimodal loading paths so text and image-text
   runs resolve through the intended adapters, stay on the supported
   Transformers surface, and no longer fail on the Gemma 4 image-token
@@ -1115,6 +1282,7 @@ from the same canonical JSON.
 ## [0.5.1] - 2026-04-02
 
 ### Added
+
 - Added a lightweight container push smoke lane built around
   `sshleifer/tiny-gpt2`, a local JSONL fixture, and the new `Tiny Container
   Smoke` workflow.
@@ -1132,6 +1300,7 @@ from the same canonical JSON.
   validation preflights.
 
 ### Changed
+
 - Drove a repo-wide hardening and architecture cleanup pass across trust-
   critical evaluation, runtime provenance, proof-pack verification,
   determinism, registry, invariants, run orchestration, and reporting flows.
@@ -1161,8 +1330,8 @@ from the same canonical JSON.
 - Bumped workflow and release security pins including `cryptography` to
   `46.0.6`, `pygments` to `2.20.0`, and the Sigstore GitHub Action used by the
   release workflow.
-- Bumped `aiohttp` from `3.13.3` to `3.13.4` in workflow requirement locks and
-  landed the corresponding Dependabot-equivalent fix on `staging/next`.
+- Bumped `aiohttp` from `3.13.3` to `3.13.4` across maintained workflow
+  requirement locks.
 
 - Refreshed docs to match the post-`v0.5.0` architecture and operations model,
   including the shell/core redesign, current evaluate contract, and updated
@@ -1176,6 +1345,7 @@ from the same canonical JSON.
   external-binary model.
 
 ### Removed
+
 - Removed remaining compatibility surfaces that no longer fit the stabilized
   architecture, including legacy command shims, reporting facades, owner-layer
   patch-sync wrappers, the retired legacy RMT module, stale lazy export
@@ -1188,6 +1358,7 @@ from the same canonical JSON.
   package-native Ed25519 manifest-signature flow.
 
 ### Fixed
+
 - Delegated and containerized evaluation reports now emit container execution
   provenance into their runtime manifests.
 - Runtime provenance and proof-pack verification now fail closed by default on
@@ -1220,6 +1391,7 @@ from the same canonical JSON.
 ## [0.5.0] - 2026-03-25
 
 ### Added
+
 - Added an offline release-verification bundle generator and reference docs for
   auditing release artifacts without network access.
 - Added public model-family and runtime-manifest contracts, packaged contract
@@ -1231,6 +1403,7 @@ from the same canonical JSON.
   evidence-sweep tooling/workflows for maintaining shipped support claims.
 
 ### Changed
+
 - Simplified the public CLI contract around `evaluate`, `verify`, `report`,
   `doctor`, and `advanced`; proof-pack, policy, plugin, and calibration flows
   now live under the `advanced` namespace, and core trusted-host evaluation now
@@ -1252,11 +1425,11 @@ from the same canonical JSON.
 - Pinned workflow and proof-pack helper dependencies into checked-in
   requirements files, and updated CI/release automation to run against the
   configured `setup-python` interpreter with tighter permission scopes.
-- Hardened the exhaustive CLI smoke runner, expanded active eval coverage
-  thresholds, and retargeted Dependabot automation to `staging/next`.
+- Hardened the exhaustive CLI smoke runner and expanded active evaluation
+  coverage thresholds.
 - Refreshed shipped model lanes and presets around evidence-backed support,
-  including `hf_text` causal-eval defaults, updated pilot/backlog family
-  coverage, and removal of the legacy ONNX adapter surface.
+  including `hf_text` causal-eval defaults, updated supported-model coverage,
+  and removal of the legacy ONNX adapter surface.
 - Simplified the human-readable Markdown evaluation report by folding the
   dashboard into a single Executive Summary section and removing the
   hand-maintained contents block.
@@ -1275,22 +1448,23 @@ from the same canonical JSON.
   refreshed related security best-practice references.
 - Clarified proof-pack wheel-boundary, scenario, and verification guidance, and
   refreshed related CLI, contracts, and adapter reference material.
-- Documented the maintained Qwen2.5-14B proof-pack sentinels, fresh-worktree
-  remote guidance, and the new secure-default proof-pack bulk-run defaults.
+- Documented the maintained Qwen2.5-14B proof-pack sentinels, reproducible setup
+  guidance, and the new secure-default proof-pack bulk-run defaults.
 - Updated report-reading/reference docs to match the streamlined Executive
   Summary-first Markdown report layout.
-- Added live execution verification for runnable Markdown examples in the
-  maintainer docs workflow, documented the new `docs-live` path plus
-  runtime-image prerequisites for repo quickstarts, and kept hosted docs CI on
-  the non-live validation path.
-- Documented proof-pack wheel verification and the nongated replacement backlog
-  lanes used for evidence-backed model support planning.
+- Added live execution verification for runnable Markdown examples, documented
+  the new `docs-live` path and runtime-image prerequisites, and kept hosted docs
+  CI on the non-live validation path.
+- Documented proof-pack wheel verification and the qualification criteria for
+  replacement model candidates.
 
 ### Removed
+
 - Removed the `QwQ-32B` model lane from the repo, including its maintained
   catalog/support references and its shipped preset and calibration configs.
 
 ### Fixed
+
 - Hardened CLI backend, doctor, plugin, and verification checks, including
   safer remote-code defaults, plugin catalog/install surfaces, and
   release-profile overhead enforcement.
@@ -1340,6 +1514,7 @@ from the same canonical JSON.
 ## [0.4.0] - 2026-03-14
 
 ### Added
+
 - Published stable public contracts for support matrices, adapter capabilities,
   plugin compatibility, proof-pack manifests, and policy packs, along with new
   CLI policy tooling and shipped public evidence fixtures for published-basis
@@ -1348,6 +1523,7 @@ from the same canonical JSON.
   claim-surface consistency checks across docs and verification flows.
 
 ### Changed
+
 - Refactored the trust-critical `verify`, runner, variance, and spectral paths
   into thinner orchestration shells with split helper modules and stronger
   per-file coverage thresholds.
@@ -1375,6 +1551,7 @@ from the same canonical JSON.
   including the terminal invariants pass shown by current CLI output.
 
 ### Fixed
+
 - Enforced verify-policy parity and preserved guard-contract parity when runs
   reuse or compare baseline evidence.
 - Repaired quickstart evaluation flows, smoke helper runners, and plugin JSON
@@ -1395,9 +1572,11 @@ from the same canonical JSON.
 ## [0.3.12] - 2026-02-27
 
 ### Added
+
 - Coverage thresholds now enforce split-module branch floors for critical CLI/reporting paths.
 
 ### Changed
+
 - Refactored CLI run/report builder flows into smaller modules and injected explicit run-command dependencies.
 - Tightened exception-hygiene handling across `run`, `report`, and `doctor` command paths.
 - Repository housekeeping now excludes research pipeline artifacts from tracked source files.
@@ -1410,6 +1589,7 @@ from the same canonical JSON.
 - Clarified calibration policy/preset guidance and aligned ASCII diagram connector formatting.
 
 ### Fixed
+
 - Hardened config include resolution and plugin subprocess path handling in CLI flows.
 - Normalized doctor/plugin command exit semantics for stable profile-specific failure behavior.
 - Strengthened reporting fail-closed schema behavior with network refcounting and schema patch hardening.
@@ -1420,13 +1600,16 @@ from the same canonical JSON.
 ## [0.3.11] - 2026-02-12
 
 ### Added
+
 - Added targeted regression coverage for quantization clipping, spectral guard branches, and report-schema edge cases.
 
 ### Changed
+
 - Plugin detection flow updated to detect AWQ support through the lightweight `awq` module path.
 - Spectral guard handling updated to treat `gate_proj` as an FFN projection in gating paths.
 
 ### Fixed
+
 - CLI plugin listing avoids importing AWQ at discovery time.
 - Reporting schema accepts nullable dataset window seeds and structured `system_overhead` payloads.
 - Quantization RTN outlier clipping path is hardened for fp16-safe behavior.
@@ -1434,11 +1617,13 @@ from the same canonical JSON.
 ## [0.3.10] - 2026-02-08
 
 ### Added
+
 - Proof packs: new guard showcase suite and expanded scenario coverage (scenario filtering/errors-only mode, suite-scoped scenarios, and model override support).
 - Proof packs: new demo/probing artifacts (verdict tables generator, VE `ve_probe` sidecar, and additional RMT/spectral/variance showcase injections).
 - CI: add Python 3.12 smoke and scheduled weekly verification.
 
 ### Changed
+
 - CI: make release/CI verification more reproducible (deterministic `verify-full`) and improve local `act` ergonomics.
 - Docs CI: allow on-demand runs via `workflow_dispatch`.
 - Proof packs: strengthen “evidence signal” outputs and tighten fail-closed behavior for verdict/task failures.
@@ -1449,6 +1634,7 @@ from the same canonical JSON.
 - Proof packs: clarify evidence vs proof-grade posture and document new artifacts (intervention summary + VE probe sidecar).
 
 ### Fixed
+
 - Guards/variance and VE: improve Mixture-of-Experts compatibility (fused expert weight layouts, broader VE layer discovery, and Mixtral `block_sparse_moe` support) and harden variance defaults/probes.
 - Proof packs: improve reliability and determinism of demos (retuned injections/detectors, more robust packaging of probe sidecars, and safer behavior when reports exist but evaluation exits nonzero).
 - Assurance: close verification/baseline evidence gaps and tighten audit coverage.
@@ -1457,12 +1643,14 @@ from the same canonical JSON.
 ## [0.3.9] - 2026-02-03
 
 ### Changed
+
 - README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
 - Branding: make the README logo lockup more logomark-dominant and add a dark-mode logo variant.
 - Branding: logomark-only avatar asset (`docs/assets/invarlock-mark.svg`) for GitHub profile usage.
 - Documentation CI can now be run on demand via `workflow_dispatch`.
 
 ### Fixed
+
 - CI: update workflow test paths after the report artifact rename.
 - Tests: apply ruff-format to warning suppression coverage test.
 - CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
@@ -1476,11 +1664,13 @@ from the same canonical JSON.
 ## [0.3.8] - 2026-02-02
 
 ### Added
+
 - CLI: `--version` / `-V` flag (alias of `invarlock version`) to print the InvarLock version (plus report schema version when available).
 - `invarlock evaluate` summary now includes total runtime and confidence interval.
 - Proof packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
 
 ### Changed
+
 - **Breaking:** Rename legacy evaluation artifacts to “report” across artifacts,
   docs, scripts, notebooks, and Python API surfaces.
 - **Breaking:** CLI terminology unified on `evaluate`.
@@ -1496,6 +1686,7 @@ from the same canonical JSON.
 - Drop legacy Transformers v4 config key documentation and fix minor formatting/typos.
 
 ### Fixed
+
 - HuggingFace/Transformers v5 compatibility: migrate load contracts and use `dtype=` where required.
 - Reduce noisy HuggingFace/Transformers warnings in `ci`/`release` CLI output.
 - Adapters: snapshot config serialization no longer emits deprecated attributes.
@@ -1508,6 +1699,7 @@ from the same canonical JSON.
 ## [0.3.7] - 2026-01-22
 
 ### Added
+
 - Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
 - Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
 - CLI flags: `invarlock run --edit-label` and baseline-report reuse on the
@@ -1517,6 +1709,7 @@ from the same canonical JSON.
   progress/NO_COLOR output refinements for longer-running evaluation flows.
 
 ### Changed
+
 - Proof-pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
 - Legacy evaluation artifact rendering was refreshed with revamped Markdown
   output, richer HTML/glossary support, and updated report terminology.
@@ -1526,6 +1719,7 @@ from the same canonical JSON.
 - Expanded and consolidated guides across CLI, configs, datasets, guards, proof packs, and notebooks.
 
 ### Fixed
+
 - Adapters: Mixtral support, improved auto-detection, and hardened causal describe/weight tying.
 - Proof packs: enforce CI floor constraints, mitigate OOM/missing-tensors cases, and make verification more resilient.
 - Reporting/eval: avoid duplicate synthetic samples and preserve primary-metric drift band handling.
@@ -1533,6 +1727,7 @@ from the same canonical JSON.
 ## [0.3.6] - 2026-01-13
 
 ### Added
+
 - Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in reports and enforced by `invarlock verify --profile ci|release`.
 - Evidence pack suite workflow split: `scripts/evidence_packs/run_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
 - Evidence pack suite knob for controlled experiments: `PACK_GUARDS_ORDER`.
@@ -1540,6 +1735,7 @@ from the same canonical JSON.
   report rendering, and `explain-gates` visibility.
 
 ### Changed
+
 - Runtime configuration was made canonical and expanded beyond `ci` / `release`
   presets so profile-driven runs, overlays, and preset paths stay aligned.
 - B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
@@ -1551,6 +1747,7 @@ from the same canonical JSON.
 - Bump markdownlint-cli2 from 0.19.1 to 0.20.0.
 
 ### Fixed
+
 - Fixed calibration and drift-stat edge cases so single-sample statistics and
   no-overlap calibration runs no longer crash under narrow data conditions.
 - Fixed B200 scheduling and evaluation reliability on constrained GPU hosts,
@@ -1563,11 +1760,13 @@ from the same canonical JSON.
 ## [0.3.5] - 2026-01-02
 
 ### Added
+
 - Evidence pack bash test suite (`scripts/evidence_packs/tests/*`, `scripts/evidence_packs/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
 - Evidence pack runtime helpers (`scripts/evidence_packs/lib/core/runtime.sh`) plus pack build/verify helpers (`scripts/evidence_packs/run_pack.sh`, `scripts/evidence_packs/verify_pack.sh`) to capture artifacts during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed
+
 - WikiText-2 window stratification now uses a deterministic offline byte-level n-gram scorer (replaces the GPT‑2 scorer) to keep window selection stable across model families and avoid implicit model downloads.
 - B200 validation suite is dynamic-scheduling only; dependency promotion is centralized to reduce queue lock contention and improve throughput.
 - B200 generated configs default to `guards.order: [invariants, rmt, variance]` to avoid slow CPU SVD during calibration; spectral caps are not produced unless you re-enable spectral calibration separately.
@@ -1576,18 +1775,22 @@ from the same canonical JSON.
 - Updated CLI/dataset/env-var references for the new difficulty scorer and removal of `INVARLOCK_SCORES_BATCH_SIZE`.
 
 ### Removed
+
 - `INVARLOCK_SCORES_BATCH_SIZE` (the WikiText‑2 difficulty scorer no longer batches on device).
 
 ### Fixed
+
 - B200 harness: treat 30B+ models as “large” for overhead-skip heuristics to avoid double-loading stalls.
 
 ## [0.3.4] - 2025-12-28
 
 ### Added
+
 - Chunked snapshot/restore support for HF adapters to reduce peak memory during retries.
 - Evidence pack workflow helpers (run_suite + scheduler/queue utilities + model creation tooling).
 
 ### Changed
+
 - CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` now requires valid `evaluation_windows` evidence and enforces dataset/tokenizer/masking parity.
 - CI/Release report generation now requires `paired_windows` evidence and rejects non-perfect window pairing.
 
@@ -1596,6 +1799,7 @@ from the same canonical JSON.
 ## [0.3.3] - 2025-12-21
 
 ### Added
+
 - Token-weighted paired Δlog-loss bootstrap support (core bootstrap + primary metric + variance guard).
 - New strictness/override toggles: `INVARLOCK_EVAL_STRICT`, `INVARLOCK_GUARD_PREPARE_STRICT`,
   `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE`, `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE`.
@@ -1603,6 +1807,7 @@ from the same canonical JSON.
 - Report metadata for guard prepare failures and evaluation soft-fail context (`metrics.eval_error`).
 
 ### Changed
+
 - Window pairing enforcement now tracks overlap vs duplicate fractions and detects count mismatches;
   CI/Release reports require perfect pairing, non-overlapping windows, and coverage floors.
 - Determinism preset chooses `CUBLAS_WORKSPACE_CONFIG` based on GPU memory and disables
@@ -1617,6 +1822,7 @@ from the same canonical JSON.
 - Assurance docs, CLI guidance, and environment variable references refreshed for new behavior.
 
 ### Fixed
+
 - Calibration data slicing now supports iterables with optional materialization and clearer errors.
 - Sequence hashing now includes per-sequence lengths to avoid ambiguous digests.
 - Variance guard predictive gating improves min-effect and regression reasoning.
@@ -1624,40 +1830,48 @@ from the same canonical JSON.
 ## [0.3.2] - 2025-12-14
 
 ### Added
+
 - Calibration CLI (`invarlock calibrate`) and runtime modules for policy and guard tuning.
 - Determinism utilities and CLI flows to exercise repeatable runs and presets.
 - Bench policy regression harness and additional regression tests for guards and reports.
 - Benchmark policy regression golden `bench-golden-2025-12-13` (`ae8094204c998fc51bf51052d7d1457d3cdc17bab9bc4785e88c4f07d0234ad3`) tracks guard-effect quality impact, runtime overhead, and memory overhead against silent gate/output shifts.
 
 ### Changed
+
 - Guard policies and tier runtime configuration updated to support calibration and determinism flows.
 - CLI commands (`run`, `verify`, `doctor`, `explain-gates`) extended with calibration and reporting surfaces.
 
 - Expanded assurance docs for calibration, guard contracts, determinism, and BCA/bootstrap methods.
 
 ### Fixed
+
 - Additional edge cases in report reporting, policy utilities, and guard analysis covered and hardened via new tests.
 
 ## [0.3.1] - 2025-12-10
 
 ### Added
+
 - **INVARLOCK_SKIP_GUARD_METRIC_IMPACT_CHECK env var** - Skip guard metric impact measurement even with ci/release profiles for large models.
 - **Configurable PM acceptance range** - Set via preset config or `INVARLOCK_PM_ACCEPTANCE_MIN/MAX` environment variables.
 - **Comprehensive evidence pack guide** - New documentation at `docs/user-guide/evidence-packs.md`.
 
 ### Changed
+
 - B200 validation scripts updated to v2.0.1 with improved cleanup traps and progress monitoring.
 
 ### Deprecated
+
 - `INVARLOCK_TINY_RELAX` for PM acceptance - prefer `INVARLOCK_PM_ACCEPTANCE_MAX` and presets instead.
 
 ### Fixed
+
 - **Memory leak in run.py reload fallback** - GPU memory is now freed before reloading models, preventing OOM on 70B+ runs.
 - **B200 validation script bugs** - Fixed preset path resolution, model size detection, and error propagation in dynamic scheduling workers.
 
 ## [0.3.0] - 2025-12-05
 
 ### Added
+
 - **Quantization-aware capabilities module** (`invarlock.adapters.capabilities`)
   - `ModelCapabilities` dataclass for declaring model properties
   - `QuantizationConfig` frozen dataclass for quantization metadata
@@ -1679,6 +1893,7 @@ from the same canonical JSON.
 - **Test documentation** - README files for `tests/guards/` and `tests/observability/`
 
 ### Changed
+
 - `hf_causal.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
 - `invarlock.plugins` AWQ adapter: Uses `_safe_to_device()` with AWQ capabilities
 - `invarlock.plugins` GPTQ adapter: Uses `_safe_to_device()` with GPTQ capabilities
@@ -1690,22 +1905,31 @@ from the same canonical JSON.
   - Quantization auto-detection flow
 
 ### Fixed
+
 - BNB 8-bit model loading error when subject is a saved quantized checkpoint
 - Empty sample handling in variance guard (`_safe_mean()` helper)
 
 ## Pre-public and import history
 
-The published release history begins at `v0.2.0`, but the repository does not contain a tagged `v0.1.0`. Git history shows two separate `feat: initial public import` roots on December 1, 2025: `v0.2.0` is a standalone one-commit public snapshot, while the continuing release line that leads to `v0.3.0` and later starts from a separate public-import root. Earlier internal development therefore exists only as pre-public foundation and is not represented here as a published semver release.
+The published release history begins at `v0.2.0`, but the repository does not
+contain a tagged `v0.1.0`. Git history shows two separate
+`feat: initial public import` roots on December 1, 2025: `v0.2.0` is a
+standalone one-commit public snapshot, while the continuing release line that
+leads to `v0.3.0` and later starts from a separate public-import root. The two
+public roots have no shared published predecessor, so no `v0.1.0` release is
+represented here.
 
 ## [0.2.0] - 2025-12-01
 
 First public GitHub and PyPI release snapshot.
 
 ### Added
+
 - Core compare & evaluate pipeline and guard chain for edit‑agnostic robustness reports.
 - Evaluation report schema v1 and CLI entry points (including `invarlock evaluate`).
 - Torch‑optional core install with optional extras (e.g., `invarlock[hf]`, `invarlock[adapters]`).
 - Initial documentation set: quickstart, user guides, and CLI reference.
 
 ### Changed
+
 - Until 1.0.0, **minor** releases (0.x.y → 0.(x+1).0) may include breaking changes. Refer to the README and CLI help for the current surface and behavior.

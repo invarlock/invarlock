@@ -7,11 +7,11 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 
 from invarlock.engine import evaluate_request_file, verify_evidence
 from invarlock.evidence_pack_integrity import public_key_fingerprint
@@ -887,6 +887,29 @@ def test_receipt_public_key_rejects_malformed_signature_blocks(
     assert any(message in error for error in errors)
 
 
+def test_receipt_public_key_rejects_a_valid_non_ed25519_key(tmp_path: Path) -> None:
+    module = _load()
+    public_key = ec.generate_private_key(ec.SECP256R1()).public_key()
+    signature = {
+        "algorithm": "ed25519",
+        "format": "invarlock/evidence-verification-receipt-signature-v1",
+        "public_key": {
+            "encoding": "pem",
+            "value": public_key.public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            ).decode("ascii"),
+        },
+        "value": "",
+    }
+    errors: list[str] = []
+
+    assert (
+        module._receipt_public_key(errors, tmp_path / "receipt.json", signature) is None
+    )
+    assert "public key is not Ed25519" in " ".join(errors)
+
+
 def test_signed_receipt_rejects_missing_statement(tmp_path: Path) -> None:
     module = _load()
     errors: list[str] = []
@@ -1023,6 +1046,16 @@ def test_index_entry_rejects_wrong_class_path_and_missing_artifacts(
     [
         (
             {
+                "kind": "file",
+                "path": "public_evidence/evidence/demo/receipt.json",
+                "size_bytes": 1,
+                "sha256": DIGEST,
+                "undeclared": True,
+            },
+            "summary fields are not closed",
+        ),
+        (
+            {
                 "kind": "archive",
                 "path": "public_evidence/evidence/demo/evidence",
                 "size_bytes": 1,
@@ -1152,6 +1185,87 @@ def test_artifact_summary_rejects_symlinked_local_carrier(tmp_path: Path) -> Non
     assert any("symlinks are not allowed" in error for error in errors)
 
 
+def test_artifact_totals_ignore_open_or_untyped_entries() -> None:
+    module = _load()
+
+    assert module._artifact_totals(
+        [
+            None,
+            {"artifacts": None},
+            {"artifacts": {"invalid": None}},
+            {
+                "artifacts": {
+                    "directory": {
+                        "kind": "directory",
+                        "file_count": 2,
+                        "size_bytes": 30,
+                    },
+                    "file": {"kind": "file", "size_bytes": 10},
+                    "bools": {
+                        "kind": "directory",
+                        "file_count": True,
+                        "size_bytes": False,
+                    },
+                }
+            },
+        ]
+    ) == (3, 40)
+
+
+def test_local_entry_reports_pack_format_anchor_and_rendered_signer_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load()
+    root = tmp_path / "public_evidence"
+    pack, _receipt = _write_local_publication(module, root)
+    manifest_path = pack / "manifest.json"
+    manifest_path.chmod(0o644)
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["format"] = "invarlock/evidence-pack-v99"
+    manifest["inputs"]["baseline"]["material_digest"] = "sha256:" + "0" * 64
+    manifest_path.write_bytes(_canonical_json_bytes(manifest))
+    monkeypatch.setattr(
+        module,
+        "render_evidence",
+        lambda _pack: SimpleNamespace(evidence_signer="sha256:" + "9" * 64),
+    )
+    errors: list[str] = []
+
+    module._check_local_entry(errors, root / "evidence/local")
+
+    joined = "\n".join(errors)
+    assert "only the canonical invarlock/evidence-pack-v1" in joined
+    assert "baseline anchor does not bind the pack manifest" in joined
+    assert "does not match the verified pack signer" in joined
+
+
+def test_local_entry_rejects_missing_pack_before_receipt_processing(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    entry = tmp_path / "evidence/local"
+    entry.mkdir(parents=True)
+    entry.joinpath("evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "format_version": "invarlock/public-evidence-meta-v1",
+                "summary": "Missing pack",
+                "artifact_paths": {
+                    "evidence_pack": "evidence",
+                    "verification_receipt": "verification.receipt.json",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    errors: list[str] = []
+
+    module._check_local_entry(errors, entry)
+
+    assert errors == [f"{entry / 'evidence'}: evidence pack is missing or unsafe"]
+
+
 def test_local_tree_rejects_unindexed_directory_and_loose_file(tmp_path: Path) -> None:
     module = _load()
     root = tmp_path / "public_evidence"
@@ -1192,6 +1306,27 @@ def test_public_evidence_rejects_invalid_index_json(tmp_path: Path) -> None:
     errors = module.check_public_evidence(root)
 
     assert errors and "Expecting property name" in errors[0]
+
+
+def test_public_evidence_rejects_index_format_and_summary_total_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load()
+    monkeypatch.setattr(module, "_validate_index", lambda *_args: None)
+    root = tmp_path / "public_evidence"
+    _write_index(
+        root,
+        format_version="invarlock/public-evidence-index-v99",
+        evidence_file_count=1,
+        evidence_size_bytes=1,
+    )
+
+    errors = module.check_public_evidence(root)
+
+    assert "public evidence index format is invalid" in errors
+    assert "evidence_file_count must match artifact summaries" in errors
+    assert "evidence_size_bytes must match artifact summaries" in errors
 
 
 def test_public_evidence_checks_packaged_index_at_canonical_root(

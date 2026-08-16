@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run one maintained Qwen3 Hugging Face ecosystem integration journey.
+"""Run one maintained compact-model Hugging Face ecosystem integration journey.
 
-Every journey starts from one official revision-pinned Qwen3 checkpoint. The
+Every journey starts from one official revision-pinned compact checkpoint. The
 Transformers journey creates an explicit behavioral derivative, the PEFT
 journey trains, saves, reloads, and merges a LoRA adapter, and the TorchAO
 journey applies INT8 weight-only quantization before materializing a portable
@@ -13,9 +13,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import stat
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,14 +26,35 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 try:
-    from examples.integrations import qwen3_profile
+    from examples.integrations.bounded_command import run_bounded_command
+except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
+    if exc.name != "examples":
+        raise
+    from bounded_command import run_bounded_command  # type: ignore[no-redef]
+
+try:
+    from examples.integrations import compact_model_profile
 except ModuleNotFoundError as exc:
     if exc.name != "examples":
         raise
     # Direct script execution places this directory, rather than the repository
     # root, on sys.path. Keep the maintained one-command entry point usable with
     # the same PYTHONPATH=src boundary as an installed core package.
-    import qwen3_profile  # type: ignore[no-redef]
+    import compact_model_profile  # type: ignore[no-redef]
+try:
+    from examples.integrations.trust_material import (
+        create_trust_material,
+        load_external_key,
+        validate_new_trust_root,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != "examples":
+        raise
+    from trust_material import (  # type: ignore[no-redef]
+        create_trust_material,
+        load_external_key,
+        validate_new_trust_root,
+    )
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import ModelRuntimeSpec, artifact_identity_sha256
 from invarlock.core.runtime_provider.types import JSONScalar
@@ -67,9 +88,15 @@ class ExamplePaths:
     html_report: Path
 
 
-def _paths(root: Path) -> ExamplePaths:
+def _paths(
+    root: Path,
+    *,
+    evidence_key: Path | None = None,
+    trust_root: Path | None = None,
+) -> ExamplePaths:
     evaluation = root / "evaluation"
-    verifier = root / "verifier"
+    verifier = trust_root or root / "verifier"
+    receipt_root = root / "verifier-output" if trust_root is not None else verifier
     return ExamplePaths(
         root=root,
         evaluation=evaluation,
@@ -78,9 +105,13 @@ def _paths(root: Path) -> ExamplePaths:
         verifier=verifier,
         trusted_inputs=verifier / "trusted-inputs.json",
         independent_policy=verifier / "policy" / "acceptance.json",
-        evidence_key=root / "keys" / "evidence-signer.pem",
-        verifier_key=verifier / "keys" / "verifier.pem",
-        receipt=verifier / "verification.receipt.json",
+        evidence_key=evidence_key or root / "keys" / "evidence-signer.pem",
+        verifier_key=(
+            verifier / "verifier.pem"
+            if trust_root is not None
+            else verifier / "keys" / "verifier.pem"
+        ),
+        receipt=receipt_root / "verification.receipt.json",
         html_report=root / "comparison-report.html",
     )
 
@@ -124,7 +155,7 @@ def _single_target_id(tokenizer: Any, expected_output: str) -> int:
     token_ids = encoded["input_ids"]
     if not isinstance(token_ids, list) or len(token_ids) != 1:
         raise RuntimeError(
-            "the pinned Qwen3 profile requires a one-token expected continuation"
+            "the pinned compact profile requires a one-token expected continuation"
         )
     return int(token_ids[0])
 
@@ -140,7 +171,7 @@ def _prompt_batch(
         return_tensors="pt",
     )
     if not hasattr(encoded["input_ids"], "shape"):
-        raise RuntimeError("the pinned Qwen3 tokenizer did not return tensors")
+        raise RuntimeError("the pinned compact tokenizer did not return tensors")
     target_id = _single_target_id(tokenizer, expected_output)
     targets = torch.full((len(records), 1), target_id, dtype=encoded["input_ids"].dtype)
     return {
@@ -162,7 +193,7 @@ def _continuation_training_batch(
     for record in _example_records(expected_output=expected_output):
         prompt_ids = tokenizer(record["prompt"], add_special_tokens=True)["input_ids"]
         if not isinstance(prompt_ids, list) or not prompt_ids:
-            raise RuntimeError("the pinned Qwen3 tokenizer returned an empty prompt")
+            raise RuntimeError("the pinned compact tokenizer returned an empty prompt")
         prompt_lengths.append(len(prompt_ids))
         sequences.append([int(value) for value in prompt_ids] + [target_id])
     width = max(len(sequence) for sequence in sequences)
@@ -198,7 +229,7 @@ def _target_row_derivative(
     model.eval()
     backbone = getattr(model, str(model.base_model_prefix), None)
     if backbone is None:
-        raise RuntimeError("the Qwen3 model does not expose its causal backbone")
+        raise RuntimeError("the Qwen3.5 model does not expose its causal backbone")
     with torch.inference_mode():
         hidden_states = backbone(
             input_ids=batch["input_ids"],
@@ -230,7 +261,7 @@ def _target_row_derivative(
             .item()
         )
     if margin <= 0.0:
-        raise RuntimeError("the Qwen3 subject transformation missed a prompt")
+        raise RuntimeError("the Qwen3.5 subject transformation missed a prompt")
     return target_id, margin
 
 
@@ -247,11 +278,11 @@ def _create_hf_checkpoints(
         ) from exc
 
     torch.manual_seed(_SEED)
-    model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch, transformers=transformers
     )
     baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = qwen3_profile.save_checkpoint(model, tokenizer, baseline)
+    tokenizer_digest = compact_model_profile.save_checkpoint(model, tokenizer, baseline)
     baseline_digest = checkpoint_tree_sha256(baseline)
     target_id, margin = _target_row_derivative(
         model,
@@ -260,19 +291,23 @@ def _create_hf_checkpoints(
         expected_output=expected_output,
     )
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = qwen3_profile.save_checkpoint(model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(model, tokenizer, subject)
     if observed_digest != tokenizer_digest:
-        raise RuntimeError("the Qwen3 baseline and subject tokenizers do not match")
+        raise RuntimeError("the Qwen3.5 baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
     if baseline_digest == subject_digest:
-        raise RuntimeError("the transformed Qwen3 subject is identical to its baseline")
+        raise RuntimeError(
+            "the transformed Qwen3.5 subject is identical to its baseline"
+        )
     (paths.evaluation / "inputs" / "subject-transformation.json").write_bytes(
         canonical_json_bytes(
             {
                 "format": "invarlock/example-hf-transformers-summary-v1",
                 "library": "transformers",
                 "library_version": str(transformers.__version__),
-                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "method": "causal-output-row-fit",
                 "expected_output": expected_output,
                 "target_token_id": target_id,
@@ -298,11 +333,11 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
 
     torch.manual_seed(_SEED)
     torch.cuda.manual_seed_all(_SEED)
-    baseline_model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    baseline_model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch, transformers=transformers
     )
     baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = qwen3_profile.save_checkpoint(
+    tokenizer_digest = compact_model_profile.save_checkpoint(
         baseline_model, tokenizer, baseline
     )
     baseline_digest = checkpoint_tree_sha256(baseline)
@@ -316,7 +351,7 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
             r=4,
             lora_alpha=8,
             lora_dropout=0.0,
-            target_modules=list(qwen3_profile.PEFT_TARGET_MODULES),
+            target_modules=list(compact_model_profile.PEFT_TARGET_MODULES),
             bias="none",
         ),
     )
@@ -383,7 +418,9 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
     )
     subject_model = reloaded.merge_and_unload().to("cpu")
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = qwen3_profile.save_checkpoint(subject_model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(
+        subject_model, tokenizer, subject
+    )
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the PEFT baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
@@ -395,8 +432,10 @@ def _create_peft_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], str]
                 "format": "invarlock/example-peft-summary-v1",
                 "library": "peft",
                 "library_version": str(peft.__version__),
-                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
-                "target_modules": list(qwen3_profile.PEFT_TARGET_MODULES),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
+                "target_modules": list(compact_model_profile.PEFT_TARGET_MODULES),
                 "training_record_count": len(_example_records()),
                 "training_steps": 12,
                 "training_device": device.type,
@@ -424,11 +463,11 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
         ) from exc
 
     torch.manual_seed(_SEED)
-    baseline_model, tokenizer = qwen3_profile.load_model_and_tokenizer(
+    baseline_model, tokenizer = compact_model_profile.load_model_and_tokenizer(
         torch=torch, transformers=transformers
     )
     baseline = paths.evaluation / "models" / "baseline"
-    tokenizer_digest = qwen3_profile.save_checkpoint(
+    tokenizer_digest = compact_model_profile.save_checkpoint(
         baseline_model, tokenizer, baseline
     )
     baseline_digest = checkpoint_tree_sha256(baseline)
@@ -549,7 +588,9 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
         materialized_digest.update(payload)
 
     subject = paths.evaluation / "models" / "subject"
-    observed_digest = qwen3_profile.save_checkpoint(subject_model, tokenizer, subject)
+    observed_digest = compact_model_profile.save_checkpoint(
+        subject_model, tokenizer, subject
+    )
     if observed_digest != tokenizer_digest:
         raise RuntimeError("the TorchAO baseline and subject tokenizers do not match")
     subject_digest = checkpoint_tree_sha256(subject)
@@ -583,7 +624,9 @@ def _create_torchao_checkpoints(paths: ExamplePaths) -> tuple[dict[str, Path], s
                 "library_version": str(torchao.__version__),
                 "torch_version": str(torch.__version__),
                 "transformers_version": str(transformers.__version__),
-                **qwen3_profile.provenance(checkpoint_tree_sha256=baseline_digest),
+                **compact_model_profile.provenance(
+                    checkpoint_tree_sha256=baseline_digest
+                ),
                 "quantization": {
                     "configuration": "Int8WeightOnlyConfig(version=2)",
                     "excluded_modules": ["lm_head"],
@@ -647,24 +690,80 @@ def _prepare_workspace(
     integration: str,
     runtime_image_digest: str,
     metric: str = "normalized_nll_per_utf8_byte",
+    evidence_signing_key: Path | None = None,
+    verifier_signing_key: Path | None = None,
+    trust_root: Path | None = None,
+    ephemeral_trust_root: bool = True,
 ) -> tuple[ExamplePaths, dict[str, str]]:
     if metric not in _METRICS:
         raise ValueError(f"unsupported comparison metric: {metric}")
     if metric == "exact_match" and integration != "hf-transformers":
         raise ValueError("exact-match preparation requires hf-transformers")
-    root = root.expanduser().resolve()
-    if root.exists():
+    external_trust = (
+        evidence_signing_key is not None
+        or verifier_signing_key is not None
+        or trust_root is not None
+    )
+    if external_trust and not all(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    ):
+        raise ValueError(
+            "evidence key, verifier key, and trust root must be supplied together"
+        )
+    if external_trust and ephemeral_trust_root:
+        raise ValueError("external trust material cannot use ephemeral mode")
+    if not external_trust and not ephemeral_trust_root:
+        raise ValueError(
+            "caller-owned evidence/verifier keys and trust root are required"
+        )
+    root = Path(os.path.abspath(root.expanduser()))
+    if root.exists() or root.is_symlink():
         raise FileExistsError(
             f"workspace already exists: {root}; choose a new disposable path"
         )
     root.parent.mkdir(parents=True, exist_ok=True)
     root.mkdir()
-    paths = _paths(root)
+    paths = _paths(
+        root,
+        evidence_key=(
+            Path(os.path.abspath(evidence_signing_key.expanduser()))
+            if external_trust
+            else None
+        ),
+        trust_root=(
+            Path(os.path.abspath(trust_root.expanduser())) if external_trust else None
+        ),
+    )
     try:
         (paths.evaluation / "inputs").mkdir(parents=True)
-        paths.independent_policy.parent.mkdir(parents=True)
-        paths.evidence_key.parent.mkdir(parents=True)
-        paths.verifier_key.parent.mkdir(parents=True)
+        if external_trust:
+            assert evidence_signing_key is not None
+            assert verifier_signing_key is not None
+            assert trust_root is not None
+            trust_root = validate_new_trust_root(trust_root, transaction_root=root)
+            evidence_key_path, evidence_key_bytes, evidence_signer = load_external_key(
+                evidence_signing_key,
+                transaction_root=root,
+                label="evidence signing key",
+            )
+            _verifier_key_path, verifier_key_bytes, verifier = load_external_key(
+                verifier_signing_key,
+                transaction_root=root,
+                label="verifier signing key",
+            )
+            if evidence_signer == verifier:
+                raise ValueError("evidence and verifier signing keys must be distinct")
+            paths = _paths(
+                root,
+                evidence_key=evidence_key_path,
+                trust_root=Path(os.path.abspath(trust_root.expanduser())),
+            )
+        else:
+            paths.independent_policy.parent.mkdir(parents=True)
+            paths.evidence_key.parent.mkdir(parents=True)
+            paths.verifier_key.parent.mkdir(parents=True)
+        paths.receipt.parent.mkdir(parents=True, exist_ok=True)
 
         expected_output = "target" if metric == "exact_match" else " target"
         checkpoints, tokenizer_digest = _create_checkpoints(
@@ -727,13 +826,14 @@ def _prepare_workspace(
         policy_bytes = canonical_json_bytes(policy)
         request_policy = paths.evaluation / "inputs" / "acceptance.json"
         request_policy.write_bytes(policy_bytes)
-        paths.independent_policy.write_bytes(policy_bytes)
+        if not external_trust:
+            paths.independent_policy.write_bytes(policy_bytes)
 
         def side(role: str) -> dict[str, object]:
             model_id = f"invarlock-example/{integration}-{role}"
             artifact_digest = settings[role]["checkpoint_tree_sha256"]
             locator = (
-                f"hf://{qwen3_profile.MODEL_ID}@{qwen3_profile.MODEL_REVISION}"
+                f"hf://{compact_model_profile.MODEL_ID}@{compact_model_profile.MODEL_REVISION}"
                 f"#checkpoint-tree-sha256:{artifact_digest}"
                 if role == "baseline"
                 else f"generated://{model_id}@sha256:{artifact_digest}"
@@ -800,14 +900,19 @@ def _prepare_workspace(
             )
             for role in ("baseline", "subject")
         }
-        evidence_signer = _write_private_key(paths.evidence_key)
-        verifier = _write_private_key(paths.verifier_key)
-        paths.evidence_key.with_suffix(".fingerprint").write_text(
-            evidence_signer + "\n", encoding="ascii"
-        )
-        paths.verifier_key.with_suffix(".fingerprint").write_text(
-            verifier + "\n", encoding="ascii"
-        )
+        if external_trust:
+            assert evidence_key_bytes is not None
+            assert verifier_key_bytes is not None
+            assert trust_root is not None
+        else:
+            evidence_signer = _write_private_key(paths.evidence_key)
+            verifier = _write_private_key(paths.verifier_key)
+            paths.evidence_key.with_suffix(".fingerprint").write_text(
+                evidence_signer + "\n", encoding="ascii"
+            )
+            paths.verifier_key.with_suffix(".fingerprint").write_text(
+                verifier + "\n", encoding="ascii"
+            )
         anchors = {
             "baseline_artifact_digest": artifact_anchors["baseline"],
             "subject_artifact_digest": artifact_anchors["subject"],
@@ -830,7 +935,24 @@ def _prepare_workspace(
             },
             "allow_installed_scorers": False,
         }
-        paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
+        if external_trust:
+            material = create_trust_material(
+                transaction_root=root,
+                evidence_key=paths.evidence_key,
+                verifier_key_bytes=verifier_key_bytes,
+                evidence_fingerprint=evidence_signer,
+                verifier_fingerprint=verifier,
+                trust_root=trust_root,
+                policy_bytes=policy_bytes,
+                verifier_identity=f"invarlock-example/{integration}-verifier",
+                anchors=anchors,
+            )
+            if material.trusted_inputs != paths.trusted_inputs:
+                raise ValueError(
+                    "external trust material resolved to an unexpected root"
+                )
+        else:
+            paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
         return paths, anchors
     except Exception:
         shutil.rmtree(root)
@@ -840,7 +962,11 @@ def _prepare_workspace(
 def _run(command: list[str]) -> None:
     rendered = " ".join(command)
     print(f"+ {rendered}")
-    completed = subprocess.run(command, check=False, capture_output=True, text=True)
+    completed = run_bounded_command(
+        command,
+        capture_output=True,
+        label="compact-model integration command",
+    )
     if completed.stdout:
         print(completed.stdout, end="")
     if completed.returncode != 0:
@@ -942,6 +1068,14 @@ def _parser() -> argparse.ArgumentParser:
             "close the generated verifier trust profile."
         ),
     )
+    parser.add_argument("--evidence-signing-key", type=Path)
+    parser.add_argument("--verifier-signing-key", type=Path)
+    parser.add_argument("--trust-root", type=Path)
+    parser.add_argument(
+        "--ephemeral-trust-root",
+        action="store_true",
+        help="Use disposable generated keys; never use this mode for acceptance.",
+    )
     parser.add_argument("--runtime-device", default="cpu")
     parser.add_argument(
         "--metric",
@@ -954,6 +1088,28 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    trust_values = (
+        arguments.evidence_signing_key,
+        arguments.verifier_signing_key,
+        arguments.trust_root,
+    )
+    provided_trust = any(value is not None for value in trust_values)
+    external_trust = all(value is not None for value in trust_values)
+    if provided_trust and not external_trust:
+        raise SystemExit(
+            "--evidence-signing-key, --verifier-signing-key, and --trust-root "
+            "must be supplied together"
+        )
+    if not external_trust and not arguments.ephemeral_trust_root:
+        raise SystemExit(
+            "caller-owned --evidence-signing-key, --verifier-signing-key, and "
+            "--trust-root are required; use --ephemeral-trust-root only for a "
+            "disposable non-acceptance demo"
+        )
+    if external_trust and arguments.ephemeral_trust_root:
+        raise SystemExit(
+            "--ephemeral-trust-root cannot be combined with caller-owned trust"
+        )
     if not arguments.prepare_only and not arguments.runtime_image:
         raise SystemExit("full execution requires --runtime-image")
     try:
@@ -962,6 +1118,10 @@ def main(argv: list[str] | None = None) -> int:
             integration=arguments.integration,
             runtime_image_digest=arguments.runtime_image_digest,
             metric=arguments.metric,
+            evidence_signing_key=arguments.evidence_signing_key,
+            verifier_signing_key=arguments.verifier_signing_key,
+            trust_root=arguments.trust_root,
+            ephemeral_trust_root=arguments.ephemeral_trust_root,
         )
         print(f"Prepared: {paths.root}")
         print(f"Request: {paths.request}")

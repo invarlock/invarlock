@@ -67,7 +67,10 @@ jobs:
         with:
           version: "0.10.10"
       - name: Install dependencies
-        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Run fast repository gates
@@ -101,7 +104,10 @@ jobs:
         with:
           version: "0.10.10"
       - name: Install dependencies
-        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Run minimum-Python tests
         run: make test-fast addins-test PYTEST_WORKERS=auto
       - name: Check command surface
@@ -126,7 +132,10 @@ jobs:
           python-version: '3.13'
           cache: pip
       - name: Install dependencies
-        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Enforce coverage
         run: make coverage-enforce
 
@@ -156,7 +165,10 @@ jobs:
           node-version: '22'
           cache: npm
       - name: Install dependencies
-        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Install documentation linters
         run: npm ci
       - name: Install actionlint

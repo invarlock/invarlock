@@ -14,6 +14,7 @@ PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:hf-cuda-local
+RUNTIME_IMAGE_CUDA129 ?= invarlock-runtime:hf-cuda129-local
 RUNTIME_CUDA_DEVICE_ARGS = $(if $(filter podman,$(CONTAINER_ENGINE)),--device nvidia.com/gpu=all,--gpus all)
 RUNTIME_SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct 2>/dev/null)
 RUNTIME_SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
@@ -53,21 +54,26 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/evidence_reporting.py \
 	src/invarlock/evidence_verification.py
 
+RELEASE_EXAMPLE_COVERAGE_FILES := \
+	examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
+	examples/evaluator-qualification/measure_signed_transactions.py \
+	examples/quickstart/run.py
+
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: compatibility-test trust-smoke mutation-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-authoritative-imports evaluator-upstream-qualification evaluator-authoritative-corpus evaluator-docs-matrix-check
+.PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
-.PHONY: example-torchao-int8 example-gguf-llama-cpp example-lm-evaluation-harness example-tensorrt-llm example-tensorrt-llm-prepared
+.PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
-.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-strict docs-check-build docs-check-links
-.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke packaging-smoke-minimal packaging-smoke-front-door
-.PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman
-.PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman container-front-door-smoke
+.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
+.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
+.PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
+.PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda129 container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
-.PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
+.PHONY: release-preflight release-reference-journey release-public-evidence-compatibility release-evaluator-qualification-compatibility release-retained-evidence-compatibility contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
 .PHONY: clean docsclean deepclean pre-commit pre-commit-install ensure-python ensure-ruff ensure-mypy
 
 help:  ## Show maintained targets
@@ -121,11 +127,11 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 	COVERAGE_FILE=$(COVERAGE_CORE_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
-		--cov-report=xml:reports/cov.xml --cov-fail-under=90
+		--cov-report=xml:reports/cov.xml --cov-fail-under=95
 	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-linux-check:
@@ -136,29 +142,29 @@ coverage-linux-check:
 
 coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src \
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:. \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests \
 		--cov --cov-config=scripts/addins.coveragerc \
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/diagnostics/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/gguf/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/multimodal/src/*' \
-		--fail-under=90
+		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
-		--fail-under=90
+		--fail-under=95
 	@git ls-files 'addins/*/src/**/*.py' | \
 		grep -v '/__init__.py$$' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-qualification:  ## Enforce branch-aware coverage for qualification tooling
@@ -177,23 +183,23 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 		--cov --cov-config=scripts/qualification.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/authenticated_runtime_build.py' --fail-under=90
+		--include='scripts/authenticated_runtime_build.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_precheck.py' --fail-under=90
+		--include='scripts/qualification_precheck.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_candidate_wheels.py' --fail-under=90
+		--include='scripts/qualification_candidate_wheels.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_receipt_check.py' --fail-under=90
+		--include='scripts/qualification_receipt_check.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_render_preflight.py' --fail-under=90
+		--include='scripts/qualification_render_preflight.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/qualification_source.py' --fail-under=90
+		--include='scripts/qualification_source.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/runtime_qualification.py' --fail-under=90
+		--include='scripts/runtime_qualification.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
-		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=90
+		--include='scripts/tensorrt_llm_canary_preflight.py' --fail-under=95
 
 coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage erase
@@ -203,47 +209,58 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		tests/scripts/test_release_preflight.py \
 		tests/scripts/test_release_preflight_adversarial.py \
 		tests/scripts/test_release_preflight_edges.py \
+		tests/scripts/test_release_reference_journey.py \
 		tests/scripts/test_verify_hosted_distributions.py \
 		tests/scripts/test_verify_hosted_distributions_edges.py \
 		tests/scripts/test_tagged_release_candidate.py \
 		--cov --cov-config=scripts/release.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/first_party_distribution_validation.py' --fail-under=90
+		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_distribution_validation.py' --fail-under=90
+		--include='scripts/release/release_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/release_preflight.py' --fail-under=90
+		--include='scripts/release/release_preflight.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/tagged_release_candidate.py' --fail-under=90
+		--include='scripts/release/release_reference_journey.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
-		--include='scripts/release/verify_hosted_distributions.py' --fail-under=90
+		--include='scripts/release/tagged_release_candidate.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
+		--include='scripts/release/verify_hosted_distributions.py' --fail-under=95
 
 coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/examples \
 		--cov=examples \
+		--cov-config=scripts/examples.coveragerc \
 		--cov-branch \
 		--cov-report=term-missing \
-		--cov-report=xml:reports/examples-cov.xml \
-		--cov-fail-under=90
+		--cov-report=xml:reports/examples-cov.xml
+	@exemptions="$$(grep -Ev '^(#|$$)' examples/coverage-exemptions.txt | paste -sd, -)"; \
+		test -n "$$exemptions"; \
+		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report \
+			--omit="$$exemptions" --fail-under=95
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
 			if grep -Fqx "$$source" examples/coverage-exemptions.txt; then continue; fi; \
-			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
+	@for source in $(RELEASE_EXAMPLE_COVERAGE_FILES); do \
+		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
+	done
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
-	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
 coverage-maintenance:  ## Measure maintained repository checks and security tooling
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/ci/test_coverage_branch_rate.py \
 		tests/ci/test_public_evidence_audit.py \
+		tests/ci/test_public_text_check.py \
 		tests/scripts/test_check_repo_cruft.py \
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
@@ -255,11 +272,11 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		--cov --cov-config=scripts/maintenance.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/maintenance-cov.xml \
-		--cov-fail-under=90
+		--cov-fail-under=95
 	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' \
 		'scripts/prepare_qualification_suites.py' | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=90 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-enforce: PYTEST_WORKERS = 2
@@ -271,7 +288,9 @@ coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in para
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
-		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 90
+		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 95 \
+		--class-exemptions reports/examples-cov.xml examples \
+		examples/coverage-exemptions.txt
 
 coverage-enforce-parallel: PYTEST_WORKERS = 2
 coverage-enforce-parallel:  ## Enforce coverage with pytest-xdist
@@ -283,8 +302,6 @@ trust-smoke:  ## Exercise pack tamper rejection and signed receipt verification
 compatibility-test:  ## Replay the permanent v0.13 compatibility corpus
 	PYTHONPATH=src $(PYTEST) -q tests/compatibility
 
-mutation-smoke: trust-smoke  ## CI alias for the trust-critical adversarial smoke
-
 trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example transaction
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py
 
@@ -293,19 +310,23 @@ example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejecti
 example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
 
+example-quickstart:  ## Verify signed fixture evidence and issue a fresh receipt
+	PYTHONPATH=src $(PYTHON) examples/quickstart/run.py \
+		--fixture examples/acceptance-handoff/golden
+
 evaluator-qualification:  ## Requalify the retained evaluator matrix offline
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify
-	$(MAKE) evaluator-authoritative-imports
+	$(MAKE) evaluator-replayable-imports
 
-evaluator-authoritative-imports:  ## Replay authoritative 102-record imports offline
-	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-authoritative
+evaluator-replayable-imports:  ## Replay independently replayable 102-record imports
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
 evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
-	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-authoritative
+	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-replayable
 	$(MAKE) evaluator-qualification
 
-evaluator-authoritative-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
+evaluator-replayable-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
 	PYTHONPATH=src:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 		uv run --isolated --locked --extra hf python \
 		examples/evaluator-qualification/authoritative/generate_cases.py --check
@@ -335,9 +356,24 @@ example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
 		--with ./addins/gguf python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
 
+example-gguf-deployment:  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
+	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with '.[hf]' \
+		--with ./addins/gguf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
+
+example-spdx-ai-observation:  ## Check the bounded SPDX 3.0.1 AI observation fixture
+	PYTHONPATH=src:. $(PYTHON) -m examples.integrations.spdx_ai_observation --check
+
 example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
 	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
 		examples/integrations/lm-evaluation-harness/launch.py $(EXAMPLE_ARGS)
+
+example-inspect-ai:  ## Run Inspect AI through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/inspect-ai/launch.py $(EXAMPLE_ARGS)
+
+example-openai-evals:  ## Run OpenAI Evals through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+		examples/integrations/openai-evals/launch.py $(EXAMPLE_ARGS)
 
 example-tensorrt-llm:  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
 	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --extra hf \
@@ -543,25 +579,18 @@ evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
 
 docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
 
-docs-lint: docs-lint-markdown docs-lint-spell  ## Run established documentation linters
+docs-lint: docs-lint-markdown docs-lint-spell docs-lint-public-text  ## Run documentation linters and public-text checks
 
 docs-lint-strict: docs-lint  ## Strict documentation lint alias
 
 docs-lint-markdown:  ## Run markdownlint-cli2
-	npx --no-install markdownlint-cli2 README.md CODE_OF_CONDUCT.md \
-		CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_NOTICES.md \
-		".github/**/*.md" \
-		"docs/**/*.md" "scripts/**/*.md" "public_evidence/**/*.md" \
-		"examples/**/*.md" "requirements/**/*.md" "tests/README.md" \
-		"addins/**/*.md"
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint-cli2 --
 
 docs-lint-spell:  ## Run cspell
-	npx --no-install cspell --no-progress README.md CODE_OF_CONDUCT.md \
-		CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_NOTICES.md \
-		".github/**/*.md" \
-		"docs/**/*.md" "scripts/**/*.md" "public_evidence/**/*.md" \
-		"examples/**/*.md" "requirements/**/*.md" "tests/README.md" \
-		"addins/**/*.md"
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install cspell --no-progress --
+
+docs-lint-public-text:  ## Reject private operational details and process-only wording
+	$(PYTHON) scripts/checks/check_public_text.py
 
 ##@ Packaging and security
 actionlint:  ## Lint GitHub Actions workflows
@@ -607,7 +636,27 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		$(PYTHON) -m venv "$$smoke_venv"; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl; \
+		"$$smoke_venv/bin/python" -m pip check; \
+		consumer_root="$$smoke_venv/quickstart-consumer"; \
+		mkdir "$$consumer_root"; \
+		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
+		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
+		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" run.py --fixture golden ); \
+		approval_root="$$smoke_venv/deployment-consumer"; \
+		cp -R examples/ci/standalone-consumer "$$approval_root"; \
+		mkdir "$$approval_root/incoming"; \
+		cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence "$$approval_root/incoming/evidence"; \
+		cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json "$$approval_root/incoming/verification.receipt.json"; \
+		( cd "$$approval_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" review/verify_deployment_receipt.py \
+			--approval-inputs review/inspect-ai-deployment-approval-inputs.json \
+			--evidence incoming/evidence \
+			--policy review/policy/acceptance.json \
+			--receipt incoming/verification.receipt.json \
+			--output deployment-approval.json ); \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/addins/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.gguf.conformance; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.multimodal.conformance; \
@@ -617,6 +666,8 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
 
+quickstart-wheel-smoke: addins-install-smoke  ## Run the five-minute flow from built wheels
+
 packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifacts
 
 packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate artifacts and CLI entry point
@@ -624,6 +675,18 @@ packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate art
 release-preflight:  ## Validate a clean exact release checkout and distributions
 	@test -n "$(RELEASE_PREFLIGHT_ARGS)" || { echo "RELEASE_PREFLIGHT_ARGS is required" >&2; exit 2; }
 	$(PYTHON) scripts/release/release_preflight.py $(RELEASE_PREFLIGHT_ARGS)
+
+release-reference-journey:  ## Replay retained signed evidence through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --json
+
+release-public-evidence-compatibility:  ## Replay every retained public pack through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --all-public-evidence --json
+
+release-evaluator-qualification-compatibility:  ## Replay retained evaluator transactions through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --all-evaluator-qualification --json
+
+release-retained-evidence-compatibility:  ## Replay all retained release evidence through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --all-retained-evidence --json
 
 ##@ Runtime image
 runtime-image:  ## Build the canonical Hugging Face runtime image
@@ -661,6 +724,22 @@ runtime-image-cuda:  ## Build the x86_64 CUDA Hugging Face runtime image
 runtime-image-cuda-podman: CONTAINER_ENGINE=podman
 runtime-image-cuda-podman: runtime-image-cuda  ## Build the CUDA runtime image with Podman
 
+runtime-image-cuda129:  ## Build the x86_64 CUDA 12.9 Hugging Face runtime image
+	@test -n "$(CONTAINER_ENGINE)" || { echo "Docker or Podman is required" >&2; exit 1; }
+	@test -n "$(RUNTIME_SOURCE_DATE_EPOCH)" || { echo "RUNTIME_SOURCE_DATE_EPOCH is required" >&2; exit 1; }
+	$(foreach variable,RUNTIME_SOURCE_COMMIT RUNTIME_SOURCE_BUNDLE RUNTIME_SOURCE_BUNDLE_SHA256,$(if $(strip $($(variable))),,$(error $(variable) is required)))
+	"$(PYTHON)" scripts/authenticated_runtime_build.py \
+		--repository "$(CURDIR)" \
+		--source-commit "$(RUNTIME_SOURCE_COMMIT)" \
+		--source-bundle "$(RUNTIME_SOURCE_BUNDLE)" \
+		--source-bundle-sha256 "$(RUNTIME_SOURCE_BUNDLE_SHA256)" \
+		--container-engine "$(CONTAINER_ENGINE)" \
+		--dockerfile runtime/Dockerfile.cuda \
+		--image "$(RUNTIME_IMAGE_CUDA129)" \
+		--platform linux/amd64 \
+		--build-arg "CUDA_PROFILE=cu129" \
+		--build-arg "SOURCE_DATE_EPOCH=$(RUNTIME_SOURCE_DATE_EPOCH)" $(if $(strip $(RUNTIME_BUILD_STATEMENT)),--statement "$(RUNTIME_BUILD_STATEMENT)")
+
 runtime-smoke:  ## Check the canonical runtime image imports
 	$(CONTAINER_ENGINE) run --rm --network none \
 		--pull=never --read-only --cap-drop=ALL \
@@ -686,6 +765,16 @@ runtime-smoke-cuda:  ## Confirm the CUDA runtime imports and sees an NVIDIA GPU
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: runtime-smoke-cuda  ## Smoke the CUDA runtime image with Podman
+
+runtime-smoke-cuda129:  ## Confirm the CUDA 12.9 runtime executes on an NVIDIA GPU
+	$(CONTAINER_ENGINE) run --rm --network none $(RUNTIME_CUDA_DEVICE_ARGS) \
+		--pull=never --read-only --cap-drop=ALL \
+		--security-opt no-new-privileges --pids-limit 1024 \
+		--user 65532:65532 \
+		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
+		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
+		--entrypoint python $(RUNTIME_IMAGE_CUDA129) \
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu129'; assert torch.version.cuda == '12.9'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 ##@ Housekeeping
 pre-commit:  ## Run configured pre-commit hooks

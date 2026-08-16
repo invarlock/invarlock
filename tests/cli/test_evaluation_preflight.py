@@ -424,6 +424,24 @@ def test_public_evaluate_api_requires_independent_runtime_digests(
     assert not (tmp_path / "artifacts").exists()
 
 
+def test_run_preflight_rejects_an_incomplete_runtime_digest_pair(
+    tmp_path: Path,
+) -> None:
+    request, signing_key = _materialize_run_request(tmp_path)
+
+    with pytest.raises(
+        EvaluationPreflightError,
+        match="requires both locally available runtime images",
+    ):
+        preflight_evaluation_request(
+            request,
+            signing_key_path=signing_key,
+            runtime_image_digests={"baseline": "sha256:" + "a" * 64},
+        )
+
+    assert not (tmp_path / "artifacts").exists()
+
+
 def test_public_evaluate_api_rejects_split_executor_and_resource_authority(
     tmp_path: Path,
 ) -> None:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import json
 import math
 import re
 import time
@@ -55,6 +56,7 @@ from invarlock.core.runtime_provider.types import (
     RuntimeScorer,
     evaluation_input_parts_sha256,
 )
+from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
 from invarlock.runtime_providers._hf_safetensors_identity import (
     HFSafetensorsIdentityError,
     safetensors_storage_keys,
@@ -326,11 +328,15 @@ def _qwen3_5_non_executing_checkpoint_keys(
     *,
     live_state: Mapping[str, object],
     model: object,
+    authenticated_config: object | None = None,
 ) -> set[str]:
-    """Recognize the exact native Qwen3.5/3.6 inference-unused MTP inventory."""
+    """Recognize authenticated Qwen3.5 tensors excluded from causal execution."""
 
     mtp_keys = {key for key in authenticated_keys if key.startswith("mtp.")}
-    if not mtp_keys:
+    candidate_visual_keys = {
+        key for key in authenticated_keys if key.startswith("model.visual.")
+    }
+    if not mtp_keys and not candidate_visual_keys:
         return set()
     try:
         qwen_module = importlib.import_module(
@@ -356,17 +362,42 @@ def _qwen3_5_non_executing_checkpoint_keys(
             [r"^mtp.*"],
         ),
     )
-    if not any(
-        model_class is native_class
-        and getattr(config, "model_type", None) == model_type
-        and getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
-        == ignored_keys
-        for native_class, model_type, ignored_keys in accepted_native_profiles
-    ) or mtp_keys != set(_QWEN3_5_NON_EXECUTING_MTP_KEYS):
+    accepted_profile = next(
+        (
+            native_class
+            for native_class, model_type, ignored_keys in accepted_native_profiles
+            if model_class is native_class
+            and getattr(config, "model_type", None) == model_type
+            and getattr(model_class, "_keys_to_ignore_on_load_unexpected", None)
+            == ignored_keys
+        ),
+        None,
+    )
+    if accepted_profile is None or (
+        mtp_keys and mtp_keys != set(_QWEN3_5_NON_EXECUTING_MTP_KEYS)
+    ):
         raise ValueError(
             "strict HF checkpoint contains an unsupported non-executing "
             "tensor inventory"
         )
+    visual_keys = (
+        candidate_visual_keys if accepted_profile is expected_causal_class else set()
+    )
+    if visual_keys:
+        projected_config = _authenticated_behavior_config(
+            authenticated_config,
+            model=model,
+            live_config=config,
+        )
+        if (
+            accepted_profile is not expected_causal_class
+            or authenticated_config is None
+            or projected_config is authenticated_config
+        ):
+            raise ValueError(
+                "strict HF checkpoint contains an unsupported non-executing "
+                "tensor inventory"
+            )
 
     def names_from(method_name: str) -> tuple[str, ...]:
         method = getattr(model, method_name, None)
@@ -391,11 +422,17 @@ def _qwen3_5_non_executing_checkpoint_keys(
     live_names.update(names_from("named_parameters"))
     live_names.update(names_from("named_buffers"))
     live_names.update(names_from("named_modules"))
-    if any(name == "mtp" or name.startswith("mtp.") for name in live_names):
+    if any(name == "mtp" or name.startswith("mtp.") for name in live_names) or (
+        visual_keys
+        and any(
+            name == "model.visual" or name.startswith("model.visual.")
+            for name in live_names
+        )
+    ):
         raise ValueError(
             "strict HF non-executing checkpoint tensors overlap live model state"
         )
-    return set(mtp_keys)
+    return set(mtp_keys | visual_keys)
 
 
 def _qwen3_5_native_float32_to_bfloat16_keys(
@@ -406,44 +443,60 @@ def _qwen3_5_native_float32_to_bfloat16_keys(
     """Return the exact native mixed-dtype inventory cast by Transformers."""
 
     config = getattr(model, "config", None)
-    text_config = getattr(config, "text_config", None)
-    if (
-        getattr(config, "model_type", None) != "qwen3_5"
-        or getattr(text_config, "model_type", None) != "qwen3_5_text"
-    ):
+    config_model_type = getattr(config, "model_type", None)
+    if config_model_type not in {"qwen3_5", "qwen3_5_text"}:
         return None
     try:
         qwen_module = importlib.import_module(
             "transformers.models.qwen3_5.modeling_qwen3_5"
         )
-        expected_class = qwen_module.Qwen3_5ForConditionalGeneration
+        expected_multimodal_class = qwen_module.Qwen3_5ForConditionalGeneration
+        expected_causal_class = qwen_module.Qwen3_5ForCausalLM
     except (AttributeError, ImportError) as exc:
         raise RuntimeError(
             "strict HF native Qwen3.5 compatibility profile is unavailable"
         ) from exc
-    if model.__class__ is not expected_class:
-        raise ValueError("strict HF native Qwen3.5 model class is unsupported")
     if authenticated_config is None:
         raise RuntimeError(
             "strict HF native Qwen3.5 authenticated configuration is unavailable"
         )
-    authenticated_text_config = getattr(authenticated_config, "text_config", None)
-    if (
-        authenticated_config.__class__ is not config.__class__
-        or authenticated_text_config.__class__ is not text_config.__class__
-        or getattr(authenticated_config, "model_type", None) != "qwen3_5"
-        or getattr(authenticated_text_config, "model_type", None) != "qwen3_5_text"
-    ):
-        raise ValueError(
-            "strict HF native Qwen3.5 authenticated configuration is unsupported"
+    if model.__class__ is expected_multimodal_class:
+        text_config = getattr(config, "text_config", None)
+        authenticated_text_config = getattr(authenticated_config, "text_config", None)
+        if (
+            authenticated_config.__class__ is not config.__class__
+            or authenticated_text_config.__class__ is not text_config.__class__
+            or getattr(authenticated_config, "model_type", None) != "qwen3_5"
+            or getattr(authenticated_text_config, "model_type", None) != "qwen3_5_text"
+        ):
+            raise ValueError(
+                "strict HF native Qwen3.5 authenticated configuration is unsupported"
+            )
+        source_prefix = "model.language_model"
+        live_dtype = str(getattr(config, "dtype", None)).removeprefix("torch.")
+        live_text_dtype = str(getattr(text_config, "dtype", None)).removeprefix(
+            "torch."
         )
+    elif model.__class__ is expected_causal_class:
+        projected_config = _authenticated_behavior_config(
+            authenticated_config,
+            model=model,
+            live_config=config,
+        )
+        if projected_config is authenticated_config:
+            return None
+        text_config = config
+        authenticated_text_config = projected_config
+        source_prefix = "model.language_model"
+        live_dtype = str(getattr(config, "dtype", None)).removeprefix("torch.")
+        live_text_dtype = live_dtype
+    else:
+        raise ValueError("strict HF native Qwen3.5 model class is unsupported")
     authenticated_dtype_value = getattr(authenticated_config, "dtype", None)
     authenticated_dtype = str(authenticated_dtype_value).removeprefix("torch.")
     authenticated_text_dtype = str(
         getattr(authenticated_text_config, "dtype", None)
     ).removeprefix("torch.")
-    live_dtype = str(getattr(config, "dtype", None)).removeprefix("torch.")
-    live_text_dtype = str(getattr(text_config, "dtype", None)).removeprefix("torch.")
     if (
         authenticated_dtype_value is not None and authenticated_dtype != "bfloat16"
     ) or authenticated_text_dtype != "bfloat16":
@@ -493,7 +546,7 @@ def _qwen3_5_native_float32_to_bfloat16_keys(
     ):
         raise ValueError("strict HF native Qwen3.5 dtype conversion profile is invalid")
     return {
-        f"model.language_model.layers.{index}.linear_attn.{suffix}"
+        f"{source_prefix}.layers.{index}.linear_attn.{suffix}"
         for index, layer_type in enumerate(layer_types)
         if layer_type == "linear_attention"
         for suffix in ("A_log", "norm.weight")
@@ -641,6 +694,79 @@ def load_hf_model_with_strict_loading_info(
             "mismatched, or invalid model tensors"
         )
     return model
+
+
+def _text_generation_model_loader(
+    transformers: object,
+    checkpoint: Path,
+) -> Callable[..., object]:
+    """Select a local auto-model class that accepts text-only causal inputs."""
+
+    auto_config = getattr(transformers, "AutoConfig", None)
+    config_loader = getattr(auto_config, "from_pretrained", None)
+    if not callable(config_loader):
+        raise RuntimeError("transformers AutoConfig is unavailable")
+    try:
+        config = config_loader(
+            str(checkpoint),
+            local_files_only=True,
+            trust_remote_code=False,
+        )
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "transformers checkpoint configuration is unavailable"
+        ) from exc
+
+    for auto_model_name in (
+        "AutoModelForCausalLM",
+        "AutoModelForImageTextToText",
+    ):
+        auto_model = getattr(transformers, auto_model_name, None)
+        model_loader = getattr(auto_model, "from_pretrained", None)
+        model_mapping = getattr(auto_model, "_model_mapping", None)
+        if not callable(model_loader) or model_mapping is None:
+            continue
+        try:
+            supported = config.__class__ in model_mapping
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                "transformers text-generation model mapping is unavailable"
+            ) from exc
+        if supported:
+            return cast(Callable[..., object], model_loader)
+    raise ValueError(
+        "transformers checkpoint architecture does not support text generation"
+    )
+
+
+def load_hf_text_tokenizer(
+    loader: Callable[..., object],
+    checkpoint: Path,
+) -> object:
+    """Load one offline tokenizer with architecture-scoped compatibility options."""
+
+    try:
+        config = json.loads(
+            read_regular_file_bytes(
+                checkpoint / "config.json",
+                label="HF checkpoint configuration",
+                max_bytes=1024 * 1024,
+            )
+        )
+    except (json.JSONDecodeError, StrictJsonError, UnicodeDecodeError) as exc:
+        raise RuntimeError("HF checkpoint configuration is unavailable") from exc
+    if not isinstance(config, Mapping):
+        raise RuntimeError("HF checkpoint configuration is invalid")
+    model_type = config.get("model_type")
+    if not isinstance(model_type, str) or not model_type:
+        raise RuntimeError("HF checkpoint model type is unavailable")
+    options: dict[str, object] = {
+        "local_files_only": True,
+        "trust_remote_code": False,
+    }
+    if model_type == "mistral3":
+        options["fix_mistral_regex"] = True
+    return loader(str(checkpoint), **options)
 
 
 def _bind_authenticated_live_tensors(
@@ -870,6 +996,7 @@ def _require_safetensors_match(
         authenticated_keys,
         live_state=live_state,
         model=model,
+        authenticated_config=authenticated_config,
     )
     bindings = _bind_authenticated_live_tensors(
         authenticated_keys,
@@ -895,6 +1022,61 @@ def _require_safetensors_match(
     )
 
 
+def _authenticated_behavior_config(
+    authenticated_config: object | None,
+    *,
+    model: object,
+    live_config: object,
+) -> object:
+    """Select the exact authenticated config governing live model execution."""
+
+    if authenticated_config is None:
+        raise RuntimeError("strict HF checkpoint configuration is unavailable")
+    if authenticated_config.__class__ is live_config.__class__:
+        return authenticated_config
+    if not (
+        getattr(authenticated_config, "model_type", None) == "qwen3_5"
+        or getattr(live_config, "model_type", None) == "qwen3_5_text"
+    ):
+        raise ValueError(
+            "strict HF live model config class does not match the checkpoint"
+        )
+    try:
+        config_module = importlib.import_module(
+            "transformers.models.qwen3_5.configuration_qwen3_5"
+        )
+        model_module = importlib.import_module(
+            "transformers.models.qwen3_5.modeling_qwen3_5"
+        )
+        expected_top_config = config_module.Qwen3_5Config
+        expected_text_config = config_module.Qwen3_5TextConfig
+        expected_vision_config = config_module.Qwen3_5VisionConfig
+        expected_model = model_module.Qwen3_5ForCausalLM
+    except (AttributeError, ImportError) as exc:
+        raise RuntimeError(
+            "strict HF native Qwen3.5 compatibility profile is unavailable"
+        ) from exc
+    text_config = getattr(authenticated_config, "text_config", None)
+    vision_config = getattr(authenticated_config, "vision_config", None)
+    if not (
+        authenticated_config.__class__ is expected_top_config
+        and text_config.__class__ is expected_text_config
+        and vision_config.__class__ is expected_vision_config
+        and live_config.__class__ is expected_text_config
+        and model.__class__ is expected_model
+        and getattr(authenticated_config, "model_type", None) == "qwen3_5"
+        and getattr(text_config, "model_type", None) == "qwen3_5_text"
+        and getattr(vision_config, "model_type", None) == "qwen3_5_vision"
+        and getattr(live_config, "model_type", None) == "qwen3_5_text"
+        and getattr(authenticated_config, "architectures", None)
+        == ["Qwen3_5ForConditionalGeneration"]
+        and getattr(expected_model, "_keys_to_ignore_on_load_unexpected", None)
+        == [r"^mtp.*", r"^model.visual.*"]
+    ):
+        raise ValueError("strict HF Qwen3.5 causal projection profile is unsupported")
+    return text_config
+
+
 def _require_model_config_match(checkpoint: Path, *, model: object) -> object:
     """Compare the live model config with a fresh offline checkpoint load."""
 
@@ -911,7 +1093,19 @@ def _require_model_config_match(checkpoint: Path, *, model: object) -> object:
             local_files_only=True,
             trust_remote_code=False,
         )
-        authenticated_to_dict = getattr(authenticated_config, "to_dict", None)
+        if not callable(getattr(authenticated_config, "to_dict", None)):
+            raise TypeError
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "strict HF checkpoint configuration could not be authenticated"
+        ) from exc
+    behavioral_config = _authenticated_behavior_config(
+        authenticated_config,
+        model=model,
+        live_config=live_config,
+    )
+    try:
+        authenticated_to_dict = getattr(behavioral_config, "to_dict", None)
         if not callable(authenticated_to_dict):
             raise TypeError
         live_payload = live_to_dict()
@@ -928,8 +1122,8 @@ def _require_model_config_match(checkpoint: Path, *, model: object) -> object:
         live_config.__class__.__module__,
         live_config.__class__.__qualname__,
     ) != (
-        authenticated_config.__class__.__module__,
-        authenticated_config.__class__.__qualname__,
+        behavioral_config.__class__.__module__,
+        behavioral_config.__class__.__qualname__,
     ):
         raise ValueError(
             "strict HF live model config class does not match the checkpoint"
@@ -1686,16 +1880,12 @@ class HFTransformersProvider:
         transformers = importlib.import_module("transformers")
         auto_tokenizer = getattr(transformers, "AutoTokenizer", None)
         tokenizer_from_pretrained = getattr(auto_tokenizer, "from_pretrained", None)
-        auto_model = getattr(transformers, "AutoModelForCausalLM", None)
-        model_from_pretrained = getattr(auto_model, "from_pretrained", None)
         if not callable(tokenizer_from_pretrained):
             raise RuntimeError("transformers AutoTokenizer is unavailable")
-        if not callable(model_from_pretrained):
-            raise RuntimeError("transformers AutoModelForCausalLM is unavailable")
-        tokenizer = tokenizer_from_pretrained(
-            str(checkpoint),
-            local_files_only=True,
-            trust_remote_code=False,
+        tokenizer = load_hf_text_tokenizer(tokenizer_from_pretrained, checkpoint)
+        model_from_pretrained = _text_generation_model_loader(
+            transformers,
+            checkpoint,
         )
         model = load_hf_model_with_strict_loading_info(
             model_from_pretrained,
@@ -1815,5 +2005,6 @@ __all__ = [
     "INVARLOCK_RUNTIME_PROVIDER_ABI",
     "hf_tokenizer_contract_sha256",
     "load_hf_model_with_strict_loading_info",
+    "load_hf_text_tokenizer",
     "require_loaded_hf_checkpoint_binding",
 ]

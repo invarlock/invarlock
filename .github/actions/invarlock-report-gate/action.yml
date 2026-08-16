@@ -26,6 +26,9 @@ inputs:
   expected-signer:
     description: Independently approved evidence-signer Ed25519 fingerprint.
     required: true
+  expected-request-digest:
+    description: Independently approved normalized-request digest; required for llama_cpp evidence.
+    required: false
   verifier-signing-key:
     description: Path to the verifier-owned Ed25519 private-key file.
     required: true
@@ -167,6 +170,7 @@ runs:
         INVARLOCK_ACTION_EXPECTED_BASELINE_RUNTIME: ${{ inputs.expected-baseline-runtime }}
         INVARLOCK_ACTION_EXPECTED_SUBJECT_RUNTIME: ${{ inputs.expected-subject-runtime }}
         INVARLOCK_ACTION_EXPECTED_SIGNER: ${{ inputs.expected-signer }}
+        INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST: ${{ inputs.expected-request-digest }}
         INVARLOCK_ACTION_VERIFIER_SIGNING_KEY: ${{ inputs.verifier-signing-key }}
         INVARLOCK_ACTION_VERIFIER_IDENTITY: ${{ inputs.verifier-identity }}
         INVARLOCK_ACTION_RECEIPT_OUTPUT: ${{ inputs.receipt-output }}
@@ -174,20 +178,30 @@ runs:
       run: |
         set -uo pipefail
         set -o noclobber
+        verify_args=(
+          "$INVARLOCK_ACTION_EVIDENCE"
+          --policy "$INVARLOCK_ACTION_POLICY"
+          --expected-baseline-artifact "$INVARLOCK_ACTION_EXPECTED_BASELINE_ARTIFACT"
+          --expected-subject-artifact "$INVARLOCK_ACTION_EXPECTED_SUBJECT_ARTIFACT"
+          --expected-schedule "$INVARLOCK_ACTION_EXPECTED_SCHEDULE"
+          --expected-baseline-runtime "$INVARLOCK_ACTION_EXPECTED_BASELINE_RUNTIME"
+          --expected-subject-runtime "$INVARLOCK_ACTION_EXPECTED_SUBJECT_RUNTIME"
+          --expected-signer "$INVARLOCK_ACTION_EXPECTED_SIGNER"
+        )
+        if [[ -n "$INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST" ]]; then
+          verify_args+=(
+            --expected-request-digest "$INVARLOCK_ACTION_EXPECTED_REQUEST_DIGEST"
+          )
+        fi
+        verify_args+=(
+          --receipt "$INVARLOCK_ACTION_RECEIPT_OUTPUT"
+          --verifier-signing-key "$INVARLOCK_ACTION_VERIFIER_SIGNING_KEY"
+          --verifier-identity "$INVARLOCK_ACTION_VERIFIER_IDENTITY"
+          --json
+        )
         set +e
         "$INVARLOCK_ACTION_PYTHON" -m invarlock verify \
-          "$INVARLOCK_ACTION_EVIDENCE" \
-          --policy "$INVARLOCK_ACTION_POLICY" \
-          --expected-baseline-artifact "$INVARLOCK_ACTION_EXPECTED_BASELINE_ARTIFACT" \
-          --expected-subject-artifact "$INVARLOCK_ACTION_EXPECTED_SUBJECT_ARTIFACT" \
-          --expected-schedule "$INVARLOCK_ACTION_EXPECTED_SCHEDULE" \
-          --expected-baseline-runtime "$INVARLOCK_ACTION_EXPECTED_BASELINE_RUNTIME" \
-          --expected-subject-runtime "$INVARLOCK_ACTION_EXPECTED_SUBJECT_RUNTIME" \
-          --expected-signer "$INVARLOCK_ACTION_EXPECTED_SIGNER" \
-          --receipt "$INVARLOCK_ACTION_RECEIPT_OUTPUT" \
-          --verifier-signing-key "$INVARLOCK_ACTION_VERIFIER_SIGNING_KEY" \
-          --verifier-identity "$INVARLOCK_ACTION_VERIFIER_IDENTITY" \
-          --json > "$INVARLOCK_ACTION_VERIFY_OUTPUT"
+          "${verify_args[@]}" > "$INVARLOCK_ACTION_VERIFY_OUTPUT"
         status=$?
         set -e
         cat "$INVARLOCK_ACTION_VERIFY_OUTPUT"

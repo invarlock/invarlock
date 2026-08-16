@@ -1,0 +1,26 @@
+{
+  "anchors": {
+    "baseline_artifact_digest": "sha256:b969ebb911ae434f45e1089f96f2cf2b2f067ff942603c6e3b044aefdee1e900",
+    "baseline_runtime_digest": "sha256:a75bf951f0528db6465511b3eed4ea35cfedb97fd551fe7802b7b8939828b443",
+    "evidence_signer_fingerprint": "sha256:51251f0ec555fe9b63e7310e3efc87b703e29ee734709a2a1e1188d6b90a8aa7",
+    "request_digest": "sha256:f0f9859987c5c2e0191c4e87c0fc6c3d08f1af9b6fc55fe571f0d453d9c4043b",
+    "schedule_digest": "sha256:776faa1f3084b77ef32671c6179e469acd17a82afc90242e513434d4aa62531f",
+    "subject_artifact_digest": "sha256:9f6abb62debb5f9cb9c65d0955b8a60364f46e7a9e8d3c3287d87e318d4b5787",
+    "subject_runtime_digest": "sha256:a75bf951f0528db6465511b3eed4ea35cfedb97fd551fe7802b7b8939828b443"
+  },
+  "evidence": {
+    "comparison_id": "comparison-58f60f77e71294585023fa29f0bc92ef",
+    "pack_manifest_digest": "sha256:dd335dfadc24699c469f14d991486f7e4bfb50e1d8e071e7b06b4e75e3570e6b",
+    "path": "examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence",
+    "reference_id": "deployment-approval-inspect-ai"
+  },
+  "expected": {
+    "policy_verdict": "pass",
+    "verification_scope": "paired_comparison"
+  },
+  "format": "invarlock/release-reference-journey-v1",
+  "policy": {
+    "digest": "sha256:4f93b9a49be6fe59035eec6b346efe790d8eb6d2a10bdf4bce6e1dc3d833a34f",
+    "path": "examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/policy.json"
+  }
+}

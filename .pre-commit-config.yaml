@@ -9,7 +9,7 @@ repos:
         # validation active below, but never rewrite an already signed pack.
         # The authoritative runtime schedule likewise retains the generator's
         # exact canonical bytes and is covered by a byte-for-byte parity check.
-        exclude: '^(public_evidence/evidence/|examples/(acceptance-handoff/golden/.*|evaluator-qualification/authoritative/runtime-schedule\.json|inputs/schedule\.json|import/(baseline|subject|rejected-subject)/(model-artifact\.identity|runtime-provider\.receipt|runtime-scoring\.observation)\.json)$)'
+        exclude: '^(public_evidence/evidence/|examples/(acceptance-handoff/golden/.*|evaluator-qualification/(authoritative/runtime-schedule\.json|signed-transactions/[^/]+/.*)|inputs/schedule\.json|import/(baseline|subject|rejected-subject)/(model-artifact\.identity|runtime-provider\.receipt|runtime-scoring\.observation)\.json|integrations/spdx-ai-observation/source/(model-aibom\.spdx3|model-artifact\.identity)\.json)$|tests/fixtures/compatibility/v0\.13\.0/package/.*)'
       - id: trailing-whitespace
       - id: check-yaml
         exclude: ^mkdocs\.yml$
@@ -18,7 +18,7 @@ repos:
       - id: detect-private-key
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.0
+    rev: v0.16.2
     hooks:
       - id: ruff
         args: ["--fix"]

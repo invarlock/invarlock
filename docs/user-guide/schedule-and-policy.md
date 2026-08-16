@@ -188,7 +188,7 @@ biased schedule remains biased.
 
 ## Metric-specific paired intervals
 
-New `invarlock/comparison-report-v2` reports use the continuity-corrected
+New `invarlock/comparison-report-v3` reports use the continuity-corrected
 paired Newcombe hybrid-score 95% interval over the subject-minus-baseline
 binary effect. The report also records baseline-pass to
 subject-fail regressions, baseline-fail to subject-pass improvements, both-pass
@@ -201,6 +201,12 @@ Strict verification retains the original
 `invarlock/comparison-report-v1` packs. New reports use
 `newcombe_hybrid_score_paired_v2`; existing evidence is not relabeled or
 reinterpreted.
+
+For exact match, policy may also set `minimum_side_accuracy` to a finite value
+from 0 through 1. Both arithmetic side means must meet the floor. The v3 report
+records each observed mean and result in `side_accuracy`; this requirement is
+combined with the paired-delta bound and any sample qualification. V1 and v2
+reports cannot carry this field.
 
 Normalized NLL uses the following deterministic schedule-resampling object:
 

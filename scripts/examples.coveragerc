@@ -1,0 +1,12 @@
+[run]
+branch = True
+parallel = True
+patch = subprocess
+source =
+    examples
+
+[report]
+show_missing = True
+precision = 2
+exclude_lines =
+    if __name__ == .__main__.:

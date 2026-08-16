@@ -75,7 +75,7 @@ An `invarlock/evidence-pack-v1` binds:
 | Dataset | Canonical schedule bytes, dataset coordinates, ordered records, input digests, and expected outputs |
 | Provider | Provider name, ABI, package identity, capabilities, backend facts, and provider receipt |
 | Runtime | Per-side image digest, execution settings, device facts, run configuration, and runtime manifest |
-| Decision | Per-record observations, derived pairs, built-in metric or scorer binding, policy bytes and digest, report arithmetic, selected paired interval, optional sample qualification, and verdict |
+| Decision | Per-record observations, derived pairs, built-in metric or scorer binding, policy bytes and digest, report arithmetic, selected paired interval, optional sample and exact-match side-accuracy qualification, and verdict |
 | Actors | Evidence-signer fingerprint in the bundle and verifier identity/fingerprint in the external receipt |
 
 For the built-in Hugging Face provider, strict run mode authenticates a local
@@ -109,9 +109,10 @@ different **declared** image, but it cannot observe execution.
 
 During verification, the caller supplies baseline and subject artifact-identity
 digests, the canonical schedule digest, and separate baseline and subject
-runtime digests. Obtain them from pinned artifact, schedule, build, or
-deployment configuration through a channel the evaluation environment cannot
-rewrite with the evidence.
+runtime digests. GGUF evidence also requires an independently approved
+normalized-request digest. Obtain them from pinned artifact, schedule, build,
+or deployment configuration through a channel the evaluation environment
+cannot rewrite with the evidence.
 
 The verifier checks each external value against the corresponding:
 
@@ -160,7 +161,9 @@ model outputs deterministic across all hardware.
 
 When the policy enables sample qualification, replay also recomputes the
 observed count, interval width, individual checks, and their conjunction with
-the metric-bound decision.
+the metric-bound decision. When exact-match policy enables side-accuracy
+qualification, replay also checks each side mean and its conjunction with the
+other verdict terms.
 
 Even with matching recorded controls, floating-point kernels, accelerator
 generations, drivers, compiler choices, thread scheduling, and hidden backend

@@ -191,6 +191,17 @@ def test_preparation_materializes_models_and_removes_partial_output_on_failure(
         )
     assert not failed.exists()
 
+    missing = tmp_path / "missing-workspace"
+    linked = tmp_path / "linked-workspace"
+    linked.symlink_to(missing, target_is_directory=True)
+    with pytest.raises(FileExistsError, match="workspace already exists"):
+        hf_vision_text.prepare_workspace(
+            linked,
+            runtime_image_digest=ZERO_DIGEST,
+            materialize_models=False,
+        )
+    assert not missing.exists()
+
 
 def test_execute_uses_public_commands_and_vision_resource_bindings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -251,8 +262,8 @@ def test_vision_command_runner_reports_output_and_failures(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
-        hf_vision_text.subprocess,
-        "run",
+        hf_vision_text,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 0, stdout="done\n", stderr=""
         ),
@@ -261,8 +272,8 @@ def test_vision_command_runner_reports_output_and_failures(
     assert "done" in capsys.readouterr().out
 
     monkeypatch.setattr(
-        hf_vision_text.subprocess,
-        "run",
+        hf_vision_text,
+        "run_bounded_command",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 4, stdout="", stderr="failed\n"
         ),
@@ -284,6 +295,7 @@ def test_vision_main_prepares_executes_and_handles_input_errors(
                 "--runtime-image-digest",
                 ZERO_DIGEST,
                 "--prepare-only",
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -299,6 +311,7 @@ def test_vision_main_prepares_executes_and_handles_input_errors(
                 "--runtime-image-digest",
                 ZERO_DIGEST,
                 "--prepare-only",
+                "--ephemeral-trust-root",
             ]
         )
         == 2
@@ -310,13 +323,18 @@ def test_vision_main_prepares_executes_and_handles_input_errors(
                 str(tmp_path / "missing-image"),
                 "--runtime-image-digest",
                 ZERO_DIGEST,
+                "--ephemeral-trust-root",
             ]
         )
 
     observed: list[tuple[Path, str]] = []
 
     def fake_prepare(
-        root: Path, *, runtime_image_digest: str, materialize_models: bool
+        root: Path,
+        *,
+        runtime_image_digest: str,
+        materialize_models: bool,
+        **_kwargs: object,
     ) -> tuple[hf_vision_text.VisionExamplePaths, dict[str, str]]:
         assert materialize_models is True
         paths = hf_vision_text._paths(root)
@@ -341,6 +359,7 @@ def test_vision_main_prepares_executes_and_handles_input_errors(
                 "sha256:" + ("a" * 64),
                 "--runtime-device",
                 "cuda:1",
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -388,6 +407,7 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
                 str(tmp_path / "journey"),
                 "--runtime-device",
                 "cuda:1",
+                "--ephemeral-trust-root",
             ]
         )
         == 0
@@ -410,7 +430,17 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
 def test_vision_example_rejects_unqualified_container_engine(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert launch.main(["hf-vision-text", "--container-engine", "podman"]) == 2
+    assert (
+        launch.main(
+            [
+                "hf-vision-text",
+                "--container-engine",
+                "podman",
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
     assert "requires Docker" in capsys.readouterr().err
 
 

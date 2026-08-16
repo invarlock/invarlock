@@ -4,6 +4,7 @@ import functools
 import json
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -475,7 +476,7 @@ def test_image_inspection_parses_bounded_docker_and_podman_json_with_argv_only(
             stderr=b"",
         )
 
-    monkeypatch.setattr(evaluation_oci.subprocess, "run", run)
+    monkeypatch.setattr(evaluation_oci, "_run_bounded_command", run)
     image = "registry.example:5000/team/runtime:candidate"
 
     inspected = evaluation_oci._inspect_local_image(  # noqa: SLF001
@@ -491,8 +492,8 @@ def test_image_inspection_parses_bounded_docker_and_podman_json_with_argv_only(
         image,
     ]
     keywords = cast(dict[str, object], observed["kwargs"])
-    assert keywords["shell"] is False
-    assert keywords["timeout"] == 30
+    assert keywords["timeout_seconds"] == 30
+    assert keywords["stdout_limit"] == evaluation_oci._MAX_IMAGE_INSPECT_BYTES
 
 
 def test_tag_resolution_selects_matching_repository_manifest_not_first_entry(
@@ -594,10 +595,10 @@ def test_image_inspection_and_launch_inputs_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        evaluation_oci.subprocess,
-        "run",
+        evaluation_oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            subprocess.TimeoutExpired("docker", 30)
+            evaluation_oci.OciEvaluationError("timed out")
         ),
     )
     with pytest.raises(OciEvaluationError, match="could not be inspected locally"):
@@ -606,13 +607,13 @@ def test_image_inspection_and_launch_inputs_fail_closed(
         )
 
     monkeypatch.setattr(
-        evaluation_oci.subprocess,
-        "run",
+        evaluation_oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
             ["docker", "image", "inspect"],
             1,
-            stdout="",
-            stderr="image is missing",
+            stdout=b"",
+            stderr=b"image is missing",
         ),
     )
     with pytest.raises(OciEvaluationError, match="image is missing"):
@@ -621,8 +622,8 @@ def test_image_inspection_and_launch_inputs_fail_closed(
         )
 
     monkeypatch.setattr(
-        evaluation_oci.subprocess,
-        "run",
+        evaluation_oci,
+        "_run_bounded_command",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
             ["docker", "image", "inspect"],
             0,
@@ -970,6 +971,75 @@ def test_worker_outer_deadline_terminates_a_hung_process() -> None:
     assert "1-second outer deadline" in completed.stderr
 
 
+def test_worker_cancellation_event_terminates_a_running_process() -> None:
+    cancellation_event = threading.Event()
+    trigger = threading.Timer(0.1, cancellation_event.set)
+    trigger.start()
+    started = time.monotonic()
+    try:
+        completed = evaluation_oci.run_side_worker(
+            [
+                sys.executable,
+                "-c",
+                "import sys, time; sys.stderr.write('partial'); "
+                "sys.stderr.flush(); time.sleep(60)",
+            ],
+            timeout_seconds=10,
+            cancellation_event=cancellation_event,
+        )
+    finally:
+        trigger.cancel()
+
+    assert completed.returncode == evaluation_oci._WORKER_CANCELLED_STATUS  # noqa: SLF001
+    assert "cancelled after paired side failure" in completed.stderr
+    assert time.monotonic() - started < 2
+
+
+def test_worker_honors_cancellation_before_starting_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cancellation_event = threading.Event()
+    cancellation_event.set()
+    monkeypatch.setattr(
+        evaluation_oci.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("cancelled worker must not start"),
+    )
+
+    completed = evaluation_oci.run_side_worker(
+        [sys.executable, "-c", "raise SystemExit(99)"],
+        timeout_seconds=10,
+        cancellation_event=cancellation_event,
+    )
+
+    assert completed.returncode == evaluation_oci._WORKER_CANCELLED_STATUS  # noqa: SLF001
+    assert completed.stdout == ""
+    assert "cancelled after paired side failure" in completed.stderr
+
+
+def test_worker_with_cancellation_token_preserves_normal_completion() -> None:
+    completed = evaluation_oci.run_side_worker(
+        [sys.executable, "-c", "print('complete')"],
+        timeout_seconds=10,
+        cancellation_event=threading.Event(),
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.strip() == "complete"
+    assert completed.stderr == ""
+
+
+def test_worker_with_cancellation_token_still_enforces_outer_deadline() -> None:
+    completed = evaluation_oci.run_side_worker(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        timeout_seconds=1,
+        cancellation_event=threading.Event(),
+    )
+
+    assert completed.returncode == 124
+    assert "1-second outer deadline" in completed.stderr
+
+
 def test_timeout_cleanup_stops_then_kills_the_engine_issued_container(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1001,7 +1071,7 @@ def test_timeout_cleanup_stops_then_kills_the_engine_issued_container(
             return -15
 
     process = Process()
-    monkeypatch.setattr(evaluation_oci.subprocess, "run", control)
+    monkeypatch.setattr(evaluation_oci, "_run_bounded_command", control)
 
     evaluation_oci._terminate_worker(  # type: ignore[arg-type]  # noqa: SLF001
         process,
@@ -1180,6 +1250,250 @@ def test_executor_fails_closed_when_one_side_fails(
             schedule_bytes=canonical_schedule_bytes(_schedule()),
             policy_digest="sha256:" + "c" * 64,
         )
+
+
+def test_sequential_executor_does_not_start_subject_after_baseline_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    commands: list[list[str]] = []
+
+    def run(
+        command: list[str], *, timeout_seconds: int
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        commands.append(command)
+        is_baseline = _launch().baseline.image_ref in command
+        return subprocess.CompletedProcess(
+            command,
+            7 if is_baseline else 0,
+            stdout="",
+            stderr="baseline failed" if is_baseline else "",
+        )
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+
+    with pytest.raises(
+        OciEvaluationError, match="baseline worker exited with status 7"
+    ):
+        OciRuntimeExecutor(_launch(), environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    assert len(commands) == 1
+    assert _launch().baseline.image_ref in commands[0]
+
+
+def test_parallel_executor_cancels_sibling_after_side_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    launch = replace(
+        _launch(),
+        subject=replace(_launch().subject, device="cpu"),
+    )
+    both_started = threading.Barrier(2)
+    subject_cancelled = threading.Event()
+
+    def run(
+        command: list[str],
+        *,
+        timeout_seconds: int,
+        cancellation_event: threading.Event,
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        both_started.wait(timeout=2)
+        if launch.baseline.image_ref in command:
+            return subprocess.CompletedProcess(
+                command, 7, stdout="", stderr="baseline failed"
+            )
+        assert cancellation_event.wait(timeout=2)
+        subject_cancelled.set()
+        return subprocess.CompletedProcess(
+            command,
+            evaluation_oci._WORKER_CANCELLED_STATUS,  # noqa: SLF001
+            stdout="",
+            stderr="worker cancelled after paired side failure",
+        )
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+
+    with pytest.raises(
+        OciEvaluationError, match="baseline worker exited with status 7"
+    ):
+        OciRuntimeExecutor(launch, environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    assert subject_cancelled.is_set()
+
+
+def test_parallel_executor_cancels_sibling_when_worker_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    launch = replace(
+        _launch(),
+        subject=replace(_launch().subject, device="cpu"),
+    )
+    both_started = threading.Barrier(2)
+    subject_cancelled = threading.Event()
+
+    def run(
+        command: list[str],
+        *,
+        timeout_seconds: int,
+        cancellation_event: threading.Event,
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        both_started.wait(timeout=2)
+        if launch.baseline.image_ref in command:
+            raise RuntimeError("launcher failed")
+        assert cancellation_event.wait(timeout=2)
+        subject_cancelled.set()
+        return subprocess.CompletedProcess(
+            command,
+            evaluation_oci._WORKER_CANCELLED_STATUS,  # noqa: SLF001
+            stdout="",
+            stderr="worker cancelled after paired side failure",
+        )
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+
+    with pytest.raises(RuntimeError, match="launcher failed"):
+        OciRuntimeExecutor(launch, environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    assert subject_cancelled.is_set()
+
+
+@pytest.mark.parametrize(
+    "control_error",
+    [
+        pytest.param(KeyboardInterrupt(), id="keyboard-interrupt"),
+        pytest.param(SystemExit(17), id="system-exit"),
+    ],
+)
+def test_parallel_executor_does_not_mask_worker_control_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    control_error: BaseException,
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    launch = replace(
+        _launch(),
+        subject=replace(_launch().subject, device="cpu"),
+    )
+    subject_observed_cancellation = threading.Event()
+
+    def run(
+        command: list[str],
+        *,
+        timeout_seconds: int,
+        cancellation_event: threading.Event,
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        if launch.baseline.image_ref in command:
+            raise RuntimeError("launcher failed first")
+        assert cancellation_event.wait(timeout=2)
+        subject_observed_cancellation.set()
+        raise control_error
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+
+    with pytest.raises(type(control_error)) as raised:
+        OciRuntimeExecutor(launch, environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    if isinstance(control_error, SystemExit):
+        assert raised.value.code == 17
+    assert subject_observed_cancellation.is_set()
+
+
+def test_parallel_executor_cancels_workers_when_collection_is_interrupted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    support = {
+        "INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT": str(tmp_path),
+        "INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT": "models/subject/tokenizer.json",
+    }
+    (tmp_path / "models/subject/tokenizer.json").write_text("{}")
+    launch = replace(
+        _launch(),
+        subject=replace(_launch().subject, device="cpu"),
+    )
+    worker_started = (threading.Event(), threading.Event())
+    worker_cancelled = (threading.Event(), threading.Event())
+
+    def run(
+        command: list[str],
+        *,
+        timeout_seconds: int,
+        cancellation_event: threading.Event,
+    ) -> subprocess.CompletedProcess[str]:
+        assert timeout_seconds == 120
+        index = 0 if launch.baseline.image_ref in command else 1
+        worker_started[index].set()
+        assert cancellation_event.wait(timeout=2)
+        worker_cancelled[index].set()
+        return subprocess.CompletedProcess(
+            command,
+            evaluation_oci._WORKER_CANCELLED_STATUS,  # noqa: SLF001
+            stdout="",
+            stderr="worker cancelled after paired side failure",
+        )
+
+    def interrupt_collection(_futures: object) -> None:
+        assert all(started.wait(timeout=2) for started in worker_started)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(evaluation_oci, "run_side_worker", run)
+    monkeypatch.setattr(evaluation_oci, "as_completed", interrupt_collection)
+
+    with pytest.raises(KeyboardInterrupt):
+        OciRuntimeExecutor(launch, environment=support).execute(
+            request,
+            registry=cast(CoreRegistry, _Registry()),
+            schedule_bytes=canonical_schedule_bytes(_schedule()),
+            policy_digest="sha256:" + "c" * 64,
+        )
+
+    assert all(cancelled.is_set() for cancelled in worker_cancelled)
 
 
 def test_six_file_loader_rejects_partial_or_mixed_output(tmp_path: Path) -> None:

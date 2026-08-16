@@ -21,6 +21,9 @@ from tests.reporting.schema.test_evidence_pack_contract import _manifest
 def test_manifest_validator_reports_closed_field_and_binding_failures() -> None:
     manifest = _manifest()
     assert verification._validate_manifest(manifest) == []
+    assert verification._validate_manifest([]) == [
+        "manifest must decode to a JSON object"
+    ]
 
     mutations = [
         (lambda value: value.update(extra=True), "manifest fields"),
@@ -344,6 +347,19 @@ def test_result_authenticity_and_policy_status_are_independent(tmp_path: Path) -
     assert mismatch.payload["verification_scope"] == "not_verified"
 
 
+def test_identity_anchor_checker_rejects_dataset_schedule_drift() -> None:
+    errors = verification._identity_anchor_errors(
+        {"dataset": "sha256:" + "a" * 64},
+        canonical_schedule_digest="sha256:" + "b" * 64,
+        artifact_digests={},
+        schedule_digest=None,
+        policy_digest=None,
+        runtime_digests={},
+    )
+
+    assert errors == ["dataset identity does not match the canonical schedule"]
+
+
 def test_runtime_side_parser_rejects_nonobject_manifest() -> None:
     errors = verification._verify_runtime_side(
         Path("/unused"),
@@ -449,12 +465,25 @@ def test_snapshot_failure_and_stability_results_preserve_anchors(
         expected_schedule_digest="sha256:" + "e" * 64,
         expected_runtime_digests=runtimes,
         expected_signer_fingerprint="sha256:" + "f" * 64,
-        expected_request_digest=None,
+        expected_request_digest="sha256:" + "9" * 64,
         manifest_digest="sha256:" + "0" * 64,
     )
     assert failure.status is EvidencePackStatus.INTEGRITY
     assert failure.manifest_digest == "sha256:" + "0" * 64
     assert failure.payload["anchors"]["artifact_digests"] == artifacts  # type: ignore[index]
+    assert failure.payload["anchors"]["request_digest"] == "sha256:" + "9" * 64  # type: ignore[index]
+
+    failure_without_request_anchor = verification._snapshot_failure_result(
+        tmp_path / "pack-without-request-anchor",
+        errors=["capture failed before request authentication"],
+        policy_path=None,
+        expected_artifact_digests=artifacts,
+        expected_schedule_digest="sha256:" + "e" * 64,
+        expected_runtime_digests=runtimes,
+        expected_signer_fingerprint="sha256:" + "f" * 64,
+        expected_request_digest=None,
+    )
+    assert "request_digest" not in failure_without_request_anchor.payload["anchors"]  # type: ignore[operator]
 
     augmented = verification._with_snapshot_errors(
         verification._result(

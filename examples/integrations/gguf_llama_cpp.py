@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare an official Qwen3 Q8 GGUF with a pinned llama.cpp Q5 derivative."""
+"""Compare an official compact Q8 GGUF with a pinned llama.cpp Q5 derivative."""
 
 from __future__ import annotations
 
@@ -17,71 +17,82 @@ from pathlib import Path
 import yaml
 
 from examples.integrations import launch
+from examples.integrations.evaluator_transaction.image_cleanup import (
+    OwnedImageTag,
+    record_owned_image_tag,
+    remove_owned_image_tags,
+    temporary_image_tag,
+)
 from examples.integrations.run import ExamplePaths, _paths, _write_private_key
+from examples.integrations.trust_material import (
+    create_trust_material,
+    load_external_key,
+    validate_new_trust_root,
+)
 from invarlock.core.runtime_provider import artifact_identity_sha256
 from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
 )
-from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.evidence_pack_contract import canonical_json_bytes, normalize_digest
 from invarlock.runtime_providers.gguf_identity import read_gguf_artifact_identity
 
-_MODEL_REPOSITORY = "Qwen/Qwen3-0.6B-GGUF"
-_MODEL_REVISION = "23749fefcc72300e3a2ad315e1317431b06b590a"
+_MODEL_REPOSITORY = "ggml-org/Qwen3.5-0.8B-GGUF"
+_MODEL_REVISION = "8fea620810c4afa23dd6443f999a48574c1611a3"
 _APT_SNAPSHOT = "20260701T000000Z"
-_MAX_DOWNLOAD_BYTES = 700 * 1024 * 1024
+_MAX_DOWNLOAD_BYTES = 900 * 1024 * 1024
 _QUANTIZATION = "Q5_K_M"
 _RECORDS = Path(__file__).with_name("gguf-llama-cpp") / "records.json"
 _MINIMUM_SIDE_ACCURACY = 0.40
-_PINNED_QWEN3_ONE_TOKEN_TARGET_IDS = {
-    " Africa": 10174,
-    " Asia": 13622,
-    " Atlantic": 22375,
-    " Berlin": 19846,
-    " Cairo": 52550,
-    " Canberra": 68790,
-    " English": 6364,
-    " Europe": 4505,
-    " Everest": 86478,
-    " Jupiter": 49689,
-    " Lisbon": 80701,
-    " Madrid": 24081,
-    " Mars": 21048,
-    " May": 3217,
-    " Nairobi": 96525,
-    " Nile": 76190,
-    " Ottawa": 32166,
-    " Pacific": 16462,
-    " Paris": 12095,
-    " Rome": 21718,
-    " Tokyo": 26194,
-    " blue": 6303,
-    " book": 2311,
-    " carbon": 12499,
-    " child": 1682,
-    " closed": 7877,
-    " cold": 9255,
-    " eight": 8063,
-    " energy": 4802,
-    " euro": 17672,
-    " fifty": 32417,
-    " four": 3040,
-    " freezing": 42218,
-    " gold": 6623,
-    " gravity": 23249,
-    " hundred": 7739,
-    " night": 3729,
-    " nine": 11627,
-    " oxygen": 23552,
-    " seven": 8094,
-    " six": 4743,
-    " slow": 6301,
-    " small": 2613,
-    " ten": 5779,
-    " twelve": 29235,
-    " vapor": 37652,
-    " water": 3015,
-    " yen": 57340,
+_PINNED_COMPACT_ONE_TOKEN_TARGET_IDS = {
+    " Africa": 9871,
+    " Asia": 13229,
+    " Atlantic": 21678,
+    " Berlin": 19241,
+    " Cairo": 50779,
+    " Canberra": 66463,
+    " English": 6163,
+    " Europe": 4357,
+    " Everest": 83489,
+    " Jupiter": 48017,
+    " Lisbon": 77916,
+    " Madrid": 23327,
+    " Mars": 20403,
+    " May": 3114,
+    " Nairobi": 93190,
+    " Nile": 73583,
+    " Ottawa": 31106,
+    " Pacific": 15979,
+    " Paris": 11751,
+    " Rome": 21047,
+    " Tokyo": 25358,
+    " blue": 6105,
+    " book": 2236,
+    " carbon": 12141,
+    " child": 1623,
+    " closed": 7629,
+    " cold": 8981,
+    " eight": 7810,
+    " energy": 4649,
+    " euro": 17146,
+    " fifty": 31347,
+    " four": 2943,
+    " freezing": 40818,
+    " gold": 6414,
+    " gravity": 22525,
+    " hundred": 7493,
+    " night": 3603,
+    " nine": 11292,
+    " oxygen": 22817,
+    " seven": 7840,
+    " six": 4590,
+    " slow": 6103,
+    " small": 2526,
+    " ten": 5600,
+    " twelve": 28279,
+    " vapor": 36405,
+    " water": 2919,
+    " yen": 55421,
 }
 
 
@@ -100,11 +111,24 @@ class ModelDownload:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class PendingTrust:
+    """Trust inputs waiting for the independently checked request identity."""
+
+    anchors: Mapping[str, str]
+    policy_bytes: bytes
+    external: bool
+    trust_root: Path | None
+    verifier_key_bytes: bytes | None
+    evidence_fingerprint: str
+    verifier_fingerprint: str
+
+
 _OFFICIAL_MODEL = ModelDownload(
     role="baseline",
-    filename="Qwen3-0.6B-Q8_0.gguf",
-    byte_length=639_446_688,
-    sha256="9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+    filename="Qwen3.5-0.8B-Q8_0.gguf",
+    byte_length=833_592_096,
+    sha256="37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f",
 )
 
 
@@ -207,7 +231,7 @@ def _stage_models(
     model_root.mkdir(parents=True)
     baseline = model_root / _OFFICIAL_MODEL.filename
     _download_model(baseline, _OFFICIAL_MODEL)
-    subject = model_root / "Qwen3-0.6B-Q5_K_M.gguf"
+    subject = model_root / "Qwen3.5-0.8B-Q5_K_M.gguf"
     uid = os.getuid() if hasattr(os, "getuid") else 65532
     gid = os.getgid() if hasattr(os, "getgid") else 65532
     launch._run(
@@ -256,7 +280,11 @@ def _inspect_image_id(repository: Path, *, container_engine: str, image: str) ->
 
 
 def _build_runtime_image(
-    repository: Path, build_root: Path, *, container_engine: str
+    repository: Path,
+    build_root: Path,
+    *,
+    container_engine: str,
+    image_tag: str | None = None,
 ) -> str:
     commit = launch._require_committed_checkout(repository)
     source_bundle = build_root / "source.tar"
@@ -279,7 +307,7 @@ def _build_runtime_image(
     if not isinstance(source_digest, str):
         raise RuntimeError("source-bundle creation did not return its digest")
     epoch = launch._git(repository, "show", "-s", "--format=%ct", commit)
-    image = f"invarlock-example-gguf:{commit[:12]}"
+    image = image_tag or f"invarlock-example-gguf:{commit[:12]}"
     launch._run(
         [
             "make",
@@ -299,7 +327,20 @@ def _build_runtime_image(
         ],
         cwd=repository,
     )
-    return _inspect_image_id(repository, container_engine=container_engine, image=image)
+    image_id = launch._load_runtime_build_statement(
+        build_root / "runtime-build.json",
+        image=image,
+        source_commit=commit,
+        source_bundle_sha256=source_digest,
+    )
+    launch._verify_runtime_image_identity(
+        repository=repository,
+        container_engine=container_engine,
+        runtime_image_id=image_id,
+        source_commit=commit,
+        source_bundle_sha256=source_digest,
+    )
+    return image_id
 
 
 def _stage_backend(
@@ -342,6 +383,14 @@ def _inspect_spec(
     *,
     container_engine: str,
     image_id: str,
+    seed: int = 0,
+    context_length: int = 64,
+    batch_size: int = 1,
+    cpu_threads: int = 1,
+    prompt_batch_size: int = 32,
+    prompt_microbatch_size: int = 32,
+    max_output_tokens: int = 1,
+    timeout_seconds: int = 30,
 ) -> dict[str, object]:
     code = (
         "from pathlib import Path; import json; "
@@ -350,8 +399,11 @@ def _inspect_spec(
         "binding=LlamaCppRuntimeBindings(gguf_path=Path('/inputs/model.gguf'),"
         "executable_path=Path('/opt/llama.cpp/llama-completion'),"
         "source_archive_path=Path('/opt/llama.cpp/source/llama.cpp-b10015.tar.gz')); "
-        "spec=LlamaCppProvider().inspect_runtime_spec(binding,seed=0,"
-        "context_length=64,batch_size=1,max_output_tokens=1,timeout_seconds=30); "
+        "spec=LlamaCppProvider().inspect_runtime_spec(binding,"
+        f"seed={seed},context_length={context_length},batch_size={batch_size},"
+        f"cpu_threads={cpu_threads},prompt_batch_size={prompt_batch_size},"
+        f"prompt_microbatch_size={prompt_microbatch_size},"
+        f"max_output_tokens={max_output_tokens},timeout_seconds={timeout_seconds}); "
         "print(json.dumps({'model_id':spec.model_id,'settings':dict(spec.settings)},"
         "sort_keys=True,separators=(',',':')))"
     )
@@ -403,7 +455,7 @@ def _load_records() -> list[dict[str, str]]:
             not record["expected"].startswith(" ")
             or record["expected"].strip() != record["expected"][1:]
             or any(character.isspace() for character in record["expected"][1:])
-            or record["expected"] not in _PINNED_QWEN3_ONE_TOKEN_TARGET_IDS
+            or record["expected"] not in _PINNED_COMPACT_ONE_TOKEN_TARGET_IDS
         ):
             raise RuntimeError(
                 f"GGUF example record {index} must use one maintained target word"
@@ -420,12 +472,71 @@ def _prepare_transaction(
     models: Mapping[str, Path],
     specs: Mapping[str, Mapping[str, object]],
     image_id: str,
-) -> ExamplePaths:
-    paths = _paths(root)
+    evidence_signing_key: Path | None = None,
+    verifier_signing_key: Path | None = None,
+    trust_root: Path | None = None,
+    ephemeral_trust_root: bool = True,
+) -> tuple[ExamplePaths, PendingTrust]:
+    external_trust = any(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    )
+    if external_trust and not all(
+        value is not None
+        for value in (evidence_signing_key, verifier_signing_key, trust_root)
+    ):
+        raise ValueError(
+            "evidence key, verifier key, and trust root must be supplied together"
+        )
+    if external_trust and ephemeral_trust_root:
+        raise ValueError("external trust material cannot use ephemeral mode")
+    if not external_trust and not ephemeral_trust_root:
+        raise ValueError(
+            "caller-owned evidence/verifier keys and trust root are required"
+        )
+    paths = _paths(
+        root,
+        evidence_key=(
+            Path(os.path.abspath(evidence_signing_key.expanduser()))
+            if external_trust
+            else None
+        ),
+        trust_root=(
+            Path(os.path.abspath(trust_root.expanduser())) if external_trust else None
+        ),
+    )
     (paths.evaluation / "inputs").mkdir(parents=True)
-    paths.independent_policy.parent.mkdir(parents=True)
-    paths.evidence_key.parent.mkdir(parents=True)
-    paths.verifier_key.parent.mkdir(parents=True)
+    evidence_key_bytes: bytes | None = None
+    verifier_key_bytes: bytes | None = None
+    if external_trust:
+        assert evidence_signing_key is not None
+        assert verifier_signing_key is not None
+        assert trust_root is not None
+        trust_root = validate_new_trust_root(trust_root, transaction_root=root)
+        evidence_key_path, evidence_key_bytes, evidence_signer = load_external_key(
+            evidence_signing_key,
+            transaction_root=root,
+            label="evidence signing key",
+        )
+        _verifier_key_path, verifier_key_bytes, verifier = load_external_key(
+            verifier_signing_key,
+            transaction_root=root,
+            label="verifier signing key",
+        )
+        if evidence_signer == verifier:
+            raise ValueError("evidence and verifier signing keys must be distinct")
+        paths = _paths(
+            root,
+            evidence_key=evidence_key_path,
+            trust_root=Path(os.path.abspath(trust_root.expanduser()))
+            if trust_root is not None
+            else None,
+        )
+    else:
+        paths.independent_policy.parent.mkdir(parents=True)
+        paths.evidence_key.parent.mkdir(parents=True)
+        paths.verifier_key.parent.mkdir(parents=True)
+    paths.receipt.parent.mkdir(parents=True, exist_ok=True)
 
     records = _load_records()
     dataset_bytes = b"".join(canonical_json_bytes(record) for record in records)
@@ -436,7 +547,7 @@ def _prepare_transaction(
         LocalDatasetRequest(
             path=dataset,
             sha256=dataset_sha256,
-            name="qwen3-0.6b-q8-to-q5",
+            name="qwen35-0.8b-q8-to-q5",
             split="validation",
             input_field="prompt",
             expected_output_field="expected",
@@ -453,6 +564,7 @@ def _prepare_transaction(
                         "delta_min_pp": -15.0,
                         "maximum_interval_width_pp": 20.0,
                         "minimum_record_count": 50,
+                        "minimum_side_accuracy": _MINIMUM_SIDE_ACCURACY,
                     }
                 }
             }
@@ -460,7 +572,8 @@ def _prepare_transaction(
     )
     request_policy = paths.evaluation / "inputs" / "acceptance.json"
     request_policy.write_bytes(policy_bytes)
-    paths.independent_policy.write_bytes(policy_bytes)
+    if not external_trust:
+        paths.independent_policy.write_bytes(policy_bytes)
 
     def side(role: str) -> dict[str, object]:
         spec = specs[role]
@@ -496,7 +609,7 @@ def _prepare_transaction(
                 "path": "inputs/records.jsonl",
                 "sha256": dataset_sha256,
                 "format": "jsonl",
-                "name": "qwen3-0.6b-q8-to-q5",
+                "name": "qwen35-0.8b-q8-to-q5",
                 "split": "validation",
                 "input_field": "prompt",
                 "expected_output_field": "expected",
@@ -542,42 +655,85 @@ def _prepare_transaction(
     )
     paths.request.write_text(yaml.safe_dump(request, sort_keys=False), encoding="utf-8")
 
-    evidence_signer = _write_private_key(paths.evidence_key)
-    verifier = _write_private_key(paths.verifier_key)
-    paths.evidence_key.with_suffix(".fingerprint").write_text(
-        evidence_signer + "\n", encoding="ascii"
-    )
-    paths.verifier_key.with_suffix(".fingerprint").write_text(
-        verifier + "\n", encoding="ascii"
-    )
+    if external_trust:
+        assert evidence_key_bytes is not None
+        assert verifier_key_bytes is not None
+    else:
+        evidence_signer = _write_private_key(paths.evidence_key)
+        verifier = _write_private_key(paths.verifier_key)
+        paths.evidence_key.with_suffix(".fingerprint").write_text(
+            evidence_signer + "\n", encoding="ascii"
+        )
+        paths.verifier_key.with_suffix(".fingerprint").write_text(
+            verifier + "\n", encoding="ascii"
+        )
     artifact_anchors = {
         role: "sha256:" + artifact_identity_sha256(read_gguf_artifact_identity(model))
         for role, model in models.items()
     }
+    anchors = {
+        "baseline_artifact_digest": artifact_anchors["baseline"],
+        "subject_artifact_digest": artifact_anchors["subject"],
+        "schedule_digest": f"sha256:{schedule.schedule_sha256}",
+        "baseline_runtime_digest": image_id,
+        "subject_runtime_digest": image_id,
+        "evidence_signer_fingerprint": evidence_signer,
+    }
+    if runtime_root != models["baseline"].parents[1]:
+        raise RuntimeError("GGUF runtime resources do not share one closed root")
+    return paths, PendingTrust(
+        anchors=anchors,
+        policy_bytes=policy_bytes,
+        external=external_trust,
+        trust_root=trust_root,
+        verifier_key_bytes=verifier_key_bytes,
+        evidence_fingerprint=evidence_signer,
+        verifier_fingerprint=verifier,
+    )
+
+
+def _materialize_trust(
+    paths: ExamplePaths,
+    pending: PendingTrust,
+    request_digest: str,
+    *,
+    verifier_identity: str = "invarlock-example/gguf-llama-cpp-verifier",
+) -> None:
+    anchored_request = normalize_digest(
+        request_digest, label="independent request anchor"
+    )
+    anchors = {**pending.anchors, "request_digest": anchored_request}
+    if pending.external:
+        if pending.trust_root is None or pending.verifier_key_bytes is None:
+            raise RuntimeError("external GGUF trust material is incomplete")
+        material = create_trust_material(
+            transaction_root=paths.root,
+            evidence_key=paths.evidence_key,
+            verifier_key_bytes=pending.verifier_key_bytes,
+            evidence_fingerprint=pending.evidence_fingerprint,
+            verifier_fingerprint=pending.verifier_fingerprint,
+            trust_root=pending.trust_root,
+            policy_bytes=pending.policy_bytes,
+            verifier_identity=verifier_identity,
+            anchors=anchors,
+        )
+        if material.trusted_inputs != paths.trusted_inputs:
+            raise ValueError("external trust material resolved to an unexpected root")
+        return
     paths.trusted_inputs.write_bytes(
         canonical_json_bytes(
             {
                 "format": "invarlock/trust-inputs-v1",
                 "policy": {"path": "policy/acceptance.json"},
-                "anchors": {
-                    "baseline_artifact_digest": artifact_anchors["baseline"],
-                    "subject_artifact_digest": artifact_anchors["subject"],
-                    "schedule_digest": f"sha256:{schedule.schedule_sha256}",
-                    "baseline_runtime_digest": image_id,
-                    "subject_runtime_digest": image_id,
-                    "evidence_signer_fingerprint": evidence_signer,
-                },
+                "anchors": anchors,
                 "verifier": {
-                    "identity": "invarlock-example/gguf-llama-cpp-verifier",
+                    "identity": verifier_identity,
                     "signing_key_path": "keys/verifier.pem",
                 },
                 "allow_installed_scorers": False,
             }
         )
     )
-    if runtime_root != models["baseline"].parents[1]:
-        raise RuntimeError("GGUF runtime resources do not share one closed root")
-    return paths
 
 
 def _execute(
@@ -587,6 +743,7 @@ def _execute(
     runtime_root: Path,
     container_engine: str,
     image_id: str,
+    pending_trust: PendingTrust,
 ) -> None:
     bindings = {
         "INVARLOCK_GGUF_RESOURCE_ROOT": str(runtime_root),
@@ -621,9 +778,7 @@ def _execute(
     try:
         preflight_result = json.loads(preflight.stdout)
         request_digest = preflight_result["request_digest"]
-        trust_profile = json.loads(paths.trusted_inputs.read_text(encoding="utf-8"))
-        anchors = trust_profile["anchors"]
-    except (KeyError, TypeError, json.JSONDecodeError, OSError) as exc:
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise RuntimeError("GGUF preflight did not return a request identity") from exc
     if (
         not isinstance(request_digest, str)
@@ -631,10 +786,7 @@ def _execute(
         or len(request_digest) != 71
     ):
         raise RuntimeError("GGUF preflight returned an invalid request identity")
-    if not isinstance(anchors, dict):
-        raise RuntimeError("GGUF trust profile anchors are invalid")
-    anchors["request_digest"] = request_digest
-    paths.trusted_inputs.write_bytes(canonical_json_bytes(trust_profile))
+    _materialize_trust(paths, pending_trust, request_digest)
     launch._run(evaluation, cwd=repository, environment=environment)
     launch._run(
         [
@@ -717,31 +869,86 @@ def _parser() -> argparse.ArgumentParser:
         "--runtime-image",
         help="Reuse a locally available GGUF runtime image; default builds current source.",
     )
+    parser.add_argument("--evidence-signing-key", type=Path)
+    parser.add_argument("--verifier-signing-key", type=Path)
+    parser.add_argument("--trust-root", type=Path)
+    parser.add_argument(
+        "--ephemeral-trust-root",
+        action="store_true",
+        help="Use disposable generated keys; never use this mode for acceptance.",
+    )
     return parser
+
+
+def _image_runner(command: list[str], *, cwd: Path) -> str:
+    completed = launch._run(command, cwd=cwd, capture_output=True)
+    return completed.stdout or ""
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    trust_values = (
+        arguments.evidence_signing_key,
+        arguments.verifier_signing_key,
+        arguments.trust_root,
+    )
+    provided_trust = any(value is not None for value in trust_values)
+    external_trust = all(value is not None for value in trust_values)
+    if provided_trust and not external_trust:
+        print(
+            "FAIL --evidence-signing-key, --verifier-signing-key, and "
+            "--trust-root must be supplied together",
+            file=sys.stderr,
+        )
+        return 2
+    if not external_trust and not arguments.ephemeral_trust_root:
+        print(
+            "FAIL caller-owned --evidence-signing-key, --verifier-signing-key, "
+            "and --trust-root are required; use --ephemeral-trust-root only for "
+            "a disposable non-acceptance demo",
+            file=sys.stderr,
+        )
+        return 2
+    if external_trust and arguments.ephemeral_trust_root:
+        print(
+            "FAIL --ephemeral-trust-root cannot be combined with caller-owned trust",
+            file=sys.stderr,
+        )
+        return 2
     repository = Path(__file__).resolve().parents[2]
     if arguments.workspace is None:
         workspace = Path(tempfile.mkdtemp(prefix="invarlock-gguf-")).resolve(
             strict=True
         )
     else:
-        workspace = arguments.workspace.expanduser().resolve()
+        workspace = Path(os.path.abspath(arguments.workspace.expanduser()))
         if workspace.exists() or workspace.is_symlink():
             print(f"FAIL workspace already exists: {workspace}", file=sys.stderr)
             return 2
         workspace.parent.mkdir(parents=True, exist_ok=True)
-        workspace.mkdir()
+        workspace.mkdir(mode=0o700)
+    cleanup_tags: list[OwnedImageTag] = []
+    result = 2
     try:
         build_root = workspace / "build"
         build_root.mkdir()
         if arguments.runtime_image is None:
+            commit = launch._require_committed_checkout(repository)
+            image_tag = temporary_image_tag("invarlock-example-gguf", commit)
             image_id = _build_runtime_image(
                 repository,
                 build_root,
                 container_engine=arguments.container_engine,
+                image_tag=image_tag,
+            )
+            cleanup_tags.append(
+                record_owned_image_tag(
+                    _image_runner,
+                    arguments.container_engine,
+                    image_tag,
+                    image_id,
+                    repository,
+                )
             )
         else:
             image_id = _inspect_image_id(
@@ -774,12 +981,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             for role, model in models.items()
         }
-        paths = _prepare_transaction(
+        paths, pending_trust = _prepare_transaction(
             transaction,
             runtime_root=runtime_root,
             models=models,
             specs=specs,
             image_id=image_id,
+            evidence_signing_key=arguments.evidence_signing_key,
+            verifier_signing_key=arguments.verifier_signing_key,
+            trust_root=arguments.trust_root,
+            ephemeral_trust_root=arguments.ephemeral_trust_root,
         )
         _execute(
             repository,
@@ -787,12 +998,26 @@ def main(argv: list[str] | None = None) -> int:
             runtime_root=runtime_root,
             container_engine=arguments.container_engine,
             image_id=image_id,
+            pending_trust=pending_trust,
         )
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)
-        return 2
-    print(f"Complete GGUF integration workspace: {workspace}")
-    return 0
+    else:
+        result = 0
+    finally:
+        try:
+            remove_owned_image_tags(
+                _image_runner,
+                arguments.container_engine,
+                repository,
+                cleanup_tags,
+            )
+        except RuntimeError as exc:
+            print(f"FAIL {exc}", file=sys.stderr)
+            result = 2
+    if result == 0:
+        print(f"Complete GGUF integration workspace: {workspace}")
+    return result
 
 
 if __name__ == "__main__":

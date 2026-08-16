@@ -297,3 +297,46 @@ def test_tokenizer_contract_size_bound_and_main_failure_are_closed(
         argv.extend(("--" + name.replace("_", "-"), value))
     with pytest.raises(SystemExit):
         preflight.main(argv)
+
+
+def test_tokenizer_contract_read_detects_short_and_trailing_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    arguments = _valid_inputs(tmp_path)
+    root = Path(arguments["input_root"])
+    relative = arguments["tokenizer_contract"]
+    real_read = preflight.os.read
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(preflight.os, "read", lambda *_args: b"")
+        with pytest.raises(preflight.CanaryPreflightError, match="while being read"):
+            preflight._read_tokenizer_contract(root, relative)
+
+    read_count = 0
+
+    def read_with_trailing_byte(descriptor: int, size: int) -> bytes:
+        nonlocal read_count
+        read_count += 1
+        if read_count == 2:
+            return b"x"
+        return real_read(descriptor, size)
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(preflight.os, "read", read_with_trailing_byte)
+        with pytest.raises(
+            preflight.CanaryPreflightError,
+            match="while being authenticated",
+        ):
+            preflight._read_tokenizer_contract(root, relative)
+
+
+def test_tokenizer_contract_rejects_a_missing_nested_directory(tmp_path: Path) -> None:
+    root = tmp_path / "inputs"
+    root.mkdir()
+
+    with pytest.raises(
+        preflight.CanaryPreflightError,
+        match="must exist beneath INPUT_ROOT",
+    ):
+        preflight._read_tokenizer_contract(root, "missing/tokenizer.json")

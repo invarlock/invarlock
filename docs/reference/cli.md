@@ -74,8 +74,8 @@ invarlock evaluate REQUEST \
 preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
-applies any coupled count and width controls, and atomically publishes the
-evidence directory named by the request.
+applies any coupled count and width controls and exact-match side-accuracy
+floor, and atomically publishes the evidence directory named by the request.
 
 `--preflight` returns after that mandatory validation instead of continuing to
 execution and publication. It validates the
@@ -300,7 +300,8 @@ evidence references; the normalized request and schedule; runtime manifests
 and provider sidecars; for GGUF, the caller-approved request digest and its
 artifact/backend/execution bindings; record ordering and input digests; derived paired
 scores; the canonical comparison report; and the policy verdict. A policy
-verdict includes any configured record-count and interval-width qualification.
+verdict includes any configured record-count, interval-width, and exact-match
+side-accuracy qualification.
 A verdict of `fail` is a valid, integrity-checked result but is not command
 success.
 
@@ -324,7 +325,7 @@ receipts](reports.md#verification-result) for the complete field matrix.
 ## `report`
 
 ```text
-invarlock report EVIDENCE [--html report.html] [--explain]
+invarlock report EVIDENCE [--html report.html] [--explain] [--json]
 ```
 
 `report` verifies the bundle's closed inventory, checksums, reference digests,
@@ -336,10 +337,13 @@ canonical JSON, and embedded evidence signature before rendering
 | `EVIDENCE` | Yes | Existing readable evidence-pack directory |
 | `--html PATH` | No | Write a new self-contained HTML report outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
+| `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
-`--html` refuses to overwrite an existing file. `report` always emits the text
-view to standard output; when HTML is requested it also prints the written
-path.
+`--html` refuses to overwrite an existing file. By default, `report` emits the
+text view to standard output and prints the written path when HTML is
+requested. With `--json`, it instead emits one compact
+`invarlock/evidence-report-v1` object containing `ok`, the pack-manifest digest,
+and the optional HTML path.
 
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
