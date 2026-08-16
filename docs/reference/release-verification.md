@@ -55,7 +55,10 @@ repository workflow:
     attestations during the tag run; and
 12. after a complete TestPyPI or PyPI publication, verifies every hosted
     archive against that tag-run ledger, installs the hosted wheels together,
-    and repeats the conformance smoke.
+    and repeats the conformance smoke; and
+13. after a verified production PyPI `complete` or `finish` run, publishes the
+    documentation from that exact tag source to its immutable version path,
+    `latest`, and `stable` in one serialized `gh-pages` commit.
 
 These checks authenticate and exercise the package set. They do not qualify a
 specific model artifact, runtime image, accelerator, dataset, or evidence pack.
@@ -212,6 +215,13 @@ identity.
 After production publication, the workflow downloads all ten archives from
 PyPI, compares their hashes with the tag-run ledger, installs the five hosted
 wheels together in a clean environment, and repeats the conformance smoke.
+Only after that smoke succeeds does the production workflow invoke the reusable
+documentation publisher. The publisher removes the leading `v` from the
+validated release tag, builds from the caller's exact tag commit, and updates
+the versioned path plus `latest` while making `stable` redirect to the immutable
+version. TestPyPI and bootstrap publication cannot update Pages, and one global
+documentation concurrency group prevents release and branch publishers from
+racing their `gh-pages` pushes.
 Reconcile the published filenames, version, source tag, provenance subjects,
 and release assets before announcing completion.
 

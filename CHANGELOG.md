@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Connected successful production publication to serialized, tagged
+  documentation publishing that atomically updates the immutable version path,
+  `latest`, and `stable`, without allowing TestPyPI or bootstrap runs to update
+  GitHub Pages.
+
 ## [0.15.0] - 2026-08-16
 
 This release extends the v0.14 evaluator-neutral qualification and recipient

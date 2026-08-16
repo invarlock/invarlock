@@ -1062,3 +1062,20 @@ jobs:
           if any(candidate != expected for candidate in observed.values()):
               raise SystemExit(f"first-party version mismatch: {observed}")
           PY
+
+  publish_documentation:
+    name: Publish tagged documentation
+    needs: [published_install_smoke, resolve_release_ref]
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.publish == true &&
+        inputs.target == 'pypi' &&
+        inputs.publication_phase != 'bootstrap'
+      }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/docs-publish.yml
+    with:
+      docs_version: ${{ needs.resolve_release_ref.outputs.release_tag }}
+      publish_latest: true
