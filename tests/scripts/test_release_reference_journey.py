@@ -60,18 +60,112 @@ def test_retained_reference_replays_through_current_cli(
             "sha256:355ed56ce95a79faa384ce2f2de6d4e3804fba81c243b82d37cac397fd4a454d"
         ),
         "policy_verdict": "pass",
+        "receipt_sha256": summary["receipt_sha256"],
         "reference_id": "qwen3.8-27b-bf16-to-q5-k-m-gguf",
         "report_sha256": summary["report_sha256"],
         "verification_scope": "paired_comparison",
     }
     assert isinstance(summary["report_sha256"], str)
     assert journey._DIGEST.fullmatch(summary["report_sha256"])
+    assert isinstance(summary["receipt_sha256"], str)
+    assert journey._DIGEST.fullmatch(summary["receipt_sha256"])
     assert (output / "verification.receipt.json").is_file()
     assert not (output / "trust" / "verifier.pem").exists()
     assert (output / "report-a.html").read_bytes() == (
         output / "report-b.html"
     ).read_bytes()
     assert str(repo_root) not in json.dumps(summary, sort_keys=True)
+
+
+def test_every_public_pack_replays_through_current_cli(
+    repo_root: Path, tmp_path: Path
+) -> None:
+    summary = journey.run_public_evidence_compatibility(
+        repo_root=repo_root,
+        command=(sys.executable, "-m", "invarlock.cli.app"),
+        workspace=tmp_path / "all-public-evidence",
+        allow_checkout_source=True,
+    )
+
+    expected_ids = {
+        path.name
+        for path in (repo_root / "public_evidence" / "evidence").iterdir()
+        if path.is_dir()
+    }
+    references = summary["references"]
+    assert isinstance(references, list)
+    assert summary == {
+        "format": "invarlock/release-public-evidence-compatibility-result-v1",
+        "ok": True,
+        "pack_count": len(expected_ids),
+        "references": references,
+    }
+    assert {item["reference_id"] for item in references} == expected_ids
+    assert all(item["ok"] is True for item in references)
+    assert all(journey._DIGEST.fullmatch(item["receipt_sha256"]) for item in references)
+    assert all(journey._DIGEST.fullmatch(item["report_sha256"]) for item in references)
+    assert not list((tmp_path / "all-public-evidence").rglob("verifier.pem"))
+
+
+def test_every_evaluator_transaction_replays_through_current_cli(
+    repo_root: Path, tmp_path: Path
+) -> None:
+    summary = journey.run_evaluator_qualification_compatibility(
+        repo_root=repo_root,
+        command=(sys.executable, "-m", "invarlock.cli.app"),
+        workspace=tmp_path / "all-evaluator-transactions",
+        allow_checkout_source=True,
+    )
+
+    transactions_root = (
+        repo_root / "examples/evaluator-qualification/signed-transactions"
+    )
+    expected_ids = {path.name for path in transactions_root.iterdir() if path.is_dir()}
+    references = summary["references"]
+    assert isinstance(references, list)
+    assert summary == {
+        "format": ("invarlock/release-evaluator-qualification-compatibility-result-v1"),
+        "ok": True,
+        "pack_count": len(expected_ids),
+        "references": references,
+    }
+    assert {item["reference_id"] for item in references} == expected_ids
+    assert {item["policy_verdict"] for item in references} == {"fail", "pass"}
+    assert all(item["ok"] is True for item in references)
+    assert not list((tmp_path / "all-evaluator-transactions").rglob("verifier.pem"))
+
+
+def test_all_retained_evidence_combines_both_closed_sets(
+    repo_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, Path]] = []
+
+    def public(**kwargs: object) -> dict[str, object]:
+        calls.append(("public", kwargs["workspace"]))  # type: ignore[arg-type]
+        return {"ok": True, "pack_count": 7}
+
+    def evaluator(**kwargs: object) -> dict[str, object]:
+        calls.append(("evaluator", kwargs["workspace"]))  # type: ignore[arg-type]
+        return {"ok": True, "pack_count": 4}
+
+    monkeypatch.setattr(journey, "run_public_evidence_compatibility", public)
+    monkeypatch.setattr(journey, "run_evaluator_qualification_compatibility", evaluator)
+    workspace = tmp_path / "all-retained-evidence"
+    summary = journey.run_retained_evidence_compatibility(
+        repo_root=repo_root,
+        command=(sys.executable,),
+        workspace=workspace,
+        allow_checkout_source=True,
+    )
+
+    assert summary == {
+        "evaluator_qualification": {"ok": True, "pack_count": 4},
+        "format": "invarlock/release-retained-evidence-compatibility-result-v1",
+        "ok": True,
+        "pack_count": 11,
+        "public_evidence": {"ok": True, "pack_count": 7},
+    }
+    assert [name for name, _workspace in calls] == ["public", "evaluator"]
 
 
 def _valid_verification(config: dict[str, object]) -> dict[str, object]:
@@ -91,7 +185,7 @@ def _valid_verification(config: dict[str, object]) -> dict[str, object]:
         "errors": [],
         "format_version": journey.VERIFY_FORMAT,
         "integrity_ok": True,
-        "ok": True,
+        "ok": expected["policy_verdict"] == "pass",
         "pack_format": "invarlock/evidence-pack-v1",
         "pack_manifest_digest": evidence["pack_manifest_digest"],
         "policy_verdict": expected["policy_verdict"],
@@ -246,7 +340,7 @@ def test_reference_configuration_is_closed(
     elif case == "expected":
         config["expected"] = {}
     elif case == "verdict":
-        config["expected"]["policy_verdict"] = "fail"
+        config["expected"]["policy_verdict"] = "other"
     elif case == "scope":
         config["expected"]["verification_scope"] = "other"
     elif case == "policy":
@@ -308,8 +402,29 @@ def test_candidate_nonzero_is_rejected(
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess([], 2, "{}", "private"),
     )
-    with pytest.raises(journey.ReleaseReferenceJourneyError, match="nonzero"):
+    with pytest.raises(journey.ReleaseReferenceJourneyError, match="unexpected status"):
         journey._run_cli((sys.executable,), (), cwd=tmp_path, environment={})
+
+
+def test_expected_policy_rejection_status_is_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        journey.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 7, "{}", ""),
+    )
+
+    assert (
+        journey._run_cli(
+            (sys.executable,),
+            (),
+            cwd=tmp_path,
+            environment={},
+            expected_status=7,
+        )
+        == {}
+    )
 
 
 @pytest.mark.parametrize(
@@ -446,7 +561,7 @@ def test_reference_source_bytes_must_match_their_pins(
         config["evidence"]["pack_manifest_digest"] = "sha256:" + "0" * 64
     else:
         config["policy"]["digest"] = "sha256:" + "0" * 64
-    monkeypatch.setattr(journey, "_load_reference", lambda _root: config)
+    monkeypatch.setattr(journey, "_load_reference", lambda _root, **_kwargs: config)
 
     with pytest.raises(journey.ReleaseReferenceJourneyError, match="pin"):
         journey.run_release_reference_journey(
@@ -555,6 +670,165 @@ def test_main_supports_source_candidate_and_error_paths(
 
     assert journey.main(["--repo-root", str(tmp_path / "missing")]) == 1
     assert "release reference journey rejected" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("option", "attribute"),
+    (
+        ("--all-public-evidence", "run_public_evidence_compatibility"),
+        (
+            "--all-evaluator-qualification",
+            "run_evaluator_qualification_compatibility",
+        ),
+        ("--all-retained-evidence", "run_retained_evidence_compatibility"),
+    ),
+)
+def test_main_dispatches_retained_evidence_selection(
+    repo_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    option: str,
+    attribute: str,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def run(**kwargs: object) -> dict[str, object]:
+        calls.append(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(journey, attribute, run)
+    assert journey.main(["--repo-root", str(repo_root), option, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"ok": True}
+    assert calls[-1]["allow_checkout_source"] is True
+
+
+def test_public_evidence_compatibility_rejects_unsafe_entries(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "checkout"
+    public_root = repo_root / "public_evidence" / "evidence"
+    public_root.mkdir(parents=True)
+    (public_root / "unexpected.txt").write_text("unexpected", encoding="utf-8")
+
+    with pytest.raises(journey.ReleaseReferenceJourneyError, match="unsafe"):
+        journey.run_public_evidence_compatibility(
+            repo_root=repo_root,
+            command=(sys.executable,),
+            workspace=tmp_path / "unsafe-workspace",
+            allow_checkout_source=True,
+        )
+
+
+def test_evaluator_qualification_compatibility_rejects_unsafe_entries(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "checkout"
+    transactions_root = (
+        repo_root / "examples/evaluator-qualification/signed-transactions"
+    )
+    transactions_root.mkdir(parents=True)
+    (transactions_root / "unexpected.txt").write_text("unexpected", encoding="utf-8")
+
+    with pytest.raises(journey.ReleaseReferenceJourneyError, match="unsafe"):
+        journey.run_evaluator_qualification_compatibility(
+            repo_root=repo_root,
+            command=(sys.executable,),
+            workspace=tmp_path / "unsafe-evaluator-workspace",
+            allow_checkout_source=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("duplicate", "duplicated"),
+        ("path", "path is inconsistent"),
+        ("coverage", "do not cover"),
+    ),
+)
+def test_public_evidence_compatibility_fails_closed_on_configuration_drift(
+    repo_root: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    config = copy.deepcopy(journey._load_reference(repo_root))
+    if case == "duplicate":
+        configs = (journey.REFERENCE_CONFIG, journey.REFERENCE_CONFIG)
+    else:
+        configs = (journey.REFERENCE_CONFIG,)
+    if case == "path":
+        config["evidence"]["path"] = "public_evidence/evidence/other/evidence"
+
+    monkeypatch.setattr(journey, "PUBLIC_EVIDENCE_REFERENCE_CONFIGS", configs)
+    monkeypatch.setattr(
+        journey,
+        "_load_reference",
+        lambda _root, **_kwargs: copy.deepcopy(config),
+    )
+    monkeypatch.setattr(
+        journey,
+        "run_release_reference_journey",
+        lambda **_kwargs: {"reference_id": config["evidence"]["reference_id"]},
+    )
+
+    with pytest.raises(journey.ReleaseReferenceJourneyError, match=message):
+        journey.run_public_evidence_compatibility(
+            repo_root=repo_root,
+            command=(sys.executable,),
+            workspace=tmp_path / f"{case}-workspace",
+            allow_checkout_source=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    (
+        ("duplicate", "duplicated"),
+        ("path", "path is inconsistent"),
+        ("coverage", "do not cover"),
+    ),
+)
+def test_evaluator_qualification_fails_closed_on_configuration_drift(
+    repo_root: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str,
+) -> None:
+    reference = journey.EVALUATOR_QUALIFICATION_REFERENCE_CONFIGS[0]
+    config = copy.deepcopy(
+        journey._load_reference(repo_root, reference_config=reference)
+    )
+    if case == "duplicate":
+        configs = (reference, reference)
+    else:
+        configs = (reference,)
+    if case == "path":
+        config["evidence"]["path"] = (
+            "examples/evaluator-qualification/signed-transactions/other/evidence"
+        )
+
+    monkeypatch.setattr(journey, "EVALUATOR_QUALIFICATION_REFERENCE_CONFIGS", configs)
+    monkeypatch.setattr(
+        journey,
+        "_load_reference",
+        lambda _root, **_kwargs: copy.deepcopy(config),
+    )
+    monkeypatch.setattr(
+        journey,
+        "run_release_reference_journey",
+        lambda **_kwargs: {"reference_id": config["evidence"]["reference_id"]},
+    )
+
+    with pytest.raises(journey.ReleaseReferenceJourneyError, match=message):
+        journey.run_evaluator_qualification_compatibility(
+            repo_root=repo_root,
+            command=(sys.executable,),
+            workspace=tmp_path / f"{case}-evaluator-workspace",
+            allow_checkout_source=True,
+        )
 
 
 def test_reference_environment_removes_runtime_bypasses(

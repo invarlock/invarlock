@@ -305,6 +305,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "examples/acceptance-handoff/golden" in install_smoke
     assert "python run.py --fixture golden" in install_smoke
     assert "examples/ci/standalone-consumer/." in install_smoke
+    assert (
+        "examples/evaluator-qualification/signed-transactions/"
+        "deployment-approval-inspect-ai/evidence"
+    ) in install_smoke
+    assert "signed-transactions/inspect-ai/" not in install_smoke
     assert "review/verify_deployment_receipt.py" in install_smoke
     assert install_smoke.index(core_install) < install_smoke.index(
         "python run.py --fixture golden"
@@ -765,6 +770,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "examples/acceptance-handoff/golden" in smoke["run"]
     assert "python run.py --fixture golden" in smoke["run"]
     assert "examples/ci/standalone-consumer/." in smoke["run"]
+    assert (
+        "examples/evaluator-qualification/signed-transactions/"
+        "deployment-approval-inspect-ai/evidence"
+    ) in smoke["run"]
+    assert "signed-transactions/inspect-ai/" not in smoke["run"]
     assert "review/verify_deployment_receipt.py" in smoke["run"]
     assert smoke["run"].index(core_install) < smoke["run"].index(
         "python run.py --fixture golden"

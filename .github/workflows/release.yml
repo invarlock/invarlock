@@ -389,9 +389,9 @@ jobs:
           )
           cp -R examples/ci/standalone-consumer/. "${approval_root}/"
           mkdir "${approval_root}/incoming"
-          cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+          cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
             "${approval_root}/incoming/evidence"
-          cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json \
+          cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json \
             "${approval_root}/incoming/verification.receipt.json"
           (
             cd "${approval_root}"
@@ -1023,9 +1023,9 @@ jobs:
           )
           cp -R examples/ci/standalone-consumer/. "${approval_root}/"
           mkdir "${approval_root}/incoming"
-          cp -R examples/evaluator-qualification/signed-transactions/inspect-ai/evidence \
+          cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
             "${approval_root}/incoming/evidence"
-          cp examples/evaluator-qualification/signed-transactions/inspect-ai/verification.receipt.json \
+          cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json \
             "${approval_root}/incoming/verification.receipt.json"
           (
             cd "${approval_root}"

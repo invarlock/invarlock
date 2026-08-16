@@ -73,7 +73,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda129 container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
-.PHONY: release-preflight release-reference-journey contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
+.PHONY: release-preflight release-reference-journey release-public-evidence-compatibility release-evaluator-qualification-compatibility release-retained-evidence-compatibility contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
 .PHONY: clean docsclean deepclean pre-commit pre-commit-install ensure-python ensure-ruff ensure-mypy
 
 help:  ## Show maintained targets
@@ -678,6 +678,15 @@ release-preflight:  ## Validate a clean exact release checkout and distributions
 
 release-reference-journey:  ## Replay retained signed evidence through the current verifier
 	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --json
+
+release-public-evidence-compatibility:  ## Replay every retained public pack through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --all-public-evidence --json
+
+release-evaluator-qualification-compatibility:  ## Replay retained evaluator transactions through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --all-evaluator-qualification --json
+
+release-retained-evidence-compatibility:  ## Replay all retained release evidence through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --all-retained-evidence --json
 
 ##@ Runtime image
 runtime-image:  ## Build the canonical Hugging Face runtime image

@@ -1,0 +1,26 @@
+{
+  "anchors": {
+    "baseline_artifact_digest": "sha256:305597dcac4733d1d82b48d1a072adbaafde47ca80e316c1f7dff2349cba8d1e",
+    "baseline_runtime_digest": "sha256:2d73b723dfaeb2eeafac2e7825db65a4fb29131208000183b47242a1dac69e0d",
+    "evidence_signer_fingerprint": "sha256:b32e2fcdb02354ae64a57d19f0434c0eb6af4bdef96d6329700a0faaf26ea60e",
+    "request_digest": "sha256:b550d8583ec08be93c9b3b657d6b0a85c5c83e080e96cbb83b41ea2759a25638",
+    "schedule_digest": "sha256:3552a65f461677b7f6a27d24c157f043a6ff5b016f2ddc5834e5f304c7d8be00",
+    "subject_artifact_digest": "sha256:66a4aaf29e294307d7a5d631dd2d70f179a5f3866830d889d975153d2309bf9b",
+    "subject_runtime_digest": "sha256:2d73b723dfaeb2eeafac2e7825db65a4fb29131208000183b47242a1dac69e0d"
+  },
+  "evidence": {
+    "comparison_id": "comparison-81b80b2eba03023be3bffe266b5289ec",
+    "pack_manifest_digest": "sha256:3c32a46fd20d71eb5d7fa8ab719e761b302ec73ee41aeb579a4e6ffaa9705b57",
+    "path": "public_evidence/evidence/tinyllama-tensorrt-llm-checkpoints/evidence",
+    "reference_id": "tinyllama-tensorrt-llm-checkpoints"
+  },
+  "expected": {
+    "policy_verdict": "pass",
+    "verification_scope": "paired_comparison"
+  },
+  "format": "invarlock/release-reference-journey-v1",
+  "policy": {
+    "digest": "sha256:42962e3acfaa37ea925d6142c2819d386be5f8ce252f65d89804c2082c7a553e",
+    "path": "scripts/release/reference_evidence/exact-match-policy.json"
+  }
+}

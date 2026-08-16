@@ -1,0 +1,26 @@
+{
+  "anchors": {
+    "baseline_artifact_digest": "sha256:2167735562615a64ac099679fda25ab76e421e8466891ec775b70a9d873b146d",
+    "baseline_runtime_digest": "sha256:e0838e97a82348d6a492b82063e8f217b476f14a89eb9d50c5a760a9777bbc01",
+    "evidence_signer_fingerprint": "sha256:b32e2fcdb02354ae64a57d19f0434c0eb6af4bdef96d6329700a0faaf26ea60e",
+    "request_digest": "sha256:76351f4ef587c6db3cd4009d9e73b3868ad3d523e636836ab036ecb973d11c0f",
+    "schedule_digest": "sha256:3552a65f461677b7f6a27d24c157f043a6ff5b016f2ddc5834e5f304c7d8be00",
+    "subject_artifact_digest": "sha256:e28002f44de04766e571ecae372289331040553c80fc5a21f3bd9ce9901d28ba",
+    "subject_runtime_digest": "sha256:e0838e97a82348d6a492b82063e8f217b476f14a89eb9d50c5a760a9777bbc01"
+  },
+  "evidence": {
+    "comparison_id": "comparison-9a8b2a5d8fcc9a2d45eeb95402a073e9",
+    "pack_manifest_digest": "sha256:759c9946d17655e3af2c202eb18de68f1295324929a76826d694f654a00a27f0",
+    "path": "public_evidence/evidence/qwen2.5-14b-weight-scale-hf/evidence",
+    "reference_id": "qwen2.5-14b-weight-scale-hf"
+  },
+  "expected": {
+    "policy_verdict": "pass",
+    "verification_scope": "paired_comparison"
+  },
+  "format": "invarlock/release-reference-journey-v1",
+  "policy": {
+    "digest": "sha256:4d2a98344605b4f81f1218544c2ca4e49d82bdbbec98ef883d20a3fdf77e7d01",
+    "path": "scripts/release/reference_evidence/normalized-nll-policy.json"
+  }
+}

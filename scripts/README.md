@@ -70,6 +70,28 @@ anchors, and requires two separately rendered HTML reports to be
 byte-identical. It does not rerun model inference or conversion and is not a
 production trust decision.
 
+Replay every retained public pack through the same current verifier with:
+
+```bash
+make release-public-evidence-compatibility
+```
+
+Replay the four retained evaluator-qualification transactions, including their
+declared passing and integrity-valid policy-rejected outcomes, with:
+
+```bash
+make release-evaluator-qualification-compatibility
+```
+
+Use `make release-retained-evidence-compatibility` for both closed sets: seven
+public packs plus four evaluator transactions. Each closed set must exactly
+match its retained directories. Every replay uses separately pinned policy and
+trust inputs, a fresh ephemeral verifier key and receipt, and two
+byte-identical reports. The JSON result records each immutable pack-manifest
+digest plus the fresh receipt and deterministic report digests. This is
+release compatibility evidence, not a replacement for recipient-owned
+verification or a new model or evaluator execution.
+
 Refresh the byte-identical source and packaged indexes, then check both with:
 
 ```bash
@@ -93,9 +115,9 @@ make release-preflight RELEASE_PREFLIGHT_ARGS="\
 `COMMIT_SHA` must be the lowercase 40-character SHA of the clean checkout. The
 hash manifest uses `sha256sum` format and lists exactly the core wheel and sdist
 from `dist/` by base name. Pass `--json` when machine-readable output is
-required. Preflight performs the same retained-evidence journey through the
-isolated candidate-wheel CLI without exposing the checkout as Python source.
-Preflight does not approve or publish a release.
+required. Preflight performs the complete eleven-pack retained-evidence
+compatibility replay through the isolated candidate-wheel CLI without exposing
+the checkout as Python source. Preflight does not approve or publish a release.
 
 GGUF, TensorRT-LLM, and Hugging Face vision-text conformance commands are
 shipped by their optional first-party distributions under `addins/`. The
