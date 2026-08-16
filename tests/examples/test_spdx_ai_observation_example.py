@@ -31,6 +31,24 @@ def _digest(character: str) -> str:
     return "sha256:" + character * 64
 
 
+def _spdx_document() -> dict[str, object]:
+    source, _identity = _fixture_bytes()
+    document = json.loads(source)
+    assert isinstance(document, dict)
+    return document
+
+
+def _graph_item(document: dict[str, object], type_name: str) -> dict[str, object]:
+    graph = document["@graph"]
+    assert isinstance(graph, list)
+    item = next(
+        candidate
+        for candidate in graph
+        if isinstance(candidate, dict) and candidate.get("type") == type_name
+    )
+    return item
+
+
 def test_committed_spdx_observation_rebuilds_exactly() -> None:
     source, identity = _fixture_bytes()
 
@@ -78,6 +96,177 @@ def test_spdx_canonicalizer_rejects_non_ascii_names_and_floats() -> None:
         example.spdx_canonical_json_bytes({"mødel": "value"})
     with pytest.raises(example.SpdxObservationError, match="canonical JSON subset"):
         example.spdx_canonical_json_bytes({"metric": 1.0})
+
+
+def test_spdx_canonicalizer_wraps_encoder_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject_json(*_args: object, **_kwargs: object) -> str:
+        raise ValueError("encoder rejected value")
+
+    monkeypatch.setattr(example.json, "dumps", reject_json)
+    with pytest.raises(example.SpdxObservationError, match="not canonical JSON"):
+        example.spdx_canonical_json_bytes({"valid": True})
+
+
+def test_spdx_subset_helpers_reject_invalid_shapes() -> None:
+    with pytest.raises(example.SpdxObservationError, match="must be an object"):
+        example._object([], label="value")
+    with pytest.raises(example.SpdxObservationError, match="non-empty array"):
+        example._object_array([], label="array")
+    with pytest.raises(example.SpdxObservationError, match="element example limit"):
+        example._object_array([{}] * 65, label="array")
+    with pytest.raises(example.SpdxObservationError, match=r"array\[0\] must"):
+        example._object_array([[]], label="array")
+    with pytest.raises(example.SpdxObservationError, match="string array"):
+        example._string_array([""], label="strings")
+    with pytest.raises(example.SpdxObservationError, match="exactly one Thing"):
+        example._one_by_type([], "Thing")
+    with pytest.raises(example.SpdxObservationError, match="non-empty spdxId"):
+        example._element_id({}, label="element")
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("extra_root_field", "only @context and @graph"),
+        ("wrong_context", "context is not pinned"),
+        ("duplicate_id", "duplicate ID"),
+        ("duplicate_creation", "exactly one CreationInfo"),
+        ("wrong_spec_version", "specVersion"),
+        ("invalid_created_by", "createdBy"),
+        ("invalid_created", "must be a timestamp"),
+        ("missing_profile", "missing the example profiles"),
+        ("missing_package_field", "missing required example fields"),
+        ("wrong_creation_binding", "creationInfo binding"),
+        ("wrong_primary_purpose", "primary purpose"),
+        ("invalid_model_types", "ai_typeOfModel"),
+        ("invalid_supplier_type", "suppliedBy must"),
+        ("missing_supplier", "agent is missing"),
+        ("multiple_hashes", "exactly one example integrity"),
+        ("invalid_hash_fields", "Hash fields"),
+        ("invalid_hash", "lowercase SHA-256"),
+        ("wrong_root", "does not root"),
+        ("wrong_relationship_source", "declared and one concluded"),
+        ("irrelevant_relationship_type", "declared and one concluded"),
+        ("wrong_license_target", "must point to NoAssertion"),
+        ("unlisted_relationship", "not listed in document elements"),
+    ],
+)
+def test_spdx_subset_rejects_bounded_structural_mutations(
+    case: str, message: str
+) -> None:
+    document = _spdx_document()
+    graph = document["@graph"]
+    assert isinstance(graph, list)
+    creation = _graph_item(document, "CreationInfo")
+    spdx_document = _graph_item(document, "SpdxDocument")
+    package = _graph_item(document, "ai_AIPackage")
+    relationships = [
+        item
+        for item in graph
+        if isinstance(item, dict) and item.get("type") == "Relationship"
+    ]
+
+    if case == "extra_root_field":
+        document["unexpected"] = True
+    elif case == "wrong_context":
+        document["@context"] = "https://example.invalid/context"
+    elif case == "duplicate_id":
+        package["spdxId"] = _graph_item(document, "SoftwareAgent")["spdxId"]
+    elif case == "duplicate_creation":
+        duplicate = copy.deepcopy(creation)
+        duplicate["@id"] = "_:other-creation-info"
+        graph.append(duplicate)
+    elif case == "wrong_spec_version":
+        creation["specVersion"] = "3.0.0"
+    elif case == "invalid_created_by":
+        creation["createdBy"] = "agent"
+    elif case == "invalid_created":
+        creation["created"] = 1
+    elif case == "missing_profile":
+        spdx_document["profileConformance"] = ["core"]
+    elif case == "missing_package_field":
+        package.pop("name")
+    elif case == "wrong_creation_binding":
+        package["creationInfo"] = "_:other"
+    elif case == "wrong_primary_purpose":
+        package["software_primaryPurpose"] = "application"
+    elif case == "invalid_model_types":
+        package["ai_typeOfModel"] = []
+    elif case == "invalid_supplier_type":
+        package["suppliedBy"] = 1
+    elif case == "missing_supplier":
+        package["suppliedBy"] = "https://example.invalid/spdx/agent/missing"
+    elif case == "multiple_hashes":
+        hashes = package["verifiedUsing"]
+        assert isinstance(hashes, list)
+        hashes.append(copy.deepcopy(hashes[0]))
+    elif case == "invalid_hash_fields":
+        hashes = package["verifiedUsing"]
+        assert isinstance(hashes, list) and isinstance(hashes[0], dict)
+        hashes[0]["unexpected"] = True
+    elif case == "invalid_hash":
+        hashes = package["verifiedUsing"]
+        assert isinstance(hashes, list) and isinstance(hashes[0], dict)
+        hashes[0]["hashValue"] = "A" * 64
+    elif case == "wrong_root":
+        spdx_document["rootElement"] = ["https://example.invalid/spdx/model/other"]
+    elif case == "wrong_relationship_source":
+        relationships[0]["from"] = "https://example.invalid/spdx/model/other"
+    elif case == "irrelevant_relationship_type":
+        relationships[0]["relationshipType"] = "describes"
+    elif case == "wrong_license_target":
+        relationships[0]["to"] = ["https://example.invalid/license"]
+    elif case == "unlisted_relationship":
+        elements = spdx_document["element"]
+        assert isinstance(elements, list)
+        elements.remove(relationships[0]["spdxId"])
+    else:  # pragma: no cover - the parameter list is closed above
+        raise AssertionError(case)
+
+    encoded = example.spdx_canonical_json_bytes(document)
+    with pytest.raises(example.SpdxObservationError, match=message):
+        example.load_spdx_document(encoded)
+
+
+def test_mapper_wraps_strict_json_and_identity_errors() -> None:
+    source, identity = _fixture_bytes()
+    document, _checks = example.load_spdx_document(source)
+
+    with pytest.raises(example.SpdxObservationError, match="valid JSON"):
+        example.load_spdx_document(b"{")
+    with pytest.raises(example.SpdxObservationError, match="valid JSON"):
+        example.build_observation_payload(source, b"{")
+
+    hf_identity = (
+        ROOT / "examples/import/baseline/model-artifact.identity.json"
+    ).read_bytes()
+    with pytest.raises(example.SpdxObservationError, match="one GGUF artifact"):
+        example._gguf_cross_binding(document, hf_identity)
+
+    pretty_identity = json.dumps(json.loads(identity), indent=2).encode("utf-8")
+    with pytest.raises(example.SpdxObservationError, match="canonical JSON bytes"):
+        example._gguf_cross_binding(document, pretty_identity)
+
+
+def test_cli_reports_output_mismatch_and_read_failures(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert example.main([]) == 0
+    assert (
+        json.loads(capsys.readouterr().out)["format"]
+        == example.OBSERVATION_PAYLOAD_FORMAT
+    )
+
+    expected = tmp_path / "expected.json"
+    expected.write_bytes(b"{}\n")
+    assert example.main(["--check", "--expected", str(expected)]) == 2
+    assert "does not match rebuilt bytes" in capsys.readouterr().err
+
+    missing = tmp_path / "missing.json"
+    assert example.main(["--source", str(missing)]) == 2
+    assert "SPDX source document is unavailable" in capsys.readouterr().err
 
 
 def test_mapper_rejects_incomplete_ai_license_relationships() -> None:
