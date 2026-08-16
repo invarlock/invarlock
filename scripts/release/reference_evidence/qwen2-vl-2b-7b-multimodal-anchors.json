@@ -1,0 +1,26 @@
+{
+  "anchors": {
+    "baseline_artifact_digest": "sha256:b7bed5b5858085fc67a75fabb39bd833d770d6987b971bbd845e6fb500dde6a7",
+    "baseline_runtime_digest": "sha256:11961f749a570b57916654b71dfc1b7ec8a2bc7507b9c435a2e47f0de9dff32d",
+    "evidence_signer_fingerprint": "sha256:b32e2fcdb02354ae64a57d19f0434c0eb6af4bdef96d6329700a0faaf26ea60e",
+    "request_digest": "sha256:4219f0f8d35069682a3e1ad1bd4aeaa65de28dc45ab36f6bb84870b6a3333526",
+    "schedule_digest": "sha256:62a4d7e96a7d83979d6888f89b3040741c83c66e371408b4b3dd88af3c660b1d",
+    "subject_artifact_digest": "sha256:e0c212077d5985587d77d3f25b39c1d4325d1bed413ec27c06d6b2063d5ed4c9",
+    "subject_runtime_digest": "sha256:11961f749a570b57916654b71dfc1b7ec8a2bc7507b9c435a2e47f0de9dff32d"
+  },
+  "evidence": {
+    "comparison_id": "comparison-76b78b07e8766b8f3efdcc13f47700a9",
+    "pack_manifest_digest": "sha256:f85d0b94ccf3f1cb58afb235463d5ea72a2172bc39f1ae278d12f6dc039501fe",
+    "path": "public_evidence/evidence/qwen2-vl-2b-7b-multimodal/evidence",
+    "reference_id": "qwen2-vl-2b-7b-multimodal"
+  },
+  "expected": {
+    "policy_verdict": "pass",
+    "verification_scope": "paired_comparison"
+  },
+  "format": "invarlock/release-reference-journey-v1",
+  "policy": {
+    "digest": "sha256:42962e3acfaa37ea925d6142c2819d386be5f8ce252f65d89804c2082c7a553e",
+    "path": "scripts/release/reference_evidence/exact-match-policy.json"
+  }
+}

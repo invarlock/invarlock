@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.14.0"
+version = "0.15.0"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -38,9 +38,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.14.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.15.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.14.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.15.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate

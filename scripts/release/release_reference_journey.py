@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay one retained evidence pack through an installed release candidate."""
+"""Replay retained evidence through an installed release candidate."""
 
 from __future__ import annotations
 
@@ -30,9 +30,51 @@ REPORT_FORMAT = "invarlock/evidence-report-v1"
 RECEIPT_FORMAT = "invarlock/evidence-verification-receipt-v2"
 RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
 REFERENCE_CONFIG = Path("scripts/release/reference_evidence/qwen38-27b-anchors.json")
+PUBLIC_EVIDENCE_SUMMARY_FORMAT = (
+    "invarlock/release-public-evidence-compatibility-result-v1"
+)
+EVALUATOR_QUALIFICATION_SUMMARY_FORMAT = (
+    "invarlock/release-evaluator-qualification-compatibility-result-v1"
+)
+RETAINED_EVIDENCE_SUMMARY_FORMAT = (
+    "invarlock/release-retained-evidence-compatibility-result-v1"
+)
+PUBLIC_EVIDENCE_REFERENCE_CONFIGS = (
+    Path(
+        "scripts/release/reference_evidence/"
+        "ministral3-8b-bf16-to-q5-k-m-gguf-anchors.json"
+    ),
+    Path("scripts/release/reference_evidence/mistral-7b-weight-scale-hf-anchors.json"),
+    Path("scripts/release/reference_evidence/qwen2-vl-2b-7b-multimodal-anchors.json"),
+    Path("scripts/release/reference_evidence/qwen2.5-14b-weight-scale-hf-anchors.json"),
+    Path(
+        "scripts/release/reference_evidence/qwen3.5-9b-bf16-to-q5-k-m-gguf-anchors.json"
+    ),
+    REFERENCE_CONFIG,
+    Path(
+        "scripts/release/reference_evidence/"
+        "tinyllama-tensorrt-llm-checkpoints-anchors.json"
+    ),
+)
+EVALUATOR_QUALIFICATION_REFERENCE_CONFIGS = (
+    Path(
+        "scripts/release/reference_evidence/deployment-approval-inspect-ai-anchors.json"
+    ),
+    Path(
+        "scripts/release/reference_evidence/gemma4-lm-evaluation-harness-anchors.json"
+    ),
+    Path("scripts/release/reference_evidence/qwen35-inspect-ai-anchors.json"),
+    Path(
+        "scripts/release/reference_evidence/qwen35-lm-evaluation-harness-anchors.json"
+    ),
+)
 MAX_JSON_BYTES = 1024 * 1024
 MAX_REPORT_BYTES = 16 * 1024 * 1024
 _DIGEST = re.compile(r"sha256:[a-f0-9]{64}\Z")
+_IGNORED_PUBLIC_EVIDENCE_CHILDREN = frozenset({".DS_Store"})
+_EVALUATOR_QUALIFICATION_FILES = frozenset(
+    {".DS_Store", "README.md", "flagship-comparison.json"}
+)
 
 
 class ReleaseReferenceJourneyError(RuntimeError):
@@ -143,10 +185,12 @@ def _require_digest(value: object, *, label: str) -> str:
     return value
 
 
-def _load_reference(repo_root: Path) -> dict[str, Any]:
+def _load_reference(
+    repo_root: Path, *, reference_config: Path = REFERENCE_CONFIG
+) -> dict[str, Any]:
     config_path = _resolve_checkout_path(
         repo_root,
-        REFERENCE_CONFIG.as_posix(),
+        reference_config.as_posix(),
         label="release reference configuration",
         directory=False,
     )
@@ -202,7 +246,7 @@ def _load_reference(repo_root: Path) -> dict[str, Any]:
         "verification_scope",
     }:
         raise ReleaseReferenceJourneyError("release reference expectations are invalid")
-    if expected.get("policy_verdict") != "pass":
+    if expected.get("policy_verdict") not in {"fail", "pass"}:
         raise ReleaseReferenceJourneyError("release reference verdict is invalid")
     if expected.get("verification_scope") != "paired_comparison":
         raise ReleaseReferenceJourneyError("release reference scope is invalid")
@@ -259,6 +303,7 @@ def _run_cli(
     *,
     cwd: Path,
     environment: dict[str, str],
+    expected_status: int = 0,
 ) -> dict[str, Any]:
     try:
         completed = subprocess.run(
@@ -274,9 +319,9 @@ def _run_cli(
         raise ReleaseReferenceJourneyError(
             "release reference candidate command failed"
         ) from exc
-    if completed.returncode != 0:
+    if completed.returncode != expected_status:
         raise ReleaseReferenceJourneyError(
-            "release reference candidate command returned nonzero"
+            "release reference candidate command returned an unexpected status"
         )
     return _strict_json_object(
         completed.stdout.encode("utf-8"),
@@ -310,13 +355,14 @@ def _validate_verification_result(
     expected = config["expected"]
     policy = config["policy"]
     anchors = config["anchors"]
+    expected_ok = expected["policy_verdict"] == "pass"
     required = {
         "assurance_status": "verified",
         "authenticity": "pinned",
         "comparison_id": evidence["comparison_id"],
         "format_version": VERIFY_FORMAT,
         "integrity_ok": True,
-        "ok": True,
+        "ok": expected_ok,
         "pack_format": "invarlock/evidence-pack-v1",
         "pack_manifest_digest": evidence["pack_manifest_digest"],
         "policy_verdict": expected["policy_verdict"],
@@ -379,6 +425,7 @@ def _validate_receipt(
         "pack_signer_fingerprint": anchors["evidence_signer_fingerprint"],
     }
     expected_statement_anchors.pop("signer_fingerprint")
+    expected_ok = config["expected"]["policy_verdict"] == "pass"
     if (
         statement.get("format") != RECEIPT_FORMAT
         or statement.get("pack_manifest_digest")
@@ -387,9 +434,9 @@ def _validate_receipt(
         or statement.get("verdict")
         != {
             "integrity_ok": True,
-            "ok": True,
+            "ok": expected_ok,
             "policy_verdict": config["expected"]["policy_verdict"],
-            "verification_status": 0,
+            "verification_status": 0 if expected_ok else 7,
         }
     ):
         raise ReleaseReferenceJourneyError(
@@ -467,6 +514,7 @@ def run_release_reference_journey(
     command: Sequence[str],
     workspace: Path,
     allow_checkout_source: bool,
+    reference_config: Path = REFERENCE_CONFIG,
 ) -> dict[str, Any]:
     """Verify and render the retained reference through one selected CLI."""
 
@@ -492,7 +540,7 @@ def run_release_reference_journey(
             "release reference candidate executable is invalid"
         )
 
-    config = _load_reference(root)
+    config = _load_reference(root, reference_config=reference_config)
     evidence_source = _resolve_checkout_path(
         root,
         config["evidence"]["path"],
@@ -567,6 +615,7 @@ def run_release_reference_journey(
         root, allow_checkout_source=allow_checkout_source
     )
     receipt_path = output_root / "verification.receipt.json"
+    expected_status = 0 if config["expected"]["policy_verdict"] == "pass" else 7
     try:
         verification = _run_cli(
             command,
@@ -581,6 +630,7 @@ def run_release_reference_journey(
             ),
             cwd=output_root,
             environment=environment,
+            expected_status=expected_status,
         )
         _validate_verification_result(verification, config)
         _validate_receipt(receipt_path, verification, config)
@@ -626,16 +676,220 @@ def run_release_reference_journey(
         raise ReleaseReferenceJourneyError(
             "release reference report rendering is not deterministic"
         )
+    receipt_bytes = _read_regular_file(
+        receipt_path,
+        label="release reference verification receipt",
+        maximum=MAX_JSON_BYTES,
+    )
     return {
         "comparison_id": config["evidence"]["comparison_id"],
         "format": SUMMARY_FORMAT,
         "ok": True,
         "pack_manifest_digest": config["evidence"]["pack_manifest_digest"],
         "policy_verdict": config["expected"]["policy_verdict"],
+        "receipt_sha256": f"sha256:{hashlib.sha256(receipt_bytes).hexdigest()}",
         "reference_id": config["evidence"]["reference_id"],
         "report_sha256": f"sha256:{hashlib.sha256(first_report).hexdigest()}",
         "verification_scope": config["expected"]["verification_scope"],
     }
+
+
+def run_public_evidence_compatibility(
+    *,
+    repo_root: Path,
+    command: Sequence[str],
+    workspace: Path,
+    allow_checkout_source: bool,
+) -> dict[str, Any]:
+    """Replay every retained public pack through one selected candidate CLI."""
+
+    try:
+        root = repo_root.resolve(strict=True)
+    except OSError as exc:
+        raise ReleaseReferenceJourneyError("release checkout is unavailable") from exc
+    output_root = _prepare_workspace(root, workspace)
+    public_root = _resolve_checkout_path(
+        root,
+        "public_evidence/evidence",
+        label="public evidence directory",
+        directory=True,
+    )
+    public_entries = tuple(public_root.iterdir())
+    unsafe_entries = sorted(
+        entry.name
+        for entry in public_entries
+        if not (entry.is_dir() and not entry.is_symlink())
+        and not (
+            entry.name in _IGNORED_PUBLIC_EVIDENCE_CHILDREN
+            and entry.is_file()
+            and not entry.is_symlink()
+        )
+    )
+    if unsafe_entries:
+        raise ReleaseReferenceJourneyError(
+            "public evidence directory contains unsafe entries"
+        )
+    public_ids = {
+        entry.name
+        for entry in public_entries
+        if entry.is_dir() and not entry.is_symlink()
+    }
+    results: list[dict[str, Any]] = []
+    configured_ids: set[str] = set()
+    for reference_config in PUBLIC_EVIDENCE_REFERENCE_CONFIGS:
+        config = _load_reference(root, reference_config=reference_config)
+        reference_id = config["evidence"]["reference_id"]
+        if reference_id in configured_ids:
+            raise ReleaseReferenceJourneyError(
+                "public evidence compatibility references are duplicated"
+            )
+        expected_path = f"public_evidence/evidence/{reference_id}/evidence"
+        if config["evidence"]["path"] != expected_path:
+            raise ReleaseReferenceJourneyError(
+                "public evidence compatibility reference path is inconsistent"
+            )
+        configured_ids.add(reference_id)
+        results.append(
+            run_release_reference_journey(
+                repo_root=root,
+                command=command,
+                workspace=output_root / reference_id,
+                allow_checkout_source=allow_checkout_source,
+                reference_config=reference_config,
+            )
+        )
+    if configured_ids != public_ids:
+        raise ReleaseReferenceJourneyError(
+            "public evidence compatibility references do not cover the retained set"
+        )
+    return {
+        "format": PUBLIC_EVIDENCE_SUMMARY_FORMAT,
+        "ok": True,
+        "pack_count": len(results),
+        "references": results,
+    }
+
+
+def run_evaluator_qualification_compatibility(
+    *,
+    repo_root: Path,
+    command: Sequence[str],
+    workspace: Path,
+    allow_checkout_source: bool,
+) -> dict[str, Any]:
+    """Replay every retained evaluator transaction through one candidate CLI."""
+
+    try:
+        root = repo_root.resolve(strict=True)
+    except OSError as exc:
+        raise ReleaseReferenceJourneyError("release checkout is unavailable") from exc
+    output_root = _prepare_workspace(root, workspace)
+    transactions_root = _resolve_checkout_path(
+        root,
+        "examples/evaluator-qualification/signed-transactions",
+        label="evaluator qualification transaction directory",
+        directory=True,
+    )
+    entries = tuple(transactions_root.iterdir())
+    unsafe_entries = sorted(
+        entry.name
+        for entry in entries
+        if not (entry.is_dir() and not entry.is_symlink())
+        and not (
+            entry.name in _EVALUATOR_QUALIFICATION_FILES
+            and entry.is_file()
+            and not entry.is_symlink()
+        )
+    )
+    if unsafe_entries:
+        raise ReleaseReferenceJourneyError(
+            "evaluator qualification directory contains unsafe entries"
+        )
+    transaction_ids = {
+        entry.name for entry in entries if entry.is_dir() and not entry.is_symlink()
+    }
+    results: list[dict[str, Any]] = []
+    configured_ids: set[str] = set()
+    for reference_config in EVALUATOR_QUALIFICATION_REFERENCE_CONFIGS:
+        config = _load_reference(root, reference_config=reference_config)
+        reference_id = config["evidence"]["reference_id"]
+        if reference_id in configured_ids:
+            raise ReleaseReferenceJourneyError(
+                "evaluator qualification references are duplicated"
+            )
+        expected_path = (
+            "examples/evaluator-qualification/signed-transactions/"
+            f"{reference_id}/evidence"
+        )
+        if config["evidence"]["path"] != expected_path:
+            raise ReleaseReferenceJourneyError(
+                "evaluator qualification reference path is inconsistent"
+            )
+        configured_ids.add(reference_id)
+        results.append(
+            run_release_reference_journey(
+                repo_root=root,
+                command=command,
+                workspace=output_root / reference_id,
+                allow_checkout_source=allow_checkout_source,
+                reference_config=reference_config,
+            )
+        )
+    if configured_ids != transaction_ids:
+        raise ReleaseReferenceJourneyError(
+            "evaluator qualification references do not cover the retained set"
+        )
+    return {
+        "format": EVALUATOR_QUALIFICATION_SUMMARY_FORMAT,
+        "ok": True,
+        "pack_count": len(results),
+        "references": results,
+    }
+
+
+def run_retained_evidence_compatibility(
+    *,
+    repo_root: Path,
+    command: Sequence[str],
+    workspace: Path,
+    allow_checkout_source: bool,
+) -> dict[str, Any]:
+    """Replay all retained public and evaluator evidence through one CLI."""
+
+    try:
+        root = repo_root.resolve(strict=True)
+    except OSError as exc:
+        raise ReleaseReferenceJourneyError("release checkout is unavailable") from exc
+    output_root = _prepare_workspace(root, workspace)
+    public = run_public_evidence_compatibility(
+        repo_root=root,
+        command=command,
+        workspace=output_root / "public-evidence",
+        allow_checkout_source=allow_checkout_source,
+    )
+    evaluator = run_evaluator_qualification_compatibility(
+        repo_root=root,
+        command=command,
+        workspace=output_root / "evaluator-qualification",
+        allow_checkout_source=allow_checkout_source,
+    )
+    return {
+        "evaluator_qualification": evaluator,
+        "format": RETAINED_EVIDENCE_SUMMARY_FORMAT,
+        "ok": True,
+        "pack_count": public["pack_count"] + evaluator["pack_count"],
+        "public_evidence": public,
+    }
+
+
+def _selected_runner(args: argparse.Namespace) -> Any:
+    if args.all_retained_evidence:
+        return run_retained_evidence_compatibility
+    if args.all_evaluator_qualification:
+        return run_evaluator_qualification_compatibility
+    if args.all_public_evidence:
+        return run_public_evidence_compatibility
+    return run_release_reference_journey
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -643,6 +897,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--invarlock-cli", type=Path)
     parser.add_argument("--workspace", type=Path)
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--all-public-evidence", action="store_true")
+    selection.add_argument("--all-evaluator-qualification", action="store_true")
+    selection.add_argument("--all-retained-evidence", action="store_true")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
 
@@ -661,14 +919,16 @@ def main(argv: list[str] | None = None) -> int:
             with tempfile.TemporaryDirectory(
                 prefix="invarlock-release-reference-"
             ) as directory:
-                summary = run_release_reference_journey(
+                runner = _selected_runner(args)
+                summary = runner(
                     repo_root=repo_root,
                     command=command,
                     workspace=Path(directory).resolve() / "journey",
                     allow_checkout_source=allow_checkout_source,
                 )
         else:
-            summary = run_release_reference_journey(
+            runner = _selected_runner(args)
+            summary = runner(
                 repo_root=repo_root,
                 command=command,
                 workspace=args.workspace,

@@ -9,8 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.15.0] - 2026-08-16
+
+This release extends the v0.14 evaluator-neutral qualification and recipient
+handoff with independently replayable deployment evidence and stricter release
+assurance. Comparison-report v3 adds minimum-side accuracy to the bounded
+acceptance policy; retained current-model journeys authenticate evaluator,
+runtime, artifact, and conversion provenance across BF16, GGUF, QAT, and OCI
+deployments; and clean-consumer candidate-wheel replay verifies every retained
+public evidence pack and evaluator transaction before release. A bounded SPDX
+3.0.1 AI observation example
+demonstrates external metadata cross-binding without expanding core contracts
+or allowing observation-only results to drive acceptance.
+
+### Added
+
 - Added a bounded CPU-only SPDX 3.0.1 AI observation example that preserves
-  exact canonical source bytes, cross-binds the declared package SHA-256 to an
+  exact canonical source bytes, cross-binds the declared package SHA-256 to a
   canonical GGUF identity, and records unperformed official schema and
   OWL/SHACL validation as `not_evaluated` without changing core contracts or
   acceptance semantics.
@@ -33,7 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frozen 400-record policy. Its published evidence records 44.75% BF16
   accuracy, 45.25% Q5_K_M accuracy, and a 95% paired interval from -1.12 to
   2.12 percentage points under an independently signed passing receipt.
-
+- Added authenticated text-only Transformers scoring for checkpoints that
+  register through the image-text auto-model mapping, while retaining offline
+  loading, safetensors binding, and strict tensor validation. This enables the
+  text component of multimodal-backed checkpoints such as Ministral 3 without
+  broadening the request to image inputs.
 - Added a five-minute CPU-only wheel-user workflow that verifies retained
   signed evidence, issues a fresh verifier receipt, renders HTML, and runs from
   versioned example files outside the installed package.
@@ -43,7 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Harness and Inspect AI, plus a Gemma 4 12B instruction-to-QAT transaction
   through LM Evaluation Harness. Each package includes 400 paired
   MMLU-Pro records, native evaluator provenance, an independently signed
-  verification receipt, policy, and builder-signed image attestation.
+  verification receipt, policy, and builder-signed image attestation. The two
+  Qwen3.5 evaluators agree exactly, while the Qwen3.5 and Gemma transformations
+  remain integrity-valid policy rejections under their declared regression
+  floor rather than being presented as passing deployments.
 - Added reproducible CPU verification-time, report-rendering-time, and retained
   artifact-size measurements for the current-model signed transactions.
 - Added a retained cross-evaluator comparison that confirms the shared ordered
@@ -60,9 +88,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   corpus with independently pinned source, selection, policy, and trust anchors.
 - Added one bounded examples-layer command runner with timeout, output-limit,
   cleanup, and nonzero-exit handling across maintained integration commands.
+- Added an optional `expected-request-digest` input to the composite evidence
+  gate so GGUF consumers can supply the independently approved normalized
+  request identity required by current llama.cpp evidence.
 
 ### Changed
 
+- Expanded release preflight from one designated Qwen3.8 reference journey to
+  fresh full verification and deterministic rendering of all seven retained
+  public evidence packs and all four evaluator-qualification transactions
+  through the isolated candidate wheel. Historical packs and checked-in
+  receipts remain immutable; declared passing and integrity-valid rejected
+  policy outcomes must remain exact; and the compatibility replay does not
+  rerun model or evaluator inference or conversion.
+- Changed distribution validation to install and exercise the core wheel,
+  wheel-user quickstart, and standalone deployment consumer before optional
+  add-ins are installed, preserving a genuine core-only release path.
 - Migrated the compact Hugging Face, PEFT, TorchAO, llama.cpp, evaluator, and
   OpenAI Evals examples from Qwen3 0.6B to revision-pinned Qwen3.5 0.8B. The
   TensorRT-LLM 1.2.1 showcase remains an explicitly scoped Qwen3 compatibility
@@ -99,8 +140,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed the superseded prospective Ministral Q8_0-to-Q4_K_M comparison from
+  the public-evidence inventory after the stronger retained Ministral 3 8B
+  BF16-to-Q5_K_M deployment transaction replaced that uncreated target.
+
 ### Fixed
 
+- Updated built-wheel and hosted-wheel release smokes to consume the retained
+  deployment-approval transaction at its current package path.
 - Separated llama.cpp prompt batching and CPU thread controls from InvarLock's
   record batch size, and bound those backend controls into the closed GGUF
   runtime request profile while preserving verification of previously signed

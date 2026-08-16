@@ -42,8 +42,10 @@ repository workflow:
 5. builds one wheel and source distribution for the core and every first-party
    add-in;
 6. validates every archive against the exact checkout and runs the release
-   preflight again from a clean detached checkout, including a retained signed
-   evidence replay through the isolated candidate-wheel CLI;
+   preflight again from a clean detached checkout, including full replay of
+   all seven retained public signed evidence packs and all four retained
+   evaluator-qualification transactions through the isolated candidate-wheel
+   CLI;
 7. runs `twine check` on every distribution;
 8. installs the built wheels together in a clean environment;
 9. exercises the public CLI, all provider conformance commands, diagnostics,
@@ -100,13 +102,21 @@ The smoke selects the maintained Python 3.12 or 3.13 lock for the invoking
 interpreter and fails closed when no matching lock exists.
 The read-only preflight then inspects the core wheel and source distribution
 against a separately generated `sha256sum`-format manifest, installs the
-candidate wheel in isolation, exercises its runtime surface, replays the
-pinned Qwen3.8 27B signed evidence pack through `verify` and `report`, and
-reruns the public-evidence audit.
+candidate wheel in isolation, exercises its runtime surface, replays all eleven
+retained release-evidence packs through `verify` and `report`, and reruns the
+public-evidence audit. Separate closed reference sets must exactly cover the
+seven public-evidence directories and four evaluator-qualification transaction
+directories, so adding or removing a carrier requires an explicit
+release-compatibility update. The evaluator replay must preserve the exact
+declared outcome: one policy pass and three integrity-valid policy rejections.
 
-The retained replay can also be exercised directly against the current
-source-tree verifier with `make release-reference-journey`. The release
-preflight remains authoritative for the isolated candidate-wheel path.
+The designated Qwen3.8 reference can be exercised directly against the current
+source-tree verifier with `make release-reference-journey`. Use
+`make release-public-evidence-compatibility` for the seven public packs,
+`make release-evaluator-qualification-compatibility` for the four evaluator
+transactions, or `make release-retained-evidence-compatibility` for both closed
+sets. The release preflight remains authoritative for the isolated
+candidate-wheel path.
 
 Run the local release gates with:
 
@@ -133,15 +143,17 @@ files as well as modified files. The manifest must contain only the two core
 artifacts by base name. `X.Y.Z` is
 the candidate version without a leading `v`; preflight rejects a dirty checkout,
 a different `HEAD`, unexpected artifacts, metadata/content mismatch, or a hash
-change. The retained replay supplies a fresh verifier key and an external,
+change. Each retained replay supplies a fresh verifier key and an external,
 digest-pinned policy and trust profile. It requires the expected artifact,
-runtime, schedule, request, and evidence-signer anchors, an independently
-verified receipt, and byte-identical repeated HTML reports. It does not rerun
-model inference or conversion and does not generalize the retained transaction
-to other artifacts or policies. A passing result is release-candidate evidence,
-not authorization to tag or publish. Run the non-publishing branch workflow
-after these local checks to exercise the same release surface on the hosted
-Linux runner before creating a release tag.
+runtime, schedule, request, and evidence-signer anchors, a freshly signed
+receipt, and byte-identical repeated HTML reports. The machine-readable result
+records every pack-manifest digest plus its fresh receipt and deterministic
+report digests. It does not rewrite checked-in evidence or receipts, rerun model
+or evaluator inference or conversion, or generalize any retained transaction
+to other artifacts or policies. A passing result is release-candidate
+compatibility evidence, not recipient authorization to deploy. Run the
+non-publishing branch workflow after these local checks to exercise the same
+release surface on the hosted Linux runner before creating a release tag.
 
 The local preflight intentionally validates the core pair in depth while
 `make dist-check` validates every archive against its checkout source and
