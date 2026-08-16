@@ -986,10 +986,173 @@ def test_docs_publish_validates_dispatch_input_before_using_it_as_a_path() -> No
 
     assert "${{ github.event.inputs.docs_version }}" not in resolve["run"]
     assert resolve["env"]["INVARLOCK_DOCS_VERSION_OVERRIDE"] == (
-        "${{ github.event.inputs.docs_version }}"
+        "${{ inputs.docs_version }}"
     )
+    assert "${override#v}" in resolve["run"]
     assert "one safe path component" in resolve["run"]
     assert "[A-Za-z0-9._-]" in resolve["run"]
+
+
+def test_docs_publish_supports_atomic_tagged_release_publication() -> None:
+    workflow = _load(WORKFLOWS / "docs-publish.yml")
+    assert workflow["on"]["push"]["branches"] == ["main"]
+    call_inputs = workflow["on"]["workflow_call"]["inputs"]
+    assert call_inputs["docs_version"] == {
+        "description": "Version label to publish (a leading v is removed)",
+        "required": True,
+        "type": "string",
+    }
+    assert call_inputs["publish_latest"] == {
+        "required": False,
+        "type": "boolean",
+        "default": False,
+        "description": "Also publish this exact source as latest",
+    }
+    assert workflow["concurrency"] == {
+        "group": "docs-publish",
+        "cancel-in-progress": False,
+    }
+
+    publish = _step(workflow["jobs"]["publish"]["steps"], "Publish versioned site")
+    assert publish["env"]["INVARLOCK_PUBLISH_LATEST"] == (
+        "${{ inputs.publish_latest }}"
+    )
+    assert 'rm -rf "${DOCS_VERSION}"' in publish["run"]
+    assert "rm -rf latest" in publish["run"]
+    assert 'git add "${DOCS_VERSION}" index.html' in publish["run"]
+    assert "git add latest stable" in publish["run"]
+    assert 'stable_target="../${DOCS_VERSION}/"' in publish["run"]
+
+
+def test_docs_publish_resolves_tag_labels_and_rejects_traversal(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "docs-publish.yml")
+    resolve = _step(workflow["jobs"]["publish"]["steps"], "Resolve docs version")
+    output = tmp_path / "output"
+    env = {
+        **os.environ,
+        "GITHUB_OUTPUT": str(output),
+        "INVARLOCK_DOCS_REF_NAME": "v0.15.0",
+        "INVARLOCK_DOCS_VERSION_OVERRIDE": "v0.15.0",
+    }
+    subprocess.run(["bash", "-c", resolve["run"]], env=env, check=True)
+    assert output.read_text(encoding="utf-8") == "docs_version=0.15.0\n"
+
+    env["INVARLOCK_DOCS_VERSION_OVERRIDE"] = "../latest"
+    rejected = subprocess.run(
+        ["bash", "-c", resolve["run"]],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "one safe path component" in rejected.stderr
+
+
+def test_docs_publish_writes_version_latest_and_stable_atomically(
+    tmp_path: Path,
+) -> None:
+    workflow = _load(WORKFLOWS / "docs-publish.yml")
+    publish = _step(workflow["jobs"]["publish"]["steps"], "Publish versioned site")
+    remote = tmp_path / "origin.git"
+    checkout = tmp_path / "checkout"
+    runner_temp = tmp_path / "runner"
+    checkout.mkdir()
+    runner_temp.mkdir()
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=checkout,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+    subprocess.run(
+        ["git", "init", "--bare", str(remote)],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    git("init")
+    git("config", "user.name", "Test Publisher")
+    git("config", "user.email", "publisher@example.invalid")
+    (checkout / "README.md").write_text("source\n", encoding="utf-8")
+    git("add", "README.md")
+    git("commit", "-m", "source")
+    git("branch", "-M", "main")
+    git("remote", "add", "origin", str(remote))
+    git("push", "-u", "origin", "main")
+    git("switch", "--orphan", "gh-pages")
+    git("rm", "-rf", "--ignore-unmatch", "README.md")
+    (checkout / "index.html").write_text("old\n", encoding="utf-8")
+    git("add", "index.html")
+    git("commit", "-m", "initial pages")
+    git("push", "origin", "gh-pages")
+    git("switch", "main")
+
+    site = checkout / "site-build"
+    site.mkdir()
+    (site / "index.html").write_text("release docs\n", encoding="utf-8")
+    subprocess.run(
+        ["bash", "-c", publish["run"]],
+        cwd=checkout,
+        env={
+            **os.environ,
+            "DOCS_VERSION": "0.15.0",
+            "GITHUB_WORKSPACE": str(checkout),
+            "INVARLOCK_PUBLISH_LATEST": "true",
+            "RUNNER_TEMP": str(runner_temp),
+        },
+        check=True,
+    )
+    git("fetch", "origin", "gh-pages")
+
+    def published(path: str) -> str:
+        return git("show", f"origin/gh-pages:{path}").stdout
+
+    assert published("0.15.0/index.html") == "release docs\n"
+    assert published("latest/index.html") == "release docs\n"
+    assert "url=latest/" in published("index.html")
+    assert "url=../0.15.0/" in published("stable/index.html")
+
+    (site / "index.html").write_text("main docs\n", encoding="utf-8")
+    second_runner_temp = tmp_path / "runner-main"
+    second_runner_temp.mkdir()
+    subprocess.run(
+        ["bash", "-c", publish["run"]],
+        cwd=checkout,
+        env={
+            **os.environ,
+            "DOCS_VERSION": "latest",
+            "GITHUB_WORKSPACE": str(checkout),
+            "INVARLOCK_PUBLISH_LATEST": "false",
+            "RUNNER_TEMP": str(second_runner_temp),
+        },
+        check=True,
+    )
+    git("fetch", "origin", "gh-pages")
+    assert published("latest/index.html") == "main docs\n"
+    assert "url=../0.15.0/" in published("stable/index.html")
+
+
+def test_release_publishes_docs_only_after_verified_production() -> None:
+    workflow = _load(WORKFLOWS / "release.yml")
+    docs = workflow["jobs"]["publish_documentation"]
+
+    assert set(docs["needs"]) == {"published_install_smoke", "resolve_release_ref"}
+    assert docs["uses"] == "./.github/workflows/docs-publish.yml"
+    assert docs["permissions"] == {"contents": "write"}
+    assert "inputs.publish == true" in docs["if"]
+    assert "inputs.target == 'pypi'" in docs["if"]
+    assert "inputs.publication_phase != 'bootstrap'" in docs["if"]
+    assert docs["with"] == {
+        "docs_version": "${{ needs.resolve_release_ref.outputs.release_tag }}",
+        "publish_latest": True,
+    }
 
 
 def test_codeql_and_scorecards_keep_least_privilege() -> None:

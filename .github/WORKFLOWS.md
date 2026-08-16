@@ -17,7 +17,10 @@ Workflow YAML is linted with `make workflow-lint`.
 
 - `docs-ci.yml` lints and builds the current documentation and smoke-checks the
   documented CLI command surface.
-- `docs-publish.yml` publishes the versioned MkDocs site.
+- `docs-publish.yml` serializes MkDocs publication to `gh-pages`. `main` pushes
+  update `latest`, while the production release workflow calls it from the
+  exact release tag to update the immutable version path, `latest`, and
+  `stable` in one commit. Release branches cannot publish implicitly.
 
 ## Security and release
 
@@ -28,9 +31,11 @@ Workflow YAML is linted with `make workflow-lint`.
 - `secret-history.yml` is the scheduled full-history secret scan.
 - `dependabot-main-guard.yml` keeps dependency updates on `staging/next`.
 - `release.yml` validates pre-tag candidates and builds, attests, and publishes
-  tagged Python distributions. A manual run with publication disabled and a
-  candidate version exercises the Linux release gates without creating or
-  moving a tag.
+  tagged Python distributions. After verified production publication, it calls
+  the reusable documentation publisher from the same tag; TestPyPI and
+  bootstrap runs cannot publish documentation. A manual run with publication
+  disabled and a candidate version exercises the Linux release gates without
+  creating or moving a tag.
 
 The release workflow builds, validates, attests, and publishes five Python
 distributions: `invarlock`, `invarlock-diagnostics`,
