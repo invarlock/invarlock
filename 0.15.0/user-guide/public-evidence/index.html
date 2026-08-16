@@ -1,0 +1,2329 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/public-evidence/">
+      
+      
+        <link rel="prev" href="../ci-integration/">
+      
+      
+        <link rel="next" href="../troubleshooting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Publish public evidence - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#publish-public-evidence" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Publish public evidence
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-not-yet-created" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence not yet created
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publication-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publication boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-a-local-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare a local entry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disclosure-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disclosure review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-and-audit-the-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and audit the index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-an-external-release-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use an external release asset
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#empty-state-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty-state behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-publication-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final publication checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#published-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-not-yet-created" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence not yet created
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publication-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publication boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-a-local-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare a local entry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disclosure-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disclosure review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-and-audit-the-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and audit the index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-an-external-release-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use an external release asset
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#empty-state-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty-state behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-publication-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final publication checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="publish-public-evidence">Publish public evidence<a class="headerlink" href="#publish-public-evidence" title="Permanent link">&para;</a></h1>
+<p>Public evidence is a curated index of immutable <code>invarlock/evidence-pack-v1</code>
+directories and independently signed verification receipts. Every current
+entry uses a 400-record paired schedule selected from a pinned public dataset.
+The index spans the built-in Hugging Face text runtime and first-party GGUF,
+vision-text, and TensorRT-LLM runtime packages. A comparison remains
+<strong>Evidence not yet created</strong> until its pack and receipt pass strict verification
+and disclosure review.</p>
+<div class="admonition tip">
+<p class="admonition-title">User guide</p>
+<p><strong>Outcome:</strong> Add one strictly verified evidence entry, publish it locally or as a hash-bound release asset, and keep the compact wheel index synchronized.
+<strong>Audience:</strong> Evidence maintainers preparing public, independently reviewable InvarLock artifacts.
+<strong>Prerequisites:</strong> An immutable signed evidence pack, a separately signed verification receipt, independently maintained anchors, permission to publish every record, and a clean repository checkout.</p>
+</div>
+<h2 id="published-evidence">Published evidence<a class="headerlink" href="#published-evidence" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Comparison</th>
+<th>Runtime</th>
+<th style="text-align: right;">Paired records</th>
+<th>Canonical metric</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mistral 7B checkpoint and authenticated 0.99-scaled derivative</td>
+<td>Hugging Face Transformers</td>
+<td style="text-align: right;">400</td>
+<td>Normalized NLL per expected UTF-8 byte</td>
+</tr>
+<tr>
+<td>Qwen2.5 14B checkpoint and authenticated 0.99-scaled derivative</td>
+<td>Hugging Face Transformers</td>
+<td style="text-align: right;">400</td>
+<td>Normalized NLL per expected UTF-8 byte</td>
+</tr>
+<tr>
+<td>Qwen3.5 9B BF16 checkpoint and source-derived Q5_K_M GGUF</td>
+<td>Hugging Face Transformers and GGUF/llama.cpp</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td>Qwen3.8 27B BF16 checkpoint and source-derived Q5_K_M GGUF</td>
+<td>Hugging Face Transformers and GGUF/llama.cpp</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td>Ministral 3 8B BF16 checkpoint and source-derived Q5_K_M GGUF</td>
+<td>Hugging Face Transformers and GGUF/llama.cpp</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td>Qwen2-VL 2B and 7B vision-text checkpoints</td>
+<td>Hugging Face vision-text add-in</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td>Two TinyLlama 1.1B checkpoint engines</td>
+<td>TensorRT-LLM add-in</td>
+<td style="text-align: right;">400</td>
+<td>Exact match</td>
+</tr>
+</tbody>
+</table>
+<p>The text suite is selected from the pinned MMLU-Pro test split and is balanced
+across 14 domains and answer choices A-J. The vision-text suite is selected
+from the pinned MMMU-Pro Vision test split and is balanced across 30 subjects
+and the same answer choices. The
+<a href="../../reference/qualification-suites.manifest.json">qualification-suite manifest</a>
+binds the dataset revisions, licenses, eligibility filters, deterministic
+selection algorithm, selected IDs, distributions, and schedule digests.</p>
+<p>These entries qualify the signed evaluation transaction and its runtime
+bindings over the authenticated finite schedules. The normalized-NLL entries
+quantify expected-continuation likelihood. Mistral 7B records a subject/baseline
+ratio of 0.9979 with a 95% paired interval from 0.9970 to 0.9988;
+Qwen2.5 14B records 0.9985 with an interval from 0.9955 to 1.0015. Both remain
+within the authenticated maximum ratio of 1.05. The Qwen3.5 deployment records
+53.0% BF16 accuracy and 54.75% Q5_K_M accuracy. Its +1.75 percentage-point
+paired effect has a 95% interval from -0.83 to 4.32 percentage points, satisfying
+the authenticated -2 percentage-point lower-bound floor, 10 percentage-point
+maximum width, and 20% side-accuracy floors. The Qwen3.8 deployment records
+63.0% BF16 accuracy and 64.5% Q5_K_M accuracy. Its +1.50 percentage-point
+paired effect has a 95% interval from -0.74 to 3.75 percentage points and
+satisfies the same policy. The independent-family Ministral 3 deployment
+records 44.75% BF16 accuracy and 45.25% Q5_K_M accuracy. Its +0.50
+percentage-point paired effect has a 95% interval from -1.12 to 2.12 percentage
+points and satisfies the same policy. The Qwen2-VL comparison records a
+paired 11 percentage-point
+exact-match improvement on its MMMU-Pro schedule, with a 95% paired interval
+from 6.34 to 15.67 percentage points. The TinyLlama engines both score zero on
+the MMLU-Pro schedule, and no relative exact-match difference is observed. Its
+supported conclusion is the signed finite-schedule non-regression decision and
+TensorRT-LLM runtime-path qualification, not model capability or output parity.
+The Qwen3.5, Qwen3.8, and Ministral results likewise qualify their
+finite-schedule deployment changes, not general output equivalence. The
+Ministral entry is an independent-family canary outside the evaluator
+qualification matrix. Broader model-quality conclusions require broader,
+task-specific evidence.</p>
+<h2 id="evidence-not-yet-created">Evidence not yet created<a class="headerlink" href="#evidence-not-yet-created" title="Permanent link">&para;</a></h2>
+<p>The following comparisons have no pack in the current index. They may be added
+when a 400-record evaluation completes the same strict verification,
+independent-receipt, and disclosure-review path.</p>
+<table>
+<thead>
+<tr>
+<th>Comparison</th>
+<th>Intended runtime</th>
+<th>Publication state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gemma 4 12B vision-text checkpoint and authenticated derivative</td>
+<td>Hugging Face vision-text add-in</td>
+<td>Evidence not yet created</td>
+</tr>
+<tr>
+<td>Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints</td>
+<td>Hugging Face vision-text add-in</td>
+<td>Evidence not yet created</td>
+</tr>
+<tr>
+<td>Qwen2.5 0.5B Q8_0 and Q4_K_M artifacts</td>
+<td>GGUF/llama.cpp add-in</td>
+<td>Evidence not yet created</td>
+</tr>
+</tbody>
+</table>
+<h2 id="publication-boundary">Publication boundary<a class="headerlink" href="#publication-boundary" title="Permanent link">&para;</a></h2>
+<p>The source tree has two carriers:</p>
+<table>
+<thead>
+<tr>
+<th>Carrier</th>
+<th>Contains</th>
+<th>Intended use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Repository-local entry</td>
+<td>Full evidence directory, receipt, and metadata beneath <code>public_evidence/evidence/SLUG/</code></td>
+<td>Small packs that are appropriate for Git history</td>
+</tr>
+<tr>
+<td>External release asset</td>
+<td>Archive available over HTTPS plus digest metadata in the index</td>
+<td>Large packs retained outside Git while remaining content-addressed</td>
+</tr>
+</tbody>
+</table>
+<p>Installed wheels contain only <code>evidence_index.json</code>. They do not silently
+embed full packs. The index is a discovery and transport-integrity surface; it
+does not replace <code>invarlock verify</code> or the caller's independent artifact,
+schedule, policy, runtime, evidence-signer, and verifier anchors, including the
+normalized-request anchor required for GGUF evidence.</p>
+<h2 id="prepare-a-local-entry">Prepare a local entry<a class="headerlink" href="#prepare-a-local-entry" title="Permanent link">&para;</a></h2>
+<p>Choose a stable, portable slug and stage exactly three objects:</p>
+<div class="codehilite"><pre><span></span><code>public_evidence/evidence/example-comparison/
+├── evidence/                       # immutable invarlock/evidence-pack-v1 directory
+├── verification.receipt.json      # separately signed receipt
+└── evidence.meta.json              # publication metadata
+</code></pre></div>
+
+<p><code>evidence.meta.json</code> is a small closed publication record:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;artifact_paths&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;evidence_pack&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;evidence&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;verification_receipt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;verification.receipt.json&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;format_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/public-evidence-meta-v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Authenticated baseline-versus-subject comparison under the published policy&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The pack must be a real directory, the receipt must be a regular file beside
+it, and neither may be a symbolic link. The metadata paths are relative to the
+entry and cannot escape it.</p>
+<p>Before indexing, independently repeat strict verification into a fresh receipt
+destination outside the pack and validate the received receipt with
+<code>verify_signed_verification_receipt</code>. An evidence signature, a report-local pass,
+or an existing receipt alone is not sufficient.</p>
+<h2 id="disclosure-review">Disclosure review<a class="headerlink" href="#disclosure-review" title="Permanent link">&para;</a></h2>
+<p>Review the entire pack and receipt before public staging. In particular, search
+record text, model outputs, locators, summaries, runtime descriptions, and error
+messages for:</p>
+<ul>
+<li>private or proprietary prompts and outputs;</li>
+<li>access tokens, credentials, private keys, or signed download URLs;</li>
+<li>absolute user, host, cache, or temporary paths;</li>
+<li>private host names, addresses, or environment dumps;</li>
+<li>unpublished model or dataset identifiers; and</li>
+<li>operational notes that do not belong in public evidence.</li>
+</ul>
+<p>Cryptographic validity does not make content safe to disclose. If redaction
+would change authenticated bytes, do not edit the pack; create a new evaluation
+from publication-safe source material.</p>
+<h2 id="build-and-audit-the-index">Build and audit the index<a class="headerlink" href="#build-and-audit-the-index" title="Permanent link">&para;</a></h2>
+<p>For repository-local entries, rebuild the compact package index and run the
+public evidence audit:</p>
+<div class="codehilite"><pre><span></span><code>make<span class="w"> </span>public-evidence-sync
+make<span class="w"> </span>public-evidence-audit
+</code></pre></div>
+
+<p>The generated entry records:</p>
+<ul>
+<li>slug, logical path, summary, and evidence class;</li>
+<li>pack kind, file count, total bytes, and control-file hashes; and</li>
+<li>receipt path, byte size, and SHA-256 digest.</li>
+</ul>
+<p>This repository audit validates publication structure, local carrier bytes,
+the receipt's Ed25519 signature and embedded verifier-key fingerprint, and the
+receipt-to-manifest binding. Authorization remains with independently managed
+artifact, schedule, policy, runtime, evidence-signer, and verifier anchors,
+including the normalized-request anchor required for GGUF evidence.
+Perform strict verification and independently anchored receipt validation
+before indexing, and retain those review inputs outside the submitted pack.</p>
+<p>The synchronizer rebuilds the source index from local metadata, preserves
+validated external-only entries, and writes the same bytes to the package-owned
+index. Every local directory must appear in the index; external-only entries
+may coexist without empty placeholder directories. Reported artifact sizes,
+file counts, and hashes are checked against each local carrier.</p>
+<h2 id="use-an-external-release-asset">Use an external release asset<a class="headerlink" href="#use-an-external-release-asset" title="Permanent link">&para;</a></h2>
+<p>For a large pack, create a deterministic archive containing the immutable
+evidence directory and signed receipt. Publish the archive as a release asset,
+then record an HTTPS URL and independently computed SHA-256 in the corresponding
+artifact summary's <code>external_asset</code> object:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">&quot;external_asset&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:VERIFIED_ARCHIVE_DIGEST&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://github.com/OWNER/REPOSITORY/releases/download/TAG/ASSET&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Use a real lowercase digest in the index. The shown value, owner, repository,
+tag, and asset name are placeholders. The audit requires HTTPS and a canonical
+<code>sha256:</code> value when the local artifact is absent.</p>
+<p>An external-only entry is authored directly in
+<code>public_evidence/evidence_index.json</code>, because there is no local
+<code>evidence.meta.json</code> from which the synchronizer could derive it. Include the
+same closed entry and artifact-summary fields produced for a local entry, but
+give each absent pack/receipt summary an <code>external_asset</code>. Then run
+<code>make public-evidence-sync</code> to preserve that entry while rebuilding local
+entries and to write both index copies. Then run <code>make public-evidence-audit</code> to
+validate both copies. Do not create an empty local entry directory: each local
+directory must contain the actual pack, receipt, and metadata. When an external
+and local entry share a slug, the locally derived record replaces the external
+record.</p>
+<p>An external archive remains subject to the same pack and receipt checks after
+download:</p>
+<ol>
+<li>obtain the expected archive digest from the independently maintained index;</li>
+<li>download the exact asset without executing it;</li>
+<li>hash the downloaded bytes and compare the result;</li>
+<li>extract into a new bounded directory without following links;</li>
+<li>run <code>invarlock verify</code> with independent acceptance anchors; and</li>
+<li>validate the signed receipt against the expected verifier identity and key.</li>
+</ol>
+<p>The release asset URL is a carrier locator, not identity. If an asset is
+re-uploaded or moved, its digest and publication record must be revalidated.</p>
+<h2 id="empty-state-behavior">Empty-state behavior<a class="headerlink" href="#empty-state-behavior" title="Permanent link">&para;</a></h2>
+<p>When no evidence entries exist, retain the checked-in index:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;carrier_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;installed_wheel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;compact_index_only&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;entries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;evidence_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;evidence_file_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;evidence_size_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;format_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/public-evidence-index-v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;not_created&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status_label&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Evidence not yet created&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Keep the <strong>Evidence not yet created</strong> state until a strictly verified,
+disclosure-reviewed pack and receipt are publishable.</p>
+<h2 id="final-publication-checklist">Final publication checklist<a class="headerlink" href="#final-publication-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>the pack is unchanged after evidence signing;</li>
+<li>strict verification succeeds with caller-owned anchors;</li>
+<li>the signed receipt independently validates and remains outside the pack;</li>
+<li>disclosure review covers every byte intended for publication;</li>
+<li>the local or external carrier is content-addressed and immutable;</li>
+<li><code>make public-evidence-sync</code> makes only the expected index change;</li>
+<li><code>make public-evidence-audit</code> succeeds; and</li>
+<li>repository documentation and release notes describe only evidence that is
+  actually available.</li>
+</ul>
+<p>For artifact roles, see <a href="../../reference/artifacts/">Evidence artifacts</a>. For
+acceptance semantics, see <a href="../evidence-and-verification/">Evidence and verification</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
