@@ -1,0 +1,2652 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/troubleshooting/">
+      
+      
+        <link rel="prev" href="../public-evidence/">
+      
+      
+        <link rel="next" href="../../assurance/assurance-case/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Troubleshooting - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#triage-by-transaction-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Triage by transaction boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safe-recovery-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe recovery pattern
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-ed25519-evidence-signing-key-is-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        an Ed25519 evidence signing key is required
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-or-receipt-destination-already-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output or receipt destination already exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-path-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request path is rejected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-mode-jsonl-preparation-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run-mode JSONL preparation fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-schedule-bytes-are-not-canonical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import schedule bytes are not canonical
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observation-or-pairing-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observation or pairing mismatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-image-digest-is-missing-or-mismatched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime image digest is missing or mismatched
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-is-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider is unavailable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strict-runtime-refuses-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict runtime refuses the environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy-digest-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy digest mismatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signer-fingerprint-is-invalid-or-unexpected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signer fingerprint is invalid or unexpected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-fails-but-a-receipt-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification fails but a receipt exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-received-receipt-does-not-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A received receipt does not validate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-match-is-unexpectedly-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact match is unexpectedly zero
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-fails-closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized NLL fails closed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#perplexity-interpretation-is-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Perplexity interpretation is unavailable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#point-value-appears-within-policy-but-the-verdict-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point value appears within policy but the verdict fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report-rejects-an-otherwise-visible-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report rejects an otherwise visible directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#machine-readable-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machine-readable diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-escalating-a-bug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before escalating a bug
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#triage-by-transaction-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Triage by transaction boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safe-recovery-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe recovery pattern
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-ed25519-evidence-signing-key-is-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        an Ed25519 evidence signing key is required
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-or-receipt-destination-already-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output or receipt destination already exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-path-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request path is rejected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-mode-jsonl-preparation-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run-mode JSONL preparation fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-schedule-bytes-are-not-canonical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import schedule bytes are not canonical
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observation-or-pairing-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observation or pairing mismatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-image-digest-is-missing-or-mismatched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime image digest is missing or mismatched
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-is-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider is unavailable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strict-runtime-refuses-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict runtime refuses the environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy-digest-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Policy digest mismatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signer-fingerprint-is-invalid-or-unexpected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signer fingerprint is invalid or unexpected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-fails-but-a-receipt-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification fails but a receipt exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-received-receipt-does-not-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A received receipt does not validate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-match-is-unexpectedly-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact match is unexpectedly zero
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-nll-fails-closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized NLL fails closed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#perplexity-interpretation-is-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Perplexity interpretation is unavailable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#point-value-appears-within-policy-but-the-verdict-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point value appears within policy but the verdict fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report-rejects-an-otherwise-visible-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report rejects an otherwise visible directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#machine-readable-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machine-readable diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-escalating-a-bug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before escalating a bug
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
+<p>InvarLock fails closed: a missing binding, unverifiable input, or ambiguous
+destination stops publication or produces a rejected verification result.</p>
+<div class="admonition tip">
+<p class="admonition-title">User guide</p>
+<p><strong>Outcome:</strong> Identify the earliest failing transaction boundary and recover
+without mutating signed evidence or weakening independent verification.</p>
+<p><strong>Audience:</strong> Evaluation operators, verifier operators, runtime integrators,
+and decision owners investigating an evaluation, verification, or report error.</p>
+<p><strong>Prerequisites:</strong> The original command and structured error, unchanged
+submitted artifacts, independently sourced anchors, and knowledge of which
+output paths existed before the attempt.</p>
+</div>
+<h2 id="triage-by-transaction-boundary">Triage by transaction boundary<a class="headerlink" href="#triage-by-transaction-boundary" title="Permanent link">&para;</a></h2>
+<p>Start with the first boundary that failed. Later artifacts may not exist and
+should not be synthesized.</p>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>Typical signal</th>
+<th>Expected output state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Request loading</td>
+<td>Schema, YAML, path, provider, or metric error</td>
+<td>No provider execution and no evidence directory</td>
+</tr>
+<tr>
+<td>Provider execution</td>
+<td>Artifact identity, runtime, backend, device, or record error</td>
+<td>No published evidence directory</td>
+</tr>
+<tr>
+<td>Import authentication</td>
+<td>Sidecar, schedule, runtime-manifest, or pair mismatch</td>
+<td>No published evidence directory</td>
+</tr>
+<tr>
+<td>Publication</td>
+<td>Signing, staging, parent identity, or destination error</td>
+<td>No partial published destination</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td>Nonzero result with integrity, policy, or anchor errors</td>
+<td>Bundle unchanged; signed rejection receipt when the transaction completed</td>
+</tr>
+<tr>
+<td>Reporting</td>
+<td>Invalid bundle or existing HTML destination</td>
+<td>Bundle unchanged; no new HTML</td>
+</tr>
+</tbody>
+</table>
+<p>Use machine-readable output for the first two core transactions:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span>--json
+invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy<span class="w"> </span>trusted/acceptance.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-baseline-artifact<span class="w"> </span>sha256:PINNED_BASELINE_ARTIFACT_DIGEST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-subject-artifact<span class="w"> </span>sha256:PINNED_SUBJECT_ARTIFACT_DIGEST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-schedule<span class="w"> </span>sha256:PINNED_CANONICAL_SCHEDULE_DIGEST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-baseline-runtime<span class="w"> </span>sha256:PINNED_BASELINE_DIGEST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-subject-runtime<span class="w"> </span>sha256:PINNED_SUBJECT_DIGEST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-signer<span class="w"> </span>sha256:AUTHORIZED_EVIDENCE_SIGNER_FINGERPRINT<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--receipt<span class="w"> </span>verification.receipt.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verifier-signing-key<span class="w"> </span>verifier.pem<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--verifier-identity<span class="w"> </span>release-verifier<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--json
+</code></pre></div>
+
+<p>Read the earliest error first. A downstream checksum, report, or policy error
+may be a consequence of an earlier identity or binding failure.</p>
+<h2 id="safe-recovery-pattern">Safe recovery pattern<a class="headerlink" href="#safe-recovery-pattern" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Preserve the submitted evidence and any signed rejection receipt.</li>
+<li>Classify the failure as request, runtime, import, publication,
+   verification, or presentation.</li>
+<li>Correct the source input or environment, not the signed artifact.</li>
+<li>Use a new evidence, receipt, or HTML destination.</li>
+<li>Repeat independent verification from the original independently maintained anchors.</li>
+</ol>
+<p>Do not turn a mismatch into a pass by copying the observed digest or signer
+from the failed bundle into verifier configuration.</p>
+<h2 id="an-ed25519-evidence-signing-key-is-required"><code>an Ed25519 evidence signing key is required</code><a class="headerlink" href="#an-ed25519-evidence-signing-key-is-required" title="Permanent link">&para;</a></h2>
+<p>Pass a PKCS8 Ed25519 private key with <code>--signing-key</code> or
+<code>INVARLOCK_SIGNING_KEY</code>. Other key algorithms are rejected.</p>
+<p>For the offline example:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>examples
+python<span class="w"> </span>generate_keys.py<span class="w"> </span>--output-dir<span class="w"> </span>.keys
+invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>.keys/evidence-signer.pem
+</code></pre></div>
+
+<h2 id="output-or-receipt-destination-already-exists">Output or receipt destination already exists<a class="headerlink" href="#output-or-receipt-destination-already-exists" title="Permanent link">&para;</a></h2>
+<p>Evidence publication and receipt creation are no-clobber operations. Choose a
+new destination in the request or verify command. For a disposable tutorial,
+start from a fresh copy of <code>examples/</code>. Do not remove or mutate an artifact that
+has already been distributed.</p>
+<p>HTML rendering is also no-clobber. Choose a new <code>--html</code> path.</p>
+<h2 id="request-path-is-rejected">Request path is rejected<a class="headerlink" href="#request-path-is-rejected" title="Permanent link">&para;</a></h2>
+<p>Request file references must be nonempty, relative, root-confined paths. They
+cannot contain absolute prefixes, URLs, backslashes, <code>.</code> or <code>..</code> segments,
+duplicate separators, control characters, leading/trailing whitespace, or a
+trailing slash. Symbolic links and identity changes during the transaction fail
+closed. Put all request inputs beneath one real directory and use forward-slash
+relative paths.</p>
+<h2 id="run-mode-jsonl-preparation-fails">Run-mode JSONL preparation fails<a class="headerlink" href="#run-mode-jsonl-preparation-fails" title="Permanent link">&para;</a></h2>
+<p>Run mode authenticates the exact JSONL source before deriving the canonical
+schedule. Check that:</p>
+<ul>
+<li><code>comparison.dataset.sha256</code> is the bare lowercase SHA-256 of the source bytes;</li>
+<li>the file contains one nonempty JSON object per line and no blank lines;</li>
+<li><code>input_field</code>, <code>expected_output_field</code>, and optional <code>id_field</code> name fields
+  present on every selected record;</li>
+<li>IDs are unique when <code>id_field</code> is supplied;</li>
+<li><code>limit</code>, when present, selects an available exact prefix; and</li>
+<li>the source file and its parent path are regular, root-confined, and unchanged
+  during the read.</li>
+</ul>
+<p>Without <code>id_field</code>, InvarLock derives stable IDs as
+<code>record/{source_index:08d}</code> while preserving source order.</p>
+<h2 id="import-schedule-bytes-are-not-canonical">Import schedule bytes are not canonical<a class="headerlink" href="#import-schedule-bytes-are-not-canonical" title="Permanent link">&para;</a></h2>
+<p>Import mode requires the exact compact, key-sorted UTF-8 serialization that
+InvarLock authenticates. Rebuild it with
+<code>build_runtime_behavioral_schedule_from_material</code> and
+<code>canonical_runtime_behavioral_schedule_json</code>; do not pretty-print it afterward.</p>
+<p>Also confirm:</p>
+<ul>
+<li>every text-part digest hashes its UTF-8 text and every <code>input_sha256</code> hashes
+  the canonical ordered <code>input_parts</code> array;</li>
+<li>record IDs are unique;</li>
+<li>record order has not changed; and</li>
+<li><code>comparison.dataset</code> and import-mode <code>execution.schedule</code> identify the same
+  exact bytes.</li>
+</ul>
+<h2 id="observation-or-pairing-mismatch">Observation or pairing mismatch<a class="headerlink" href="#observation-or-pairing-mismatch" title="Permanent link">&para;</a></h2>
+<p>Baseline and subject observations must bind the same schedule digest and repeat
+the exact ordered <code>(record_id, input_sha256)</code> sequence. The imported paired
+records must equal InvarLock's derivation byte-for-byte in canonical JSON.
+Regenerate provider output from the frozen schedule; do not edit paired scores
+to make them agree.</p>
+<p>If import mode fails, check the sidecars as one atomic set:</p>
+<ul>
+<li><code>model-artifact.identity.json</code> must equal a fresh identity derived by the
+  installed provider from request settings;</li>
+<li><code>runtime-provider.receipt.json</code> must bind that identity, provider,
+  capabilities, settings, device, outer image, and observation;</li>
+<li><code>runtime-scoring.observation.json</code> must bind the same schedule and contain
+  one successful record per scheduled ID in order;</li>
+<li><code>report.json</code> must bind the provider, identity, observation, schedule, and
+  record count;</li>
+<li><code>runtime.manifest.json</code> must name the exact sibling bytes; and</li>
+<li>imported paired records must equal InvarLock's fresh derivation.</li>
+</ul>
+<p>Replacing only the file named by the first error usually creates the next
+cross-binding error. Re-export the complete side from the original provider
+execution.</p>
+<h2 id="runtime-image-digest-is-missing-or-mismatched">Runtime image digest is missing or mismatched<a class="headerlink" href="#runtime-image-digest-is-missing-or-mismatched" title="Permanent link">&para;</a></h2>
+<p>Run mode requires independently known lowercase <code>sha256:</code> image digests and
+references embedding the corresponding digest. A shared image can be supplied
+once; cross-runtime comparisons supply the side-specific image bindings
+documented by <code>invarlock evaluate --help</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_RUNTIME_IMAGE</span><span class="o">=</span>registry.example/runtime@sha256:PINNED_DIGEST
+<span class="nb">export</span><span class="w"> </span><span class="nv">INVARLOCK_RUNTIME_IMAGE_DIGEST</span><span class="o">=</span>sha256:PINNED_DIGEST
+</code></pre></div>
+
+<p>The executing container must report the same identity. Do not replace the
+expected digest with the value copied from a failed evidence bundle.</p>
+<p>During verification, pass the baseline and subject digests from the decision
+authority. They may be equal when both sides intentionally used one runtime.</p>
+<h2 id="provider-is-unavailable">Provider is unavailable<a class="headerlink" href="#provider-is-unavailable" title="Permanent link">&para;</a></h2>
+<p>The base package includes the HF text provider and can authenticate its local
+snapshot identity for import mode without Torch or Transformers. Install
+<code>invarlock[hf]</code> before run-mode execution. GGUF, TensorRT-LLM, and Hugging Face
+vision-text providers are separate first-party add-ins and must be installed
+and qualified in their required runtimes. A
+request naming an undiscoverable provider fails before evidence publication.</p>
+<p>Run the add-in's conformance entry point in the same Python environment:</p>
+<div class="codehilite"><pre><span></span><code>invarlock-gguf-conformance
+invarlock-tensorrt-llm-conformance
+invarlock-hf-vision-text-conformance
+</code></pre></div>
+
+<p>If the command is missing, compare <code>python -m pip --version</code>, <code>which
+invarlock</code>, and the active virtual environment. If conformance passes but
+evaluation fails, troubleshoot the concrete artifact, backend resources,
+runtime image, and device; conformance does not execute the model.</p>
+<p>For GGUF, confirm the artifact, pinned <code>llama.cpp</code> executable, and source
+archive are the same inputs used to derive request settings. For TensorRT-LLM,
+also confirm the engine was inspected on the target compute capability with the
+same tokenizer contract and runner. For vision-text, confirm the processor
+contract and every content ID, media type, byte length, and digest against the
+caller-authorized content store.</p>
+<h2 id="strict-runtime-refuses-the-environment">Strict runtime refuses the environment<a class="headerlink" href="#strict-runtime-refuses-the-environment" title="Permanent link">&para;</a></h2>
+<p>Strict run mode expects a real container boundary, a digest-bearing image
+identity, offline execution, remote code disabled, third-party plugins
+disabled, and <code>batch_size=1</code>.</p>
+<p>Environment switches do not simulate those controls. In particular:</p>
+<ul>
+<li><code>INVARLOCK_CONTAINER_EXECUTION=true</code> does not replace kernel-visible
+  container evidence;</li>
+<li>setting <code>INVARLOCK_ALLOW_NETWORK</code> makes the environment unsuitable for the
+  strict evidence path;</li>
+<li>enabling remote code or arbitrary third-party plugins can make strict
+  evaluation reject; and</li>
+<li>a mutable image tag is not a runtime digest.</li>
+</ul>
+<p>Invoke the host CLI with the pinned image bindings. It establishes the
+network-disabled Docker or Podman workers and the strict child context. If the
+host launch fails, inspect local engine availability, exact image presence,
+digest agreement, signing-key placement, and device syntax. If a child starts
+but rejects the boundary, inspect its image entrypoint, container markers,
+offline flags, and runtime-integration resources. See
+<a href="../runtime-providers/">Runtime providers</a> for provider-specific setup.</p>
+<h2 id="policy-digest-mismatch">Policy digest mismatch<a class="headerlink" href="#policy-digest-mismatch" title="Permanent link">&para;</a></h2>
+<p>Verification uses the exact bytes at <code>--policy</code>; it never trusts a policy found
+only inside submitted evidence. Obtain the approved policy file from the
+acceptance authority. Reformatting equivalent JSON changes its digest. If the
+policy truly changed, produce a new comparison rather than relabeling the old
+bundle.</p>
+<h2 id="signer-fingerprint-is-invalid-or-unexpected">Signer fingerprint is invalid or unexpected<a class="headerlink" href="#signer-fingerprint-is-invalid-or-unexpected" title="Permanent link">&para;</a></h2>
+<p>Fingerprints must be <code>sha256:</code> plus 64 lowercase hexadecimal characters and
+must hash raw Ed25519 public-key bytes. Do not hash PEM text. Read the expected
+evidence-signer value from a trusted registry or the example's independently generated
+<code>evidence-signer.fingerprint</code>, not from <code>manifest.signature.json</code>.</p>
+<h2 id="verification-fails-but-a-receipt-exists">Verification fails but a receipt exists<a class="headerlink" href="#verification-fails-but-a-receipt-exists" title="Permanent link">&para;</a></h2>
+<p>This is expected when enough inputs are available to sign a rejection. Preserve
+the receipt: it records the evidence manifest digest, external anchors, verifier
+identity, and failed verdict. Inspect the CLI error or <code>--json</code> result, correct
+the external or evaluation-side cause, and use a new receipt destination for any
+new verification attempt.</p>
+<p>Never treat the existence of a receipt as a passing result. Check its signed
+verdict and independently pin the verifier fingerprint.</p>
+<h2 id="a-received-receipt-does-not-validate">A received receipt does not validate<a class="headerlink" href="#a-received-receipt-does-not-validate" title="Permanent link">&para;</a></h2>
+<p>The stable receipt reader checks six independent relationships: verifier
+signature, verifier identity and fingerprint, pack manifest digest, policy
+digest, both runtime digests, and evidence-signer fingerprint.</p>
+<p>Classify the error before retrying:</p>
+<table>
+<thead>
+<tr>
+<th>Error family</th>
+<th>Likely cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signature or embedded public-key mismatch</td>
+<td>Receipt was changed, malformed, or signed by another key.</td>
+</tr>
+<tr>
+<td>Verifier identity or fingerprint mismatch</td>
+<td>Caller trust configuration does not authorize the signer.</td>
+</tr>
+<tr>
+<td>Manifest digest mismatch</td>
+<td>Receipt belongs to another pack or pack bytes changed.</td>
+</tr>
+<tr>
+<td>Policy/runtime/evidence-signer anchor mismatch</td>
+<td>Caller and verifier did not use the same independently maintained trust inputs.</td>
+</tr>
+<tr>
+<td>Receipt is inside the evidence pack</td>
+<td>The closed bundle was modified or packaged incorrectly.</td>
+</tr>
+</tbody>
+</table>
+<p>Do not read expected values from the failing receipt to silence these errors.
+Locate the correct evidence/receipt pair and compare both with the independent
+authorization record.</p>
+<h2 id="exact-match-is-unexpectedly-zero">Exact match is unexpectedly zero<a class="headerlink" href="#exact-match-is-unexpectedly-zero" title="Permanent link">&para;</a></h2>
+<p>Exact match is literal Unicode string equality. Whitespace, case, punctuation,
+and line endings are significant. If normalization is part of the desired
+metric, define and authenticate it before provider observation; do not normalize
+only one side after execution.</p>
+<h2 id="normalized-nll-fails-closed">Normalized NLL fails closed<a class="headerlink" href="#normalized-nll-fails-closed" title="Permanent link">&para;</a></h2>
+<p>Each successful record needs finite <code>logprob_sum</code>, positive <code>token_count</code>, and
+positive <code>utf8_byte_count</code>. InvarLock derives <code>-logprob_sum / utf8_byte_count</code>.
+The baseline mean must be greater than zero. Confirm both providers use the same
+scoring target and byte-count definition before comparing them.</p>
+<h2 id="perplexity-interpretation-is-unavailable">Perplexity interpretation is unavailable<a class="headerlink" href="#perplexity-interpretation-is-unavailable" title="Permanent link">&para;</a></h2>
+<p>The verifier derives a token-weighted perplexity ratio only when normalized-NLL
+evidence binds matching authenticated tokenizer digests and equal positive
+target-token counts for every pair. If those facts differ or are unavailable,
+the report records a closed unavailable reason. The byte-normalized NLL decision
+remains authoritative; do not copy one side's tokenizer facts into the other.</p>
+<h2 id="point-value-appears-within-policy-but-the-verdict-fails">Point value appears within policy but the verdict fails<a class="headerlink" href="#point-value-appears-within-policy-but-the-verdict-fails" title="Permanent link">&para;</a></h2>
+<p>The point comparison is descriptive. Exact match passes only when the paired
+Newcombe interval's lower bound meets <code>delta_min_pp</code>; normalized NLL passes only
+when the schedule-resampling interval's upper bound meets <code>ratio_max</code>.
+If the policy enables sample qualification, the observed record count must also
+meet <code>minimum_record_count</code> and the observed width must not exceed the matching
+maximum-width field. Inspect <code>sample_qualification</code> before changing the metric
+threshold.
+Review the authenticated schedule, interval method, and record-level variation.
+Changing the threshold or schedule requires a new evidence transaction.</p>
+<h2 id="report-rejects-an-otherwise-visible-directory">Report rejects an otherwise visible directory<a class="headerlink" href="#report-rejects-an-otherwise-visible-directory" title="Permanent link">&para;</a></h2>
+<p><code>report</code> authenticates the closed inventory before rendering. Extra files,
+missing files, changed bytes, non-canonical manifest/report JSON, symbolic links,
+or an invalid evidence signature are fatal. Keep receipts and HTML outside the
+evidence directory. Recover from an immutable trusted copy; do not repair files
+inside a signed bundle.</p>
+<h2 id="machine-readable-diagnostics">Machine-readable diagnostics<a class="headerlink" href="#machine-readable-diagnostics" title="Permanent link">&para;</a></h2>
+<p>Use <code>--json</code> for evaluation and verification automation:</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span>--json
+invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span>...<span class="w"> </span>--receipt<span class="w"> </span>receipt.json<span class="w"> </span>--json
+</code></pre></div>
+
+<p>The report command intentionally renders human-facing console or HTML output.
+The canonical JSON report remains inside the authenticated bundle.</p>
+<h2 id="before-escalating-a-bug">Before escalating a bug<a class="headerlink" href="#before-escalating-a-bug" title="Permanent link">&para;</a></h2>
+<p>Collect the smallest non-sensitive reproduction that preserves the failing
+contract:</p>
+<ul>
+<li>InvarLock and first-party add-in versions;</li>
+<li>the command name and structured error text;</li>
+<li>request shape with private locators and content redacted consistently;</li>
+<li>which boundary failed and whether any output was published;</li>
+<li>provider name, ABI, artifact kind, and high-level device class;</li>
+<li>whether the offline example passes in the same installation; and</li>
+<li>a synthetic schedule or sidecar fixture when the failure can be reproduced
+  without private model or dataset material.</li>
+</ul>
+<p>Do not attach private keys, local absolute paths, access tokens, environment
+dumps, proprietary prompts, raw checkpoints, or evidence bundles not approved
+for publication to a public issue.</p>
+<p>For exact contract shapes, see <a href="../../reference/contracts/">Public contracts</a>.
+For trust implications, see the <a href="../../security/threat-model/">Threat model</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

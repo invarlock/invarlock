@@ -1,0 +1,2837 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/runtime-providers/">
+      
+      
+        <link rel="prev" href="../reports/">
+      
+      
+        <link rel="next" href="../runtime-security/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Runtime providers - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#runtime-providers" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Runtime providers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#provider-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider protocol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capabilities-and-current-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities and current scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifact-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifact identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-party-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-party settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-party settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hf_transformers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hf_transformers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llama_cpp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama_cpp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tensorrt_llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tensorrt_llm
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scoring-obligations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoring obligations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caller-owned-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caller-owned resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-side-oci-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-side OCI execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discovery-and-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discovery and authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-party-add-ins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-party add-ins
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-party add-ins">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#candidate-wheel-manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate wheel manifest
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authoring-an-abi-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authoring an ABI provider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-conformance-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider conformance checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#provider-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider protocol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capabilities-and-current-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities and current scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifact-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifact identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-party-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-party settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-party settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hf_transformers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hf_transformers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llama_cpp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama_cpp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tensorrt_llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tensorrt_llm
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scoring-obligations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoring obligations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caller-owned-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caller-owned resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-side-oci-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-side OCI execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discovery-and-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discovery and authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-party-add-ins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-party add-ins
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-party add-ins">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#candidate-wheel-manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate wheel manifest
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authoring-an-abi-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authoring an ABI provider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-conformance-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider conformance checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="runtime-providers">Runtime providers<a class="headerlink" href="#runtime-providers" title="Permanent link">&para;</a></h1>
+<p>Runtime-provider ABI <code>1</code> isolates backend-specific artifact identity and
+execution from the evidence transaction. Hugging Face Transformers is built
+into the core distribution. GGUF through <code>llama.cpp</code>, TensorRT-LLM, and Hugging
+Face vision-text are first-party optional add-ins.</p>
+<div class="admonition info">
+<p class="admonition-title">Reference</p>
+<ul>
+<li><strong>Surface:</strong> Runtime-provider ABI <code>1</code>, typed identities, settings, resources, discovery, and conformance</li>
+<li><strong>Stability:</strong> Providers must match versioned ABI <code>1</code> exactly; first-party settings and capability declarations are closed</li>
+<li><strong>Use this page when:</strong> Selecting, configuring, implementing, or validating a runtime provider</li>
+</ul>
+</div>
+<h2 id="provider-protocol">Provider protocol<a class="headerlink" href="#provider-protocol" title="Permanent link">&para;</a></h2>
+<p>A provider implements <code>RuntimeProvider</code> with an exact <code>name</code> and
+<code>abi_version</code>, then supplies:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_config</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ModelRuntimeSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">capabilities</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">RuntimeProviderCapabilities</span><span class="p">:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">identify_artifact</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ModelRuntimeSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModelArtifactIdentity</span><span class="p">:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">authenticate_artifact</span><span class="p">(</span>
+    <span class="n">spec</span><span class="p">:</span> <span class="n">ModelRuntimeSpec</span><span class="p">,</span>
+    <span class="n">artifact_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModelArtifactIdentity</span><span class="p">:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">prepare_execution</span><span class="p">(</span>
+    <span class="n">spec</span><span class="p">:</span> <span class="n">ModelRuntimeSpec</span><span class="p">,</span>
+    <span class="n">resources</span><span class="p">:</span> <span class="n">RuntimeArtifactResources</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeExecutionContext</span><span class="p">:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ModelRuntimeSpec</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">RuntimeExecutionContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSession</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+
+<p>The opened session provides <code>score(batch)</code>, <code>runtime_receipt()</code>, and <code>close()</code>.
+Provider state is opaque. Backend imports must be lazy so discovery and contract
+inspection remain usable without loading a model runtime.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Input</th>
+<th>Required result or effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>validate_config</code></td>
+<td>Closed <code>ModelRuntimeSpec</code></td>
+<td>Reject unknown, missing, malformed, or inconsistent settings</td>
+</tr>
+<tr>
+<td><code>capabilities</code></td>
+<td>None</td>
+<td>Return closed artifact, task, metric, and execution-mode declarations</td>
+</tr>
+<tr>
+<td><code>identify_artifact</code></td>
+<td>Validated spec</td>
+<td>Return a typed portable identity reproducible from authenticated inputs</td>
+</tr>
+<tr>
+<td><code>authenticate_artifact</code></td>
+<td>Validated spec and local artifact path</td>
+<td>Read the local bytes without loading the backend, require their canonical identity to equal the spec, and return that identity</td>
+</tr>
+<tr>
+<td><code>prepare_execution</code></td>
+<td>Spec and caller-owned resources</td>
+<td>Authenticate local resources and return an immutable execution context</td>
+</tr>
+<tr>
+<td><code>open</code></td>
+<td>Spec and context</td>
+<td>Open one session without changing the authenticated identity</td>
+</tr>
+<tr>
+<td><code>session.score</code></td>
+<td>Ordered <code>EvaluationBatch</code></td>
+<td>Return one ordered <code>ScoringObservation</code> for that batch</td>
+</tr>
+<tr>
+<td><code>session.runtime_receipt</code></td>
+<td>Completed scoring state</td>
+<td>Return a receipt bound to the latest complete observation</td>
+</tr>
+<tr>
+<td><code>session.close</code></td>
+<td>None</td>
+<td>Release resources; repeated close calls must be safe</td>
+</tr>
+</tbody>
+</table>
+<h2 id="capabilities-and-current-scope">Capabilities and current scope<a class="headerlink" href="#capabilities-and-current-scope" title="Permanent link">&para;</a></h2>
+<p>Capabilities are closed over:</p>
+<ul>
+<li>artifact formats: <code>hf_snapshot</code>, <code>gguf</code>, <code>tensorrt_llm_engine</code>;</li>
+<li>canonical tasks declared by each provider, currently <code>text_causal</code> and
+  <code>vision_text_generation</code> across shipped integrations;</li>
+<li>metrics: <code>exact_match</code> and <code>normalized_nll_per_utf8_byte</code>; and</li>
+<li>execution modes: <code>in_process</code>, <code>local_process</code>, <code>container</code>.</li>
+</ul>
+<p>The request loader rejects a built-in metric the selected provider does not
+declare. A scorer extension is not a provider metric: the provider collects
+authenticated output text through its declared exact-match path, and an
+explicitly authorized verifier-replay scorer derives unit-interval values from
+those text facts after collection.
+Strict evidence execution further requires a real offline container and
+<code>batch_size=1</code>, regardless of a provider's broader capability declaration.</p>
+<table>
+<thead>
+<tr>
+<th>Shipped provider</th>
+<th>Distribution</th>
+<th>Artifact</th>
+<th>Metric</th>
+<th>Declared mode</th>
+<th>Strict device</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hf_transformers</code></td>
+<td><code>invarlock</code></td>
+<td><code>hf_snapshot</code></td>
+<td><code>exact_match</code>, <code>normalized_nll_per_utf8_byte</code></td>
+<td><code>in_process</code></td>
+<td><code>cpu</code> or <code>cuda</code>, inside its authenticated side worker</td>
+</tr>
+<tr>
+<td><code>llama_cpp</code></td>
+<td><code>invarlock-runtime-gguf</code></td>
+<td><code>gguf</code></td>
+<td><code>exact_match</code></td>
+<td><code>container</code>, <code>local_process</code></td>
+<td><code>cpu</code>; strict evidence uses an authenticated side worker</td>
+</tr>
+<tr>
+<td><code>tensorrt_llm</code></td>
+<td><code>invarlock-runtime-tensorrt-llm</code></td>
+<td><code>tensorrt_llm_engine</code></td>
+<td><code>exact_match</code></td>
+<td><code>container</code></td>
+<td><code>cuda</code> in an authenticated side worker</td>
+</tr>
+<tr>
+<td><code>hf_vision_text</code></td>
+<td><code>invarlock-runtime-hf-vision-text</code></td>
+<td><code>hf_snapshot</code></td>
+<td><code>exact_match</code></td>
+<td><code>container</code></td>
+<td><code>cuda</code> in an authenticated side worker</td>
+</tr>
+</tbody>
+</table>
+<p>The built-in HF scorer computes log-probability facts by teacher-forcing a
+target token sequence that must decode as the exact schedule <code>expected_output</code>
+when appended to the prompt tokens. Boundary-unstable encodings fail closed.
+It binds the target token count and verifier-checkable UTF-8 byte count in each
+scoring record. Normalized NLL divides by expected-output bytes, so it remains
+comparable across tokenizers. It measures teacher-forced expected-continuation
+likelihood regression rather than general model quality. When authenticated
+tokenizer digests and paired token counts match, the verifier may render a
+token-weighted perplexity ratio as an interpretation without giving it policy
+authority. The GGUF add-in
+does not declare normalized NLL: its authenticated execution surface is
+the raw <code>llama-completion</code> executable, which emits generated bytes but no
+deterministic per-target-token log probabilities. TensorRT-LLM and Hugging Face
+vision-text likewise remain exact-match only. A provider may not emit a metric it did not advertise, and
+request loading rejects that mismatch before execution.</p>
+<h2 id="artifact-identity">Artifact identity<a class="headerlink" href="#artifact-identity" title="Permanent link">&para;</a></h2>
+<p>Providers return one typed identity:</p>
+<ul>
+<li>Hugging Face binds a model ID, immutable revision and/or checkpoint tree,
+  plus tokenizer metadata;</li>
+<li>GGUF binds the regular file bytes, GGUF metadata, tensor inventory, and
+  tokenizer metadata; and</li>
+<li>TensorRT-LLM binds the engine tree, file inventory, builder configuration,
+  tokenizer metadata, engine metadata, and target compute capability.</li>
+</ul>
+<p>The identity must be reproducible from the request-side <code>ModelRuntimeSpec</code> and
+the exact artifact. The transaction compares imported identities with a fresh
+provider derivation.</p>
+<table>
+<thead>
+<tr>
+<th>Artifact format</th>
+<th>Identity fields beyond <code>format</code> and <code>artifact_format</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hugging Face snapshot</td>
+<td><code>model_id</code>, <code>immutable_revision</code> and/or <code>checkpoint_tree_sha256</code>, <code>tokenizer_metadata_sha256</code></td>
+</tr>
+<tr>
+<td>GGUF</td>
+<td><code>artifact_name</code>, <code>sha256</code>, <code>byte_length</code>, <code>gguf_metadata_sha256</code>, <code>tensor_inventory_sha256</code>, <code>tokenizer_metadata_sha256</code></td>
+</tr>
+<tr>
+<td>TensorRT-LLM engine</td>
+<td><code>bundle_name</code>, <code>engine_bundle_tree_sha256</code>, <code>file_inventory_sha256</code>, <code>builder_config_sha256</code>, <code>tokenizer_metadata_sha256</code>, <code>engine_metadata_sha256</code>, <code>target_compute_capability</code></td>
+</tr>
+</tbody>
+</table>
+<p>Identity fields describe authenticated bytes, not merely a user-facing model
+name. GGUF and TensorRT-LLM use privacy-safe digest-derived model IDs in their
+runtime specs so local filenames and host paths cannot enter public evidence.</p>
+<h2 id="first-party-settings">First-party settings<a class="headerlink" href="#first-party-settings" title="Permanent link">&para;</a></h2>
+<p>Settings are JSON scalars in <code>request.yaml</code>. Unknown keys fail closed.</p>
+<h3 id="hf_transformers"><code>hf_transformers</code><a class="headerlink" href="#hf_transformers" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Requirement</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>immutable_revision</code></td>
+<td>Identity: revision or checkpoint tree required</td>
+<td>Immutable upstream revision</td>
+</tr>
+<tr>
+<td><code>checkpoint_tree_sha256</code></td>
+<td>Required for local execution</td>
+<td>Authenticated checkpoint-directory tree digest</td>
+</tr>
+<tr>
+<td><code>tokenizer_metadata_sha256</code></td>
+<td>Required</td>
+<td>Authenticated tokenizer contract digest</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>Required for strict receipt; must be <code>1</code></td>
+<td>Scoring batch size</td>
+</tr>
+<tr>
+<td><code>context_length</code></td>
+<td>Required, positive integer</td>
+<td>Maximum input context</td>
+</tr>
+<tr>
+<td><code>max_output_tokens</code></td>
+<td>Required, positive integer</td>
+<td>Maximum generated output</td>
+</tr>
+<tr>
+<td><code>offline</code></td>
+<td>Required and <code>true</code></td>
+<td>Backend offline intent</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>Required, non-negative integer</td>
+<td>Deterministic seed</td>
+</tr>
+<tr>
+<td><code>timeout_seconds</code></td>
+<td>Required, positive integer</td>
+<td>Per-call timeout</td>
+</tr>
+</tbody>
+</table>
+<p>The provider loads only local files, disables remote code, requires
+SafeTensors-compatible loading, and authenticates the checkpoint tree and
+tokenizer contract against the declared digests. Hugging Face documents the
+underlying library's <a href="https://huggingface.co/docs/transformers/installation#offline-mode">offline-mode
+controls</a>;
+InvarLock additionally binds its own strict runtime and receipt conditions.</p>
+<h3 id="llama_cpp"><code>llama_cpp</code><a class="headerlink" href="#llama_cpp" title="Permanent link">&para;</a></h3>
+<p>Every key is required: <code>artifact_byte_length</code>, <code>artifact_sha256</code>,
+<code>backend_binary_sha256</code>, <code>backend_source_sha256</code>, <code>backend_version</code>,
+<code>batch_size</code>, <code>context_length</code>, <code>gguf_metadata_sha256</code>, <code>max_output_tokens</code>,
+<code>seed</code>, <code>tensor_inventory_sha256</code>, <code>timeout_seconds</code>, and
+<code>tokenizer_metadata_sha256</code>. Digest values are lowercase bare SHA-256 values.
+The provider authenticates the GGUF bytes, typed metadata and tensor inventory,
+tokenizer metadata, and the pinned <code>llama.cpp</code> executable and source tree.
+Independent verification also requires the normalized-request digest from the
+reviewed preflight result. It reconciles every GGUF identity, backend, and shared
+execution setting in that request with the authenticated provider receipt.</p>
+<h3 id="tensorrt_llm"><code>tensorrt_llm</code><a class="headerlink" href="#tensorrt_llm" title="Permanent link">&para;</a></h3>
+<p>Every key is required: <code>backend_build_sha256</code>, <code>backend_version</code>, <code>batch_size</code>,
+<code>builder_config_sha256</code>, <code>context_length</code>, <code>engine_bundle_tree_sha256</code>,
+<code>engine_metadata_sha256</code>, <code>file_inventory_sha256</code>, <code>max_output_tokens</code>,
+<code>runner_binary_sha256</code>, <code>seed</code>, <code>target_compute_capability</code>, <code>timeout_seconds</code>,
+and <code>tokenizer_metadata_sha256</code>. The target compute capability uses
+<code>major.minor</code> notation and is checked against the observed GPU. The provider
+binds the engine tree, build configuration, file inventory, runner, backend,
+tokenizer, engine metadata, and GPU target. See NVIDIA's <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM
+documentation</a> for backend concepts;
+the InvarLock add-in defines the evidence bindings above.</p>
+<h2 id="scoring-obligations">Scoring obligations<a class="headerlink" href="#scoring-obligations" title="Permanent link">&para;</a></h2>
+<p>For every schedule record, a provider emits one record with the same
+<code>record_id</code> and <code>input_sha256</code>, in exactly the same order. Successful records
+carry output facts, log-probability facts, or both. Failed records carry an
+error code and no measured output facts; canonical evidence rejects them.</p>
+<table>
+<thead>
+<tr>
+<th>Scoring-record field group</th>
+<th><code>ok</code> record</th>
+<th><code>error</code> record</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>record_id</code>, <code>input_sha256</code>, <code>status</code></td>
+<td>Required</td>
+<td>Required</td>
+</tr>
+<tr>
+<td>Output text and output digest</td>
+<td>Required for <code>exact_match</code> and scorer-extension collection</td>
+<td>Forbidden</td>
+</tr>
+<tr>
+<td><code>logprob_sum</code>, positive <code>token_count</code>, positive <code>utf8_byte_count</code></td>
+<td>Required for normalized NLL</td>
+<td>Forbidden</td>
+</tr>
+<tr>
+<td><code>error_code</code></td>
+<td>Forbidden</td>
+<td>Required</td>
+</tr>
+</tbody>
+</table>
+<p>The exact schema determines the allowed combinations. A batch must contain
+exactly one record for every schedule entry, with no reordering, duplication,
+omission, or replacement by positional IDs.</p>
+<p>The observation binds the provider name, artifact-identity digest, schedule
+digest, ordered records, and an aggregate-source digest computed from those
+records. Providers report facts; InvarLock owns aggregate scores and policy
+arithmetic.</p>
+<p>Provider discovery does not authorize scorer extensions. An embedding that
+selects <code>comparison.scorer_extension</code> must supply an explicit
+<code>ScorerExtensionRegistry</code> to both evaluation and verification. That registry
+may contain caller-injected scorers or may explicitly enable discovery from
+the separate <code>invarlock.scorers</code> entry-point group.</p>
+<p>The runtime receipt must agree with the provider's capabilities and bind:</p>
+<ul>
+<li>plugin distribution and version;</li>
+<li>backend identity with at least one source, binary, or build digest;</li>
+<li>artifact identity;</li>
+<li>deterministic execution settings;</li>
+<li>device facts;</li>
+<li>the outer image digest; and</li>
+<li>the scoring-observation digest.</li>
+</ul>
+<h2 id="caller-owned-resources">Caller-owned resources<a class="headerlink" href="#caller-owned-resources" title="Permanent link">&para;</a></h2>
+<p>Requests cannot grant host permissions or name executable support resources.
+For each side, the caller supplies an absolute, non-symbolic resource root, a
+primary artifact, closed support-resource names, device kind, and container
+image digest through <code>RuntimeArtifactResources</code>. Each access repeats
+component-by-component no-follow validation.</p>
+<p>The public CLI environment resolver uses the variables listed in
+<a href="../environment/">Environment variables</a>. A programmatic caller can supply its
+own resource resolver to <code>evaluate_request_file</code>.</p>
+<h2 id="per-side-oci-execution">Per-side OCI execution<a class="headerlink" href="#per-side-oci-execution" title="Permanent link">&para;</a></h2>
+<p>The host owns the canonical schedule and launches one independently configured
+worker for baseline and one for subject. A shared image, digest, device, and
+entrypoint profile can provide defaults; every value also has a per-side
+override. The selected image reference and digest must agree before launch.</p>
+<p>Each worker receives only:</p>
+<ul>
+<li>its read-only job and canonical schedule;</li>
+<li>its read-only primary artifact and closed support resources;</li>
+<li>an isolated writable side-output directory; and</li>
+<li>the device mapping selected for that side.</li>
+</ul>
+<p>The evidence-signing and verifier keys remain on the host. After both workers
+exit successfully, the host loads exactly the six expected side files,
+reproduces the artifact and runtime bindings, derives paired records, and signs
+the closed evidence bundle.</p>
+<p>CPU workers may run concurrently. Workers on two different explicit CUDA
+indexes, such as <code>cuda:0</code> and <code>cuda:1</code>, may also run concurrently. Generic CUDA,
+a shared explicit index, and CPU/CUDA pairs run sequentially. The selected CUDA
+device only exposes hardware; the image must already contain a CUDA-capable
+runtime. See <a href="../environment/#canonical-hugging-face-runtime-images">Environment variables</a>
+for the separate canonical CPU and x86_64 CUDA image targets.</p>
+<p>The host applies the same caller-owned <code>OciWorkerLimits</code> to each side: a
+positive CPU decimal, an integer MiB memory ceiling, and a numeric non-root
+<code>UID:GID</code>. Defaults are four CPUs, 65536 MiB, and <code>65532:65532</code>. The submitted
+request cannot alter them. A worker also receives a finite outer deadline
+derived from its validated per-record <code>timeout_seconds</code> and the authenticated
+schedule length, capped at 24 hours; expiry stops or kills the exact container
+before the side fails closed.</p>
+<h2 id="discovery-and-authorization">Discovery and authorization<a class="headerlink" href="#discovery-and-authorization" title="Permanent link">&para;</a></h2>
+<p>Providers register in the <code>invarlock.runtime_providers</code> entry-point group. The
+registry validates entry-point name, distribution identity, module/class path,
+module-declared ABI, instance ABI, and provider name before use.</p>
+<p>Python entry-point discovery follows the <a href="https://packaging.python.org/en/latest/specifications/entry-points/">PyPA entry-points
+specification</a>.
+For example:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">[project.entry-points.</span><span class="s2">&quot;invarlock.runtime_providers&quot;</span><span class="k">]</span>
+<span class="n">example_runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;example_invarlock.provider:ExampleProvider&quot;</span>
+</code></pre></div>
+
+<p>Entry-point metadata belongs to an installed distribution. Making a source
+tree importable with <code>PYTHONPATH</code> does not register a provider and cannot
+satisfy this authorization boundary. The interpreter that performs provider
+discovery must contain the matching-version core distribution and the exact
+add-in wheel selected for the transaction.</p>
+<p>The core provider and three named first-party add-ins are recognized without
+enabling arbitrary plugins. Other installed entry points are ignored unless
+<code>INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS</code> is explicitly enabled. Strict evidence
+execution records that setting and requires it to be false, so enabling
+arbitrary plugins is not compatible with the strict evidence path.</p>
+<h2 id="first-party-add-ins">First-party add-ins<a class="headerlink" href="#first-party-add-ins" title="Permanent link">&para;</a></h2>
+<p>Install the exact GGUF wheel into the qualification host interpreter and check
+discovery through that interpreter:</p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/wheelhouse/invarlock_runtime_gguf-EXACT.whl
+<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock_addins.gguf.conformance
+</code></pre></div>
+
+<p>Install and check the exact TensorRT-LLM wheel the same way:</p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/wheelhouse/invarlock_runtime_tensorrt_llm-EXACT.whl
+<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock_addins.tensorrt_llm.conformance
+</code></pre></div>
+
+<p>Install and check the exact Hugging Face vision-text base wheel. Its declared
+Pillow dependency supports host preflight; the inference stack remains in the
+runtime image:</p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/wheelhouse/Pillow-EXACT.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/wheelhouse/invarlock_runtime_hf_vision_text-EXACT.whl
+<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock_addins.multimodal.conformance
+</code></pre></div>
+
+<p>Each command returns a JSON object whose <code>ok</code> value must be true and whose
+provider and ABI must match the installed core. Conformance checks packaging,
+entry-point identity, protocol structure, and lightweight contract behavior; it
+does not execute a representative model or certify GPU compatibility.</p>
+<p>Artifact inspection for either native add-in executes backend code. Run it in
+the exact digest-pinned, network-disabled runtime image with read-only artifact
+mounts. TensorRT-LLM inspection also requires the target GPU. The add-in READMEs
+contain the binding constructors and inspection examples.</p>
+<p>The conformance output is one JSON object:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;abi_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;llama_cpp&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>ok: true</code> proves lightweight packaging, discovery, and protocol compatibility.
+It does not prove that a model artifact loads, that native binaries match an
+image, or that a representative score succeeds. Follow it with a digest-pinned
+runtime canary for the exact artifact/backend/device combination.</p>
+<h3 id="candidate-wheel-manifest">Candidate wheel manifest<a class="headerlink" href="#candidate-wheel-manifest" title="Permanent link">&para;</a></h3>
+<p>Maintained qualification executes caller-selected wheel artifacts, not an
+arbitrary first-party installation already visible to the host interpreter.
+Build the coordinated distributions, then use the maintained helper to create
+one no-clobber manifest. For example, a GGUF transaction authenticates the core
+and GGUF wheels together:</p>
+<div class="codehilite"><pre><span></span><code>make<span class="w"> </span>dist-check
+install<span class="w"> </span>-d<span class="w"> </span>-m<span class="w"> </span><span class="m">700</span><span class="w"> </span>qualification
+python<span class="w"> </span>scripts/qualification_candidate_wheels.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--wheel<span class="w"> </span>dist/invarlock-*.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--wheel<span class="w"> </span>dist/addins/invarlock_runtime_gguf-*.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/qualification/gguf-candidate-wheels.json&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">CANDIDATE_WHEEL_MANIFEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/qualification/gguf-candidate-wheels.json&quot;</span>
+</code></pre></div>
+
+<p>The helper accepts one <code>--wheel</code> per artifact, resolves only real <code>.whl</code> files,
+captures their SHA-256 digests, and creates a new
+<code>invarlock/qualification-candidate-wheels-v1</code> document with restrictive file
+permissions. The driver then requires the manifest to contain the core wheel
+and every maintained add-in used by the request, with unique distributions, a
+single version, and contents matching the authenticated source archive. A
+built-in Hugging Face transaction needs only the core wheel; GGUF,
+TensorRT-LLM, and vision-text transactions also need their selected add-in
+wheel. Recreate the manifest whenever any wheel changes, and pass the same
+<code>CANDIDATE_WHEEL_MANIFEST</code> to canary, readiness, and evidence qualification.</p>
+<p><code>PYTHON</code> owns the third-party dependency environment used by qualification.
+It must provide the dependencies declared by the candidate wheels, such as
+cryptography and JSON Schema support from the core or Pillow for vision-text
+host preflight. It does not select the first-party candidate. The driver
+extracts the authenticated wheels into a private site, places that site before
+the interpreter's dependency paths, and probes the expected distribution and
+provider entry-point metadata before running the public transaction. An older
+installed InvarLock or maintained add-in therefore cannot substitute for a
+manifest wheel. Model-runtime dependencies such as Torch, Transformers, or
+TensorRT-LLM remain inside the digest-pinned runtime image.</p>
+<p>The GGUF package documents a tiny <code>evaluate -&gt; verify</code> canary using a real GGUF
+artifact and <code>llama.cpp</code>. The Hugging Face vision-text package documents a
+prompt-and-image <code>evaluate -&gt; verify -&gt; report</code> qualification using a local
+checkpoint and authenticated content store. Its host preflight uses the same
+frozen caller-owned side resources as execution and authenticates every
+schedule-selected media object before any worker or GPU starts; workers repeat
+the check before model preparation. The TensorRT-LLM package ships
+<code>python -m invarlock_addins.tensorrt_llm.canary</code>, which checks the authenticated
+engine bundle, exact runner protocol, selected GPU, image digest, and one
+representative request. Run each qualification only inside its intended
+digest-pinned runtime. None of these commands supplies or qualifies a
+production model fixture.</p>
+<p>Maintained qualification adds a signed image prerequisite around those
+provider checks. Run <code>runtime-qualification-canary</code> at the repository root, or
+the provider's <code>qualify-canary</code> target, once for a small representative request
+through one exact image digest. Retain its evidence, signed verification
+receipt, and verifier-owned trust profile. Subsequent readiness and evidence
+targets require those paths as <code>CANARY_EVIDENCE</code>, <code>CANARY_RECEIPT</code>, and
+<code>CANARY_TRUST_PROFILE</code>; they strictly reverify the canary and require its
+runtime-image digest to equal the image being qualified. The retained canary
+may be reused while that exact digest remains unchanged.</p>
+<p>This signed canary is a real end-to-end transaction. By contrast, readiness is
+execution-free and starts no model worker. The sequence prevents many jobs
+from being launched through an image that cannot complete one representative
+strict transaction. It does not prove that another model loads, fits device
+memory, satisfies backend-specific compatibility, or completes its own run.</p>
+<p>The maintained qualification targets delegate to one repository driver rather
+than assembling separate shell transactions. The driver authenticates the Git
+source archive against the execution files in the named local Git commit,
+requires matching source labels on the runtime
+image, executes every child from a private archive-backed source snapshot and
+empty working directory, matches the caller-digested candidate wheels to that
+source, and executes their core and maintained add-in code through an isolated
+interpreter bootstrap. The qualification summary binds the candidate manifest,
+candidate wheel digests, and selected interpreter digest in addition to the
+normalized request digest returned by preflight.</p>
+<p>Qualification assumes a controlled host: the selected Python dependency
+closure, container daemon, kernel, driver, and device stack remain trusted
+computing base. Release qualification therefore uses a fresh hash-locked Linux
+environment, the real container journey, and a signed canary for each claimed
+provider/task class. Stronger host claims require an independent rerun or
+measured-execution attestation.</p>
+<p>Completion also requires strict pack verification plus an independent check of
+the signed receipt and the renderer-observed pack identity. Readiness mode
+performs the same source, image, request, trust, output, provider, and
+runtime-availability checks without starting a model worker, after reverifying
+the required signed canary. Create the exact archive with
+<code>scripts/qualification_source.py create</code>; maintained image builds reject absent
+or malformed source bindings before invoking Docker or Podman.</p>
+<p>For these targets, <code>QUALIFICATION_DRIVER_PYTHON</code> launches the standard-library
+driver while <code>PYTHON</code> supplies the dependency paths used by provider discovery,
+preflight, and the public CLI children. First-party distribution and
+entry-point metadata come from <code>CANDIDATE_WHEEL_MANIFEST</code>, not from
+<code>PYTHONPATH</code> or an installed core/add-in package. The vision-text host
+environment additionally needs Pillow; its Torch and Transformers inference
+dependencies remain in the runtime image.</p>
+<p>The root and first-party add-in wrappers forward one shared resource-control
+surface: <code>QUALIFICATION_DEVICE</code>, <code>QUALIFICATION_CPUS</code>,
+<code>QUALIFICATION_MEMORY_MIB</code>, and <code>QUALIFICATION_USER</code>. The root wrapper requires
+an explicit device; add-in wrappers use provider-appropriate defaults when it
+is omitted. Keep the resolved image and digest plus all supplied resource
+controls identical across signed canary, readiness, and evidence.</p>
+<p>The TensorRT-LLM runner protocol accepts one canonical JSON request on standard
+input and returns one canonical JSON response on standard output. Inspection
+and evaluation are separate modes, nonzero exit is failure, unknown response
+fields fail closed, and configured input/output byte and timeout bounds apply.
+The add-in README is the normative operator example for those bounds.</p>
+<h2 id="authoring-an-abi-provider">Authoring an ABI provider<a class="headerlink" href="#authoring-an-abi-provider" title="Permanent link">&para;</a></h2>
+<p>Third-party authors implement the protocol against the stable ABI module, keep
+backend imports behind <code>prepare_execution</code> or <code>open</code>, and publish one entry
+point. This minimal shape illustrates the boundary; it omits the required typed
+constructors and validation logic:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.core.runtime_provider</span><span class="w"> </span><span class="kn">import</span> <span class="n">INVARLOCK_RUNTIME_PROVIDER_ABI</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ExampleProvider</span><span class="p">:</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;example_runtime&quot;</span>
+    <span class="n">abi_version</span> <span class="o">=</span> <span class="n">INVARLOCK_RUNTIME_PROVIDER_ABI</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">capabilities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">identify_artifact</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">authenticate_artifact</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">artifact_path</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">prepare_execution</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">resources</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="o">...</span>
+</code></pre></div>
+
+<p>Use the exported typed value classes rather than free-form dictionaries.
+Provider authors own their conformance harnesses and can use the first-party
+add-in suites as examples.
+Tests should cover unknown settings, byte-authentication and each identity mismatch,
+no-follow resource access, record order and failure shapes, receipt-to-observation
+binding, deterministic canonical bytes, session cleanup, and discovery without
+importing the backend.</p>
+<p>A non-first-party provider can be discovered only when
+<code>INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS</code> is enabled. Strict evidence execution
+requires that switch to be false. Consequently, the public ABI supports
+experimentation and conformance, but a third-party distribution does not become
+an authorized strict-evidence provider merely by installing an entry point.</p>
+<p>The execution transaction observes this switch before opening any provider and
+rejects when it is enabled. It never records a disabled value merely because a
+provider returned otherwise valid records. A deployment that adds a provider
+to its authorized first-party set must change and test its own
+authorization boundary; environment opt-in is deliberately insufficient.</p>
+<h2 id="provider-conformance-checklist">Provider conformance checklist<a class="headerlink" href="#provider-conformance-checklist" title="Permanent link">&para;</a></h2>
+<p>A provider is suitable for the strict path only when it:</p>
+<ol>
+<li>declares and matches ABI <code>1</code> at module and instance level;</li>
+<li>keeps discovery free of eager backend imports;</li>
+<li>returns only closed typed capabilities and identities;</li>
+<li>authenticates local artifact and support resources without following links;</li>
+<li>runs offline in an observed digest-pinned container;</li>
+<li>emits one schedule-ordered scoring record per input;</li>
+<li>binds its receipt to the exact artifact, observation, settings, device, and
+   outer image; and</li>
+<li>closes the session on both success and failure.</li>
+</ol>
+<h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../contracts/">Public contracts</a> defines the provider-emitted document
+  schemas and canonical-byte rules.</li>
+<li><a href="../environment/">Environment variables</a> lists caller-owned GGUF and
+  TensorRT-LLM resources.</li>
+<li><a href="../api-guide/">Python API</a> identifies the provider ABI types exported through
+  the stable facade.</li>
+<li><a href="../release-verification/">Release verification</a> explains add-in version and
+  conformance checks.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
