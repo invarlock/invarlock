@@ -213,6 +213,15 @@ def test_independent_canary_rejects_rendering_identity_drift(
         corpora.independent_canary_records()
 
 
+def test_qwen38_records_reject_rendering_identity_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(corpora, "_QWEN38_27B_BYTES", corpora._QWEN38_27B_BYTES + 1)
+
+    with pytest.raises(RuntimeError, match="Qwen3.8 27B corpus"):
+        corpora.qwen38_27b_records()
+
+
 def test_flagship_policy_is_frozen_before_model_execution() -> None:
     policy = corpora.corpus_profile("flagship").acceptance_policy()
 
