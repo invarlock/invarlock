@@ -37,8 +37,9 @@ Let:
 | $d_{\mathcal S}$ | Independently supplied canonical schedule digest |
 | $R_B, R_S$ | Independently supplied baseline and subject runtime digests |
 | $K_E$ | Independently authorized evidence-signer public-key fingerprint |
+| $d_{\mathcal Q}$ | Independently supplied normalized-request digest, required when either side uses `llama_cpp` |
 | $K_V, I_V$ | Verifier key fingerprint and stable verifier identity |
-| $D(E,A_v)$ | Deterministic replay result for evidence $E$ under verifier anchors $A_v=(\pi_v,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E)$ |
+| $D(E,A_v)$ | Deterministic replay result for evidence $E$ under base anchors $A_v^0=(\pi_v,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E)$ plus $d_{\mathcal Q}$ for `llama_cpp` evidence |
 
 The machine acceptance predicate is:
 
@@ -82,9 +83,9 @@ row succeeds.
 | --- | --- | --- |
 | The comparison names closed inputs. | The normalized request and input identities bind the baseline, subject, schedule, policy, both runtime digests, and an exact scorer binding when selected. | The request loader rejects unknown fields, unsafe paths, ambiguous YAML, missing inputs, unsupported metrics, and incomplete scorer bindings. The publisher checks the request against provider identities, material digests, and the independently authorized scorer registry. |
 | Both sides evaluated the same ordered records. | The canonical schedule contains one task, unique record IDs, authenticated ordered input parts, expected outputs, and dataset coordinates. Each provider observation binds the schedule digest and repeats the ordered record IDs and input digests. | Pair derivation rejects missing, failed, duplicated, reordered, task-mismatched, or input-mismatched records. See [Pairing and replay](pairing-and-replay.md). |
-| The decision follows the declared arithmetic. | The bundle contains runtime facts, verifier-derived paired scores, the canonical comparison report, its metric-specific paired interval, optional sample qualification, the exact policy digest, and scorer replay results when selected. | Verification reconstructs every built-in score or replays an explicitly authorized scorer twice, then reconstructs each paired statistic or interval replicate, comparison, optional count/width checks, and verdict from the bound records and independently supplied policy. See [Decision semantics](decision-semantics.md). |
+| The decision follows the declared arithmetic. | The bundle contains runtime facts, verifier-derived paired scores, the canonical comparison report, its metric-specific paired interval, optional sample and exact-match side-accuracy qualification, the exact policy digest, and scorer replay results when selected. | Verification reconstructs every built-in score or replays an explicitly authorized scorer twice, then reconstructs each paired statistic or interval replicate, comparison, optional count/width and side-accuracy checks, and verdict from the bound records and independently supplied policy. See [Decision semantics](decision-semantics.md). |
 | The published evidence has not changed. | `manifest.json`, `checksums.sha256`, the complete file inventory, and the Ed25519 evidence signature bind the bundle. | Strict verification rejects checksum gaps, extra files, unsafe paths, JSON that is not canonical, signature failure, or an evidence-signer fingerprint different from the caller's anchor. |
-| Acceptance uses an independent trust decision. | The verifier supplies the policy bytes, expected artifact identities, canonical schedule, runtime digests, evidence-signer fingerprint, verifier identity, and verifier key outside the bundle. | `invarlock verify` replays the bundle under those anchors and writes a signed receipt outside the immutable evidence directory. |
+| Acceptance uses an independent trust decision. | The verifier supplies the policy bytes, expected artifact identities, canonical schedule, runtime digests, evidence-signer fingerprint, normalized-request digest for GGUF evidence, verifier identity, and verifier key outside the bundle. | `invarlock verify` replays the bundle under those anchors and writes a signed receipt outside the immutable evidence directory. |
 | People see the same decision as machines. | Console and HTML output are rendered from the canonical comparison report. | `invarlock report` authenticates bundle integrity and the evidence signature before rendering; it does not alter evidence or create an acceptance verdict. |
 
 The public contracts are summarized in
@@ -100,7 +101,7 @@ and
 | Assumption | Why it matters | Defeater |
 | --- | --- | --- |
 | Evidence signer and verifier fingerprints were authorized through independent identity processes. | A valid signature authenticates a key, not an organization or role by itself. | Fingerprint copied from submitted evidence, unknown key owner, revoked or compromised key. |
-| Verifier anchors are controlled outside the evidence submission path. | Otherwise the evidence signer can choose the expected policy, artifacts, schedule, runtimes, and signer. | Anchors parsed from the bundle or supplied by the same actor without independent review. |
+| Verifier anchors are controlled outside the evidence submission path. | Otherwise the evidence signer can choose the expected policy, artifacts, schedule, runtimes, signer, and GGUF request. | Anchors parsed from the bundle or supplied by the same actor without independent review. |
 | Schedule and policy were selected before subject results were inspected. | Post-result selection can preserve perfect internal consistency while biasing the result. | Cherry-picked records, changed expected outputs, favorable run selection, or threshold tuning. |
 | Provider measurements are credible enough for the decision context. | Replay checks consistency, not physical execution truth. | Compromised evaluation environment or provider, missing external attestation where one is required. |
 | Selected scorer code was reviewed and independently authorized. | A scorer extension executes code that determines per-record values, although the core retains aggregation and policy arithmetic. | Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, human judgment, or LLM judge. |
@@ -141,11 +142,12 @@ A passing signed verification receipt establishes that:
   independently expected;
 - the bundle inventory, checksums, input bindings, runtime-integration bindings,
   schedule, paired records, runtime manifests, comparison arithmetic, paired
-  interval, and optional sample qualification replayed without error;
+  interval, and optional sample and side-accuracy qualification replayed without error;
 - the independently supplied policy, artifact-identity, schedule, and runtime
   digests matched the bound identities; and
 - the replayed finite-schedule decision passed that policy using the required
-  conservative interval bound and any configured count and width controls.
+  conservative interval bound and any configured count, width, and side-
+  accuracy controls.
 
 The receipt also identifies the verifier key and verifier identity that made
 that statement. It does not silently upgrade the statement beyond those
@@ -200,11 +202,15 @@ invarlock verify evidence/ \
   --expected-baseline-runtime sha256:BASELINE_RUNTIME_DIGEST \
   --expected-subject-runtime sha256:SUBJECT_RUNTIME_DIGEST \
   --expected-signer sha256:EVIDENCE_SIGNER_KEY_FINGERPRINT \
+  --expected-request-digest sha256:NORMALIZED_REQUEST_DIGEST \
   --receipt verification.receipt.json \
   --verifier-signing-key verifier.pem \
   --verifier-identity release-verifier
 invarlock report evidence/ --html evidence.html --explain
 ```
+
+Omit `--expected-request-digest` only when neither side uses `llama_cpp` and
+the verifier has not approved an optional request anchor.
 
 Use the [acceptance checklist](acceptance-checklist.md) before relying on the
 receipt.

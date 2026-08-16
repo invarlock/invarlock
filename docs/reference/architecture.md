@@ -29,7 +29,7 @@ bundle.
 | Transaction | Reads | Writes | Independent trust required | Acceptance authority |
 | --- | --- | --- | --- | --- |
 | `evaluate` | Closed request, referenced inputs, caller runtime resources or imported sidecars | One immutable evidence directory | Evidence-signing private key; authenticated runtime/material inputs | Creates paired measurements, a finite-schedule policy result, and signed evidence |
-| `verify` | Untrusted evidence directory plus independent artifact/schedule/policy/runtime/signer anchors | One signed receipt outside the pack | Expected artifacts, schedule, policy, runtimes, evidence signer, verifier identity, and private key | Yes, for the exact bound comparison |
+| `verify` | Untrusted evidence directory plus independent artifact/schedule/policy/runtime/signer anchors and the request anchor required for GGUF | One signed receipt outside the pack | Expected artifacts, schedule, policy, runtimes, evidence signer, GGUF request when applicable, verifier identity, and private key | Yes, for the exact bound comparison |
 | `report` | Signature-authenticated evidence directory | Console and optional HTML outside the pack | None beyond embedded evidence signature | Presents the canonical report; the verification receipt carries acceptance authority |
 
 The same pack can be rendered many times and verified by many independent
@@ -41,7 +41,7 @@ authorities without changing a byte in the evidence directory.
 | --- | --- |
 | Closed request | Select exactly two artifacts, one pinned dataset source or canonical schedule, one policy, exactly one built-in metric or scorer-extension binding, one execution mode, and one output directory |
 | Runtime integration ABI | Identify artifacts and emit typed receipts and ordered scoring observations |
-| Paired transaction | Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width controls |
+| Paired transaction | Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width and exact-match side-accuracy controls |
 | Canonical bundle | Bind normalized intent, identities, provider material, paired records, report, checksums, and evidence signature |
 | Independent verifier | Recompute integrity, identities, pairs, scores, report, and policy verdict under caller-owned trust anchors |
 | Human renderer | Produce a console view and optional self-contained HTML from the authenticated canonical report |
@@ -56,7 +56,8 @@ are not selected by the bundle:
 - the expected baseline and subject artifact-identity digests;
 - the expected canonical schedule digest;
 - expected baseline and subject runtime image digests; and
-- the expected evidence-signer fingerprint.
+- the expected evidence-signer fingerprint; and
+- for GGUF evidence, the expected normalized-request digest.
 
 The verifier signs those anchors, the pack-manifest digest, and its verdict
 with a separate key. Keeping the verification receipt outside the bundle lets
@@ -69,7 +70,7 @@ sourced copies of the policy bytes bound into that bundle.
 | Which inputs were scored | Canonical schedule and ordered observation records | Recompute schedule digest, IDs, order, and input digests |
 | Which runtime executed each side | Runtime manifests and provider receipts | Compare both image digests to caller-owned expected values |
 | What each backend returned | Scoring observations | Validate per-record facts and observation digests |
-| What score and threshold apply | Paired records, policy, scorer binding when selected, and canonical report | Re-derive scores, means, comparison, paired interval, threshold, optional count/width qualification, and verdict; require independently authorized scorer code when selected |
+| What score and threshold apply | Paired records, policy, scorer binding when selected, and canonical report | Re-derive scores, means, comparison, paired interval, threshold, optional count/width and exact-match side-accuracy qualification, and verdict; require independently authorized scorer code when selected |
 | Who signed the pack | Manifest signature | Compare the public-key fingerprint to the caller anchor |
 | Who accepted or rejected it | External receipt | Verify receipt signature, identity, fingerprint, anchors, and manifest digest |
 

@@ -23,12 +23,14 @@ identity and canonical-schedule digests, expected runtime digests,
 evidence-signer and verifier fingerprints, and private signing key are trust
 inputs. Those verifier-owned inputs remain outside the submitted bundle and
 arrive through independent channels; verification compares them with the
-corresponding signed evidence.
+corresponding signed evidence. GGUF evidence adds an independently approved
+normalized-request digest to those inputs.
 
 Verification requires an external policy, both expected artifact-identity
 digests, the expected canonical-schedule digest, both expected runtime digests,
 the expected evidence-signer fingerprint, and a verifier identity and signing
-key.
+key. When either side uses `llama_cpp`, it also requires the independently
+approved normalized-request digest.
 See the [verification guide](../docs/user-guide/evidence-and-verification.md)
 for the trust model. A complete command is:
 
@@ -45,6 +47,9 @@ invarlock verify PATH/TO/EVIDENCE \
   --verifier-signing-key verifier.pem \
   --verifier-identity verifier.example
 ```
+
+When either evidence side uses `llama_cpp`, also pass the independent request
+anchor as `--expected-request-digest "$REQUEST_DIGEST"` before `--receipt`.
 
 Render its signer-authenticated comparison report with:
 

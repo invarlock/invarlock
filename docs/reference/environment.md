@@ -29,6 +29,7 @@ do not satisfy required paths, digests, fingerprints, or identities.
 | `INVARLOCK_EXPECTED_BASELINE_RUNTIME` | `verify` | Expected baseline `sha256:...` runtime-image digest |
 | `INVARLOCK_EXPECTED_SUBJECT_RUNTIME` | `verify` | Expected subject `sha256:...` runtime-image digest |
 | `INVARLOCK_EXPECTED_SIGNER` | `verify` | Expected Ed25519 evidence-signer fingerprint |
+| `INVARLOCK_EXPECTED_REQUEST_DIGEST` | `verify` | Approved normalized-request digest; required when either evidence side uses `llama_cpp` |
 | `INVARLOCK_VERIFIER_SIGNING_KEY` | `verify` | Ed25519 verifier private-key path |
 | `INVARLOCK_VERIFIER_IDENTITY` | `verify` | Stable verifier identity included in the receipt |
 

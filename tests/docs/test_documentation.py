@@ -345,6 +345,39 @@ def test_runtime_qualification_docs_use_authenticated_candidate_wheels() -> None
         assert wheel in text
 
 
+def test_runtime_and_report_references_track_current_closed_contracts() -> None:
+    runtime_reference = _read("docs/reference/runtime-providers.md")
+    for setting in (
+        "cpu_threads",
+        "prompt_batch_size",
+        "prompt_microbatch_size",
+        "processor_metadata_sha256",
+    ):
+        assert f"`{setting}`" in runtime_reference
+
+    gguf_addin = _read("addins/gguf/README.md")
+    gguf_guide = _read("docs/user-guide/runtime-providers.md")
+    for fragment in (
+        "cpu_threads=16",
+        "prompt_batch_size=512",
+        "prompt_microbatch_size=512",
+    ):
+        assert fragment in gguf_addin
+        assert fragment in gguf_guide
+
+    contracts = _read("docs/reference/contracts.md")
+    assert "The v3 comparison report is the current writer format" in contracts
+    assert "| Behavioral schedule | `format_version`, `task`," in contracts
+    assert "`minimum_side_accuracy`" in contracts
+
+    cli = _read("docs/reference/cli.md")
+    assert "[--json]" in cli.split("## `report`", maxsplit=1)[1]
+    assert "invarlock/evidence-report-v1" in cli
+
+    api = _read("docs/reference/api-guide.md")
+    assert "expected_request_digest: str | None = None" in api
+
+
 def test_documentation_lint_discovers_maintained_markdown_surfaces() -> None:
     makefile = _read("Makefile")
     assert makefile.count("git ls-files -z -- ':(icase,glob)**/*.md'") == 2
@@ -629,10 +662,13 @@ def test_complete_docs_cover_current_assurance_and_claim_limits() -> None:
         "paired-records-v1",
         "comparison-report-v1",
         "comparison-report-v2",
+        "comparison-report-v3",
         "runtime-side-report-v1",
         "minimum_record_count",
+        "minimum_side_accuracy",
         "maximum_interval_width_pp",
         "maximum_interval_width_ratio",
+        "normalized-request digest",
         "verification receipt",
     ):
         assert phrase in text

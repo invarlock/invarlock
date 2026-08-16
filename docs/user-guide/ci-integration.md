@@ -21,7 +21,8 @@ The action runs the same public transactions documented by the
 
 1. `invarlock verify EVIDENCE` authenticates and replays the bundle using the
    supplied artifact identities, schedule, policy, runtime digests, and
-   evidence-signer fingerprint, then writes a verifier-signed receipt.
+   evidence-signer fingerprint plus the normalized-request digest required for
+   GGUF evidence, then writes a verifier-signed receipt.
 2. `invarlock report EVIDENCE --html PATH --explain` authenticates the bundle
    and writes a human view without changing the evidence.
 3. The action uploads the evidence directory, verification JSON, signed
@@ -42,6 +43,7 @@ from the submitted evidence directory.
 | `expected-baseline-runtime` | Yes | Approved baseline outer-image digest |
 | `expected-subject-runtime` | Yes | Approved subject outer-image digest |
 | `expected-signer` | Yes | Authorized Ed25519 evidence-signer fingerprint |
+| `expected-request-digest` | For GGUF | Approved normalized-request digest; required when either side uses `llama_cpp` |
 | `verifier-signing-key` | Yes | Path to the verifier-owned private-key file |
 | `verifier-identity` | Yes | Stable identity recorded in the signed receipt |
 | `python` | No | Python executable; defaults to `python` |
@@ -133,6 +135,7 @@ jobs:
           expected-baseline-runtime: ${{ vars.INVARLOCK_BASELINE_RUNTIME_DIGEST }}
           expected-subject-runtime: ${{ vars.INVARLOCK_SUBJECT_RUNTIME_DIGEST }}
           expected-signer: ${{ vars.INVARLOCK_EVIDENCE_SIGNER_FINGERPRINT }}
+          expected-request-digest: ${{ vars.INVARLOCK_REQUEST_DIGEST }}
           verifier-signing-key: ${{ runner.temp }}/invarlock-verifier.pem
           verifier-identity: release-verifier
           receipt-output: reports/invarlock/verification.receipt.json
@@ -148,6 +151,9 @@ use that release's pinned immutable commit SHA. A tag is easier to read but a
 full commit pin makes action-source substitution visible in review.
 `INVARLOCK_POLICY_SHA256` must likewise be a protected verifier-owned digest,
 not a value read from the submitted checkout.
+`INVARLOCK_REQUEST_DIGEST` is required when either evidence side uses
+`llama_cpp`; omit `expected-request-digest` for a non-GGUF workflow that does
+not maintain this additional anchor.
 
 ## Protected deployment approval
 
@@ -217,6 +223,8 @@ receipt through the
 ## Trust and secret handling
 
 - Never derive `expected-signer` from `manifest.signature.json` in the pack.
+- For GGUF evidence, never derive `expected-request-digest` from the submitted
+  normalized request.
 - Never copy either expected runtime digest from the submitted runtime
   manifests.
 - Do not upload or cache the verifier private key.

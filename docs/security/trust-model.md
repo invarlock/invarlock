@@ -31,11 +31,16 @@ Let $M$ be the canonical pack manifest, $\sigma_E$ its evidence signature,
 $\pi_V$ the independently supplied policy, $A_B$ and $A_S$ the expected
 artifact-identity digests, $d_{\mathcal S}$ the expected canonical schedule
 digest, $R_B$ and $R_S$ the expected runtime digests, and $K_E$ the expected
-evidence-signer fingerprint. Define the verifier anchor set as:
+evidence-signer fingerprint. Let $d_{\mathcal Q}$ be the independently
+approved normalized-request digest required when either side uses
+`llama_cpp`. Define the base verifier anchor set as:
 
 $$
-A_V=(\pi_V,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E).
+A_V^0=(\pi_V,A_B,A_S,d_{\mathcal S},R_B,R_S,K_E).
 $$
+
+For non-GGUF evidence, $A_V=A_V^0$. When either side uses `llama_cpp`,
+$A_V=(A_V^0,d_{\mathcal Q})$.
 
 Let $V(E,A_V)$ be the replay result and $Q$ the signed receipt statement. The
 cryptographic checks establish:
@@ -69,15 +74,15 @@ policy. A valid outer signature cannot authorize the inner receipt signer.
 | Role | Controls | Signed or rendered output | Reliance |
 | --- | --- | --- | --- |
 | Evidence signer | Closed request, model artifacts, provider execution or imported records, and evidence-signing key | Immutable `invarlock/evidence-pack-v1` | Authorized to state what evidence it produced; not automatically trusted to choose acceptance anchors or report truthful execution |
-| Verifier | Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, explicitly authorized scorer registry when selected, verifier identity, and verifier key | External signed verification receipt | Authorized to make the scoped acceptance statement under independently managed anchors and scorer authorization |
+| Verifier | Policy bytes, expected baseline and subject artifact-identity digests, expected canonical schedule digest, both expected runtime digests, expected evidence-signer fingerprint, normalized-request digest for GGUF evidence, explicitly authorized scorer registry when selected, verifier identity, and verifier key | External signed verification receipt | Authorized to make the scoped acceptance statement under independently managed anchors and scorer authorization |
 | Envelope signer | Signed receipt, bound evidence metadata, exact subject, and envelope-signing key | in-toto Statement in a DSSE envelope | Authorized to transport a technical result; not automatically authorized as the technical receipt verifier or recipient decision owner |
 | Recipient | Current recipient policy, envelope-signer and receipt-verifier registries, expected subject bytes or digest, and evaluation time | Accepted or rejected portable handoff | Authorizes both signer roles and decides present-day acceptability without changing the historical technical verdict |
 | Renderer | Submitted evidence pack and presentation destination | Console or HTML view | Presents the authenticated canonical report; acceptance authority remains with independent verification and its receipt |
 
 The verifier must not derive an expected value from the evidence field that the
 value is intended to check. Copying the policy, artifact identities, schedule
-digest, runtime digests, or evidence-signer fingerprint from the submitted
-bundle makes the check circular.
+digest, runtime digests, evidence-signer fingerprint, or GGUF normalized-
+request digest from the submitted bundle makes the check circular.
 
 ## Trust-anchor matrix
 
@@ -91,6 +96,7 @@ bundle makes the check circular.
 | Canonical schedule digest | Approved schedule record | The evidence covers the exact expected ordered inputs and outputs | The schedule is representative or sufficiently powered |
 | Baseline runtime digest | Pinned image/build record | The baseline evidence declares the expected image identity | The image executed |
 | Subject runtime digest | Pinned image/build record | The subject evidence declares the expected image identity | The image executed |
+| Normalized-request digest | Approved deployment request or signed release configuration; required for `llama_cpp` evidence | The evidence carries the exact approved canonical request, including bound GGUF execution controls | The declared runtime executed or the request is scientifically sufficient |
 | Verifier identity/fingerprint | Independently maintained verifier-identity record | The receipt was signed by the expected verifier key | The verifier host and process were free of compromise |
 | Envelope-signer identity/fingerprint | Recipient-maintained envelope-signer registry | The DSSE envelope was signed by the expected transport key | The embedded technical receipt is authentic or authorized |
 | Trust-profile digest | Canonical digest of an independently maintained `invarlock/trust-inputs-v1` profile | The receipt records the exact closed profile used for verification | The profile's anchors were authorized or scientifically sufficient |
@@ -153,7 +159,7 @@ verification succeeds. The verifier checks canonical JSON, safe paths, bounded
 files, the exact inventory, checksums, signatures, versioned schemas, input
 identities, provider cross-bindings, schedule order, per-record scores, report
 arithmetic, the selected paired interval, optional count/width qualification,
-and the policy result.
+optional exact-match side-accuracy qualification, and the policy result.
 
 A scorer binding inside the submitted request or evidence is also untrusted.
 It identifies requested code and configuration but cannot authorize either.
@@ -162,9 +168,9 @@ It identifies requested code and configuration but cannot authorize either.
 
 The verifier's policy bytes, baseline and subject artifact-identity digests,
 canonical schedule digest, runtime digests, evidence-signer fingerprint,
-verifier identity, and verifier key are outside the submitted evidence. Their
-source, review, authorization, rotation, and revocation are operational
-controls.
+GGUF normalized-request digest when applicable, verifier identity, and
+verifier key are outside the submitted evidence. Their source, review,
+authorization, rotation, and revocation are operational controls.
 InvarLock records them; it does not operate a public-key infrastructure or
 policy distribution service.
 
@@ -242,6 +248,7 @@ keys. It binds:
 - the canonical schedule digest;
 - baseline and subject runtime digests;
 - the expected evidence-signer fingerprint;
+- the normalized-request digest when either side uses `llama_cpp`;
 - verifier identity and verifier fingerprint; and
 - integrity, policy, and overall verdicts.
 

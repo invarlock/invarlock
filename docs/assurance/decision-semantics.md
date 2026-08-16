@@ -3,9 +3,10 @@
 !!! abstract "Assurance note"
     **In plain language:** InvarLock recomputes every score from authenticated
     paired records, derives the metric's paired interval, and applies the policy
-    to the conservative bound. When the policy qualifies sample size and
-    precision, those checks must pass too. A favorable point value cannot
-    override a threshold, count, or width failure.
+    to the conservative bound. When the policy qualifies sample size,
+    precision, or exact-match side accuracy, those checks must pass too. A
+    favorable point value cannot override a threshold, count, width, or side-
+    accuracy failure.
 
     **Question:** How are a built-in metric or authorized deterministic scorer
     converted into a reproducible policy verdict?
@@ -146,7 +147,7 @@ of asymmetry between regressions and improvements; it does not control the
 acceptance verdict.
 
 The exact-match interval is a paired Newcombe hybrid-score 95% interval for
-the subject-minus-baseline effect. The current v2 report uses the
+the subject-minus-baseline effect. Current v3 reports use the
 continuity-corrected method:
 
 ```json
@@ -402,7 +403,8 @@ The evidence signer cannot supply an accepted aggregate directly. Verification:
   are comparable;
 - reconstructs canonical paired records;
 - recomputes side means, point comparison, the selected interval, threshold
-  application, optional count/width qualification, and verdict; and
+  application, optional count/width and exact-match side-accuracy
+  qualification, and verdict; and
 - requires canonical equality with the stored report.
 
 The implementation is in
@@ -413,8 +415,8 @@ and independent replay is in
 ## Finite-schedule interpretation
 
 A pass means that the policy's conservative bound cleared its threshold and
-any configured count and width requirements passed for the authenticated
-records and runtime configuration. It does not establish:
+any configured count, width, and exact-match side-accuracy requirements passed
+for the authenticated records and runtime configuration. It does not establish:
 
 - equality, equivalence, or non-inferiority in a broader population;
 - representativeness of the selected prompts or targets;

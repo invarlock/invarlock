@@ -138,13 +138,38 @@ underlying library's [offline-mode
 controls](https://huggingface.co/docs/transformers/installation#offline-mode);
 InvarLock additionally binds its own strict runtime and receipt conditions.
 
+### `hf_vision_text`
+
+| Setting | Requirement | Meaning |
+| --- | --- | --- |
+| `immutable_revision` | Required when the artifact identity includes it | Immutable upstream revision |
+| `checkpoint_tree_sha256` | Required | Authenticated checkpoint-directory tree digest |
+| `tokenizer_metadata_sha256` | Required | Authenticated tokenizer contract digest |
+| `processor_metadata_sha256` | Required | Authenticated multimodal processor contract digest |
+| `batch_size` | Required for strict receipt; must be `1` | Scoring batch size |
+| `context_length` | Required, positive integer | Maximum input context |
+| `max_output_tokens` | Required, positive integer | Maximum generated output |
+| `offline` | Required and `true` | Backend offline intent |
+| `seed` | Required, non-negative integer | Deterministic seed |
+| `timeout_seconds` | Required, positive integer | Per-call timeout |
+
+The closed set is the Hugging Face text contract plus
+`processor_metadata_sha256`, with `checkpoint_tree_sha256` mandatory for every
+vision-text request. The provider authenticates the checkpoint, tokenizer, and
+processor before execution and resolves image bytes through the caller-owned
+content store described in the user guide.
+
 ### `llama_cpp`
 
-Every key is required: `artifact_byte_length`, `artifact_sha256`,
+Newly inspected specifications use the current closed set and require every
+key: `artifact_byte_length`, `artifact_sha256`,
 `backend_binary_sha256`, `backend_source_sha256`, `backend_version`,
-`batch_size`, `context_length`, `gguf_metadata_sha256`, `max_output_tokens`,
-`seed`, `tensor_inventory_sha256`, `timeout_seconds`, and
-`tokenizer_metadata_sha256`. Digest values are lowercase bare SHA-256 values.
+`batch_size`, `context_length`, `cpu_threads`, `gguf_metadata_sha256`,
+`max_output_tokens`, `prompt_batch_size`, `prompt_microbatch_size`, `seed`,
+`tensor_inventory_sha256`, `timeout_seconds`, and `tokenizer_metadata_sha256`.
+Digest values are lowercase bare SHA-256 values. Strict verification also
+accepts historical GGUF request profiles that predate the three backend
+execution controls; current inspection never emits that legacy set.
 The provider authenticates the GGUF bytes, typed metadata and tensor inventory,
 tokenizer metadata, and the pinned `llama.cpp` executable and source tree.
 Independent verification also requires the normalized-request digest from the
