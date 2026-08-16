@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a bounded CPU-only SPDX 3.0.1 AI observation example that preserves
+  exact canonical source bytes, cross-binds the declared package SHA-256 to an
+  canonical GGUF identity, and records unperformed official schema and
+  OWL/SHACL validation as `not_evaluated` without changing core contracts or
+  acceptance semantics.
 - Added a clean-consumer release-reference journey that reauthenticates the
   retained Qwen3.8 27B signed evidence with the isolated candidate wheel,
   issues an independent receipt, and requires deterministic report rendering.

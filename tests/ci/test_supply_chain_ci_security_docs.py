@@ -86,6 +86,8 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
         "public_evidence/evidence/example/manifest.json",
         "examples/evaluator-qualification/signed-transactions/qwen35-inspect-ai/"
         "build-attestation.json",
+        "examples/integrations/spdx-ai-observation/source/model-aibom.spdx3.json",
+        "examples/integrations/spdx-ai-observation/source/model-artifact.identity.json",
         "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
     ):
         assert excluded.search(path)
@@ -95,6 +97,9 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
     assert not excluded.search(
         "examples/ci/standalone-consumer/review/"
         "inspect-ai-deployment-approval-inputs.json"
+    )
+    assert not excluded.search(
+        "examples/integrations/spdx-ai-observation/observation-payload.json"
     )
 
 

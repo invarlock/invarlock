@@ -337,9 +337,14 @@ in a separate context section.
 
 Observations are authenticated context. The selected paired comparison, its
 paired interval, and policy are the complete acceptance calculation. Adding,
-removing, or changing an observation cannot alter the verdict; any byte change
+removing, or changing an observation changes the request-bound comparison ID
+and therefore creates a different signed transaction, but cannot alter the
+paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
-variance summaries from `invarlock-diagnostics` use this path.
+variance summaries from `invarlock-diagnostics` use this path. The
+[SPDX 3.0.1 AI observation example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation)
+shows how to retain an external document, its exact source digest, validation
+status, and an artifact cross-binding without granting it acceptance authority.
 
 ## Interval and sample-controlled verdict
 

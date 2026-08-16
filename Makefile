@@ -64,7 +64,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
 .PHONY: acceptance-policy-interop
-.PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
+.PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
@@ -359,6 +359,9 @@ example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 example-gguf-deployment:  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
 	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with '.[hf]' \
 		--with ./addins/gguf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
+
+example-spdx-ai-observation:  ## Check the bounded SPDX 3.0.1 AI observation fixture
+	PYTHONPATH=src:. $(PYTHON) -m examples.integrations.spdx_ai_observation --check
 
 example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
 	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
