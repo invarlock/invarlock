@@ -9,8 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.15.0] - 2026-08-16
+
+This release extends the v0.14 evaluator-neutral qualification and recipient
+handoff with independently replayable deployment evidence and stricter release
+assurance. Comparison-report v3 adds minimum-side accuracy to the bounded
+acceptance policy; retained current-model journeys authenticate evaluator,
+runtime, artifact, and conversion provenance across BF16, GGUF, QAT, and OCI
+deployments; and a clean-consumer candidate-wheel replay verifies signed
+Qwen3.8 evidence before release. A bounded SPDX 3.0.1 AI observation example
+demonstrates external metadata cross-binding without expanding core contracts
+or allowing observation-only results to drive acceptance.
+
+### Added
+
 - Added a bounded CPU-only SPDX 3.0.1 AI observation example that preserves
-  exact canonical source bytes, cross-binds the declared package SHA-256 to an
+  exact canonical source bytes, cross-binds the declared package SHA-256 to a
   canonical GGUF identity, and records unperformed official schema and
   OWL/SHACL validation as `not_evaluated` without changing core contracts or
   acceptance semantics.
