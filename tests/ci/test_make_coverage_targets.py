@@ -84,6 +84,7 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
         "first_party_distribution_validation.py",
         "release_distribution_validation.py",
         "release_preflight.py",
+        "release_reference_journey.py",
         "tagged_release_candidate.py",
         "verify_hosted_distributions.py",
     ):

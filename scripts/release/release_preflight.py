@@ -5,7 +5,8 @@ This command deliberately keeps artifact *shape* checks separate from release
 approval.  It proves that the checked-out commit is the requested clean commit,
 that the two built distributions have the expected metadata and hashes, and
 that an isolated installed-wheel interpreter is not importing the checkout.
-It then audits the current public-evidence index. It does not publish anything.
+It then replays one retained signed evidence pack through that installed wheel
+and audits the current public-evidence index. It does not publish anything.
 """
 
 from __future__ import annotations
@@ -96,6 +97,10 @@ try:
         _require_regular_file,
         validate_distributions,
     )
+    from scripts.release.release_reference_journey import (
+        ReleaseReferenceJourneyError,
+        run_release_reference_journey,
+    )
 except ImportError:  # pragma: no cover - direct script execution path
     from first_party_distribution_validation import (  # type: ignore[import-not-found, no-redef]
         validate_first_party_addin_distributions,
@@ -108,6 +113,10 @@ except ImportError:  # pragma: no cover - direct script execution path
         _require_executable_file,
         _require_regular_file,
         validate_distributions,
+    )
+    from release_reference_journey import (  # type: ignore[import-not-found, no-redef]
+        ReleaseReferenceJourneyError,
+        run_release_reference_journey,
     )
 
 
@@ -324,6 +333,24 @@ def _smoke_installed_wheel_cli(cli: Path, *, cwd: Path) -> None:
         )
 
 
+def _run_installed_wheel_reference_journey(
+    config: ReleasePreflightConfig, cli: Path, *, cwd: Path
+) -> None:
+    """Replay retained evidence through only the installed candidate CLI."""
+
+    try:
+        run_release_reference_journey(
+            repo_root=config.repo_root,
+            command=(str(cli),),
+            workspace=cwd / "release-reference-journey",
+            allow_checkout_source=False,
+        )
+    except (OSError, ReleaseReferenceJourneyError) as exc:
+        raise ReleasePreflightError(
+            "installed-wheel release reference journey failed"
+        ) from exc
+
+
 def _probe_installed_wheel(
     config: ReleasePreflightConfig, wheel: Path
 ) -> InstalledWheelImport:
@@ -387,8 +414,13 @@ def _probe_installed_wheel(
             raise ReleasePreflightError(
                 "installed-wheel import did not resolve from the isolated environment"
             )
+        validate_installed_wheel_import(config, imported)
         _smoke_installed_wheel_cli(wheel_cli, cwd=cwd)
-    validate_installed_wheel_import(config, imported)
+        _run_installed_wheel_reference_journey(
+            config,
+            wheel_cli,
+            cwd=cwd,
+        )
     return imported
 
 
@@ -477,6 +509,7 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
             for item in addin_artifacts
         ],
         "installed_wheel_import": "isolated_venv_from_candidate_wheel",
+        "installed_wheel_reference_journey": "passed",
         "installed_wheel_runtime_surface": "passed",
         "current_public_evidence": "passed",
     }

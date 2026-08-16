@@ -688,6 +688,7 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
     for fragment in (
         "make dist-check",
         "make release-preflight",
+        "make release-reference-journey",
         '--hash-manifest "$HASH_MANIFEST"',
         "scripts/release/make_offline_bundle.sh",
         "fix forward under a new version",

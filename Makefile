@@ -73,7 +73,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda129 container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
-.PHONY: release-preflight contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
+.PHONY: release-preflight release-reference-journey contracts-check contracts-sync repo-cruft-check public-evidence-audit public-evidence-sync examples-check
 .PHONY: clean docsclean deepclean pre-commit pre-commit-install ensure-python ensure-ruff ensure-mypy
 
 help:  ## Show maintained targets
@@ -209,6 +209,7 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		tests/scripts/test_release_preflight.py \
 		tests/scripts/test_release_preflight_adversarial.py \
 		tests/scripts/test_release_preflight_edges.py \
+		tests/scripts/test_release_reference_journey.py \
 		tests/scripts/test_verify_hosted_distributions.py \
 		tests/scripts/test_verify_hosted_distributions_edges.py \
 		tests/scripts/test_tagged_release_candidate.py \
@@ -222,6 +223,8 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		--include='scripts/release/release_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/release_preflight.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
+		--include='scripts/release/release_reference_journey.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/tagged_release_candidate.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
@@ -669,6 +672,9 @@ packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate art
 release-preflight:  ## Validate a clean exact release checkout and distributions
 	@test -n "$(RELEASE_PREFLIGHT_ARGS)" || { echo "RELEASE_PREFLIGHT_ARGS is required" >&2; exit 2; }
 	$(PYTHON) scripts/release/release_preflight.py $(RELEASE_PREFLIGHT_ARGS)
+
+release-reference-journey:  ## Replay retained signed evidence through the current verifier
+	PYTHONPATH=src $(PYTHON) scripts/release/release_reference_journey.py --repo-root . --json
 
 ##@ Runtime image
 runtime-image:  ## Build the canonical Hugging Face runtime image

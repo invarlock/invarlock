@@ -254,6 +254,7 @@ def test_release_preflight_runs_all_independent_gates(
     ]
     assert summary["ok"] is True
     assert summary["installed_wheel_import"] == "isolated_venv_from_candidate_wheel"
+    assert summary["installed_wheel_reference_journey"] == "passed"
     assert summary["installed_wheel_runtime_surface"] == "passed"
     assert summary["current_public_evidence"] == "passed"
 
@@ -460,6 +461,7 @@ def test_candidate_wheel_is_installed_in_a_disposable_isolated_environment(
     config = _config(module, tmp_path)
     artifacts = module.validate_distributions(config)
     smoke_calls: list[tuple[Path, Path]] = []
+    reference_calls: list[tuple[Path, Path]] = []
     monkeypatch.setattr(
         module,
         "_smoke_installed_wheel_cli",
@@ -488,6 +490,15 @@ print(json.dumps({
 """,
     )
     monkeypatch.setattr(module, "_PROBED_INVARLOCK_MODULES", frozenset({"invarlock"}))
+    monkeypatch.setattr(
+        module,
+        "_run_installed_wheel_reference_journey",
+        lambda received, cli, *, cwd: (
+            reference_calls.append((cli, cwd))
+            if received == config
+            else pytest.fail("unexpected release configuration")
+        ),
+    )
 
     imported = module._probe_installed_wheel(config, artifacts.wheel)
 
@@ -498,6 +509,7 @@ print(json.dumps({
     assert len(smoke_calls) == 1
     assert smoke_calls[0][0].name == "invarlock"
     assert not module._is_within(smoke_calls[0][1], config.repo_root)
+    assert reference_calls == smoke_calls
 
 
 def test_public_evidence_audit_is_pinned_to_canonical_checkout_tree(
@@ -540,6 +552,56 @@ def test_make_release_preflight_is_distinct_from_artifact_shape_check() -> None:
     assert "RELEASE_PREFLIGHT_ARGS is required" in preflight
     assert "evidence_contracts.py" not in preflight
     assert ".PHONY: release-preflight" in text
+    assert ".PHONY: release-preflight release-reference-journey" in text
+
+    reference = text.split("release-reference-journey:", 1)[1].split(
+        "\n\n##@ Runtime image", 1
+    )[0]
+    assert "scripts/release/release_reference_journey.py" in reference
+    assert "--repo-root . --json" in reference
+
+
+def test_installed_wheel_reference_journey_uses_candidate_only(
+    module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _config(module, tmp_path)
+    cli = tmp_path / "installed" / "bin" / "invarlock"
+    cwd = tmp_path / "consumer"
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        module,
+        "run_release_reference_journey",
+        lambda **kwargs: calls.append(kwargs) or {"ok": True},
+    )
+
+    module._run_installed_wheel_reference_journey(config, cli, cwd=cwd)
+
+    assert calls == [
+        {
+            "repo_root": config.repo_root,
+            "command": (str(cli),),
+            "workspace": cwd / "release-reference-journey",
+            "allow_checkout_source": False,
+        }
+    ]
+
+
+def test_installed_wheel_reference_journey_fails_preflight_closed(
+    module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = _config(module, tmp_path)
+
+    def reject(**_kwargs: object) -> None:
+        raise module.ReleaseReferenceJourneyError("rejected")
+
+    monkeypatch.setattr(module, "run_release_reference_journey", reject)
+
+    with pytest.raises(module.ReleasePreflightError, match="reference journey failed"):
+        module._run_installed_wheel_reference_journey(
+            config,
+            tmp_path / "invarlock",
+            cwd=tmp_path / "consumer",
+        )
 
 
 def test_post_gate_checkout_recheck_rejects_source_toctou(
