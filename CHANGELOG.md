@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a signed Qwen3.8 27B deployment journey that compares one pinned BF16
+  Transformers checkpoint with its source-derived Q5_K_M GGUF under separate
+  immutable runtime images and the frozen balanced 400-record MMLU-Pro policy.
+  Its published evidence records 63.0% baseline accuracy, 64.5% subject
+  accuracy, and a 95% paired interval from -0.74 to 3.75 percentage points
+  under an independently signed passing receipt.
 - Added a signed Qwen3.5 9B deployment journey that compares one pinned BF16
   Transformers text-causal component with its source-derived Q5_K_M GGUF under
   separate immutable runtime images and the balanced 400-record MMLU-Pro

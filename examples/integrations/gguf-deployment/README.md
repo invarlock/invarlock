@@ -9,18 +9,20 @@ derived artifact through the optional llama.cpp provider.
 | Profile | Source | Purpose |
 | --- | --- | --- |
 | `qwen35-9b` (default) | `Qwen/Qwen3.5-9B` | Maintained deployment non-regression result for the Qwen3.5 text-causal projection |
+| `qwen38-27b` | `Qwen/Qwen3.8-27B` | Current-model deployment non-regression result for the native text-causal checkpoint |
 | `ministral3-8b` | `mistralai/Ministral-3-8B-Instruct-2512-BF16` | Independent-family, text-only canary over a multimodal-backed checkpoint |
 
 The execution scope is the checkpoint's text-causal component. For Qwen3.5,
 Transformers loads the exact native causal projection from the authenticated
 multimodal checkpoint while the stored vision and MTP tensors remain bound to
-the source identity and verified outside the live model state. For Ministral
-3, Transformers authenticates and loads the complete checkpoint but receives
-text-only inputs, while llama.cpp converts and executes its language-model
-component. Each profile gives its BF16 and GGUF sides the same text behavior
-boundary.
+the source identity and verified outside the live model state. Qwen3.8 uses its
+pinned native text-causal checkpoint and authenticated no-thinking ChatML
+rendering. For Ministral 3, Transformers authenticates and loads the complete
+checkpoint but receives text-only inputs, while llama.cpp converts and
+executes its language-model component. Each profile gives its BF16 and GGUF
+sides the same text behavior boundary.
 
-Both sides use the same ordered 400-record balanced MMLU-Pro semantic
+All profiles use the same ordered 400-record balanced MMLU-Pro semantic
 selection, rendered through the selected model's pinned chat format. The policy
 is fixed before execution: at least 20% accuracy on each side, a paired interval
 no wider than 10 percentage points, and a subject-minus-baseline paired
@@ -48,15 +50,26 @@ frozen policy. This result exercises the deployment architecture with an
 independent model family; it remains a bounded canary outside the evaluator
 qualification matrix.
 
+The [Qwen3.8 signed transaction](../../../public_evidence/evidence/qwen3.8-27b-bf16-to-q5-k-m-gguf/)
+records 252 of 400 exact matches for BF16 and 258 of 400 for Q5_K_M. The paired
+subject-minus-baseline effect is +1.50 percentage points, with a 95% interval
+from -0.74 to 3.75 percentage points. Its 4.49 percentage-point interval width
+and both side accuracies satisfy the same frozen policy. This is a bounded
+finite-schedule deployment non-regression result, not a claim of general
+output equivalence or broader model quality.
+
 ## Compute and storage
 
-The maintained run uses Linux, Docker, one CUDA-capable GPU with at least 24 GB
-of memory for the BF16 baseline, 64 GB of system memory, and about 70 GB of free
-disk space while conversion is active. The llama.cpp subject uses CPU because
-that provider's qualified execution profile is CPU-bound. Budget roughly eight
-to twelve hours for image construction, conversion, quantization, and the
-400-record transaction on a recent server; the CPU subject dominates elapsed
-time. Cached image layers reduce later runs.
+The maintained run uses Linux and Docker. The smaller profiles require one
+CUDA-capable GPU with at least 24 GB of memory for the BF16 baseline, 64 GB of
+system memory, and about 70 GB of free disk space while conversion is active.
+The Qwen3.8 profile needs a GPU that can hold its roughly 55 GB BF16 checkpoint
+plus runtime overhead. Its checkpoint, intermediate BF16 GGUF, and final
+Q5_K_M GGUF occupy about 129 GB before image layers and working overhead. The
+llama.cpp subject uses CPU because that provider's qualified execution profile
+is CPU-bound. Budget roughly eight to twelve hours for the smaller profiles
+and longer for Qwen3.8; the CPU subject dominates elapsed time. Cached image
+layers reduce later runs.
 
 Network access is used only while building the pinned images and downloading
 the exact checkpoint files. The conversion, quantization, and model-execution
@@ -83,6 +96,16 @@ make example-gguf-deployment EXAMPLE_ARGS="\
   --evidence-signing-key /secure/keys/evidence.pem \
   --verifier-signing-key /secure/keys/verifier.pem \
   --trust-root /secure/trust/gguf-deployment-ministral3"
+```
+
+Select the current Qwen3.8 profile with `--profile qwen38-27b`:
+
+```bash
+make example-gguf-deployment EXAMPLE_ARGS="\
+  --profile qwen38-27b \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --trust-root /secure/trust/gguf-deployment-qwen38"
 ```
 
 The command builds source-bound baseline and subject images, stages the exact
