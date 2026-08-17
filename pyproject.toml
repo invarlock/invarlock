@@ -109,7 +109,7 @@ precommit-ci = [
 release-ci = [
   "build>=0.10.0",
   "setuptools>=83.0.0",
-  "wheel==0.47.0",
+  "wheel==0.48.0",
   "twine>=4.0.0",
   "cyclonedx-bom>=4.1",
 ]
