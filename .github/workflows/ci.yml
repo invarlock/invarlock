@@ -63,7 +63,7 @@ jobs:
           python-version: '3.13'
           cache: pip
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           version: "0.10.10"
       - name: Install dependencies
@@ -100,7 +100,7 @@ jobs:
           python-version: '3.12'
           cache: pip
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           version: "0.10.10"
       - name: Install dependencies
@@ -156,7 +156,7 @@ jobs:
           python-version: '3.13'
           cache: pip
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           version: "0.10.10"
       - name: Set up Node.js
