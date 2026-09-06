@@ -169,6 +169,10 @@ the maintained Linux x86_64/Python 3.12 lock. This includes pinned NVIDIA CUDA
 Tile, FlashInfer CUDA kernel binaries and CUDA 13 JIT assets. Runtime execution has no network
 access; bundled kernels must suffice. Rust extensions are disabled for this
 Python HTTP route, and the FA3 selection uses the bundled kernel implementation.
+After installing the runtime wheels, the image removes the three Ubuntu
+pip/venv bootstrap packages offline and records the resulting OS inventory.
+The active pip installation, compiler and headers, native dependencies, and
+bootstrap provenance records remain available.
 
 The native probe checks installed source identities, actual imports, server help,
 dependency consistency, and rejection of the excluded grammar operation through

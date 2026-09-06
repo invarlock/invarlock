@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Removed obsolete Ubuntu pip/venv bootstrap packages from the native K2
+  image after runtime installation and recorded the OS inventory after cleanup.
 - Installed the authenticated pip bootstrap wheel offline before downloading
   native K2 runtime dependencies. Core wheels retain their actual filename and
   version, with bounded metadata checks rejecting relabeled distributions.

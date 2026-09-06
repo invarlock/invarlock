@@ -80,6 +80,11 @@ networked build step. Before that step, the image verifies and installs the
 separately supplied pip wheel offline. The initial Ubuntu pip never downloads
 the locked dependency set. The candidate core wheel retains its validated
 filename and distribution version in the prepared manifest.
+After runtime wheel installation, an offline purge removes only
+`python3-pip-whl`, `python3.12-venv`, and `python3-venv`, without automatic
+dependency removal. The final OS inventory is recorded afterward; compiler,
+headers, native dependencies, and bootstrap provenance records are retained.
+Remaining OS findings still require their own review and disposition.
 
 To review a dependency update, prepare the authenticated source first, then
 resolve the same Linux/Python target with the core and explicit build/kernel

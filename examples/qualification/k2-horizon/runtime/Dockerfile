@@ -52,7 +52,10 @@ RUN --network=none cd /tmp/sglang-source/python \
     && python -m build --wheel --no-isolation --outdir /tmp/runtime-wheel \
     && python -m pip install --no-deps --no-index \
        /tmp/runtime-wheel/*.whl /tmp/core/*.whl \
+    && apt-get --yes --no-download --no-auto-remove purge \
+       python3-pip-whl python3.12-venv python3-venv \
     && python -m pip check \
+    && dpkg-query -W > /usr/share/invarlock-k2/os-packages.txt \
     && cp /tmp/sglang-source/source-derivation.json /usr/share/invarlock-k2/ \
     && python -m pip list --format=json > /usr/share/invarlock-k2/python-packages.json \
     && sha256sum /usr/share/invarlock-k2/bootstrap/*.whl /tmp/runtime-wheel/*.whl /tmp/core/*.whl > /usr/share/invarlock-k2/wheel-artifacts.sha256 \
