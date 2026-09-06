@@ -17,6 +17,8 @@ sys.path.insert(0, str(ROOT.parent))
 
 import matrix  # noqa: E402
 
+from invarlock.filesystem import publish_directory_no_replace  # noqa: E402
+
 
 def execute(*, cases: Path, schedule: Path, output: Path) -> dict[str, Any]:
     if output.exists() or output.is_symlink():
@@ -24,6 +26,7 @@ def execute(*, cases: Path, schedule: Path, output: Path) -> dict[str, Any]:
     definition = matrix.load(ROOT / "inspect-profile.json")
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(ROOT.parent)
+    environment["UV_PYTHON"] = sys.executable
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=".inspect-qualification-", dir=output.parent
@@ -51,7 +54,7 @@ def execute(*, cases: Path, schedule: Path, output: Path) -> dict[str, Any]:
         (artifact / "qualification-result.json").write_bytes(
             matrix.canonical_json_bytes(result)
         )
-        artifact.rename(output)
+        publish_directory_no_replace(artifact, output)
     return result
 
 
