@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Omitted unused GLib from the native K2 package selection after native consumer
+  inspection and an actual removal/import check, retaining GPU and compiler tools.
 - Built the signed whole Expat release as matched local runtime and development
   packages for the native K2 image, preserving narrow and wide library variants
   and verifying installed package, payload, and loaded-version identities.

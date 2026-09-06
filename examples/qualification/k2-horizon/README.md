@@ -190,6 +190,12 @@ pip/venv bootstrap packages offline and records the resulting OS inventory.
 The active pip installation, compiler and headers, native dependencies, and
 bootstrap provenance records remain available.
 
+The maintained Ubuntu package selection omits GLib. The selected text-only
+runtime has no installed native consumer of it; optional GUI and diffusion
+dependencies are outside this campaign. Removing GLib passed the native CPU
+probe with all Python versions and other OS packages unchanged. GPU startup
+and generated kernels still require the separate preflight.
+
 The signed Expat release is built offline into locally derived `libexpat1`
 and `libexpat1-dev` packages at version `2.8.4-0invarlock1`. Both narrow and
 wide shared libraries, static archives, headers, and development metadata are
@@ -197,7 +203,6 @@ replaced together. The image retains the source authentication, package
 artifacts, build logs, and installed-file hashes. Verification checks package
 metadata, actual payload bytes, both loaded libraries, and Python's Expat
 version; it rejects leftover older shared libraries.
-
 
 The native probe checks installed source identities, actual imports, server help,
 dependency consistency, and rejection of the excluded grammar operation through

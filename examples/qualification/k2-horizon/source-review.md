@@ -86,6 +86,12 @@ dependency removal. The final OS inventory is recorded afterward; compiler,
 headers, native dependencies, and bootstrap provenance records are retained.
 Remaining OS findings still require their own review and disposition.
 
+The Ubuntu selection also omits GLib after inspecting installed native consumers,
+selected source paths, and actual imports. A single-package removal experiment
+passed the native CPU probe with all Python versions and other OS packages
+unchanged. Optional GUI and diffusion paths are outside the selected text-only
+campaign; `libGL`, `libelf`, compiler, and GPU dependencies remain available.
+
 Expat uses the complete signed upstream 2.8.4 release, with separately pinned
 archive, detached signature, public key, and exact signing-key identities.
 The image builds locally derived `libexpat1` and `libexpat1-dev` packages as
