@@ -121,6 +121,57 @@ def test_signed_evidence_requires_independent_key_inputs_and_policy():
         verify_evidence(changed, **kwargs)
 
 
+@pytest.mark.parametrize("side", ["baseline", "candidate"])
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda run: run.update(artifact_digest="sha256:" + "a" * 64),
+        lambda run: run.update(source_digest="sha256:" + "b" * 64),
+        lambda run: run["source"].update(version="another-version"),
+        lambda run: run["records"][0]["context"].update(
+            generation={"temperature": 0.7}, tools=["search"]
+        ),
+    ],
+    ids=["artifact", "source-bytes", "evaluator-version", "execution-context"],
+)
+def test_resigned_context_changes_cannot_reuse_independent_run_anchors(side, change):
+    baseline, candidate, policy = example_project("extraction")
+    key = Ed25519PrivateKey.generate()
+    original = create_evidence(baseline, candidate, policy, key)
+    anchors = {
+        "expected_baseline": digest(baseline),
+        "expected_candidate": digest(candidate),
+    }
+    assert (
+        verify_evidence(
+            original, public_key=key.public_key(), policy=policy, **anchors
+        )["decision"]
+        == "pass"
+    )
+    changed_runs = {
+        "baseline": copy.deepcopy(baseline),
+        "candidate": copy.deepcopy(candidate),
+    }
+    change(changed_runs[side])
+    changed = create_evidence(
+        changed_runs["baseline"], changed_runs["candidate"], policy, key
+    )
+    # The display name, outputs, scores, and valid signer are unchanged. A
+    # context change still needs the recipient's approval of the new run bytes.
+    with pytest.raises(PipelineError, match="independently expected run"):
+        verify_evidence(changed, public_key=key.public_key(), policy=policy, **anchors)
+    new_anchors = {
+        "expected_baseline": digest(changed_runs["baseline"]),
+        "expected_candidate": digest(changed_runs["candidate"]),
+    }
+    assert (
+        verify_evidence(
+            changed, public_key=key.public_key(), policy=policy, **new_anchors
+        )["decision"]
+        == "pass"
+    )
+
+
 def test_order_is_paired_by_id_and_overall_pass_cannot_hide_slice_failure():
     base, candidate, policy = example_project("extraction")
     candidate["records"].reverse()

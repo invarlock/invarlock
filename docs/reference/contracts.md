@@ -42,6 +42,55 @@ These fields do not express adapter maintenance or signed-journey maturity.
 Those independent axes belong to the examples-layer qualification catalog, so
 an export cannot promote itself by claiming support or demonstration status.
 
+## Identity and evaluation-context boundaries
+
+A model name is a display label. It does not select the evaluated artifact,
+package, runtime, scorer or complete execution context. Independent verification
+requires recipient-selected expectations and checks the relationships between
+the authenticated objects, in addition to validating their schemas.
+
+| Requirement | Existing binding and recipient check | Authority and limit |
+| --- | --- | --- |
+| Exact artifact | Typed HF snapshot, GGUF or TensorRT-LLM identity; independent artifact-identity digest and actual content checks where supplied | Content identity is separate from a model name or declared ancestry |
+| Tokenizer and template | Artifact tokenizer-metadata digest; supported providers measure relevant files, including HF chat-template metadata | Additional processor or execution settings must be checked through the applicable provider/request binding |
+| Evaluated task and schedule | Normalized request, canonical schedule, and both authenticated provider capability declarations must agree | A valid signature cannot make conflicting task declarations consistent |
+| Generation, runtime and security settings | Provider-specific request/receipt checks and independent runtime digests; a full normalized-request digest can additionally pin the exact declared context | Authenticated settings and local enforcement tests do not establish independent hardware attestation |
+| Scorer and evaluation data | Scorer identifier/version/descriptor/configuration bindings, policy bytes, and independently selected schedule identity | A qualified scoring domain does not imply support for every behavior of the external evaluator |
+| Complete transaction request | Optional independent `request_digest` in the trust-input profile, or `--expected-request-digest`; required for the llama.cpp path | Receipt v2 records this expectation; receipt v1 does not acquire it retroactively |
+| Package-to-model mapping | The [ModelKit example](../user-guide/modelkit-handoff.md) verifies recipient-selected package blobs, both model directories and their relation to replayed evidence | This is an example-owned point-of-use check; the generic acceptance envelope alone does not verify a ModelKit |
+| Transformation or contextual observations | Canonical payload digest in the normalized request, comparison-bound observation envelope, and signed manifest inventory | Authenticates the payload and its association; arbitrary payload claims are not independently validated |
+| Current recipient acceptance | Trusted envelope and receipt signers, exact transported identity consistency, actual subject binding, contract versions, freshness and current policy | Current acceptance is separate from the original technical result |
+
+The independently selected complete-request digest can require exact declared
+settings and observation contents without introducing another model hash. It
+does not prove that a hosted service truthfully reported its revision or that an
+observation's scientific conclusion is correct. Do not obtain an expected digest
+from incoming evidence and describe the resulting equality as independent trust.
+
+Observation payloads may use a versioned profile for method, configuration,
+probe-set identity, assumptions, result and uncertainty. A consumer must implement
+that profile's semantic checks before claiming to understand or validate it.
+The current recipient policy does not implement a generic required lineage or
+context-profile result. Its optional receipt trust-profile digest identifies the
+selected verifier configuration; it does not create missing validation logic.
+Unknown policy fields reject, while opaque observation payloads retain only
+observation authority.
+
+Declared transformation history, empirical similarity and exact artifact
+identity remain separate. No supported behavioral fingerprint proves ancestry
+merely because its payload is signed. A future profile must avoid including the
+complete normalized-request digest inside a payload already hashed by that
+request; bind component identities first and let the envelope add comparison
+bindings after normalization.
+
+The separate [pipeline contracts](pipeline-contracts.md) bind complete captured
+runs and policy bytes, including source versions and per-record context. Their
+independent run digests include outputs, so they are not pre-execution context
+identities. Replaying signed pipeline evidence verifies the captured comparison;
+it does not prove that an untrusted capture worker executed the declared model.
+The native rehearsal's recipient independently pins the protocol and capture
+before reconstructing those runs.
+
 ## Provider contracts
 
 The provider ABI uses these schema-backed documents:
