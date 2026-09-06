@@ -1,11 +1,16 @@
 # Runnable examples
 
-These examples execute InvarLock's public transaction instead of describing a
-hypothetical integration. Each maintained command produces a signed evidence
+The transaction journeys below execute InvarLock's public transaction. Each
+listed command produces a signed evidence
 pack, verifies it against separately generated trust inputs, and renders a
 human-readable report. The self-contained examples create both sets of keys;
 an acceptance workflow should have the verifier owner choose and hold its own
 trust anchors and signing key.
+
+To gate results from an existing evaluator, start with the separate
+[pipeline examples](pipeline/README.md). For an artifact handoff, the
+[ModelKit guide](../docs/user-guide/modelkit-handoff.md) checks delivered
+package contents and recipient acceptance at the actual model directories.
 
 | Journey | Command | What actually runs |
 | --- | --- | --- |
@@ -82,3 +87,8 @@ For the underlying contracts, see the
 [getting-started guide](../docs/user-guide/getting-started.md),
 [model-change workflow guide](../docs/user-guide/change-scenarios.md), and
 [evidence and verification guide](../docs/user-guide/evidence-and-verification.md).
+
+The [K2 Horizon campaign](qualification/k2-horizon/README.md) is a separate
+maintainer qualification protocol with CPU preparation and tests. Its five
+model configurations remain candidates pending a reviewed runtime and actual
+GPU execution; they do not replace the established examples above.

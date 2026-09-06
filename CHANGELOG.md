@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identities, replays signed evidence, and applies current recipient acceptance
   against both actual model directories. A pinned KitOps test exercises
   repackaging and an independent recipient.
+- Added a five-model K2 Horizon campaign harness with immutable model pairs,
+  logical tensor measurements, frozen workflow cases, bounded native capture,
+  and independent pipeline replay. The configurations remain unqualified
+  candidates until the runtime and actual GPU campaigns pass their gates.
 
 ### Changed
 
@@ -47,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boundary-normalization collisions while preserving supported whitespace and
   punctuation. Native differential checks and new qualification artifacts
   retain the original profile and signed evidence unchanged.
+- Added separate current profiles for five batch evaluators that validate
+  native row identities, metric configuration and score details. Boundary
+  audits expose unsupported renderer behavior, and complete profile bindings
+  prevent dependency changes without review from reusing qualification authority.
 - Added real-container checks for network isolation, read-only inputs, key
   separation, resource and output limits, interruption, exact-container cleanup,
   and prevention of evidence publication after failed execution.

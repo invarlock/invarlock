@@ -160,6 +160,7 @@ as the complete pull-request check:
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
 | ModelKit package handoff | Run `tests/examples/test_modelkit_handoff.py` and the pinned real-CLI test described in the [handoff guide](docs/user-guide/modelkit-handoff.md) |
+| K2 campaign capture or protocol | Run the four `tests/examples/test_k2_*.py` suites and follow the [candidate campaign gates](examples/qualification/k2-horizon/README.md); CPU tests do not qualify a GPU model |
 | Dependency declarations or locks | `make lock-sync` and `make security`, plus affected installed-package checks |
 | GitHub Actions | `make workflow-lint` |
 
