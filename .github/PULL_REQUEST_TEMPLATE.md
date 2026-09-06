@@ -1,28 +1,40 @@
-## Description
+## Summary
 
-<!-- What does this PR change and why? -->
-
-## Changes
+<!-- State the resulting user behavior in a short paragraph or a few concrete
+bullets. Use a title that names the change. Remove unused sections and prompts. -->
 
 -
 
-## Testing
+## Why
 
-- [ ] Unit tests added/updated
-- [ ] Integration test or complete local user journey where applicable
-- [ ] Changed evidence format verified with independent trust anchors;
-      runtime receipt checked where applicable
-- [ ] Applicable coverage, documentation, installed-wheel, workflow, and
-      dependency checks from CONTRIBUTING.md run; failures and skips explained
+<!-- Describe the problem or trigger and the previous behavior. Include a
+before/after example when it makes the change easier to understand. -->
 
-## Docs
+## Contract and release impact
 
-- [ ] User docs updated
-- [ ] Changelog entry added if user-visible change
+<!-- Describe relevant API/schema, trust-boundary, compatibility, dependency,
+migration, and release effects. Link related issues or superseded PRs. Omit this
+section when the change has no such impact. -->
+
+## Validation
+
+<!-- List commands or actual user journeys and their observed results. Follow
+CONTRIBUTING.md for applicable gates. Distinguish passed, failed, and skipped
+checks; identify the tested commit or artifact when results depend on it. -->
+
+-
+
+## Evidence and limits
+
+<!-- For evaluation or assurance changes, state measured outcomes, independent
+verification, runtime/artifact identities, and unsupported scope. Preserve the
+distinction between evidence integrity and policy acceptance. Omit this section
+when validation above fully describes a simple change. -->
 
 ## Checklist
 
-- [ ] `make verify-fast` passes
 - [ ] Target branch is appropriate (`staging/next` for normal integration)
-- [ ] Contract and trust-boundary impact described
-- [ ] CI green
+- [ ] Relevant behavior and failure paths are tested
+- [ ] User documentation and `CHANGELOG.md` are updated where applicable
+- [ ] Applicable checks from `CONTRIBUTING.md` are recorded above
+- [ ] Final pushed changes have been checked for generated artifacts and secrets
