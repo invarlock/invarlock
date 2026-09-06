@@ -5,7 +5,7 @@
     "node": ">=22.18.0"
   },
   "devDependencies": {
-    "cspell": "^10.1.1",
+    "cspell": "^10.2.0",
     "markdownlint-cli2": "^0.23.2"
   },
   "dependencies": {
