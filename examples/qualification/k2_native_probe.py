@@ -7,19 +7,27 @@ import importlib
 import importlib.metadata
 import json
 import platform
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+
+def package_inventory(distributions):
+    packages = {}
+    for distribution in distributions:
+        name = re.sub(r"[-_.]+", "-", distribution.metadata["Name"].lower())
+        if name in packages:
+            raise ValueError(f"duplicate installed distribution identity: {name}")
+        packages[name] = distribution.version
+    return packages
 
 
 def inspect_native(root=Path("/usr/share/invarlock-k2")):
     if sys.platform != "linux" or platform.machine() != "x86_64":
         raise ValueError("probe requires the declared Linux x86_64 image")
     inputs = json.loads((root / "build-inputs.json").read_text())
-    packages = {
-        d.metadata["Name"].lower().replace("_", "-"): d.version
-        for d in importlib.metadata.distributions()
-    }
+    packages = package_inventory(importlib.metadata.distributions())
     if {"outlines", "outlines-core", "diskcache"} & packages.keys():
         raise ValueError("excluded grammar/cache distribution is installed")
     if packages.get("sglang") != inputs["derived_distribution_version"]:

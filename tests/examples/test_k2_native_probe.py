@@ -132,3 +132,53 @@ def test_probe_requires_the_declared_platform(monkeypatch):
     monkeypatch.setattr(probe.sys, "platform", "darwin")
     with pytest.raises(ValueError, match="platform|Linux"):
         probe.inspect_native()
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        ("Example-Package", "example_package"),
+        ("example.package", "example--package"),
+        ("packaging", "packaging"),
+    ],
+)
+def test_duplicate_real_installed_metadata_cannot_hide_a_version(tmp_path, names):
+    from importlib.metadata import distributions
+
+    roots = []
+    for index, (name, version) in enumerate(zip(names, ("0.0.0", "26.0"), strict=True)):
+        root = tmp_path / str(index)
+        metadata = root / f"example_{index}-{version}.dist-info"
+        metadata.mkdir(parents=True)
+        (metadata / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n"
+        )
+        roots.append(str(root))
+    observed = list(distributions(path=roots))
+    assert len(observed) == 2
+    with pytest.raises(ValueError, match="duplicate installed distribution"):
+        probe.package_inventory(observed)
+
+
+def test_package_inventory_normalizes_unique_distribution_names():
+    assert probe.package_inventory(
+        [
+            SimpleNamespace(metadata={"Name": "Example._Package"}, version="1.0"),
+            SimpleNamespace(metadata={"Name": "Other"}, version="2.0"),
+        ]
+    ) == {"example-package": "1.0", "other": "2.0"}
+
+
+def test_native_probe_rejects_duplicates_before_importing(tmp_path, monkeypatch):
+    root, calls, _ = _environment(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        probe.importlib.metadata,
+        "distributions",
+        lambda: [
+            SimpleNamespace(metadata={"Name": "sglang"}, version="wrong"),
+            SimpleNamespace(metadata={"Name": "SGLang"}, version="fixture"),
+        ],
+    )
+    with pytest.raises(ValueError, match="duplicate installed distribution"):
+        probe.inspect_native(root)
+    assert calls == []
