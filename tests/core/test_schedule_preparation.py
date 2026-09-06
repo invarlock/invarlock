@@ -163,7 +163,7 @@ def test_path_free_preparation_descriptor_binds_mapping_and_selection(
     assert (
         dataset_preparation_binding_errors(
             {
-                "comparison": {"dataset": descriptor},
+                "comparison": {"dataset": descriptor, "task": schedule.task},
                 "execution": {"mode": "run"},
             },
             schedule,
@@ -649,7 +649,10 @@ def test_preparation_binding_rejects_missing_mode_specific_intent(
     assert (
         dataset_preparation_binding_errors(
             {
-                "comparison": {"dataset": "schedule/runtime-behavioral-schedule.json"},
+                "comparison": {
+                    "dataset": "schedule/runtime-behavioral-schedule.json",
+                    "task": schedule.task,
+                },
                 "execution": {"mode": "import"},
             },
             schedule,
@@ -660,7 +663,7 @@ def test_preparation_binding_rejects_missing_mode_specific_intent(
         "canonical schedule"
         in dataset_preparation_binding_errors(
             {
-                "comparison": {"dataset": "other.json"},
+                "comparison": {"dataset": "other.json", "task": schedule.task},
                 "execution": {"mode": "import"},
             },
             schedule,
@@ -670,7 +673,7 @@ def test_preparation_binding_rejects_missing_mode_specific_intent(
         "path-free preparation descriptor"
         in dataset_preparation_binding_errors(
             {
-                "comparison": {"dataset": "wrong"},
+                "comparison": {"dataset": "wrong", "task": schedule.task},
                 "execution": {"mode": "run"},
             },
             schedule,
@@ -683,7 +686,7 @@ def test_preparation_binding_rejects_missing_mode_specific_intent(
         "selected_record_count"
         in dataset_preparation_binding_errors(
             {
-                "comparison": {"dataset": drifted},
+                "comparison": {"dataset": drifted, "task": schedule.task},
                 "execution": {"mode": "run"},
             },
             schedule,

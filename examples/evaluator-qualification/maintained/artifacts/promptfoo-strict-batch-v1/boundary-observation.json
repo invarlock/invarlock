@@ -1,0 +1,2692 @@
+{
+  "format": "invarlock/batch-semantic-observation-v1",
+  "provider": "promptfoo",
+  "upstream_version": "0.121.19",
+  "candidate_dependency": false,
+  "authority": "none",
+  "semantic_drift": false,
+  "problems": [],
+  "scorer_configuration": {
+    "provider": "echo",
+    "assertion": "equals",
+    "reference_type": "string",
+    "max_concurrency": 1
+  },
+  "cases": [
+    {
+      "record_id": "plain_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "distinct",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_leading_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "output_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "reference_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "trailing_newline",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "unicode_case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_composition",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "zero_width_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "empty_mismatch",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "multiple_targets_match",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "multiple_targets_miss",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "single_target_array",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "template",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "statement",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "comment",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "file_reference",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "array_output",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "package_reference",
+      "supported": false,
+      "literal_score": null
+    }
+  ],
+  "native_scores": [
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "native_rows": [
+    {
+      "cost": 0,
+      "gradingResult": {
+        "pass": true,
+        "score": 1,
+        "reason": "All assertions passed",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": true,
+            "score": 1,
+            "reason": "Assertion passed",
+            "assertion": {
+              "type": "equals",
+              "value": "answer"
+            }
+          }
+        ]
+      },
+      "id": "7708cd43-2bbd-4ec3-9186-6a6edbdcbd9a",
+      "latencyMs": 1,
+      "namedScores": {},
+      "prompt": {
+        "raw": "answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "answer",
+        "raw": "answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 1,
+      "success": true,
+      "testCase": {
+        "description": "plain_equal",
+        "vars": {
+          "output": "answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 0
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"Answer\" to equal \"answer\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"Answer\" to equal \"answer\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"Answer\" to equal \"answer\"",
+            "assertion": {
+              "type": "equals",
+              "value": "answer"
+            }
+          }
+        ]
+      },
+      "id": "4b897492-f66f-478a-8775-f355d84314c8",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "Answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "Answer",
+        "raw": "Answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "case",
+        "vars": {
+          "output": "Answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 1,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "Answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"answer\" to equal \"different\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"answer\" to equal \"different\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"answer\" to equal \"different\"",
+            "assertion": {
+              "type": "equals",
+              "value": "different"
+            }
+          }
+        ]
+      },
+      "id": "0761663a-e03f-4ca7-9ce6-f37808437194",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "answer",
+        "raw": "answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "distinct",
+        "vars": {
+          "output": "answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "different"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 2,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "gradingResult": {
+        "pass": true,
+        "score": 1,
+        "reason": "All assertions passed",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": true,
+            "score": 1,
+            "reason": "Assertion passed",
+            "assertion": {
+              "type": "equals",
+              "value": " answer"
+            }
+          }
+        ]
+      },
+      "id": "ff3985d3-94e9-46b5-b3b0-9a1c3d21c9e2",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": " answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": " answer",
+        "raw": " answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 1,
+      "success": true,
+      "testCase": {
+        "description": "equal_leading_space",
+        "vars": {
+          "output": " answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": " answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 3,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": " answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 0
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \" answer\" to equal \"answer\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \" answer\" to equal \"answer\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \" answer\" to equal \"answer\"",
+            "assertion": {
+              "type": "equals",
+              "value": "answer"
+            }
+          }
+        ]
+      },
+      "id": "d2fb2baf-ebe7-43bf-a56f-7737c47ce2a6",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": " answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": " answer",
+        "raw": " answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "output_leading_space",
+        "vars": {
+          "output": " answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 4,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": " answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"answer\" to equal \" answer\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"answer\" to equal \" answer\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"answer\" to equal \" answer\"",
+            "assertion": {
+              "type": "equals",
+              "value": " answer"
+            }
+          }
+        ]
+      },
+      "id": "111c45b5-8e26-47f2-a1d3-795ba99c81c8",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "answer",
+        "raw": "answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "reference_leading_space",
+        "vars": {
+          "output": "answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": " answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 5,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "gradingResult": {
+        "pass": true,
+        "score": 1,
+        "reason": "All assertions passed",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": true,
+            "score": 1,
+            "reason": "Assertion passed",
+            "assertion": {
+              "type": "equals",
+              "value": "!answer!"
+            }
+          }
+        ]
+      },
+      "id": "71d5bc61-04d7-420e-ac51-3509bfa1d3c0",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "!answer!",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "!answer!",
+        "raw": "!answer!",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 1,
+      "success": true,
+      "testCase": {
+        "description": "equal_boundary_punctuation",
+        "vars": {
+          "output": "!answer!"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "!answer!"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 6,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "!answer!"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 0
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"answer!\" to equal \"answer\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"answer!\" to equal \"answer\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"answer!\" to equal \"answer\"",
+            "assertion": {
+              "type": "equals",
+              "value": "answer"
+            }
+          }
+        ]
+      },
+      "id": "d2ec09e3-995e-4d0f-96ae-513307cda189",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "answer!",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "answer!",
+        "raw": "answer!",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "boundary_punctuation",
+        "vars": {
+          "output": "answer!"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 7,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "answer!"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"a b\" to equal \"a  b\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"a b\" to equal \"a  b\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"a b\" to equal \"a  b\"",
+            "assertion": {
+              "type": "equals",
+              "value": "a  b"
+            }
+          }
+        ]
+      },
+      "id": "93693277-7af4-4ca3-a65a-42d19f2b5548",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "a b",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "a b",
+        "raw": "a b",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "internal_whitespace",
+        "vars": {
+          "output": "a b"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "a  b"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 8,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "a b"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"a,b\" to equal \"ab\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"a,b\" to equal \"ab\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"a,b\" to equal \"ab\"",
+            "assertion": {
+              "type": "equals",
+              "value": "ab"
+            }
+          }
+        ]
+      },
+      "id": "bc021799-ec99-4c3b-99bb-acaa76bcb9ce",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "a,b",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "a,b",
+        "raw": "a,b",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "internal_punctuation",
+        "vars": {
+          "output": "a,b"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "ab"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 9,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "a,b"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "gradingResult": {
+        "pass": true,
+        "score": 1,
+        "reason": "All assertions passed",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": true,
+            "score": 1,
+            "reason": "Assertion passed",
+            "assertion": {
+              "type": "equals",
+              "value": "é"
+            }
+          }
+        ]
+      },
+      "id": "1afd111d-0890-41bd-84cb-587e0ba8e4ea",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "é",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "é",
+        "raw": "é",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 1,
+      "success": true,
+      "testCase": {
+        "description": "unicode_equal",
+        "vars": {
+          "output": "é"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "é"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 10,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "é"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 0
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"É\" to equal \"é\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"É\" to equal \"é\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"É\" to equal \"é\"",
+            "assertion": {
+              "type": "equals",
+              "value": "é"
+            }
+          }
+        ]
+      },
+      "id": "b0371380-90f9-4410-b727-3839da0e592e",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "É",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "É",
+        "raw": "É",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "unicode_case",
+        "vars": {
+          "output": "É"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "é"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 11,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "É"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"é\" to equal \"é\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"é\" to equal \"é\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"é\" to equal \"é\"",
+            "assertion": {
+              "type": "equals",
+              "value": "é"
+            }
+          }
+        ]
+      },
+      "id": "bf8aae0b-6ecd-4000-9e39-410a0e4c854a",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "é",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "é",
+        "raw": "é",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "unicode_composition",
+        "vars": {
+          "output": "é"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "é"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 12,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "é"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"“yes”\" to equal \"yes\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"“yes”\" to equal \"yes\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"“yes”\" to equal \"yes\"",
+            "assertion": {
+              "type": "equals",
+              "value": "yes"
+            }
+          }
+        ]
+      },
+      "id": "56d046f2-3571-46d7-9b28-dbf8aaf5232e",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "“yes”",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "“yes”",
+        "raw": "“yes”",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "unicode_punctuation",
+        "vars": {
+          "output": "“yes”"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "yes"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 13,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "“yes”"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \" answer\" to equal \"answer\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \" answer\" to equal \"answer\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \" answer\" to equal \"answer\"",
+            "assertion": {
+              "type": "equals",
+              "value": "answer"
+            }
+          }
+        ]
+      },
+      "id": "f0b267d8-a7d3-4bdd-9a32-d5c920f622df",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": " answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": " answer",
+        "raw": " answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "unicode_boundary_space",
+        "vars": {
+          "output": " answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 14,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": " answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "gradingResult": {
+        "pass": true,
+        "score": 1,
+        "reason": "All assertions passed",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": true,
+            "score": 1,
+            "reason": "Assertion passed",
+            "assertion": {
+              "type": "equals",
+              "value": " answer"
+            }
+          }
+        ]
+      },
+      "id": "11b3a26d-cb9f-4e9c-a619-c677ab246cc4",
+      "latencyMs": 1,
+      "namedScores": {},
+      "prompt": {
+        "raw": " answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": " answer",
+        "raw": " answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 1,
+      "success": true,
+      "testCase": {
+        "description": "equal_unicode_boundary_space",
+        "vars": {
+          "output": " answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": " answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 15,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": " answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 0
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"​answer\" to equal \"answer\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"​answer\" to equal \"answer\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"​answer\" to equal \"answer\"",
+            "assertion": {
+              "type": "equals",
+              "value": "answer"
+            }
+          }
+        ]
+      },
+      "id": "49c82cad-d704-436d-a5fc-2816679b2aca",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "​answer",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "​answer",
+        "raw": "​answer",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "zero_width_space",
+        "vars": {
+          "output": "​answer"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "answer"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 16,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "​answer"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "gradingResult": {
+        "pass": true,
+        "score": 1,
+        "reason": "All assertions passed",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": true,
+            "score": 1,
+            "reason": "Assertion passed",
+            "assertion": {
+              "type": "equals",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "id": "6a9cae4b-d62f-4107-913b-d1b264d47447",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "",
+        "raw": "",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 1,
+      "success": true,
+      "testCase": {
+        "description": "empty_equal",
+        "vars": {
+          "output": ""
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": ""
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 17,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": ""
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 0
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"\" to equal \"no\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"\" to equal \"no\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"\" to equal \"no\"",
+            "assertion": {
+              "type": "equals",
+              "value": "no"
+            }
+          }
+        ]
+      },
+      "id": "3f4e11c3-945e-4fd6-8f27-e111370a87a8",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "",
+        "raw": "",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "empty_mismatch",
+        "vars": {
+          "output": ""
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "no"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 18,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": ""
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"\" to equal \"  \"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"\" to equal \"  \"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"\" to equal \"  \"",
+            "assertion": {
+              "type": "equals",
+              "value": "  "
+            }
+          }
+        ]
+      },
+      "id": "0fac0bba-3870-455b-8ca9-f82671e3452e",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "",
+        "raw": "",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "empty_whitespace",
+        "vars": {
+          "output": ""
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "  "
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 19,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": ""
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"!\" to equal \"\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"!\" to equal \"\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"!\" to equal \"\"",
+            "assertion": {
+              "type": "equals",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "id": "218375c8-0b9e-494b-8672-d79655209b8a",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "!",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "!",
+        "raw": "!",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "empty_punctuation",
+        "vars": {
+          "output": "!"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": ""
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 20,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "!"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"1,000\" to equal \"1000\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"1,000\" to equal \"1000\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"1,000\" to equal \"1000\"",
+            "assertion": {
+              "type": "equals",
+              "value": "1000"
+            }
+          }
+        ]
+      },
+      "id": "b5f0dbf0-fe47-4b60-8f57-4cce45b9b2b8",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "1,000",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "1,000",
+        "raw": "1,000",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "numeric_disabled_internal",
+        "vars": {
+          "output": "1,000"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "1000"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 21,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "1,000"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    },
+    {
+      "cost": 0,
+      "error": "Expected output \"$42\" to equal \"42\"",
+      "gradingResult": {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \"$42\" to equal \"42\"",
+        "namedScores": {},
+        "tokensUsed": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0
+        },
+        "componentResults": [
+          {
+            "pass": false,
+            "score": 0,
+            "reason": "Expected output \"$42\" to equal \"42\"",
+            "assertion": {
+              "type": "equals",
+              "value": "42"
+            }
+          }
+        ]
+      },
+      "id": "3d60f56c-bf89-4a94-93e7-79ebbabf44c5",
+      "latencyMs": 0,
+      "namedScores": {},
+      "prompt": {
+        "raw": "$42",
+        "label": "{{output}}",
+        "config": {}
+      },
+      "promptId": "343155ae77c81fd6d016484b639909bc6f4e68f7730061d1d2a8d7e707456d32",
+      "promptIdx": 0,
+      "provider": {
+        "id": "echo",
+        "label": ""
+      },
+      "response": {
+        "output": "$42",
+        "raw": "$42",
+        "cost": 0,
+        "cached": false,
+        "tokenUsage": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "numRequests": 1
+        },
+        "isRefusal": false,
+        "metadata": {}
+      },
+      "score": 0,
+      "success": false,
+      "testCase": {
+        "description": "numeric_disabled_boundary",
+        "vars": {
+          "output": "$42"
+        },
+        "assert": [
+          {
+            "type": "equals",
+            "value": "42"
+          }
+        ],
+        "options": {},
+        "metadata": {}
+      },
+      "testIdx": 22,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 1,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "vars": {
+        "output": "$42"
+      },
+      "metadata": {
+        "_promptfooFileMetadata": {}
+      },
+      "failureReason": 1
+    }
+  ]
+}

@@ -22,6 +22,7 @@ after the journey, including when a retained workspace is requested.
 | [GGUF with llama.cpp](gguf-llama-cpp/) | `make example-gguf-llama-cpp` | Official Qwen3.5-0.8B Q8 GGUF and an authenticated Q5 derivative |
 | [BF16-to-GGUF deployment](gguf-deployment/) | `make example-gguf-deployment` | Closed Qwen3.5 9B, Qwen3.8 27B, and Ministral 3 8B profiles executed through Transformers/CUDA and derived Q5_K_M GGUFs through llama.cpp/CPU |
 | [SPDX 3.0.1 AI observation](spdx-ai-observation/) | `make example-spdx-ai-observation` | CPU-only mapping of one canonical AI document into the existing authenticated observation boundary; no SPDX conformance or acceptance claim |
+| [ModelKit recipient handoff](modelkit-handoff/) | `python examples/integrations/modelkit_handoff.py --request recipient.json` | Offline package/content binding, evidence replay, and current recipient acceptance against actual model directories |
 | [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | Real upstream per-record output across compact CPU and retained CUDA profiles |
 | [Inspect AI](inspect-ai/) | `make example-inspect-ai` | Native Inspect Task/scorer execution across compact CPU and retained CUDA profiles |
 | [OpenAI Evals](openai-evals/) | `make example-openai-evals` | CPU, maintained native OpenAI Evals Match adapter; signed journey not yet retained |

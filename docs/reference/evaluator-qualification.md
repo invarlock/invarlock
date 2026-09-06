@@ -110,6 +110,186 @@ authenticated boundary recovery, and InvarLock replays byte-exact equality for
 the signed acceptance decision after checking each evaluator's native event
 semantics.
 
+### Inspect literal-pair boundary
+
+Fresh literal qualification uses the separate
+`inspect-ai-literal-pairs-v1` profile in
+`examples/evaluator-qualification/maintained/inspect-profile.json`.
+Its pinned scorer is Inspect 0.3.254
+`match(location="exact", ignore_case=False, numeric=False)` with one string
+target. Inspect strips boundary whitespace and ASCII punctuation even with
+these settings, so its native notion of exact matching can differ from literal
+equality.
+
+The supported domain is defined for each output/reference pair. Literal
+equality must agree with equality after Inspect's boundary stripping. Equal
+strings containing leading whitespace or punctuation remain supported, as do
+distinct strings that remain distinct after stripping. Unequal strings that
+collapse together, such as `" answer"` and `"answer"`, fail explicitly.
+Array or multiple targets are outside this profile. Native score, answer and
+explanation contradictions also fail before an export is written. The
+independent qualification metric remains byte-exact equality.
+
+Before scoring, the current runner checks the complete supplied public profile
+against its local, source-bound definition: package version, dependency lock,
+runner bundle, upstream URL and authority must all agree. Even a matching
+candidate package installation cannot reuse this profile identity. The runner
+also freezes its inputs before scoring and publication.
+
+Run the pinned 28-case differential corpus and a fresh qualification of the
+retained 102 model outputs with:
+
+```bash
+uv run --no-project --with-requirements examples/evaluator-qualification/locks/inspect-ai.txt python examples/evaluator-qualification/maintained/inspect_differential.py --output /tmp/inspect-boundaries.json
+PYTHONPATH=src python examples/evaluator-qualification/maintained/qualify_inspect.py --output /tmp/inspect-literal-qualification
+```
+
+Both output paths must be new. The differential covers boundary and internal
+whitespace and punctuation, case, Unicode, empty outputs and multiple targets.
+It reports semantic drift with exit 2 and always declares `authority: none`.
+Running it with a candidate dependency version cannot promote that dependency
+to a qualified profile. The fresh qualification command separately executes
+the pinned upstream scorer and independently checks the resulting export.
+This is scoring of existing outputs, without new model inference or a new
+signed OCI transaction.
+
+The separate artifacts under
+`examples/evaluator-qualification/maintained/artifacts/inspect-ai-literal-pairs-v1/`
+retain the 28-case observation, the fresh 102-record qualification and a source
+hash manifest. All 102 scores and the normalized runtime-record digest agree
+with the historical Inspect import: 61 matches and 41 mismatches.
+
+The original `inspect-ai` profile, runner bytes, qualification artifacts and
+signed transaction outcomes remain unchanged and replay under their original
+identities. They are not relabeled as evidence for the new runner. The matrix
+below continues to describe those retained identities.
+
+### Current strict batch profiles
+
+Fresh batch qualification uses the separately named `*-strict-batch-v1`
+profiles in
+`examples/evaluator-qualification/maintained/batch-profiles.json`.
+These profiles preserve the original matrix's historical identities while
+adding strict validation of the actual native rows:
+
+| Evaluator | Pinned version | Current native path |
+| --- | --- | --- |
+| Promptfoo | 0.121.19 | Local echo provider with one string `equals` assertion |
+| Evidently | 0.7.21 | `ExactMatch` descriptor over output and reference columns |
+| Langfuse | 4.14.1 | Local experiment with one named Boolean equality callback |
+| Azure AI Evaluation | 1.18.1 | Batch orchestration with explicitly mapped equality callback |
+| Pydantic Evals | 2.18.0 | `EqualsExpected` with case identity and captured output in each input |
+
+Each supported record has one string output and reference, and a unique ID in
+the independent schedule order. Repeated prompts can carry different outputs;
+they do not overwrite one another. The runner rejects missing, duplicate,
+extra or reordered native rows, changed references or outputs, wrong metric
+configuration, score/detail contradictions, and aggregate substitution. Source
+inputs are copied before execution so a later source edit cannot change which
+records are exported. The complete supplied public profile must match its
+local definition, including package identity, dependency and runner hashes,
+upstream URL, and authority. Changing the installed package and supplied
+profile together does not bypass this check.
+
+Literal equality preserves case, whitespace, punctuation, Unicode and empty
+strings. Promptfoo's echo path has additional renderer restrictions: an output
+ending in LF is rejected because the pinned variable renderer removes one
+final newline. Output or reference text containing template opening delimiters,
+`file://` or `package:` is also rejected before execution. Leading whitespace
+and internal whitespace remain supported. Multiple targets and non-string
+outputs are outside all five profiles.
+
+For example, run the pinned Evidently boundary audit and separately qualify
+the retained model outputs:
+
+```bash
+uv run --no-project --with-requirements examples/evaluator-qualification/locks/evidently.txt python examples/evaluator-qualification/maintained/batch_differential.py --provider evidently --output /tmp/evidently-boundaries.json
+PYTHONPATH=src python examples/evaluator-qualification/maintained/qualify_batch.py --provider evidently --output /tmp/evidently-batch-qualification
+```
+
+Use the matching lock and provider name for the other Python evaluators.
+Promptfoo runs the same commands with the repository Python environment and
+requires Node.js with `npm` and `npx`; its runner verifies the exact package
+version and registry integrity in `locks/promptfoo.txt`. Every output path
+must be new. The differential observation covers 34 boundary cases, including
+explicitly unsupported inputs; it always has `authority: none` and returns
+exit 2 for drift. A candidate Python environment can run this observation,
+but the current qualification runner rejects a changed package/profile until
+its definition and source bindings are deliberately reviewed.
+
+The five separate directories under `maintained/artifacts/` retain actual
+pinned executions, native row projections, source/artifact hash manifests,
+and fresh 102-record qualifications. All five match the historical 102-score
+vectors and runtime-record digests. These are new scorer executions over the
+same captured outputs, without new model inference or signed transactions.
+The historical matrix below is not evidence that arbitrary domains or newer
+dependencies have been qualified.
+
+### Current scalar profiles
+
+For new scalar evaluations, use the `*-literal-scalar-v1` profiles in
+`examples/evaluator-qualification/maintained/scalar-profiles.json` and the
+`qualify_scalar.py` command. These profiles execute one native scalar call for
+each immutable, scheduled input/output/reference pair. Their package version,
+runner bundle, dependency declaration, scorer configuration and native module
+content are checked before any score is exported. They validate the returned
+numeric or Boolean type, metric name, success status and error fields where
+the upstream API provides them. A scalar return value does not supply native
+batch-row identity assurance.
+
+| Provider name | Pinned version | Current literal domain |
+| --- | --- | --- |
+| `lm-evaluation-harness` | 0.4.12 | Explicit NumPy object arrays preserve trailing NUL characters |
+| `deepeval` | 4.1.3 | Nonempty outputs; literal equality must agree with boundary-whitespace stripping |
+| `ragas` | 0.4.3 | One string output and reference |
+| `lighteval` | 0.13.0 | Full matching without normalization; equal empty strings are unsupported |
+| `hugging-face-evaluate` | 0.4.6 | The loaded metric file is content-bound; trailing-NUL equality collisions are unsupported |
+| `autoevals` | 0.3.0 | One string output and reference |
+| `openevals` | 0.2.0 | One string output and reference, with a named Boolean result |
+| `openai-evals` | 3.0.1.post1 | Literal match function and the locked source revision |
+| `arize-phoenix-evals` | 3.3.0 | One string output and reference |
+| `opik` | 2.2.7 | Explicit case-sensitive matching with tracking disabled |
+| `trulens` | 2.9.0 | Named local literal-equality function through the upstream Metric wrapper |
+
+The restrictions are defined per pair. Equal strings with leading whitespace
+remain valid for DeepEval; an empty LightEval output with a different reference
+remains a valid mismatch. Multiple references and non-string values are rejected
+before native execution. Hugging Face Evaluate loads metric code separately
+from its package, so the profile also binds that metric file's exact content
+hash. OpenAI Evals additionally checks its installed source revision.
+
+Run a boundary audit in a fresh working directory, then independently qualify
+new outputs or the retained 102-record corpus:
+
+```bash
+repo_root="$PWD"
+audit_dir="$(mktemp -d)"
+cd "$audit_dir"
+uv run --no-project --python python3.12 --with-requirements "$repo_root/examples/evaluator-qualification/locks/lm-evaluation-harness.txt" python "$repo_root/examples/evaluator-qualification/maintained/scalar_differential.py" --provider lm-evaluation-harness --output "$audit_dir/observation.json"
+cd "$repo_root"
+PYTHONPATH=src python examples/evaluator-qualification/maintained/qualify_scalar.py --provider lm-evaluation-harness --output /tmp/lm-literal-qualification
+```
+
+Choose the matching provider and lock for each row. The qualification command
+uses the invoking Python interpreter for its isolated upstream environment.
+Use `make evaluator-scalar-semantics PYTHON=python3.12` to audit all eleven
+providers in a temporary working directory with their matching dependency locks.
+Pass `--cases cases.json --schedule schedule.json` to qualify a new evaluation;
+both inputs are frozen before execution, and the destination must be new.
+Atomic publication refuses to replace even a directory created concurrently.
+
+The 39-case differential checks both historical and current native semantics,
+including whitespace, case, Unicode, empty strings, multiple targets and NUL
+characters. Its observations always have `authority: none`; candidate package
+or module changes cannot become qualified through the audit command. Fresh
+qualification separately enforces the complete current profile and returns
+independently recomputed per-record results. All eleven retained current
+profiles reproduce the historical 102-score vectors and runtime-record digest:
+61 matches and 41 mismatches. Their source/artifact manifests and native
+observations live in the corresponding `maintained/artifacts/` directories.
+These executions reuse captured model outputs without new model inference or
+new signed transactions.
+
 <!-- evaluator-matrix:start -->
 <!-- Generated by examples/evaluator-qualification/render_docs_matrix.py; do not edit by hand. -->
 
@@ -181,15 +361,17 @@ Run the retained, network-free verification:
 make evaluator-qualification
 ```
 
-This verifies every maintained adapter profile and replays every retained
-independently replayable import. To re-execute all pinned upstream tools over both corpora
-and refresh the retained artifacts:
+This verifies the historical matrix profiles and rechecks every retained
+independently replayable import. The following command reproduces the two
+historical corpora with their original runner identities and refreshes those
+retained artifacts:
 
 ```bash
 make evaluator-upstream-qualification
 ```
 
-The upstream command requires `uv`, Node.js with `npx`, and network access on a
+Use the current Inspect, batch or scalar commands above for new evaluations.
+The historical reproduction command requires `uv`, Node.js with `npx`, and network access on a
 cold cache. The retained model outputs do not require a model during evaluator
 execution.
 

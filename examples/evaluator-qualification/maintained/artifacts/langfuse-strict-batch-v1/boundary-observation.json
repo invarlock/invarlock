@@ -1,0 +1,761 @@
+{
+  "format": "invarlock/batch-semantic-observation-v1",
+  "provider": "langfuse",
+  "upstream_version": "4.14.1",
+  "candidate_dependency": false,
+  "authority": "none",
+  "semantic_drift": false,
+  "problems": [],
+  "scorer_configuration": {
+    "evaluator": "local literal string equality",
+    "name": "exact_match",
+    "data_type": "BOOLEAN",
+    "max_concurrency": 1
+  },
+  "cases": [
+    {
+      "record_id": "plain_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "distinct",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_leading_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "output_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "reference_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "trailing_newline",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "unicode_case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_composition",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "zero_width_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "empty_mismatch",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "multiple_targets_match",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "multiple_targets_miss",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "single_target_array",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "template",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "statement",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "comment",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "file_reference",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "array_output",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "package_reference",
+      "supported": true,
+      "literal_score": 1.0
+    }
+  ],
+  "native_scores": [
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "native_rows": [
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "plain_equal",
+          "output": "answer"
+        }
+      },
+      "output": "answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "case",
+          "output": "Answer"
+        }
+      },
+      "output": "Answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "different",
+        "metadata": {
+          "record_id": "distinct",
+          "output": "answer"
+        }
+      },
+      "output": "answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": " answer",
+        "metadata": {
+          "record_id": "equal_leading_space",
+          "output": " answer"
+        }
+      },
+      "output": " answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "output_leading_space",
+          "output": " answer"
+        }
+      },
+      "output": " answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": " answer",
+        "metadata": {
+          "record_id": "reference_leading_space",
+          "output": "answer"
+        }
+      },
+      "output": "answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer\n",
+        "metadata": {
+          "record_id": "equal_trailing_newline",
+          "output": "answer\n"
+        }
+      },
+      "output": "answer\n",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "trailing_newline",
+          "output": "answer\n"
+        }
+      },
+      "output": "answer\n",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "!answer!",
+        "metadata": {
+          "record_id": "equal_boundary_punctuation",
+          "output": "!answer!"
+        }
+      },
+      "output": "!answer!",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "boundary_punctuation",
+          "output": "answer!"
+        }
+      },
+      "output": "answer!",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "a  b",
+        "metadata": {
+          "record_id": "internal_whitespace",
+          "output": "a b"
+        }
+      },
+      "output": "a b",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "ab",
+        "metadata": {
+          "record_id": "internal_punctuation",
+          "output": "a,b"
+        }
+      },
+      "output": "a,b",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "é",
+        "metadata": {
+          "record_id": "unicode_equal",
+          "output": "é"
+        }
+      },
+      "output": "é",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "é",
+        "metadata": {
+          "record_id": "unicode_case",
+          "output": "É"
+        }
+      },
+      "output": "É",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "é",
+        "metadata": {
+          "record_id": "unicode_composition",
+          "output": "é"
+        }
+      },
+      "output": "é",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "yes",
+        "metadata": {
+          "record_id": "unicode_punctuation",
+          "output": "“yes”"
+        }
+      },
+      "output": "“yes”",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "unicode_boundary_space",
+          "output": " answer"
+        }
+      },
+      "output": " answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": " answer",
+        "metadata": {
+          "record_id": "equal_unicode_boundary_space",
+          "output": " answer"
+        }
+      },
+      "output": " answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "answer",
+        "metadata": {
+          "record_id": "zero_width_space",
+          "output": "​answer"
+        }
+      },
+      "output": "​answer",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "",
+        "metadata": {
+          "record_id": "empty_equal",
+          "output": ""
+        }
+      },
+      "output": "",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "no",
+        "metadata": {
+          "record_id": "empty_mismatch",
+          "output": ""
+        }
+      },
+      "output": "",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "  ",
+        "metadata": {
+          "record_id": "empty_whitespace",
+          "output": ""
+        }
+      },
+      "output": "",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "",
+        "metadata": {
+          "record_id": "empty_punctuation",
+          "output": "!"
+        }
+      },
+      "output": "!",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "1000",
+        "metadata": {
+          "record_id": "numeric_disabled_internal",
+          "output": "1,000"
+        }
+      },
+      "output": "1,000",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "42",
+        "metadata": {
+          "record_id": "numeric_disabled_boundary",
+          "output": "$42"
+        }
+      },
+      "output": "$42",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": false,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "{{output}}",
+        "metadata": {
+          "record_id": "template",
+          "output": "{{output}}"
+        }
+      },
+      "output": "{{output}}",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "{% print 'x' %}",
+        "metadata": {
+          "record_id": "statement",
+          "output": "{% print 'x' %}"
+        }
+      },
+      "output": "{% print 'x' %}",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "{# comment #}",
+        "metadata": {
+          "record_id": "comment",
+          "output": "{# comment #}"
+        }
+      },
+      "output": "{# comment #}",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "file://reference.txt",
+        "metadata": {
+          "record_id": "file_reference",
+          "output": "file://reference.txt"
+        }
+      },
+      "output": "file://reference.txt",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "item": {
+        "input": "Repeated prompt; identity comes from the record ID.",
+        "expected_output": "package:module:function",
+        "metadata": {
+          "record_id": "package_reference",
+          "output": "package:module:function"
+        }
+      },
+      "output": "package:module:function",
+      "evaluations": [
+        {
+          "name": "exact_match",
+          "value": true,
+          "data_type": "BOOLEAN"
+        }
+      ]
+    }
+  ]
+}

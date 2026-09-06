@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -10,8 +11,9 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -102,6 +104,49 @@ _MAX_WORKER_TMPFS_GIB = 64
 _TENSORRT_ENGINE_COPY_FACTOR = 2
 _TENSORRT_SCRATCH_RESERVE_BYTES = _GIBIBYTE
 _ROLES: tuple[RuntimeSideRole, RuntimeSideRole] = ("baseline", "subject")
+_OUTPUT_CLEANUP_TIMEOUT_SECONDS = 30
+
+# This stdlib-only program must also run in an older selected runtime image.
+# O_PATH pins mode-000 directories before chmod; no symlink target or regular
+# file is chmod'ed. Only this run's output mount is writable in the helper.
+_OUTPUT_CLEANUP_SCRIPT = """
+import os, stat, sys
+remaining = 4096
+root = os.open(sys.argv[1], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+device = os.fstat(root).st_dev
+def remove_entries(parent, depth):
+    global remaining
+    if depth > 64:
+        raise RuntimeError('worker output cleanup exceeds depth limit')
+    with os.scandir(parent) as entries:
+        for entry in entries:
+            remaining -= 1
+            if remaining < 0:
+                raise RuntimeError('worker output cleanup exceeds entry limit')
+            descriptor = os.open(entry.name, os.O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC,
+                                 dir_fd=parent)
+            try:
+                facts = os.fstat(descriptor)
+                if stat.S_ISDIR(facts.st_mode):
+                    if facts.st_dev != device:
+                        raise RuntimeError('worker output cleanup crosses filesystem')
+                    pinned = '/proc/self/fd/' + str(descriptor)
+                    os.chmod(pinned, 0o700)
+                    child = os.open(pinned, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+                    try:
+                        remove_entries(child, depth + 1)
+                    finally:
+                        os.close(child)
+                    os.rmdir(entry.name, dir_fd=parent)
+                else:
+                    os.unlink(entry.name, dir_fd=parent)
+            finally:
+                os.close(descriptor)
+try:
+    remove_entries(root, 0)
+finally:
+    os.close(root)
+"""
 
 
 class OciEvaluationError(ValueError):
@@ -1239,6 +1284,174 @@ def _worker_outer_timeout_seconds(
     return min(calculated, _MAX_OUTER_WORKER_TIMEOUT_SECONDS)
 
 
+def _remove_collectible_output(directory: Path) -> None:
+    """Remove a bounded flat output without opening files or following links."""
+
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(directory, flags)
+    try:
+        with os.scandir(descriptor) as entries:
+            first = next(entries, None)
+            if first is None:
+                return
+            if first.name != "side" or next(entries, None) is not None:
+                raise OSError("worker output requires bounded container cleanup")
+        side = os.open("side", flags, dir_fd=descriptor)
+        try:
+            names: list[str] = []
+            with os.scandir(side) as entries:
+                for entry in entries:
+                    if len(names) == 6 or entry.is_dir(follow_symlinks=False):
+                        raise OSError(
+                            "worker output requires bounded container cleanup"
+                        )
+                    names.append(entry.name)
+            for name in names:
+                os.unlink(name, dir_fd=side)
+        finally:
+            os.close(side)
+        os.rmdir("side", dir_fd=descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _output_cleanup_command(
+    root: Path,
+    directory: Path,
+    launch: OciEvaluationLaunch,
+    side_launch: OciSideLaunch,
+    provider_name: str,
+) -> list[str]:
+    profile = side_launch.entrypoint
+    if profile == "auto":
+        provider_profile = OPTIONAL_RUNTIME_PROVIDER_PROFILES.get(provider_name)
+        profile = (
+            provider_profile.automatic_entrypoint if provider_profile else "python"
+        )
+    executable = (
+        "/opt/invarlock/cli-venv/bin/python" if profile == "nvidia" else "python"
+    )
+    return [
+        launch.engine_path or launch.engine,
+        "run",
+        "--rm",
+        "--init",
+        "--pull=never",
+        "--cidfile",
+        str(root / f"{directory.name}-cleanup.cid"),
+        "--stop-timeout",
+        str(_CONTAINER_STOP_SECONDS),
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "32",
+        "--cpus",
+        "1",
+        "--memory",
+        "128m",
+        "--user",
+        launch.worker_limits.user,
+        *_mount(directory, "/invarlock/output-root", read_only=False),
+        "--entrypoint",
+        executable,
+        side_launch.image_ref,
+        "-I",
+        "-S",
+        "-c",
+        _OUTPUT_CLEANUP_SCRIPT,
+        "/invarlock/output-root",
+    ]
+
+
+def _cleanup_worker_directory(
+    root: Path,
+    launch: OciEvaluationLaunch,
+    providers: Mapping[RuntimeSideRole, str],
+) -> None:
+    """Clean only this run's outputs after both worker launchers have settled."""
+
+    failures: list[str] = []
+    for role in _ROLES:
+        directory = root / f"{role}-output"
+        try:
+            try:
+                facts = directory.lstat()
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISDIR(facts.st_mode):
+                raise OciEvaluationError(
+                    "worker output root must remain a real directory"
+                )
+            try:
+                _remove_collectible_output(directory)
+            except OSError:
+                # The private host parent remains mode 0700. Give the same
+                # worker UID listing access to its one dedicated output mount.
+                descriptor = os.open(
+                    directory,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                )
+                try:
+                    if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino) != (
+                        facts.st_dev,
+                        facts.st_ino,
+                    ):
+                        raise OciEvaluationError(
+                            "worker output root changed before cleanup"
+                        )
+                    os.fchmod(descriptor, 0o777)
+                    command = _output_cleanup_command(
+                        root, directory, launch, getattr(launch, role), providers[role]
+                    )
+                    result = run_side_worker(
+                        command, timeout_seconds=_OUTPUT_CLEANUP_TIMEOUT_SECONDS
+                    )
+                    if result.returncode:
+                        raise OciEvaluationError(
+                            f"{role} output cleanup exited with status {result.returncode}: "
+                            + (result.stderr.strip() or "no diagnostic")
+                        )
+                    _remove_collectible_output(directory)
+                finally:
+                    try:
+                        os.fchmod(descriptor, 0o733)
+                    finally:
+                        os.close(descriptor)
+            directory.rmdir()
+        except (OSError, OciEvaluationError) as exc:
+            failures.append(f"{role}: {exc}")
+    if failures:
+        raise OciEvaluationError("worker output cleanup failed: " + "; ".join(failures))
+    # Only bounded, host-created job files remain; worker trees were handled above.
+    shutil.rmtree(root)
+
+
+@contextmanager
+def _worker_directory(
+    launch: OciEvaluationLaunch, providers: Mapping[RuntimeSideRole, str]
+) -> Iterator[Path]:
+    root = Path(tempfile.mkdtemp(prefix="invarlock-side-workers-"))
+    original_error: BaseException | None = None
+    try:
+        yield root
+    except BaseException as exc:
+        original_error = exc
+        raise
+    finally:
+        try:
+            _cleanup_worker_directory(root, launch, providers)
+        except (OSError, OciEvaluationError) as exc:
+            diagnostic = f"worker temporary cleanup failed; retained {root}: {exc}"
+            if original_error is None:
+                raise OciEvaluationError(diagnostic) from exc
+            original_error.add_note(diagnostic)
+            logging.getLogger(__name__).error(diagnostic)
+
+
 @dataclass(frozen=True)
 class OciRuntimeExecutor:
     """Host-side coordinator for two isolated model workers."""
@@ -1307,8 +1520,11 @@ class OciRuntimeExecutor:
             "baseline": (request.comparison.baseline, self.launch.baseline),
             "subject": (request.comparison.subject, self.launch.subject),
         }
-        with tempfile.TemporaryDirectory(prefix="invarlock-side-workers-") as temporary:
-            root = Path(temporary)
+        providers: dict[RuntimeSideRole, str] = {
+            cast(RuntimeSideRole, role): side.runtime.provider
+            for role, (side, _side_launch) in sides.items()
+        }
+        with _worker_directory(self.launch, providers) as root:
             commands: dict[RuntimeSideRole, list[str]] = {}
             outputs: dict[RuntimeSideRole, Path] = {}
             timeouts: dict[RuntimeSideRole, int] = {}

@@ -1,0 +1,37 @@
+{
+  "format": "invarlock/k2-runtime-readiness-v1",
+  "status": "blocked",
+  "source_repository": "https://github.com/sgl-project/sglang",
+  "source_commit": "392841f47cb7ef214601eeb528906a0abba02471",
+  "route": "external_sglang_pipeline_capture",
+  "precision": "bfloat16",
+  "model_repository_code_execution": false,
+  "image_digest": null,
+  "resolved_dependency_count": 204,
+  "blockers": [
+    {
+      "action": "Build the exact native runtime; retain installed source identities, dependency consistency, offline native imports, and Python plus OS vulnerability reviews."
+    }
+  ],
+  "excluded_optional_dependencies": {
+    "packages": [
+      "outlines",
+      "outlines-core",
+      "diskcache"
+    ],
+    "source_changes": [
+      "python/pyproject.toml",
+      "python/sglang/srt/constrained/outlines_backend.py",
+      "python/sglang/srt/constrained/outlines_jump_forward.py"
+    ],
+    "advisories": [
+      "GHSA-w8v5-vhqr-4h9v",
+      "PYSEC-2026-2447"
+    ],
+    "verification": "Authenticated source derivation removes the dependency and explicitly rejects both optional modules; installed imports and dispatch remain required."
+  },
+  "model_qualification_gates": [
+    "Observe real H200 startup and bounded inference, then independently verify the retained model captures before qualification."
+  ],
+  "ready_meaning": "Exact image passes CPU build, installed-source, offline-import and security checks; approved GPU preflight and model qualification remain separate."
+}

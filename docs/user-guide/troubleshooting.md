@@ -222,6 +222,23 @@ but rejects the boundary, inspect its image entrypoint, container markers,
 offline flags, and runtime-integration resources. See
 [Runtime providers](runtime-providers.md) for provider-specific setup.
 
+## Worker output cleanup fails
+
+A failed or interrupted worker can leave temporary files owned by its numeric
+user. InvarLock first attempts bounded host cleanup. If those permissions block
+removal, it runs a cleanup helper with the same non-root user and pinned image,
+disabled networking, and only that side's temporary output mounted writable.
+The helper has a 30-second deadline, 128 MiB of memory, and limits of 4,096
+entries and 64 nested directory levels. It does not follow symbolic links or
+change regular-file permissions.
+
+If cleanup still fails, the diagnostic names the retained private temporary
+directory. An existing evaluation error remains the primary error; cleanup
+failure is also reported. Check the local engine and exact image availability,
+then have the machine operator inspect and remove only the reported temporary
+directory using its file ownership. A cleanup failure does not publish a
+completed evidence bundle.
+
 ## Policy digest mismatch
 
 Verification uses the exact bytes at `--policy`; it never trusts a policy found

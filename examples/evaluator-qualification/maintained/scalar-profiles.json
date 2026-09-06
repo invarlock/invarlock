@@ -1,0 +1,442 @@
+{
+  "format": "invarlock/literal-scalar-profile-definitions-v1",
+  "profiles": [
+    {
+      "profile_id": "lm-evaluation-harness-literal-scalar-v1",
+      "historical_profile": "lm-evaluation-harness",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "lm-eval",
+        "version": "0.4.12"
+      },
+      "project_url": "https://github.com/EleutherAI/lm-evaluation-harness",
+      "lock": "locks/lm-evaluation-harness.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "input_dtype": "object",
+        "regexes_to_ignore": null,
+        "ignore_case": false,
+        "ignore_punctuation": false,
+        "ignore_numbers": false
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:7292215bb68b9cf650023939b2c0e0a9a6f48c77b39600a4069c796c33384b94"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "Explicit NumPy object-array inputs preserve trailing NUL characters; all single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "deepeval-literal-scalar-v1",
+      "historical_profile": "deepeval",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "deepeval",
+        "version": "4.1.3"
+      },
+      "project_url": "https://deepeval.com/",
+      "lock": "locks/deepeval.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "threshold": 1,
+        "verbose_mode": false
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:acaa28ab5f74f84849f542077a8adee835ff632cbf5a0a125d279182039a3d85"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "Empty output is unsupported; literal equality must agree with equality after Unicode boundary whitespace stripping. Equal boundary whitespace remains supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "ragas-literal-scalar-v1",
+      "historical_profile": "ragas",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "ragas",
+        "version": "0.4.3"
+      },
+      "project_url": "https://docs.ragas.io/",
+      "lock": "locks/ragas.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "metric": "ExactMatch"
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:9935e46a0a048d4d5a7790abfd0d20c38909231da34b1aab5da5268758b00230"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "All single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "lighteval-literal-scalar-v1",
+      "historical_profile": "lighteval",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "lighteval",
+        "version": "0.13.0"
+      },
+      "project_url": "https://huggingface.co/docs/lighteval/",
+      "lock": "locks/lighteval.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "strip_strings": false,
+        "normalize_pred": null,
+        "normalize_gold": null,
+        "type_exact_match": "full",
+        "references": 1,
+        "predictions": 1
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:e8b27f8caea91ca9705ba7e0bbeca2813a0b95a49f5ac5d3252644f5e36737db"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "The equal-empty output/reference pair is unsupported because the native metric returns zero; empty-output mismatches remain supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "hugging-face-evaluate-literal-scalar-v1",
+      "historical_profile": "hugging-face-evaluate",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "evaluate",
+        "version": "0.4.6"
+      },
+      "project_url": "https://huggingface.co/docs/evaluate/",
+      "lock": "locks/hugging-face-evaluate.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "metric": "exact_match",
+        "regexes_to_ignore": null,
+        "ignore_case": false,
+        "ignore_punctuation": false,
+        "ignore_numbers": false
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:fd585beeb12df6ea93c99fcfbedf4374d3f5e5778ab91c93ada701ff176e53f1"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "Literal equality must agree with equality after removing trailing NUL characters from each string. The dynamically loaded metric module content hash is independently bound.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "autoevals-literal-scalar-v1",
+      "historical_profile": "autoevals",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "autoevals",
+        "version": "0.3.0"
+      },
+      "project_url": "https://github.com/braintrustdata/autoevals",
+      "lock": "locks/autoevals.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "metric": "ExactMatch"
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:9ec999c773e666b8778b179bde3c9f7dc442f798607d4426de1aec07a0dbb8ef"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "All single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "openevals-literal-scalar-v1",
+      "historical_profile": "openevals",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "openevals",
+        "version": "0.2.0"
+      },
+      "project_url": "https://github.com/langchain-ai/openevals",
+      "lock": "locks/openevals.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "key": "exact_match",
+        "input_type": "string"
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:6edfad694a8fc27ae213a44657057900768bdb9b3bbc50edec192679981b59d6"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "All single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "openai-evals-literal-scalar-v1",
+      "historical_profile": "openai-evals",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "evals",
+        "version": "3.0.1.post1"
+      },
+      "project_url": "https://github.com/openai/evals",
+      "lock": "locks/openai-evals.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "match_function": "exact"
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:86b36f2d69b62d631417b32d2ce282f7838deb0fabbb37e451f7a0916698ac15",
+        "source_revision": "8eac7a7de5215c907fbddc30efdaf316913eccdd"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "All single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "arize-phoenix-evals-literal-scalar-v1",
+      "historical_profile": "arize-phoenix-evals",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "arize-phoenix-evals",
+        "version": "3.3.0"
+      },
+      "project_url": "https://github.com/Arize-ai/phoenix",
+      "lock": "locks/arize-phoenix-evals.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "metric": "exact_match"
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:0f80e10314f3deea4226c986c05d2ab49d8fb1767f9465758bf5f7a08e2d9c5a"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "All single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "opik-literal-scalar-v1",
+      "historical_profile": "opik",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "opik",
+        "version": "2.2.7"
+      },
+      "project_url": "https://github.com/comet-ml/opik",
+      "lock": "locks/opik.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "case_sensitive": true,
+        "name": "equals_metric",
+        "track": false
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:97d801fee4aa695c1a1d516b6cabf2abfda1e59435105ee4b2b9217895d21e26"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "case_sensitive=True is explicit; all single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    },
+    {
+      "profile_id": "trulens-literal-scalar-v1",
+      "historical_profile": "trulens",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "trulens",
+        "version": "2.9.0"
+      },
+      "project_url": "https://github.com/truera/trulens",
+      "lock": "locks/trulens.txt",
+      "runner": "maintained/scalar_runner.py",
+      "runner_assets": [
+        "maintained/scalar_native.py",
+        "maintained/scalar_semantics.py",
+        "maintained/batch_semantics.py",
+        "maintained/profile_binding.py",
+        "maintained/scalar-profiles.json",
+        "runners/trulens_metric.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "name": "exact_match",
+        "implementation": "runners.trulens_metric.exact_match"
+      },
+      "source_bindings": {
+        "module_sha256": "sha256:25fe267f73d083ecdfc09fcd6aae555bbc20dc42e69d9232e2ae3b4886f1145e"
+      },
+      "supported_domain": {
+        "records": "Unique nonempty IDs and one string input/output/reference per independent schedule record. One actual scalar call per pair; no native batch-row identity assurance is claimed.",
+        "pairs": "All single-string literal pairs are supported.",
+        "unsupported": "Multiple targets, non-string values, malformed native scores, score/detail contradictions, changed package/module source, or unsupported pair semantics fail before publication."
+      }
+    }
+  ]
+}

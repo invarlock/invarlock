@@ -93,6 +93,17 @@ jobs:
               f'    {name}: {annotation} | None = "{canary}",\n',
               encoding="utf-8",
           )
+          metadata = Path(sys.argv[1]) / "examples/qualification/k2-horizon/model-card-observations.json"
+          metadata.parent.mkdir(parents=True)
+          metadata.write_text(
+              f'      "api_response_sha256": "{canary}",\n'
+              f'      "api_key": "{canary}"\n',
+              encoding="utf-8",
+          )
+          metadata.with_name("unrelated.json").write_text(
+              f'      "api_response_sha256": "{canary}",\n',
+              encoding="utf-8",
+          )
           PY
           git -C "${probe_root}" add .
           git -C "${probe_root}" commit --quiet -m "Add scanner boundary probe"
@@ -119,6 +130,8 @@ jobs:
               ("public_evidence/evidence/example/evidence/request.json", 1),
               ("src/invarlock/pipeline/evidence.py", 3),
               ("src/invarlock/pipeline/evidence.py", 4),
+              ("examples/qualification/k2-horizon/model-card-observations.json", 2),
+              ("examples/qualification/k2-horizon/unrelated.json", 1),
           }
           observed = {(item["File"], item["StartLine"]) for item in findings}
           if len(findings) != len(expected) or observed != expected:

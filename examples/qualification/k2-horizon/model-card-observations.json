@@ -1,0 +1,228 @@
+{
+  "format": "invarlock/example-model-card-observations-v1",
+  "observed_on": "2026-09-06",
+  "scope": "Publisher metadata at the exact frozen campaign revisions. These observations do not determine legal rights or model quality.",
+  "observations": [
+    {
+      "model": "0.9b",
+      "role": "baseline",
+      "repository": "IFM/K2-Horizon-0.9B",
+      "revision": "92959a6834719d4fac3b8e3e080f48605c5cbe1f",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-0.9B/revision/92959a6834719d4fac3b8e3e080f48605c5cbe1f?blobs=true",
+      "api_response_sha256": "4a61ebf06a19b623eed2956ba2e762155861d529f8da401f49abdd7d9f0d7405",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-0.9B/raw/92959a6834719d4fac3b8e3e080f48605c5cbe1f/README.md",
+      "readme_status": "absent_at_revision",
+      "readme_sha256": null,
+      "card_license_fields": {
+        "license": null,
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "0.9b",
+      "role": "candidate",
+      "repository": "IFM/K2-Horizon-0.9B",
+      "revision": "02d0da0fefe5a2f8dc3db091cad29b15c9d8e4fa",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-0.9B/revision/02d0da0fefe5a2f8dc3db091cad29b15c9d8e4fa?blobs=true",
+      "api_response_sha256": "c0d98af6471863dc8e39295f022dddf28ad3dc4b578a27493f3d4284f269e471",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-0.9B/raw/02d0da0fefe5a2f8dc3db091cad29b15c9d8e4fa/README.md",
+      "readme_status": "present",
+      "readme_sha256": "6d4504e8284a23f417442fbd835f933484b5893cf03a5e8423a6de789c28033d",
+      "card_license_fields": {
+        "license": "apache-2.0",
+        "license_name": "internal-only",
+        "license_link": "LICENSE"
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "3.7b",
+      "role": "baseline",
+      "repository": "IFM/K2-Horizon-3.7B",
+      "revision": "2cd32eff5bdcae05fea9cd665295e69c7d0d62fe",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-3.7B/revision/2cd32eff5bdcae05fea9cd665295e69c7d0d62fe?blobs=true",
+      "api_response_sha256": "bc1953e15f3b2e07e4b0c8a854d327d2cf348abe5c1e2f539bce544f7f99e61e",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-3.7B/raw/2cd32eff5bdcae05fea9cd665295e69c7d0d62fe/README.md",
+      "readme_status": "absent_at_revision",
+      "readme_sha256": null,
+      "card_license_fields": {
+        "license": null,
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "3.7b",
+      "role": "candidate",
+      "repository": "IFM/K2-Horizon-3.7B",
+      "revision": "633f52ad28b17edeabd82afc61d2d13b4c59a561",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-3.7B/revision/633f52ad28b17edeabd82afc61d2d13b4c59a561?blobs=true",
+      "api_response_sha256": "2a53455251de249ee8f7da4642b57ed7f97e1d409f735d06df627e3368efcc83",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-3.7B/raw/633f52ad28b17edeabd82afc61d2d13b4c59a561/README.md",
+      "readme_status": "present",
+      "readme_sha256": "223a975c529e5080bd4ce3f7e953e20b346c61a92670909404b398a7c8b7fd9a",
+      "card_license_fields": {
+        "license": "apache-2.0",
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "7b",
+      "role": "baseline",
+      "repository": "IFM/K2-Horizon-7B",
+      "revision": "c0bab2cc96a6953d7fad4d828938c729ae8088b2",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-7B/revision/c0bab2cc96a6953d7fad4d828938c729ae8088b2?blobs=true",
+      "api_response_sha256": "43146eeb3f43fecb47f6bce638b5cf12ed35fc2d82401e580d581d510e76493b",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-7B/raw/c0bab2cc96a6953d7fad4d828938c729ae8088b2/README.md",
+      "readme_status": "absent_at_revision",
+      "readme_sha256": null,
+      "card_license_fields": {
+        "license": null,
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "7b",
+      "role": "candidate",
+      "repository": "IFM/K2-Horizon-7B",
+      "revision": "586b03f0fd1fbbf2f13eeafc33749e95ae34dd10",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-7B/revision/586b03f0fd1fbbf2f13eeafc33749e95ae34dd10?blobs=true",
+      "api_response_sha256": "eac54c3a14444872de225d348aef8ead9de511f656f8f4ed931b1384fa12c861",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-7B/raw/586b03f0fd1fbbf2f13eeafc33749e95ae34dd10/README.md",
+      "readme_status": "present",
+      "readme_sha256": "c86ea9a4ec6b5166103b40cd045af4a74396a7d12133ee14359274ebaf85239f",
+      "card_license_fields": {
+        "license": "apache-2.0",
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "mova-36b-a4b",
+      "role": "baseline",
+      "repository": "IFM/K2-Horizon-MoVA-36B-A4B",
+      "revision": "a37d42a0475d090feba15a69bef441f4b5caf43b",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-MoVA-36B-A4B/revision/a37d42a0475d090feba15a69bef441f4b5caf43b?blobs=true",
+      "api_response_sha256": "6708df2c69a72edcb6867f911b93a6723d699683d734c27ce77732f6b1fe4e11",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-MoVA-36B-A4B/raw/a37d42a0475d090feba15a69bef441f4b5caf43b/README.md",
+      "readme_status": "absent_at_revision",
+      "readme_sha256": null,
+      "card_license_fields": {
+        "license": null,
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "mova-36b-a4b",
+      "role": "candidate",
+      "repository": "IFM/K2-Horizon-MoVA-36B-A4B",
+      "revision": "05cab0a4d7150c1c460a000b37ff40cc1af2feaa",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-MoVA-36B-A4B/revision/05cab0a4d7150c1c460a000b37ff40cc1af2feaa?blobs=true",
+      "api_response_sha256": "4d0254c036976093237f7c6ccfae850b9367377f3ae6dd5e9da0681858726318",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-MoVA-36B-A4B/raw/05cab0a4d7150c1c460a000b37ff40cc1af2feaa/README.md",
+      "readme_status": "present",
+      "readme_sha256": "944ab934d06a08965b5eadc656272a3052e6d2d5dff16ae8e4b718769f1098ab",
+      "card_license_fields": {
+        "license": "apache-2.0",
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "32b",
+      "role": "baseline",
+      "repository": "IFM/K2-Horizon-32B",
+      "revision": "ac2f1a7b9fad9cf2d3815b3b5cc81501cf15dbb0",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-32B/revision/ac2f1a7b9fad9cf2d3815b3b5cc81501cf15dbb0?blobs=true",
+      "api_response_sha256": "86e4a9c186d0a67b9ca66ffc8fd23b11d2ebb2bf933574eabd483d58665ef8f4",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-32B/raw/ac2f1a7b9fad9cf2d3815b3b5cc81501cf15dbb0/README.md",
+      "readme_status": "absent_at_revision",
+      "readme_sha256": null,
+      "card_license_fields": {
+        "license": null,
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    },
+    {
+      "model": "32b",
+      "role": "candidate",
+      "repository": "IFM/K2-Horizon-32B",
+      "revision": "466db5f23c8a7c96b0b320b688612ee6f4446a35",
+      "repository_exists_at_revision": true,
+      "api_url": "https://huggingface.co/api/models/IFM/K2-Horizon-32B/revision/466db5f23c8a7c96b0b320b688612ee6f4446a35?blobs=true",
+      "api_response_sha256": "ec454dace71e41ce142111a2720d8f2bd45e2a45f7b6813092011a08fcf71501",
+      "readme_url": "https://huggingface.co/IFM/K2-Horizon-32B/raw/466db5f23c8a7c96b0b320b688612ee6f4446a35/README.md",
+      "readme_status": "present",
+      "readme_sha256": "a69ee353684a8d82bb15c890dbe60dca4a53fe4a1df597b031d956e44806ba0a",
+      "card_license_fields": {
+        "license": "apache-2.0",
+        "license_name": null,
+        "license_link": null
+      },
+      "license_or_notice_paths": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "candidate-0.9b-conflicting-card-fields",
+      "affected": [
+        {
+          "model": "0.9b",
+          "role": "candidate"
+        }
+      ],
+      "observation": "The card declares apache-2.0 together with license_name internal-only and license_link LICENSE. No LICENSE path appears in the repository listing at this revision.",
+      "follow_up": "Resolve the conflicting fields with the publisher before presenting this revision as a commercial reference model."
+    },
+    {
+      "id": "baseline-license-metadata-absent",
+      "affected": [
+        {
+          "model": "0.9b",
+          "role": "baseline"
+        },
+        {
+          "model": "3.7b",
+          "role": "baseline"
+        },
+        {
+          "model": "7b",
+          "role": "baseline"
+        },
+        {
+          "model": "mova-36b-a4b",
+          "role": "baseline"
+        },
+        {
+          "model": "32b",
+          "role": "baseline"
+        }
+      ],
+      "observation": "All five frozen baseline revisions exist, but their repository listings have no README, license or notice file, and their API responses have no card license fields.",
+      "follow_up": "Establish the applicable terms for the exact baseline revisions before redistribution or commercial reference promotion. Absence of metadata alone does not establish a restriction."
+    }
+  ],
+  "qualification_boundary": "Technical workflow qualification and applicable model terms are separate. Do not infer rights from successful capture, public download availability, parameter count, or a signed comparison."
+}

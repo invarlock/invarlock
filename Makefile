@@ -64,7 +64,8 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
+.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
+.PHONY: evaluator-inspect-semantics evaluator-batch-semantics
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
@@ -325,7 +326,43 @@ evaluator-qualification:  ## Requalify the retained evaluator matrix offline
 evaluator-replayable-imports:  ## Replay independently replayable 102-record imports
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
-evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
+evaluator-inspect-semantics:  ## Check the pinned Inspect scorer's literal-pair domain
+	@set -eu; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		uv run --no-project --python "$(PYTHON)" \
+			--with-requirements examples/evaluator-qualification/locks/inspect-ai.txt \
+			python examples/evaluator-qualification/maintained/inspect_differential.py \
+			--output "$$audit_dir/observation.json"
+
+evaluator-batch-semantics:  ## Check the five pinned batch scorers against literal boundaries
+	@set -eu; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		for provider in evidently langfuse azure-ai-evaluation pydantic-evals; do \
+			uv run --no-project --python "$(PYTHON)" \
+				--with-requirements "examples/evaluator-qualification/locks/$$provider.txt" \
+				python examples/evaluator-qualification/maintained/batch_differential.py \
+				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
+		done; \
+		$(PYTHON) examples/evaluator-qualification/maintained/batch_differential.py \
+			--provider promptfoo --output "$$audit_dir/promptfoo.json"
+
+evaluator-scalar-semantics:  ## Check the eleven pinned scalar scorers against literal boundaries
+	@set -eu; \
+		repo_root="$$(pwd)"; \
+		qualification_python="$$($(PYTHON) -c 'import sys; print(sys.executable)')"; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		cd "$$audit_dir"; \
+		for provider in lm-evaluation-harness deepeval ragas lighteval hugging-face-evaluate autoevals openevals openai-evals arize-phoenix-evals opik trulens; do \
+			uv run --no-project --python "$$qualification_python" \
+				--with-requirements "$$repo_root/examples/evaluator-qualification/locks/$$provider.txt" \
+				python "$$repo_root/examples/evaluator-qualification/maintained/scalar_differential.py" \
+				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
+		done
+
+evaluator-upstream-qualification:  ## Reproduce the retained historical corpora with their original runners
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-replayable
 	$(MAKE) evaluator-qualification
@@ -440,7 +477,8 @@ local-hf-pipeline-smoke-locked:  ## Run the built-in provider smoke in the locke
 container-front-door-smoke: runtime-image  ## Run the host-to-container evaluation smoke
 	INVARLOCK_RUN_CONTAINER_SMOKE=1 INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
 		INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
-		PYTHONPATH=src $(PYTEST) -q -m integration tests/integration/test_container_front_door_journey.py
+		PYTHONPATH=src $(PYTEST) -q -m integration \
+		tests/integration/test_container_front_door_journey.py tests/integration/test_oci_isolation.py
 
 qualification-source-bundle:  ## Create the exact Git archive used by runtime qualification
 	$(foreach variable,SOURCE_BUNDLE_OUTPUT,$(if $(strip $($(variable))),,$(error $(variable) is required)))
@@ -645,9 +683,12 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		consumer_root="$$smoke_venv/quickstart-consumer"; \
 		mkdir "$$consumer_root"; \
 		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
+		cp examples/pipeline/wheel_smoke.py "$$consumer_root/pipeline-wheel-smoke.py"; \
 		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
 		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
 			"$$smoke_venv/bin/python" run.py --fixture golden ); \
+		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" pipeline-wheel-smoke.py --cli "$$smoke_venv/bin/invarlock-pipeline" ); \
 		approval_root="$$smoke_venv/deployment-consumer"; \
 		cp -R examples/ci/standalone-consumer "$$approval_root"; \
 		mkdir "$$approval_root/incoming"; \

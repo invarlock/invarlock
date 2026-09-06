@@ -21,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluator qualification with independently bound reference text.
 - Added runnable classification, extraction and recorded-judge onboarding
   examples and an integration guide for existing evaluation pipelines.
+- Added real local-model rehearsals for Inspect, LM Evaluation Harness and
+  Promptfoo, with retained native exports, measured call latency, and separate
+  installed-wheel recipient verification across classification, JSON extraction
+  and arithmetic workflows.
+- Added a standalone ModelKit example that verifies package and model-content
+  identities, replays signed evidence, and applies current recipient acceptance
+  against both actual model directories. A pinned KitOps test exercises
+  repackaging and an independent recipient.
+- Added a five-model K2 Horizon campaign harness with immutable model pairs,
+  logical tensor measurements, frozen workflow cases, bounded native capture,
+  and independent pipeline replay. The configurations remain unqualified
+  candidates until the runtime and actual GPU campaigns pass their gates.
+- Added a native K2 image verification helper that reconstructs inputs, observes
+  installed dependencies and CPU execution, and retains raw security findings
+  with explicit applicability decisions. Missing or unresolved reviews keep
+  runtime readiness blocked; CPU success does not qualify a GPU model.
 
 ### Changed
 
@@ -28,11 +44,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI actions. Python dependency updates now use the uv ecosystem so the root
   manifest and lock are proposed together; hashed workflow locks remain
   separately checked.
+- Added installed pipeline signing, verification, report, and rejection checks
+  to both candidate and published wheel validation before optional packages
+  are installed.
 
 ### Removed
 
 ### Fixed
 
+- Installed the authenticated pip bootstrap wheel offline before downloading
+  native K2 runtime dependencies. Core wheels retain their actual filename and
+  version, with bounded metadata checks rejecting relabeled distributions.
+- Rejected signed evidence whose request task, canonical schedule and provider
+  capabilities disagree, and checked the canonical evaluation-source identity
+  digest during recipient acceptance. Existing signed formats remain unchanged.
+- Allowed the ModelKit recipient example to require the existing complete-request
+  digest during independent technical replay. Package and signature checks cannot
+  override a mismatched recipient expectation; older requests remain valid.
+- Preserved valid Promptfoo responses after failed quality assertions instead
+  of classifying them as execution errors. Conflicting native failure fields
+  now fail import, while actual execution failures remain insufficient evidence.
+- Defined a separate Inspect literal-pair qualification domain that rejects
+  boundary-normalization collisions while preserving supported whitespace and
+  punctuation. Native differential checks and new qualification artifacts
+  retain the original profile and signed evidence unchanged.
+- Added separate current profiles for five batch evaluators that validate
+  native row identities, metric configuration and score details. Boundary
+  audits expose unsupported renderer behavior, and complete profile bindings
+  prevent dependency changes without review from reusing qualification authority.
+- Added current profiles for eleven scalar evaluators with explicit native
+  settings, source bindings and literal input domains. Boundary audits cover
+  whitespace, case, Unicode, empty strings and trailing NUL characters while
+  preserving historical runner and evidence identities.
+- Bound current qualification environments to the invoking Python interpreter
+  and prevented publication from replacing an output directory created during
+  execution.
+- Added real-container checks for network isolation, read-only inputs, key
+  separation, resource and output limits, interruption, exact-container cleanup,
+  and prevention of evidence publication after failed execution.
+- Fixed cleanup of partial Linux worker output owned by a different numeric
+  user. A bounded helper uses the selected non-root user and pinned image,
+  preserves the original evaluation error, and reports any retained files.
 - Remediated maintained dependency-audit findings by updating pip, wheel, and
   Material for MkDocs, and removing unused NLTK and ROUGE dependencies from the
   fixed evaluator images. Derived wheels keep authenticated upstream inputs

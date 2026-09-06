@@ -81,6 +81,18 @@ jobs:
           INVARLOCK_CONTAINER_SMOKE_INSTALLED_WHEEL=1 \
           INVARLOCK_CONTAINER_ENGINE="$CONTAINER_ENGINE" \
           INVARLOCK_RUNTIME_IMAGE="$INVARLOCK_RUNTIME_IMAGE" \
+          INVARLOCK_OCI_ISOLATION_RESULTS="$GITHUB_WORKSPACE/artifacts/oci-isolation/cases" \
           PYTHONPATH='' \
           python -m pytest -q -m integration \
-            tests/integration/test_container_front_door_journey.py
+            --junitxml=artifacts/oci-isolation/results.xml \
+            tests/integration/test_container_front_door_journey.py \
+            tests/integration/test_oci_isolation.py
+
+      - name: Retain OCI isolation outcomes
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: oci-isolation-outcomes
+          path: artifacts/oci-isolation
+          if-no-files-found: warn
+          retention-days: 30
