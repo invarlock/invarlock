@@ -64,7 +64,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
+.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
 .PHONY: evaluator-inspect-semantics evaluator-batch-semantics
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
@@ -348,7 +348,21 @@ evaluator-batch-semantics:  ## Check the five pinned batch scorers against liter
 		$(PYTHON) examples/evaluator-qualification/maintained/batch_differential.py \
 			--provider promptfoo --output "$$audit_dir/promptfoo.json"
 
-evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
+evaluator-scalar-semantics:  ## Check the eleven pinned scalar scorers against literal boundaries
+	@set -eu; \
+		repo_root="$$(pwd)"; \
+		qualification_python="$$($(PYTHON) -c 'import sys; print(sys.executable)')"; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		cd "$$audit_dir"; \
+		for provider in lm-evaluation-harness deepeval ragas lighteval hugging-face-evaluate autoevals openevals openai-evals arize-phoenix-evals opik trulens; do \
+			uv run --no-project --python "$$qualification_python" \
+				--with-requirements "$$repo_root/examples/evaluator-qualification/locks/$$provider.txt" \
+				python "$$repo_root/examples/evaluator-qualification/maintained/scalar_differential.py" \
+				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
+		done
+
+evaluator-upstream-qualification:  ## Reproduce the retained historical corpora with their original runners
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-replayable
 	$(MAKE) evaluator-qualification

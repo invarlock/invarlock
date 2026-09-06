@@ -1,0 +1,497 @@
+{
+  "format": "invarlock/scalar-semantic-observation-v1",
+  "provider": "openai-evals",
+  "authority": "none",
+  "upstream_version": "3.0.1.post1",
+  "candidate_dependency": false,
+  "scorer_configuration": {
+    "match_function": "exact"
+  },
+  "source_bindings": {
+    "module_sha256": "sha256:86b36f2d69b62d631417b32d2ce282f7838deb0fabbb37e451f7a0916698ac15",
+    "source_revision": "8eac7a7de5215c907fbddc30efdaf316913eccdd"
+  },
+  "semantic_drift": false,
+  "problems": [],
+  "cases": [
+    {
+      "record_id": "plain_equal",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "case",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "distinct",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "equal_leading_space",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "output_leading_space",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "reference_leading_space",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "trailing_newline",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "internal_whitespace",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "internal_punctuation",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "unicode_equal",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "unicode_case",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "unicode_composition",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "zero_width_space",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "empty_equal",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "empty_mismatch",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "empty_whitespace",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "empty_punctuation",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "multiple_targets_match",
+      "supported": false,
+      "current": null,
+      "historical": null
+    },
+    {
+      "record_id": "multiple_targets_miss",
+      "supported": false,
+      "current": null,
+      "historical": null
+    },
+    {
+      "record_id": "single_target_array",
+      "supported": false,
+      "current": null,
+      "historical": null
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "template",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "statement",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "comment",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "file_reference",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "array_output",
+      "supported": false,
+      "current": null,
+      "historical": null
+    },
+    {
+      "record_id": "package_reference",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "nul_equal",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "nul_suffix",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "nul_empty",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    },
+    {
+      "record_id": "whitespace_equal",
+      "supported": true,
+      "current": {
+        "score": 1.0,
+        "native": {
+          "score": 1.0
+        }
+      },
+      "historical": {
+        "score": 1.0
+      }
+    },
+    {
+      "record_id": "empty_reference",
+      "supported": true,
+      "current": {
+        "score": 0.0,
+        "native": {
+          "score": 0.0
+        }
+      },
+      "historical": {
+        "score": 0.0
+      }
+    }
+  ]
+}

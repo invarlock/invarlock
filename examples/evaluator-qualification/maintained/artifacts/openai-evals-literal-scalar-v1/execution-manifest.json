@@ -1,0 +1,30 @@
+{
+  "artifacts_sha256": {
+    "boundary-observation.json": "sha256:cbc522224e65c03dfc3cad216ea3847b49507fe4b8db06f6e55cedda8691b948",
+    "cases.json": "sha256:021b8e2155f2006d68dfee297bc3a54ab54ff43424b5aa56e1ea20db1379a113",
+    "export.json": "sha256:485f8e53289d70dee1c060721e26f8896f0eccac1cf62706c6af3912eb2b01d2",
+    "profile.json": "sha256:9af1b17b525b451fc000f283563fca86ae3b3b0159dbd45d875f817af9e6e391",
+    "qualification-result.json": "sha256:bca79c724d1f1894978f87cac8f7a9e3c1e4b754d147f84ba33c8af914e5eedd",
+    "schedule.json": "sha256:854393a8d790334f3c7deafa7f6df064dfb806a61394cf946fd038607815617c",
+    "upstream-output.json": "sha256:323c010a41fe7ef1ded5bd529255751a94e0a75c5a4c00b91d9fad39022e9505"
+  },
+  "differential_case_count": 39,
+  "format": "invarlock/scalar-maintenance-execution-v1",
+  "model_output_count": 102,
+  "native_batch_identity_assurance": false,
+  "new_model_inference": false,
+  "profile_id": "openai-evals-literal-scalar-v1",
+  "signed_transaction": false,
+  "sources_sha256": {
+    "batch_semantics.py": "sha256:516b9a5fbfa233bee2d1b92a6c89c2a1c784068375c4a6277ebc1f65bdb63ca8",
+    "profile_binding.py": "sha256:5dade9fe3a96c0ae29a9ca57dd437b2b45dff95837868caaf3c451096e27635b",
+    "qualify_scalar.py": "sha256:405199c18209545fffc29c921f1a8eeffb764216b58f8f6adbe63f2f1a435fee",
+    "scalar-boundaries.json": "sha256:91e603aa9b61ce85cc78a807a540f807d5205c1c6efa02dff90ba21c3cec8f62",
+    "scalar-profiles.json": "sha256:d99856f8e7148a7e674d48c7447cd84223fb7d0de69800122956b44c179199dc",
+    "scalar_differential.py": "sha256:8258ecec03bbfd47504ed8967f5e3239353d83ec59d15e5d5013afbfb1c5690d",
+    "scalar_native.py": "sha256:3dafa90c1afc66461393056a8767512c4b927583841e7aab57be7790105e0155",
+    "scalar_runner.py": "sha256:cf8fc0154235f5f9d5d4d3f95a508c24f3906b8e92d3984c101d0ec707e820d6",
+    "scalar_semantics.py": "sha256:6328c72899cbed865185c888ee3c168f9341025d0bfcbd4efb5baf5881a0efb5"
+  },
+  "upstream_version": "3.0.1.post1"
+}
