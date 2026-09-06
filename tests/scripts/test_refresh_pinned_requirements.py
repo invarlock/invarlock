@@ -23,7 +23,8 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
         "build_cache_free_lm_eval_wheel.py",
         "build_restricted_openai_evals_wheel.py",
     ):
-        shutil.copyfile(ROOT / "scripts/security" / name, scripts / name)
+        # Subprocess coverage must retain the helpers' canonical source identity.
+        (scripts / name).symlink_to(ROOT / "scripts/security" / name)
 
     # The compiler is an external dependency. Exercise the actual refresh and
     # filter commands against a deterministic compiled closure without network.
