@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Installed the authenticated pip bootstrap wheel offline before downloading
+  native K2 runtime dependencies. Core wheels retain their actual filename and
+  version, with bounded metadata checks rejecting relabeled distributions.
 - Rejected signed evidence whose request task, canonical schedule and provider
   capabilities disagree, and checked the canonical evaluation-source identity
   digest during recipient acceptance. Existing signed formats remain unchanged.

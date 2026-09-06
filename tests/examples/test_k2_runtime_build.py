@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
+import zipfile
 
 import pytest
 
 from examples.qualification import k2_runtime_build as build
+
+
+def _wheel_bytes(
+    *,
+    metadata=b"Name: invarlock\nVersion: 0.15.1\n",
+    member="invarlock-0.15.1.dist-info/METADATA",
+):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(member, metadata)
+    return buffer.getvalue()
 
 
 def _inputs(tmp_path, monkeypatch):
@@ -30,12 +43,16 @@ def _inputs(tmp_path, monkeypatch):
         json.dumps({"reviewed_source_files": {"python/sglang/model.py": "a" * 64}})
     )
     lock = root / "requirements.txt"
-    lock.write_text("package==1\n")
+    pip = tmp_path / build.PIP_WHEEL
+    pip.write_bytes(b"pip fixture")
+    pip_digest = hashlib.sha256(pip.read_bytes()).hexdigest()
+    lock.write_text(f"pip==26.2 --hash=sha256:{pip_digest}\n")
+    monkeypatch.setattr(build, "PIP_WHEEL_SHA256", pip_digest)
     monkeypatch.setattr(build, "ROOT", root)
     monkeypatch.setattr(build, "RUNTIME", runtime)
     monkeypatch.setattr(build, "LOCK", lock)
-    wheel = tmp_path / "core.whl"
-    wheel.write_bytes(b"authenticated fixture")
+    wheel = tmp_path / "invarlock-0.15.1-py3-none-any.whl"
+    wheel.write_bytes(_wheel_bytes())
     expected = hashlib.sha256(wheel.read_bytes()).hexdigest()
 
     def derive(archive, output):
@@ -58,13 +75,25 @@ def test_context_binds_exact_wheel_source_and_campaign_inputs(tmp_path, monkeypa
         wheel,
         expected,
         output,
+        pip_wheel=tmp_path / build.PIP_WHEEL,
         apt_bundle=None,
         expected_apt_manifest="fixture",
     )
     assert result["status"] == "prepared_not_built"
-    assert result["input_sha256"]["core.whl"] == expected
+    assert result["core_wheel_filename"] == wheel.name
+    assert result["core_distribution_version"] == "0.15.1"
+    assert result["input_sha256"][f"core/{wheel.name}"] == expected
+    pip = tmp_path / build.PIP_WHEEL
+    assert (
+        result["input_sha256"][f"bootstrap/{build.PIP_WHEEL}"]
+        == hashlib.sha256(pip.read_bytes()).hexdigest()
+    )
+    assert (output / "bootstrap" / build.PIP_WHEEL).read_bytes() == pip.read_bytes()
+    assert (output / "bootstrap/pip-wheel.sha256").read_text() == (
+        f"{build.PIP_WHEEL_SHA256}  /usr/share/invarlock-k2/bootstrap/{build.PIP_WHEEL}\n"
+    )
     assert result["reviewed_source_files"] == {"python/sglang/model.py": "a" * 64}
-    assert (output / "core.whl").read_bytes() == wheel.read_bytes()
+    assert (output / "core" / wheel.name).read_bytes() == wheel.read_bytes()
     assert json.loads((output / "build-inputs.json").read_text()) == result
     with pytest.raises(FileExistsError):
         build.prepare(
@@ -72,6 +101,7 @@ def test_context_binds_exact_wheel_source_and_campaign_inputs(tmp_path, monkeypa
             wheel,
             expected,
             output,
+            pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
         )
@@ -88,6 +118,94 @@ def test_wrong_core_identity_cannot_create_build_context(
             wheel,
             expected,
             tmp_path / "output",
+            pip_wheel=tmp_path / build.PIP_WHEEL,
+            apt_bundle=None,
+            expected_apt_manifest="fixture",
+        )
+    assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "core.whl",
+        "other-0.15.1-py3-none-any.whl",
+        "invarlock-0.15.1-cp312-cp312-linux_x86_64.whl",
+        "invarlock-0.15.1-1-py3-none-any.whl",
+        "Invarlock-0.15.1-py3-none-any.whl",
+        "invarlock-0.15.1-py2.py3-none-any.whl",
+    ],
+)
+def test_core_wheel_rejects_noncanonical_or_unsupported_filenames(
+    tmp_path, monkeypatch, name
+):
+    wheel, expected = _inputs(tmp_path, monkeypatch)
+    wheel = wheel.rename(tmp_path / name)
+    with pytest.raises(ValueError, match="filename"):
+        build.prepare(
+            tmp_path / "archive",
+            wheel,
+            expected,
+            tmp_path / "output",
+            pip_wheel=tmp_path / build.PIP_WHEEL,
+            apt_bundle=None,
+            expected_apt_manifest="fixture",
+        )
+    assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "name",
+        "version",
+        "missing",
+        "duplicate_header",
+        "duplicate_member",
+        "extra_metadata",
+        "oversized",
+        "invalid_zip",
+        "wrong_member",
+    ],
+)
+def test_core_wheel_rejects_false_or_ambiguous_embedded_identity(
+    tmp_path, monkeypatch, kind
+):
+    wheel, _ = _inputs(tmp_path, monkeypatch)
+    metadata = b"Name: invarlock\nVersion: 0.15.1\n"
+    member = "invarlock-0.15.1.dist-info/METADATA"
+    if kind == "name":
+        metadata = metadata.replace(b"invarlock", b"another")
+    elif kind == "version":
+        metadata = metadata.replace(b"0.15.1", b"0.15.0")
+    elif kind == "missing":
+        metadata = b"Name: invarlock\n"
+    elif kind == "duplicate_header":
+        metadata += b"Version: 0.15.1\n"
+    elif kind == "oversized":
+        metadata += b"a" * 65536
+    elif kind == "wrong_member":
+        member = "invarlock-0.15.0.dist-info/METADATA"
+    data = _wheel_bytes(metadata=metadata, member=member)
+    if kind in {"duplicate_member", "extra_metadata"}:
+        buffer = io.BytesIO(data)
+        with zipfile.ZipFile(buffer, "a") as archive:
+            if kind == "duplicate_member":
+                with pytest.warns(UserWarning, match="Duplicate name"):
+                    archive.writestr(member, metadata)
+            else:
+                archive.writestr("another-1.dist-info/METADATA", metadata)
+        data = buffer.getvalue()
+    elif kind == "invalid_zip":
+        data = b"not a wheel archive"
+    wheel.write_bytes(data)
+    with pytest.raises(ValueError, match="metadata|archive"):
+        build.prepare(
+            tmp_path / "archive",
+            wheel,
+            hashlib.sha256(data).hexdigest(),
+            tmp_path / "output",
+            pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
         )
@@ -109,6 +227,7 @@ def test_failed_derivation_removes_only_its_new_context(tmp_path, monkeypatch):
             wheel,
             expected,
             tmp_path / "output",
+            pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
         )
@@ -131,6 +250,82 @@ def test_input_reader_refuses_special_symlink_and_oversized_files(tmp_path):
         build._read(fifo, 10)
 
 
+@pytest.mark.parametrize(
+    "kind", ["missing", "tampered", "symlink", "fifo", "oversized", "renamed", "sdist"]
+)
+def test_bootstrap_rejects_substituted_or_unbounded_wheels_before_output(
+    tmp_path, monkeypatch, kind
+):
+    wheel, expected = _inputs(tmp_path, monkeypatch)
+    pip = tmp_path / build.PIP_WHEEL
+    if kind == "missing":
+        pip.unlink()
+    elif kind == "tampered":
+        pip.write_bytes(b"untrusted code")
+    elif kind in {"symlink", "fifo"}:
+        pip.unlink()
+        if kind == "symlink":
+            pip.symlink_to(wheel)
+        else:
+            os.mkfifo(pip)
+    elif kind == "oversized":
+        with pip.open("wb") as stream:
+            stream.truncate(4 * 1024 * 1024 + 1)
+    elif kind == "renamed":
+        pip = pip.rename(tmp_path / "pip-24.0-py3-none-any.whl")
+    else:
+        pip.write_bytes(b"sdist fixture")
+        build.LOCK.write_text(
+            build.LOCK.read_text().rstrip()
+            + f" --hash=sha256:{hashlib.sha256(pip.read_bytes()).hexdigest()}\n"
+        )
+    output = tmp_path / "rejected"
+    with pytest.raises((ValueError, OSError)):
+        build.prepare(
+            tmp_path / "archive",
+            wheel,
+            expected,
+            output,
+            pip_wheel=pip,
+            apt_bundle=None,
+            expected_apt_manifest="fixture",
+        )
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("kind", ["absent", "version", "hash", "duplicate", "option"])
+def test_bootstrap_requires_one_exact_hash_bound_lock_record(
+    tmp_path, monkeypatch, kind
+):
+    _inputs(tmp_path, monkeypatch)
+    lock = build.LOCK.read_bytes()
+    if kind == "absent":
+        lock = b"other==1\n"
+    elif kind == "version":
+        lock = lock.replace(b"26.2", b"24.0")
+    elif kind == "hash":
+        lock = lock.replace(build.PIP_WHEEL_SHA256.encode(), b"0" * 64)
+    elif kind == "duplicate":
+        lock += lock
+    else:
+        lock = lock.rstrip() + b" --extra-index-url=https://example.invalid\n"
+    with pytest.raises(ValueError, match="maintained lock"):
+        build._pip_inputs(tmp_path / build.PIP_WHEEL, lock)
+
+
+def test_bootstrap_accepts_continued_hashes_without_accepting_the_sdist(
+    tmp_path, monkeypatch
+):
+    _inputs(tmp_path, monkeypatch)
+    lock = (
+        "pip==26.2 \\\n"
+        f"    --hash=sha256:{'a' * 64} \\\n"
+        f"    --hash=sha256:{build.PIP_WHEEL_SHA256}\nother==1\n"
+    ).encode()
+    payloads = build._pip_inputs(tmp_path / build.PIP_WHEEL, lock)
+    assert payloads[f"bootstrap/{build.PIP_WHEEL}"] == b"pip fixture"
+
+
 def test_cli_requires_and_passes_the_independent_os_manifest(tmp_path, monkeypatch):
     wheel, expected = _inputs(tmp_path, monkeypatch)
     assert (
@@ -138,6 +333,8 @@ def test_cli_requires_and_passes_the_independent_os_manifest(tmp_path, monkeypat
             [
                 "--archive",
                 str(tmp_path / "archive"),
+                "--pip-wheel",
+                str(tmp_path / build.PIP_WHEEL),
                 "--core-wheel",
                 str(wheel),
                 "--expected-core-wheel-sha256",
@@ -226,6 +423,8 @@ def test_real_build_cli_rejects_wrong_wheel_before_output(tmp_path):
             "examples.qualification.k2_runtime_build",
             "--archive",
             str(tmp_path / "source.tar.gz"),
+            "--pip-wheel",
+            str(tmp_path / build.PIP_WHEEL),
             "--core-wheel",
             str(wheel),
             "--expected-core-wheel-sha256",
@@ -320,6 +519,8 @@ def test_cli_reports_signature_and_compressed_index_failures_as_input_errors(
             [
                 "--archive",
                 "source.tar.gz",
+                "--pip-wheel",
+                str(tmp_path / build.PIP_WHEEL),
                 "--core-wheel",
                 "core.whl",
                 "--expected-core-wheel-sha256",

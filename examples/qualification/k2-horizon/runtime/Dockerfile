@@ -31,6 +31,12 @@ RUN --network=none sed 's|/out/debs/|/tmp/apt-debs/|' /usr/share/invarlock-k2/de
     && python3 -m venv /opt/k2
 
 ENV PATH=/opt/k2/bin:$PATH
+COPY bootstrap /usr/share/invarlock-k2/bootstrap
+# Replace Ubuntu's venv seed using only the independently authenticated wheel.
+RUN --network=none sha256sum -c /usr/share/invarlock-k2/bootstrap/pip-wheel.sha256 \
+    && python -m pip --isolated install --no-index --no-deps --no-cache-dir \
+       /usr/share/invarlock-k2/bootstrap/pip-26.2-py3-none-any.whl \
+    && python -c 'import pip; assert pip.__version__ == "26.2"'
 COPY requirements.txt /usr/share/invarlock-k2/requirements.txt
 RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes \
     -r /usr/share/invarlock-k2/requirements.txt
@@ -38,7 +44,7 @@ RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes \
 COPY apt/package-indexes /usr/share/invarlock-k2/package-indexes
 COPY apt/package-verification.json /usr/share/invarlock-k2/package-verification.json
 COPY source /tmp/sglang-source
-COPY core.whl /tmp/core/invarlock-0.15.0-py3-none-any.whl
+COPY core /tmp/core
 COPY examples /opt/campaign/examples
 COPY native_probe.py /opt/campaign/native_probe.py
 COPY build-inputs.json /usr/share/invarlock-k2/build-inputs.json
@@ -49,7 +55,7 @@ RUN --network=none cd /tmp/sglang-source/python \
     && python -m pip check \
     && cp /tmp/sglang-source/source-derivation.json /usr/share/invarlock-k2/ \
     && python -m pip list --format=json > /usr/share/invarlock-k2/python-packages.json \
-    && sha256sum /tmp/runtime-wheel/*.whl /tmp/core/*.whl > /usr/share/invarlock-k2/wheel-artifacts.sha256 \
+    && sha256sum /usr/share/invarlock-k2/bootstrap/*.whl /tmp/runtime-wheel/*.whl /tmp/core/*.whl > /usr/share/invarlock-k2/wheel-artifacts.sha256 \
     && rm -rf /tmp/sglang-source /tmp/runtime-wheel /tmp/core
 
 WORKDIR /opt/campaign

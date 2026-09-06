@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import lzma
 import os
@@ -11,7 +12,11 @@ import re
 import shutil
 import stat
 import subprocess
+import zipfile
+from email.parser import BytesParser
 from pathlib import Path
+
+from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 
 from examples.qualification import k2_runtime_apt as apt
 from examples.qualification import k2_runtime_source as source
@@ -19,6 +24,8 @@ from examples.qualification import k2_runtime_source as source
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "examples/qualification/k2-horizon/runtime"
 LOCK = ROOT / "requirements/workflows/k2-campaign-py312.txt"
+PIP_WHEEL = "pip-26.2-py3-none-any.whl"
+PIP_WHEEL_SHA256 = "931c303696af6fa3417112103b1cad26890e5a07eccb5b99783700e33f2b8aad"
 
 
 def _read(path, limit):
@@ -94,12 +101,88 @@ def _apt_inputs(bundle, expected):
     return payloads
 
 
+def _pip_inputs(path, lock):
+    # The universal wheel identity is independently checked against the maintained
+    # lock; accepting its sdist hash would permit archive substitution.
+    records = [
+        line.strip()
+        for line in lock.decode("utf-8").replace("\\\n", " ").splitlines()
+        if re.match(r"(?i)^pip(?:\W|$)", line.strip())
+    ]
+    if (
+        len(records) != 1
+        or re.fullmatch(r"pip==26\.2(?:\s+--hash=sha256:[0-9a-f]{64})+", records[0])
+        is None
+        or PIP_WHEEL_SHA256
+        not in re.findall(r"--hash=sha256:([0-9a-f]{64})", records[0])
+    ):
+        raise ValueError("maintained lock must bind the exact pip bootstrap wheel")
+    if path.name != PIP_WHEEL:
+        raise ValueError(
+            "pip bootstrap requires the exact official universal wheel name"
+        )
+    wheel = _read(path, 4 * 1024 * 1024)
+    if hashlib.sha256(wheel).hexdigest() != PIP_WHEEL_SHA256:
+        raise ValueError("pip bootstrap wheel identity differs")
+    return {
+        f"bootstrap/{PIP_WHEEL}": wheel,
+        "bootstrap/pip-wheel.sha256": (
+            f"{PIP_WHEEL_SHA256}  /usr/share/invarlock-k2/bootstrap/{PIP_WHEEL}\n"
+        ).encode(),
+    }
+
+
+def _core_version(filename, wheel):
+    try:
+        name, version, build_tag, tags = parse_wheel_filename(filename)
+    except InvalidWheelFilename as error:
+        raise ValueError("candidate core wheel filename is invalid") from error
+    if (
+        name != "invarlock"
+        or build_tag
+        or {str(tag) for tag in tags} != {"py3-none-any"}
+        or filename != f"invarlock-{version}-py3-none-any.whl"
+    ):
+        raise ValueError(
+            "candidate core wheel must use its canonical universal filename"
+        )
+    try:
+        with zipfile.ZipFile(io.BytesIO(wheel)) as archive:
+            records = [
+                item
+                for item in archive.infolist()
+                if item.filename.endswith(".dist-info/METADATA")
+            ]
+            if (
+                len(records) != 1
+                or records[0].filename != f"invarlock-{version}.dist-info/METADATA"
+                or records[0].file_size > 65536
+                or records[0].flag_bits & 1
+            ):
+                raise ValueError(
+                    "candidate core wheel metadata is ambiguous or unbounded"
+                )
+            with archive.open(records[0]) as stream:
+                metadata = stream.read(65537)
+            if len(metadata) > 65536:
+                raise ValueError("candidate core wheel metadata exceeds size bound")
+    except (zipfile.BadZipFile, RuntimeError, NotImplementedError) as error:
+        raise ValueError("candidate core wheel archive is invalid") from error
+    headers = BytesParser().parsebytes(metadata, headersonly=True)
+    if headers.get_all("Name") != ["invarlock"] or headers.get_all("Version") != [
+        str(version)
+    ]:
+        raise ValueError("candidate core wheel metadata differs from filename")
+    return str(version)
+
+
 def prepare(
     archive,
     core_wheel,
     expected_core_wheel,
     output,
     *,
+    pip_wheel,
     apt_bundle,
     expected_apt_manifest,
 ):
@@ -108,14 +191,17 @@ def prepare(
     wheel = _read(core_wheel, 32 * 1024 * 1024)
     if hashlib.sha256(wheel).hexdigest() != expected_core_wheel:
         raise ValueError("candidate core wheel identity differs")
+    version = _core_version(core_wheel.name, wheel)
+    lock = _read(LOCK, 1024 * 1024)
     payloads = {
         "Dockerfile": _read(RUNTIME / "Dockerfile", 65536),
-        "requirements.txt": _read(LOCK, 1024 * 1024),
+        "requirements.txt": lock,
         "native_probe.py": _read(
             ROOT / "examples/qualification/k2_native_probe.py", 65536
         ),
-        "core.whl": wheel,
+        f"core/{core_wheel.name}": wheel,
         "os-security-pins.txt": _read(RUNTIME / "os-security-pins.txt", 65536),
+        **_pip_inputs(pip_wheel, lock),
         **_apt_inputs(apt_bundle, expected_apt_manifest),
     }
     for name in ("k2_runtime_source.py", "k2_runtime_build.py", "k2_runtime_apt.py"):
@@ -138,6 +224,8 @@ def prepare(
         inputs = {
             "format": "invarlock/k2-runtime-build-inputs-v1",
             "status": "prepared_not_built",
+            "core_wheel_filename": core_wheel.name,
+            "core_distribution_version": version,
             "source_commit": source.COMMIT,
             "source_archive_sha256": source.ARCHIVE_SHA256,
             "derived_distribution_version": source.DERIVED_VERSION,
@@ -166,6 +254,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--core-wheel", type=Path, required=True)
+    parser.add_argument("--pip-wheel", type=Path, required=True)
     parser.add_argument("--expected-core-wheel-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--apt-bundle", type=Path, required=True)
@@ -177,6 +266,7 @@ def main(argv=None):
             args.core_wheel,
             args.expected_core_wheel_sha256,
             args.output,
+            pip_wheel=args.pip_wheel,
             apt_bundle=args.apt_bundle,
             expected_apt_manifest=args.expected_apt_manifest_sha256,
         )
