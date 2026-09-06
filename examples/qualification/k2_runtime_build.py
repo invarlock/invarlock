@@ -19,6 +19,7 @@ from pathlib import Path
 from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 
 from examples.qualification import k2_runtime_apt as apt
+from examples.qualification import k2_runtime_expat as expat
 from examples.qualification import k2_runtime_source as source
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -183,6 +184,7 @@ def prepare(
     output,
     *,
     pip_wheel,
+    expat_bundle,
     apt_bundle,
     expected_apt_manifest,
 ):
@@ -202,6 +204,10 @@ def prepare(
         f"core/{core_wheel.name}": wheel,
         "os-security-pins.txt": _read(RUNTIME / "os-security-pins.txt", 65536),
         **_pip_inputs(pip_wheel, lock),
+        **expat.prepared_inputs(expat_bundle),
+        "expat/build.py": _read(
+            ROOT / "examples/qualification/k2_runtime_expat.py", 65536
+        ),
         **_apt_inputs(apt_bundle, expected_apt_manifest),
     }
     for name in ("k2_runtime_source.py", "k2_runtime_build.py", "k2_runtime_apt.py"):
@@ -255,6 +261,7 @@ def main(argv=None):
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--core-wheel", type=Path, required=True)
     parser.add_argument("--pip-wheel", type=Path, required=True)
+    parser.add_argument("--expat-bundle", type=Path, required=True)
     parser.add_argument("--expected-core-wheel-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--apt-bundle", type=Path, required=True)
@@ -267,6 +274,7 @@ def main(argv=None):
             args.expected_core_wheel_sha256,
             args.output,
             pip_wheel=args.pip_wheel,
+            expat_bundle=args.expat_bundle,
             apt_bundle=args.apt_bundle,
             expected_apt_manifest=args.expected_apt_manifest_sha256,
         )

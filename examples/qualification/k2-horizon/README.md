@@ -122,6 +122,21 @@ python -m examples.qualification.k2_runtime_source \
   --archive sglang-source.tar.gz --output runtime-source
 ```
 
+Prepare the separate whole-release Expat input directory. The image preparation
+command checks fixed archive, signature, and public-key hashes, then verifies
+the exact upstream signing key in an isolated GPG directory with automatic
+key retrieval and agent startup disabled:
+
+```bash
+mkdir expat-release
+curl --fail --location --output expat-release/expat-2.8.4.tar.xz \
+  https://github.com/libexpat/libexpat/releases/download/R_2_8_4/expat-2.8.4.tar.xz
+curl --fail --location --output expat-release/expat-2.8.4.tar.xz.asc \
+  https://github.com/libexpat/libexpat/releases/download/R_2_8_4/expat-2.8.4.tar.xz.asc
+curl --fail --location --output expat-release/hartwork.gpg \
+  https://github.com/hartwork.gpg
+```
+
 Resolve the Ubuntu packages using the exact base image and signed Ubuntu
 repositories. The resolution container downloads packages but does not execute
 models. Inspect the retained package versions, repository signatures, and
@@ -146,6 +161,7 @@ python -m examples.qualification.k2_runtime_build \
   --expected-core-wheel-sha256 "$EXPECTED_CORE_WHEEL" \
   --apt-bundle runtime-apt \
   --pip-wheel pip-26.2-py3-none-any.whl \
+  --expat-bundle expat-release \
   --expected-apt-manifest-sha256 "$EXPECTED_OS_MANIFEST" \
   --output runtime-context
 docker build --platform linux/amd64 --iidfile runtime-image-id.txt \
@@ -173,6 +189,15 @@ After installing the runtime wheels, the image removes the three Ubuntu
 pip/venv bootstrap packages offline and records the resulting OS inventory.
 The active pip installation, compiler and headers, native dependencies, and
 bootstrap provenance records remain available.
+
+The signed Expat release is built offline into locally derived `libexpat1`
+and `libexpat1-dev` packages at version `2.8.4-0invarlock1`. Both narrow and
+wide shared libraries, static archives, headers, and development metadata are
+replaced together. The image retains the source authentication, package
+artifacts, build logs, and installed-file hashes. Verification checks package
+metadata, actual payload bytes, both loaded libraries, and Python's Expat
+version; it rejects leftover older shared libraries.
+
 
 The native probe checks installed source identities, actual imports, server help,
 dependency consistency, and rejection of the excluded grammar operation through

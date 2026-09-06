@@ -37,6 +37,7 @@ def _inputs(tmp_path, monkeypatch):
         "k2_runtime_source.py",
         "k2_runtime_build.py",
         "k2_runtime_apt.py",
+        "k2_runtime_expat.py",
     ):
         (root / "examples/qualification" / name).write_text(name)
     (runtime.parent / "catalog.json").write_text(
@@ -62,6 +63,11 @@ def _inputs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(build.source, "prepare", derive)
     monkeypatch.setattr(
+        build.expat,
+        "prepared_inputs",
+        lambda *_: {"expat/source-authentication.json": b"{}"},
+    )
+    monkeypatch.setattr(
         build, "_apt_inputs", lambda *args: {"apt/deb-artifacts.sha256": b"fixture"}
     )
     return wheel, expected
@@ -75,6 +81,7 @@ def test_context_binds_exact_wheel_source_and_campaign_inputs(tmp_path, monkeypa
         wheel,
         expected,
         output,
+        expat_bundle=None,
         pip_wheel=tmp_path / build.PIP_WHEEL,
         apt_bundle=None,
         expected_apt_manifest="fixture",
@@ -101,6 +108,7 @@ def test_context_binds_exact_wheel_source_and_campaign_inputs(tmp_path, monkeypa
             wheel,
             expected,
             output,
+            expat_bundle=None,
             pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
@@ -118,6 +126,7 @@ def test_wrong_core_identity_cannot_create_build_context(
             wheel,
             expected,
             tmp_path / "output",
+            expat_bundle=None,
             pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
@@ -147,6 +156,7 @@ def test_core_wheel_rejects_noncanonical_or_unsupported_filenames(
             wheel,
             expected,
             tmp_path / "output",
+            expat_bundle=None,
             pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
@@ -205,6 +215,7 @@ def test_core_wheel_rejects_false_or_ambiguous_embedded_identity(
             wheel,
             hashlib.sha256(data).hexdigest(),
             tmp_path / "output",
+            expat_bundle=None,
             pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
@@ -227,6 +238,7 @@ def test_failed_derivation_removes_only_its_new_context(tmp_path, monkeypatch):
             wheel,
             expected,
             tmp_path / "output",
+            expat_bundle=None,
             pip_wheel=tmp_path / build.PIP_WHEEL,
             apt_bundle=None,
             expected_apt_manifest="fixture",
@@ -286,6 +298,7 @@ def test_bootstrap_rejects_substituted_or_unbounded_wheels_before_output(
             wheel,
             expected,
             output,
+            expat_bundle=None,
             pip_wheel=pip,
             apt_bundle=None,
             expected_apt_manifest="fixture",
@@ -333,6 +346,8 @@ def test_cli_requires_and_passes_the_independent_os_manifest(tmp_path, monkeypat
             [
                 "--archive",
                 str(tmp_path / "archive"),
+                "--expat-bundle",
+                str(tmp_path / "expat"),
                 "--pip-wheel",
                 str(tmp_path / build.PIP_WHEEL),
                 "--core-wheel",
@@ -423,6 +438,8 @@ def test_real_build_cli_rejects_wrong_wheel_before_output(tmp_path):
             "examples.qualification.k2_runtime_build",
             "--archive",
             str(tmp_path / "source.tar.gz"),
+            "--expat-bundle",
+            str(tmp_path / "expat"),
             "--pip-wheel",
             str(tmp_path / build.PIP_WHEEL),
             "--core-wheel",
@@ -519,6 +536,8 @@ def test_cli_reports_signature_and_compressed_index_failures_as_input_errors(
             [
                 "--archive",
                 "source.tar.gz",
+                "--expat-bundle",
+                str(tmp_path / "expat"),
                 "--pip-wheel",
                 str(tmp_path / build.PIP_WHEEL),
                 "--core-wheel",

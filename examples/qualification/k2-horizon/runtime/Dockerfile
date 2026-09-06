@@ -43,6 +43,10 @@ RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes \
 
 COPY apt/package-indexes /usr/share/invarlock-k2/package-indexes
 COPY apt/package-verification.json /usr/share/invarlock-k2/package-verification.json
+COPY expat /usr/share/invarlock-k2/expat
+RUN --network=none python /usr/share/invarlock-k2/expat/build.py build-install \
+    && apt-get --yes --no-download --no-auto-remove purge \
+       cmake cmake-data libarchive13t64 libcurl4t64 libjsoncpp25 librhash0 libuv1t64
 COPY source /tmp/sglang-source
 COPY core /tmp/core
 COPY examples /opt/campaign/examples

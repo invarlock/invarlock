@@ -86,6 +86,27 @@ dependency removal. The final OS inventory is recorded afterward; compiler,
 headers, native dependencies, and bootstrap provenance records are retained.
 Remaining OS findings still require their own review and disposition.
 
+Expat uses the complete signed upstream 2.8.4 release, with separately pinned
+archive, detached signature, public key, and exact signing-key identities.
+The image builds locally derived `libexpat1` and `libexpat1-dev` packages as
+`2.8.4-0invarlock1`; package metadata reflects the installed code. The matched
+packages preserve both character-width variants, shared-library major version 1,
+existing exported symbols, both static archives, and development headers.
+Build tools come through the same authenticated Ubuntu package chain. After
+packaging, explicit cleanup removes CMake and its six newly introduced companion
+packages without automatic dependency removal; the prior compiler and runtime
+dependency set remains available.
+
+Upstream tests run for the narrow shared and static builds. Upstream CMake
+disables its test suite for the wide `ushort` configuration; independent
+compiled probes instead check parsing, namespace and entity handling,
+callbacks, and character widths for all four library variants. The wide ABI
+remains `sizeof(XML_Char) == 2` and `sizeof(XML_LChar) == 1`. These checks do
+not establish complete ABI compatibility or eliminate every vulnerability.
+`CVE-2025-66382` remains unresolved, and all other OS findings retain their
+separate applicability review. No scanner suppression or security-ready
+claim follows from replacing Expat.
+
 To review a dependency update, prepare the authenticated source first, then
 resolve the same Linux/Python target with the core and explicit build/kernel
 requirements:
