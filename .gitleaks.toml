@@ -59,3 +59,15 @@ paths = [
 regexes = [
   '''key",\s*max_bytes=64\s''',
 ]
+
+[[allowlists]]
+description = "Retained public model-card responses have SHA-256 content digests, not API credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^examples/qualification/k2-horizon/model-card-observations\.json$''',
+]
+regexes = [
+  '''^\n?      "api_response_sha256": "[0-9a-f]{64}",$''',
+]

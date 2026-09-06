@@ -176,19 +176,26 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
     )
 
 
-@pytest.mark.parametrize("exclude_pipeline_path", (False, True))
-def test_supply_chain_scanner_probe_rejects_pipeline_path_exclusions(
-    tmp_path: Path, exclude_pipeline_path: bool
+@pytest.mark.parametrize(
+    "excluded_path",
+    [
+        None,
+        "src/invarlock/pipeline/evidence.py",
+        "examples/qualification/k2-horizon/model-card-observations.json",
+    ],
+)
+def test_supply_chain_scanner_probe_rejects_broad_path_exclusions(
+    tmp_path: Path, excluded_path: str | None
 ) -> None:
     if shutil.which("gitleaks") is None:
         pytest.skip("the pinned Gitleaks executable is required for the workflow probe")
     workflow = _load(WORKFLOWS / "supply-chain-pr.yml")
     probe = _step(workflow["jobs"]["scan"]["steps"], "Test gitleaks allowlist boundary")
     config = Path(".gitleaks.toml").read_text(encoding="utf-8")
-    if exclude_pipeline_path:
+    if excluded_path:
         config += (
             '\n[[allowlists]]\ndescription = "Deliberately overbroad test allowance"\n'
-            "paths = ['''^src/invarlock/pipeline/evidence\\.py$''']\n"
+            f"paths = ['''^{re.escape(excluded_path)}$''']\n"
         )
     (tmp_path / ".gitleaks.toml").write_text(config, encoding="utf-8")
     result = subprocess.run(
@@ -203,7 +210,7 @@ def test_supply_chain_scanner_probe_rejects_pipeline_path_exclusions(
         text=True,
         check=False,
     )
-    if exclude_pipeline_path:
+    if excluded_path:
         assert result.returncode != 0
     else:
         assert result.returncode == 0, result.stderr
