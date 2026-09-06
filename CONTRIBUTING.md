@@ -160,8 +160,9 @@ as the complete pull-request check:
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
+| Scalar evaluator qualification semantics | `make evaluator-scalar-semantics`; qualify fresh outputs under the current literal profile and preserve historical runner identities |
 | ModelKit package handoff | Run `tests/examples/test_modelkit_handoff.py` and the pinned real-CLI test described in the [handoff guide](docs/user-guide/modelkit-handoff.md) |
-| K2 campaign capture or protocol | Run the four `tests/examples/test_k2_*.py` suites and follow the [candidate campaign gates](examples/qualification/k2-horizon/README.md); CPU tests do not qualify a GPU model |
+| K2 campaign or runtime preparation | Run `tests/examples/test_k2_*.py` and follow the [candidate campaign gates](examples/qualification/k2-horizon/README.md), including the exact image's offline native probe and dependency scans; CPU tests do not qualify a GPU model |
 | Dependency declarations or locks | `make lock-sync` and `make security`, plus affected installed-package checks |
 | GitHub Actions | `make workflow-lint` |
 

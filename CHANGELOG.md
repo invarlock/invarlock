@@ -59,9 +59,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   native row identities, metric configuration and score details. Boundary
   audits expose unsupported renderer behavior, and complete profile bindings
   prevent dependency changes without review from reusing qualification authority.
+- Added current profiles for eleven scalar evaluators with explicit native
+  settings, source bindings and literal input domains. Boundary audits cover
+  whitespace, case, Unicode, empty strings and trailing NUL characters while
+  preserving historical runner and evidence identities.
+- Bound current qualification environments to the invoking Python interpreter
+  and prevented publication from replacing an output directory created during
+  execution.
 - Added real-container checks for network isolation, read-only inputs, key
   separation, resource and output limits, interruption, exact-container cleanup,
   and prevention of evidence publication after failed execution.
+- Fixed cleanup of partial Linux worker output owned by a different numeric
+  user. A bounded helper uses the selected non-root user and pinned image,
+  preserves the original evaluation error, and reports any retained files.
 - Remediated maintained dependency-audit findings by updating pip, wheel, and
   Material for MkDocs, and removing unused NLTK and ROUGE dependencies from the
   fixed evaluator images. Derived wheels keep authenticated upstream inputs
