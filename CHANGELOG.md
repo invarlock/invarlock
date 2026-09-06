@@ -63,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Excluded operating-system metadata from distributions and rejected it anywhere
+  in wheel or source archives during release validation.
 - Made private K2 JIT storage executable and added a bounded CPU host-library
   compile-and-load check before runtime finalization. Container network and
   filesystem restrictions remain enforced.

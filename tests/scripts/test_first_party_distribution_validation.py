@@ -101,6 +101,36 @@ def built_core(tmp_path_factory: pytest.TempPathFactory) -> Path:
     )
     dist = fixture_root / "dist"
     dist.mkdir()
+    metadata_paths = [
+        isolated_source / directory / name
+        for directory in (".", "src", "src/invarlock", "src/invarlock/_data/contracts")
+        for name in (".DS_Store", "._payload", "Thumbs.db", "desktop.ini")
+    ]
+    for path in metadata_paths:
+        path.write_bytes(b"desktop metadata")
+    # A direct wheel build must also exclude metadata before sdist filtering.
+    direct_wheel = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "build",
+            "--wheel",
+            "--no-isolation",
+            "--outdir",
+            str(dist),
+            str(isolated_source),
+        ],
+        cwd=isolated_source,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert direct_wheel.returncode == 0, direct_wheel.stderr
+    with zipfile.ZipFile(next(dist.glob("*.whl"))) as archive:
+        assert not any(
+            distribution_validation._is_os_metadata_path(name)
+            for name in archive.namelist()
+        )
     completed = subprocess.run(
         [
             sys.executable,
@@ -117,6 +147,12 @@ def built_core(tmp_path_factory: pytest.TempPathFactory) -> Path:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
+    with tarfile.open(next(dist.glob("*.tar.gz")), "r:gz") as archive:
+        assert not any(
+            distribution_validation._is_os_metadata_path(name)
+            for name in archive.getnames()
+        )
+    assert all(path.read_bytes() == b"desktop metadata" for path in metadata_paths)
     return dist
 
 

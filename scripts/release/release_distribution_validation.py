@@ -29,7 +29,7 @@ MAX_METADATA_BYTES = 1_048_576
 MAX_ARCHIVE_MEMBERS = 50_000
 RUNTIME_PACKAGE_SUFFIXES = frozenset({".json", ".py", ".pyi", ".yaml", ".yml"})
 RUNTIME_PACKAGE_FILENAMES = frozenset({"py.typed"})
-IGNORED_RUNTIME_PACKAGE_FILENAMES = frozenset({".DS_Store"})
+OS_METADATA_FILENAMES = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
 IMPORT_AFFECTING_SUFFIXES = frozenset({".pth"})
 EXECUTABLE_PAYLOAD_SUFFIXES = frozenset(
     {".dll", ".dylib", ".exe", ".pyd", ".py", ".pyc", ".pyo", ".so"}
@@ -537,6 +537,13 @@ def _package_ancestor(path: str, package_path: str) -> bool:
     return bool(normalized) and package_path.startswith(f"{normalized}/")
 
 
+def _is_os_metadata_path(value: str) -> bool:
+    return any(
+        part in OS_METADATA_FILENAMES or part.startswith("._")
+        for part in PurePosixPath(value).parts
+    )
+
+
 def _checkout_package_files(
     spec: DistributionValidationSpec,
 ) -> dict[str, CheckoutSource]:
@@ -550,9 +557,7 @@ def _checkout_package_files(
     sources: dict[str, CheckoutSource] = {}
     for path in sorted(source_root.rglob("*")):
         relative = path.relative_to(source_root)
-        if "__pycache__" in relative.parts or path.name in (
-            IGNORED_RUNTIME_PACKAGE_FILENAMES
-        ):
+        if "__pycache__" in relative.parts or _is_os_metadata_path(relative.as_posix()):
             continue
         if path.is_symlink():
             raise ReleasePreflightError(
@@ -643,6 +648,10 @@ def _validate_wheel_distribution(
                 if not _safe_archive_member_name(member.filename):
                     raise ReleasePreflightError(
                         "wheel has an unsafe archive member name"
+                    )
+                if _is_os_metadata_path(member.filename):
+                    raise ReleasePreflightError(
+                        "wheel must not contain operating-system metadata"
                     )
                 if stat.S_ISLNK(member.external_attr >> 16):
                     raise ReleasePreflightError("wheel contains a symbolic link")
@@ -790,6 +799,10 @@ def _validate_sdist_distribution(
                 if not _safe_archive_member_name(member.name):
                     raise ReleasePreflightError(
                         "sdist has an unsafe archive member name"
+                    )
+                if _is_os_metadata_path(member.name):
+                    raise ReleasePreflightError(
+                        "sdist must not contain operating-system metadata"
                     )
                 if not (member.isdir() or member.isreg()):
                     raise ReleasePreflightError(

@@ -148,6 +148,9 @@ where = ["src"]
   "_data/public_evidence/*.json",
 ]
 
+[tool.setuptools.exclude-package-data]
+"*" = [".DS_Store", "._*", "Thumbs.db", "desktop.ini"]
+
 # Enable namespace packages
 [tool.setuptools]
 include-package-data = true
