@@ -55,6 +55,14 @@ choice/log-likelihood outputs, multiple generations, agent traces and
 multimodal response content need explicit adapters; the generation parser does
 not infer their meaning. Inspect metadata exposes only string values as slices.
 
+Promptfoo's typed `failureReason` distinguishes ordinary failed assertions (`1`)
+from provider or grading execution failures (`2`). A consistent failed assertion
+retains its response for quality scoring even though the native row also uses
+`error` for the assertion's explanation. Conflicting success, score, reason or
+response fields fail import. Execution failures remain upstream errors; exports
+without a typed reason conservatively treat a nonempty error as an upstream
+error. These rules are exercised against a native Promptfoo 0.121.19 capture.
+
 Native recorded scores never inherit deterministic replay authority from the
 adapter name. The policy must approve their source, version, unit and, for
 judgments, rubric digest. Source metadata is a declaration until your own

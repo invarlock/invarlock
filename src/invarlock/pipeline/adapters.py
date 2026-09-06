@@ -148,6 +148,47 @@ def _harness(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+def _promptfoo_error(row: dict[str, Any]) -> str | None:
+    """Distinguish Promptfoo's ASSERT failure from provider or grading ERROR."""
+    response = row.get("response") or {}
+    error = row.get("error") or response.get("error")
+    if "failureReason" not in row:
+        # Older exports without typed reasons retain conservative error handling.
+        return "upstream_error" if error else None
+    reason = row["failureReason"]
+    if type(reason) is not int or reason not in (0, 1, 2):
+        raise PipelineError("Promptfoo failureReason is unsupported or ambiguous")
+    if reason == 2:
+        if row.get("success") is not False:
+            raise PipelineError("Promptfoo runtime failure contradicts success")
+        return "upstream_error"
+    grading = row.get("gradingResult")
+    if reason == 0:
+        if (
+            error
+            or row.get("success") is False
+            or (isinstance(grading, dict) and grading.get("pass") is False)
+        ):
+            raise PipelineError("Promptfoo failureReason contradicts failure fields")
+        return None
+    if (
+        row.get("success") is not False
+        or not isinstance(grading, dict)
+        or grading.get("pass") is not False
+        or "output" not in response
+        or response.get("error")
+        or type(row.get("score")) not in (int, float)
+        or type(grading.get("score")) not in (int, float)
+        or row["score"] != grading["score"]
+        or not isinstance(grading.get("reason"), str)
+        or row.get("error") != grading["reason"]
+    ):
+        raise PipelineError("Promptfoo assertion failure fields are inconsistent")
+    # Native applyGradingResult uses row.error for an ordinary wrong answer.
+    # Preserve that answer so deterministic metrics can still evaluate it.
+    return None
+
+
 def _promptfoo(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result = []
     for row in rows:
@@ -177,7 +218,7 @@ def _promptfoo(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     }
                 ),
                 "metadata": _tags(case),
-                "error": "upstream_error" if row.get("error") else None,
+                "error": _promptfoo_error(row),
             }
         )
     return result
