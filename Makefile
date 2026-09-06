@@ -645,9 +645,12 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		consumer_root="$$smoke_venv/quickstart-consumer"; \
 		mkdir "$$consumer_root"; \
 		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
+		cp examples/pipeline/wheel_smoke.py "$$consumer_root/pipeline-wheel-smoke.py"; \
 		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
 		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
 			"$$smoke_venv/bin/python" run.py --fixture golden ); \
+		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" pipeline-wheel-smoke.py --cli "$$smoke_venv/bin/invarlock-pipeline" ); \
 		approval_root="$$smoke_venv/deployment-consumer"; \
 		cp -R examples/ci/standalone-consumer "$$approval_root"; \
 		mkdir "$$approval_root/incoming"; \

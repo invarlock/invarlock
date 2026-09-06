@@ -382,10 +382,13 @@ jobs:
           approval_root="$(mktemp -d)"
           trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
           cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp examples/pipeline/wheel_smoke.py "${quickstart_root}/pipeline-wheel-smoke.py"
           cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          pipeline_cli="$(command -v invarlock-pipeline)"
           (
             cd "${quickstart_root}"
             python run.py --fixture golden
+            python pipeline-wheel-smoke.py --cli "${pipeline_cli}"
           )
           cp -R examples/ci/standalone-consumer/. "${approval_root}/"
           mkdir "${approval_root}/incoming"
@@ -1016,10 +1019,13 @@ jobs:
           approval_root="$(mktemp -d)"
           trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
           cp examples/quickstart/run.py "${quickstart_root}/run.py"
+          cp examples/pipeline/wheel_smoke.py "${quickstart_root}/pipeline-wheel-smoke.py"
           cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
+          pipeline_cli="$(command -v invarlock-pipeline)"
           (
             cd "${quickstart_root}"
             python run.py --fixture golden
+            python pipeline-wheel-smoke.py --cli "${pipeline_cli}"
           )
           cp -R examples/ci/standalone-consumer/. "${approval_root}/"
           mkdir "${approval_root}/incoming"
