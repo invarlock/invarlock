@@ -84,7 +84,10 @@ retained. Only job outputs are writable inside the container. Normal Docker
 calls stop at the deadline minus the cleanup reserve; removal attempts share
 the remaining cleanup budget. SIGINT and SIGTERM stop admission and attempt
 owned-container cleanup. An unresponsive Docker daemon can still require
-operator intervention; uncertain cleanup prevents further admission.
+operator intervention; uncertain cleanup prevents further admission. Individual
+job timeouts are checked at control boundaries. Container removal latency can
+overrun an individual timeout while remaining bounded by the global cleanup
+budget.
 
 Restarting the same command verifies completed results and removes interrupted
 owned containers. Interrupted jobs remain cancelled, with their descendants

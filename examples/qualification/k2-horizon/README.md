@@ -21,6 +21,11 @@ scoring. It is not native InvarLock isolated-transaction evidence, proof of GPU
 execution, or a general endorsement of a model's quality. The core provider's
 remote-code restrictions remain unchanged.
 
+The [resource-aware campaign runner](../campaign-runner.md) can schedule
+independent preflight chains with concrete GPU, CPU, memory and disk-work
+reservations. Its forecasts distinguish full-campaign assumptions from matched
+sentinel observations and remaining admissible work.
+
 ## Frozen model pairs
 
 The [catalog](catalog.json) contains immutable revisions and all 477 selected

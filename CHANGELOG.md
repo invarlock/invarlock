@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a resource-aware qualification runner with dependency scheduling,
+  concrete GPU and CPU reservations, bounded container execution, durable
+  recovery records, and workload-matched timing forecasts. Frozen K2 preflights
+  retain snapshot checks before and after scheduled captures.
+
 - Added the `invarlock-pipeline` companion CLI and SDK for captured evaluation
   results, with reusable projects, native export parsers, multiple typed metrics,
   data slices, explicit recorded-score provenance, CI exit codes and JSON, HTML,
