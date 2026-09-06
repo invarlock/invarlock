@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added optional project run-digest pins that reject changed evaluation inputs,
+  including path overrides, before signing or publishing pipeline results.
+
 - Added the `invarlock-pipeline` companion CLI and SDK for captured evaluation
   results, with reusable projects, native export parsers, multiple typed metrics,
   data slices, explicit recorded-score provenance, CI exit codes and JSON, HTML,

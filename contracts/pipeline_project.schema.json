@@ -108,6 +108,10 @@
             ]
           },
           "maxProperties": 100
+        },
+        "expected_run_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
         }
       },
       "required": [
@@ -217,6 +221,10 @@
             ]
           },
           "maxProperties": 100
+        },
+        "expected_run_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
         }
       },
       "required": [

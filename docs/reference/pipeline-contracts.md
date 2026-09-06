@@ -38,6 +38,43 @@ slices, plus the automatically checked `overall` slice. Comparisons use ordinary
 CPU memory and require no evaluator dependency. Native exports larger than these
 limits need an explicit supported projection before import.
 
+## Pinning reusable inputs
+
+Each `pipeline-project-v1` side may specify `expected_run_digest`, a lowercase
+`sha256:` digest of the complete normalized run. Compute it from a reviewed
+normalized export with `invarlock-pipeline digest baseline.json --run`, then
+retain it in the reviewed project:
+
+```json
+{
+  "path": "baseline.json",
+  "adapter": "invarlock",
+  "expected_run_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+```
+
+Replace the placeholder with the actual reviewed digest. The check happens after
+loading and normalization, before signing or publishing results. `--baseline`
+and `--candidate` override the path but retain its expected digest. A mismatch
+returns integration-error exit code 2 and publishes no result directory.
+Omitting the pin preserves ordinary comparisons of changing CI exports.
+
+For native adapters, normalize the export using the same source, artifact and
+score-provenance settings before obtaining the run digest. The pin includes the
+original export's `source_digest`, all run identities, records and their order.
+Reformatting an already normalized JSON file preserves its digest; changing
+native export bytes changes its provenance and therefore its normalized digest.
+
+Pins let a later workflow reuse an approved run without silently substituting
+its contents. Approve and retain the expected digest independently of the input
+being checked. A pin computed from a replacement that has not been reviewed is no assurance
+of its identity. Pins do not establish representative sampling, truthful execution
+or semantic correctness. They also do not define an intended case set before
+capture; two matching exports can both omit intended cases unless the capture
+protocol independently checks coverage. Keep separately captured workflows and
+phases separately identified; do not splice incompatible captures into an older
+signed run.
+
 ## Native adapters
 
 | Adapter | Accepted native shape | Pairing and scoring limits |

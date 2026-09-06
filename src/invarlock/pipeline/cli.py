@@ -19,6 +19,7 @@ from invarlock.pipeline.adapters import load_run
 from invarlock.pipeline.contracts import (
     MAX_EVIDENCE_BYTES,
     PipelineError,
+    digest,
     read_json,
     validate,
     write_directory,
@@ -126,9 +127,17 @@ def import_export(
 def _project_run(
     specification: dict[str, Any], root_path: Path, override: Path | None
 ) -> dict[str, Any]:
-    options = {k: v for k, v in specification.items() if k != "path"}
+    options = {
+        k: v
+        for k, v in specification.items()
+        if k not in {"path", "expected_run_digest"}
+    }
     path = override if override is not None else root_path / specification["path"]
-    return load_run(path, **options)
+    run = load_run(path, **options)
+    expected = specification.get("expected_run_digest")
+    if expected is not None and digest(run) != expected:
+        raise PipelineError(f"{path}: run digest does not match expected_run_digest")
+    return run
 
 
 @app.command()
