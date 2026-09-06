@@ -182,6 +182,7 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
         None,
         "src/invarlock/pipeline/evidence.py",
         "examples/qualification/k2-horizon/model-card-observations.json",
+        "examples/qualification/k2_runtime_expat.py",
     ],
 )
 def test_supply_chain_scanner_probe_rejects_broad_path_exclusions(

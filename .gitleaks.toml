@@ -71,3 +71,15 @@ paths = [
 regexes = [
   '''^\n?      "api_response_sha256": "[0-9a-f]{64}",$''',
 ]
+
+[[allowlists]]
+description = "The verified Expat release signing fingerprint identifies a public key."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^examples/qualification/k2_runtime_expat\.py$''',
+]
+regexes = [
+  '''^\n?SIGNING_KEY = "CB8DE70A90CFBF6C3BF5CC5696262ACFFBD3AEC6"$''',
+]

@@ -104,6 +104,20 @@ jobs:
               f'      "api_response_sha256": "{canary}",\n',
               encoding="utf-8",
           )
+          expat = Path(sys.argv[1]) / "examples/qualification/k2_runtime_expat.py"
+          expat.parent.mkdir(parents=True, exist_ok=True)
+          label = "_".join(("SIGNING", "KEY"))
+          fingerprint = "CB8DE70A90CFBF6C3BF5CC5696262ACFFBD3AEC6"
+          public_line = f'{label} = "{fingerprint}"\n'
+          expat.write_text(
+              "# Synthetic scanner boundary probe.\n"
+              + public_line
+              + f'api_key = "{canary}"\n'
+              + f'{label} = "{fingerprint[:-1]}0"\n'
+              + public_line.rstrip("\n") + f'; api_key = "{canary}"\n',
+              encoding="utf-8",
+          )
+          expat.with_name("unrelated.py").write_text(public_line, encoding="utf-8")
           PY
           git -C "${probe_root}" add .
           git -C "${probe_root}" commit --quiet -m "Add scanner boundary probe"
@@ -125,16 +139,23 @@ jobs:
           import sys
           from pathlib import Path
 
+          from collections import Counter
+
           findings = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          expected = {
+          expected = Counter([
               ("public_evidence/evidence/example/evidence/request.json", 1),
               ("src/invarlock/pipeline/evidence.py", 3),
               ("src/invarlock/pipeline/evidence.py", 4),
               ("examples/qualification/k2-horizon/model-card-observations.json", 2),
               ("examples/qualification/k2-horizon/unrelated.json", 1),
-          }
-          observed = {(item["File"], item["StartLine"]) for item in findings}
-          if len(findings) != len(expected) or observed != expected:
+              ("examples/qualification/k2_runtime_expat.py", 3),
+              ("examples/qualification/k2_runtime_expat.py", 4),
+              ("examples/qualification/k2_runtime_expat.py", 5),
+              ("examples/qualification/k2_runtime_expat.py", 5),
+              ("examples/qualification/unrelated.py", 1),
+          ])
+          observed = Counter((item["File"], item["StartLine"]) for item in findings)
+          if observed != expected:
               raise SystemExit("gitleaks boundary probe findings changed")
           PY
 
