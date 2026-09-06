@@ -76,7 +76,10 @@ distributions and requires hashes. No advisory suppression is included.
 The image's Ubuntu packages use signed repository metadata and authenticated
 local package artifacts. Package installation and source compilation run with
 network access disabled; the hashed Python wheel installation is the separate
-networked build step.
+networked build step. Before that step, the image verifies and installs the
+separately supplied pip wheel offline. The initial Ubuntu pip never downloads
+the locked dependency set. The candidate core wheel retains its validated
+filename and distribution version in the prepared manifest.
 
 To review a dependency update, prepare the authenticated source first, then
 resolve the same Linux/Python target with the core and explicit build/kernel
@@ -127,7 +130,11 @@ parallelism, driver, CUDA kernels, GPU memory, topology, and resource bounds
 before decisions. GPU startup and inference failures remain failed preflights;
 they cannot inherit success from the earlier CPU image checks.
 
-The runtime readiness file deliberately remains blocked until the image-build and CPU
-checks above are fulfilled. A valid ready receipt must come from the reviewed
-build and checks; manually filling digest-shaped strings does not establish
-readiness or qualification.
+The maintained finalization command reconstructs the prepared context, observes the exact
+local image, and retains the raw dependency reports and every OS applicability
+disposition. Its receipt remains blocked without an explicit scoped security
+decision, even when CPU checks pass. An unresolved finding cannot become an
+accepted applicability row without an attributed rationale and supporting
+evidence. The receipt is an unsigned local observation; it does not establish
+independent execution attestation. See [finalization](README.md#finalize-the-exact-image)
+for the command and review fields.

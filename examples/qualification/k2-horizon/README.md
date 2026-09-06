@@ -145,6 +145,7 @@ python -m examples.qualification.k2_runtime_build \
   --archive sglang-source.tar.gz --core-wheel "$CORE_WHEEL" \
   --expected-core-wheel-sha256 "$EXPECTED_CORE_WHEEL" \
   --apt-bundle runtime-apt \
+  --pip-wheel pip-26.2-py3-none-any.whl \
   --expected-apt-manifest-sha256 "$EXPECTED_OS_MANIFEST" \
   --output runtime-context
 docker build --platform linux/amd64 --iidfile runtime-image-id.txt \
@@ -159,8 +160,11 @@ docker run --rm --platform linux/amd64 --network none --read-only \
   python /opt/campaign/native_probe.py > native-imports.json
 ```
 
-The image installs its Ubuntu bundle with network access disabled, and verifies
-every selected artifact. Python installation permits only hashed wheels from
+Supply the separately downloaded `pip-26.2-py3-none-any.whl`; preparation
+checks its exact maintained hash and lock membership. The image installs its
+Ubuntu bundle and upgrades the initial pip from that wheel with network access
+disabled. The first networked Python installation therefore uses the reviewed
+pip version and permits only hashed wheels from
 the maintained Linux x86_64/Python 3.12 lock. This includes pinned NVIDIA CUDA
 Tile, FlashInfer CUDA kernel binaries and CUDA 13 JIT assets. Runtime execution has no network
 access; bundled kernels must suffice. Rust extensions are disabled for this
@@ -173,6 +177,95 @@ result explicitly has no GPU qualification authority. Retain both Python and
 OS vulnerability reports for the final image, including applicability decisions
 and unresolved findings. A prepared context or successful build alone cannot
 produce a ready runtime receipt.
+
+### Finalize the exact image
+
+The finalization command reconstructs the prepared inputs, checks the exact local Docker
+image ID, observes the installed 204-package lock plus SGLang and InvarLock,
+and runs the native CPU probe without network access, root privileges, or a
+writable image filesystem. It creates a fresh output directory and never
+replaces previous evidence. Start with the CPU observation:
+
+```bash
+python -m examples.qualification.k2_runtime_finalize \
+  --context runtime-context --archive sglang-source.tar.gz \
+  --image "$(cat runtime-image-id.txt)" --output runtime-observation
+```
+
+With no security review, this writes `runtime-observation/runtime-build.json`
+with `status: blocked`, `cpu_checks: passed`, and `gpu_qualified: false`.
+Malformed inputs or failed execution exit with status 2 and publish no receipt.
+A completed blocked observation exits with status 0; check the receipt's status
+before proceeding. CPU success does not authorize GPU execution.
+
+Retain four JSON artifacts beside a security review: the raw Python scanner
+report (`components` count and `findings` list), the exact image's raw Trivy OS
+report, the source verification report, and an applicability assessment. The
+source report must identify `source_commit`, `archive_sha256`, and
+`source_derivation_manifest_sha256` from the verified inputs, with
+`all_derived_hashes_verified: true` only after the corresponding inspection.
+The Python scanner's component count is not authenticated inventory; the
+finalization command separately compares every observed installed version with the lock.
+
+The applicability artifact has format
+`invarlock/k2-runtime-applicability-v1`, `image_digest`, `os_scan_sha256`,
+`scope: offline_fixed_qualification`, and a `findings` list. Every raw OS row
+must have a corresponding entry, retaining its `advisory`, `package`,
+`installed_version`, and `scanner_severity`. Each entry also needs a concrete
+`rationale` and `decision`: `unresolved`, `not_applicable`, or
+`accepted_for_scope`. These are attributed review decisions, not scanner
+suppressions or independent proof. Retain evidence supporting applicability;
+missing a named executable does not establish that its shared library is absent.
+
+After reviewing those artifacts, assemble their byte bindings without editing
+the generated runtime receipt. This example records a blocked decision:
+
+```python
+import hashlib
+import json
+from pathlib import Path
+
+root = Path("security-review")
+inputs_path = Path("runtime-context/build-inputs.json")
+inputs = json.loads(inputs_path.read_text())
+applicability = json.loads((root / "applicability.json").read_text())
+artifacts = {}
+for kind in ("python", "os", "source", "applicability"):
+    name = kind + ".json"
+    artifacts[kind] = {
+        "path": name,
+        "sha256": hashlib.sha256((root / name).read_bytes()).hexdigest(),
+    }
+review = {
+    "format": "invarlock/k2-runtime-security-review-v1",
+    "image_digest": Path("runtime-image-id.txt").read_text().strip(),
+    "build_inputs_sha256": hashlib.sha256(inputs_path.read_bytes()).hexdigest(),
+    "requirements_sha256": inputs["input_sha256"]["requirements.txt"],
+    "decision": "blocked",
+    "reviewer": "Replace with the responsible reviewer",
+    "rationale": "Replace with the remaining findings and required action",
+    "unresolved_findings": sorted({
+        row["advisory"] for row in applicability["findings"]
+        if row["decision"] == "unresolved"
+    }),
+    "artifacts": artifacts,
+}
+with (root / "review.json").open("x") as stream:
+    json.dump(review, stream, indent=2)
+    stream.write("\n")
+```
+
+Run the same finalization command with `--review security-review/review.json` and a fresh
+`--output runtime-finalized`. It checks every artifact's actual bytes and
+retains the full raw findings, severities, and applicability decisions. A
+review may be `blocked`, `rejected`, or
+`accepted_for_bounded_gpu_preflight`; acceptance requires no unresolved
+applicability rows, an empty unresolved list, and no Python findings. The
+reviewer must support each scoped decision before selecting acceptance.
+Only that last decision yields `status: ready`, limited to the separately
+budgeted offline qualification. It does not approve public serving, establish
+independent execution attestation, or qualify a GPU model. All receipts remain
+unsigned local observations with an operator-attributed security review.
 
 ## Materialize and freeze before evaluation
 
@@ -202,7 +295,7 @@ python -m examples.qualification.k2_campaign measure \
   --output candidate-measurement.json
 ```
 
-The reviewed image builder must produce `runtime-build.json` with format
+The finalization command writes `runtime-finalized/runtime-build.json` with format
 `invarlock/k2-runtime-build-v1`, status `ready`, the exact SGLang source commit
 and reviewed source-file hashes from the catalog, its Docker image ID, source
 archive digest, complete dependency-inventory digest, and security-review
@@ -222,7 +315,7 @@ before paid execution; this example does not infer them.
 
 ```bash
 python -m examples.qualification.k2_campaign freeze \
-  --model 0.9b --runtime-build runtime-build.json \
+  --model 0.9b --runtime-build runtime-finalized/runtime-build.json \
   --baseline-measurement baseline-measurement.json \
   --candidate-measurement candidate-measurement.json \
   --maximum-wall-seconds "$APPROVED_ROLE_SECONDS" \

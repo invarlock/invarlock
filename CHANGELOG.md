@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   logical tensor measurements, frozen workflow cases, bounded native capture,
   and independent pipeline replay. The configurations remain unqualified
   candidates until the runtime and actual GPU campaigns pass their gates.
+- Added a native K2 image verification helper that reconstructs inputs, observes
+  installed dependencies and CPU execution, and retains raw security findings
+  with explicit applicability decisions. Missing or unresolved reviews keep
+  runtime readiness blocked; CPU success does not qualify a GPU model.
 
 ### Changed
 
