@@ -75,6 +75,7 @@ EXPECTED_DOC_PAGES = {
     "user-guide/getting-started.md",
     "user-guide/pipeline-integration.md",
     "user-guide/key-management.md",
+    "user-guide/modelkit-handoff.md",
     "user-guide/runtime-providers.md",
     "user-guide/schedule-and-policy.md",
     "user-guide/troubleshooting.md",

@@ -661,3 +661,24 @@ def test_regular_archive_header_cannot_claim_missing_payload(tmp_path):
         handoff._extract(
             io.BytesIO(item.tobuf()), tmp_path, PurePosixPath("model"), handoff.Limits()
         )
+
+
+def test_reading_an_operational_file_may_update_access_time(tmp_path):
+    import os
+
+    store, digest, model = _package(
+        tmp_path,
+        members=[
+            ("model/config.json", b'{"model_type":"fixture"}\n'),
+            ("model/model.safetensors", b"not executable weights\n"),
+            ("model/logs/status.txt", b"unchanged operational content"),
+        ],
+    )
+    (model / "logs").mkdir()
+    status = model / "logs/status.txt"
+    status.write_bytes(b"unchanged operational content")
+    # Access time is allowed to change from reading; content/mtime/ctime and
+    # inode substitutions remain guarded. This matters on Linux relatime mounts.
+    os.utime(status, ns=(1_000_000_000, status.stat().st_mtime_ns))
+    result = _verify(store, digest, model)
+    assert result["model_file_count"] == 3

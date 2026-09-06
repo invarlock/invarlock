@@ -24,7 +24,7 @@ def test_real_kit_pack_repack_and_independent_recipient(tmp_path):
         pytest.skip("requires a KitOps1.15.0 binary and independently verified SHA-256")
     binary = Path(configured)
     assert hashlib.sha256(binary.read_bytes()).hexdigest() == expected_binary
-    producer = tmp_path / "producer"
+    publisher = tmp_path / "publisher"
     context = tmp_path / "context"
     context.mkdir()
     model = context / "model"
@@ -45,7 +45,7 @@ def test_real_kit_pack_repack_and_independent_recipient(tmp_path):
         )
         return result.stdout
 
-    version = kit(producer, "version")
+    version = kit(publisher, "version")
     assert "1.15.0" in version
     assert "6b8162ae5da4d46f1d2af2beb43e7fb077f052f4" in version
 
@@ -54,14 +54,14 @@ def test_real_kit_pack_repack_and_independent_recipient(tmp_path):
             "manifestVersion: 1.0.0\npackage:\n  name: serialization-fixture\n"
             f"  description: {description}\nmodel:\n  path: model\n"
         )
-        kit(producer, "pack", str(context), "--tag", tag, "--compression", compression)
-        return json.loads(kit(producer, "inspect", tag))["digest"]
+        kit(publisher, "pack", str(context), "--tag", tag, "--compression", compression)
+        return json.loads(kit(publisher, "inspect", tag))["digest"]
 
     original = pack("Synthetic original; no inference", "none")
     repacked = pack("Same model in changed package", "gzip")
     assert original != repacked
     recipient = tmp_path / "recipient"
-    shutil.copytree(producer / "storage", recipient / "storage")
+    shutil.copytree(publisher / "storage", recipient / "storage")
     # The mutable tag now selects the repack. The recipient independently uses
     # the original manifest digest and an entirely separate local store.
     destination = tmp_path / "recipient-model"

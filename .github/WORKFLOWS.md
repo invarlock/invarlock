@@ -7,9 +7,12 @@ Workflow YAML is linted with `make workflow-lint`.
 
 - `ci.yml` runs `verify-fast`, the Python 3.12 suite, coverage enforcement,
   manual full verification, distribution checks, and the tag supply-chain
-  backstop.
+  backstop. Its fast job also downloads a checksum-pinned KitOps executable
+  and exercises real package creation, repackaging, and recipient validation.
 - `container-front-door-smoke.yml` builds the final runtime image and exercises
   `evaluate`, `verify`, and `report` through the installed command surface.
+  It also checks network isolation with positive controls, resource limits,
+  interruption, exact-container cleanup, and failed evidence publication.
 - `pre-commit.yml` runs the repository pre-commit hooks.
 - `repo-hygiene.yml` rejects generated artifacts and oversized files.
 
@@ -43,6 +46,9 @@ distributions: `invarlock`, `invarlock-diagnostics`,
 `invarlock-runtime-tensorrt-llm`. The optional
 packages live under `addins/`; their provider-specific runtime dependencies
 stay outside the core wheel.
+Candidate and published core wheels exercise the standalone pipeline workflow,
+including signing, independent verification, reports, and rejection exit codes,
+before the optional packages are installed.
 
 ## Local checks
 

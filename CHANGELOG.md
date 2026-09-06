@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluator qualification with independently bound reference text.
 - Added runnable classification, extraction and recorded-judge onboarding
   examples and an integration guide for existing evaluation pipelines.
+- Added a standalone ModelKit example that verifies package and model-content
+  identities, replays signed evidence, and applies current recipient acceptance
+  against both actual model directories. A pinned KitOps test exercises
+  repackaging and an independent recipient.
 
 ### Changed
 
@@ -28,11 +32,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI actions. Python dependency updates now use the uv ecosystem so the root
   manifest and lock are proposed together; hashed workflow locks remain
   separately checked.
+- Added installed pipeline signing, verification, report, and rejection checks
+  to both candidate and published wheel validation before optional packages
+  are installed.
 
 ### Removed
 
 ### Fixed
 
+- Preserved valid Promptfoo responses after failed quality assertions instead
+  of classifying them as execution errors. Conflicting native failure fields
+  now fail import, while actual execution failures remain insufficient evidence.
+- Defined a separate Inspect literal-pair qualification domain that rejects
+  boundary-normalization collisions while preserving supported whitespace and
+  punctuation. Native differential checks and new qualification artifacts
+  retain the original profile and signed evidence unchanged.
+- Added real-container checks for network isolation, read-only inputs, key
+  separation, resource and output limits, interruption, exact-container cleanup,
+  and prevention of evidence publication after failed execution.
 - Remediated maintained dependency-audit findings by updating pip, wheel, and
   Material for MkDocs, and removing unused NLTK and ROUGE dependencies from the
   fixed evaluator images. Derived wheels keep authenticated upstream inputs

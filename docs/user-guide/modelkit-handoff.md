@@ -1,9 +1,9 @@
 # Verify a ModelKit at the point of use
 
-!!! info "User guide"
+!!! tip "User guide"
     **Outcome:** Check the exact delivered package, both actual model directories,
     signed evaluation evidence, and the recipient's current acceptance policy.
-    **Audience:** Model producers and recipients integrating an artifact handoff.
+    **Audience:** Model publishers and recipients integrating an artifact handoff.
     **Prerequisites:** Python 3.12 or newer, the current source candidate's installed
     InvarLock wheel, a separately reviewed copy of the example script, complete
     local package blobs, and independently selected trust inputs.
@@ -26,7 +26,7 @@ archive digest, and every extracted file. It compares the complete file inventor
 with the actual candidate directory, including operational files that the core
 checkpoint identity intentionally excludes. It also recomputes the normal
 `hf_snapshot_tree_sha256` identity. Neither a package label nor a mapping supplied
-by a producer becomes an acceptance authority.
+by a package author becomes an acceptance authority.
 
 The supported packaging subset is KitOps **1.15.0**, one embedded model directory,
 one tar or gzip-compressed tar model layer, manifest schema version 2, and `Kitfile`
@@ -51,21 +51,21 @@ model:
 ```
 
 ```bash
-kit --config producer-store pack package-context \
+kit --config publisher-store pack package-context \
   --tag registry.example/models/candidate:review
-kit --config producer-store inspect registry.example/models/candidate:review
+kit --config publisher-store inspect registry.example/models/candidate:review
 ```
 
 Freeze the returned SHA-256 manifest digest. Retain its exact raw blob, the config
 blob, and the model-layer blob. The CLI's local content store holds them under
-`producer-store/storage/blobs/sha256/`, named by the hexadecimal digest. A portable
+`publisher-store/storage/blobs/sha256/`, named by the hexadecimal digest. A portable
 recipient directory can contain just these blobs; the verifier does not consult
-tags, registry credentials, a producer cache, or the CLI's rendered manifest.
+tags, registry credentials, a publisher cache, or the CLI's rendered manifest.
 
 Perform this for both baseline and subject. Repackaging is a separate operation
 from model transformation: retain the actual transformation's command, source and
 output identities, runtime, and configuration with the evaluation provenance.
-This example checks package-to-content binding; it does not certify a producer's
+This example checks package-to-content binding; it does not certify a package author's
 claim that a transformation was executed honestly.
 
 ## Prepare independent recipient inputs
