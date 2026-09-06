@@ -130,6 +130,12 @@ Array or multiple targets are outside this profile. Native score, answer and
 explanation contradictions also fail before an export is written. The
 independent qualification metric remains byte-exact equality.
 
+Before scoring, the current runner checks the complete supplied public profile
+against its local, source-bound definition: package version, dependency lock,
+runner bundle, upstream URL and authority must all agree. Even a matching
+candidate package installation cannot reuse this profile identity. The runner
+also freezes its inputs before scoring and publication.
+
 Run the pinned 28-case differential corpus and a fresh qualification of the
 retained 102 model outputs with:
 

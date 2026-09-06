@@ -84,22 +84,23 @@ def test_versioned_runner_uses_native_results_and_rejects_other_profiles(monkeyp
     monkeypatch.setattr(runner, "load_inputs", lambda _: (profile, {}, cases))
     checked = []
     monkeypatch.setattr(runner, "require_profile_package", lambda p: checked.append(p))
+    monkeypatch.setattr(runner, "require_current_profile", lambda *_: None)
     finished = []
     monkeypatch.setattr(
         runner, "finish_deterministic", lambda **kwargs: finished.append(kwargs)
     )
-    asyncio.run(runner.run())
+    asyncio.run(runner.execute("args"))
     assert calls == [{"location": "exact", "ignore_case": False, "numeric": False}]
     assert observed == ["one", "two"] and checked == [profile]
     assert finished[0]["scores"] == [1.0, 0.0]
     assert finished[0]["details"][0] == {"answer": "answer", "score_value": "C"}
     profile["profile_id"] = "inspect-ai"
     with pytest.raises(ValueError, match="separate versioned profile"):
-        asyncio.run(runner.run())
+        asyncio.run(runner.execute("args"))
     profile["profile_id"] = runner.PROFILE_ID
     cases[0]["reference"] = "answer"
     with pytest.raises(ValueError, match="normalization collision"):
-        asyncio.run(runner.run())
+        asyncio.run(runner.execute("args"))
     assert observed == ["one", "two"]
 
 

@@ -4,7 +4,7 @@
   "project_url": "https://github.com/UKGovernmentBEIS/inspect_ai",
   "lock": "locks/inspect-ai.txt",
   "runner": "maintained/inspect_literal_runner.py",
-  "runner_assets": ["maintained/inspect_semantics.py", "maintained/inspect-profile.json"],
+  "runner_assets": ["maintained/inspect_semantics.py", "maintained/inspect-profile.json", "maintained/profile_binding.py"],
   "authority": {"mode": "deterministic_per_record", "metric": {"kind": "exact_match"}, "reason": null},
   "scorer_configuration": {"location": "exact", "ignore_case": false, "numeric": false},
   "supported_domain": {

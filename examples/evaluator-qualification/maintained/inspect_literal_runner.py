@@ -1,6 +1,10 @@
 """Execute Inspect's single-target scorer only on its literal-agreement domain."""
 
+import argparse
 import asyncio
+import json
+import tempfile
+from pathlib import Path
 
 from inspect_ai.model import ChatMessageUser, ModelOutput
 from inspect_ai.scorer import Target, match
@@ -11,6 +15,7 @@ from maintained.inspect_semantics import (
     project_result,
     validate_cases,
 )
+from maintained.profile_binding import require_current_profile
 from runner_support import (
     arguments,
     finish_deterministic,
@@ -21,11 +26,24 @@ from runner_support import (
 
 async def run() -> None:
     args = arguments()
+    with tempfile.TemporaryDirectory(prefix="invarlock-inspect-inputs-") as temporary:
+        frozen = argparse.Namespace(**vars(args))
+        for name in ("cases", "profile", "schedule", "dependency_lock"):
+            path = Path(temporary) / name
+            path.write_bytes(getattr(args, name).read_bytes())
+            setattr(frozen, name, path)
+        await execute(frozen)
+
+
+async def execute(args: argparse.Namespace) -> None:
     profile, _, cases = load_inputs(args)
     if profile["profile_id"] != PROFILE_ID:
         raise ValueError(
             "Inspect literal runner requires its separate versioned profile"
         )
+    root = Path(__file__).resolve().parent
+    definition = json.loads((root / "inspect-profile.json").read_bytes())
+    require_current_profile(profile, definition, root.parent)
     require_profile_package(profile)
     validate_cases(cases)
     scorer = match(**SCORER_CONFIGURATION)

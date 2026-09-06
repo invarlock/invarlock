@@ -30,22 +30,27 @@ def execute(*, cases: Path, schedule: Path, output: Path) -> dict[str, Any]:
     ) as temporary:
         artifacts = Path(temporary)
         profile_path = matrix.write_profile(definition, artifacts=artifacts)
+        artifact = profile_path.parent
+        captured_cases = artifact / "cases.json"
+        captured_schedule = artifact / "schedule.json"
+        shutil.copyfile(cases, captured_cases)
+        shutil.copyfile(schedule, captured_schedule)
         subprocess.run(
             matrix.runner_command(
-                definition, profile_path, cases=cases, schedule=schedule
+                definition,
+                profile_path,
+                cases=captured_cases,
+                schedule=captured_schedule,
             ),
             check=True,
             env=environment,
         )
         result = matrix.qualify(
-            definition, artifacts=artifacts, schedule=schedule
+            definition, artifacts=artifacts, schedule=captured_schedule
         ).as_dict()
-        artifact = profile_path.parent
         (artifact / "qualification-result.json").write_bytes(
             matrix.canonical_json_bytes(result)
         )
-        shutil.copyfile(cases, artifact / "cases.json")
-        shutil.copyfile(schedule, artifact / "schedule.json")
         artifact.rename(output)
     return result
 
