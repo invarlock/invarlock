@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `json_exact` whole-document structured-output scoring with binary paired
+  intervals, signed replay and a separate built-in scorer identity.
+
 - Added optional project run-digest pins that reject changed evaluation inputs,
   including path overrides, before signing or publishing pipeline results.
 

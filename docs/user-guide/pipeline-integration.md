@@ -125,12 +125,14 @@ blocks the gate.
 | `exact_match` | Literal identifiers and labels | Yes |
 | `normalized_match` | Labels with case or whitespace differences | Yes |
 | `numeric_tolerance` | Numeric answers within declared absolute or relative tolerance | Yes |
-| `json_fields` | Required structured output fields | Yes |
+| `json_fields` | Average accuracy of selected structured output fields | Yes |
+| `json_exact` | Complete structured output correctness, with no extra fields | Yes |
 | `token_f1` | Reference token overlap | Yes |
 | `recorded` | Existing judge, human, cost, latency or external metric scores | Aggregation only |
 
 `token_f1` is token overlap, not semantic correctness. `json_fields` checks only
-the declared JSON pointers. Scorer details and statistical assumptions are in
+the declared JSON pointers and averages their matches. Use `json_exact` with
+`configuration: {}` for an all-or-nothing whole-document check. Scorer details and statistical assumptions are in
 the [contract reference](../reference/pipeline-contracts.md).
 
 For `normalized_match` and `token_f1`, approve an explicit

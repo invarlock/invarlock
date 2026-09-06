@@ -261,7 +261,8 @@ def _metric_result(
         left_values,
         right_values,
         seed,
-        metric["kind"] in ("exact_match", "normalized_match", "numeric_tolerance"),
+        metric["kind"]
+        in ("exact_match", "normalized_match", "numeric_tolerance", "json_exact"),
     )
     if not all(
         math.isfinite(v) for v in (b, c, c - b, interval["lower"], interval["upper"])

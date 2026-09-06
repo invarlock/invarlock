@@ -123,6 +123,14 @@ All shipped deterministic metrics produce higher-is-better scores in `[0,1]`.
   pointers in `configuration.fields`. Missing candidate fields score zero;
   missing reference fields fail. Duplicate JSON keys are rejected. Numeric
   representation and JSON types are preserved; `true` does not equal `1`.
+- `json_exact`: one for equality of the complete parsed canonical JSON value,
+  otherwise zero; configuration must be empty. Object key order and whitespace
+  do not matter. Extra or missing fields, array order, and parsed JSON types
+  and values do matter: `1` differs from `1.0`, while `1e0` equals `1.0`. Invalid or duplicate-key candidate JSON scores
+  zero; invalid references fail. This uses the standard JSON numeric parser,
+  so encode precision-sensitive decimals as strings. Do not infer successful
+  response completion from parseable JSON; retain upstream errors and completion
+  status in the imported records.
 - `token_f1`: multiset precision/recall F1 over normalized whitespace tokens.
   Punctuation remains part of each token. Two empty strings score one.
 
@@ -137,9 +145,9 @@ policy and scorer binding; it must not silently rescore historical evidence.
 `invarlock-pipeline init` records the local version explicitly in its generated
 policy. The other deterministic and recorded metrics do not take this setting.
 
-The four additional scorers are also available in the core transaction registry
+The five additional scorers are also available in the core transaction registry
 as `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
-`invarlock.json_fields` and `invarlock.token_f1`, version `1.0.0`. They require an
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1`, version `1.0.0`. They require an
 explicit scorer binding and do not require enabling installed third-party
 scorers. See [Scorer extensions](api-guide.md) for the binding contract.
 

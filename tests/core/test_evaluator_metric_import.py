@@ -54,6 +54,8 @@ def qualify(paths):
         ("numeric_tolerance", {"absolute": 0.1}, "10", "10.05", 1.0),
         ("token_f1", {"unicode_version": UNICODE_VERSION}, "a b", "a", 2 / 3),
         ("json_fields", {"fields": ["/a", "/b"]}, '{"a":1,"b":2}', '{"a":1}', 0.5),
+        ("json_exact", {}, '{"a":1,"b":2}', '{"a":1}', 0.0),
+        ("json_exact", {}, '{"a":1}', '{ "a": 1 }', 1.0),
     ],
 )
 def test_non_exact_metric_qualifies_and_exposes_the_bound_scorer(

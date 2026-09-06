@@ -271,9 +271,9 @@ Neither an installed package nor a binding inside the submitted evidence
 authorizes scorer code by itself. Strict verification resolves the policy-
 pinned scorer through this registry and replays it deterministically.
 
-The unreleased registry includes four shipped deterministic scorers:
+The unreleased registry includes five shipped deterministic scorers:
 `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
-`invarlock.json_fields` and `invarlock.token_f1`. Pass
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1`. Pass
 `ScorerExtensionRegistry(allow_installed=False)` to use these through the SDK
 without enabling third-party discovery. The core CLI supplies this registry
 automatically. Bindings still pin the scorer's version and configuration schema.

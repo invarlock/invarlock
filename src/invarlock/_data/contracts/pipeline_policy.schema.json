@@ -25,6 +25,7 @@
               "normalized_match",
               "numeric_tolerance",
               "json_fields",
+              "json_exact",
               "token_f1",
               "recorded"
             ]
