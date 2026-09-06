@@ -81,6 +81,17 @@ All shipped deterministic metrics produce higher-is-better scores in `[0,1]`.
 - `token_f1`: multiset precision/recall F1 over normalized whitespace tokens.
   Punctuation remains part of each token. Two empty strings score one.
 
+`normalized_match` and `token_f1` require an explicit
+`configuration.unicode_version`, such as `"15.0.0"` for Python 3.12. Normalization,
+case folding and whitespace classification use the executing Python runtime's
+Unicode tables. The declared version must equal `unicodedata.unidata_version`;
+a missing or different version is an integration error before scoring. This
+requirement also applies when `casefold` is false. Recipient verification needs
+a runtime with the policy's Unicode version. Changing the version changes the
+policy and scorer binding; it must not silently rescore historical evidence.
+`invarlock-pipeline init` records the local version explicitly in its generated
+policy. The other deterministic and recorded metrics do not take this setting.
+
 The four additional scorers are also available in the core transaction registry
 as `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
 `invarlock.json_fields` and `invarlock.token_f1`, version `1.0.0`. They require an

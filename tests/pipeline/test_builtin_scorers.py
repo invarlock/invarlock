@@ -12,14 +12,15 @@ from invarlock.core.scorer_extension import (
     ScorerReplayRequest,
     build_scorer_binding,
 )
+from invarlock.pipeline.metrics import UNICODE_VERSION
 
 
 @pytest.mark.parametrize(
     "kind,config,target,output,value",
     [
-        ("normalized_match", {}, "yes", " YES ", 1),
+        ("normalized_match", {"unicode_version": UNICODE_VERSION}, "yes", " YES ", 1),
         ("numeric_tolerance", {"absolute": 0.1}, "10", "10.01", 1),
-        ("token_f1", {}, "a b", "a", 2 / 3),
+        ("token_f1", {"unicode_version": UNICODE_VERSION}, "a b", "a", 2 / 3),
         ("json_fields", {"fields": ["/x"]}, '{"x":1}', '{"x":1}', 1),
     ],
 )
@@ -56,7 +57,9 @@ def test_external_code_cannot_shadow_a_shipped_scorer():
     registry = ScorerExtensionRegistry(allow_installed=False, authorized=(scorer,))
     with pytest.raises(ScorerExtensionError, match="shadowed"):
         registry.validate_binding(
-            build_scorer_binding(scorer.descriptor(), {}),
+            build_scorer_binding(
+                scorer.descriptor(), {"unicode_version": UNICODE_VERSION}
+            ),
             task="text_causal",
             input_kinds=("text",),
             output_kind="text",
@@ -70,7 +73,10 @@ def test_shipped_scorer_completes_existing_signed_evaluate_verify_report(tmp_pat
     from tests.cli.test_import_journey import _input_anchors, _key, _materialize_request
 
     registry = ScorerExtensionRegistry(allow_installed=False)
-    binding = build_scorer_binding(BuiltinScorer("normalized_match").descriptor(), {})
+    binding = build_scorer_binding(
+        BuiltinScorer("normalized_match").descriptor(),
+        {"unicode_version": UNICODE_VERSION},
+    )
     material = _materialize_request(
         tmp_path, scorer_binding=binding, scorer_registry=registry
     )

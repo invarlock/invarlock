@@ -31,14 +31,24 @@ class BuiltinScorer:
 
     def configuration_schema(self) -> Mapping[str, object]:
         properties: dict[str, Any] = {}
+        required = []
         if self.kind in ("normalized_match", "token_f1"):
-            properties = {"casefold": {"type": "boolean"}}
+            properties = {
+                "casefold": {"type": "boolean"},
+                "unicode_version": {
+                    "type": "string",
+                    "pattern": r"^[0-9]+\.[0-9]+\.[0-9]+$",
+                    "maxLength": 32,
+                },
+            }
+            required = ["unicode_version"]
         elif self.kind == "numeric_tolerance":
             properties = {
                 key: {"type": "number", "minimum": 0}
                 for key in ("absolute", "relative")
             }
         else:
+            required = ["fields"]
             properties = {
                 "fields": {
                     "type": "array",
@@ -52,7 +62,7 @@ class BuiltinScorer:
             "type": "object",
             "additionalProperties": False,
             "properties": properties,
-            "required": ["fields"] if self.kind == "json_fields" else [],
+            "required": required,
         }
 
     def descriptor(self) -> ScorerExtensionDescriptor:

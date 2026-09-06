@@ -219,12 +219,16 @@ qualification, and strict runtime-import replay.
 
 ## Authority rules
 
-`deterministic_per_record` is currently limited to exact match. The export must
-cover the independent schedule in exact order, bind each input and output, and
-carry successful record status. InvarLock ignores the evaluator's aggregate
-claim and recomputes `output_sha256 == reference_output_sha256` for every
-record. A mismatch between the upstream-reported score and this replay rejects
-the export.
+`deterministic_per_record` recomputes the supported metric declared by the
+profile. The export must cover the independent schedule in exact order, bind
+each input and output, and carry successful record status. Exact match compares
+`output_sha256 == reference_output_sha256` for every record. Normalized match,
+numeric tolerance, structured fields and token F1 require independently supplied
+reference text whose digest agrees with the schedule. Their metric configuration
+also forms part of the qualified profile. InvarLock rejects aggregate substitution
+and disagreement between an upstream-reported score and independent replay.
+The retained evaluator demonstrations continue to use their declared exact-match
+profiles; support for other metrics does not change those historical semantics.
 
 `observation_only` requires one explicit reason:
 

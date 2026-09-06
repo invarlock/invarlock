@@ -21,7 +21,7 @@ from invarlock.pipeline import (
 )
 from invarlock.pipeline.cli import app
 from invarlock.pipeline.contracts import digest, read_json, write_directory, write_new
-from invarlock.pipeline.metrics import MetricError, score
+from invarlock.pipeline.metrics import UNICODE_VERSION, MetricError, score
 from invarlock.pipeline.templates import example_project
 
 
@@ -60,8 +60,10 @@ def test_policy_contradictions_are_integration_errors(change):
         metric["accepted_provenance"]["rubric_digest"] = None
     elif change == "recomputed_provenance":
         metric["kind"] = "normalized_match"
+        metric["configuration"] = {"unicode_version": UNICODE_VERSION}
     elif change in ("direction", "scorer_config"):
         metric.update(kind="normalized_match")
+        metric["configuration"] = {"unicode_version": UNICODE_VERSION}
         del metric["accepted_provenance"], metric["score_key"]
         if change == "direction":
             metric["direction"] = "lower"
@@ -94,7 +96,10 @@ def test_structured_array_pointers_and_bad_answers():
         == 0.5
     )
     assert score("json_fields", {"a": [1]}, {"a": 3}, {"fields": ["/a/0"]}) == 0
-    assert score("normalized_match", "answer", {}) == 0
+    assert (
+        score("normalized_match", "answer", {}, {"unicode_version": UNICODE_VERSION})
+        == 0
+    )
     with pytest.raises(ValueError):
         BuiltinScorer("unknown")
 

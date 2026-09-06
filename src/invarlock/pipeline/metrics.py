@@ -18,6 +18,7 @@ KINDS = (
     "token_f1",
 )
 SCORER_VERSION = "1.0.0"
+UNICODE_VERSION = unicodedata.unidata_version
 
 
 class MetricError(ValueError):
@@ -27,13 +28,22 @@ class MetricError(ValueError):
 def validate_configuration(kind: str, configuration: dict[str, Any]) -> None:
     allowed = {
         "exact_match": set(),
-        "normalized_match": {"casefold"},
-        "token_f1": {"casefold"},
+        "normalized_match": {"casefold", "unicode_version"},
+        "token_f1": {"casefold", "unicode_version"},
         "numeric_tolerance": {"absolute", "relative"},
         "json_fields": {"fields"},
     }
     if kind not in allowed or set(configuration) - allowed[kind]:
         raise MetricError(f"unsupported configuration for {kind!r}")
+    if kind in ("normalized_match", "token_f1"):
+        if "unicode_version" not in configuration:
+            raise MetricError(f"{kind} requires an explicit unicode_version")
+        if configuration["unicode_version"] != unicodedata.unidata_version:
+            raise MetricError(
+                f"{kind} requires Unicode {configuration['unicode_version']!r}; "
+                f"this runtime provides {unicodedata.unidata_version}. "
+                "Use a runtime with the policy's Unicode version."
+            )
     if "casefold" in configuration and not isinstance(configuration["casefold"], bool):
         raise MetricError("casefold must be a boolean")
     for key in ("absolute", "relative"):

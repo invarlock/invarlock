@@ -6,6 +6,7 @@ from typing import Any
 
 from invarlock.pipeline.comparison import make_run
 from invarlock.pipeline.contracts import digest
+from invarlock.pipeline.metrics import UNICODE_VERSION
 
 
 def example_project(kind: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -40,7 +41,7 @@ def example_project(kind: str) -> tuple[dict[str, Any], dict[str, Any], dict[str
     metric: dict[str, Any] = {
         "name": "quality",
         "kind": "normalized_match",
-        "configuration": {},
+        "configuration": {"unicode_version": UNICODE_VERSION},
         "direction": "higher",
         "unit": "score",
         "aggregation": "mean",
@@ -55,7 +56,10 @@ def example_project(kind: str) -> tuple[dict[str, Any], dict[str, Any], dict[str
         )
     if kind == "judge":
         metric.update(
-            kind="recorded", score_key="quality", accepted_provenance=provenance
+            kind="recorded",
+            configuration={},
+            score_key="quality",
+            accepted_provenance=provenance,
         )
     latency_provenance = {
         "kind": "measurement",

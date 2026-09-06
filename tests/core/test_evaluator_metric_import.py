@@ -9,6 +9,7 @@ from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
 )
+from invarlock.pipeline.metrics import UNICODE_VERSION
 from tests.core.test_evaluator_qualification import _write_json, qualification_fixture
 
 
@@ -49,9 +50,9 @@ def qualify(paths):
 @pytest.mark.parametrize(
     "kind,config,target,output,value",
     [
-        ("normalized_match", {}, "yes", " YES ", 1.0),
+        ("normalized_match", {"unicode_version": UNICODE_VERSION}, "yes", " YES ", 1.0),
         ("numeric_tolerance", {"absolute": 0.1}, "10", "10.05", 1.0),
-        ("token_f1", {}, "a b", "a", 2 / 3),
+        ("token_f1", {"unicode_version": UNICODE_VERSION}, "a b", "a", 2 / 3),
         ("json_fields", {"fields": ["/a", "/b"]}, '{"a":1,"b":2}', '{"a":1}', 0.5),
     ],
 )
@@ -72,7 +73,14 @@ def test_non_exact_metric_qualifies_and_exposes_the_bound_scorer(
 )
 def test_broader_import_rejects_false_or_ambiguous_scoring(tmp_path, change):
     paths = qualification_fixture(tmp_path)
-    setup(paths, "normalized_match", {}, "yes", "YES", 1.0)
+    setup(
+        paths,
+        "normalized_match",
+        {"unicode_version": UNICODE_VERSION},
+        "yes",
+        "YES",
+        1.0,
+    )
     profile, schedule, export, _ = paths
     p, s, e = [json.loads(f.read_text()) for f in paths[:3]]
     if change == "wrong_score":
@@ -92,5 +100,16 @@ def test_broader_import_rejects_false_or_ambiguous_scoring(tmp_path, change):
         "sha256:" + hashlib.sha256(schedule.read_bytes()).hexdigest()
     )
     _write_json(export, e)
+    with pytest.raises(EvaluatorQualificationError):
+        qualify(paths)
+
+
+@pytest.mark.parametrize("kind", ["normalized_match", "token_f1"])
+@pytest.mark.parametrize("configuration", [{}, {"unicode_version": "0.0.0"}])
+def test_qualification_rejects_missing_or_unsupported_unicode_semantics(
+    tmp_path, kind, configuration
+):
+    paths = qualification_fixture(tmp_path)
+    setup(paths, kind, configuration, "yes", "YES", 1.0)
     with pytest.raises(EvaluatorQualificationError):
         qualify(paths)

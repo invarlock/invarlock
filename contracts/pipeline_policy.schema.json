@@ -135,6 +135,47 @@
           "minimum_count",
           "maximum_regression",
           "maximum_interval_width"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "normalized_match",
+                    "token_f1"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "configuration": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "casefold": {
+                      "type": "boolean"
+                    },
+                    "unicode_version": {
+                      "type": "string",
+                      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+                      "maxLength": 32
+                    }
+                  },
+                  "required": [
+                    "unicode_version"
+                  ]
+                }
+              },
+              "required": [
+                "configuration"
+              ]
+            }
+          }
         ]
       },
       "minItems": 1,

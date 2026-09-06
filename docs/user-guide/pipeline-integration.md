@@ -133,6 +133,14 @@ blocks the gate.
 the declared JSON pointers. Scorer details and statistical assumptions are in
 the [contract reference](../reference/pipeline-contracts.md).
 
+For `normalized_match` and `token_f1`, approve an explicit
+`configuration.unicode_version` matching the runtime used for comparison and
+verification. Check it with
+`python -c "import unicodedata; print(unicodedata.unidata_version)"`.
+The generated classification example sets it for you. Reuse a matching runtime
+when replaying evidence; a missing or different version fails the integration
+instead of silently changing text scoring after a Python upgrade.
+
 For recorded metrics, include per-record `scores`, declare `score_provenance` in
 each run, and copy the approved provenance into the policy's
 `accepted_provenance`. Units, source, version and rubric digest must match on both

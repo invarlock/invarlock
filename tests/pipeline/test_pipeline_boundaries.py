@@ -5,13 +5,18 @@ from copy import deepcopy
 import pytest
 
 from invarlock.pipeline import PipelineError, compare_runs, make_run
+from invarlock.pipeline.metrics import UNICODE_VERSION
 
 
 def policy(kind="normalized_match"):
     metric = {
         "name": "quality",
         "kind": kind,
-        "configuration": {},
+        "configuration": (
+            {"unicode_version": UNICODE_VERSION}
+            if kind in ("normalized_match", "token_f1")
+            else {}
+        ),
         "direction": "higher",
         "unit": "score",
         "aggregation": "mean",

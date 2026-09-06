@@ -19,7 +19,7 @@ from invarlock.pipeline import (
 from invarlock.pipeline.cli import app
 from invarlock.pipeline.contracts import digest
 from invarlock.pipeline.evidence import DOMAIN
-from invarlock.pipeline.metrics import MetricError, score
+from invarlock.pipeline.metrics import UNICODE_VERSION, MetricError, score
 from invarlock.pipeline.report import render_html, render_junit
 from invarlock.pipeline.templates import example_project
 
@@ -27,8 +27,20 @@ from invarlock.pipeline.templates import example_project
 @pytest.mark.parametrize(
     "kind,target,output,configuration,expected",
     [
-        ("normalized_match", "Straße  YES", " STRASSE yes ", {}, 1),
-        ("normalized_match", "YES", "yes", {"casefold": False}, 0),
+        (
+            "normalized_match",
+            "Straße  YES",
+            " STRASSE yes ",
+            {"unicode_version": UNICODE_VERSION},
+            1,
+        ),
+        (
+            "normalized_match",
+            "YES",
+            "yes",
+            {"casefold": False, "unicode_version": UNICODE_VERSION},
+            0,
+        ),
         ("exact_match", " yes", "yes", {}, 0),
         ("numeric_tolerance", 100, "100.5", {"relative": 0.01}, 1),
         ("numeric_tolerance", 0, "0.001", {"absolute": 0.0001}, 0),
@@ -44,8 +56,8 @@ from invarlock.pipeline.templates import example_project
             {"fields": ["/a~1b/~0"]},
             1,
         ),
-        ("token_f1", "a a b", "a b", {}, 0.8),
-        ("token_f1", "", "", {}, 1),
+        ("token_f1", "a a b", "a b", {"unicode_version": UNICODE_VERSION}, 0.8),
+        ("token_f1", "", "", {"unicode_version": UNICODE_VERSION}, 1),
     ],
 )
 def test_metric_meanings(kind, target, output, configuration, expected):
@@ -59,8 +71,12 @@ def test_metric_meanings(kind, target, output, configuration, expected):
         ("numeric_tolerance", 1, {"relative": -1}),
         ("json_fields", {}, {"fields": ["/missing"]}),
         ("json_fields", {}, {"fields": ["/a~2b"]}),
-        ("normalized_match", "yes", {"casefold": "true"}),
-        ("token_f1", [], {}),
+        (
+            "normalized_match",
+            "yes",
+            {"casefold": "true", "unicode_version": UNICODE_VERSION},
+        ),
+        ("token_f1", [], {"unicode_version": UNICODE_VERSION}),
     ],
 )
 def test_invalid_metric_configuration_or_reference_fails(kind, target, config):
