@@ -75,6 +75,21 @@ jobs:
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Exercise installed pipeline workflows
         run: python examples/pipeline/wheel_smoke.py
+      - name: Verify real ModelKit package handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          kit_root="$(mktemp -d)"
+          trap 'rm -rf "$kit_root"' EXIT
+          curl --fail --location --retry 2 --max-time 120 \
+            https://github.com/kitops-ml/kitops/releases/download/v1.15.0/kitops-linux-x86_64.tar.gz \
+            --output "$kit_root/kit.tar.gz"
+          echo "c95ab7cfe1a57fcb37101454ff1d5b2783781a72cbbb4016018a701c892bf26f  $kit_root/kit.tar.gz" | sha256sum --check --status
+          tar -xzf "$kit_root/kit.tar.gz" -C "$kit_root"
+          export INVARLOCK_KIT_BINARY="$kit_root/kit"
+          INVARLOCK_KIT_BINARY_SHA256="$(sha256sum "$INVARLOCK_KIT_BINARY" | cut -d ' ' -f1)"
+          export INVARLOCK_KIT_BINARY_SHA256
+          python -m pytest -q tests/integration/test_modelkit_cli.py
       - name: Run fast repository gates
         run: make verify-fast
       - name: Build, install, and validate distributions

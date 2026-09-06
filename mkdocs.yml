@@ -9,6 +9,7 @@ nav:
   - User guide:
       - Getting started: user-guide/getting-started.md
       - Existing evaluation pipelines: user-guide/pipeline-integration.md
+      - ModelKit recipient handoff: user-guide/modelkit-handoff.md
       - Change scenarios: user-guide/change-scenarios.md
       - Key management: user-guide/key-management.md
       - Runtime providers: user-guide/runtime-providers.md
