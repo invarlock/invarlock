@@ -2,7 +2,7 @@
 
 !!! info "Reference"
 
-    **Surface:** `invarlock.pipeline`, `invarlock-pipeline`, and five packaged
+    **Surface:** `invarlock.pipeline`, `invarlock-pipeline`, and six packaged
     `pipeline_*.schema.json` contracts.
 
     **Stability:** Unreleased v1 formats. Existing core evidence contracts and
@@ -69,11 +69,75 @@ Pins let a later workflow reuse an approved run without silently substituting
 its contents. Approve and retain the expected digest independently of the input
 being checked. A pin computed from a replacement that has not been reviewed is no assurance
 of its identity. Pins do not establish representative sampling, truthful execution
-or semantic correctness. They also do not define an intended case set before
-capture; two matching exports can both omit intended cases unless the capture
-protocol independently checks coverage. Keep separately captured workflows and
+or semantic correctness. To check the intended case set before scoring, use the
+separate policy pin below. Keep separately captured workflows and
 phases separately identified; do not splice incompatible captures into an older
 signed run.
+
+## Freezing planned case membership
+
+An optional policy field, `expected_case_set_digest`, requires both runs to
+contain exactly the approved case IDs, inputs, references and metadata. This
+detects shared omissions that ordinary baseline/candidate pairing cannot catch.
+It also rejects shared additions and changes to any planned case field, even
+when the runs still meet the metric's minimum count.
+
+Author a closed `invarlock/pipeline-case-set-v1` file before capture:
+
+```json
+{
+  "format": "invarlock/pipeline-case-set-v1",
+  "cases": [
+    {
+      "id": "invoice-001",
+      "input": {"document": "Invoice total: 125 USD"},
+      "expected": {"amount": 125, "currency": "USD"},
+      "metadata": {"workflow": "extraction", "source_cluster": "document-001"}
+    }
+  ]
+}
+```
+
+Validate and freeze its canonical identity:
+
+```bash
+invarlock-pipeline case-set planned-cases.json --output frozen-cases.json
+```
+
+The command prints the case count and digest. Put that approved digest in
+`policy.json` as `expected_case_set_digest`; it is not a project input path or
+an arbitrary input file checksum. The emitted canonical file has the same
+SHA-256 digest. The policy must remain independently controlled by the
+reviewer. The optional output is written without replacing an existing file.
+SDK callers can use `canonical_case_set` and `case_set_digest` for the same
+operation.
+
+The digest covers the versioned artifact with cases sorted by their exact IDs.
+Only this outer order is ignored. Nested array order, string bytes, numeric
+types and metadata retain their parsed JSON identity: integer `1`, float `1.0`
+and boolean `true` are distinct, while `1e0` and `1.0` parse identically. Use
+strings for precision-sensitive decimal text. Unknown fields, duplicate IDs
+and empty sets fail validation.
+The existing 64 MiB and 10,000-record limits apply.
+
+Comparison checks every record on both sides before scoring, including records
+with errors. A case mismatch returns integration-error exit code 2 before key
+loading or result publication. Path overrides cannot bypass the policy pin.
+Errors in a complete schedule retain their ordinary insufficient-evidence
+meaning; the case pin does not change scoring or minimum counts.
+
+The signed policy carries the pin into evidence. Recipient verification checks
+it again using the independently supplied policy and full-run identities. No
+additional trusted sidecar is needed. A policy without this field retains the
+existing pairing behavior. Older versions may reject policies containing the
+new field.
+
+Case membership excludes outputs, scores, errors, context, model/runtime
+identities and execution order. Complete-run pins and signatures cover those
+separately. Freezing cases does not establish reference correctness, authorship,
+independent sampling or that planning happened before capture. Source and
+cluster labels are declarations, and deriving a pin from already selected
+results does not prove that omitted cases never existed.
 
 ## Native adapters
 
