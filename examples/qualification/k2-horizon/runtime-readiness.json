@@ -31,7 +31,7 @@
     "verification": "Authenticated source derivation removes the dependency and explicitly rejects both optional modules; installed imports and dispatch remain required."
   },
   "model_qualification_gates": [
-    "Observe real H200 startup and bounded inference, then independently verify the retained model captures before qualification."
+    "Observe real startup and bounded inference on matching full H100 80GB HBM3 or H200 141GB devices with MIG disabled, then independently verify the retained model captures before qualification. Both configurations remain unqualified candidates."
   ],
   "ready_meaning": "Exact image passes CPU build, installed-source, offline-import and security checks; approved GPU preflight and model qualification remain separate."
 }

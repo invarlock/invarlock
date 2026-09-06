@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added full H100 80GB HBM3 devices to the K2 candidate hardware checks alongside
+  H200, requiring matching devices with MIG disabled and the existing security
+  driver minimum. The bounded launcher now caps host memory at 280 GiB and
+  rejects UID 0 before plan reads or container operations. Actual GPU preflight
+  and model qualification remain required.
 - Updated coordinated Python tooling, documentation dependencies, and pinned
   CI actions. Python dependency updates now use the uv ecosystem so the root
   manifest and lock are proposed together; hashed workflow locks remain

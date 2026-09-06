@@ -311,11 +311,27 @@ unsigned local observations with an operator-attributed security review.
 ## Materialize and freeze before evaluation
 
 After the runtime is ready and execution has an approved budget, provision a
-Linux x86_64 host with two full H200 141GB GPUs, verified NVLink connectivity,
-512GB host RAM, 32 vCPUs, and 2TB free NVMe space. Run checkpoint roles and model
-pairs sequentially. These host resource figures are planning estimates, not
-measurements. The worker checks H200 identity, memory, GPU count, and the reviewed R580
-branch at version 580.159.03 or later. Request 580.178.04; the minimum follows
+Linux x86_64 host with two matching full H100 80GB HBM3 or H200 141GB GPUs,
+verified NVLink connectivity, at least 320 GiB host RAM, 32 vCPUs, and 2TB free
+NVMe space. Run checkpoint roles and model pairs sequentially. These host
+resource figures are planning requirements; actual startup and bounded inference
+must establish whether each model fits. Both GPU configurations remain
+unqualified candidates.
+
+The worker accepts only the exact device names `NVIDIA H100 80GB HBM3` with at
+least 80,000 MiB per device or `NVIDIA H200` with at least 135,000 MiB per device.
+All visible GPUs must have the same accepted name and report MIG mode `Disabled`;
+unknown names, mixed devices, partitions, and insufficient GPU counts fail
+preflight. The launcher limits container memory to 280 GiB and CPU use to 32
+cores, retaining private 16 GiB executable JIT storage and 32 GiB shared memory.
+These memory-backed files count toward the container memory limit. Network
+isolation, a read-only image, and non-root execution remain enforced. Run the
+launcher as a non-root operator with Docker access; UID 0 is rejected before
+plan reads, output creation, or Docker calls. The container uses the operator's
+UID and GID so generated files retain that ownership.
+
+The worker requires the reviewed R580 branch at version 580.159.03 or later.
+Request 580.178.04; the minimum follows
 [NVIDIA's driver security bulletin](https://nvidia.custhelp.com/app/answers/detail/a_id/5821).
 Newer driver branches require their own verified security minimum before being
 accepted. The image's CUDA requirements, actual loaded host driver libraries,
@@ -344,7 +360,9 @@ digest. A Docker image ID is an OCI configuration digest; do not substitute a
 registry manifest digest for it. Retain the image archive and any registry
 manifest relationship separately. The image must contain the candidate
 InvarLock wheel and both campaign modules plus the catalog under an importable
-`examples.qualification` directory. The plan binds both modules' actual bytes.
+`examples.qualification` directory. The plan binds both modules' actual bytes, including the hardware policy and
+container resource limits. A launcher change requires a newly prepared image and
+fresh plan; historical receipts retain their original identities.
 
 Do not fabricate a ready receipt. The reviewed runtime closure and executable
 image are still required; see the build strategy in
