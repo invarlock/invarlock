@@ -1,7 +1,7 @@
 # Contributing to InvarLock
 
-Thank you for improving InvarLock. The repository is intentionally centered on
-one user journey:
+Thank you for improving InvarLock. The runtime transaction executes or imports
+paired model evaluations:
 
 ```text
 invarlock evaluate request.yaml
@@ -9,20 +9,51 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-Changes should make that transaction easier to understand, safer to execute,
-or easier to verify.
+The separate `invarlock-pipeline` CLI and Python SDK compare existing evaluator
+exports, apply metric and slice policies, and verify signed pipeline evidence.
+See the [pipeline integration guide](docs/user-guide/pipeline-integration.md).
+Changes should make these workflows easier to understand, safer to execute,
+or easier to verify. Preserve the distinct assurance meaning of each evidence
+format.
 
 ## Development setup
 
-InvarLock requires Python 3.12 or newer. Clone the repository, create a virtual
+InvarLock requires Python 3.12 or newer. Use Python 3.13 to match the main CI
+jobs; Python 3.12 has a separate minimum-version gate. Documentation tooling
+requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
 environment, and install the development dependencies:
 
 ```bash
-python -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev,hf]"
 npm ci
 ```
+
+Install `uv` for lock, distribution, and dependency-audit targets; CI currently
+uses version `0.10.10`. Workflow changes also require `actionlint` on `PATH`.
+With Go installed:
+
+```bash
+python -m pip install uv==0.10.10
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+```
+
+Add Go's binary directory to `PATH`. These tools are not installed by the
+Python development extra.
+
+For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
+environment and run:
+
+```bash
+python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+python -m build --wheel --no-isolation
+python -m pip install --no-deps --force-reinstall dist/*.whl
+```
+
+Use the matching `py312` lock for Python 3.12. These locks include the build
+requirements needed by `--no-isolation`. Do not use an editable install as
+evidence that the wheel contains every module, entry point, and schema.
 
 Run the local gate before opening a pull request:
 
@@ -31,21 +62,24 @@ make verify-fast
 ```
 
 `make verify`, `make verify-fast`, and `make coverage-enforce` run independent
-suites concurrently and use bounded pytest-xdist workers. Set
-`VERIFY_TARGET_JOBS=1 COVERAGE_TARGET_JOBS=1 PYTEST_WORKERS=0` when diagnosing
-a failure sequentially.
-`make verify` adds the complete test and documentation build. The opt-in
-container journey builds the final runtime image and exercises all three
-commands:
+suites concurrently and use bounded pytest-xdist workers. Pass overrides as
+Make command-line arguments when diagnosing a failure sequentially:
 
 ```bash
-make container-front-door-smoke
+make verify-fast VERIFY_TARGET_JOBS=1 PYTEST_WORKERS=0
+make coverage-enforce COVERAGE_TARGET_JOBS=1 PYTEST_WORKERS=0
 ```
+
+`make verify` adds the complete test suite and strict documentation build.
+Some integration tests download pinned model artifacts. It does not include
+the separate coverage, distribution, workflow, lock, or dependency-audit gates
+listed below. Run them for the affected surface before requesting review.
 
 ## Repository shape
 
 - `src/invarlock/` contains the request transaction, provider ABI, canonical
-  evidence bundle, independent verifier, and report renderer.
+  evidence bundle, independent verifier, and report renderer. Its `pipeline/`
+  package contains the separate paired-export workflow.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
   Hugging Face vision-text, and diagnostics packages.
@@ -61,8 +95,9 @@ specific dependencies out of the core distribution.
 
 ## Contract changes
 
-The request, runtime manifest, provider evidence, evidence pack, and signed
-verification receipt are security boundaries. Contract changes must:
+The request, runtime manifest, provider evidence, evidence pack, signed
+verification receipt, and pipeline run, policy, and evidence formats are
+security boundaries. Contract changes must:
 
 1. start with adversarial tests that demonstrate the intended failure mode;
 2. keep schemas closed with `additionalProperties: false` where applicable;
@@ -111,10 +146,47 @@ make coverage-enforce
 make dist-check
 ```
 
+Choose additional gates from the change, rather than treating `verify-fast`
+as the complete pull-request check:
+
+| Changed surface | Additional validation |
+| --- | --- |
+| Python behavior or example launcher | Focused failing test first, then `make verify` and the applicable coverage target |
+| Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
+| Documentation or public command examples | `make docs-check`; exercise the documented commands |
+| Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
+| Pipeline CLI or evidence behavior | Build and install the candidate wheel, then run `python examples/pipeline/wheel_smoke.py` |
+| Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
+| Dependency declarations or locks | `make lock-sync` and `make security`, plus affected installed-package checks |
+| GitHub Actions | `make workflow-lint` |
+
+Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
+review their changes and repeat affected validation before committing.
+
+The complete coverage gate requires Linux descriptor execution. On another
+operating system, run the relevant portable target such as `make
+coverage-examples`, and report the full Linux result from CI separately.
+Coverage includes newly added example launchers: successful execution in a
+separate smoke job does not collect their branch coverage. Add meaningful
+tests under `tests/examples/`; do not weaken thresholds to make a change pass.
+
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
 `make dist-check` builds and validates the core, diagnostics, GGUF connector,
 Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
+
+For runtime launcher changes, run the opt-in real-container journey with a
+working Docker or Podman engine. Commit the source being tested, create its
+archive with `scripts/qualification_source.py create`, and supply
+`RUNTIME_SOURCE_COMMIT`, `RUNTIME_SOURCE_BUNDLE`, and
+`RUNTIME_SOURCE_BUNDLE_SHA256` to `make container-front-door-smoke`. The
+[Container Front Door workflow](.github/workflows/container-front-door-smoke.yml)
+shows the complete source authentication and installed-wheel procedure.
+A skipped container test does not establish isolation or cleanup behavior.
+
+Investigate dependency-audit failures even when the affected lock predates the
+pull request. Follow the [dependency-audit policy](docs/security/dependency-audit.md)
+for remediation and any explicitly approved, time-bounded exception.
 
 ## Documentation and public text
 
@@ -126,7 +198,10 @@ should use portable request-relative paths and placeholder digests.
 Documentation lint discovers every tracked Markdown file through Git. It checks
 formatting, spelling, machine-specific paths, credential-like values, and
 review-process wording. Update affected public surfaces together when a product
-or release boundary changes.
+or release boundary changes. Stage intended new source and documentation files
+before the final gates so checks that enumerate Git's file inventory include
+them. Inspect the staged diff to keep generated artifacts, local evidence, and
+secrets out of the change.
 
 ### Documentation type contracts
 
@@ -165,6 +240,10 @@ enumerating commits.
 
 Create branches with the `work/` prefix. Keep commits small enough to review,
 but group implementation, tests, and documentation for one logical change.
+Target `staging/next` for normal integration work. Run the relevant checks on
+the final changes, inspect `git diff --check` and `git status`, and include
+their outcomes in the pull request. Distinguish passed, failed, and skipped
+checks; an earlier commit's result does not validate a later behavior change.
 Pull requests should explain:
 
 - the user or verifier problem being solved;

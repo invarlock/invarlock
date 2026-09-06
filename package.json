@@ -5,10 +5,10 @@
     "node": ">=22.18.0"
   },
   "devDependencies": {
-    "cspell": "^10.0.1",
+    "cspell": "^10.1.1",
     "markdownlint-cli2": "^0.23.2"
   },
   "dependencies": {
-    "katex": "^0.18.1"
+    "katex": "^0.18.4"
   }
 }

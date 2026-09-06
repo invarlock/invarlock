@@ -31,8 +31,17 @@ Pass `EXAMPLE_ARGS="--workspace PATH"` when you want to retain the transaction
 at a specific new path. The evidence and verifier keys must be caller-owned and
 outside the transaction; the trust root is created outside the transaction.
 
-The command builds the source-authenticated CPU runtime and adds a hash-pinned
-OpenAI Evals environment. It needs roughly 7 GB of temporary disk for the two
+The command builds the source-authenticated CPU runtime and adds
+`evals==3.0.1.post1+invarlock.match.1`, derived from the hash-pinned upstream
+3.0.1.post1 wheel. Every upstream code file is unchanged; package metadata
+removes the unused NLTK dependency and records the derived version. This image
+supports `basic.Match` with the repository's HF completion adapter. NLTK-based
+suites and data-generation helpers are unsupported; their upstream modules
+can fail on missing optional dependencies.
+The broader qualification profile and historical evidence keep their original
+dependency identities.
+
+The journey needs roughly 7 GB of temporary disk for the two
 Qwen3.5 snapshots, runtime images, and outputs. Both model runs execute without
 network access inside the inspected image. The immutable image ID is bound into
 both runtime receipts before the import transaction is signed.

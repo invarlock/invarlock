@@ -5,10 +5,13 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from scripts.release import verify_hosted_distributions as hosted_verifier
@@ -171,6 +174,39 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
         steps.index(lock_upload)
         == steps.index(_step(steps, "Audit maintained dependency locks")) + 1
     )
+
+
+@pytest.mark.parametrize("exclude_pipeline_path", (False, True))
+def test_supply_chain_scanner_probe_rejects_pipeline_path_exclusions(
+    tmp_path: Path, exclude_pipeline_path: bool
+) -> None:
+    if shutil.which("gitleaks") is None:
+        pytest.skip("the pinned Gitleaks executable is required for the workflow probe")
+    workflow = _load(WORKFLOWS / "supply-chain-pr.yml")
+    probe = _step(workflow["jobs"]["scan"]["steps"], "Test gitleaks allowlist boundary")
+    config = Path(".gitleaks.toml").read_text(encoding="utf-8")
+    if exclude_pipeline_path:
+        config += (
+            '\n[[allowlists]]\ndescription = "Deliberately overbroad test allowance"\n'
+            "paths = ['''^src/invarlock/pipeline/evidence\\.py$''']\n"
+        )
+    (tmp_path / ".gitleaks.toml").write_text(config, encoding="utf-8")
+    result = subprocess.run(
+        ["bash", "-c", probe["run"]],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "GITHUB_WORKSPACE": str(tmp_path),
+            "PATH": f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if exclude_pipeline_path:
+        assert result.returncode != 0
+    else:
+        assert result.returncode == 0, result.stderr
 
 
 def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> None:

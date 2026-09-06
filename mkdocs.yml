@@ -8,6 +8,7 @@ nav:
   - Overview: README.md
   - User guide:
       - Getting started: user-guide/getting-started.md
+      - Existing evaluation pipelines: user-guide/pipeline-integration.md
       - Change scenarios: user-guide/change-scenarios.md
       - Key management: user-guide/key-management.md
       - Runtime providers: user-guide/runtime-providers.md
@@ -30,6 +31,7 @@ nav:
       - CLI: reference/cli.md
       - Architecture: reference/architecture.md
       - Contracts: reference/contracts.md
+      - Pipeline contracts: reference/pipeline-contracts.md
       - Compatibility covenant: reference/compatibility.md
       - Acceptance attestations: reference/acceptance-attestations.md
       - Policy-engine interoperability: reference/policy-engine-interop.md

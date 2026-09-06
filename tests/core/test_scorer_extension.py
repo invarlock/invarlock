@@ -12,6 +12,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 import invarlock.core.scorer_extension as scorer_module
+from invarlock.core.builtin_scorers import BUILTIN_SCORER_IDS
 from invarlock.core.scorer_extension import (
     CANONICAL_BUILTIN_ACCEPTANCE_METRICS,
     SCORER_EXTENSION_ABI_VERSION,
@@ -427,7 +428,7 @@ def test_registry_is_lazy_and_replays_valid_extension_twice(
 
     registry, entry = _install_scorer(monkeypatch, replay=replay)
 
-    assert registry.list_scorers() == (_SCORER_ID,)
+    assert registry.list_scorers() == tuple(sorted((_SCORER_ID, *BUILTIN_SCORER_IDS)))
     assert entry.load_count == 0
     result = registry.replay(_request())
 
@@ -534,7 +535,7 @@ def test_registry_requires_explicit_installed_plugin_authorization(
     _, entry = _install_scorer(monkeypatch)
     registry = ScorerExtensionRegistry(allow_installed=False)
 
-    assert registry.list_scorers() == ()
+    assert registry.list_scorers() == tuple(sorted(BUILTIN_SCORER_IDS))
     assert entry.load_count == 0
     with pytest.raises(ScorerExtensionError, match="not installed or enabled"):
         registry.replay(_request())

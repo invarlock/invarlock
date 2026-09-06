@@ -1,0 +1,810 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/pipeline_evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/pipeline-evidence-v1"
+    },
+    "baseline": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://invarlock.dev/contracts/pipeline_run.schema.json",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "invarlock/pipeline-run-v1"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            }
+          },
+          "required": [
+            "name",
+            "version"
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "source_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "score_provenance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "judge",
+                  "human",
+                  "measurement",
+                  "external_metric"
+                ]
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "rubric_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "version",
+              "unit",
+              "rubric_digest"
+            ]
+          },
+          "maxProperties": 100
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "input": {},
+              "expected": {},
+              "output": {},
+              "scores": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "maxProperties": 100
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "maxProperties": 100
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "context": {}
+            },
+            "required": [
+              "id",
+              "input",
+              "expected",
+              "output",
+              "scores",
+              "metadata",
+              "error",
+              "context"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "format",
+        "source",
+        "run_id",
+        "artifact_digest",
+        "source_digest",
+        "score_provenance",
+        "records"
+      ]
+    },
+    "candidate": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://invarlock.dev/contracts/pipeline_run.schema.json",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "invarlock/pipeline-run-v1"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            }
+          },
+          "required": [
+            "name",
+            "version"
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "source_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "score_provenance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "judge",
+                  "human",
+                  "measurement",
+                  "external_metric"
+                ]
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "rubric_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "version",
+              "unit",
+              "rubric_digest"
+            ]
+          },
+          "maxProperties": 100
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "input": {},
+              "expected": {},
+              "output": {},
+              "scores": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "maxProperties": 100
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "maxProperties": 100
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "context": {}
+            },
+            "required": [
+              "id",
+              "input",
+              "expected",
+              "output",
+              "scores",
+              "metadata",
+              "error",
+              "context"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "format",
+        "source",
+        "run_id",
+        "artifact_digest",
+        "source_digest",
+        "score_provenance",
+        "records"
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "invarlock/pipeline-policy-v1"
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "kind": {
+                "enum": [
+                  "exact_match",
+                  "normalized_match",
+                  "numeric_tolerance",
+                  "json_fields",
+                  "token_f1",
+                  "recorded"
+                ]
+              },
+              "configuration": {
+                "type": "object",
+                "additionalProperties": {},
+                "maxProperties": 100
+              },
+              "direction": {
+                "enum": [
+                  "higher",
+                  "lower"
+                ]
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "aggregation": {
+                "const": "mean"
+              },
+              "minimum_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10000
+              },
+              "maximum_regression": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maximum_interval_width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "candidate_minimum": {
+                "type": "number"
+              },
+              "candidate_maximum": {
+                "type": "number"
+              },
+              "score_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "accepted_provenance": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "judge",
+                      "human",
+                      "measurement",
+                      "external_metric"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "rubric_digest": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source",
+                  "version",
+                  "unit",
+                  "rubric_digest"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "kind",
+              "configuration",
+              "direction",
+              "unit",
+              "aggregation",
+              "minimum_count",
+              "maximum_regression",
+              "maximum_interval_width"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "normalized_match",
+                        "token_f1"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "configuration": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "casefold": {
+                          "type": "boolean"
+                        },
+                        "unicode_version": {
+                          "type": "string",
+                          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+                          "maxLength": 32
+                        }
+                      },
+                      "required": [
+                        "unicode_version"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "configuration"
+                  ]
+                }
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "slices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "where": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "maxProperties": 100,
+                "minProperties": 1
+              }
+            },
+            "required": [
+              "name",
+              "where"
+            ]
+          },
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "format",
+        "metrics",
+        "slices"
+      ]
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "invarlock/pipeline-comparison-v1"
+        },
+        "decision": {
+          "enum": [
+            "pass",
+            "regression",
+            "insufficient_evidence"
+          ]
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "baseline": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "candidate": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "policy": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "baseline",
+            "candidate",
+            "policy"
+          ]
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "slice": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "direction": {
+                "enum": [
+                  "higher",
+                  "lower"
+                ]
+              },
+              "aggregation": {
+                "const": "mean"
+              },
+              "scoring_assurance": {
+                "enum": [
+                  "recomputed",
+                  "recorded"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "missing_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                }
+              },
+              "baseline_mean": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "candidate_mean": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "delta": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "interval": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "lower": {
+                        "type": "number"
+                      },
+                      "upper": {
+                        "type": "number"
+                      },
+                      "method": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                      },
+                      "mass": {
+                        "type": "number"
+                      },
+                      "replicates": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "lower",
+                      "upper",
+                      "method",
+                      "mass",
+                      "replicates"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "decision": {
+                "enum": [
+                  "pass",
+                  "regression",
+                  "insufficient_evidence"
+                ]
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 4096
+                }
+              }
+            },
+            "required": [
+              "name",
+              "slice",
+              "kind",
+              "unit",
+              "direction",
+              "aggregation",
+              "scoring_assurance",
+              "count",
+              "missing_ids",
+              "baseline_mean",
+              "candidate_mean",
+              "delta",
+              "interval",
+              "decision",
+              "reasons"
+            ]
+          },
+          "maxItems": 272
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      },
+      "required": [
+        "format",
+        "decision",
+        "bindings",
+        "metrics",
+        "limitations"
+      ]
+    },
+    "signature": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "Ed25519"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]{86}==$"
+            }
+          },
+          "required": [
+            "algorithm",
+            "value"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "baseline",
+    "candidate",
+    "policy",
+    "comparison",
+    "signature"
+  ]
+}

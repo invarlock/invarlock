@@ -743,15 +743,23 @@ class ScorerExtensionRegistry:
             )
 
     def list_scorers(self) -> tuple[str, ...]:
-        """List installed extension IDs without importing their code."""
+        """List shipped and installed extension IDs without loading external code."""
+
+        from invarlock.core.builtin_scorers import BUILTIN_SCORER_IDS
 
         self._ensure_initialized()
-        return tuple(sorted({*self._entries, *self._authorized}))
+        return tuple(sorted({*BUILTIN_SCORER_IDS, *self._entries, *self._authorized}))
 
     def _load(self, scorer_id: str) -> _LoadedScorer:
+        from invarlock.core.builtin_scorers import BUILTIN_SCORER_IDS, BuiltinScorer
+
         self._ensure_initialized()
         entry = self._entries.get(scorer_id)
         authorized = self._authorized.get(scorer_id)
+        if scorer_id in BUILTIN_SCORER_IDS:
+            if entry is not None or authorized is not None:
+                raise ScorerExtensionError("a shipped scorer cannot be shadowed")
+            authorized = BuiltinScorer(scorer_id.split(".", 1)[1])
         if entry is None and authorized is None:
             raise ScorerExtensionError(
                 f"required scorer extension {scorer_id!r} is not installed or enabled"

@@ -14,13 +14,14 @@ import hashlib
 import os
 import tempfile
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, cast
 
 from jsonschema import Draft202012Validator
 
 from invarlock.core.runtime_provider import RuntimeScoringRecord
+from invarlock.core.scorer_extension import ScorerExtensionBinding
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import (
     StrictJsonError,
@@ -178,7 +179,24 @@ class EvaluatorQualificationResult:
     runner_sha256: str
     dependency_lock_sha256: str
     _records: tuple[RuntimeScoringRecord, ...]
+    _metric: dict[str, object] = field(default_factory=lambda: {"kind": "exact_match"})
     format: str = EVALUATOR_QUALIFICATION_FORMAT
+
+    def scorer_binding(self) -> ScorerExtensionBinding | None:
+        """Return the shipped scoring binding for non-exact runtime import."""
+        if (
+            self.authority != "verdict_authority"
+            or self._metric["kind"] == "exact_match"
+        ):
+            return None
+        from invarlock.core.builtin_scorers import BuiltinScorer
+        from invarlock.core.scorer_extension import build_scorer_binding
+
+        scorer = BuiltinScorer(str(self._metric["kind"]))
+        return build_scorer_binding(
+            scorer.descriptor(),
+            cast(dict[str, object], self._metric.get("configuration", {})),
+        )
 
     def runtime_records(self) -> tuple[RuntimeScoringRecord, ...]:
         """Return qualified import facts; observation-only results return none."""
@@ -351,6 +369,19 @@ def _deterministic_result(
     runner_sha256: str,
     dependency_lock_sha256: str,
 ) -> EvaluatorQualificationResult:
+    from invarlock.pipeline.metrics import MetricError, score, validate_configuration
+
+    metric = _object(
+        _object(profile["authority"], field="authority")["metric"], field="metric"
+    )
+    kind = _string(metric["kind"], field="metric.kind")
+    configuration = _object(
+        metric.get("configuration", {}), field="metric.configuration"
+    )
+    try:
+        validate_configuration(kind, configuration)
+    except MetricError as exc:
+        raise EvaluatorQualificationError(str(exc)) from exc
     if export.get("summary") is not None:
         raise EvaluatorQualificationError(
             "deterministic export must not substitute an aggregate summary"
@@ -390,6 +421,31 @@ def _deterministic_result(
         expected_score = (
             1.0 if output_sha256 == expected_record["reference_output_sha256"] else 0.0
         )
+        if "reference_output" in expected_record:
+            reference = _string(
+                expected_record["reference_output"], field="reference_output"
+            )
+            if (
+                _sha256(reference.encode())
+                != expected_record["reference_output_sha256"]
+            ):
+                raise EvaluatorQualificationError(
+                    "reference text differs from its independent digest"
+                )
+        if kind != "exact_match":
+            if "reference_output" not in expected_record:
+                raise EvaluatorQualificationError(
+                    "non-exact replay requires independently supplied reference_output text"
+                )
+            try:
+                expected_score = score(
+                    kind,
+                    expected_record["reference_output"],
+                    output_text,
+                    configuration,
+                )
+            except MetricError as exc:
+                raise EvaluatorQualificationError(str(exc)) from exc
         reported_score = _number(
             observed_record["reported_score"],
             field=f"record {record_id!r} reported_score",
@@ -397,7 +453,7 @@ def _deterministic_result(
         if reported_score != expected_score:
             raise EvaluatorQualificationError(
                 f"export record {record_id!r} reported score does not match "
-                "independent exact-match replay"
+                f"independent {kind} replay"
             )
         input_sha256 = _string(
             observed_record["input_sha256"],
@@ -430,6 +486,7 @@ def _deterministic_result(
         runner_sha256=runner_sha256,
         dependency_lock_sha256=dependency_lock_sha256,
         _records=runtime_record_tuple,
+        _metric=metric,
     )
     error = _schema_error(
         result.as_dict(),

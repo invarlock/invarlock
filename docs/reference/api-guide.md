@@ -30,6 +30,11 @@ Imports from other `invarlock.*` modules are not stable merely because they are
 importable. Use the facade unless implementing the provider protocol documented
 in [Runtime providers](runtime-providers.md).
 
+The unreleased `invarlock.pipeline` module is an additional documented SDK for
+captured-result comparisons. It exports `make_run`, `load_run`, `compare_runs`,
+`create_evidence`, `verify_evidence` and `PipelineError`. Its evidence format and
+recorded-score semantics are described in [Pipeline contracts](pipeline-contracts.md).
+
 ## Transactions
 
 ```python
@@ -265,6 +270,13 @@ or may explicitly enable installed `invarlock.scorers` entry-point discovery.
 Neither an installed package nor a binding inside the submitted evidence
 authorizes scorer code by itself. Strict verification resolves the policy-
 pinned scorer through this registry and replays it deterministically.
+
+The unreleased registry includes four shipped deterministic scorers:
+`invarlock.normalized_match`, `invarlock.numeric_tolerance`,
+`invarlock.json_fields` and `invarlock.token_f1`. Pass
+`ScorerExtensionRegistry(allow_installed=False)` to use these through the SDK
+without enabling third-party discovery. The core CLI supplies this registry
+automatically. Bindings still pin the scorer's version and configuration schema.
 
 ## Request loading
 

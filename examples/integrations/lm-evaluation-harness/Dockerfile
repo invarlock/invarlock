@@ -11,7 +11,7 @@ LABEL org.invarlock.example.base-image-id="${BASE_IMAGE_ID}"
 LABEL org.invarlock.example.source-commit="${SOURCE_COMMIT}"
 LABEL org.invarlock.example.source-bundle-sha256="${SOURCE_BUNDLE_SHA256}"
 LABEL org.invarlock.example.evaluator="lm-evaluation-harness"
-LABEL org.invarlock.example.evaluator-version="0.4.12+invarlock.nocache.1"
+LABEL org.invarlock.example.evaluator-version="0.4.12+invarlock.exactmatch.1"
 LABEL org.invarlock.example.evaluator-lock-sha256="sha256:${EVALUATOR_LOCK_SHA256}"
 LABEL org.invarlock.example.evaluator-runtime="${EVALUATOR_RUNTIME}"
 
@@ -46,9 +46,9 @@ RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
     && python -m pip install \
       --no-compile \
       --no-deps \
-      /tmp/lm-eval-derived/lm_eval-0.4.12+invarlock.nocache.1-py3-none-any.whl \
+      /tmp/lm-eval-derived/lm_eval-0.4.12+invarlock.exactmatch.1-py3-none-any.whl \
     && python -m pip check \
-    && python -c 'import importlib.metadata, importlib.util; assert importlib.metadata.version("lm-eval") == "0.4.12+invarlock.nocache.1"; assert importlib.util.find_spec("sqlitedict") is None'
+    && python -c 'import importlib.metadata, importlib.util; assert importlib.metadata.version("lm-eval") == "0.4.12+invarlock.exactmatch.1"; assert all(importlib.util.find_spec(name) is None for name in ("sqlitedict", "rouge_score", "nltk"))'
 
 COPY examples/integrations/lm-evaluation-harness/example.py \
     /opt/invarlock/examples/lm-evaluation-harness-example.py

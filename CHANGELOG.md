@@ -9,11 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `invarlock-pipeline` companion CLI and SDK for captured evaluation
+  results, with reusable projects, native export parsers, multiple typed metrics,
+  data slices, explicit recorded-score provenance, CI exit codes and JSON, HTML,
+  Markdown and JUnit reports.
+- Added optional signed pipeline evidence with independently supplied run
+  identities and policy, full arithmetic replay, bounded inputs and atomic
+  publication without replacing previous results.
+- Added shared normalized-match, numeric-tolerance, structured-field and token-F1
+  scorers to pipeline comparisons, the core scorer registry and deterministic
+  evaluator qualification with independently bound reference text.
+- Added runnable classification, extraction and recorded-judge onboarding
+  examples and an integration guide for existing evaluation pipelines.
+
 ### Changed
+
+- Updated coordinated Python tooling, documentation dependencies, and pinned
+  CI actions. Python dependency updates now use the uv ecosystem so the root
+  manifest and lock are proposed together; hashed workflow locks remain
+  separately checked.
 
 ### Removed
 
 ### Fixed
+
+- Remediated maintained dependency-audit findings by updating pip, wheel, and
+  Material for MkDocs, and removing unused NLTK and ROUGE dependencies from the
+  fixed evaluator images. Derived wheels keep authenticated upstream inputs
+  in the audit inventory and preserve selected scorer code. Historical signed
+  evidence retains its original identities.
 
 - Connected successful production publication to serialized, tagged
   documentation publishing that atomically updates the immutable version path,

@@ -27,6 +27,27 @@ When `make security` reports an advisory:
 Do not add an exception merely because exploitation was not reproduced. Lack
 of a local proof is not evidence that a vulnerability is unreachable.
 
+## Restricted evaluator images
+
+The maintained LM Evaluation Harness and OpenAI Evals example images support
+specific evaluator paths. Their build helpers authenticate the complete
+upstream wheel by SHA-256, validate its `RECORD`, apply exact expected changes,
+and regenerate `RECORD` under an explicit local package version. A changed
+upstream input fails the derivation.
+
+The LM image omits response caching, ROUGE, and NLTK; the OpenAI Evals image
+omits NLTK. Selected exact-match scorer code remains unchanged. These images
+do not provide the removed task and metric dependencies. Their respective
+example READMEs describe the supported execution paths.
+
+Keep the original package names and versions in the hash-pinned
+`requirements/workflows/*-upstream-wheel.txt` inputs. The maintained-lock audit
+scans these files as well as runtime locks, so a derived package version does
+not hide future advisories against its upstream code. A dependency removal
+requires a consistent installed dependency closure, execution of the supported
+path, and checks that the omitted packages are absent. Historical signed packs
+and their declared identities are not rewritten to describe a newer image.
+
 ## Exception decision
 
 An exception is appropriate only when all of these are true:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive the cache-free LM Evaluation Harness wheel and dependency lock."""
+"""Derive the cache-free, exact-match LM Evaluation Harness image profile."""
 
 from __future__ import annotations
 
@@ -12,17 +12,18 @@ import os
 import re
 import sys
 import zipfile
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 
 UPSTREAM_VERSION = "0.4.12"
-DERIVED_VERSION = "0.4.12+invarlock.nocache.1"
+DERIVED_VERSION = "0.4.12+invarlock.exactmatch.1"
 UPSTREAM_WHEEL_SHA256 = (
     "02971ff68284dd14cfa7fce9310a58452c4162e8d413ba96aa7988a0ff9352ef"
 )
 UPSTREAM_DIST_INFO = f"lm_eval-{UPSTREAM_VERSION}.dist-info"
 DERIVED_DIST_INFO = f"lm_eval-{DERIVED_VERSION}.dist-info"
 DERIVED_WHEEL_NAME = f"lm_eval-{DERIVED_VERSION}-py3-none-any.whl"
-REMOVED_REQUIREMENTS = frozenset(("lm-eval", "sqlitedict"))
+REMOVED_REQUIREMENTS = frozenset(("lm-eval", "sqlitedict", "rouge-score", "nltk"))
 
 
 class DerivationError(ValueError):
@@ -79,16 +80,33 @@ def validate_wheel_record(archive: zipfile.ZipFile) -> None:
             raise DerivationError("wheel RECORD does not match the wheel contents")
 
 
-def _patch_metadata(payload: bytes) -> bytes:
-    version = f"Version: {UPSTREAM_VERSION}\n".encode()
-    dependency = b"Requires-Dist: sqlitedict\n"
+def patch_metadata(
+    payload: bytes,
+    upstream_version: str,
+    derived_version: str,
+    removed: tuple[bytes, ...],
+) -> bytes:
+    """Replace the identity and remove only exact authenticated dependency lines."""
+
+    version = f"Version: {upstream_version}\n".encode()
     if payload.count(version) != 1:
         raise DerivationError("upstream wheel metadata version changed")
-    if payload.count(dependency) != 1:
-        raise DerivationError("upstream wheel metadata dependency changed")
-    return payload.replace(
-        version, f"Version: {DERIVED_VERSION}\n".encode(), 1
-    ).replace(dependency, b"", 1)
+    for dependency in removed:
+        if payload.count(dependency) != 1:
+            raise DerivationError("upstream wheel metadata dependency changed")
+    patched = payload.replace(version, f"Version: {derived_version}\n".encode(), 1)
+    for dependency in removed:
+        patched = patched.replace(dependency, b"", 1)
+    return patched
+
+
+def _patch_metadata(payload: bytes) -> bytes:
+    return patch_metadata(
+        payload,
+        UPSTREAM_VERSION,
+        DERIVED_VERSION,
+        (b"Requires-Dist: sqlitedict\n", b"Requires-Dist: rouge-score>=0.0.4\n"),
+    )
 
 
 def _patch_model(payload: bytes) -> bytes:
@@ -137,15 +155,24 @@ def _record(files: dict[str, bytes], record_name: str) -> bytes:
     return output.getvalue().encode("utf-8")
 
 
-def build_wheel(source: Path, output_directory: Path) -> Path:
+def build_derived_wheel(
+    source: Path,
+    output_directory: Path,
+    *,
+    upstream_sha256: str,
+    upstream_dist_info: str,
+    derived_dist_info: str,
+    derived_wheel_name: str,
+    patches: dict[str, Callable[[bytes], bytes]],
+) -> Path:
     """Build one deterministic local-version wheel from the pinned upstream wheel."""
 
     try:
         source_payload = source.read_bytes()
     except OSError as exc:
         raise DerivationError("upstream wheel is unreadable") from exc
-    if _digest(source_payload) != UPSTREAM_WHEEL_SHA256:
-        raise DerivationError("upstream LM Evaluation Harness wheel SHA-256 changed")
+    if _digest(source_payload) != upstream_sha256:
+        raise DerivationError("upstream evaluator wheel SHA-256 changed")
     try:
         with zipfile.ZipFile(io.BytesIO(source_payload)) as archive:
             validate_wheel_record(archive)
@@ -156,33 +183,27 @@ def build_wheel(source: Path, output_directory: Path) -> Path:
     except zipfile.BadZipFile as exc:
         raise DerivationError("upstream wheel is not a readable ZIP archive") from exc
 
-    metadata_name = f"{UPSTREAM_DIST_INFO}/METADATA"
-    model_name = "lm_eval/api/model.py"
-    record_name = f"{UPSTREAM_DIST_INFO}/RECORD"
-    if (
-        metadata_name not in files
-        or model_name not in files
-        or record_name not in files
-    ):
+    record_name = f"{upstream_dist_info}/RECORD"
+    if record_name not in files or not set(patches).issubset(files):
         raise DerivationError(
             "upstream wheel is missing the authenticated patch surface"
         )
     del files[record_name]
-    files[metadata_name] = _patch_metadata(files[metadata_name])
-    files[model_name] = _patch_model(files[model_name])
+    for name, patch in patches.items():
+        files[name] = patch(files[name])
     renamed = {
         (
-            f"{DERIVED_DIST_INFO}/{name.removeprefix(f'{UPSTREAM_DIST_INFO}/')}"
-            if name.startswith(f"{UPSTREAM_DIST_INFO}/")
+            f"{derived_dist_info}/{name.removeprefix(f'{upstream_dist_info}/')}"
+            if name.startswith(f"{upstream_dist_info}/")
             else name
         ): payload
         for name, payload in files.items()
     }
-    derived_record = f"{DERIVED_DIST_INFO}/RECORD"
+    derived_record = f"{derived_dist_info}/RECORD"
     renamed[derived_record] = _record(renamed, derived_record)
 
     output_directory.mkdir(parents=True, exist_ok=True)
-    destination = output_directory / DERIVED_WHEEL_NAME
+    destination = output_directory / derived_wheel_name
     if destination.exists() or destination.is_symlink():
         raise DerivationError("derived wheel output already exists")
     with zipfile.ZipFile(
@@ -199,6 +220,23 @@ def build_wheel(source: Path, output_directory: Path) -> Path:
     return destination
 
 
+def build_wheel(source: Path, output_directory: Path) -> Path:
+    """Preserve the selected scorer and HF execution code from the pinned wheel."""
+
+    return build_derived_wheel(
+        source,
+        output_directory,
+        upstream_sha256=UPSTREAM_WHEEL_SHA256,
+        upstream_dist_info=UPSTREAM_DIST_INFO,
+        derived_dist_info=DERIVED_DIST_INFO,
+        derived_wheel_name=DERIVED_WHEEL_NAME,
+        patches={
+            f"{UPSTREAM_DIST_INFO}/METADATA": _patch_metadata,
+            "lm_eval/api/model.py": _patch_model,
+        },
+    )
+
+
 def _requirement_name(line: str) -> str | None:
     if not line or line[0].isspace() or line.startswith(("#", "-")):
         return None
@@ -206,8 +244,13 @@ def _requirement_name(line: str) -> str | None:
     return match.group(1).lower().replace("_", "-") if match else None
 
 
-def filter_lock(source: Path, destination: Path) -> None:
-    """Remove the replaced upstream wheel and vulnerable cache package blocks."""
+def filter_lock(
+    source: Path,
+    destination: Path,
+    *,
+    removed_requirements: frozenset[str] = REMOVED_REQUIREMENTS,
+) -> None:
+    """Remove the replaced upstream wheel and unused dependency blocks."""
 
     lines = source.read_text(encoding="utf-8").splitlines(keepends=True)
     blocks: list[list[str]] = []
@@ -219,14 +262,14 @@ def filter_lock(source: Path, destination: Path) -> None:
         current.append(line)
     if current:
         blocks.append(current)
-    removed: dict[str, int] = dict.fromkeys(REMOVED_REQUIREMENTS, 0)
+    removed: dict[str, int] = dict.fromkeys(sorted(removed_requirements), 0)
     retained: list[str] = []
     for block in blocks:
         name = next(
             (_requirement_name(line) for line in block if _requirement_name(line)),
             None,
         )
-        if name in REMOVED_REQUIREMENTS:
+        if name in removed_requirements:
             removed[name] += 1
         else:
             retained.extend(block)
@@ -235,7 +278,9 @@ def filter_lock(source: Path, destination: Path) -> None:
             suffix = " exactly once" if count else ""
             raise DerivationError(f"compiled lock must contain {name}{suffix}")
     payload = "".join(retained)
-    if "sqlitedict" in payload.lower() or re.search(r"^lm[-_]eval==", payload, re.M):
+    if "sqlitedict" in payload.lower() or any(
+        _requirement_name(line) in removed_requirements for line in payload.splitlines()
+    ):
         raise DerivationError("removed requirement remained in the dependency lock")
     if destination.is_symlink() or (destination.exists() and not destination.is_file()):
         raise DerivationError("filtered lock output must be a regular file")

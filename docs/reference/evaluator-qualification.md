@@ -17,6 +17,13 @@ upstream tools and normalize their results into the same four contracts.
 A matrix row demonstrates the named version and entry point; it does not make
 that evaluator a built-in InvarLock plugin.
 
+The unreleased [pipeline companion](pipeline-contracts.md) adds installed parsers
+for selected native export shapes and a separate multi-metric comparison. The
+qualification boundary documented here also accepts normalized matching, numeric
+tolerance, structured fields and token F1 when independent reference text is
+available for recomputation. Existing retained matrix rows continue to prove
+their declared exact-match profiles; they are not evidence for every new metric.
+
 ## Three independent status axes
 
 The repository does not assign one cumulative “integration level.” Support,
@@ -85,8 +92,10 @@ The matrix represents the Microsoft PromptFlow lineage with Azure AI Evaluation
 rather than preserving the deprecated `promptflow-evals` package as a second
 legacy row. The OpenAI Evals qualification profile is installed from an
 immutable source revision, while its signed transaction integration runs the
-upstream `basic.Match` evaluator from the hash-pinned `evals==3.0.1.post1` wheel
-in its isolated image.
+unchanged upstream `basic.Match` evaluator from an explicitly versioned wheel
+derived from the hash-pinned `evals==3.0.1.post1` input. The isolated image
+removes the unused NLTK dependency; its narrower dependency set does not change
+the retained qualification profile.
 
 The generated matrix below describes the retained generic qualification
 profiles. The signed bridges execute LM Evaluation Harness and the native
@@ -212,12 +221,16 @@ qualification, and strict runtime-import replay.
 
 ## Authority rules
 
-`deterministic_per_record` is currently limited to exact match. The export must
-cover the independent schedule in exact order, bind each input and output, and
-carry successful record status. InvarLock ignores the evaluator's aggregate
-claim and recomputes `output_sha256 == reference_output_sha256` for every
-record. A mismatch between the upstream-reported score and this replay rejects
-the export.
+`deterministic_per_record` recomputes the supported metric declared by the
+profile. The export must cover the independent schedule in exact order, bind
+each input and output, and carry successful record status. Exact match compares
+`output_sha256 == reference_output_sha256` for every record. Normalized match,
+numeric tolerance, structured fields and token F1 require independently supplied
+reference text whose digest agrees with the schedule. Their metric configuration
+also forms part of the qualified profile. InvarLock rejects aggregate substitution
+and disagreement between an upstream-reported score and independent replay.
+The retained evaluator demonstrations continue to use their declared exact-match
+profiles; support for other metrics does not change those historical semantics.
 
 `observation_only` requires one explicit reason:
 

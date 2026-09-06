@@ -124,7 +124,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         model_profile,
     )
 
-VERSION = "0.4.12+invarlock.nocache.1"
+VERSION = "0.4.12+invarlock.exactmatch.1"
 MAX_GENERATION_TOKENS = 1
 HARNESS_SEED = 20_260_716
 QUICK_CORPUS = corpus_profile("quick")

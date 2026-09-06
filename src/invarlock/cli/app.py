@@ -249,10 +249,8 @@ def evaluate(
 
     result: EvaluationPreflightResult | EvaluationTransactionResult
     try:
-        scorer_registry = (
-            ScorerExtensionRegistry(allow_installed=True)
-            if allow_installed_scorers
-            else None
+        scorer_registry = ScorerExtensionRegistry(
+            allow_installed=allow_installed_scorers
         )
         registry = CoreRegistry()
         loaded_request = load_evaluation_request(
@@ -535,10 +533,8 @@ def verify(
             verifier_signing_key_path=verifier_signing_key,
             verifier_identity=verifier_identity,
             trust_profile_digest=trust_profile_digest,
-            scorer_registry=(
-                ScorerExtensionRegistry(allow_installed=True)
-                if allow_installed_scorers
-                else None
+            scorer_registry=ScorerExtensionRegistry(
+                allow_installed=allow_installed_scorers
             ),
             policy_bytes=policy_bytes,
             verifier_signing_key_bytes=verifier_signing_key_bytes,

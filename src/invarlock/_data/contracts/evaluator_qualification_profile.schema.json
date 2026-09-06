@@ -12,13 +12,92 @@
               "additionalProperties": false,
               "properties": {
                 "kind": {
-                  "const": "exact_match"
+                  "enum": [
+                    "exact_match",
+                    "normalized_match",
+                    "numeric_tolerance",
+                    "json_fields",
+                    "token_f1"
+                  ]
+                },
+                "configuration": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "casefold": {
+                      "type": "boolean"
+                    },
+                    "absolute": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "relative": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 4096
+                      },
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "uniqueItems": true
+                    },
+                    "unicode_version": {
+                      "type": "string",
+                      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+                      "maxLength": 32
+                    }
+                  }
                 }
               },
               "required": [
                 "kind"
               ],
-              "type": "object"
+              "type": "object",
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "normalized_match",
+                          "token_f1"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "configuration": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "casefold": {
+                            "type": "boolean"
+                          },
+                          "unicode_version": {
+                            "type": "string",
+                            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+                            "maxLength": 32
+                          }
+                        },
+                        "required": [
+                          "unicode_version"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "configuration"
+                    ]
+                  }
+                }
+              ]
             },
             "mode": {
               "const": "deterministic_per_record"

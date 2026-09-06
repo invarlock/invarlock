@@ -77,13 +77,31 @@ jobs:
           digest="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
           printf '{"tokenizer_metadata_sha256":"%s","api_key":"%s"}\n' \
             "${digest}" "${digest}" > "${probe_root}/${probe_path}/request.json"
+          python - "${probe_root}" "${digest}" <<'PY'
+          import sys
+          from pathlib import Path
+
+          source = Path(sys.argv[1]) / "src/invarlock/pipeline/evidence.py"
+          source.parent.mkdir(parents=True)
+          name = "_".join(("signing", "key"))
+          annotation = "Ed25519" + "PrivateKey"
+          canary = sys.argv[2]
+          source.write_text(
+              "# Synthetic scanner boundary probe.\n"
+              f"    {name}: {annotation} | None = None,\n"
+              f'{name} = "{canary}"\n'
+              f'    {name}: {annotation} | None = "{canary}",\n',
+              encoding="utf-8",
+          )
+          PY
           git -C "${probe_root}" add .
           git -C "${probe_root}" commit --quiet -m "Add scanner boundary probe"
           set +e
           (
             cd "${probe_root}"
             gitleaks git . --config "${GITHUB_WORKSPACE}/.gitleaks.toml" \
-              --redact --no-banner
+              --redact --no-banner --report-format json \
+              --report-path "${probe_root}/gitleaks.json"
           )
           exit_code=$?
           set -e
@@ -91,6 +109,21 @@ jobs:
             echo "gitleaks allowlist suppressed an unrelated credential or failed" >&2
             exit 1
           fi
+          python - "${probe_root}/gitleaks.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          findings = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected = {
+              ("public_evidence/evidence/example/evidence/request.json", 1),
+              ("src/invarlock/pipeline/evidence.py", 3),
+              ("src/invarlock/pipeline/evidence.py", 4),
+          }
+          observed = {(item["File"], item["StartLine"]) for item in findings}
+          if len(findings) != len(expected) or observed != expected:
+              raise SystemExit("gitleaks boundary probe findings changed")
+          PY
 
       - name: Run gitleaks PR git delta scan
         id: gitleaks_scan
