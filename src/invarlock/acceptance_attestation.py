@@ -931,9 +931,10 @@ def _receipt_consistency_errors(
             else:
                 if transported != reconstructed:
                     errors.append(f"{role} artifact disagrees with embedded identity")
-    if predicate["evaluation_source"]["schedule_digest"] != receipt_anchors.get(
-        "schedule_digest"
-    ):
+    source = predicate["evaluation_source"]
+    if source["identity_digest"] != _digest(_canonical_json_bytes(source["identity"])):
+        errors.append("evaluation source identity digest does not match its identity")
+    if source["schedule_digest"] != receipt_anchors.get("schedule_digest"):
         errors.append("evaluation source digest disagrees with embedded receipt")
     if predicate["policy"]["digest"] != receipt_anchors.get("policy_digest"):
         errors.append("policy digest disagrees with embedded receipt")

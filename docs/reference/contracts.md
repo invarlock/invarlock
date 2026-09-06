@@ -59,7 +59,7 @@ the authenticated objects, in addition to validating their schemas.
 | Complete transaction request | Optional independent `request_digest` in the trust-input profile, or `--expected-request-digest`; required for the llama.cpp path | Receipt v2 records this expectation; receipt v1 does not acquire it retroactively |
 | Package-to-model mapping | The [ModelKit example](../user-guide/modelkit-handoff.md) verifies recipient-selected package blobs, both model directories and their relation to replayed evidence | This is an example-owned point-of-use check; the generic acceptance envelope alone does not verify a ModelKit |
 | Transformation or contextual observations | Canonical payload digest in the normalized request, comparison-bound observation envelope, and signed manifest inventory | Authenticates the payload and its association; arbitrary payload claims are not independently validated |
-| Current recipient acceptance | Trusted envelope and receipt signers, exact transported identity consistency, actual subject binding, contract versions, freshness and current policy | Current acceptance is separate from the original technical result |
+| Current recipient acceptance | Trusted envelope and receipt signers, exact transported identity consistency, independent subject digest or actual-content binding, contract versions, freshness and current policy | Current acceptance is separate from the original technical result |
 
 The independently selected complete-request digest can require exact declared
 settings and observation contents without introducing another model hash. It
