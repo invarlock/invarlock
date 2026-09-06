@@ -9,10 +9,10 @@
 
 All five configurations are **candidates, not qualified**. No K2 weights have
 been executed to establish the claims described here. The harness can prepare
-and test its protocol on a CPU. Its initial runtime build remains blocked by
-the dependency finding recorded in [runtime readiness](runtime-readiness.json).
-Do not provision GPU time until that blocker is resolved and the image passes
-its build, dependency, native-import, and startup checks.
+and test its protocol on a CPU. The restricted runtime source excludes the
+optional dependency finding recorded in [runtime readiness](runtime-readiness.json).
+Do not provision GPU time until the exact image passes its build, dependency,
+and native-import checks. Actual GPU startup is the first bounded preflight.
 
 This route uses SGLang's native K2 implementation to generate responses and
 InvarLock's public pipeline interface to compare the captures. A signed result
@@ -40,6 +40,13 @@ metadata. The MoVA model stores approximately 37.4B parameters; its active
 parameter label does not describe weight residency. The 32B pair compares
 training stage 4 with the available Stage-1 release. Each pair's specific
 change is recorded in the catalog.
+
+The [model-card observations](model-card-observations.json) retain the license
+fields at these exact revisions. The 0.9B candidate declares both `apache-2.0`
+and `license_name: internal-only`, with a missing linked `LICENSE` file. The
+five baseline revisions have no model-card license metadata. These facts need
+clarification before commercial reference promotion; successful technical
+qualification does not establish applicable model terms.
 
 Materialization recomputes file hashes and logical BF16 tensor hashes, including
 tensor names and shapes. Changing shard layout alone cannot satisfy the
@@ -101,15 +108,84 @@ The model selectors are `0.9b`, `3.7b`, `7b`, `mova-36b-a4b`, and `32b`.
 The plan command neither downloads weights nor starts a container. Every
 output path must be new.
 
+## Build the candidate runtime
+
+The source helper authenticates the complete SGLang archive before extraction.
+It changes only the optional Outlines dependency and its two backend modules;
+selecting either excluded operation raises an explicit error. Native K2 code,
+reasoning parsing, and the HTTP interface retain their reviewed bytes.
+
+```bash
+curl --fail --location --output sglang-source.tar.gz \
+  https://codeload.github.com/sgl-project/sglang/tar.gz/392841f47cb7ef214601eeb528906a0abba02471
+python -m examples.qualification.k2_runtime_source \
+  --archive sglang-source.tar.gz --output runtime-source
+```
+
+Resolve the Ubuntu packages using the exact base image and signed Ubuntu
+repositories. The resolution container downloads packages but does not execute
+models. Inspect the retained package versions, repository signatures, and
+artifact hashes before accepting the resulting manifest identity. The index
+helper uses `gpgv` and the public Ubuntu keyring pinned from that base, fetches
+exact compressed indexes by their signed hashes, and retains them for replay.
+Context preparation rechecks the signature-to-index-to-package chain for every
+selected package; it rejects changed metadata or an unmatched artifact.
+
+```bash
+mkdir runtime-apt
+docker run --rm --platform linux/amd64 \
+  --mount "type=bind,src=$PWD/runtime-apt,dst=/out" \
+  --mount "type=bind,src=$PWD/examples/qualification/k2-horizon/runtime/resolve-os.sh,dst=/resolve-os.sh,readonly" \
+  --mount "type=bind,src=$PWD/examples/qualification/k2-horizon/runtime/os-security-pins.txt,dst=/security-pins.txt,readonly" \
+  nvidia/cuda@sha256:a85c9f5af049f0ab679c1669ae6fa8393022886739af7361e85bb96878e8cdd4 \
+  bash /resolve-os.sh
+python -m examples.qualification.k2_runtime_apt --bundle runtime-apt
+
+python -m examples.qualification.k2_runtime_build \
+  --archive sglang-source.tar.gz --core-wheel "$CORE_WHEEL" \
+  --expected-core-wheel-sha256 "$EXPECTED_CORE_WHEEL" \
+  --apt-bundle runtime-apt \
+  --expected-apt-manifest-sha256 "$EXPECTED_OS_MANIFEST" \
+  --output runtime-context
+docker build --platform linux/amd64 --iidfile runtime-image-id.txt \
+  --tag k2-candidate:reviewed runtime-context
+docker run --rm --platform linux/amd64 --network none --read-only \
+  --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+  --user 65532:65532 --env HOME=/tmp --env XDG_CACHE_HOME=/tmp/cache \
+  --env HF_HOME=/tmp/huggingface \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --cpus 2 --memory 8g --pids-limit 512 --entrypoint timeout \
+  "$(cat runtime-image-id.txt)" --signal=TERM --kill-after=10s 360 \
+  python /opt/campaign/native_probe.py > native-imports.json
+```
+
+The image installs its Ubuntu bundle with network access disabled, and verifies
+every selected artifact. Python installation permits only hashed wheels from
+the maintained Linux x86_64/Python 3.12 lock. This includes pinned NVIDIA CUDA
+Tile, FlashInfer CUDA kernel binaries and CUDA 13 JIT assets. Runtime execution has no network
+access; bundled kernels must suffice. Rust extensions are disabled for this
+Python HTTP route, and the FA3 selection uses the bundled kernel implementation.
+
+The native probe checks installed source identities, actual imports, server help,
+dependency consistency, and rejection of the excluded grammar operation through
+the upstream test context. CPU imports do not exercise GPU-conditional kernels. Its
+result explicitly has no GPU qualification authority. Retain both Python and
+OS vulnerability reports for the final image, including applicability decisions
+and unresolved findings. A prepared context or successful build alone cannot
+produce a ready runtime receipt.
+
 ## Materialize and freeze before evaluation
 
 After the runtime is ready and execution has an approved budget, provision a
 Linux x86_64 host with two full H200 141GB GPUs, verified NVLink connectivity,
 512GB host RAM, 32 vCPUs, and 2TB free NVMe space. Run checkpoint roles and model
 pairs sequentially. These host resource figures are planning estimates, not
-measurements. The worker checks H200 identity, memory, GPU count, and an R580
-or newer driver; the image's exact CUDA requirements and NVLink topology must
-also pass host preflight.
+measurements. The worker checks H200 identity, memory, GPU count, and the reviewed R580
+branch at version 580.159.03 or later. Request 580.178.04; the minimum follows
+[NVIDIA's driver security bulletin](https://nvidia.custhelp.com/app/answers/detail/a_id/5821).
+Newer driver branches require their own verified security minimum before being
+accepted. The image's CUDA requirements, actual loaded host driver libraries,
+and NVLink topology must also pass host preflight.
 
 Download only the catalog's selected files into fresh, regular-file snapshots:
 

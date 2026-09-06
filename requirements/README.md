@@ -51,8 +51,9 @@ Refresh them with:
 bash scripts/security/refresh_pinned_requirements.sh
 ```
 
-That compiler owns every generated workflow lock except two deliberately
-minimal, hand-maintained bootstrap surfaces:
+That compiler refreshes the workflow locks from the repository's ordinary
+runtime and tooling inputs. Two minimal bootstrap surfaces are maintained
+separately:
 
 - `pip-bootstrap.txt` contains the Python-version-independent pip bootstrap
   wheel and source hashes already reviewed in `release-security-py313.txt`;
@@ -65,6 +66,14 @@ ownership comments. The refresh script does not rewrite them. The same rule
 applies to `lm-evaluation-harness-upstream-wheel.txt`: update its reviewed wheel
 hash and the cache-free derivation script together when the upstream Harness
 version changes.
+
+`workflows/k2-campaign-py312.txt` is owned by the authenticated K2 runtime recipe
+in [source review](../examples/qualification/k2-horizon/source-review.md#source-derivation-and-runtime-gate).
+The general refresh script does not regenerate it. Preserve its frozen target,
+source derivation, build and kernel inputs, and vendor wheel hashes. Its
+regeneration command constrains existing versions; deliberate updates require
+reviewing the changed closure and repeating the image checks. This optional
+campaign runtime does not change the core installation requirements.
 
 After refreshing, run the lock and security checks:
 

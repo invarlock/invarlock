@@ -188,7 +188,7 @@ def test_hardware_preflight_rejects_wrong_device_memory_driver_or_count(rows, tp
 
 
 def test_hardware_preflight_accepts_full_h200_devices():
-    capture_worker.validate_hardware(["NVIDIA H200, 143771, 580.95.05"] * 2, 2)
+    capture_worker.validate_hardware(["NVIDIA H200, 143771, 580.178.04"] * 2, 2)
 
 
 def test_plan_cli_writes_an_unqualified_plan(tmp_path):
@@ -298,3 +298,11 @@ def test_preflight_rejects_impossible_resource_duration(field, value):
     captured["resources"][field] = value
     with pytest.raises(ValueError, match="duration"):
         capture_worker.preflight_summary(captured)
+
+
+@pytest.mark.parametrize(
+    "driver", ["580.126.20", "580.159.02", "590.99.99", "580", "580.159"]
+)
+def test_hardware_requires_a_verified_security_fixed_driver_branch(driver):
+    with pytest.raises(ValueError, match="hardware"):
+        capture_worker.validate_hardware([f"NVIDIA H200, 143771, {driver}"], 1)

@@ -197,10 +197,13 @@ def validate_hardware(rows, tensor_parallel):
             raise ValueError("insufficient GPUs")
         for row in rows:
             name, memory, driver = [field.strip() for field in row.split(",")]
+            driver_parts = tuple(int(part) for part in driver.split("."))
             if (
                 "H200" not in name
                 or int(memory) < 135000
-                or int(driver.split(".")[0]) < 580
+                or len(driver_parts) != 3
+                or driver_parts[0] != 580
+                or driver_parts < (580, 159, 3)
             ):
                 raise ValueError("unsupported GPU, memory, or driver")
     except (TypeError, ValueError) as error:

@@ -104,7 +104,7 @@ def test_worker_retains_capture_and_cleans_its_process_group(
         capture_worker.subprocess,
         "run",
         lambda command, **kwargs: subprocess.CompletedProcess(
-            command, 0, "NVIDIA H200, 143771, 580.95.05\n", ""
+            command, 0, "NVIDIA H200, 143771, 580.178.04\n", ""
         ),
     )
     monkeypatch.setattr(
@@ -137,7 +137,7 @@ def test_worker_retains_capture_and_cleans_its_process_group(
     else:
         capture_worker.worker(plan, "baseline", phase, tmp_path)
         captured = campaign.read_json(tmp_path / "capture.json")
-        assert captured["hardware"] == ["NVIDIA H200, 143771, 580.95.05"]
+        assert captured["hardware"] == ["NVIDIA H200, 143771, 580.178.04"]
         assert len(captured["rows"]) == (24 if phase == "preflight" else 576)
         assert (tmp_path / "preflight.json").exists() is (phase == "preflight")
     assert (tmp_path / "server.log").read_bytes() == b"native server diagnostic\n"

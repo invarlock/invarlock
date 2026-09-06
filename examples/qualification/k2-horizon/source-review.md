@@ -45,39 +45,89 @@ This is a bounded review of the selected execution and parsing boundary, not
 an assertion that every transitive runtime source line has been audited. The
 whole immutable image and dependency inventory must be retained and reviewed.
 
-## Build strategy and current blocker
+## Source derivation and runtime gate
 
-The pinned source's Python 3.12/Linux x86_64 dependency closure resolves to 202
-packages, including Torch 2.13.0, Transformers 5.12.1, and FlashInfer 0.6.18 with
-CUDA 13 dependencies. The native path avoids checkpoint `trust_remote_code`;
-the model-card Transformers runtime is a separate configuration.
+The maintained Python 3.12/Linux x86_64 lock contains 204 runtime, core, build,
+and kernel distributions, including Torch 2.13.0, Transformers 5.12.1, and
+FlashInfer 0.6.18 with CUDA 13 dependencies. The native path avoids checkpoint
+`trust_remote_code`; the model-card Transformers runtime is a separate
+configuration.
 
-The resolved closure includes `outlines==0.1.11`, which depends on
+The unmodified source requires `outlines==0.1.11`, which depends on
 `diskcache==5.6.3`. DiskCache has an unpatched unsafe-deserialization advisory,
 [a published advisory](https://github.com/advisories/GHSA-w8v5-vhqr-4h9v).
 Writable cache contents can trigger pickle deserialization. A generic claim
 that the chosen task does not use caching is insufficient to remove this
 finding: the actual import and execution paths must be established.
 
-No vulnerable runtime lock or advisory suppression is included in the
-maintained campaign. Before producing a ready build receipt:
+The source helper authenticates the full archive, verifies the original bytes
+of exactly three changed files, removes the optional Outlines dependency, and
+replaces its two backend modules with explicit rejection. Native K2, HTTP,
+configuration, reasoning, and grammar-dispatch source remain unchanged. Three
+known source symlinks become regular files with the same target contents.
+The resulting distribution has a distinct derived version; it must not be
+represented as an unchanged upstream release. An advisory lookup for that
+derived version does not establish source-level safety.
 
-1. Resolve the optional grammar/cache dependency through a reviewed source
-   change or upstream fix. Preserve native K2 code bytes and make excluded
-   operations fail explicitly. Exercise real imports and generation, rather
-   than changing dependency metadata alone.
+The maintained lock excludes Outlines and DiskCache. It binds the actual
+NVIDIA CUDA Tile wheel rather than the PyPI download stub, plus both official
+FlashInfer CUDA kernel binaries and CUDA 13 JIT wheel artifacts. Installation rejects source
+distributions and requires hashes. No advisory suppression is included.
+The image's Ubuntu packages use signed repository metadata and authenticated
+local package artifacts. Package installation and source compilation run with
+network access disabled; the hashed Python wheel installation is the separate
+networked build step.
+
+To review a dependency update, prepare the authenticated source first, then
+resolve the same Linux/Python target with the core and explicit build/kernel
+requirements:
+
+```bash
+uv pip compile runtime-source/python/pyproject.toml pyproject.toml \
+  examples/qualification/k2-horizon/runtime/build-requirements.in \
+  examples/qualification/k2-horizon/runtime/kernel-requirements.in \
+  --python-version 3.12 --python-platform x86_64-unknown-linux-gnu \
+  --only-binary :all: --generate-hashes --no-header --no-annotate \
+  --find-links https://pypi.nvidia.com/cuda-tile/ \
+  --find-links https://flashinfer.ai/whl/flashinfer-cubin/ \
+  --find-links https://flashinfer.ai/whl/cu130/flashinfer-jit-cache/ \
+  --constraints requirements/workflows/k2-campaign-py312.txt \
+  --emit-find-links --output candidate-runtime-lock.txt
+```
+
+Review the resulting versions and hashes against the maintained lock. Some
+vendor indexes require streaming an entire wheel before its hash is available;
+never accept a version-only line or a stub download. The maintained vendor
+hashes come from the official NVIDIA index and FlashInfer release artifacts,
+and installation independently recomputes them. Audit the changed closure
+before replacing the maintained lock or rebuilding its image.
+
+Before producing a ready build receipt:
+
+1. Exercise the derived source's actual installed imports and unchanged grammar
+   dispatcher. Confirm that excluded operations fail explicitly, the excluded
+   distributions are absent, and the selected native modules retain their
+   reviewed hashes. Source-level tests alone do not establish these results.
 2. Archive the exact source commit. Bind any derived source change, the
    Dockerfile, a digest-pinned CUDA 13 base, the complete hashed dependency lock,
    candidate InvarLock wheel, and campaign source bytes in the build manifest.
-3. Build for Linux x86_64, run dependency consistency and vulnerability checks,
+3. Build for Linux x86_64, run dependency consistency and vulnerability checks
+   for both Python and operating-system packages,
    observe installed source hashes and package versions, and retain the image
    ID and exported image identity. The source-review hashes in the catalog must
    match the installed native K2 and reasoning implementation.
-4. Run native import/startup tests, then the bounded H200 preflight with real
-   tensors. Check dtype, architecture, parsers, selected parallelism, driver,
-   CUDA kernels, GPU memory, topology, and resource bounds before decisions.
+4. Run the native CPU import and help checks in the final image with network
+   access disabled. A ready runtime receipt means this image is ready for the
+   separately authorized GPU preflight; it does not mean that a model or GPU
+   configuration has been qualified.
 
-The runtime readiness file deliberately remains blocked until those concrete
-requirements are fulfilled. A valid ready receipt must come from the reviewed
+After the ready image has an approved compute budget, run the bounded H200
+preflight with real tensors. Check dtype, architecture, parsers, selected
+parallelism, driver, CUDA kernels, GPU memory, topology, and resource bounds
+before decisions. GPU startup and inference failures remain failed preflights;
+they cannot inherit success from the earlier CPU image checks.
+
+The runtime readiness file deliberately remains blocked until the image-build and CPU
+checks above are fulfilled. A valid ready receipt must come from the reviewed
 build and checks; manually filling digest-shaped strings does not establish
 readiness or qualification.
