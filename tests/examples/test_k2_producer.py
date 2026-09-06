@@ -146,6 +146,7 @@ def test_container_timeout_removes_only_its_named_worker(tmp_path, monkeypatch):
         )
     command = calls[1][0]
     assert "--network=none" in command and "--read-only" in command
+    assert "--tmpfs=/tmp:rw,nosuid,nodev,exec,size=16g" in command
     assert "--pull=never" in command
     assert plan["runtime"]["image_digest"] in command
     name = command[command.index("--name") + 1]

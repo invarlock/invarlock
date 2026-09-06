@@ -18,7 +18,7 @@ mapfile -t security_pins < /security-pins.txt
 apt-get "${options[@]}" --download-only --yes --no-install-recommends install \
   "${security_pins[@]}" \
   python3 python3-venv python3-dev build-essential libnuma1 libibverbs1 \
-  ca-certificates git libgl1 libglib2.0-0
+  ca-certificates git libgl1
 cp /usr/share/keyrings/ubuntu-archive-keyring.gpg /out/package-indexes/
 cp /tmp/ubuntu-sources/ubuntu.sources /out/repository-metadata/
 cp /var/lib/apt/lists/*InRelease /out/repository-metadata/

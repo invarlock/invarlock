@@ -122,6 +122,21 @@ python -m examples.qualification.k2_runtime_source \
   --archive sglang-source.tar.gz --output runtime-source
 ```
 
+Prepare the separate whole-release Expat input directory. The image preparation
+command checks fixed archive, signature, and public-key hashes, then verifies
+the exact upstream signing key in an isolated GPG directory with automatic
+key retrieval and agent startup disabled:
+
+```bash
+mkdir expat-release
+curl --fail --location --output expat-release/expat-2.8.4.tar.xz \
+  https://github.com/libexpat/libexpat/releases/download/R_2_8_4/expat-2.8.4.tar.xz
+curl --fail --location --output expat-release/expat-2.8.4.tar.xz.asc \
+  https://github.com/libexpat/libexpat/releases/download/R_2_8_4/expat-2.8.4.tar.xz.asc
+curl --fail --location --output expat-release/hartwork.gpg \
+  https://github.com/hartwork.gpg
+```
+
 Resolve the Ubuntu packages using the exact base image and signed Ubuntu
 repositories. The resolution container downloads packages but does not execute
 models. Inspect the retained package versions, repository signatures, and
@@ -146,12 +161,13 @@ python -m examples.qualification.k2_runtime_build \
   --expected-core-wheel-sha256 "$EXPECTED_CORE_WHEEL" \
   --apt-bundle runtime-apt \
   --pip-wheel pip-26.2-py3-none-any.whl \
+  --expat-bundle expat-release \
   --expected-apt-manifest-sha256 "$EXPECTED_OS_MANIFEST" \
   --output runtime-context
 docker build --platform linux/amd64 --iidfile runtime-image-id.txt \
   --tag k2-candidate:reviewed runtime-context
 docker run --rm --platform linux/amd64 --network none --read-only \
-  --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+  --tmpfs /tmp:rw,nosuid,nodev,exec,size=1g \
   --user 65532:65532 --env HOME=/tmp --env XDG_CACHE_HOME=/tmp/cache \
   --env HF_HOME=/tmp/huggingface \
   --cap-drop ALL --security-opt no-new-privileges \
@@ -169,8 +185,33 @@ the maintained Linux x86_64/Python 3.12 lock. This includes pinned NVIDIA CUDA
 Tile, FlashInfer CUDA kernel binaries and CUDA 13 JIT assets. Runtime execution has no network
 access; bundled kernels must suffice. Rust extensions are disabled for this
 Python HTTP route, and the FA3 selection uses the bundled kernel implementation.
+After installing the runtime wheels, the image removes the three Ubuntu
+pip/venv bootstrap packages offline and records the resulting OS inventory.
+The active pip installation, compiler and headers, native dependencies, and
+bootstrap provenance records remain available.
 
-The native probe checks installed source identities, actual imports, server help,
+The maintained Ubuntu package selection omits GLib. The selected text-only
+runtime has no installed native consumer of it; optional GUI and diffusion
+dependencies are outside this campaign. Removing GLib passed the native CPU
+probe with all Python versions and other OS packages unchanged. GPU startup
+and generated kernels still require the separate preflight.
+
+The signed Expat release is built offline into locally derived `libexpat1`
+and `libexpat1-dev` packages at version `2.8.4-0invarlock1`. Both narrow and
+wide shared libraries, static archives, headers, and development metadata are
+replaced together. The image retains the source authentication, package
+artifacts, build logs, and installed-file hashes. Verification checks package
+metadata, actual payload bytes, both loaded libraries, and Python's Expat
+version; it rejects leftover older shared libraries.
+
+The fresh private `/tmp` filesystem allows execution for JIT-generated host
+libraries while retaining `nosuid` and `nodev`. The image filesystem stays
+read-only. The native probe compiles a fixed C function through the installed
+Triton host compiler, loads the resulting library, and checks its return value.
+The subprocess has a 60-second wall limit, a 30-second CPU limit, and a 16MB
+file-size limit; this checks host compilation and loading, not GPU kernels.
+
+The native probe also checks installed source identities, actual imports, server help,
 dependency consistency, and rejection of the excluded grammar operation through
 the upstream test context. CPU imports do not exercise GPU-conditional kernels. Its
 result explicitly has no GPU qualification authority. Retain both Python and

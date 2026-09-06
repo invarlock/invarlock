@@ -52,6 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Made private K2 JIT storage executable and added a bounded CPU host-library
+  compile-and-load check before runtime finalization. Container network and
+  filesystem restrictions remain enforced.
+- Omitted unused GLib from the native K2 package selection after native consumer
+  inspection and an actual removal/import check, retaining GPU and compiler tools.
+- Built the signed whole Expat release as matched local runtime and development
+  packages for the native K2 image, preserving narrow and wide library variants
+  and verifying installed package, payload, and loaded-version identities.
+  Remaining OS findings continue to block security readiness without review.
+- Removed obsolete Ubuntu pip/venv bootstrap packages from the native K2
+  image after runtime installation and recorded the OS inventory after cleanup.
 - Installed the authenticated pip bootstrap wheel offline before downloading
   native K2 runtime dependencies. Core wheels retain their actual filename and
   version, with bounded metadata checks rejecting relabeled distributions.

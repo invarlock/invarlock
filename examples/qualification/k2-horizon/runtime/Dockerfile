@@ -43,6 +43,10 @@ RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes \
 
 COPY apt/package-indexes /usr/share/invarlock-k2/package-indexes
 COPY apt/package-verification.json /usr/share/invarlock-k2/package-verification.json
+COPY expat /usr/share/invarlock-k2/expat
+RUN --network=none python /usr/share/invarlock-k2/expat/build.py build-install \
+    && apt-get --yes --no-download --no-auto-remove purge \
+       cmake cmake-data libarchive13t64 libcurl4t64 libjsoncpp25 librhash0 libuv1t64
 COPY source /tmp/sglang-source
 COPY core /tmp/core
 COPY examples /opt/campaign/examples
@@ -52,7 +56,10 @@ RUN --network=none cd /tmp/sglang-source/python \
     && python -m build --wheel --no-isolation --outdir /tmp/runtime-wheel \
     && python -m pip install --no-deps --no-index \
        /tmp/runtime-wheel/*.whl /tmp/core/*.whl \
+    && apt-get --yes --no-download --no-auto-remove purge \
+       python3-pip-whl python3.12-venv python3-venv \
     && python -m pip check \
+    && dpkg-query -W > /usr/share/invarlock-k2/os-packages.txt \
     && cp /tmp/sglang-source/source-derivation.json /usr/share/invarlock-k2/ \
     && python -m pip list --format=json > /usr/share/invarlock-k2/python-packages.json \
     && sha256sum /usr/share/invarlock-k2/bootstrap/*.whl /tmp/runtime-wheel/*.whl /tmp/core/*.whl > /usr/share/invarlock-k2/wheel-artifacts.sha256 \

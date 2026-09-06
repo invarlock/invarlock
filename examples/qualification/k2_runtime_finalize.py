@@ -16,6 +16,7 @@ import time
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
+from examples.qualification import k2_native_probe as native
 from examples.qualification import k2_runtime_build as build
 from examples.qualification import k2_runtime_source as source
 
@@ -142,7 +143,7 @@ def container(image, entrypoint, arguments):
                 "--cpus",
                 "4",
                 "--tmpfs",
-                "/tmp:rw,nosuid,nodev,size=1g",
+                "/tmp:rw,nosuid,nodev,exec,size=1g",
                 "--env",
                 "HOME=/tmp",
                 "--env",
@@ -228,9 +229,18 @@ def verify_context(context, archive):
             Path(temporary).resolve() / "context",
             apt_bundle=context / "apt",
             pip_wheel=context / "bootstrap" / build.PIP_WHEEL,
+            expat_bundle=context / "expat",
             expected_apt_manifest=inputs["input_sha256"]["apt/deb-artifacts.sha256"],
         )
-        for name in ("source", "core", "apt", "bootstrap", "examples", "preparation"):
+        for name in (
+            "source",
+            "core",
+            "apt",
+            "bootstrap",
+            "examples",
+            "preparation",
+            "expat",
+        ):
             if tree_entries(context / name) != tree_entries(
                 Path(temporary).resolve() / "context" / name
             ):
@@ -336,10 +346,20 @@ def observe(image, inputs, build_hash, context):
         {
             name: digest
             for name, digest in inputs["input_sha256"].items()
-            if name.startswith("bootstrap/")
+            if name.startswith(("bootstrap/", "expat/"))
         }
     )
     expected["os-security-pins.txt"] = inputs["input_sha256"]["os-security-pins.txt"]
+    if {
+        name: digest for name, digest in files.items() if name.startswith("expat/")
+    } != {
+        name: digest
+        for name, digest in inputs["input_sha256"].items()
+        if name.startswith("expat/")
+    }:
+        raise ValueError(
+            "installed Expat input tree contains missing or unexpected files"
+        )
     if any(files.get(name) != digest for name, digest in expected.items()):
         raise ValueError("installed build artifacts differ")
     if observed.get("native_probe_sha256") != inputs["input_sha256"][
@@ -354,6 +374,22 @@ def observe(image, inputs, build_hash, context):
         re.MULTILINE,
     ):
         raise ValueError("installed probe or core wheel record differs")
+    expat_observation = decode(
+        container(
+            image,
+            "/opt/k2/bin/python",
+            ["/usr/share/invarlock-k2/expat/build.py", "verify"],
+        )
+    )
+    if (
+        expat_observation.get("source_version") != build.expat.VERSION
+        or expat_observation.get("package_version") != build.expat.PACKAGE_VERSION
+        or expat_observation.get("pyexpat_version") != "expat_" + build.expat.VERSION
+        or expat_observation.get("build_report_sha256")
+        != files.get("expat-built/build-report.json")
+    ):
+        raise ValueError("installed Expat observation identity differs")
+    observed["expat"] = expat_observation
     packages = observed["packages"]
     pins = lock_packages(read(context / "requirements.txt", 1024 * 1024))
     if (
@@ -375,6 +411,7 @@ def observe(image, inputs, build_hash, context):
         or probe.get("packages") != packages
     ):
         raise ValueError("native CPU probe identity or result differs")
+    native.validate_host_compiler(probe.get("host_compiler"), packages.get("triton"))
     return observed, probe
 
 

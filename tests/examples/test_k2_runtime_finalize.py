@@ -269,6 +269,7 @@ def test_container_cleanup_uses_observed_id_and_offline_limits(monkeypatch):
     assert finalize.container("sha256:" + "a" * 64, "python", ["-c", "pass"]) == b"{}"
     assert calls[-1] == ["docker", "rm", "--force", "f" * 64]
     command = calls[0]
+    assert "/tmp:rw,nosuid,nodev,exec,size=1g" in command
     assert "none" in command and "--read-only" in command
     assert "NVIDIA_VISIBLE_DEVICES=void" in command and "--gpus" not in command
     assert "65532:65532" in command and "--pids-limit" in command
@@ -439,17 +440,33 @@ def observation(tmp_path, monkeypatch):
             "requirements.txt": finalize.sha(lock),
             "os-security-pins.txt": "d" * 64,
             "package-verification.json": "f" * 64,
+            "expat-built/build-report.json": "2" * 64,
             "os-packages.txt": finalize.sha(b"test\t1\n"),
         },
         "os_packages": "test\t1\n",
         "native_probe_sha256": "e" * 64,
         "wheel_artifacts": "c" * 64 + "  /tmp/core/invarlock-0.15.0-py3-none-any.whl\n",
     }
+    expat_observation = {
+        "source_version": finalize.build.expat.VERSION,
+        "package_version": finalize.build.expat.PACKAGE_VERSION,
+        "pyexpat_version": "expat_" + finalize.build.expat.VERSION,
+        "build_report_sha256": "2" * 64,
+    }
+    observed["expat"] = expat_observation
     probe = {
         "status": "cpu_imports_passed_not_gpu_qualified",
         "gpu_execution": False,
         "build_inputs_sha256": build_hash,
         "packages": dict(packages),
+    }
+    probe["host_compiler"] = {
+        "status": "fixed_cpu_host_compile_and_call_passed",
+        "source_sha256": finalize.sha(finalize.native.HOST_SOURCE),
+        "compiled_library_sha256": "3" * 64,
+        "triton_version": packages["triton"],
+        "result": 42,
+        "gpu_execution": False,
     }
     inspection = {"Id": image, "Os": "linux", "Architecture": "amd64"}
     monkeypatch.setattr(
@@ -459,7 +476,11 @@ def observation(tmp_path, monkeypatch):
         finalize,
         "container",
         lambda _image, _entry, args: json.dumps(
-            observed if args[0] == "-c" else probe
+            observed
+            if args[0] == "-c"
+            else expat_observation
+            if args[-1] == "verify"
+            else probe
         ).encode(),
     )
     return tmp_path, image, inputs, build_hash, observed, probe, inspection
@@ -553,18 +574,14 @@ def context_case(tmp_path, monkeypatch):
     }
     write(context / "build-inputs.json", inputs)
     expected = json.loads(json.dumps(inputs))
+    for name in ("bootstrap", "examples", "preparation", "expat"):
+        (context / name).mkdir()
 
     def prepare(_archive, _wheel, digest, output, **kwargs):
         assert digest == finalize.sha(b"wheel")
         assert kwargs["expected_apt_manifest"] == finalize.sha(b"debs")
-        import shutil
-
-        for name in ("core", "apt", "bootstrap", "examples", "preparation"):
-            if name in {"core", "apt"}:
-                (output / name).mkdir(parents=True)
-            else:
-                (context / name).mkdir(exist_ok=True)
-                shutil.copytree(context / name, output / name)
+        for name in ("core", "apt", "bootstrap", "examples", "preparation", "expat"):
+            (output / name).mkdir(parents=True)
         (output / "core/invarlock-0.15.0-py3-none-any.whl").write_bytes(b"wheel")
         (output / "apt/deb-artifacts.sha256").write_bytes(b"debs")
         (output / "source").mkdir(parents=True)
@@ -755,7 +772,7 @@ def test_observed_core_version_follows_prepared_wheel(observation):
         finalize.observe(image, inputs, digest, root)
 
 
-@pytest.mark.parametrize("name", ["source/extra.py", "core/extra.whl"])
+@pytest.mark.parametrize("name", ["source/extra.py", "core/extra.whl", "expat/json.py"])
 def test_extra_copied_input_is_rejected(context_case, name):
     context, _ = context_case
     (context / name).write_bytes(b"unexpected executable input")
@@ -840,3 +857,35 @@ def test_embedded_inventory_rejects_real_canonical_duplicates(tmp_path):
     assert namespace["package_inventory"](first) == {"example-package": "0.0.0"}
     with pytest.raises(ValueError, match="duplicate installed distribution"):
         namespace["package_inventory"](distributions(path=roots))
+
+
+def test_installed_expat_observation_cannot_use_old_version(observation):
+    root, image, inputs, digest, observed, *_ = observation
+    observed["expat"]["pyexpat_version"] = "expat_2.6.1"
+    with pytest.raises(ValueError, match="Expat observation"):
+        finalize.observe(image, inputs, digest, root)
+
+
+def test_image_side_expat_module_injection_is_rejected_before_helper(
+    observation, monkeypatch
+):
+    root, image, inputs, digest, observed, *_ = observation
+    observed["files"]["expat/json.py"] = "0" * 64
+    calls = []
+
+    def container(_image, _entry, args):
+        calls.append(args)
+        assert args[0] == "-c"
+        return json.dumps(observed).encode()
+
+    monkeypatch.setattr(finalize, "container", container)
+    with pytest.raises(ValueError, match="Expat input tree"):
+        finalize.observe(image, inputs, digest, root)
+    assert len(calls) == 1
+
+
+def test_native_probe_cannot_omit_required_host_compiler_check(observation):
+    root, image, inputs, digest, _, probe, _ = observation
+    probe.pop("host_compiler")
+    with pytest.raises(ValueError, match="host compiler observation"):
+        finalize.observe(image, inputs, digest, root)
