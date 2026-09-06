@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -9,6 +11,30 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/security/build_restricted_openai_evals_wheel.py"
+
+
+def test_executable_cli_rejects_unauthenticated_input(tmp_path: Path) -> None:
+    source = tmp_path / "untrusted.whl"
+    source.write_bytes(b"not the pinned upstream wheel")
+    output = tmp_path / "output"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "build-wheel",
+            "--input",
+            str(source),
+            "--output-directory",
+            str(output),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "SHA-256 changed" in result.stderr
+    assert not output.exists()
 
 
 def _load(monkeypatch):
