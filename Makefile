@@ -440,7 +440,8 @@ local-hf-pipeline-smoke-locked:  ## Run the built-in provider smoke in the locke
 container-front-door-smoke: runtime-image  ## Run the host-to-container evaluation smoke
 	INVARLOCK_RUN_CONTAINER_SMOKE=1 INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
 		INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
-		PYTHONPATH=src $(PYTEST) -q -m integration tests/integration/test_container_front_door_journey.py
+		PYTHONPATH=src $(PYTEST) -q -m integration \
+		tests/integration/test_container_front_door_journey.py tests/integration/test_oci_isolation.py
 
 qualification-source-bundle:  ## Create the exact Git archive used by runtime qualification
 	$(foreach variable,SOURCE_BUNDLE_OUTPUT,$(if $(strip $($(variable))),,$(error $(variable) is required)))
