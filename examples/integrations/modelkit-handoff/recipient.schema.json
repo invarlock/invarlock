@@ -126,6 +126,10 @@
         "evidence_signer_fingerprint": {
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "request_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       },
       "required": [

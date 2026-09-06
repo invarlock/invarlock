@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Allowed the ModelKit recipient example to require the existing complete-request
+  digest during independent technical replay. Package and signature checks cannot
+  override a mismatched recipient expectation; older requests remain valid.
 - Preserved valid Promptfoo responses after failed quality assertions instead
   of classifying them as execution errors. Conflicting native failure fields
   now fail import, while actual execution failures remain insufficient evidence.

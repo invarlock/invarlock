@@ -287,6 +287,48 @@ def test_wrong_independent_runtime_anchor_cannot_be_overridden_by_envelope(
     assert result["exit_code"] == 2
 
 
+def test_independent_request_anchor_binds_complete_evaluation_context(
+    recipient_request,
+):
+    import jsonschema
+
+    from invarlock.evidence_pack_contract import canonical_json_bytes
+
+    evidence = Path(recipient_request["evidence"])
+    manifest = json.loads((evidence / "manifest.json").read_bytes())
+    request_path = evidence / manifest["evidence"]["request"]["path"]
+    normalized_request = json.loads(request_path.read_bytes())
+    request_digest = (
+        "sha256:" + hashlib.sha256(canonical_json_bytes(normalized_request)).hexdigest()
+    )
+    recipient_request["technical_anchors"]["request_digest"] = request_digest
+    schema = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "examples/integrations/modelkit-handoff/recipient.schema.json"
+        ).read_bytes()
+    )
+    jsonschema.Draft202012Validator(schema).validate(recipient_request)
+    result = handoff.verify_point_of_use(
+        recipient_request, now=datetime(2026, 7, 25, 12, 5, tzinfo=UTC)
+    )
+    assert result["accepted"] is True
+    assert result["technical_integrity_ok"] is True
+
+    # Package/content identities and both signatures remain valid. Only the
+    # recipient's independently selected complete-request expectation changes.
+    recipient_request["technical_anchors"]["request_digest"] = "sha256:" + "0" * 64
+    rejected = handoff.verify_point_of_use(
+        recipient_request, now=datetime(2026, 7, 25, 12, 5, tzinfo=UTC)
+    )
+    assert rejected["accepted"] is False
+    assert rejected["technical_integrity_ok"] is False
+    assert rejected["envelope_authenticated"] is True
+    assert rejected["receipt_authenticated"] is True
+    assert rejected["exit_code"] == 2
+    assert any("independent request anchor" in error for error in rejected["errors"])
+
+
 def _rewrite(store, digest, *, manifest_change=None, config_change=None):
     manifest = json.loads((store / digest[7:]).read_bytes())
     if config_change:
@@ -406,6 +448,8 @@ def test_new_package_cannot_reuse_old_content_anchor(tmp_path):
         lambda r: r.update(trusted_public_keys={}),
         lambda r: r["sides"]["subject"].update(candidate=12),
         lambda r: r["technical_anchors"].update(schedule_digest="latest"),
+        lambda r: r["technical_anchors"].update(request_digest="latest"),
+        lambda r: r["technical_anchors"].update(request_digest=None),
     ],
 )
 def test_recipient_configuration_fails_closed(recipient_request, change):

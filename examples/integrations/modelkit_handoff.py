@@ -449,13 +449,15 @@ def verify_point_of_use(
             "schedule_digest",
             "evidence_signer_fingerprint",
         },
-        set(),
+        {"request_digest"},
     )
     for field in ("artifact_digests", "runtime_digests"):
         for value in _object(anchors[field], {"baseline", "subject"}, set()).values():
             _digest(value)
     _digest(anchors["schedule_digest"])
     _digest(anchors["evidence_signer_fingerprint"])
+    if "request_digest" in anchors:
+        _digest(anchors["request_digest"])
     keys = request["trusted_public_keys"]
     if not isinstance(keys, dict) or not keys:
         raise ModelKitError("recipient must supply trusted public keys")
@@ -467,6 +469,7 @@ def verify_point_of_use(
         expected_schedule_digest=anchors["schedule_digest"],
         expected_runtime_digests=anchors["runtime_digests"],
         expected_signer_fingerprint=anchors["evidence_signer_fingerprint"],
+        expected_request_digest=anchors.get("request_digest"),
     )
     checked_at = now or datetime.now(UTC)
     decision = verify_acceptance_attestation(
