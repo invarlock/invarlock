@@ -663,6 +663,41 @@ def test_regular_archive_header_cannot_claim_missing_payload(tmp_path):
         )
 
 
+def test_directory_header_cannot_hide_file_contents(tmp_path):
+    from pathlib import PurePosixPath
+
+    item = tarfile.TarInfo("model")
+    item.type = tarfile.DIRTYPE
+    item.size = 512
+    archive = io.BytesIO(item.tobuf() + b"hidden payload".ljust(512, b"\0"))
+    with pytest.raises(handoff.ModelKitError, match="invalid archive header size"):
+        handoff._extract(archive, tmp_path, PurePosixPath("model"), handoff.Limits())
+    assert not (tmp_path / "model").exists()
+
+
+def test_excluded_file_added_during_final_candidate_check_is_detected(
+    tmp_path, monkeypatch
+):
+    store, digest, model = _package(tmp_path)
+    original = handoff.checkpoint_tree_observation
+    observations = []
+
+    def mutate(path):
+        observed = original(path)
+        observations.append(observed)
+        if len(observations) == 2:
+            (model / "logs").mkdir()
+            (model / "logs" / "new-content.txt").write_bytes(b"unpackaged content")
+        return observed
+
+    monkeypatch.setattr(handoff, "checkpoint_tree_observation", mutate)
+    with pytest.raises(handoff.ModelKitError, match="file inventory changed"):
+        _verify(store, digest, model)
+    assert len(observations) == 2
+    assert observations[0] == observations[1]
+    assert checkpoint_tree_sha256(model) == observations[0].digest
+
+
 def test_reading_an_operational_file_may_update_access_time(tmp_path):
     import os
 
