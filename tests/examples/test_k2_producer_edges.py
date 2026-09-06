@@ -7,6 +7,7 @@ import json
 import signal
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,15 @@ from examples.qualification import k2_campaign as campaign
 from examples.qualification import k2_producer as capture_worker
 from tests.examples.test_k2_campaign import _ready_plan
 from tests.examples.test_k2_producer import _transport
+
+
+@pytest.fixture(autouse=True)
+def nonroot_operator(monkeypatch):
+    monkeypatch.setattr(
+        capture_worker, "os", SimpleNamespace(**vars(capture_worker.os))
+    )
+    monkeypatch.setattr(capture_worker.os, "getuid", lambda: 1234)
+    monkeypatch.setattr(capture_worker.os, "getgid", lambda: 2345)
 
 
 def test_native_transport_serializes_exact_request_and_bounds_responses(monkeypatch):
@@ -100,13 +110,18 @@ def test_worker_retains_capture_and_cleans_its_process_group(
         return process
 
     monkeypatch.setattr(capture_worker.subprocess, "Popen", start)
-    monkeypatch.setattr(
-        capture_worker.subprocess,
-        "run",
-        lambda command, **kwargs: subprocess.CompletedProcess(
-            command, 0, "NVIDIA H200, 143771, 580.178.04\n", ""
-        ),
-    )
+
+    def query_hardware(command, **kwargs):
+        assert command == [
+            "nvidia-smi",
+            "--query-gpu=name,memory.total,driver_version,mig.mode.current",
+            "--format=csv,noheader,nounits",
+        ]
+        return subprocess.CompletedProcess(
+            command, 0, "NVIDIA H100 80GB HBM3, 81559, 580.173.02, Disabled\n", ""
+        )
+
+    monkeypatch.setattr(capture_worker.subprocess, "run", query_hardware)
     monkeypatch.setattr(
         capture_worker.os, "killpg", lambda pid, sig: signals.append((pid, sig))
     )
@@ -137,7 +152,9 @@ def test_worker_retains_capture_and_cleans_its_process_group(
     else:
         capture_worker.worker(plan, "baseline", phase, tmp_path)
         captured = campaign.read_json(tmp_path / "capture.json")
-        assert captured["hardware"] == ["NVIDIA H200, 143771, 580.178.04"]
+        assert captured["hardware"] == [
+            "NVIDIA H100 80GB HBM3, 81559, 580.173.02, Disabled"
+        ]
         assert len(captured["rows"]) == (24 if phase == "preflight" else 576)
         assert (tmp_path / "preflight.json").exists() is (phase == "preflight")
     assert (tmp_path / "server.log").read_bytes() == b"native server diagnostic\n"

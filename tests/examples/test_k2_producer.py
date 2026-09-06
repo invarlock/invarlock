@@ -6,12 +6,22 @@ import copy
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from examples.qualification import k2_campaign as campaign
 from examples.qualification import k2_producer as capture_worker
 from tests.examples.test_k2_campaign import _ready_plan
+
+
+@pytest.fixture(autouse=True)
+def nonroot_operator(monkeypatch):
+    monkeypatch.setattr(
+        capture_worker, "os", SimpleNamespace(**vars(capture_worker.os))
+    )
+    monkeypatch.setattr(capture_worker.os, "getuid", lambda: 1234)
+    monkeypatch.setattr(capture_worker.os, "getgid", lambda: 2345)
 
 
 def _transport(plan, role="baseline", *, fail=False, mutate=False):
@@ -118,7 +128,27 @@ def test_server_arguments_keep_bf16_native_loading_and_mova_routing():
     }
 
 
+def test_root_operator_rejected_before_plan_engine_or_output(tmp_path, monkeypatch):
+    monkeypatch.setattr(capture_worker.os, "getuid", lambda: 0)
+    monkeypatch.setattr(
+        campaign, "read_json", lambda *args: pytest.fail("must not read plan")
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("must not contact engine"),
+    )
+    output = tmp_path / "output"
+    with pytest.raises(ValueError, match="non-root operator with Docker access"):
+        capture_worker.run_container(
+            tmp_path / "missing-plan.json", "baseline", tmp_path, output, "preflight"
+        )
+    assert not output.exists()
+
+
 def test_container_timeout_removes_only_its_named_worker(tmp_path, monkeypatch):
+    monkeypatch.setattr(capture_worker.os, "getuid", lambda: 1234)
+    monkeypatch.setattr(capture_worker.os, "getgid", lambda: 2345)
     plan = _ready_plan()
     plan_path = tmp_path / "plan.json"
     campaign.write_json(plan_path, plan)
@@ -148,6 +178,8 @@ def test_container_timeout_removes_only_its_named_worker(tmp_path, monkeypatch):
     assert "--network=none" in command and "--read-only" in command
     assert "--tmpfs=/tmp:rw,nosuid,nodev,exec,size=16g" in command
     assert "--pull=never" in command
+    assert "--memory=280g" in command and "--cpus=32" in command
+    assert command[command.index("--user") + 1] == "1234:2345"
     assert plan["runtime"]["image_digest"] in command
     name = command[command.index("--name") + 1]
     assert calls[-1][0] == ["docker", "rm", "--force", name]
@@ -177,10 +209,10 @@ def test_missing_preflight_cannot_start_decision_container(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     "rows,tp",
     [
-        (["NVIDIA A100, 80000, 580.65"], 1),
-        (["NVIDIA H200, 140000, 570.65"], 1),
-        (["NVIDIA H200, 70000, 580.65"], 1),
-        (["NVIDIA H200, 140000, 580.65"], 2),
+        (["NVIDIA A100, 80000, 580.159.03, Disabled"], 1),
+        (["NVIDIA H200, 140000, 570.159.03, Disabled"], 1),
+        (["NVIDIA H200, 70000, 580.159.03, Disabled"], 1),
+        (["NVIDIA H200, 140000, 580.159.03, Disabled"], 2),
     ],
 )
 def test_hardware_preflight_rejects_wrong_device_memory_driver_or_count(rows, tp):
@@ -189,7 +221,43 @@ def test_hardware_preflight_rejects_wrong_device_memory_driver_or_count(rows, tp
 
 
 def test_hardware_preflight_accepts_full_h200_devices():
-    capture_worker.validate_hardware(["NVIDIA H200, 143771, 580.178.04"] * 2, 2)
+    capture_worker.validate_hardware(
+        ["NVIDIA H200, 143771, 580.178.04, Disabled"] * 2, 2
+    )
+
+
+@pytest.mark.parametrize(
+    "name,memory",
+    [
+        ("NVIDIA H100 80GB HBM3", 81559),
+        ("NVIDIA H100 80GB HBM3", 80000),
+        ("NVIDIA H200", 135000),
+    ],
+)
+def test_hardware_accepts_full_supported_devices_with_mig_disabled(name, memory):
+    capture_worker.validate_hardware([f"{name}, {memory}, 580.159.03, Disabled"] * 2, 2)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        ["NVIDIA H100 80GB HBM3, 79999, 580.159.03, Disabled"] * 2,
+        ["NVIDIA H100 80GB HBM3 MIG 1g.10gb, 81559, 580.159.03, Disabled"] * 2,
+        ["NVIDIA H100 80GB HBM3, 81559, 580.159.03, Enabled"] * 2,
+        ["NVIDIA H100 80GB HBM3, 81559, 580.159.03, N/A"] * 2,
+        ["NVIDIA H100 PCIe, 81559, 580.159.03, Disabled"] * 2,
+        ["NVIDIA H100 NVL, 95830, 580.159.03, Disabled"] * 2,
+        ["NVIDIA H200 unreviewed, 143771, 580.159.03, Disabled"] * 2,
+        [
+            "NVIDIA H200, 143771, 580.159.03, Disabled",
+            "NVIDIA H100 80GB HBM3, 81559, 580.159.03, Disabled",
+        ],
+        ["NVIDIA H100 80GB HBM3, 81559, 580.159.03"],
+    ],
+)
+def test_hardware_rejects_undersized_partitioned_unknown_or_mixed_devices(rows):
+    with pytest.raises(ValueError, match="hardware"):
+        capture_worker.validate_hardware(rows, min(2, len(rows)))
 
 
 def test_plan_cli_writes_an_unqualified_plan(tmp_path):
@@ -306,4 +374,6 @@ def test_preflight_rejects_impossible_resource_duration(field, value):
 )
 def test_hardware_requires_a_verified_security_fixed_driver_branch(driver):
     with pytest.raises(ValueError, match="hardware"):
-        capture_worker.validate_hardware([f"NVIDIA H200, 143771, {driver}"], 1)
+        capture_worker.validate_hardware(
+            [f"NVIDIA H200, 143771, {driver}, Disabled"], 1
+        )

@@ -156,8 +156,11 @@ Before producing a ready build receipt:
    separately authorized GPU preflight; it does not mean that a model or GPU
    configuration has been qualified.
 
-After the ready image has an approved compute budget, run the bounded H200
-preflight with real tensors. Check dtype, architecture, parsers, selected
+After the ready image has an approved compute budget, run the bounded H100 80GB HBM3
+or H200 141GB preflight with real tensors. The worker requires matching full
+devices with MIG disabled and the reviewed R580 security minimum; neither
+hardware configuration is qualified by these source checks. The fixed
+container limit is 280 GiB host memory and 32 CPU cores. Check dtype, architecture, parsers, selected
 parallelism, driver, CUDA kernels, GPU memory, topology, and resource bounds
 before decisions. GPU startup and inference failures remain failed preflights;
 they cannot inherit success from the earlier CPU image checks.

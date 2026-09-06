@@ -26,7 +26,7 @@ def digest(value: Any) -> str:
     return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
 
 
-@lru_cache(maxsize=5)
+@lru_cache(maxsize=6)
 def _validator(name: str) -> Draft202012Validator:
     schema = parse_json_bytes(
         importlib.resources.files("invarlock")

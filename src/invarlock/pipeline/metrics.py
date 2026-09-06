@@ -15,6 +15,7 @@ KINDS = (
     "normalized_match",
     "numeric_tolerance",
     "json_fields",
+    "json_exact",
     "token_f1",
 )
 SCORER_VERSION = "1.0.0"
@@ -32,6 +33,7 @@ def validate_configuration(kind: str, configuration: dict[str, Any]) -> None:
         "token_f1": {"casefold", "unicode_version"},
         "numeric_tolerance": {"absolute", "relative"},
         "json_fields": {"fields"},
+        "json_exact": set(),
     }
     if kind not in allowed or set(configuration) - allowed[kind]:
         raise MetricError(f"unsupported configuration for {kind!r}")
@@ -150,6 +152,17 @@ def score(
                     _number(configuration.get("relative", 0)) * abs(numeric_target),
                 )
             )
+    if kind == "json_exact":
+        try:
+            reference_bytes = canonical_json_bytes(_json(expected))
+        except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+            raise MetricError(
+                "JSON reference must be a valid finite JSON value"
+            ) from exc
+        try:
+            return float(canonical_json_bytes(_json(output)) == reference_bytes)
+        except (ValueError, TypeError, OverflowError, RecursionError):
+            return 0.0
     if kind == "json_fields":
         try:
             reference = _json(expected)

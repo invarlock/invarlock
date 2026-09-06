@@ -47,7 +47,7 @@ class BuiltinScorer:
                 key: {"type": "number", "minimum": 0}
                 for key in ("absolute", "relative")
             }
-        else:
+        elif self.kind == "json_fields":
             required = ["fields"]
             properties = {
                 "fields": {

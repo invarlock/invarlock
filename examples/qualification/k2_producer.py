@@ -192,23 +192,29 @@ def _drain(stream, path):
 
 
 def validate_hardware(rows, tensor_parallel):
+    minimum_memory = {"NVIDIA H100 80GB HBM3": 80000, "NVIDIA H200": 135000}
     try:
         if len(rows) < tensor_parallel:
             raise ValueError("insufficient GPUs")
+        names = set()
         for row in rows:
-            name, memory, driver = [field.strip() for field in row.split(",")]
+            name, memory, driver, mig = [field.strip() for field in row.split(",")]
+            names.add(name)
             driver_parts = tuple(int(part) for part in driver.split("."))
             if (
-                "H200" not in name
-                or int(memory) < 135000
+                name not in minimum_memory
+                or int(memory) < minimum_memory[name]
+                or mig != "Disabled"
                 or len(driver_parts) != 3
                 or driver_parts[0] != 580
                 or driver_parts < (580, 159, 3)
             ):
-                raise ValueError("unsupported GPU, memory, or driver")
+                raise ValueError("unsupported GPU, memory, MIG mode, or driver")
+        if len(names) != 1:
+            raise ValueError("mixed GPU identities")
     except (TypeError, ValueError) as error:
         raise ValueError(
-            "hardware differs from the candidate H200/CUDA13 protocol"
+            "hardware differs from the candidate H100/H200 CUDA13 protocol"
         ) from error
 
 
@@ -217,7 +223,7 @@ def worker(plan, role, phase, output):
     hardware = subprocess.run(
         [
             "nvidia-smi",
-            "--query-gpu=name,memory.total,driver_version",
+            "--query-gpu=name,memory.total,driver_version,mig.mode.current",
             "--format=csv,noheader,nounits",
         ],
         capture_output=True,
@@ -285,6 +291,9 @@ def worker(plan, role, phase, output):
 def run_container(
     plan_path, role, snapshot, output, phase, engine="docker", preflight=None
 ):
+    uid, gid = os.getuid(), os.getgid()
+    if uid == 0:
+        raise ValueError("run as a non-root operator with Docker access")
     plan = campaign.read_json(plan_path)
     campaign.require_ready(plan)
     measured = campaign.measure_snapshot(snapshot, plan["model"][role]["files"])
@@ -332,10 +341,10 @@ def run_container(
         "--shm-size=32g",
         "--tmpfs=/tmp:rw,nosuid,nodev,exec,size=16g",
         "--cpus=32",
-        "--memory=440g",
+        "--memory=280g",
         "--gpus=all",
         "--user",
-        f"{os.getuid()}:{os.getgid()}",
+        f"{uid}:{gid}",
         "--env",
         "CUDA_VISIBLE_DEVICES="
         + ("0,1" if plan["runtime"]["tensor_parallel"] == 2 else "0"),

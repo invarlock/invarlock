@@ -37,6 +37,24 @@ contains recorded numbers; it does not call a judge or demonstrate judge quality
 Each invocation requires a new output directory, so a failed or repeated run
 cannot silently replace a previous result.
 
+## Freeze the cases you intend to evaluate
+
+For a planned evaluation, retain its case IDs, inputs, references and slice tags
+before either release runs. Put them in a case-set file as shown in the
+[case membership reference](../reference/pipeline-contracts.md#freezing-planned-case-membership),
+then run:
+
+```bash
+invarlock-pipeline case-set planned-cases.json --output frozen-cases.json
+```
+
+Add the printed digest to your approved policy as `expected_case_set_digest`.
+The comparison and independent verifier will then reject missing, additional
+or changed cases, including the same omission from both exports. Keep failed
+cases in each export with their error information. This optional pin checks
+coverage of the intended schedule; it does not make the sample representative
+or validate its references.
+
 ## Capture your own results
 
 Keep stable case IDs, task inputs, references and string slice tags identical
@@ -125,12 +143,14 @@ blocks the gate.
 | `exact_match` | Literal identifiers and labels | Yes |
 | `normalized_match` | Labels with case or whitespace differences | Yes |
 | `numeric_tolerance` | Numeric answers within declared absolute or relative tolerance | Yes |
-| `json_fields` | Required structured output fields | Yes |
+| `json_fields` | Average accuracy of selected structured output fields | Yes |
+| `json_exact` | Complete structured output correctness, with no extra fields | Yes |
 | `token_f1` | Reference token overlap | Yes |
 | `recorded` | Existing judge, human, cost, latency or external metric scores | Aggregation only |
 
 `token_f1` is token overlap, not semantic correctness. `json_fields` checks only
-the declared JSON pointers. Scorer details and statistical assumptions are in
+the declared JSON pointers and averages their matches. Use `json_exact` with
+`configuration: {}` for an all-or-nothing whole-document check. Scorer details and statistical assumptions are in
 the [contract reference](../reference/pipeline-contracts.md).
 
 For `normalized_match` and `token_f1`, approve an explicit

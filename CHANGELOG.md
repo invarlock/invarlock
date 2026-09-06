@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added optional policy pins for planned case membership, rejecting shared
+  omissions and changed references during comparison and signed replay.
+- Added `json_exact` whole-document structured-output scoring with binary paired
+  intervals, signed replay and a separate built-in scorer identity.
+
+- Added optional project run-digest pins that reject changed evaluation inputs,
+  including path overrides, before signing or publishing pipeline results.
+
 - Added the `invarlock-pipeline` companion CLI and SDK for captured evaluation
   results, with reusable projects, native export parsers, multiple typed metrics,
   data slices, explicit recorded-score provenance, CI exit codes and JSON, HTML,
@@ -40,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added full H100 80GB HBM3 devices to the K2 candidate hardware checks alongside
+  H200, requiring matching devices with MIG disabled and the existing security
+  driver minimum. The bounded launcher now caps host memory at 280 GiB and
+  rejects UID 0 before plan reads or container operations. Actual GPU preflight
+  and model qualification remain required.
 - Updated coordinated Python tooling, documentation dependencies, and pinned
   CI actions. Python dependency updates now use the uv ecosystem so the root
   manifest and lock are proposed together; hashed workflow locks remain
@@ -52,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Excluded operating-system metadata from distributions and rejected it anywhere
+  in wheel or source archives during release validation.
 - Made private K2 JIT storage executable and added a bounded CPU host-library
   compile-and-load check before runtime finalization. Container network and
   filesystem restrictions remain enforced.

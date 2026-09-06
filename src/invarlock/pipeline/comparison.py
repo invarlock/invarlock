@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.paired_exact_match import paired_exact_match_statistics
+from invarlock.pipeline.cases import validate_run_case_set
 from invarlock.pipeline.contracts import PipelineError, digest, validate
 from invarlock.pipeline.metrics import MetricError, score, validate_configuration
 
@@ -261,7 +262,8 @@ def _metric_result(
         left_values,
         right_values,
         seed,
-        metric["kind"] in ("exact_match", "normalized_match", "numeric_tolerance"),
+        metric["kind"]
+        in ("exact_match", "normalized_match", "numeric_tolerance", "json_exact"),
     )
     if not all(
         math.isfinite(v) for v in (b, c, c - b, interval["lower"], interval["upper"])
@@ -299,6 +301,9 @@ def compare_runs(
     _check_run(baseline)
     _check_run(candidate)
     _check_policy(policy)
+    if "expected_case_set_digest" in policy:
+        for run in (baseline, candidate):
+            validate_run_case_set(run, policy["expected_case_set_digest"])
     baseline_rows = {r["id"]: r for r in baseline["records"]}
     candidate_rows = {r["id"]: r for r in candidate["records"]}
     if baseline_rows.keys() != candidate_rows.keys():

@@ -16,9 +16,15 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import read_regular_file_bytes
 from invarlock.pipeline.adapters import load_run
+from invarlock.pipeline.cases import (
+    canonical_case_set,
+    case_set_digest,
+    validate_run_case_set,
+)
 from invarlock.pipeline.contracts import (
     MAX_EVIDENCE_BYTES,
     PipelineError,
+    digest,
     read_json,
     validate,
     write_directory,
@@ -126,9 +132,43 @@ def import_export(
 def _project_run(
     specification: dict[str, Any], root_path: Path, override: Path | None
 ) -> dict[str, Any]:
-    options = {k: v for k, v in specification.items() if k != "path"}
+    options = {
+        k: v
+        for k, v in specification.items()
+        if k not in {"path", "expected_run_digest"}
+    }
     path = override if override is not None else root_path / specification["path"]
-    return load_run(path, **options)
+    run = load_run(path, **options)
+    expected = specification.get("expected_run_digest")
+    if expected is not None and digest(run) != expected:
+        raise PipelineError(f"{path}: run digest does not match expected_run_digest")
+    return run
+
+
+@app.command(name="case-set")
+def freeze_case_set(
+    cases: Path,
+    output: Path | None = typer.Option(None, "--output"),
+) -> None:
+    """Validate explicitly planned cases and print the digest for your policy."""
+    try:
+        value = canonical_case_set(read_json(cases))
+        expected = case_set_digest(value)
+        if output is not None:
+            write_new(output, canonical_json_bytes(value))
+        typer.echo(
+            canonical_json_bytes(
+                {
+                    "format": "invarlock/pipeline-case-set-digest-v1",
+                    "case_count": len(value["cases"]),
+                    "expected_case_set_digest": expected,
+                    "output": str(output) if output is not None else None,
+                }
+            ).decode(),
+            nl=False,
+        )
+    except (ValueError, OSError) as exc:
+        _fail(exc)
 
 
 @app.command()
@@ -148,6 +188,10 @@ def compare(
         base = _project_run(config["baseline"], project.parent, baseline)
         subject = _project_run(config["candidate"], project.parent, candidate)
         policy = read_json(project.parent / config["policy"])
+        if isinstance(policy, dict) and "expected_case_set_digest" in policy:
+            validate(policy, "policy")
+            for run in (base, subject):
+                validate_run_case_set(run, policy["expected_case_set_digest"])
         evidence = create_evidence(
             base, subject, policy, _private(signing_key) if signing_key else None
         )

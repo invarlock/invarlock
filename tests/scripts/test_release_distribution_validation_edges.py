@@ -734,3 +734,61 @@ def test_validate_distributions_rejects_hash_mismatch(
     )
     with pytest.raises(validation.ReleasePreflightError, match="does not match"):
         validation.validate_distributions(config)
+
+
+@pytest.mark.parametrize("name", [".DS_Store", "._payload", "Thumbs.db", "desktop.ini"])
+@pytest.mark.parametrize("parent", ["", "example/", "example-1.0.dist-info/"])
+def test_wheel_rejects_operating_system_metadata(
+    tmp_path: Path, name: str, parent: str
+) -> None:
+    wheel = tmp_path / "candidate.whl"
+    _write_wheel(wheel, extra_files={parent + name: b"desktop metadata"})
+    with pytest.raises(
+        validation.ReleasePreflightError, match="operating-system metadata"
+    ):
+        _validate_wheel(wheel, tmp_path)
+
+
+@pytest.mark.parametrize("name", [".DS_Store", "._payload", "Thumbs.db", "desktop.ini"])
+@pytest.mark.parametrize("parent", ["", "src/example/", "src/example.egg-info/"])
+def test_sdist_rejects_operating_system_metadata(
+    tmp_path: Path, name: str, parent: str
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "example"\nversion = "1.0"\n', encoding="utf-8"
+    )
+    checkout_metadata = tmp_path / parent / name
+    checkout_metadata.parent.mkdir(parents=True, exist_ok=True)
+    checkout_metadata.write_bytes(b"desktop metadata")
+    sdist = tmp_path / "candidate.tar.gz"
+    _write_sdist(
+        sdist,
+        [
+            *_minimal_sdist_entries(),
+            _tar_info(f"example-1.0/{parent}{name}", b"desktop metadata"),
+        ],
+    )
+    with pytest.raises(
+        validation.ReleasePreflightError, match="operating-system metadata"
+    ):
+        validation._validate_sdist_distribution(
+            _spec(tmp_path),
+            sdist,
+            {},
+            expected_metadata=_metadata(),
+            expected_entry_points={},
+        )
+
+
+def test_checkout_metadata_is_ignored_without_deleting_it(tmp_path: Path) -> None:
+    source = tmp_path / "src/example"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_bytes(b"VALUE = 1\n")
+    metadata = [
+        source / name
+        for name in (".DS_Store", "._module.py", "Thumbs.db", "desktop.ini")
+    ]
+    for path in metadata:
+        path.write_bytes(b"desktop metadata")
+    assert set(validation._checkout_package_files(_spec(tmp_path))) == {"__init__.py"}
+    assert all(path.read_bytes() == b"desktop metadata" for path in metadata)

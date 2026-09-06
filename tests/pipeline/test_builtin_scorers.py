@@ -22,6 +22,8 @@ from invarlock.pipeline.metrics import UNICODE_VERSION
         ("numeric_tolerance", {"absolute": 0.1}, "10", "10.01", 1),
         ("token_f1", {"unicode_version": UNICODE_VERSION}, "a b", "a", 2 / 3),
         ("json_fields", {"fields": ["/x"]}, '{"x":1}', '{"x":1}', 1),
+        ("json_exact", {}, '{"x":1}', '{ "x": 1 }', 1),
+        ("json_exact", {}, '{"x":1}', '{"x":1,"extra":0}', 0),
     ],
 )
 def test_shipped_scorers_replay_with_third_party_code_disabled(
