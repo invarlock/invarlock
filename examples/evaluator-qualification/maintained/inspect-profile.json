@@ -1,0 +1,21 @@
+{
+  "profile_id": "inspect-ai-literal-pairs-v1",
+  "upstream": {"ecosystem": "pypi", "name": "inspect-ai", "version": "0.3.254"},
+  "project_url": "https://github.com/UKGovernmentBEIS/inspect_ai",
+  "lock": "locks/inspect-ai.txt",
+  "runner": "maintained/inspect_literal_runner.py",
+  "runner_assets": ["maintained/inspect_semantics.py", "maintained/inspect-profile.json"],
+  "authority": {"mode": "deterministic_per_record", "metric": {"kind": "exact_match"}, "reason": null},
+  "scorer_configuration": {"location": "exact", "ignore_case": false, "numeric": false},
+  "supported_domain": {
+    "name": "single-target-literal-agreement-v1",
+    "reference_count": 1,
+    "reference_type": "string",
+    "pair_rule": "Literal output equality must agree with equality after each string's Unicode strip(), then ASCII boundary whitespace/punctuation stripping.",
+    "unsupported": "Unequal strings collapsed together by boundary stripping; array or multiple targets; native scorer configuration or detail drift.",
+    "preserved": "Equal strings including leading/trailing whitespace or punctuation, internal whitespace/punctuation, Unicode and empty strings remain eligible. Distinct normalized strings remain eligible mismatches.",
+    "metric": "The independent qualification still uses byte-exact equality; no normalization is added to the accepted metric."
+  },
+  "historical_profile": "inspect-ai",
+  "qualification_status": "requires fresh execution; historical evidence is not promoted to this runner identity"
+}

@@ -1,0 +1,211 @@
+{
+  "authority": "none",
+  "candidate_dependency": false,
+  "cases": [
+    {
+      "case_id": "plain_equal",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "case",
+      "native_answer": "Answer",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "distinct",
+      "native_answer": "answer",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "equal_leading_space",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "output_leading_space",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "reference_leading_space",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "equal_trailing_newline",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "trailing_newline",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "equal_boundary_punctuation",
+      "native_answer": "!answer!",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "boundary_punctuation",
+      "native_answer": "answer!",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "internal_whitespace",
+      "native_answer": "a b",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "internal_punctuation",
+      "native_answer": "a,b",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "unicode_equal",
+      "native_answer": "é",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "unicode_case",
+      "native_answer": "É",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "unicode_composition",
+      "native_answer": "é",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "unicode_punctuation",
+      "native_answer": "“yes”",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "unicode_boundary_space",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "equal_unicode_boundary_space",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "zero_width_space",
+      "native_answer": "​answer",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "empty_equal",
+      "native_answer": "",
+      "native_value": "C",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "empty_mismatch",
+      "native_answer": "",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "empty_whitespace",
+      "native_answer": "",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "empty_punctuation",
+      "native_answer": "!",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "multiple_targets_match",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "multiple_targets_miss",
+      "native_answer": "answer",
+      "native_value": "I",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "single_target_array",
+      "native_answer": "answer",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    },
+    {
+      "case_id": "numeric_disabled_internal",
+      "native_answer": "1,000",
+      "native_value": "I",
+      "problems": [],
+      "supported": true
+    },
+    {
+      "case_id": "numeric_disabled_boundary",
+      "native_answer": "$42",
+      "native_value": "C",
+      "problems": [],
+      "supported": false
+    }
+  ],
+  "format": "invarlock/inspect-literal-differential-observation-v1",
+  "observed_package_version": "0.3.254",
+  "reference_package_version": "0.3.254",
+  "scorer_configuration": {
+    "ignore_case": false,
+    "location": "exact",
+    "numeric": false
+  },
+  "semantic_drift": false
+}

@@ -1,0 +1,215 @@
+{
+  "format": "invarlock/inspect-literal-differential-corpus-v1",
+  "upstream_version": "0.3.254",
+  "scorer_configuration": {
+    "location": "exact",
+    "ignore_case": false,
+    "numeric": false
+  },
+  "cases": [
+    {
+      "id": "plain_equal",
+      "output": "answer",
+      "reference": "answer",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "case",
+      "output": "Answer",
+      "reference": "answer",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "distinct",
+      "output": "answer",
+      "reference": "different",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "equal_leading_space",
+      "output": " answer",
+      "reference": " answer",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "output_leading_space",
+      "output": " answer",
+      "reference": "answer",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "reference_leading_space",
+      "output": "answer",
+      "reference": " answer",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "equal_trailing_newline",
+      "output": "answer\n",
+      "reference": "answer\n",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "trailing_newline",
+      "output": "answer\n",
+      "reference": "answer",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "equal_boundary_punctuation",
+      "output": "!answer!",
+      "reference": "!answer!",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "boundary_punctuation",
+      "output": "answer!",
+      "reference": "answer",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "internal_whitespace",
+      "output": "a b",
+      "reference": "a  b",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "internal_punctuation",
+      "output": "a,b",
+      "reference": "ab",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "unicode_equal",
+      "output": "é",
+      "reference": "é",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "unicode_case",
+      "output": "É",
+      "reference": "é",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "unicode_composition",
+      "output": "é",
+      "reference": "é",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "unicode_punctuation",
+      "output": "“yes”",
+      "reference": "yes",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "unicode_boundary_space",
+      "output": " answer",
+      "reference": "answer",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "equal_unicode_boundary_space",
+      "output": " answer",
+      "reference": " answer",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "zero_width_space",
+      "output": "​answer",
+      "reference": "answer",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "empty_equal",
+      "output": "",
+      "reference": "",
+      "native_correct": true,
+      "supported": true
+    },
+    {
+      "id": "empty_mismatch",
+      "output": "",
+      "reference": "no",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "empty_whitespace",
+      "output": "",
+      "reference": "  ",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "empty_punctuation",
+      "output": "!",
+      "reference": "",
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "multiple_targets_match",
+      "output": "answer",
+      "reference": [
+        "answer",
+        "other"
+      ],
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "multiple_targets_miss",
+      "output": "answer",
+      "reference": [
+        "first",
+        "second"
+      ],
+      "native_correct": false,
+      "supported": false
+    },
+    {
+      "id": "single_target_array",
+      "output": "answer",
+      "reference": [
+        "answer"
+      ],
+      "native_correct": true,
+      "supported": false
+    },
+    {
+      "id": "numeric_disabled_internal",
+      "output": "1,000",
+      "reference": "1000",
+      "native_correct": false,
+      "supported": true
+    },
+    {
+      "id": "numeric_disabled_boundary",
+      "output": "$42",
+      "reference": "42",
+      "native_correct": true,
+      "supported": false
+    }
+  ]
+}
