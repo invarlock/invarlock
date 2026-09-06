@@ -167,7 +167,7 @@ python -m examples.qualification.k2_runtime_build \
 docker build --platform linux/amd64 --iidfile runtime-image-id.txt \
   --tag k2-candidate:reviewed runtime-context
 docker run --rm --platform linux/amd64 --network none --read-only \
-  --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+  --tmpfs /tmp:rw,nosuid,nodev,exec,size=1g \
   --user 65532:65532 --env HOME=/tmp --env XDG_CACHE_HOME=/tmp/cache \
   --env HF_HOME=/tmp/huggingface \
   --cap-drop ALL --security-opt no-new-privileges \
@@ -204,7 +204,14 @@ artifacts, build logs, and installed-file hashes. Verification checks package
 metadata, actual payload bytes, both loaded libraries, and Python's Expat
 version; it rejects leftover older shared libraries.
 
-The native probe checks installed source identities, actual imports, server help,
+The fresh private `/tmp` filesystem allows execution for JIT-generated host
+libraries while retaining `nosuid` and `nodev`. The image filesystem stays
+read-only. The native probe compiles a fixed C function through the installed
+Triton host compiler, loads the resulting library, and checks its return value.
+The subprocess has a 60-second wall limit, a 30-second CPU limit, and a 16MB
+file-size limit; this checks host compilation and loading, not GPU kernels.
+
+The native probe also checks installed source identities, actual imports, server help,
 dependency consistency, and rejection of the excluded grammar operation through
 the upstream test context. CPU imports do not exercise GPU-conditional kernels. Its
 result explicitly has no GPU qualification authority. Retain both Python and

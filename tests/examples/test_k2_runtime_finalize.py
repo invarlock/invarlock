@@ -269,6 +269,7 @@ def test_container_cleanup_uses_observed_id_and_offline_limits(monkeypatch):
     assert finalize.container("sha256:" + "a" * 64, "python", ["-c", "pass"]) == b"{}"
     assert calls[-1] == ["docker", "rm", "--force", "f" * 64]
     command = calls[0]
+    assert "/tmp:rw,nosuid,nodev,exec,size=1g" in command
     assert "none" in command and "--read-only" in command
     assert "NVIDIA_VISIBLE_DEVICES=void" in command and "--gpus" not in command
     assert "65532:65532" in command and "--pids-limit" in command
@@ -458,6 +459,14 @@ def observation(tmp_path, monkeypatch):
         "gpu_execution": False,
         "build_inputs_sha256": build_hash,
         "packages": dict(packages),
+    }
+    probe["host_compiler"] = {
+        "status": "fixed_cpu_host_compile_and_call_passed",
+        "source_sha256": finalize.sha(finalize.native.HOST_SOURCE),
+        "compiled_library_sha256": "3" * 64,
+        "triton_version": packages["triton"],
+        "result": 42,
+        "gpu_execution": False,
     }
     inspection = {"Id": image, "Os": "linux", "Architecture": "amd64"}
     monkeypatch.setattr(
@@ -873,3 +882,10 @@ def test_image_side_expat_module_injection_is_rejected_before_helper(
     with pytest.raises(ValueError, match="Expat input tree"):
         finalize.observe(image, inputs, digest, root)
     assert len(calls) == 1
+
+
+def test_native_probe_cannot_omit_required_host_compiler_check(observation):
+    root, image, inputs, digest, _, probe, _ = observation
+    probe.pop("host_compiler")
+    with pytest.raises(ValueError, match="host compiler observation"):
+        finalize.observe(image, inputs, digest, root)

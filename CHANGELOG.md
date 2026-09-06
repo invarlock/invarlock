@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Made private K2 JIT storage executable and added a bounded CPU host-library
+  compile-and-load check before runtime finalization. Container network and
+  filesystem restrictions remain enforced.
 - Omitted unused GLib from the native K2 package selection after native consumer
   inspection and an actual removal/import check, retaining GPU and compiler tools.
 - Built the signed whole Expat release as matched local runtime and development

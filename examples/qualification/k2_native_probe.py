@@ -6,10 +6,13 @@ import hashlib
 import importlib
 import importlib.metadata
 import json
+import os
 import platform
 import re
+import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -21,6 +24,96 @@ def package_inventory(distributions):
             raise ValueError(f"duplicate installed distribution identity: {name}")
         packages[name] = distribution.version
     return packages
+
+
+HOST_SOURCE = b"int fixed_host_probe(void) { return 42; }\n"
+HOST_COMPILER_TIMEOUT = 60
+
+
+def validate_host_compiler(report, triton_version):
+    if (
+        not isinstance(report, dict)
+        or report.get("status") != "fixed_cpu_host_compile_and_call_passed"
+        or report.get("source_sha256") != hashlib.sha256(HOST_SOURCE).hexdigest()
+        or report.get("triton_version") != triton_version
+        or report.get("result") != 42
+        or report.get("gpu_execution") is not False
+        or re.fullmatch(r"[0-9a-f]{64}", str(report.get("compiled_library_sha256")))
+        is None
+    ):
+        raise ValueError("fixed CPU host compiler observation is missing or invalid")
+    return report
+
+
+def fixed_host_compile():
+    import ctypes
+    import resource
+
+    resource.setrlimit(resource.RLIMIT_CPU, (30, 30))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (16 * 1024 * 1024, 16 * 1024 * 1024))
+    from triton.runtime.build import _build
+
+    with tempfile.TemporaryDirectory(prefix="k2-fixed-host-compile-") as directory:
+        root = Path(directory).resolve()
+        source = root / "fixed_host_probe.c"
+        source.write_bytes(HOST_SOURCE)
+        library = Path(
+            _build("fixed_host_probe", str(source), str(root), [], [], [], [])
+        )
+        if (
+            library.is_symlink()
+            or library.resolve().parent != root
+            or library.stat().st_size > 16 * 1024 * 1024
+        ):
+            raise ValueError(
+                "host compiler output escaped its private bounded directory"
+            )
+        loaded = ctypes.CDLL(str(library))
+        loaded.fixed_host_probe.restype = ctypes.c_int
+        result = loaded.fixed_host_probe()
+        report = {
+            "status": "fixed_cpu_host_compile_and_call_passed",
+            "source_sha256": hashlib.sha256(HOST_SOURCE).hexdigest(),
+            "compiled_library_sha256": hashlib.sha256(library.read_bytes()).hexdigest(),
+            "triton_version": importlib.metadata.version("triton"),
+            "result": result,
+            "gpu_execution": False,
+        }
+        return validate_host_compiler(report, report["triton_version"])
+
+
+def host_compiler_probe():
+    with tempfile.TemporaryDirectory(prefix="k2-host-compiler-result-") as directory:
+        output, error = Path(directory) / "stdout", Path(directory) / "stderr"
+        with output.open("wb") as stdout, error.open("wb") as stderr:
+            process = subprocess.Popen(
+                [sys.executable, str(Path(__file__).resolve()), "--host-compiler"],
+                stdout=stdout,
+                stderr=stderr,
+                start_new_session=True,
+            )
+            try:
+                code = process.wait(timeout=HOST_COMPILER_TIMEOUT)
+            except BaseException:
+                # Stop the compiler's private process group on timeout/interruption.
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+                raise
+            if code:
+                with error.open("rb") as diagnostic:
+                    excerpt = diagnostic.read(4096).decode("utf-8", errors="replace")
+                raise ValueError(
+                    "fixed CPU host compilation or library loading failed "
+                    f"(exit {code}): {excerpt}"
+                )
+        if output.stat().st_size > 65536:
+            raise ValueError("host compiler observation exceeds size bound")
+        return validate_host_compiler(
+            json.loads(output.read_bytes()), importlib.metadata.version("triton")
+        )
 
 
 def inspect_native(root=Path("/usr/share/invarlock-k2")):
@@ -95,7 +188,9 @@ def inspect_native(root=Path("/usr/share/invarlock-k2")):
         stdout=sys.stderr,
         timeout=60,
     )
+    host_compiler = host_compiler_probe()
     return {
+        "host_compiler": host_compiler,
         "format": "invarlock/k2-native-cpu-probe-v1",
         "status": "cpu_imports_passed_not_gpu_qualified",
         "build_inputs_sha256": hashlib.sha256(
@@ -113,4 +208,11 @@ def inspect_native(root=Path("/usr/share/invarlock-k2")):
 
 
 if __name__ == "__main__":
-    print(json.dumps(inspect_native(), sort_keys=True))
+    print(
+        json.dumps(
+            fixed_host_compile()
+            if sys.argv[1:] == ["--host-compiler"]
+            else inspect_native(),
+            sort_keys=True,
+        )
+    )

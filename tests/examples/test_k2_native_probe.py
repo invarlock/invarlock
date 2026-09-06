@@ -28,6 +28,7 @@ def _environment(tmp_path, monkeypatch, *, mode="good"):
         },
     }
     (root / "build-inputs.json").write_text(json.dumps(inputs))
+    monkeypatch.setattr(probe, "host_compiler_probe", lambda: {"status": "fixture"})
     monkeypatch.setattr(probe.sys, "platform", "linux")
     monkeypatch.setattr(probe.platform, "machine", lambda: "x86_64")
     monkeypatch.setattr(probe.platform, "platform", lambda: "Linux fixture")
@@ -182,3 +183,125 @@ def test_native_probe_rejects_duplicates_before_importing(tmp_path, monkeypatch)
     with pytest.raises(ValueError, match="duplicate installed distribution"):
         probe.inspect_native(root)
     assert calls == []
+
+
+def host_report():
+    return {
+        "status": "fixed_cpu_host_compile_and_call_passed",
+        "source_sha256": hashlib.sha256(probe.HOST_SOURCE).hexdigest(),
+        "compiled_library_sha256": "a" * 64,
+        "triton_version": "fixture",
+        "result": 42,
+        "gpu_execution": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"result": 0},
+        {"gpu_execution": True},
+        {"source_sha256": "0" * 64},
+        {"compiled_library_sha256": ""},
+        {"triton_version": "other"},
+        {"status": "skipped"},
+    ],
+)
+def test_host_compiler_report_must_bind_fixture_and_runtime(change):
+    value = host_report()
+    value.update(change)
+    with pytest.raises(ValueError):
+        probe.validate_host_compiler(value, "fixture")
+
+
+def test_host_compiler_missing_report_rejected():
+    with pytest.raises(ValueError):
+        probe.validate_host_compiler(None, "fixture")
+
+
+@pytest.mark.parametrize("mode", ["good", "failure", "large", "timeout"])
+def test_host_compiler_child_result_and_timeout(tmp_path, monkeypatch, mode):
+    child = tmp_path / "child.py"
+    if mode == "good":
+        code = "print(" + repr(json.dumps(host_report())) + ")"
+    elif mode == "failure":
+        code = "raise SystemExit(3)"
+    elif mode == "large":
+        code = 'print("x" * 70000)'
+    else:
+        code = "import time; time.sleep(20)"
+    child.write_text(code)
+    monkeypatch.setattr(probe, "__file__", str(child))
+    monkeypatch.setattr(probe.importlib.metadata, "version", lambda name: "fixture")
+    monkeypatch.setattr(probe, "HOST_COMPILER_TIMEOUT", 0.1 if mode == "timeout" else 5)
+    if mode == "good":
+        assert probe.host_compiler_probe() == host_report()
+    else:
+        with pytest.raises(
+            subprocess.TimeoutExpired if mode == "timeout" else ValueError
+        ):
+            probe.host_compiler_probe()
+
+
+def test_host_compiler_failed_child_retains_bounded_diagnostic(tmp_path, monkeypatch):
+    child = tmp_path / "child.py"
+    child.write_text(
+        "import sys\n"
+        "sys.stderr.buffer.write(b'failed to map segment: \\xff' + b'x' * 5000)\n"
+        "raise SystemExit(3)\n"
+    )
+    monkeypatch.setattr(probe, "__file__", str(child))
+    with pytest.raises(ValueError) as caught:
+        probe.host_compiler_probe()
+    message = str(caught.value)
+    assert "(exit 3): failed to map segment: \ufffd" in message
+    assert len(message.split("(exit 3): ", 1)[1]) == 4096
+
+
+@pytest.mark.parametrize("mode", ["good", "wrong_result", "noexec", "escape"])
+def test_fixed_host_compile_uses_real_interface_and_checks_load(
+    tmp_path, monkeypatch, mode
+):
+    import ctypes
+    import resource
+
+    limits = []
+    calls = []
+    monkeypatch.setattr(
+        resource, "setrlimit", lambda kind, value: limits.append((kind, value))
+    )
+    monkeypatch.setattr(probe.importlib.metadata, "version", lambda name: "fixture")
+    module = ModuleType("triton.runtime.build")
+
+    def build(name, src, directory, library_dirs, include_dirs, libraries, ccflags):
+        from pathlib import Path
+
+        assert Path(src).read_bytes() == probe.HOST_SOURCE
+        calls.append((name, library_dirs, include_dirs, libraries, ccflags))
+        path = (
+            tmp_path / "escaped.so"
+            if mode == "escape"
+            else Path(directory) / "fixed.so"
+        )
+        path.write_bytes(b"compiled fixture")
+        return str(path)
+
+    module._build = build
+    monkeypatch.setitem(sys.modules, "triton.runtime.build", module)
+
+    def load(path):
+        if mode == "noexec":
+            raise OSError("failed to map segment")
+        return SimpleNamespace(
+            fixed_host_probe=lambda: 0 if mode == "wrong_result" else 42
+        )
+
+    monkeypatch.setattr(ctypes, "CDLL", load)
+    if mode == "good":
+        assert probe.fixed_host_compile()["result"] == 42
+    else:
+        with pytest.raises(OSError if mode == "noexec" else ValueError):
+            probe.fixed_host_compile()
+    assert calls == [("fixed_host_probe", [], [], [], [])]
+    assert (resource.RLIMIT_CPU, (30, 30)) in limits
+    assert (resource.RLIMIT_FSIZE, (16 * 1024 * 1024, 16 * 1024 * 1024)) in limits

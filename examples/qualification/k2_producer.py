@@ -330,7 +330,7 @@ def run_container(
         "--cap-drop=ALL",
         "--security-opt=no-new-privileges",
         "--shm-size=32g",
-        "--tmpfs=/tmp:rw,nosuid,size=16g",
+        "--tmpfs=/tmp:rw,nosuid,nodev,exec,size=16g",
         "--cpus=32",
         "--memory=440g",
         "--gpus=all",

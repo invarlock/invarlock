@@ -16,6 +16,7 @@ import time
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
+from examples.qualification import k2_native_probe as native
 from examples.qualification import k2_runtime_build as build
 from examples.qualification import k2_runtime_source as source
 
@@ -142,7 +143,7 @@ def container(image, entrypoint, arguments):
                 "--cpus",
                 "4",
                 "--tmpfs",
-                "/tmp:rw,nosuid,nodev,size=1g",
+                "/tmp:rw,nosuid,nodev,exec,size=1g",
                 "--env",
                 "HOME=/tmp",
                 "--env",
@@ -410,6 +411,7 @@ def observe(image, inputs, build_hash, context):
         or probe.get("packages") != packages
     ):
         raise ValueError("native CPU probe identity or result differs")
+    native.validate_host_compiler(probe.get("host_compiler"), packages.get("triton"))
     return observed, probe
 
 
