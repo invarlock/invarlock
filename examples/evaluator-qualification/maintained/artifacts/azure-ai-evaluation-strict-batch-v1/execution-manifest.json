@@ -1,0 +1,28 @@
+{
+  "artifacts_sha256": {
+    "boundary-observation.json": "sha256:8b0e453ffebdc1df689f74bb53421109a085c1d53bcf1e697c8c7bf23e1da1b6",
+    "cases.json": "sha256:021b8e2155f2006d68dfee297bc3a54ab54ff43424b5aa56e1ea20db1379a113",
+    "export.json": "sha256:d6f80d59f26efaee2f75473ef04f6c6a40e8682d65c795f875387a711215b3bd",
+    "profile.json": "sha256:f7e01a2e17d01716676fa84d097276049016ef223b37860d20e42c2031dac248",
+    "qualification-result.json": "sha256:84f44e0240ef693b8ecdbde3660a19b7eae6b56fd5ca3e2a08ad0c524fef1ac2",
+    "schedule.json": "sha256:854393a8d790334f3c7deafa7f6df064dfb806a61394cf946fd038607815617c",
+    "upstream-output.json": "sha256:ec6628d56c2de1aeb1c0c18f89d1ccb7d7659e95ba05c180eca990bff9dccf1a"
+  },
+  "differential_case_count": 34,
+  "format": "invarlock/batch-maintenance-execution-v1",
+  "model_output_count": 102,
+  "new_model_inference": false,
+  "profile_id": "azure-ai-evaluation-strict-batch-v1",
+  "signed_transaction": false,
+  "sources_sha256": {
+    "batch-boundaries.json": "sha256:ae26286afbed5ad478b7439648d89c356bfa3be92e2376725e2def01d2e8fd01",
+    "batch-profiles.json": "sha256:78660b5a0df67b25446512c3f479deae08585572c2c6500b71e5522722da65f5",
+    "batch_differential.py": "sha256:85d4319683dd4b67290076559052fe22177225cae2c60893fcf437f08f11ecbe",
+    "batch_native.py": "sha256:f4d562a866d85935eeb022747d59f2a5136bcd2191d38d1a0c6b77ac1f4c7395",
+    "batch_runner.py": "sha256:9127590014d6e5d98db76f6abdcf04999b0344082309de83550876dbe16b46b1",
+    "batch_semantics.py": "sha256:516b9a5fbfa233bee2d1b92a6c89c2a1c784068375c4a6277ebc1f65bdb63ca8",
+    "profile_binding.py": "sha256:5dade9fe3a96c0ae29a9ca57dd437b2b45dff95837868caaf3c451096e27635b",
+    "qualify_batch.py": "sha256:4939c877baadd89f192254ad3c554098437a94b43b3acaad9134699975a914a4"
+  },
+  "upstream_version": "1.18.1"
+}

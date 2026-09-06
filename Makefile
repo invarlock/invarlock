@@ -65,7 +65,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
-.PHONY: evaluator-inspect-semantics
+.PHONY: evaluator-inspect-semantics evaluator-batch-semantics
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
@@ -334,6 +334,19 @@ evaluator-inspect-semantics:  ## Check the pinned Inspect scorer's literal-pair 
 			--with-requirements examples/evaluator-qualification/locks/inspect-ai.txt \
 			python examples/evaluator-qualification/maintained/inspect_differential.py \
 			--output "$$audit_dir/observation.json"
+
+evaluator-batch-semantics:  ## Check the five pinned batch scorers against literal boundaries
+	@set -eu; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		for provider in evidently langfuse azure-ai-evaluation pydantic-evals; do \
+			uv run --no-project --python "$(PYTHON)" \
+				--with-requirements "examples/evaluator-qualification/locks/$$provider.txt" \
+				python examples/evaluator-qualification/maintained/batch_differential.py \
+				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
+		done; \
+		$(PYTHON) examples/evaluator-qualification/maintained/batch_differential.py \
+			--provider promptfoo --output "$$audit_dir/promptfoo.json"
 
 evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
