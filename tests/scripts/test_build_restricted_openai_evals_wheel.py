@@ -13,7 +13,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/security/build_restricted_openai_evals_wheel.py"
 
 
-def test_executable_cli_rejects_unauthenticated_input(tmp_path: Path) -> None:
+@pytest.mark.parametrize("from_checkout", [False, True])
+def test_executable_cli_rejects_unauthenticated_input(
+    tmp_path: Path, from_checkout: bool
+) -> None:
     source = tmp_path / "untrusted.whl"
     source.write_bytes(b"not the pinned upstream wheel")
     output = tmp_path / "output"
@@ -27,7 +30,7 @@ def test_executable_cli_rejects_unauthenticated_input(tmp_path: Path) -> None:
             "--output-directory",
             str(output),
         ],
-        cwd=tmp_path,
+        cwd=ROOT if from_checkout else tmp_path,
         capture_output=True,
         text=True,
         check=False,
