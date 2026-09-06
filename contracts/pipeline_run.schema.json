@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/pipeline_run.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/pipeline-run-v1"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "score_provenance": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "judge",
+              "human",
+              "measurement",
+              "external_metric"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "rubric_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "source",
+          "version",
+          "unit",
+          "rubric_digest"
+        ]
+      },
+      "maxProperties": 100
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "input": {},
+          "expected": {},
+          "output": {},
+          "scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "maxProperties": 100
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxProperties": 100
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context": {}
+        },
+        "required": [
+          "id",
+          "input",
+          "expected",
+          "output",
+          "scores",
+          "metadata",
+          "error",
+          "context"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 10000
+    }
+  },
+  "required": [
+    "format",
+    "source",
+    "run_id",
+    "artifact_digest",
+    "source_digest",
+    "score_provenance",
+    "records"
+  ]
+}
