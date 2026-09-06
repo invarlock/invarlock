@@ -96,7 +96,7 @@ This is an internal consistency check: the receipt binds the schedule digest,
 but does not contain the complete schedule or independently recover its dataset
 metadata. Source labels and metric descriptions are envelope-signer context
 unless a recipient also replays the complete evidence and checks those fields.
-A countersigner can supply a different self-consistent source description
+An envelope signer can supply a different self-consistent source description
 without changing the original receipt-bound schedule or technical result;
 envelope-only verification does not establish that description's relationship
 to the schedule bytes. Do not present those fields as independently replayed
