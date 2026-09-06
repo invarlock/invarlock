@@ -337,3 +337,27 @@ def test_cli_import_digest_and_invalid_keys(tmp_path):
         ).exit_code
         == 2
     )
+
+
+def test_cli_digest_rejects_artifact_changed_while_reading(tmp_path, monkeypatch):
+    artifact = tmp_path / "model.bin"
+    artifact.write_bytes(b"original artifact")
+    inode = artifact.stat().st_ino
+    original_fstat = os.fstat
+    changed = False
+
+    def mutate_after_initial_stat(fd):
+        nonlocal changed
+        snapshot = original_fstat(fd)
+        if snapshot.st_ino == inode and not changed:
+            changed = True
+            artifact.write_bytes(b"different artifact bytes")
+        return snapshot
+
+    monkeypatch.setattr(os, "fstat", mutate_after_initial_stat)
+    result = CliRunner().invoke(app, ["digest", str(artifact)])
+    assert changed
+    assert result.exit_code == 2
+    failure = json.loads(result.stdout)
+    assert failure["status"] == "integration_error"
+    assert "artifact changed during hashing" in failure["message"]

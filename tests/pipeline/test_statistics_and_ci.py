@@ -45,6 +45,37 @@ def test_swapping_paired_runs_reverses_delta_and_interval():
     assert forward["interval"]["upper"] == pytest.approx(-reverse["interval"]["lower"])
 
 
+def test_latency_regression_rejects_candidate_below_absolute_ceiling():
+    base, candidate, policy = example_project("judge")
+    for row in candidate["records"]:
+        row["scores"]["latency_ms"] = 150.0
+    result = compare_runs(base, candidate, policy)
+    latency = result["metrics"][1]
+    assert latency["candidate_mean"] < policy["metrics"][1]["candidate_maximum"]
+    assert latency["decision"] == result["decision"] == "regression"
+    assert latency["reasons"] == ["upper interval bound exceeds allowed regression"]
+
+
+def test_wide_interval_cannot_pass_an_acceptable_mean():
+    base, candidate, policy = example_project("judge")
+    policy["metrics"][0]["maximum_interval_width"] = 0.001
+    for i, row in enumerate(candidate["records"]):
+        row["scores"]["quality"] += 0.05 if i % 2 else -0.05
+    result = compare_runs(base, candidate, policy)
+    quality = result["metrics"][0]
+    assert quality["delta"] == pytest.approx(0)
+    assert quality["decision"] == result["decision"] == "insufficient_evidence"
+    assert quality["reasons"] == ["interval is too wide"]
+
+
+def test_invalid_reference_identifies_metric_and_record():
+    base, candidate, policy = example_project("extraction")
+    for run in (base, candidate):
+        del run["records"][0]["expected"]["currency"]
+    with pytest.raises(PipelineError, match="metric quality, record case-0: reference"):
+        compare_runs(base, candidate, policy)
+
+
 @pytest.mark.parametrize(
     "mutation", ["unit", "nan", "boolean", "empty_slice", "missing_score"]
 )

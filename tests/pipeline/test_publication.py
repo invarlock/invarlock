@@ -25,6 +25,22 @@ def test_failed_directory_write_is_never_published(tmp_path, monkeypatch):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_failed_temporary_file_creation_preserves_destination(tmp_path, monkeypatch):
+    import tempfile
+
+    destination = tmp_path / "evidence.json"
+    destination.write_bytes(b"previous evidence")
+
+    def no_space(**kwargs):
+        raise OSError("no space for temporary file")
+
+    monkeypatch.setattr(tempfile, "mkstemp", no_space)
+    with pytest.raises(contracts.PipelineError, match="no space"):
+        contracts.write_new(destination, b"replacement")
+    assert destination.read_bytes() == b"previous evidence"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
 def test_complete_directory_does_not_replace_even_an_empty_destination(tmp_path):
     destination = tmp_path / "result"
     destination.mkdir()

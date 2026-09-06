@@ -69,20 +69,19 @@ def write_new(path: str | Path, payload: bytes) -> Path:
 
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
     try:
         fd, name = tempfile.mkstemp(dir=destination.parent, prefix=".pipeline-")
         temporary = Path(name)
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(temporary, destination)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.link(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
     except OSError as exc:
         raise PipelineError(f"cannot create {destination}: {exc}") from exc
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
     return destination
 
 
