@@ -24,9 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated coordinated Python tooling, documentation dependencies, and pinned
+  CI actions. Python dependency updates now use the uv ecosystem so the root
+  manifest and lock are proposed together; hashed workflow locks remain
+  separately checked.
+
 ### Removed
 
 ### Fixed
+
+- Remediated maintained dependency-audit findings by updating pip, wheel, and
+  Material for MkDocs, and removing unused NLTK and ROUGE dependencies from the
+  fixed evaluator images. Derived wheels keep authenticated upstream inputs
+  in the audit inventory and preserve selected scorer code. Historical signed
+  evidence retains its original identities.
 
 - Connected successful production publication to serialized, tagged
   documentation publishing that atomically updates the immutable version path,
