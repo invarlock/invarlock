@@ -7,6 +7,7 @@ bounded diagnostics, deadlines and cleanup all come from production code.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 import signal
@@ -77,6 +78,105 @@ for label, path in [('artifact', '/invarlock-resources/artifact/input.txt'),
         results[label + '_errno'] = error.errno
 Path('/invarlock/output-root/probe-output.json').write_text(json.dumps(results))
 print(json.dumps(results), flush=True)
+"""
+
+FOREIGN_UID_CLEANUP_PROBE = r"""
+import json, os, stat, subprocess, sys, traceback
+from pathlib import Path
+cleanup, host_cleanup = json.loads(sys.argv[1])
+exec(host_cleanup)
+def as_user(uid, function):
+    child = os.fork()
+    if child == 0:
+        try:
+            os.setgroups([])
+            os.setgid(uid)
+            os.setuid(uid)
+            assert os.getuid() == uid and os.geteuid() == uid
+            function()
+        except BaseException:
+            traceback.print_exc()
+            os._exit(1)
+        os._exit(0)
+    _, status = os.waitpid(child, 0)
+    return os.waitstatus_to_exitcode(status)
+
+observations = []
+for kind in ('ordinary', 'hostile', 'entry-limit', 'depth-limit'):
+    root = Path('/tmp/' + kind)
+    output = root / 'output'
+    os.seteuid(1000)
+    root.mkdir(mode=0o700)
+    output.mkdir(mode=0o733)
+    output.chmod(0o733)
+    descriptor = os.open(output, os.O_RDONLY | os.O_DIRECTORY)
+    os.seteuid(0)
+    sentinel = Path('/tmp/sentinel-' + kind)
+    def create():
+        os.fchdir(descriptor)
+        side = Path('side')
+        side.mkdir(mode=0o755)
+        (side / 'report.json').write_text('{}')
+        sentinel.write_text('unchanged')
+        sentinel.chmod(0o400)
+        if kind == 'hostile':
+            (side / 'link').symlink_to(sentinel)
+            (side / 'directory-link').symlink_to('/tmp', target_is_directory=True)
+            (side / 'hardlink').hardlink_to(sentinel)
+            os.mkfifo(side / 'fifo', 0o000)
+            locked = side / 'locked'
+            locked.mkdir()
+            (locked / 'private').write_text('private')
+            locked.chmod(0o000)
+            side.chmod(0o000)
+        elif kind == 'entry-limit':
+            for index in range(4097):
+                (side / str(index)).touch()
+        elif kind == 'depth-limit':
+            nested = side
+            for index in range(65):
+                nested = nested / str(index)
+                nested.mkdir()
+    assert as_user(65532, create) == 0
+    def host_attempt():
+        assert output.stat().st_uid == 1000
+        assert (output / 'side').stat().st_uid == 65532
+        try:
+            _remove_collectible_output(output)
+        except OSError:
+            return
+        raise AssertionError('host must be unable to remove worker-owned output')
+    assert as_user(1000, host_attempt) == 0
+    os.seteuid(1000)
+    os.fchmod(descriptor, 0o777)
+    os.seteuid(0)
+    def worker_cleanup():
+        os.fchdir(descriptor)
+        result = subprocess.run([sys.executable, '-I', '-S', '-c', cleanup, '.'],
+                                capture_output=True, text=True, timeout=15)
+        if kind in ('ordinary', 'hostile'):
+            assert result.returncode == 0, result.stderr
+            assert list(Path('.').iterdir()) == []
+        else:
+            assert result.returncode != 0
+            assert ('entry limit' if kind == 'entry-limit' else 'depth limit') in result.stderr
+            assert Path('side').is_dir()
+        assert sentinel.read_text() == 'unchanged'
+        assert stat.S_IMODE(sentinel.stat().st_mode) == 0o400
+    assert as_user(65532, worker_cleanup) == 0
+    os.seteuid(1000)
+    os.fchmod(descriptor, 0o733)
+    if kind in ('ordinary', 'hostile'):
+        _remove_collectible_output(output)
+        output.rmdir()
+        root.rmdir()
+    os.seteuid(0)
+    os.close(descriptor)
+    observations.append({'case': kind, 'host_uid': 1000, 'worker_uid': 65532,
+                         'host_cleanup_blocked': True,
+                         'bounded_cleanup': 'removed' if kind in ('ordinary', 'hostile') else 'rejected',
+                         'external_file_unchanged': True})
+print(json.dumps(observations), flush=True)
 """
 
 
@@ -446,7 +546,9 @@ def test_failed_real_worker_cannot_publish_completed_transaction(
         output="rejected-evidence",
     )
     original = oci.compose_side_worker_command
+    original_runner = oci.run_side_worker
     observed = []
+    cleanup_commands = []
     payload = (
         "raise SystemExit(7)"
         if mode == "nonzero"
@@ -459,7 +561,13 @@ def test_failed_real_worker_cannot_publish_completed_transaction(
         observed.append(command)
         return command
 
+    def run(command, **kwargs):
+        if oci._OUTPUT_CLEANUP_SCRIPT in command:
+            cleanup_commands.append(command)
+        return original_runner(command, **kwargs)
+
     monkeypatch.setattr(oci, "compose_side_worker_command", compose)
+    monkeypatch.setattr(oci, "run_side_worker", run)
     executor = oci.OciRuntimeExecutor(runtime)
     with pytest.raises(
         EvaluationTransactionError, match="worker exited|six-file bundle"
@@ -473,6 +581,17 @@ def test_failed_real_worker_cannot_publish_completed_transaction(
     assert len(observed) == 2
     assert not (workspace / "rejected-evidence").exists()
     assert not list(workspace.rglob("pack.manifest.json"))
+    output_roots = []
+    for command in observed:
+        mount = next(
+            value
+            for value in command
+            if value.startswith("type=bind,")
+            and "target=/invarlock/output-root" in value
+        )
+        output = Path(mount.split("source=", 1)[1].split(",", 1)[0])
+        output_roots.append(str(output))
+        assert not output.parent.exists()
     _record(
         "transaction-" + mode,
         runtime,
@@ -480,4 +599,90 @@ def test_failed_real_worker_cannot_publish_completed_transaction(
         None,
         rejected=str(failure.value),
         evidence_published=False,
+        removed_output_roots=output_roots,
+        cleanup_commands=cleanup_commands,
+    )
+
+
+def test_distinct_linux_uids_clean_failed_output_without_touching_external_files(
+    runtime,
+):
+    """Use Linux tmpfs so desktop mount ownership cannot hide a UID mismatch."""
+    command = [
+        runtime.engine,
+        "run",
+        "--rm",
+        "--init",
+        "--pull=never",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--cap-add=SETUID",
+        "--cap-add=SETGID",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "32",
+        "--cpus",
+        "1",
+        "--memory",
+        "128m",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+        "--user",
+        "0:0",
+        "--entrypoint",
+        "python",
+        runtime.baseline.image_ref,
+        "-I",
+        "-S",
+        "-c",
+        FOREIGN_UID_CLEANUP_PROBE,
+        json.dumps(
+            [
+                oci._OUTPUT_CLEANUP_SCRIPT,
+                inspect.getsource(oci._remove_collectible_output),
+            ]
+        ),
+    ]
+    # SETUID/SETGID are fixture-only: each operation drops to the specified UID.
+    # The production helper itself retains --cap-drop=ALL and a non-root user.
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    observations = json.loads(result.stdout)
+    assert len(observations) == 4
+    assert all(item["host_cleanup_blocked"] for item in observations)
+    assert all(item["external_file_unchanged"] for item in observations)
+    _record("foreign-uid-cleanup", runtime, command, result, outcomes=observations)
+
+
+def test_cleanup_helper_runs_in_selected_container(runtime, tmp_path):
+    payload = (
+        "from pathlib import Path; "
+        "side=Path('/invarlock/output-root/side'); side.mkdir(); "
+        "nested=side/'nested'; nested.mkdir(); "
+        "(nested/'partial.json').write_text('{}'); nested.chmod(0)"
+    )
+    root = tmp_path / "fixture"
+    command = _command(runtime, root, payload)
+    created = oci.run_side_worker(command, timeout_seconds=30)
+    assert created.returncode == 0, created.stderr
+    output = root / "output"
+    with pytest.raises(OSError):
+        oci._remove_collectible_output(output)
+    cleanup = oci._output_cleanup_command(
+        root, output, runtime, runtime.baseline, "hf_transformers"
+    )
+    result = oci.run_side_worker(cleanup, timeout_seconds=30)
+    assert result.returncode == 0, result.stderr
+    assert not (root / "output-cleanup.cid").exists()
+    assert list(output.iterdir()) == []
+    _record(
+        "cleanup-helper",
+        runtime,
+        cleanup,
+        result,
+        worker_command=command,
+        output_empty=True,
     )
