@@ -12,7 +12,40 @@
               "additionalProperties": false,
               "properties": {
                 "kind": {
-                  "const": "exact_match"
+                  "enum": [
+                    "exact_match",
+                    "normalized_match",
+                    "numeric_tolerance",
+                    "json_fields",
+                    "token_f1"
+                  ]
+                },
+                "configuration": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "casefold": {
+                      "type": "boolean"
+                    },
+                    "absolute": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "relative": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 4096
+                      },
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "uniqueItems": true
+                    }
+                  }
                 }
               },
               "required": [
