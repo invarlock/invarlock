@@ -1,0 +1,23 @@
+{
+  "format": "invarlock/k2-runtime-readiness-v1",
+  "status": "blocked",
+  "source_repository": "https://github.com/sgl-project/sglang",
+  "source_commit": "392841f47cb7ef214601eeb528906a0abba02471",
+  "route": "external_sglang_pipeline_capture",
+  "precision": "bfloat16",
+  "model_repository_code_execution": false,
+  "image_digest": null,
+  "resolved_dependency_count": 202,
+  "blockers": [
+    {
+      "package": "diskcache",
+      "version": "5.6.3",
+      "dependency_route": ["sglang", "outlines==0.1.11", "diskcache==5.6.3"],
+      "advisories": ["GHSA-w8v5-vhqr-4h9v", "PYSEC-2026-2447"],
+      "action": "Review and remove the optional cache/grammar execution surface or adopt a verified upstream fix; no suppression."
+    },
+    {
+      "action": "Build and audit the exact native runtime, then observe real H200 inference and independently verify retained captures."
+    }
+  ]
+}
