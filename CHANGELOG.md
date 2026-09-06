@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluator qualification with independently bound reference text.
 - Added runnable classification, extraction and recorded-judge onboarding
   examples and an integration guide for existing evaluation pipelines.
+- Added real local-model rehearsals for Inspect, LM Evaluation Harness and
+  Promptfoo, with retained native exports, measured call latency, and separate
+  installed-wheel recipient verification across classification, JSON extraction
+  and arithmetic workflows.
 - Added a standalone ModelKit example that verifies package and model-content
   identities, replays signed evidence, and applies current recipient acceptance
   against both actual model directories. A pinned KitOps test exercises

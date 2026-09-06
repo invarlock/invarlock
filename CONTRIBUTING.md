@@ -156,6 +156,7 @@ as the complete pull-request check:
 | Documentation or public command examples | `make docs-check`; exercise the documented commands |
 | Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
 | Pipeline CLI or evidence behavior | Build and install the candidate wheel, then run `python examples/pipeline/wheel_smoke.py` |
+| Native evaluator capture or mapping | Follow the [real native rehearsal](examples/pipeline/README.md#real-native-evaluator-rehearsal), including the explicit model, protocol and environment inputs for `INVARLOCK_RUN_NATIVE_PIPELINE=1`; verify the captured outputs in a separate wheel-only recipient |
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
