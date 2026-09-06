@@ -9,6 +9,6 @@
     "markdownlint-cli2": "^0.23.2"
   },
   "dependencies": {
-    "katex": "^0.18.4"
+    "katex": "^0.18.5"
   }
 }
