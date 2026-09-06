@@ -92,8 +92,10 @@ The matrix represents the Microsoft PromptFlow lineage with Azure AI Evaluation
 rather than preserving the deprecated `promptflow-evals` package as a second
 legacy row. The OpenAI Evals qualification profile is installed from an
 immutable source revision, while its signed transaction integration runs the
-upstream `basic.Match` evaluator from the hash-pinned `evals==3.0.1.post1` wheel
-in its isolated image.
+unchanged upstream `basic.Match` evaluator from an explicitly versioned wheel
+derived from the hash-pinned `evals==3.0.1.post1` input. The isolated image
+removes the unused NLTK dependency; its narrower dependency set does not change
+the retained qualification profile.
 
 The generated matrix below describes the retained generic qualification
 profiles. The signed bridges execute LM Evaluation Harness and the native

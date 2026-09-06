@@ -859,10 +859,6 @@ docstring-parser==0.18.0 \
     --hash=sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015 \
     --hash=sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b
     # via anthropic
-evals==3.0.1.post1 \
-    --hash=sha256:0abcb2051303500784b1641a6e4f6b813ed43ad64f879a37d344a6774eb8eb78 \
-    --hash=sha256:0ffd9bed75c273a4a9f0b10ccf11a5e1e1c63c89926f12958375551429a4dc21
-    # via -r requirements/workflows/openai-evals-runtime.in
 evaluate==0.4.6 \
     --hash=sha256:bca85bc294f338377b7ac2f861e21c308b11b2a285f510d7d5394d5df437db29 \
     --hash=sha256:e07036ca12b3c24331f83ab787f21cc2dbf3631813a1631e63e40897c69a3f21
@@ -2560,10 +2556,6 @@ namex==0.1.0 \
 networkx==3.6.1 \
     --hash=sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509 \
     --hash=sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762
-    # via evals
-nltk==3.10.3 \
-    --hash=sha256:bb9327a461c3811c2fa4900e03840401f2126adfb30c0072827c433bd2444ea4 \
-    --hash=sha256:ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c
     # via evals
 numexpr==2.14.2 \
     --hash=sha256:022e61a3d5dbf5807746264b62126d1c2c24057ad90052478a4d4482ab2555c2 \

@@ -268,6 +268,8 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		tests/scripts/test_sync_packaged_public_evidence.py \
 		tests/scripts/test_prepare_qualification_suites.py \
 		tests/scripts/test_build_cache_free_lm_eval_wheel.py \
+		tests/scripts/test_build_restricted_openai_evals_wheel.py \
+		tests/scripts/test_refresh_pinned_requirements.py \
 		tests/scripts/test_cve_audit.py \
 		tests/scripts/test_filter_scorecard_sarif.py \
 		tests/scripts/test_run_pip_audit.py \

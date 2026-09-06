@@ -244,23 +244,41 @@ run_workflow_locks() {
     --torch-backend cu129 \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
 
+  local evals_full_lock="${WORKFLOW_DIR}/.openai-evals-runtime-full-py312.txt"
   compile_req_platform \
     "${WORKFLOW_DIR}/openai-evals-runtime.in" \
-    "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt" \
+    "${evals_full_lock}" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
     --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime.in" \
     --torch-backend cpu \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_restricted_openai_evals_wheel.py" \
+    filter-lock \
+    --input "${evals_full_lock}" \
+    --output "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt"; then
+    rm -f "${evals_full_lock}"
+    return 1
+  fi
+  rm -f "${evals_full_lock}"
 
+  local evals_cuda_full_lock="${WORKFLOW_DIR}/.openai-evals-runtime-full-py312-cu129.txt"
   compile_req_platform \
     "${WORKFLOW_DIR}/openai-evals-runtime.in" \
-    "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt" \
+    "${evals_cuda_full_lock}" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
     --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime-cu129.in" \
     --torch-backend cu129 \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_restricted_openai_evals_wheel.py" \
+    filter-lock \
+    --input "${evals_cuda_full_lock}" \
+    --output "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt"; then
+    rm -f "${evals_cuda_full_lock}"
+    return 1
+  fi
+  rm -f "${evals_cuda_full_lock}"
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \

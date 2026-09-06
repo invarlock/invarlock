@@ -97,8 +97,18 @@ the declared −2-point floor.
 
 ## Trust boundary
 
-The command builds a source-authenticated runtime and adds a cache-free package
-derived from the hash-pinned `lm-eval` 0.4.12 wheel. The immutable inspected
+The command builds a source-authenticated runtime and adds
+`lm-eval==0.4.12+invarlock.exactmatch.1`, derived from the hash-pinned upstream
+0.4.12 wheel. This image supports the fixed HF causal `generate_until` and
+exact-match path. Its selected scorer and HF execution code remain unchanged.
+Response caching is explicitly disabled, and unused ROUGE and NLTK dependencies
+are removed. ROUGE metrics and NLTK-dependent task suites are unsupported in
+this image. Their upstream modules can fail on missing optional dependencies;
+the maintained entry point fixes its task and scorer.
+The broader qualification profiles and historical signed transactions retain
+their original dependency identities.
+
+The immutable inspected
 image ID is bound into both runtime receipts and a builder-signed image
 attestation before the evidence is signed.
 

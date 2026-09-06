@@ -47,7 +47,7 @@ EVALUATORS: dict[str, dict[str, str]] = {
     },
     "openai-evals": {
         "distribution": "evals",
-        "version": "3.0.1.post1",
+        "version": "3.0.1.post1+invarlock.match.1",
         "entrypoint": "evals.elsuite.basic.match.Match",
         "lock": "requirements/workflows/openai-evals-runtime-py312.txt",
         "cuda_lock": "requirements/workflows/openai-evals-runtime-py312-cu129.txt",

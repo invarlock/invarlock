@@ -71,6 +71,7 @@
     "overweights",
     "logspace",
     "numpy",
+    "NLTK",
     "wikitext",
     "bitwidth",
     "pipx",

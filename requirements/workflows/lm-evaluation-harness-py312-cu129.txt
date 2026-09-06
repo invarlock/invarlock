@@ -1046,10 +1046,6 @@ networkx==3.6.1 \
     --hash=sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509 \
     --hash=sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762
     # via torch
-nltk==3.10.3 \
-    --hash=sha256:bb9327a461c3811c2fa4900e03840401f2126adfb30c0072827c433bd2444ea4 \
-    --hash=sha256:ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c
-    # via rouge-score
 numpy==2.5.2 \
     --hash=sha256:0090ccdd57ec2703e9b49d0bf554767370581c1dd0a6b2bb2b2d9def317d042a \
     --hash=sha256:078f9b027b478c9379b9677babbf0f8b8f1ecfada27636d7b9a93990c638739f \
@@ -1704,9 +1700,6 @@ rich==14.3.3 \
     # via
     #   -c requirements/workflows/runtime-image-cu129.in
     #   typer
-rouge-score==0.1.2 \
-    --hash=sha256:c7d4da2683e68c9abf0135ef915d63a46643666f848e558a1b9f7ead17ff0f04
-    # via lm-eval
 sacrebleu==2.6.0 \
     --hash=sha256:3edc1531575cfe4ad04ce53491a9307e234af1c3f805a1f491cbec844229a8a8 \
     --hash=sha256:91499b6cd46138d95154fff1e863c2f9be57e82f0c719d8dd718d0006cf6c566
