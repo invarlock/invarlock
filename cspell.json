@@ -30,6 +30,8 @@
     "*.egg-info/**"
   ],
   "words": [
+    "NFKC",
+    "multiset",
     "invarlock",
     "venv",
     "pytest",

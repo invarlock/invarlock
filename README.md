@@ -94,6 +94,26 @@ corresponding controls and reviewers. See the
 and [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md)
 for the complete claim boundary and assumptions.
 
+## Check results from your existing pipeline
+
+The unreleased source checkout includes `invarlock-pipeline`: an installed CLI
+and Python SDK for comparing existing evaluation records without rerunning
+inference. It supports normalized labels, numeric tolerances, structured fields,
+token overlap and explicitly attributed recorded scores, with multiple metrics,
+data slices and JSON, HTML, Markdown and JUnit reports.
+
+```bash
+python -m pip install .
+invarlock-pipeline init release-check --example extraction
+invarlock-pipeline compare release-check/pipeline.json --output release-check/result
+```
+
+The example uses synthetic records and illustrative thresholds. Follow the
+[pipeline integration guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/pipeline-integration.md)
+to capture real results, use native export adapters and add a CI gate. This
+workflow is not in the published 0.15.0 wheel. Its optional signed comparison
+authenticates captured inputs and arithmetic; recorded judgments remain explicit.
+
 ## Try the signed handoff locally
 
 The five-minute wheel workflow verifies retained signed evidence against

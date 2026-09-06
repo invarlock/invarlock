@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `invarlock-pipeline` companion CLI and SDK for captured evaluation
+  results, with reusable projects, native export parsers, multiple typed metrics,
+  data slices, explicit recorded-score provenance, CI exit codes and JSON, HTML,
+  Markdown and JUnit reports.
+- Added optional signed pipeline evidence with independently supplied run
+  identities and policy, full arithmetic replay, bounded inputs and atomic
+  publication without replacing previous results.
+- Added shared normalized-match, numeric-tolerance, structured-field and token-F1
+  scorers to pipeline comparisons, the core scorer registry and deterministic
+  evaluator qualification with independently bound reference text.
+- Added runnable classification, extraction and recorded-judge onboarding
+  examples and an integration guide for existing evaluation pipelines.
+
 ### Changed
 
 ### Removed

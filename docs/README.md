@@ -22,6 +22,12 @@ independently supplied trust anchors.
 [Run a paired comparison](user-guide/getting-started.md) ·
 [Read the assurance case](assurance/assurance-case.md)
 
+Already running an evaluator? The unreleased
+[existing pipeline workflow](user-guide/pipeline-integration.md) imports per-case
+results, checks multiple metrics and slices, and writes CI reports without model
+execution. It includes runnable classification, extraction and recorded-judge
+examples and an explicit boundary between recomputed and recorded scores.
+
 ```bash
 invarlock evaluate request.yaml
 invarlock verify evidence/

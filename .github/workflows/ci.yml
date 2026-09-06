@@ -73,6 +73,8 @@ jobs:
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Exercise installed pipeline workflows
+        run: python examples/pipeline/wheel_smoke.py
       - name: Run fast repository gates
         run: make verify-fast
       - name: Build, install, and validate distributions

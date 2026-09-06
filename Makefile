@@ -46,6 +46,8 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/evaluation_request.py \
 	src/invarlock/core/runtime_provider \
 	src/invarlock/evaluator_qualification.py \
+	src/invarlock/pipeline \
+	src/invarlock/core/builtin_scorers.py \
 	src/invarlock/evaluation_run.py \
 	src/invarlock/evaluation_runtime.py \
 	src/invarlock/evaluation_transaction.py \

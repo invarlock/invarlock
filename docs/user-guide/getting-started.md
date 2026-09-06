@@ -31,6 +31,12 @@ invarlock report evidence/
     JSONL evaluation source; and separate Ed25519 evidence-signer and verifier
     keys.
 
+To check results from an existing evaluator without preparing an OCI runtime,
+start with [Existing evaluation pipelines](pipeline-integration.md). That
+unreleased companion workflow supports multiple metrics and slices with its own
+captured-result evidence contract. This page covers the core execution and
+independent receipt path.
+
 ## What each command owns
 
 | Transaction | Reads | Writes | Result |
