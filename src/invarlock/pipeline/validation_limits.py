@@ -38,23 +38,18 @@ def _abbreviate(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     marker = " ... [truncated] ... "
-    if limit <= len(marker):
-        return text[:limit]
     head = (limit - len(marker)) // 2
     tail = limit - len(marker) - head
     return text[:head] + marker + text[-tail:]
 
 
-def format_validation_error(
-    error: ValidationError, name: str, *, max_chars: int = 2400
-) -> str:
+def format_validation_error(error: ValidationError, name: str) -> str:
     """Retain location and both ends of a schema reason in bounded output.
 
     This bounds the returned diagnostic, not jsonschema's construction of its
     original message. Known excessive record arrays are handled before that.
     """
-    if type(max_chars) is not int or max_chars < 80:
-        raise ValueError("diagnostic size must be an integer of at least 80 characters")
+    max_chars = 2400
     path_limit = max_chars // 3
     location = ""
     for part in error.absolute_path:
