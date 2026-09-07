@@ -7,7 +7,7 @@ of them.
 !!! info "Reference"
 
     - **Surface:** Capacity limits for `invarlock-pipeline` and `invarlock.pipeline`
-    - **Stability:** Unreleased pipeline contracts; row and byte limits are fixed, while the statistical work budget is caller-configurable
+    - **Stability:** Row and byte limits are fixed by the pipeline formats; the statistical work budget is caller-configurable
     - **Use this page when:** Sizing a comparison, choosing a local work budget, or resolving a capacity error
 
 ## Limits and caller controls

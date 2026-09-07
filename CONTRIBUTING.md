@@ -214,6 +214,12 @@ Describe current behavior; use Git history and the changelog for the sequence
 of changes. Public reference pages explain supported interfaces and failure
 behavior, rather than narrating development experiments or internal reviews.
 
+Keep package availability notices in the README and installation instructions.
+Reference pages describe format versions and compatibility, rather than a
+temporary publication stage. Before publishing a release, check those notices
+and installation commands against its versioned wheel; update development-build
+instructions when the functionality becomes available in the published package.
+
 Documentation lint discovers every tracked Markdown file through Git. It checks
 formatting, spelling, machine-specific paths, credential-like values, and
 review-process wording. Update affected public surfaces together when a product

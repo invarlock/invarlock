@@ -5,7 +5,7 @@
     **Surface:** `invarlock.pipeline`, `invarlock-pipeline`, and six packaged
     `pipeline_*.schema.json` contracts.
 
-    **Stability:** Unreleased v1 formats. Existing core evidence contracts and
+    **Stability:** Versioned v1 formats. Existing core evidence contracts and
     retained verification transactions keep their existing semantics.
 
     **Use this page when:** Mapping evaluator exports, defining metrics or
