@@ -41,6 +41,36 @@ automatically checked `overall` slice. Comparisons use ordinary
 CPU memory and require no evaluator dependency. Native exports larger than these
 limits need an explicit supported projection before import.
 
+## Local statistical work budget
+
+`compare_runs`, `create_evidence` and `verify_evidence` accept the keyword
+`max_bootstrap_draws`. The `compare` and `verify` commands expose the same local
+setting as `--max-bootstrap-draws`. A non-negative integer bounds the sum of
+planned scalar bootstrap draws across all metrics, `overall` and every named
+slice. Zero permits only policies that require no scalar bootstrap draws.
+Omitting the setting currently preserves the existing contract bounds without
+an additional statistical work budget.
+
+The preflight charge is 2,048 times the selected pair count for each scalar
+metric and scope. Overlapping slices each contribute their full count. Recorded
+metrics use this charge even when their scores happen to be binary. The bound
+is conservative: missing observations and constant differences do not reduce
+it. Binary built-in metrics use their existing paired interval method and have
+no bootstrap draw charge.
+
+For example, 12,000 pairs with two scalar metrics and two disjoint slices that
+partition the schedule require a budget of 98,304,000 draws: each pair
+contributes to `overall` and one named slice for each metric. Verification
+performs its own replay and applies its own local budget. These are draw counts,
+not a promised runtime or memory allowance.
+
+An insufficient budget raises `PipelineError`; the CLI returns integration-error
+exit code 2 and publishes no comparison directory. It does not produce a quality
+verdict, omit scopes or reduce the 2,048 repetitions. The budget is supplied by
+the caller, independently of the signed artifact and acceptance policy. A
+producer's larger budget cannot raise the recipient's budget. Increase it only
+after assessing the complete workload on the intended host.
+
 ## Pinning reusable inputs
 
 Each `pipeline-project-v1` side may specify `expected_run_digest`, a lowercase

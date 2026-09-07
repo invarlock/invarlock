@@ -13,6 +13,11 @@ from invarlock.pipeline.cases import validate_run_case_set
 from invarlock.pipeline.contracts import PipelineError, digest, validate
 from invarlock.pipeline.metrics import MetricError, score, validate_configuration
 
+BOOTSTRAP_REPLICATES = 2048
+_BINARY_METRICS = frozenset(
+    ("exact_match", "normalized_match", "numeric_tolerance", "json_exact")
+)
+
 
 def make_run(
     records: list[dict[str, Any]],
@@ -143,7 +148,7 @@ def _interval(
         # Fixed SHAKE stream and little-endian uint64 mapping make replay independent
         # of Python's random module. Rejection sampling avoids modulo bias.
         ceiling = (2**64 // count) * count
-        for replicate in range(2048):
+        for replicate in range(BOOTSTRAP_REPLICATES):
             values: list[float] = []
             block = 0
             while len(values) < count:
@@ -172,7 +177,7 @@ def _interval(
         "upper": upper,
         "method": "paired_mean_shake256_percentile_v1",
         "mass": 0.95,
-        "replicates": 2048,
+        "replicates": BOOTSTRAP_REPLICATES,
     }
 
 
@@ -262,8 +267,7 @@ def _metric_result(
         left_values,
         right_values,
         seed,
-        metric["kind"]
-        in ("exact_match", "normalized_match", "numeric_tolerance", "json_exact"),
+        metric["kind"] in _BINARY_METRICS,
     )
     if not all(
         math.isfinite(v) for v in (b, c, c - b, interval["lower"], interval["upper"])
@@ -295,9 +299,17 @@ def _metric_result(
 
 
 def compare_runs(
-    baseline: dict[str, Any], candidate: dict[str, Any], policy: dict[str, Any]
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    policy: dict[str, Any],
+    *,
+    max_bootstrap_draws: int | None = None,
 ) -> dict[str, Any]:
     """Check an approved policy against existing paired records without inference."""
+    if max_bootstrap_draws is not None and (
+        type(max_bootstrap_draws) is not int or max_bootstrap_draws < 0
+    ):
+        raise PipelineError("max_bootstrap_draws must be a non-negative integer")
     _check_run(baseline)
     _check_run(candidate)
     _check_policy(policy)
@@ -317,16 +329,34 @@ def compare_runs(
             if canonical_json_bytes(left[key]) != canonical_json_bytes(right[key]):
                 raise PipelineError(f"record {record_id}: {key} changed between runs")
         pairs.append((left, right))
-    results = []
+    scopes = []
     for subset in [{"name": "overall", "where": {}}, *policy["slices"]]:
         selected = [
             (b, c)
             for b, c in pairs
             if all(b["metadata"].get(k) == v for k, v in subset["where"].items())
         ]
+        scopes.append((subset["name"], selected))
+    # Charge the complete planned policy before evaluating even its first metric.
+    # This conservative bound includes overlapping scopes and does not depend on
+    # favorable scores, constant differences, or missing observations.
+    scalar_metrics = sum(m["kind"] not in _BINARY_METRICS for m in policy["metrics"])
+    required_draws = (
+        sum(len(selected) for _, selected in scopes)
+        * scalar_metrics
+        * BOOTSTRAP_REPLICATES
+    )
+    if max_bootstrap_draws is not None and required_draws > max_bootstrap_draws:
+        raise PipelineError(
+            f"comparison requires up to {required_draws} bootstrap draws; "
+            f"local budget is {max_bootstrap_draws}. Increase the local budget "
+            "only on a suitable host; the complete policy has not been evaluated."
+        )
+    results = []
+    for slice_name, selected in scopes:
         for metric in policy["metrics"]:
             results.append(
-                _metric_result(baseline, candidate, metric, subset["name"], selected)
+                _metric_result(baseline, candidate, metric, slice_name, selected)
             )
     decisions = {r["decision"] for r in results}
     decision = (

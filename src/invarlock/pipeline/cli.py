@@ -180,6 +180,12 @@ def compare(
     ),
     baseline: Path | None = typer.Option(None, "--baseline"),
     candidate: Path | None = typer.Option(None, "--candidate"),
+    max_bootstrap_draws: int | None = typer.Option(
+        None,
+        "--max-bootstrap-draws",
+        min=0,
+        help="Local total bootstrap draw budget across every metric and slice.",
+    ),
 ) -> None:
     """Check all metrics/slices and write JSON, HTML, Markdown and JUnit reports."""
     try:
@@ -193,7 +199,11 @@ def compare(
             for run in (base, subject):
                 validate_run_case_set(run, policy["expected_case_set_digest"])
         evidence = create_evidence(
-            base, subject, policy, _private(signing_key) if signing_key else None
+            base,
+            subject,
+            policy,
+            _private(signing_key) if signing_key else None,
+            max_bootstrap_draws=max_bootstrap_draws,
         )
         result = evidence["comparison"]
         artifacts = {
@@ -253,6 +263,12 @@ def verify(
     policy: Path = typer.Option(..., "--policy"),
     expected_baseline: str = typer.Option(..., "--expected-baseline"),
     expected_candidate: str = typer.Option(..., "--expected-candidate"),
+    max_bootstrap_draws: int | None = typer.Option(
+        None,
+        "--max-bootstrap-draws",
+        min=0,
+        help="Recipient-owned total bootstrap draw budget for complete replay.",
+    ),
 ) -> None:
     """Authenticate and replay using recipient-owned expected inputs, never pack keys."""
     try:
@@ -267,6 +283,7 @@ def verify(
             policy=read_json(policy),
             expected_baseline=expected_baseline,
             expected_candidate=expected_candidate,
+            max_bootstrap_draws=max_bootstrap_draws,
         )
         typer.echo(
             canonical_json_bytes(
