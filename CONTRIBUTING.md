@@ -209,6 +209,11 @@ artifact locations, credentials, execution notes intended only for maintainers,
 and unrelated product planning out of public files and pull requests. Examples
 should use portable request-relative paths and placeholder digests.
 
+Keep calendar dates and dated status updates out of maintained documentation.
+Describe current behavior; use Git history and the changelog for the sequence
+of changes. Public reference pages explain supported interfaces and failure
+behavior, rather than narrating development experiments or internal reviews.
+
 Documentation lint discovers every tracked Markdown file through Git. It checks
 formatting, spelling, machine-specific paths, credential-like values, and
 review-process wording. Update affected public surfaces together when a product

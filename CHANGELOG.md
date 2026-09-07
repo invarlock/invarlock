@@ -61,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Clarified fixed pipeline capacity limits, caller-owned work budgets and
+  capacity-error recovery in the public reference documentation.
 - Pipeline digest and size checks encode canonical JSON incrementally, reducing
   whole-artifact allocations while preserving existing digests and signatures.
 

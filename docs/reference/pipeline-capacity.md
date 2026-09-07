@@ -1,112 +1,120 @@
 # Pipeline capacity and resource limits
 
+The pipeline SDK compares captured evaluation records on a CPU. Record count,
+file size and statistical work have separate limits; a comparison must fit all
+of them.
+
 !!! info "Reference"
 
-    **Surface:** Pipeline record, byte and statistical-work limits.
+    - **Surface:** Capacity limits for `invarlock-pipeline` and `invarlock.pipeline`
+    - **Stability:** Unreleased pipeline contracts; row and byte limits are fixed, while the statistical work budget is caller-configurable
+    - **Use this page when:** Sizing a comparison, choosing a local work budget, or resolving a capacity error
 
-    **Stability:** Unreleased defaults with measured workload-specific results.
+## Limits and caller controls
 
-    **Use this page when:** Sizing a complete comparison or choosing local
-    resources and work allowances for independent replay.
+| Resource | Limit or default | Caller control |
+| --- | ---: | --- |
+| Paired cases | 50,000, with at most 50,000 records in each run | Fixed contract limit; no supported override |
+| Each input file or normalized run | 128 MiB | Fixed limit; no supported general override |
+| Complete signed evidence | 384 MiB | Fixed limit; no supported override |
+| Planned scalar bootstrap draws | 102,400,000 per comparison or verification | Python `max_bootstrap_draws` or CLI `--max-bootstrap-draws` |
+| Metrics | 16 per policy | Fixed contract limit |
+| Named slices | 16 per policy, plus `overall` | Fixed contract limit |
 
-The pipeline SDK compares captured evaluation records on a CPU. Its limits
-govern different resources: 50,000 paired records, 128 MiB per input, 384 MiB
-per complete signed evidence file, and a default of 102,400,000 planned scalar
-bootstrap draws. All limits apply together. See the
-[contract reference](pipeline-contracts.md#local-statistical-work-budget) for
-the exact counting rules and caller-owned overrides.
+One pair contains the baseline and candidate result for the same case. A
+50,000-pair comparison therefore contains up to 100,000 records across its two
+runs. Slices select from these cases; they do not create extra record allowances.
 
-## Why these limits are separate
+The 128 MiB canonical size limit also applies to planned case sets, policies and
+comparison results. Physical input bytes and normalized canonical bytes are
+checked separately. Signed evidence embeds both runs, the policy and the
+comparison, so valid individual inputs do not guarantee that the complete
+evidence fits its final limit.
 
-The reviewed evaluation tools establish no common 12,000- or 50,000-row
-standard. Inspect exposes dataset memory and concurrency controls separately;
-promptfoo exposes concurrent-call and test-range controls. These are useful
-precedents for separating resources, not claims of equivalent signed replay or
-unlimited capacity. See [Inspect parallelism](https://inspect.aisi.org.uk/parallelism.html)
-and [promptfoo CLI controls](https://www.promptfoo.dev/docs/usage/command-line/).
+These limits apply to the pipeline comparison SDK. Runtime schedules and
+external scoring imports retain their separate 10,000-record limits. See the
+[pipeline contracts](pipeline-contracts.md#records-and-identities) for exact
+record and pairing requirements.
 
-The earlier 12,000-row target followed a particular evaluation design. Actual
-4,000-case exports then showed why row count alone was insufficient. Larger
-performance fixtures derived from enriched financial-QA exports needed
-95.39 MiB per input at 12,000 records, or 96.49 MiB with four scalar metrics.
-The latter produced 192.87 MiB of complete signed evidence. The previous
-64 MiB input and 192 MiB evidence limits excluded these workloads.
+## Choosing a statistical work budget
 
-The 128 MiB input allowance provides about 33% headroom above the measured
-96.49 MiB input. The 384 MiB evidence allowance accommodates two embedded inputs
-and additional policy/comparison data, subject to final size validation. It is
-not a proof that every combination of independently saturated inputs, policy
-and comparison will fit.
+Scalar intervals use 2,048 bootstrap repetitions. The planned work is the sum
+of the selected pair counts for every scalar metric and every scope, multiplied
+by 2,048. Each scope includes either the complete schedule (`overall`) or one
+named slice. Overlapping slices count separately.
 
-Compact exports can fit 50,000 records; larger enriched shapes in the same study
-needed roughly 251–397 MiB per input at that count and remain outside the byte
-limit. A 128 MiB input provides approximately 2.68 kB per record at 50,000 rows,
-before top-level overhead. Any supported projection must preserve the intended
-pairing and authenticated provenance. Splitting a complete comparison into
-independent verdicts does not preserve its original policy assessment.
+| Workload | Planned draws |
+| --- | ---: |
+| 50,000 pairs, one scalar metric, overall only | 102,400,000 |
+| 50,000 pairs, two scalar metrics, overall only | 204,800,000 |
+| 12,000 pairs, four scalar metrics, overall only | 98,304,000 |
 
-## Measured CPU envelope
+For an existing project with sufficient local resources, allow the second
+workload explicitly:
 
-Measurements on September 7, 2026 used Python 3.12.3 and a Linux container on an
-AMD EPYC 9555 host, restricted to two CPUs and 8 GiB memory with no extra swap,
-network or GPU access. The target, declared before execution, was at most 120 seconds and 4 GiB
-process peak RSS for **each** creation and independent replay phase. Fixture
-preparation and container setup were outside those phase times. This resource
-choice was informed by modest private CI runners; these measurements were not
-made on GitHub-hosted runners. See [GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+```bash
+invarlock-pipeline compare pipeline.json --output comparison \
+  --max-bootstrap-draws 204800000
+```
 
-| Workload | Largest input | Creation / replay | Peak RSS, creation / replay |
-| --- | ---: | ---: | ---: |
-| 4,000 captured routing records | 18.95 MiB | 6.01 / 4.81 s | 0.23 / 0.17 GiB |
-| 12,000 financial-QA performance records, four scalar metrics with varying differences | 96.49 MiB | 33.34 / 27.54 s | 0.79 / 0.69 GiB |
-| 12,000 nested performance records with Unicode text | 128 MiB exactly | 27.64 / 21.03 s | 2.12 / 1.94 GiB |
-| 50,000 compact structured performance records, one scalar metric with varying differences | 128 MiB exactly | 63.38 / 51.56 s | 2.68 / 2.44 GiB |
+The `verify` command accepts the same option. In Python, `compare_runs`,
+`create_evidence` and `verify_evidence` accept `max_bootstrap_draws` as a
+non-negative integer. An explicit `None` disables this additional work bound
+in the Python API; row and byte limits still apply.
 
-Each boundary run produced slightly more than 256 MiB of signed evidence and
-independently replayed their declared decisions. The measured implementation was commit
-`8361eeb81b20ad691ef697b2d57e6112385def0d`; the 50,000-case run explicitly used
-102,400,000 draws. The subsequent default adopts that same allowance. The
-12,000-case four-metric workload uses 98,304,000 draws and also fits.
+Each recipient chooses its own verification budget. An author's larger
+allowance cannot increase the recipient's allowance. Changing the budget does
+not change the policy, acceptance thresholds or bootstrap repetitions.
 
-These larger fixtures repeat captured record shapes with original-source
-identities and explicitly authored performance scores. They add no independent
-model-quality observations. Every phase used a fresh Python process, but OS
-caches were not flushed. Two earlier 18-cell matrices included repeated visits;
-container memory reached its 8 GiB limit without recorded OOM kills. Container
-memory includes file cache and controller memory and differs from process RSS.
-The table is a tested envelope, not a universal latency or memory guarantee for
-every valid JSON shape, policy or host.
+Recorded numeric metrics incur the scalar charge even when their values are
+zero or one. Missing values and constant differences do not reduce the planned
+charge. Binary built-in metrics use a different interval method and incur no
+bootstrap charge. They still require CPU work. See the
+[counting rules](pipeline-contracts.md#local-statistical-work-budget).
 
-## Implementation tradeoffs
+## Sizing a workload
 
-An initial incremental-encoding implementation was slower than the original
-whole-object encoder: creation phases increased by 19–41% and replay phases by
-22–48% in the matched 18-cell matrices. Most process-memory changes were small.
-The final bounded-subtree implementation recovered most of that overhead. In
-the two final matched workloads, it remained approximately 2.5–14% slower than
-the original, depending on phase and workload.
-Those earlier matrices used temporary copies with identical higher capacity
-constants to measure otherwise-rejected shapes. Their exploratory limits were
-not release defaults. The final table used the unmodified production row and
-byte limits.
+The record ceiling is a supported contract boundary, not a recommended sample
+size or a demonstrated maximum for every machine. At 50,000 records, a 128 MiB
+input allows approximately 2.68 kB per record before shared file overhead.
+Document context, long answers, nested objects and retained traces can exhaust
+the byte allowance at a much smaller case count.
 
-The retained benefit is earlier byte rejection and avoiding whole-artifact
-serialization buffers during validation and hashing. It is not a general
-throughput improvement. Full JSON parsing, copying, signature construction and
-output publication still consume memory proportional to the artifact. Large
-individual strings retain the standard encoder's allocation behavior.
+JSON parsing, copying, signing and output publication consume memory beyond
+the encoded input size. Incremental canonical encoding bounds intermediate
+serialization work, but does not make the complete workflow stream through
+constant memory. Large individual strings also require their own allocations.
 
-## Tokens and statistical sample size
+The pipeline SDK sets no universal wall-time or process-memory limit. Configure
+those limits in the CI runner, container or job scheduler. Size resources using
+the intended record shapes, metrics and slice overlap, measuring both evidence
+creation and independent verification. A bootstrap draw allowance is not a
+promise about elapsed time or peak memory.
 
-Pipeline replay loads neither model weights nor a model tokenizer. Generation
-capacity separately depends on the exact tokenizer and chat template, input,
-output and reasoning tokens, architecture, cache precision and concurrency.
-Prompt bytes are not token counts. See [Hugging Face chat templates](https://huggingface.co/docs/transformers/main/en/chat_templating).
-Model choice can indirectly increase replay cost through longer captured
-answers, reasoning traces or additional context in the exported records.
+Comparison and replay load neither model weights nor the model's tokenizer.
+Model choice affects their workload indirectly through captured outputs and
+context. Generation has separate model, token, runtime and hardware requirements.
 
-Supported row count also does not establish power, interval coverage or
-representative sampling. Sample planning depends on the intended effect,
-uncertainty and source dependence. Repeated shapes used to measure capacity
-cannot increase the effective quality sample. See
-[NIST sample-size guidance](https://itl.nist.gov/div898/handbook/ppc/section3/ppc333.htm).
+## Capacity errors and recovery
+
+Exceeding a capacity bound raises `PipelineError`. The CLI returns integration
+error status 2; it does not issue a quality verdict or publish a completed
+comparison directory. It does not silently truncate cases, omit slices or
+reduce statistical repetitions to fit the budget.
+
+For a bootstrap budget error, assess the required work and increase the local
+allowance explicitly if the machine can support it. For a row or byte error,
+there is no supported setting that raises the fixed bound. A larger allowance
+requires an implementation change, including matching schema changes for
+schema-enforced limits, and verification support on the recipient.
+
+A supported input projection must preserve the intended pairing, task meaning
+and authenticated provenance. Splitting a complete comparison into separate
+verdicts does not preserve its original policy assessment. Any smaller study
+needs its own explicit case selection and policy; it must not silently replace
+the planned comparison.
+
+Capacity does not establish statistical power, representative sampling or
+independent observations. Plan the sample for the intended decision and source
+dependence. See [policy and statistics](pipeline-contracts.md#policy-and-statistics)
+for the shipped methods and their assumptions.

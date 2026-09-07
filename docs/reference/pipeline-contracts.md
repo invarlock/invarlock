@@ -44,8 +44,8 @@ The same 128 MiB canonical limit applies to planned case sets, policies and
 comparison results. Physical file bytes and normalized canonical bytes are
 checked separately. The row, byte and statistical work bounds all apply;
 50,000 rows are supported only when the complete workload fits those bounds.
-See [capacity measurements](pipeline-capacity.md) for the rationale, tested
-workloads and resource limitations.
+See [pipeline capacity](pipeline-capacity.md) for caller controls, workload
+sizing and capacity-error recovery.
 Splitting a dataset into independent verdicts does not preserve the original
 paired comparison or its complete policy.
 Missing-result IDs remain present for each metric and slice. If these repeated

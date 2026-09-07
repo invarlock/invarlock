@@ -57,6 +57,11 @@ validate a task; reference must enumerate exact syntax and failure behavior;
 assurance must connect claims to observable evidence and limits; security must
 name adversaries, controls, residual risks, and response.
 
+Describe the current repository state without calendar dates, dated status
+updates or development history. Use Git history and the changelog to trace
+changes. Keep public prose focused on the reader's task and supported behavior;
+internal experiment logs do not belong in an interface reference.
+
 ## Links and versioned contracts
 
 - Prefer relative links for pages and repository-owned assets in the same
