@@ -54,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pipeline digest and size checks encode canonical JSON incrementally, reducing
+  whole-artifact allocations while preserving existing digests and signatures.
+
 - Added full H100 80GB HBM3 devices to the K2 candidate hardware checks alongside
   H200, requiring matching devices with MIG disabled and the existing security
   driver minimum. The bounded launcher now caps host memory at 280 GiB and

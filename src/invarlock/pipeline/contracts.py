@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import importlib.resources
+import json
+from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 
 MAX_INPUT_BYTES = 64 * 1024 * 1024
@@ -22,8 +23,24 @@ class PipelineError(ValueError):
     """Malformed, unsupported or contradictory pipeline evidence."""
 
 
+def _canonical_chunks(value: Any) -> Iterator[bytes]:
+    """Emit the existing canonical wire bytes without a whole-artifact copy."""
+    encoder = json.JSONEncoder(
+        allow_nan=False, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    )
+    try:
+        for chunk in encoder.iterencode(value):
+            yield chunk.encode("utf-8")
+        yield b"\n"
+    except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+        raise PipelineError(f"value is not canonical JSON: {exc}") from exc
+
+
 def digest(value: Any) -> str:
-    return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+    hasher = hashlib.sha256()
+    for chunk in _canonical_chunks(value):
+        hasher.update(chunk)
+    return "sha256:" + hasher.hexdigest()
 
 
 @lru_cache(maxsize=6)
@@ -40,8 +57,11 @@ def _validator(name: str) -> Draft202012Validator:
 def validate(value: Any, name: str) -> None:
     try:
         limit = MAX_EVIDENCE_BYTES if name == "evidence" else MAX_INPUT_BYTES
-        if len(canonical_json_bytes(value)) > limit:
-            raise PipelineError(f"{name} exceeds the {limit} byte limit")
+        size = 0
+        for chunk in _canonical_chunks(value):
+            size += len(chunk)
+            if size > limit:
+                raise PipelineError(f"{name} exceeds the {limit} byte limit")
         error = next(_validator(name).iter_errors(value), None)
     except (ValueError, TypeError, OverflowError, RecursionError) as exc:
         raise PipelineError(f"invalid {name}: {exc}") from exc
