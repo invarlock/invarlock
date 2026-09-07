@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.pipeline.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.pipeline.comparison import compare_runs
 from invarlock.pipeline.contracts import PipelineError, digest, validate
 
@@ -25,7 +26,7 @@ def create_evidence(
     policy: dict[str, Any],
     signing_key: Ed25519PrivateKey | None = None,
     *,
-    max_bootstrap_draws: int | None = None,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
 ) -> dict[str, Any]:
     """Bind the complete inputs and comparison; unsigned local use is explicit."""
     if signing_key is not None and not isinstance(signing_key, Ed25519PrivateKey):
@@ -62,7 +63,7 @@ def verify_evidence(
     expected_baseline: str,
     expected_candidate: str,
     policy: dict[str, Any],
-    max_bootstrap_draws: int | None = None,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
 ) -> dict[str, Any]:
     """Verify using recipient-owned key, complete-run digests and policy bytes."""
     if not isinstance(public_key, Ed25519PublicKey):

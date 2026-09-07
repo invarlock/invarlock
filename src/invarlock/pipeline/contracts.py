@@ -19,9 +19,9 @@ from invarlock.pipeline.validation_limits import (
     format_validation_error,
 )
 
-MAX_INPUT_BYTES = 64 * 1024 * 1024
-MAX_EVIDENCE_BYTES = 192 * 1024 * 1024
-MAX_RECORDS = 12000
+MAX_INPUT_BYTES = 128 * 1024 * 1024
+MAX_EVIDENCE_BYTES = 384 * 1024 * 1024
+MAX_RECORDS = 50000
 _CANONICAL_BUFFER_BYTES = 65536
 
 

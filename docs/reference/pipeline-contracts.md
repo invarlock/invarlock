@@ -32,14 +32,20 @@ prompts, retrieved material or decoding settings. It is still covered by the
 complete run digest and signature. These checks prevent inconsistent pairing;
 they do not prove that either evaluation operator selected a representative schedule.
 
-A file or normalized run is at most 64 MiB. Complete embedded evidence is at most
-192 MiB. A comparison contains at most 12,000 paired cases, with up to 12,000
+A file or normalized run is at most 128 MiB. Complete embedded evidence is at most
+384 MiB. A comparison contains at most 50,000 paired cases, with up to 50,000
 records in each run; slices do not create separate record allowances. Runtime
 schedules and external scoring imports retain their separate 10,000-record
 limits. Policies contain at most 16 metrics and 16 named slices, plus the
 automatically checked `overall` slice. Comparisons use ordinary
 CPU memory and require no evaluator dependency. Native exports larger than these
 limits need an explicit supported projection before import.
+The same 128 MiB canonical limit applies to planned case sets, policies and
+comparison results. Physical file bytes and normalized canonical bytes are
+checked separately. The row, byte and statistical work bounds all apply;
+50,000 rows are supported only when the complete workload fits those bounds.
+Splitting a dataset into independent verdicts does not preserve the original
+paired comparison or its complete policy.
 Missing-result IDs remain present for each metric and slice. If these repeated
 arrays alone would exceed the comparison byte limit, comparison rejects the
 workload before scoring. Passing that preflight is not a guarantee that the
@@ -52,8 +58,11 @@ complete artifact fits; final size validation still applies.
 setting as `--max-bootstrap-draws`. A non-negative integer bounds the sum of
 planned scalar bootstrap draws across all metrics, `overall` and every named
 slice. Zero permits only policies that require no scalar bootstrap draws.
-Omitting the setting currently preserves the existing contract bounds without
-an additional statistical work budget.
+The default is 98,304,000, also exported as
+`invarlock.pipeline.DEFAULT_MAX_BOOTSTRAP_DRAWS`. This corresponds to 12,000
+pairs, four scalar metrics and 2,048 repetitions over `overall`. The Python API
+accepts an explicit `None` to disable this additional work bound; other contract
+limits still apply. The CLI accepts an explicit non-negative integer override.
 
 The preflight charge is 2,048 times the selected pair count for each scalar
 metric and scope. Overlapping slices each contribute their full count. Recorded
@@ -61,19 +70,25 @@ metrics use this charge even when their scores happen to be binary. The bound
 is conservative: missing observations and constant differences do not reduce
 it. Binary built-in metrics use their existing paired interval method and have
 no bootstrap draw charge.
+The charge counts planned resample positions. Rejection sampling can inspect
+additional random values, so it is not a count of random-generator operations.
 
 For example, 12,000 pairs with two scalar metrics and two disjoint slices that
 partition the schedule require a budget of 98,304,000 draws: each pair
 contributes to `overall` and one named slice for each metric. Verification
 performs its own replay and applies its own local budget. These are draw counts,
 not a promised runtime or memory allowance.
+One scalar metric over 50,000 pairs requires 102,400,000 draws, so it needs an
+explicit larger local budget. Adding slices increases the charge further.
 
 An insufficient budget raises `PipelineError`; the CLI returns integration-error
 exit code 2 and publishes no comparison directory. It does not produce a quality
 verdict, omit scopes or reduce the 2,048 repetitions. The budget is supplied by
 the caller, independently of the signed artifact and acceptance policy. A
-comparison author's larger budget cannot raise the recipient's budget. Increase it only
-after assessing the complete workload on the intended host.
+comparison author's larger budget cannot raise the recipient's budget. Increase
+it only after assessing the complete workload on the intended host. A previously
+created artifact may require an explicit larger recipient budget; its signed
+policy, inputs, repetitions and comparison remain unchanged.
 
 ## Pinning reusable inputs
 
@@ -155,7 +170,7 @@ types and metadata retain their parsed JSON identity: integer `1`, float `1.0`
 and boolean `true` are distinct, while `1e0` and `1.0` parse identically. Use
 strings for precision-sensitive decimal text. Unknown fields, duplicate IDs
 and empty sets fail validation.
-The existing 64 MiB and 12,000-record limits apply.
+The existing 128 MiB and 50,000-record limits apply.
 
 Comparison checks every record on both sides before scoring, including records
 with errors. A case mismatch returns integration-error exit code 2 before key

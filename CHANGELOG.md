@@ -10,12 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added caller-owned bootstrap work budgets to pipeline comparison and signed
-  replay, rejecting excessive combined metric and slice work before scoring.
+  replay, with a default of 98,304,000 planned draws. Excessive combined metric
+  and slice work is rejected before scoring; callers can explicitly override
+  their own local budget without changing the signed acceptance policy.
 - Added early rejection of missing-result ID arrays that would exceed the
   comparison byte limit across overlapping metrics and slices.
+- Added early record-count rejection and bounded validation diagnostics so
+  oversized schedules do not print their complete contents in errors.
 
-- Expanded pipeline comparisons and signed evidence to 12,000 planned cases,
-  including binary paired intervals, while retaining the existing byte limits.
+- Expanded pipeline comparisons and signed evidence to 50,000 planned cases,
+  including binary paired intervals, with separate 128 MiB input and 384 MiB
+  complete evidence limits. Runtime schedules retain their separate limits.
 
 - Added optional policy pins for planned case membership, rejecting shared
   omissions and changed references during comparison and signed replay.

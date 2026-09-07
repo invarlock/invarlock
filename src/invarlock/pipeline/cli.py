@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import read_regular_file_bytes
 from invarlock.pipeline.adapters import load_run
+from invarlock.pipeline.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.pipeline.cases import (
     canonical_case_set,
     case_set_digest,
@@ -180,8 +181,8 @@ def compare(
     ),
     baseline: Path | None = typer.Option(None, "--baseline"),
     candidate: Path | None = typer.Option(None, "--candidate"),
-    max_bootstrap_draws: int | None = typer.Option(
-        None,
+    max_bootstrap_draws: int = typer.Option(
+        DEFAULT_MAX_BOOTSTRAP_DRAWS,
         "--max-bootstrap-draws",
         min=0,
         help="Local total bootstrap draw budget across every metric and slice.",
@@ -263,8 +264,8 @@ def verify(
     policy: Path = typer.Option(..., "--policy"),
     expected_baseline: str = typer.Option(..., "--expected-baseline"),
     expected_candidate: str = typer.Option(..., "--expected-candidate"),
-    max_bootstrap_draws: int | None = typer.Option(
-        None,
+    max_bootstrap_draws: int = typer.Option(
+        DEFAULT_MAX_BOOTSTRAP_DRAWS,
         "--max-bootstrap-draws",
         min=0,
         help="Recipient-owned total bootstrap draw budget for complete replay.",

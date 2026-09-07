@@ -159,7 +159,7 @@
         ]
       },
       "minItems": 1,
-      "maxItems": 12000
+      "maxItems": 50000
     }
   },
   "required": [

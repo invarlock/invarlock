@@ -72,15 +72,16 @@ def material(count=12000):
     return baseline, candidate, policy
 
 
-def test_full_capacity_signed_independent_recipient(tmp_path):
-    baseline, candidate, policy = material()
+@pytest.mark.parametrize("count", [12000, 50000])
+def test_full_capacity_signed_independent_recipient(tmp_path, count):
+    baseline, candidate, policy = material(count)
     key = Ed25519PrivateKey.generate()
     evidence = create_evidence(baseline, candidate, policy, key)
     assert evidence["comparison"]["decision"] == "pass"
     assert [m["count"] for m in evidence["comparison"]["metrics"]] == [
-        12000,
+        count,
         6000,
-        6000,
+        count - 6000,
     ]
     (tmp_path / "evidence.json").write_text(json.dumps(evidence))
     (tmp_path / "policy.json").write_text(json.dumps(policy))
@@ -142,7 +143,7 @@ def test_capacity_policy_minimum_and_mutual_omission_before_arithmetic(monkeypat
 
 
 def test_capacity_plus_one_rejected_before_metric_arithmetic(monkeypatch):
-    baseline, candidate, policy = material()
+    baseline, candidate, policy = material(50000)
     for run in (baseline, candidate):
         run["records"].append({**deepcopy(run["records"][0]), "id": "extra"})
 

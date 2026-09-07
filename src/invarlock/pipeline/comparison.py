@@ -10,7 +10,11 @@ from typing import Any, cast
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.paired_exact_match import paired_exact_match_statistics
 from invarlock.pipeline import contracts
-from invarlock.pipeline.capacity import check_missing_id_capacity, missing_pair
+from invarlock.pipeline.capacity import (
+    DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    check_missing_id_capacity,
+    missing_pair,
+)
 from invarlock.pipeline.cases import validate_run_case_set
 from invarlock.pipeline.contracts import PipelineError, digest, validate
 from invarlock.pipeline.metrics import MetricError, score, validate_configuration
@@ -296,7 +300,7 @@ def compare_runs(
     candidate: dict[str, Any],
     policy: dict[str, Any],
     *,
-    max_bootstrap_draws: int | None = None,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
 ) -> dict[str, Any]:
     """Check an approved policy against existing paired records without inference."""
     if max_bootstrap_draws is not None and (
@@ -341,7 +345,7 @@ def compare_runs(
     )
     if max_bootstrap_draws is not None and required_draws > max_bootstrap_draws:
         raise PipelineError(
-            f"comparison requires up to {required_draws} bootstrap draws; "
+            f"comparison plans {required_draws} bootstrap draws; "
             f"local budget is {max_bootstrap_draws}. Increase the local budget "
             "only on a suitable host; the complete policy has not been evaluated."
         )
