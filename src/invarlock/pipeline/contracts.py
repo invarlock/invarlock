@@ -14,6 +14,10 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
+from invarlock.pipeline.validation_limits import (
+    check_record_counts,
+    format_validation_error,
+)
 
 MAX_INPUT_BYTES = 64 * 1024 * 1024
 MAX_EVIDENCE_BYTES = 192 * 1024 * 1024
@@ -162,6 +166,7 @@ def _validator(name: str) -> Draft202012Validator:
 
 def validate(value: Any, name: str) -> None:
     try:
+        check_record_counts(value, name, max_records=MAX_RECORDS)
         limit = MAX_EVIDENCE_BYTES if name == "evidence" else MAX_INPUT_BYTES
         size = 0
         for chunk in _canonical_chunks(value):
@@ -172,8 +177,7 @@ def validate(value: Any, name: str) -> None:
     except (ValueError, TypeError, OverflowError, RecursionError) as exc:
         raise PipelineError(f"invalid {name}: {exc}") from exc
     if error is not None:
-        location = ".".join(str(p) for p in error.absolute_path)
-        raise PipelineError(f"invalid {name} {location}: {error.message}")
+        raise PipelineError(format_validation_error(error, name))
 
 
 def read_json(path: str | Path, *, max_bytes: int = MAX_INPUT_BYTES) -> Any:
