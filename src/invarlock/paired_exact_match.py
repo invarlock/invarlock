@@ -17,7 +17,7 @@ from typing import Final
 
 type ExactMatchOutcome = bool | int | float
 
-MAX_PAIRED_EXACT_MATCH_OUTCOMES: Final = 10_000
+MAX_PAIRED_EXACT_MATCH_OUTCOMES: Final = 50_000
 PAIRED_CONFIDENCE_LEVEL: Final = 0.95
 PAIRED_CONFIDENCE_INTERVAL_METHOD_V1: Final = "newcombe_hybrid_score_paired_v1"
 PAIRED_CONFIDENCE_INTERVAL_METHOD_V2: Final = "newcombe_hybrid_score_paired_v2"
