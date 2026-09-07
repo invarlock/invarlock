@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added caller-owned bootstrap work budgets to pipeline comparison and signed
-  replay, with a default of 98,304,000 planned draws. Excessive combined metric
+  replay, with a default of 102,400,000 planned draws. Excessive combined metric
   and slice work is rejected before scoring; callers can explicitly override
   their own local budget without changing the signed acceptance policy.
 - Added early rejection of missing-result ID arrays that would exceed the

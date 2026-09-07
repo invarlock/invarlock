@@ -33,6 +33,7 @@ nav:
       - Architecture: reference/architecture.md
       - Contracts: reference/contracts.md
       - Pipeline contracts: reference/pipeline-contracts.md
+      - Pipeline capacity: reference/pipeline-capacity.md
       - Compatibility covenant: reference/compatibility.md
       - Acceptance attestations: reference/acceptance-attestations.md
       - Policy-engine interoperability: reference/policy-engine-interop.md

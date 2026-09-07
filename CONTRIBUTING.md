@@ -153,7 +153,7 @@ as the complete pull-request check:
 | --- | --- |
 | Python behavior or example launcher | Focused failing test first, then `make verify` and the applicable coverage target |
 | Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
-| Documentation or public command examples | `make docs-check`; exercise the documented commands |
+| Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
 | Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
 | Pipeline CLI or evidence behavior | Build and install the candidate wheel, then run `python examples/pipeline/wheel_smoke.py` |
 | Native evaluator capture or mapping | Follow the [real native rehearsal](examples/pipeline/README.md#real-native-evaluator-rehearsal), including the explicit model, protocol and environment inputs for `INVARLOCK_RUN_NATIVE_PIPELINE=1`; verify the captured outputs in a separate wheel-only recipient |
@@ -165,6 +165,12 @@ as the complete pull-request check:
 | K2 campaign or runtime preparation | Run `tests/examples/test_k2_*.py` and follow the [candidate campaign gates](examples/qualification/k2-horizon/README.md), including the exact image's offline native probe and dependency scans; CPU tests do not qualify a GPU model |
 | Dependency declarations or locks | `make lock-sync` and `make security`, plus affected installed-package checks |
 | GitHub Actions | `make workflow-lint` |
+
+For new documentation pages, follow the
+[page-type contracts](docs/reference/documentation.md#page-type-contracts), add
+the page to `mkdocs.yml`, and update `EXPECTED_DOC_PAGES` in
+`tests/docs/test_documentation.py`. The documentation build alone does not run
+these page inventory and reader-contract tests.
 
 Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
 review their changes and repeat affected validation before committing.

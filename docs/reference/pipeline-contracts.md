@@ -44,6 +44,8 @@ The same 128 MiB canonical limit applies to planned case sets, policies and
 comparison results. Physical file bytes and normalized canonical bytes are
 checked separately. The row, byte and statistical work bounds all apply;
 50,000 rows are supported only when the complete workload fits those bounds.
+See [capacity measurements](pipeline-capacity.md) for the rationale, tested
+workloads and resource limitations.
 Splitting a dataset into independent verdicts does not preserve the original
 paired comparison or its complete policy.
 Missing-result IDs remain present for each metric and slice. If these repeated
@@ -58,9 +60,9 @@ complete artifact fits; final size validation still applies.
 setting as `--max-bootstrap-draws`. A non-negative integer bounds the sum of
 planned scalar bootstrap draws across all metrics, `overall` and every named
 slice. Zero permits only policies that require no scalar bootstrap draws.
-The default is 98,304,000, also exported as
-`invarlock.pipeline.DEFAULT_MAX_BOOTSTRAP_DRAWS`. This corresponds to 12,000
-pairs, four scalar metrics and 2,048 repetitions over `overall`. The Python API
+The default is 102,400,000, also exported as
+`invarlock.pipeline.DEFAULT_MAX_BOOTSTRAP_DRAWS`. This corresponds to 50,000
+pairs, one scalar metric and 2,048 repetitions over `overall`. The Python API
 accepts an explicit `None` to disable this additional work bound; other contract
 limits still apply. The CLI accepts an explicit non-negative integer override.
 
@@ -78,8 +80,8 @@ partition the schedule require a budget of 98,304,000 draws: each pair
 contributes to `overall` and one named slice for each metric. Verification
 performs its own replay and applies its own local budget. These are draw counts,
 not a promised runtime or memory allowance.
-One scalar metric over 50,000 pairs requires 102,400,000 draws, so it needs an
-explicit larger local budget. Adding slices increases the charge further.
+One scalar metric over 50,000 pairs fits the default exactly. Adding a nonempty named
+slice or another scalar metric requires an explicit larger local budget.
 
 An insufficient budget raises `PipelineError`; the CLI returns integration-error
 exit code 2 and publishes no comparison directory. It does not produce a quality

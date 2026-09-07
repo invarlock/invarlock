@@ -8,9 +8,9 @@ from typing import Any
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.pipeline.contracts import PipelineError
 
-# The measured workload contains 12,000 pairs, four scalar metrics and 2,048
-# repetitions. This is a default work allowance, not a time or memory guarantee.
-DEFAULT_MAX_BOOTSTRAP_DRAWS = 98_304_000
+# One overall scalar over the supported 50,000 pairs uses 2,048 repetitions.
+# This measured work allowance is not a time or memory guarantee.
+DEFAULT_MAX_BOOTSTRAP_DRAWS = 102_400_000
 
 
 def missing_pair(
