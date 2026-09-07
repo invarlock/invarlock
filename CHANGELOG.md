@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Expanded pipeline comparisons and signed evidence to 12,000 planned cases,
+  including binary paired intervals, while retaining the existing byte limits.
+
 - Added optional policy pins for planned case membership, rejecting shared
   omissions and changed references during comparison and signed replay.
 - Added `json_exact` whole-document structured-output scoring with binary paired

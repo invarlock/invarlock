@@ -32,9 +32,12 @@ prompts, retrieved material or decoding settings. It is still covered by the
 complete run digest and signature. These checks prevent inconsistent pairing;
 they do not prove that either evaluation operator selected a representative schedule.
 
-A file or normalized run is at most 64 MiB and 10,000 records. Complete embedded
-evidence is at most 192 MiB. Policies contain at most 16 metrics and 16 named
-slices, plus the automatically checked `overall` slice. Comparisons use ordinary
+A file or normalized run is at most 64 MiB. Complete embedded evidence is at most
+192 MiB. A comparison contains at most 12,000 paired cases, with up to 12,000
+records in each run; slices do not create separate record allowances. Runtime
+schedules and external scoring imports retain their separate 10,000-record
+limits. Policies contain at most 16 metrics and 16 named slices, plus the
+automatically checked `overall` slice. Comparisons use ordinary
 CPU memory and require no evaluator dependency. Native exports larger than these
 limits need an explicit supported projection before import.
 
@@ -118,7 +121,7 @@ types and metadata retain their parsed JSON identity: integer `1`, float `1.0`
 and boolean `true` are distinct, while `1e0` and `1.0` parse identically. Use
 strings for precision-sensitive decimal text. Unknown fields, duplicate IDs
 and empty sets fail validation.
-The existing 64 MiB and 10,000-record limits apply.
+The existing 64 MiB and 12,000-record limits apply.
 
 Comparison checks every record on both sides before scoring, including records
 with errors. A case mismatch returns integration-error exit code 2 before key

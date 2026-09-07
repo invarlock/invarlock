@@ -131,10 +131,10 @@ def test_case_count_and_byte_limits(monkeypatch):
         "format": CASE_SET_FORMAT,
         "cases": [
             {"id": str(i), "input": None, "expected": None, "metadata": {}}
-            for i in range(10000)
+            for i in range(12000)
         ],
     }
-    assert len(canonical_case_set(value)["cases"]) == 10000
+    assert len(canonical_case_set(value)["cases"]) == 12000
     value["cases"].append(
         {"id": "extra", "input": None, "expected": None, "metadata": {}}
     )
@@ -427,7 +427,7 @@ def test_legacy_unpinned_comparison_and_signature_identity():
 
 def test_source_and_packaged_case_contracts_match():
     root = Path(__file__).resolve().parents[2]
-    for name in ("case_set", "policy", "evidence"):
+    for name in ("case_set", "run", "policy", "evidence"):
         filename = f"pipeline_{name}.schema.json"
         assert (root / "contracts" / filename).read_bytes() == (
             root / "src/invarlock/_data/contracts" / filename

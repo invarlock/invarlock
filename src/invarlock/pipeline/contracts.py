@@ -15,7 +15,7 @@ from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_byt
 
 MAX_INPUT_BYTES = 64 * 1024 * 1024
 MAX_EVIDENCE_BYTES = 192 * 1024 * 1024
-MAX_RECORDS = 10000
+MAX_RECORDS = 12000
 
 
 class PipelineError(ValueError):
