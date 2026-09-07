@@ -9,6 +9,8 @@ from typing import Any, cast
 
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.paired_exact_match import paired_exact_match_statistics
+from invarlock.pipeline import contracts
+from invarlock.pipeline.capacity import check_missing_id_capacity, missing_pair
 from invarlock.pipeline.cases import validate_run_case_set
 from invarlock.pipeline.contracts import PipelineError, digest, validate
 from invarlock.pipeline.metrics import MetricError, score, validate_configuration
@@ -201,16 +203,7 @@ def _metric_result(
     values: list[list[float]] = [[], []]
     missing = []
     for left, right in pairs:
-        if (
-            left["error"] is not None
-            or right["error"] is not None
-            or (
-                recorded
-                and any(
-                    metric["score_key"] not in row["scores"] for row in (left, right)
-                )
-            )
-        ):
+        if missing_pair(left, right, metric):
             missing.append(left["id"])
             continue
         for side, row in enumerate((left, right)):
@@ -352,6 +345,9 @@ def compare_runs(
             f"local budget is {max_bootstrap_draws}. Increase the local budget "
             "only on a suitable host; the complete policy has not been evaluated."
         )
+    check_missing_id_capacity(
+        scopes, policy["metrics"], byte_limit=contracts.MAX_INPUT_BYTES
+    )
     results = []
     for slice_name, selected in scopes:
         for metric in policy["metrics"]:

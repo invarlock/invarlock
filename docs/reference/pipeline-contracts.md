@@ -40,6 +40,10 @@ limits. Policies contain at most 16 metrics and 16 named slices, plus the
 automatically checked `overall` slice. Comparisons use ordinary
 CPU memory and require no evaluator dependency. Native exports larger than these
 limits need an explicit supported projection before import.
+Missing-result IDs remain present for each metric and slice. If these repeated
+arrays alone would exceed the comparison byte limit, comparison rejects the
+workload before scoring. Passing that preflight is not a guarantee that the
+complete artifact fits; final size validation still applies.
 
 ## Local statistical work budget
 

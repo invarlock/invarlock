@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added caller-owned bootstrap work budgets to pipeline comparison and signed
   replay, rejecting excessive combined metric and slice work before scoring.
+- Added early rejection of missing-result ID arrays that would exceed the
+  comparison byte limit across overlapping metrics and slices.
 
 - Expanded pipeline comparisons and signed evidence to 12,000 planned cases,
   including binary paired intervals, while retaining the existing byte limits.
