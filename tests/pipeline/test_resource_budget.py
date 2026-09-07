@@ -88,7 +88,7 @@ def test_signed_recipient_owns_budget_and_never_returns_partial_verdict(monkeypa
 
 def test_producer_budget_prevents_signing(monkeypatch):
     def forbidden(*args, **kwargs):
-        pytest.fail("producer must not calculate a partial comparison")
+        pytest.fail("evidence creation must not calculate a partial comparison")
 
     monkeypatch.setattr(comparison, "_interval", forbidden)
     with pytest.raises(PipelineError, match="bootstrap draws"):

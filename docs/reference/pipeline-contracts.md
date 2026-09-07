@@ -72,7 +72,7 @@ An insufficient budget raises `PipelineError`; the CLI returns integration-error
 exit code 2 and publishes no comparison directory. It does not produce a quality
 verdict, omit scopes or reduce the 2,048 repetitions. The budget is supplied by
 the caller, independently of the signed artifact and acceptance policy. A
-producer's larger budget cannot raise the recipient's budget. Increase it only
+comparison author's larger budget cannot raise the recipient's budget. Increase it only
 after assessing the complete workload on the intended host.
 
 ## Pinning reusable inputs
