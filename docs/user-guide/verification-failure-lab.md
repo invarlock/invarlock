@@ -49,9 +49,12 @@ unchanged; each failure starts from a separate copy.
 ## Authentic policy rejection
 
 The second checked-in request uses the same schedule, policy, identities, and
-runtimes. Its subject answers one of two records incorrectly, so the independently
-replayed exact-match delta is `-50` percentage points against a required minimum
-of `0`. Produce its immutable evidence, then verify it under the same anchors:
+runtimes. Its subject answers one of 50 records incorrectly: baseline accuracy
+is 100%, candidate accuracy is 98%, and the point change is −2 percentage
+points. The paired interval lower bound is approximately −10.4954 percentage
+points, below the approved minimum of −10. The minimum count of 50 and maximum
+interval width of 20 percentage points both pass; the conservative change bound
+fails. Produce its immutable evidence, then verify it under the same anchors:
 
 ```bash
 invarlock evaluate rejected-request.yaml --signing-key .keys/evidence-signer.pem
@@ -74,9 +77,12 @@ fi
 ```
 
 Expected result: the evidence remains authentic and integrity-valid, the
-replayed policy verdict is `fail`, the command exits nonzero, and
+replayed policy verdict is `fail`, verification exits `7`, and
 `policy-rejected.receipt.json` is a verifier-signed rejection. This is a valid
 measurement outcome rather than an infrastructure or cryptographic failure.
+Evaluation itself exits `0` because evidence publication succeeded. Its human
+summary shows the recorded policy failure separately from publication; recipient
+verification has not yet occurred at that point.
 
 ## Wrong evidence signer anchor
 

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `invarlock pipeline` as an equivalent front door to the standalone
+  pipeline CLI, with explicit human or JSON output and detailed explanations
+  for comparison and independent verification. JSON remains the default.
+- Added pipeline report regeneration from existing bounded evidence without
+  scoring or replay, with explicit unsigned, unverified-signature and
+  comparison-only assurance states.
+- Added an explicit run-mode runtime resource profile with closed fields,
+  command-line overrides and visible configuration origins during preflight.
+  Resource selection does not change policy or signer authorization.
+
 - Added caller-owned bootstrap work budgets to pipeline comparison and signed
   replay, with a default of 102,400,000 planned draws. Excessive combined metric
   and slice work is rejected before scoring; callers can explicitly override
@@ -61,6 +71,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Made core command output distinguish publication, recorded policy results and
+  independent verification, while preserving transaction and rejection exit
+  codes. Grouped help makes runtime configuration easier to find.
+- Redesigned human reports with policy checks, missing counts, absolute floors,
+  interval diagrams, readable likelihood interpretation and explicit assurance
+  limits. Reports retain recorded decisions, escape external labels, and bound
+  configuration and missing-ID previews without changing evidence bytes.
+
 - Clarified fixed pipeline capacity limits, caller-owned work budgets and
   capacity-error recovery in the public reference documentation. Package
   availability remains documented at the installation entry points.
@@ -83,6 +101,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- Kept core report failures in JSON when requested and preserved literal error
+  details such as signer fingerprints in human output.
+- Displayed sample-count, precision and side-accuracy requirements in both
+  report formats, and matched interval labels and units to the actual scorer.
 
 - Excluded operating-system metadata from distributions and rejected it anywhere
   in wheel or source archives during release validation.

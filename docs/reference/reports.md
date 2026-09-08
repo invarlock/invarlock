@@ -382,45 +382,94 @@ Downstream readers use
 
 ## Human report
 
-`invarlock report` authenticates the closed inventory, checksums, canonical JSON,
-and embedded evidence signature before rendering the comparison as console text
-or standalone HTML. Rendering never changes bundle bytes.
+Render a controlled evaluation bundle for inspection:
 
-A shortened text view is:
-
-```text
-# InvarLock comparison report
-
-- **Comparison:** `cmp-example`
-- **Metric:** `exact_match`
-- **Records:** 20
-- **Verdict:** **PASS**
-- **Bundle integrity:** embedded evidence signature verified
-- **Acceptance path:** `invarlock verify` records the expected signer and independent anchors in a signed receipt
-- **Evidence signer:** `sha256:...`
-
-| Measure | Value |
-| --- | ---: |
-| Baseline mean | 0.75 |
-| Subject mean | 0.8 |
-| Exact-match delta (pp) | 5 |
-| Paired Newcombe 95% interval | [-14.975805, 24.866849] |
-| Minimum allowed (pp) | -15 |
-| Paired record count | 20 (minimum 20) |
-| Confidence-interval width (pp) | 39.842654 (maximum 50) |
+```bash
+invarlock report evidence/ --html comparison.html
+invarlock report evidence/ --explain
+invarlock report evidence/ --html comparison.html --json
 ```
 
-The exact-match rendering also lists regression and improvement counts, the
-discordant-pair count, and the exact two-sided McNemar probability. When the
-policy includes sample qualification, console and HTML render the observed and
-required record count, interval width, and combined qualification result.
-When exact-match policy includes side-accuracy qualification, both renderings
-also show the minimum, each observed side mean, and the combined result.
+`invarlock report` checks the closed inventory, checksums, canonical JSON and
+embedded evidence signature before rendering. The console displays a formatted
+summary; the self-contained HTML works offline and can be printed. The HTML
+file must be outside the evidence pack. Rendering preserves every bundle byte.
+`--json` emits a rendering result object, including the HTML path when requested;
+it does not turn the report into an independent acceptance receipt.
 
-The human view states what it is: a rendering of signature-authenticated
-evidence. Independent acceptance comes from `invarlock verify` and its signed
-receipt. Automation should parse verified JSON or validate a receipt, never
-scrape console or HTML.
+### Read the result and its requirements
+
+The report leads with **Policy satisfied** or **Policy not met**, the recorded
+verdict and the checks responsible for it. Each metric shows baseline and
+candidate values, change, observed pair count, an interval and the configured
+requirements. The interval diagram marks the policy boundary, while the table
+shows which numerical checks passed or were not met. Display values are rounded;
+exact recorded values remain available in the evidence and technical details.
+
+For exact match, means appear as percentages and changes as percentage points.
+The decision tests the paired interval's lower bound, not just the observed
+change. An improving candidate can still fail an absolute accuracy floor. When
+configured, the report shows observed and required record count, interval width,
+and the separate baseline and candidate accuracy checks. An absent requirement
+is identified as absent; rendering does not supply a new threshold.
+
+For normalized negative log-likelihood, the change is a candidate-to-baseline
+ratio and the upper ratio bound is compared with the policy maximum. Its
+finite-schedule resampling interval describes stability on the authenticated
+schedule. It does not establish population uncertainty. Available derived
+perplexity values appear separately and do not affect acceptance; an unavailable
+interpretation includes its recorded reason.
+
+HTML includes expandable identities, exact comparison data, paired outcome
+analysis where available, and supplementary authenticated observations.
+`--explain` adds technical details to the text view. Paired outcome analysis can
+include improvement and regression counts, discordant pairs and the exact
+McNemar probability; those diagnostics do not replace the configured decision.
+
+### Keep rendering separate from recipient acceptance
+
+The assurance panel distinguishes embedded bundle authentication from
+independent recipient acceptance. A bundle's embedded signer is not a
+recipient-owned trust anchor. Use `invarlock verify` with independent policy,
+identity and signer inputs to produce the signed acceptance or rejection
+receipt. A report can truthfully show an authenticated policy failure.
+
+A successful `report` invocation indicates that rendering completed, including
+when the recorded policy verdict is `fail`. Automation should parse verified
+JSON or validate a receipt, never scrape the console or HTML. Renderer failures
+use the selected text or JSON mode; argument-parser errors remain usage errors.
+
+### Reports from existing evaluation exports
+
+Pipeline comparisons use their separate evidence contract and commands:
+
+```bash
+invarlock pipeline compare release-check/pipeline.json \
+  --output result --output-format human --explain
+invarlock pipeline report result/evidence.json --output report-copy
+```
+
+The standalone `invarlock-pipeline` command exposes the same pipeline commands.
+Both `compare` and `verify` retain JSON output by default; human output is an
+explicit option. `report` regenerates HTML and Markdown from bounded, structurally
+validated evidence and checks embedded input bindings. It does not score,
+replay arithmetic, verify a signature or authorize a signer.
+
+Pipeline reports distinguish unsigned local evidence, a signature that has not
+been independently verified, and unavailable signing information in a
+comparison-only view. They preserve `pass`, `regression` and
+`insufficient_evidence` as the recorded decisions. A `regression` decision means
+a policy bound failed, which can be an absolute floor even when the observed
+candidate improved. Missing paired results remain missing; overlapping scope
+counts are not independent samples. Advanced configuration and missing-ID lists
+use labeled previews while the original values remain in bound evidence.
+
+Use `invarlock pipeline verify` with a recipient-owned key, policy and complete-run
+digests for independent authentication and replay. Successful pipeline report
+regeneration exits `0` regardless of the stored policy decision; comparison and
+verification keep their decision-specific exit codes. See the
+[pipeline integration guide](../user-guide/pipeline-integration.md) for the full
+workflow and its assurance limits.
 
 ## Failure-state interpretation
 

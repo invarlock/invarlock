@@ -104,15 +104,31 @@ data slices and JSON, HTML, Markdown and JUnit reports.
 
 ```bash
 python -m pip install .
-invarlock-pipeline init release-check --example extraction
-invarlock-pipeline compare release-check/pipeline.json --output release-check/result
+invarlock pipeline init release-check --example extraction
+invarlock pipeline compare release-check/pipeline.json \
+  --output release-check/result --output-format human --explain
 ```
+
+`invarlock-pipeline` remains available as the standalone equivalent. Pipeline
+commands default to JSON for automation; the explicit human mode shows policy
+checks, usable and missing pairs, and report paths. To recreate HTML and
+Markdown from evidence without rerunning the comparison, use
+`invarlock pipeline report release-check/result/evidence.json --output report-copy`.
+Rendering does not independently verify or authorize the evidence signer.
 
 The example uses synthetic records and illustrative thresholds. Follow the
 [pipeline integration guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/pipeline-integration.md)
 to capture real results, use native export adapters and add a CI gate. This
 workflow is not in the published 0.15.0 wheel. Its optional signed comparison
 authenticates captured inputs and arithmetic; recorded judgments remain explicit.
+
+For controlled evaluations in the source checkout, `invarlock evaluate --help`
+groups the main workflow separately from advanced runtime options. Run requests
+can use `--runtime-profile runtime.json` to reuse explicit container resources;
+`--preflight` checks the resolved setup before execution. The profile configures
+execution resources, not policy or signer trust. See the
+[CLI reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md)
+for its closed fields, precedence and validation.
 
 ## Try the signed handoff locally
 

@@ -37,6 +37,29 @@ contains recorded numbers; it does not call a judge or demonstrate judge quality
 Each invocation requires a new output directory, so a failed or repeated run
 cannot silently replace a previous result.
 
+## Choose human or machine output
+
+JSON remains the default for `compare` and `verify`, including when stdout is a
+terminal. Request a readable summary explicitly:
+
+```bash
+invarlock-pipeline compare release-check/pipeline.json \
+  --output release-check/readable-result --output-format human --explain
+```
+
+The summary separates the policy result from independent verification. It shows
+usable and missing pairs for each metric and slice, failure reasons and artifact
+paths. `--explain` adds recorded means, deltas, intervals, units, scoring assurance,
+limitations and input bindings. Counts across overlapping metrics and slices must
+not be added together as independent cases. Missing results stay missing.
+
+`--output-format json` selects the existing machine format explicitly. `--explain`
+does not add fields or prose to JSON output. Output mode never changes evidence,
+signatures, thresholds or decision exit codes: `0` means pass, `1` regression,
+`3` insufficient evidence and `2` an integration or usage error. Usage errors such
+as invalid options are reported by the argument parser; they are not JSON status
+objects.
+
 ## Freeze the cases you intend to evaluate
 
 For a planned evaluation, retain its case IDs, inputs, references and slice tags
@@ -233,6 +256,39 @@ The expected digests identify complete normalized runs, not just model files.
 Do not obtain them from the received evidence itself. Verification checks the
 signature, independent run identities and policy, then recomputes the entire
 comparison. Recorded judgments remain recorded judgments after authentication.
+
+For the same verification with readable output, append
+`--output-format human --explain`. Successful verification reports the recipient
+checks separately from the policy decision: authenticated evidence can still
+show regression or insufficient evidence and retain exit code `1` or `3`.
+Signing during `compare` does not perform recipient verification. A public key
+and expected digests remain recipient-owned inputs in every output mode.
+
+## Regenerate reports from existing evidence
+
+Create fresh HTML and Markdown views without running inference or recomputing
+the comparison:
+
+```bash
+invarlock-pipeline report signed-result/evidence.json \
+  --output regenerated-views --output-format human --explain
+```
+
+The command reads a bounded evidence file, validates its closed structure and
+checks that its comparison bindings match the embedded runs and policy. It
+preserves the recorded decision. It does **not** verify a signature, authorize a
+signer or replay metric arithmetic. A present signature is labeled unverified;
+unsigned evidence is labeled unsigned local. Use `verify` with independently
+supplied inputs for authentication and replay. A regenerated report does not
+inherit a prior verification status that was not supplied and checked here.
+
+The new output directory contains `report.html` and `summary.md`; the source
+file is unchanged. Advanced policy configuration and missing case IDs use
+explicitly labeled previews in the report. Full values remain in the original
+evidence, identified by the displayed policy and run bindings. Existing output directories are rejected. Successful
+rendering returns `0`, including for a recorded regression or insufficient
+result; rendering errors return `2`. In JSON mode, `recorded_decision` is separate
+from the rendering status and `independent_verification` is `not_performed`.
 
 This pipeline evidence format does not replace the OCI-backed
 [`evaluate → verify → report` transaction](getting-started.md). Use that path
