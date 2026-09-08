@@ -331,15 +331,25 @@ inside a signed bundle.
 
 ## Machine-readable diagnostics
 
-Use `--json` for evaluation and verification automation:
+Use `--json` for core evaluation, verification and rendering automation:
 
 ```bash
 invarlock evaluate request.yaml --signing-key evidence-signer.pem --json
 invarlock verify evidence/ ... --receipt receipt.json --json
+invarlock report evidence/ --html report.html --json
 ```
 
-The report command intentionally renders human-facing console or HTML output.
-The canonical JSON report remains inside the authenticated bundle.
+The report result describes rendering success or failure and includes the HTML
+path when requested. It is not the canonical comparison JSON or an acceptance
+receipt. The canonical report remains inside the authenticated bundle.
+Application errors use structured output; invalid CLI options and path arguments
+rejected before a command runs still produce usage diagnostics on stderr.
+
+For the existing-results workflow, `invarlock pipeline compare`, `verify` and
+`report` default to JSON; use `--output-format human --explain` to inspect their
+checks interactively. Human text and HTML are presentation formats and should
+not be parsed as stable machine interfaces. See the
+[CLI output contract](../reference/cli.md#human-and-machine-output).
 
 ## Before escalating a bug
 

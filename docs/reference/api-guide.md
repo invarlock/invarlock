@@ -106,10 +106,17 @@ The result types are:
 | Type | Important fields |
 | --- | --- |
 | `EvaluationPreflightResult` | `execution_mode`, `output`, input digests, providers, checks, `as_json()` |
-| `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, `as_json()` |
+| `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, optional `policy_verdict`, `as_json()` |
 | `EvidenceVerification` | `evidence_path`, `payload`, `receipt_path`, `summary`, `as_json()` |
 | `EvidenceReport` | `text`, `html_path`, `evidence_signer` |
 | `ReceiptVerification` | `ok`, `signed`, `statement`, `verifier_fingerprint`, `errors` |
+
+`EvaluationTransactionResult.policy_verdict` is optional presentation metadata
+from publication. It is not added to `as_json()` and does not establish
+recipient acceptance. Use independent verification for that decision.
+`EvidenceReport.text` is Markdown presentation content; console and HTML
+layouts are not stable parsing interfaces. Use canonical evidence and verifier
+payloads for automation.
 
 `EvaluationPreflightError`, `EvaluationTransactionError`,
 `EvidenceVerificationError`, and `EvidenceReportError` carry CLI-compatible

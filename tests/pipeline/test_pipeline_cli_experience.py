@@ -380,3 +380,30 @@ def test_both_cli_publication_paths_build_one_evidence_view(
     )
     assert result.exit_code == 0, result.stdout
     assert calls == [1]
+
+
+def test_generated_starter_commands_run_with_the_core_namespace(tmp_path, monkeypatch):
+    import shlex
+
+    from invarlock.cli.app import app as core_app
+
+    runner = CliRunner()
+    project = tmp_path / "starter"
+    assert runner.invoke(core_app, ["pipeline", "init", str(project)]).exit_code == 0
+    readme = (project / "README.txt").read_text()
+    commands = [line for line in readme.splitlines() if line.startswith("invarlock ")]
+    assert len(commands) == 2
+    monkeypatch.chdir(project)
+    comparison = runner.invoke(core_app, shlex.split(commands[0])[1:])
+    assert comparison.exit_code == 0
+    assert json.loads(comparison.stdout)["decision"] == "pass"
+    original = (project / "result/evidence.json").read_bytes()
+    rendered = runner.invoke(core_app, shlex.split(commands[1])[1:])
+    assert rendered.exit_code == 0
+    assert "Independent verification: not performed" in rendered.stdout
+    assert "Signing: Unsigned local evidence" in rendered.stdout
+    assert "recorded decision not replayed" in rendered.stdout
+    assert (project / "rendered/report.html").read_bytes() == (
+        project / "result/report.html"
+    ).read_bytes()
+    assert (project / "result/evidence.json").read_bytes() == original

@@ -177,7 +177,17 @@ def init(
         ):
             artifacts[name] = canonical_json_bytes(value)
         artifacts["README.txt"] = (
-            b"These are synthetic records and illustrative thresholds, not customer results.\nReplace both runs with your captured exports and review policy.json before reliance.\nUse a new output directory for each comparison. No inference or external service is required.\n"
+            b"These are synthetic records and illustrative thresholds, not customer results.\n"
+            b"Replace both runs with your captured exports and review policy.json before reliance.\n"
+            b"Use a new output directory for each comparison. No inference or external service is required.\n"
+            b"Run these commands from this project directory:\n"
+            b"invarlock pipeline compare pipeline.json --output result\n"
+            b"JSON is the default. For a human summary, add --output-format human --explain.\n"
+            b"Regenerate HTML and Markdown views from existing evidence:\n"
+            b"invarlock pipeline report result/evidence.json --output rendered --output-format human\n"
+            b"Rendering does not replay the decision or independently verify a signature.\n"
+            b"This example is unsigned unless you supply --signing-key when comparing.\n"
+            b"The equivalent standalone command is invarlock-pipeline.\n"
         )
         write_directory(directory, artifacts)
         typer.echo(

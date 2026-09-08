@@ -12,8 +12,11 @@
     and per-case results from both releases. No model, GPU, container or evaluator
     SDK is required for comparison.
 
-This workflow is **unreleased**. Install the checkout to try it; the published
-0.15.0 wheel does not contain `invarlock-pipeline`.
+Install the source checkout to use this workflow; the published 0.15.0 wheel
+does not contain it. `invarlock pipeline COMMAND` and
+`invarlock-pipeline COMMAND` expose the same options, defaults and exit codes.
+The examples below use the standalone spelling; the main README demonstrates
+the command under `invarlock pipeline`.
 
 ## Get a complete first result
 

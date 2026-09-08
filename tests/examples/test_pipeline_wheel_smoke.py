@@ -13,6 +13,7 @@ from types import ModuleType
 import pytest
 from typer.testing import CliRunner
 
+from invarlock.cli.app import app as core_app
 from invarlock.pipeline.cli import app
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,13 +28,16 @@ def _module() -> ModuleType:
     return module
 
 
-def _real_cli_transport(monkeypatch, module, *, fault=None):
+def _real_cli_transport(monkeypatch, module, *, fault=None, namespace=False):
     """Replace only process launching; execute each command against the real CLI."""
     runner = CliRunner()
     calls = []
     roots = []
     executable = "/candidate/bin/invarlock-pipeline"
-    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--cli", executable])
+    arguments = [str(SCRIPT), "--cli", executable]
+    if namespace:
+        arguments.append("--pipeline-namespace")
+    monkeypatch.setattr(sys, "argv", arguments)
     monkeypatch.setattr(module.shutil, "which", lambda name: name)
     monkeypatch.setenv("PYTHONPATH", "/untrusted/checkout")
     monkeypatch.setenv("INVARLOCK_PIPELINE_SIGNING_KEY", "/untrusted/private.pem")
@@ -52,7 +56,7 @@ def _real_cli_transport(monkeypatch, module, *, fault=None):
             # the production launcher before supplying its captured environment.
             process.delenv("PYTHONPATH", raising=False)
             process.delenv("INVARLOCK_PIPELINE_SIGNING_KEY", raising=False)
-            result = runner.invoke(app, command[1:], env=env)
+            result = runner.invoke(core_app if namespace else app, command[1:], env=env)
         completed = subprocess.CompletedProcess(
             command, result.exit_code, result.stdout, result.stderr
         )
@@ -80,11 +84,15 @@ def test_wheel_smoke_rehearses_real_signed_handoffs_and_all_gate_exits(
         "regression, integration error and insufficient-evidence exit codes pass"
         in output
     )
-    verifications = [call for call in calls if call.args[1] == "verify"]
+    verifications = [
+        call
+        for call in calls
+        if call.args[1] == "verify" and "--output-format" not in call.args
+    ]
     assert len(verifications) == 3
     assert all(json.loads(call.stdout)["authenticated"] for call in verifications)
     comparisons = [call for call in calls if call.args[1] == "compare"]
-    assert [call.returncode for call in comparisons] == [0, 2, 0, 2, 0, 2, 1, 3]
+    assert [call.returncode for call in comparisons] == [0, 2, 0, 2, 0, 2, 0, 1, 3]
     assert json.loads(comparisons[-2].stdout)["decision"] == "regression"
     assert json.loads(comparisons[-1].stdout)["decision"] == "insufficient_evidence"
     assert roots and all(root == roots[0] for root in roots)
@@ -131,6 +139,9 @@ def test_wheel_smoke_reports_failed_command_diagnostics_and_cleans_up(monkeypatc
         ("empty_report", AssertionError),
         ("unauthenticated", AssertionError),
         ("missed_regression", RuntimeError),
+        ("render_claims_verified", AssertionError),
+        ("render_changed_evidence", AssertionError),
+        ("human_claims_verified", AssertionError),
     ],
 )
 def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
@@ -141,7 +152,12 @@ def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
     def corrupt(completed, root):
         command = completed.args
         if command[1] == "compare" and command[2] == "classification/pipeline.json":
-            if fault_name == "malformed_status":
+            if fault_name == "human_claims_verified" and "--output-format" in command:
+                completed.stdout = completed.stdout.replace(
+                    "Independent verification: not performed",
+                    "Independent verification: passed",
+                )
+            elif fault_name == "malformed_status":
                 completed.stdout = "not JSON"
             elif fault_name == "failed_decision":
                 status = json.loads(completed.stdout)
@@ -155,6 +171,13 @@ def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
             status = json.loads(completed.stdout)
             status["authenticated"] = False
             completed.stdout = json.dumps(status)
+        elif command[1] == "report":
+            if fault_name == "render_claims_verified":
+                status = json.loads(completed.stdout)
+                status["independent_verification"] = "passed"
+                completed.stdout = json.dumps(status)
+            elif fault_name == "render_changed_evidence":
+                (root / "classification/result/evidence.json").write_text("{}")
         elif command[-1] == "regressed" and fault_name == "missed_regression":
             completed.returncode = 0
 
@@ -162,3 +185,12 @@ def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
     with pytest.raises(error):
         module.main()
     assert roots and not roots[0].exists()
+
+
+def test_wheel_smoke_runs_the_real_core_pipeline_namespace(monkeypatch, capsys):
+    module = _module()
+    calls, roots = _real_cli_transport(monkeypatch, module, namespace=True)
+    module.main()
+    assert calls and all(call.args[1] == "pipeline" for call in calls)
+    assert "human summaries and rendering" in capsys.readouterr().out
+    assert not roots[0].exists()

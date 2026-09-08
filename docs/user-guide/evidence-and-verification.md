@@ -176,6 +176,12 @@ Applying different policy bytes requires a new evidence transaction.
 
 ## Read the verification result
 
+Human output separates evidence integrity from the policy decision. A replayed
+policy rejection includes observed and required values for failed checks and
+the signed receipt path. Evidence, receipt and HTML paths remain complete
+logical lines even on narrow terminals. A readable report or an existing
+receipt file alone does not establish acceptance.
+
 Use `--json` in automation. A successful result includes the core verifier
 fields plus the receipt path and verifier identity. Check the structured
 meaning rather than a human substring:
@@ -282,6 +288,13 @@ signature before rendering. It shows:
   configured count, precision, and side-accuracy requirements;
 - policy digest; and
 - evidence-signer fingerprint.
+
+The HTML starts with the recorded policy decision and named baseline and
+subject. Each configured check shows its own status; expandable sections hold
+exact values, identities and technical details. Display rounding does not
+change the underlying evidence. The self-contained report works offline.
+`report --json` returns rendering status and the optional HTML path. A
+successful render exits `0` for both passing and failing recorded policies.
 
 The report verifies the embedded signature without pinning that signer to an
 independent allowlist, and it does not validate a verification receipt. Treat
