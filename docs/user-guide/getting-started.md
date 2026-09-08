@@ -44,7 +44,7 @@ independent receipt path.
 | --- | --- | --- | --- |
 | `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample and side-accuracy qualification, and evaluation-time policy verdict |
 | `verify` | Untrusted evidence plus independent artifact, schedule, policy, runtime, and signer anchors; verifier identity; and verifier key | One no-clobber signed receipt outside the bundle | Independent replay and acceptance/rejection record |
-| `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Human view of the canonical comparison |
+| `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Summary of the canonical comparison |
 
 Run mode is the primary path. Import mode is available when another controlled
 execution already produced the complete provider sidecars; the final section
@@ -256,7 +256,7 @@ invarlock evaluate release-check/request.yaml \
 ```
 
 Create `runtime.json` using that reference and your actual pinned images before
-running this command. Human preflight output shows the effective settings and
+running this command. Preflight text output shows the effective settings and
 where they came from. Explicit CLI overrides take precedence over profile
 values. The profile does not contain signing keys or acceptance policy and is
 not accepted for import requests. Remove `--preflight` to execute the same

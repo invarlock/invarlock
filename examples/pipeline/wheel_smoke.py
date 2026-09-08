@@ -132,7 +132,7 @@ def main() -> None:
         )
         assert "Independent verification: passed" in verified
         assert "40/40 usable pairs, 0 missing" in verified
-        print("human summaries and rendering without independent verification pass")
+        print("text summaries and rendering without independent verification pass")
         candidate_path = root / "judge/candidate.json"
         candidate_run = json.loads(candidate_path.read_text())
         for row in candidate_run["records"]:

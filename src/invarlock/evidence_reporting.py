@@ -1,4 +1,4 @@
-"""One human renderer for the canonical report inside an evidence pack."""
+"""Render the canonical report inside an evidence pack."""
 
 from __future__ import annotations
 
@@ -1165,7 +1165,7 @@ def _report_view(
             "Keep this report alongside the original immutable evidence and the separate verification receipt.",
         ),
         limitations=(
-            "This is a human rendering of the signature-authenticated evidence bundle; rendering does not establish independent acceptance.",
+            "This report summarizes the evidence bundle. Rendering checks its integrity and embedded signature; independent acceptance requires verification with your own trust inputs.",
             "Results apply to the recorded cases, metric and policy. A pass does not establish general model quality, safety or representative production performance.",
             "The interval describes paired binary outcomes under its stated method. Population interpretation requires an appropriate sampling design."
             if exact

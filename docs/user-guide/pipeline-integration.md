@@ -40,7 +40,7 @@ contains recorded numbers; it does not call a judge or demonstrate judge quality
 Each invocation requires a new output directory, so a failed or repeated run
 cannot silently replace a previous result.
 
-## Choose human or machine output
+## Choose text or JSON output
 
 JSON remains the default for `compare` and `verify`, including when stdout is a
 terminal. Request a readable summary explicitly:

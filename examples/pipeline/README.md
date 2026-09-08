@@ -13,7 +13,7 @@ project and policy, and quality plus latency checks on the full dataset and a
 selected category. Also try `--example classification` or `--example judge`.
 The examples are illustrative; they do not establish deployment quality.
 
-The human summary shows the policy decision, usable and missing pair counts,
+The text summary shows the policy decision, usable and missing pair counts,
 reasons, signing status and report paths. Omit `--output-format human` for the
 unchanged JSON default used by automation. `invarlock-pipeline` remains an
 equivalent standalone command.
@@ -37,7 +37,7 @@ use the SDK or native parsers and add the gate to CI.
 
 The distribution smoke test runs outside the source checkout, clears Python's
 source-path override and exercises all examples, signing, independent
-verification, human summaries, report regeneration, repeated destinations and
+verification, text summaries, report regeneration, repeated destinations and
 every decision exit code:
 
 ```bash

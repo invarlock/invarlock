@@ -12,6 +12,18 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
+# Static mark from docs/assets/invarlock-app-icon.svg; the adjacent name labels it.
+_BRAND_MARK = """<svg class="mark" xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+<rect x="32" y="32" width="448" height="448" rx="92" fill="#11130f"/>
+<rect x="32.5" y="32.5" width="447" height="447" rx="91.5" fill="none" stroke="#3f4235"/>
+<g transform="translate(256 256) scale(1.3) translate(-256 -256)">
+<path d="M174 150 H126 V362 H174" fill="none" stroke="#f4efe3" stroke-width="26.15" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M338 150 H386 V362 H338" fill="none" stroke="#f4efe3" stroke-width="26.15" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242" fill="none" stroke="#9fb7ff" stroke-width="24.62" stroke-linecap="round" opacity="0.72"/>
+<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242" fill="none" stroke="#f4efe3" stroke-width="10.77" stroke-linecap="round" opacity="0.52"/>
+<circle cx="256" cy="252" r="6.92" fill="#f4efe3" opacity="0.64"/>
+</g></svg>"""
+
 
 @dataclass(frozen=True)
 class CheckView:
@@ -137,7 +149,7 @@ def _interval(view: IntervalView) -> str:
 _CSS = """
 :root{color-scheme:light;--ink:#172a35;--muted:#526773;--line:#d8e3e8;--paper:#fff;--canvas:#f2f6f8;--teal:#086756;--red:#a32639;--amber:#79530b}
 *{box-sizing:border-box}body{margin:0;overflow-wrap:anywhere;background:var(--canvas);color:var(--ink);font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-a{color:#145d7b}main{max-width:1120px;margin:auto;padding:36px 28px 60px}.brand{display:flex;align-items:center;gap:10px;font-weight:750;letter-spacing:.01em}.mark{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--ink);color:white;font-size:18px}.family{margin-left:auto;color:var(--muted);font-size:12px;text-align:right}
+a{color:#145d7b}main{max-width:1120px;margin:auto;padding:36px 28px 60px}.brand{display:flex;align-items:center;gap:10px;font-weight:750;letter-spacing:.01em}.mark{display:block;width:34px;height:34px;flex-shrink:0}.family{margin-left:auto;color:var(--muted);font-size:12px;text-align:right}
 .hero{margin:26px 0 22px;padding:30px;border:1px solid var(--line);border-radius:16px;background:var(--paper);border-top:4px solid var(--teal)}.hero.fail{border-top-color:var(--red)}.hero.insufficient{border-top-color:var(--amber)}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:750;color:var(--muted);margin:0 0 7px}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin:0 0 14px}h2{font-size:21px;letter-spacing:-.02em;line-height:1.3;margin:0}h3{font-size:16px;margin:0 0 10px}.hero>p{max-width:80ch;margin:0 0 18px}.summary-row{display:flex;flex-wrap:wrap;gap:8px}.pill{font-size:12px;font-weight:650;padding:4px 10px;border-radius:6px;background:#eef3f6;color:var(--muted)}.badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:2px 8px;white-space:nowrap}.pass .badge,.badge.pass{color:var(--teal);background:#eef8f4}.fail .badge,.badge.fail{color:var(--red);background:#fff1f2}.insufficient .badge,.badge.insufficient{color:var(--amber);background:#fff8e6}
 .subjects{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 24px}.subjects div{min-width:0}.subjects dt{font-size:11px;font-weight:650;color:var(--muted)}.subjects dd{margin:3px 0 0;font-size:13px;overflow-wrap:anywhere}
 .section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:30px 0 14px}.section-heading p{font-size:12px;margin:0;color:var(--muted)}.metric{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:0 0 16px;padding:24px;break-inside:avoid}.metric-heading>div{min-width:0}.metric-heading>.badge{flex-shrink:0;max-width:45%}.metric-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.scope{font-size:12px;color:var(--muted);margin:4px 0}.metric-explanation{margin:12px 0 18px}.values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;background:#f8fafb;overflow:hidden}.value{padding:12px 16px;border-right:1px solid var(--line)}.value:last-child{border:0}.value dt{font-size:11px;color:var(--muted)}.value dd{margin:3px 0 0;font-size:22px;font-weight:650;letter-spacing:-.02em;overflow-wrap:anywhere}.interval{margin:14px 0}.interval svg{display:block;width:100%;max-height:68px}.interval figcaption{font-size:12px;color:var(--muted)}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--ink);stroke:white;stroke-width:2}.threshold{stroke:var(--amber);stroke-width:2;stroke-dasharray:4 4}.legend{display:block}
@@ -155,7 +167,7 @@ def render_html(view: ReportView) -> str:
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\">",
         f"<title>{e(view.title)}</title><style>{_CSS}</style></head><body><main>",
-        f'<header class="brand"><span class="mark" aria-hidden="true">↔</span> InvarLock<span class="family">{e(view.family)}</span></header>',
+        f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
         f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p>{e(view.summary)}</p><div class="summary-row">',
         f'<span class="pill">{len(view.metrics)} metric / scope result{"s" if len(view.metrics) != 1 else ""}</span>',
         f'<span class="pill">Original decision: {e(view.decision)}</span></div></section>',
@@ -238,7 +250,7 @@ def render_html(view: ReportView) -> str:
             f'<details><summary>{e(heading)}</summary><div class="detail-content"><pre>{e(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False))}</pre></div></details>'
         )
     parts.append(
-        '<footer class="footer">InvarLock · Human-readable evidence report. Display values are rounded; exact values remain in the evidence. This HTML is a presentation, not an independent acceptance receipt.</footer></main></body></html>\n'
+        '<footer class="footer">InvarLock · Evidence report. Displayed values may be rounded; exact values are preserved in the evidence bundle. This report is not an independent acceptance receipt.</footer></main></body></html>\n'
     )
     return "".join(parts)
 

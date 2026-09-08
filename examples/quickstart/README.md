@@ -25,7 +25,7 @@ The successful command prints `Decision: pass` and writes:
 
 - `verification.result.json`, the machine-readable verifier result;
 - `verification.receipt.json`, the newly signed independent receipt; and
-- `evidence.html`, the human-readable rendering.
+- `evidence.html`, the HTML report.
 
 The script creates a one-use demonstration verifier key and deletes it after
 receipt issuance. Production verifiers retain their keys in an appropriate

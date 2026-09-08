@@ -13,7 +13,7 @@ artifact.
     per-record results.
 
     **Outcome:** A signed comparison bundle, an independently signed
-    verification receipt, and a human-readable report.
+    verification receipt, and an evidence report.
 
     **Audience:** Model adaptation, runtime, evaluation, and release teams.
 

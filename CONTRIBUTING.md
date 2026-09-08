@@ -186,7 +186,7 @@ separate smoke job does not collect their branch coverage. Add meaningful
 tests under `tests/examples/`; do not weaken thresholds to make a change pass.
 
 Changes to command output or reports must preserve policy outcomes, signed bytes,
-recipient-owned trust inputs and documented exit codes. Test human and machine
+recipient-owned trust inputs and documented exit codes. Test text and JSON
 modes separately, including policy rejection, missing evidence and malformed
 input. A rendered report must not inherit independent verification status from
 a signature's presence. Retain the distinction between core transaction

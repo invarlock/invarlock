@@ -454,7 +454,7 @@ def test_trust_boundary_demo_accepts_rejects_and_detects_tampering(
 
     assert completed.returncode == 0, completed.stderr or completed.stdout
     assert "PASS accepted evidence and receipt" in completed.stdout
-    assert "PASS human-readable report" in completed.stdout
+    assert "PASS evidence report" in completed.stdout
     assert "PASS authentic policy rejection" in completed.stdout
     assert "PASS byte-tamper rejection" in completed.stdout
     report = workspace / "verifier/reports/accepted.html"

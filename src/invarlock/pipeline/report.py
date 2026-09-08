@@ -1,4 +1,4 @@
-"""Human reports derived from explicit pipeline evidence and policy checks."""
+"""Reports derived from explicit pipeline evidence and policy checks."""
 
 from __future__ import annotations
 
@@ -319,7 +319,7 @@ def _view(comparison: dict[str, Any], evidence: dict[str, Any] | None) -> Report
             )
         )
     )
-    # Human detail remains compact even when evidence lists many missing case IDs.
+    # Report detail remains compact even when evidence lists many missing case IDs.
     technical = {
         **comparison,
         "metrics": [

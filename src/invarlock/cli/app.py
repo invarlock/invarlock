@@ -686,7 +686,7 @@ def verify(
 
 @app.command(
     name="report",
-    help="Render one human-readable report from the canonical report in an evidence pack.",
+    help="Summarize an evidence pack in the terminal and optionally write an HTML report.",
 )
 def report(
     evidence: Path = typer.Argument(

@@ -182,7 +182,7 @@ def init(
             b"Use a new output directory for each comparison. No inference or external service is required.\n"
             b"Run these commands from this project directory:\n"
             b"invarlock pipeline compare pipeline.json --output result\n"
-            b"JSON is the default. For a human summary, add --output-format human --explain.\n"
+            b"JSON is the default. For a text summary, add --output-format human --explain.\n"
             b"Regenerate HTML and Markdown views from existing evidence:\n"
             b"invarlock pipeline report result/evidence.json --output rendered --output-format human\n"
             b"Rendering does not replay the decision or independently verify a signature.\n"
@@ -288,7 +288,7 @@ def compare(
     explain: bool = typer.Option(
         False,
         "--explain",
-        help="Include metric values, bindings and limitations in human output; JSON is unchanged.",
+        help="Include metric values, bindings and limitations in text output; JSON is unchanged.",
     ),
 ) -> None:
     """Check all metrics/slices and write JSON, HTML, Markdown and JUnit reports."""
@@ -395,7 +395,7 @@ def verify(
     explain: bool = typer.Option(
         False,
         "--explain",
-        help="Include metric values, bindings and limitations in human output; JSON is unchanged.",
+        help="Include metric values, bindings and limitations in text output; JSON is unchanged.",
     ),
 ) -> None:
     """Authenticate and replay using recipient-owned expected inputs, never pack keys."""
@@ -447,7 +447,7 @@ def report(
     explain: bool = typer.Option(
         False,
         "--explain",
-        help="Include recorded metric values, bindings and limitations in human output.",
+        help="Include recorded metric values, bindings and limitations in text output.",
     ),
 ) -> None:
     """Render existing evidence without scoring, replay or independent authentication."""

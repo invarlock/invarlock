@@ -1,4 +1,4 @@
-"""Human views preserve pipeline decisions and never confer recipient authority."""
+"""Text summaries preserve pipeline decisions and never confer recipient authority."""
 
 import json
 

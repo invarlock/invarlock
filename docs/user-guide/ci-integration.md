@@ -24,7 +24,7 @@ The action runs the same public transactions documented by the
    evidence-signer fingerprint plus the normalized-request digest required for
    GGUF evidence, then writes a verifier-signed receipt.
 2. `invarlock report EVIDENCE --html PATH --explain` authenticates the bundle
-   and writes a human view without changing the evidence.
+   and writes a report without changing the evidence.
 3. The action uploads the evidence directory, verification JSON, signed
    receipt, and HTML report. It never uploads the verifier private key.
 
@@ -206,7 +206,7 @@ directory. Their roles remain distinct:
 | Evidence directory | Signed canonical evidence and comparison report |
 | `verification.result.json` | Machine-readable result for this verifier run |
 | `verification.receipt.json` | Verifier-signed decision and independent anchors |
-| `evidence.html` | Reproducible human rendering; not an acceptance record |
+| `evidence.html` | Reproducible HTML report; not an acceptance record |
 
 Verification JSON is written even when the verifier returns nonzero. The action
 then attempts the authenticated renderer and uploads available review material.

@@ -44,7 +44,7 @@ authorities without changing a byte in the evidence directory.
 | Paired transaction | Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width and exact-match side-accuracy controls |
 | Canonical bundle | Bind normalized intent, identities, provider material, paired records, report, checksums, and evidence signature |
 | Independent verifier | Recompute integrity, identities, pairs, scores, report, and policy verdict under caller-owned trust anchors |
-| Human renderer | Produce a console view and optional self-contained HTML from the authenticated canonical report |
+| Report renderer | Produce a console view and optional self-contained HTML from the authenticated canonical report |
 
 ## Trust boundaries
 
@@ -92,7 +92,7 @@ The `invarlock` distribution contains:
 - the request and evidence contracts;
 - the runtime-provider ABI;
 - the Hugging Face Transformers provider; and
-- the independent verifier and human renderer.
+- the independent verifier and report renderer.
 
 The GGUF, TensorRT-LLM, and Hugging Face vision-text providers are first-party
 optional distributions. They implement the same ABI and register through the

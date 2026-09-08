@@ -110,7 +110,7 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 ## Present and retain
 
 - [ ] Use `invarlock report evidence/ --html evidence.html --explain` for a
-      human view; do not treat the rendered file as the signed acceptance
+      report; do not treat the rendered file as the signed acceptance
       record.
 - [ ] Record any external attestation, independent rerun, exception, or decision owner
       decision beside the bundle without modifying it.

@@ -1,13 +1,13 @@
 # Reports and receipts
 
 InvarLock separates provider facts, a canonical comparison report, independent
-verification output, a signed verification receipt, and a human rendering.
+verification output, a signed verification receipt, and console or HTML summaries.
 They have different trust meanings.
 
 !!! info "Reference"
 
     - **Surface:** Runtime-side reports, canonical comparison reports,
-      verification results, signed receipts, and human renderings
+      verification results, signed receipts, and console or HTML summaries
     - **Stability:** Versioned machine contracts are stable by format; console
       and HTML output are presentation surfaces
     - **Use this page when:** Parsing a decision, validating a receipt, or
@@ -380,7 +380,7 @@ Downstream readers use
 | Expected verifier fingerprint | Embedded receipt public key and receipt signature |
 | Expected trust-profile digest or `null` | Receipt verifier profile binding |
 
-## Human report
+## Console and HTML reports
 
 Render a controlled evaluation bundle for inspection:
 
@@ -450,7 +450,7 @@ invarlock pipeline report result/evidence.json --output report-copy
 ```
 
 The standalone `invarlock-pipeline` command exposes the same pipeline commands.
-Both `compare` and `verify` retain JSON output by default; human output is an
+Both `compare` and `verify` retain JSON output by default; text output is an
 explicit option. `report` regenerates HTML and Markdown from bounded, structurally
 validated evidence and checks embedded input bindings. It does not score,
 replay arithmetic, verify a signature or authorize a signer.
@@ -479,7 +479,7 @@ workflow and its assurance limits.
 | Policy rejection | True | `fail` | Signed rejection receipt when completion reached | Authentic evidence did not meet the policy |
 | Integrity rejection | False | Unavailable or untrusted | Signed rejection receipt when safe completion reached | Pack must not be used |
 | Precondition failure | Not completed | Unavailable | May be absent | Caller input or structure prevented completed verification |
-| Render success only | Embedded signature authenticated | Stored verdict only | None | Human inspection of evidence, not independent acceptance |
+| Render success only | Embedded signature authenticated | Stored verdict only | None | Inspection of evidence, not independent acceptance |
 
 ## Related documentation
 

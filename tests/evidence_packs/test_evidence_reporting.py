@@ -278,9 +278,7 @@ def test_render_markdown_from_complete_evidence_signed_pack(
     assert "# InvarLock comparison report" in result.text
     assert "**Recorded policy result: Policy satisfied**" in result.text
     assert "| 50% | 100% | +50 pp | 2 |" in result.text
-    assert (
-        "human rendering of the signature-authenticated evidence bundle" in result.text
-    )
+    assert "This report summarizes the evidence bundle." in result.text
     assert "embedded evidence signature verified" in result.text
     assert "independently supplied trust profile" in result.text
     assert "create the signed acceptance or rejection receipt" in result.text
@@ -304,7 +302,7 @@ def test_render_html_is_self_contained_and_no_clobber(tmp_path: Path) -> None:
     assert result.html_path == html.absolute()
     rendered = html.read_text(encoding="utf-8")
     assert '<h1 id="decision">Policy satisfied</h1>' in rendered
-    assert "human rendering of the signature-authenticated evidence bundle" in rendered
+    assert "This report summarizes the evidence bundle." in rendered
     assert signer in rendered
     assert "fixture://baseline" in rendered
     assert rendered.index("fixture://subject") < rendered.index(

@@ -171,7 +171,7 @@ observations:
 and both artifact identities, includes its digest in the signed manifest, and
 places it under `observations/`. Strict verification rejects malformed,
 non-canonical, unbound, or tampered observations. The verification JSON lists
-the authenticated observation ID, kind, scope, and digest. Human reports place
+the authenticated observation ID, kind, scope, and digest. Reports place
 the payload under **Authenticated observations** and state that it is outside
 the acceptance calculation.
 

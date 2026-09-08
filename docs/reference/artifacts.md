@@ -255,7 +255,7 @@ bundle so the bundle can stay byte-identical.
 | Output | Produced by | May be written inside pack? | Trust meaning |
 | --- | --- | --- | --- |
 | Signed verification receipt | `invarlock verify` | No | Independent verifier assertion over manifest, anchors, and verdict |
-| Console report | `invarlock report` | Not a file | Human rendering of signature-authenticated canonical content |
+| Console report | `invarlock report` | Not a file | Summary of canonical content after integrity and embedded-signature checks |
 | Self-contained HTML | `invarlock report --html` | No | Unsigned presentation; not independent acceptance |
 
 Multiple verifiers can issue separate receipts for the same immutable manifest.
