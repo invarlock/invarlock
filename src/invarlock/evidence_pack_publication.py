@@ -8,8 +8,9 @@ import os
 import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -67,6 +68,7 @@ class EvidencePublication:
 
     evidence_path: Path
     pack_manifest_digest: str
+    policy_verdict: str | None = field(default=None, compare=False)
 
 
 def _write_new(path: Path, payload: bytes, *, mode: int = 0o444) -> None:
@@ -538,6 +540,7 @@ def publish_comparison_evidence(
     return EvidencePublication(
         evidence_path=destination,
         pack_manifest_digest=sha256_digest(manifest_bytes),
+        policy_verdict=cast(str, report["verdict"]),
     )
 
 

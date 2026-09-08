@@ -8,7 +8,7 @@ import os
 import re
 import stat
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -162,6 +162,7 @@ class EvaluationTransactionResult:
     evidence_path: Path
     comparison_id: str
     pack_manifest_digest: str
+    policy_verdict: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -1427,6 +1428,7 @@ def evaluate_request_file(
         evidence_path=publication.evidence_path.resolve(),
         comparison_id=comparison_id,
         pack_manifest_digest=publication.pack_manifest_digest,
+        policy_verdict=publication.policy_verdict,
     )
 
 

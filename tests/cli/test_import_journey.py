@@ -510,7 +510,7 @@ def test_text_scorer_extension_evaluate_verify_report_transaction(
     )
     assert verified.payload["ok"] is True
     rendered = render_evidence(evidence)
-    assert "Extension scorer delta (pp)" in rendered.text
+    assert "finite-schedule" in rendered.text
     assert binding.scorer_id in rendered.text
 
 
@@ -656,7 +656,7 @@ def test_installed_text_scorer_runs_through_public_cli(
 
     rendered = runner.invoke(app, ["report", str(evidence)])
     assert rendered.exit_code == 0, rendered.stdout
-    assert "Extension scorer delta (pp)" in rendered.stdout
+    assert "finite-schedule" in rendered.stdout
 
 
 @pytest.mark.parametrize(
@@ -806,9 +806,9 @@ def test_cli_import_verify_report_is_a_real_signed_transaction(tmp_path: Path) -
     )
     assert independent.ok is True
 
-    rendered = runner.invoke(app, ["report", str(evidence)])
+    rendered = runner.invoke(app, ["report", str(evidence), "--explain"])
     assert rendered.exit_code == 0, rendered.stdout
-    assert "PASS" in rendered.stdout
+    assert "Policy satisfied" in rendered.stdout
     assert "subject-variance" in rendered.stdout
     assert "complete acceptance calculation" in rendered.stdout
 

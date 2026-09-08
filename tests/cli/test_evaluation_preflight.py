@@ -283,7 +283,9 @@ def test_cli_preflight_default_output_states_that_no_execution_occurred(
     )
 
     assert invoked.exit_code == 0, invoked.stdout
-    assert "PASS Preflight complete" in invoked.stdout
+    assert "Preflight complete" in invoked.stdout
+    assert "Mode: import; paired records: 2" in invoked.stdout
+    assert "Validated checks:" in invoked.stdout
     assert "No execution or publication was performed" in invoked.stdout
     assert not output.exists()
 

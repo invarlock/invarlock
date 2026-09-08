@@ -35,13 +35,13 @@ def _options(name: str) -> set[str]:
 
 
 def test_core_help_renders() -> None:
-    for args in ((), ("evaluate",), ("verify",), ("report",)):
+    for args in ((), ("evaluate",), ("verify",), ("report",), ("pipeline",)):
         result = RUNNER.invoke(app, [*args, "--help"])
         assert result.exit_code == 0, result.output
 
 
-def test_root_teaches_only_the_core_user_journey() -> None:
-    assert set(ROOT_COMMAND.commands) == {"evaluate", "verify", "report"}
+def test_root_exposes_distinct_core_and_existing_pipeline_journeys() -> None:
+    assert set(ROOT_COMMAND.commands) == {"pipeline", "evaluate", "verify", "report"}
 
 
 def test_evaluate_accepts_one_request_instead_of_model_flag_sprawl() -> None:

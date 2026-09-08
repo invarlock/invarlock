@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,7 @@ from invarlock.pipeline.contracts import (
     write_new,
 )
 from invarlock.pipeline.evidence import create_evidence, verify_evidence
-from invarlock.pipeline.report import render_html, render_junit, render_markdown
+from invarlock.pipeline.report import render_junit, render_reports
 from invarlock.pipeline.templates import example_project
 from invarlock.security import enforce_default_security
 
@@ -50,7 +51,89 @@ def root() -> None:
     enforce_default_security()
 
 
-def _fail(exc: Exception) -> None:
+class OutputFormat(StrEnum):
+    human = "human"
+    json = "json"
+
+
+def _human_summary(
+    result: dict[str, Any],
+    *,
+    verification: bool = False,
+    signed: bool = False,
+    explain: bool = False,
+    output: Path | None = None,
+    evidence: dict[str, Any] | None = None,
+    recorded: bool = False,
+) -> None:
+    """Display existing conclusions; never infer authentication from a signature."""
+    typer.echo(
+        f"{'Recorded policy result' if recorded else 'Policy result'}: {result['decision']}"
+    )
+    typer.echo(
+        "Independent verification: passed (recipient-owned key, policy and run identities; complete replay)"
+        if verification
+        else "Independent verification: not performed"
+    )
+    if not verification:
+        typer.echo(
+            "Signing: signature present; signer authorization and signature not independently verified"
+            if signed
+            else "Signing: Unsigned local evidence"
+        )
+    if recorded:
+        typer.echo(
+            "Rendering only: structure and embedded input bindings checked; recorded decision not replayed."
+        )
+    if evidence is not None:
+        typer.echo(
+            f"Run records: baseline {len(evidence['baseline']['records'])}; "
+            f"candidate {len(evidence['candidate']['records'])}"
+        )
+    for metric in result["metrics"]:
+        missing = len(metric["missing_ids"])
+        typer.echo(
+            f"{metric['name']} / {metric['slice']}: {metric['decision']}; "
+            f"{metric['count'] - missing}/{metric['count']} usable pairs, {missing} missing"
+        )
+        for reason in metric["reasons"]:
+            typer.echo(f"  Reason: {reason}")
+        if explain:
+            interval = metric["interval"]
+            bounds = (
+                f"[{interval['lower']:.6g}, {interval['upper']:.6g}]"
+                if interval is not None
+                else "unavailable"
+            )
+            typer.echo(
+                f"  Baseline: {metric['baseline_mean']}; candidate: {metric['candidate_mean']}; "
+                f"delta: {metric['delta']}; interval: {bounds}; unit: {metric['unit']}"
+            )
+            typer.echo(
+                f"  Scoring: {metric['scoring_assurance']}; direction: {metric['direction']}"
+            )
+    if explain:
+        typer.echo(
+            "Counts are per metric and slice; overlapping scopes are not independent samples."
+        )
+        for limitation in result["limitations"]:
+            typer.echo(f"Limitation: {limitation}")
+        for name, value in result["bindings"].items():
+            typer.echo(f"{name} binding: {value}")
+    if output is not None:
+        typer.echo(f"HTML report: {output / 'report.html'}")
+        typer.echo(f"Markdown summary: {output / 'summary.md'}")
+
+
+def _fail(
+    exc: Exception,
+    output_format: OutputFormat = OutputFormat.json,
+    action: str = "Operation",
+) -> None:
+    if output_format == OutputFormat.human:
+        typer.echo(f"{action} unavailable: {exc}")
+        typer.echo("Exit code: 2 (integration error; no verified policy result)")
+        raise typer.Exit(2) from exc
     typer.echo(
         canonical_json_bytes(
             {"status": "integration_error", "message": str(exc), "exit_code": 2}
@@ -187,6 +270,16 @@ def compare(
         min=0,
         help="Local total bootstrap draw budget across every metric and slice.",
     ),
+    output_format: OutputFormat = typer.Option(
+        OutputFormat.json,
+        "--output-format",
+        help="Explicit output mode; JSON remains the default.",
+    ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Include metric values, bindings and limitations in human output; JSON is unchanged.",
+    ),
 ) -> None:
     """Check all metrics/slices and write JSON, HTML, Markdown and JUnit reports."""
     try:
@@ -207,28 +300,42 @@ def compare(
             max_bootstrap_draws=max_bootstrap_draws,
         )
         result = evidence["comparison"]
+        html, markdown = render_reports(result, evidence=evidence)
         artifacts = {
             "evidence.json": canonical_json_bytes(evidence),
             "comparison.json": canonical_json_bytes(result),
-            "report.html": render_html(result).encode(),
-            "summary.md": render_markdown(result).encode(),
+            "report.html": html.encode(),
+            "summary.md": markdown.encode(),
             "junit.xml": render_junit(result),
         }
         write_directory(output, artifacts)
-        typer.echo(
-            canonical_json_bytes(
-                {
-                    "decision": result["decision"],
-                    "bindings": result["bindings"],
-                    "authentication": "signed" if signing_key else "unsigned_local",
-                    "output": str(output),
-                    "exit_code": EXIT_CODES[result["decision"]],
-                }
-            ).decode(),
-            nl=False,
-        )
+        if output_format == OutputFormat.human:
+            _human_summary(
+                result,
+                signed=signing_key is not None,
+                explain=explain,
+                output=output,
+                evidence=evidence,
+            )
+            typer.echo(f"Evidence: {output / 'evidence.json'}")
+            typer.echo(f"Comparison JSON: {output / 'comparison.json'}")
+            typer.echo(f"JUnit: {output / 'junit.xml'}")
+            typer.echo(f"Exit code: {EXIT_CODES[result['decision']]}")
+        else:
+            typer.echo(
+                canonical_json_bytes(
+                    {
+                        "decision": result["decision"],
+                        "bindings": result["bindings"],
+                        "authentication": "signed" if signing_key else "unsigned_local",
+                        "output": str(output),
+                        "exit_code": EXIT_CODES[result["decision"]],
+                    }
+                ).decode(),
+                nl=False,
+            )
     except (ValueError, OSError, OverflowError) as exc:
-        _fail(exc)
+        _fail(exc, output_format, "Comparison")
     raise typer.Exit(EXIT_CODES[result["decision"]])
 
 
@@ -270,6 +377,16 @@ def verify(
         min=0,
         help="Recipient-owned total bootstrap draw budget for complete replay.",
     ),
+    output_format: OutputFormat = typer.Option(
+        OutputFormat.json,
+        "--output-format",
+        help="Explicit output mode; JSON remains the default.",
+    ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Include metric values, bindings and limitations in human output; JSON is unchanged.",
+    ),
 ) -> None:
     """Authenticate and replay using recipient-owned expected inputs, never pack keys."""
     try:
@@ -286,19 +403,88 @@ def verify(
             expected_candidate=expected_candidate,
             max_bootstrap_draws=max_bootstrap_draws,
         )
-        typer.echo(
-            canonical_json_bytes(
-                {
-                    "authenticated": True,
-                    "decision": result["decision"],
-                    "exit_code": EXIT_CODES[result["decision"]],
-                }
-            ).decode(),
-            nl=False,
-        )
+        if output_format == OutputFormat.human:
+            _human_summary(result, verification=True, explain=explain)
+            typer.echo(f"Evidence: {evidence}")
+            typer.echo(f"Exit code: {EXIT_CODES[result['decision']]}")
+        else:
+            typer.echo(
+                canonical_json_bytes(
+                    {
+                        "authenticated": True,
+                        "decision": result["decision"],
+                        "exit_code": EXIT_CODES[result["decision"]],
+                    }
+                ).decode(),
+                nl=False,
+            )
     except (ValueError, OSError, OverflowError) as exc:
-        _fail(exc)
+        _fail(exc, output_format, "Verification")
     raise typer.Exit(EXIT_CODES[result["decision"]])
+
+
+@app.command()
+def report(
+    evidence: Path,
+    output: Path = typer.Option(
+        ..., "--output", help="New directory for HTML and Markdown views."
+    ),
+    output_format: OutputFormat = typer.Option(
+        OutputFormat.json,
+        "--output-format",
+        help="Explicit output mode; JSON remains the default.",
+    ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Include recorded metric values, bindings and limitations in human output.",
+    ),
+) -> None:
+    """Render existing evidence without scoring, replay or independent authentication."""
+    try:
+        value = read_json(evidence, max_bytes=MAX_EVIDENCE_BYTES)
+        if not isinstance(value, dict) or not isinstance(value.get("comparison"), dict):
+            raise PipelineError("pipeline evidence must contain a comparison object")
+        result = value["comparison"]
+        html, markdown = render_reports(result, evidence=value)
+        signed = value["signature"] is not None
+        write_directory(
+            output,
+            {
+                "report.html": html.encode(),
+                "summary.md": markdown.encode(),
+            },
+        )
+        if output_format == OutputFormat.human:
+            _human_summary(
+                result,
+                signed=signed,
+                explain=explain,
+                output=output,
+                evidence=value,
+                recorded=True,
+            )
+            typer.echo(
+                "Exit code: 0 (reports written; recorded policy result unchanged)"
+            )
+        else:
+            typer.echo(
+                canonical_json_bytes(
+                    {
+                        "status": "rendered",
+                        "recorded_decision": result["decision"],
+                        "independent_verification": "not_performed",
+                        "signing": "signature_present_unverified"
+                        if signed
+                        else "unsigned_local",
+                        "output": str(output),
+                        "exit_code": 0,
+                    }
+                ).decode(),
+                nl=False,
+            )
+    except (ValueError, OSError, OverflowError) as exc:
+        _fail(exc, output_format, "Report")
 
 
 @app.command(name="digest")

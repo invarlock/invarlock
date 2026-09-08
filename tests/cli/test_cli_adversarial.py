@@ -82,7 +82,7 @@ def test_evaluate_renders_success_in_human_and_json_modes(
     machine = _RUNNER.invoke(app, ["evaluate", str(request), "--json"])
 
     assert human.exit_code == 0
-    assert "PASS Evidence pack published" in human.stdout
+    assert "Evidence created" in human.stdout
     assert str(evidence) in human.stdout.replace("\n", "")
     assert machine.exit_code == 0
     assert json.loads(machine.stdout) == json.loads(result.as_json())
@@ -145,7 +145,7 @@ def test_verify_renders_success_in_human_and_json_modes(
     machine = _RUNNER.invoke(app, ["verify", str(evidence), "--json"])
 
     assert human.exit_code == 0
-    assert "PASS Evidence verified" in human.stdout
+    assert "PASS Independent verification complete" in human.stdout
     assert "Comparison: comparison-123" in human.stdout
     assert machine.exit_code == 0
     assert json.loads(machine.stdout)["ok"] is True
@@ -236,7 +236,8 @@ def test_report_renders_text_and_html_location(
     )
 
     assert result.exit_code == 0
-    assert "# InvarLock comparison report" in result.stdout
+    assert "InvarLock comparison report" in result.stdout
+    assert "# InvarLock" not in result.stdout
     assert f"HTML {html}" in result.stdout.replace("\n", "")
 
 
