@@ -53,6 +53,7 @@ EXPECTED_DOC_PAGES = {
     "reference/compatibility.md",
     "reference/contracts.md",
     "reference/pipeline-contracts.md",
+    "reference/pipeline-capacity.md",
     "reference/evaluator-qualification.md",
     "reference/environment.md",
     "reference/lifecycle.md",

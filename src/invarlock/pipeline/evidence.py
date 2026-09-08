@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.pipeline.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.pipeline.comparison import compare_runs
 from invarlock.pipeline.contracts import PipelineError, digest, validate
 
@@ -24,6 +25,8 @@ def create_evidence(
     candidate: dict[str, Any],
     policy: dict[str, Any],
     signing_key: Ed25519PrivateKey | None = None,
+    *,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
 ) -> dict[str, Any]:
     """Bind the complete inputs and comparison; unsigned local use is explicit."""
     if signing_key is not None and not isinstance(signing_key, Ed25519PrivateKey):
@@ -36,7 +39,9 @@ def create_evidence(
         "baseline": baseline,
         "candidate": candidate,
         "policy": policy,
-        "comparison": compare_runs(baseline, candidate, policy),
+        "comparison": compare_runs(
+            baseline, candidate, policy, max_bootstrap_draws=max_bootstrap_draws
+        ),
     }
     signature = None
     if signing_key is not None:
@@ -58,6 +63,7 @@ def verify_evidence(
     expected_baseline: str,
     expected_candidate: str,
     policy: dict[str, Any],
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
 ) -> dict[str, Any]:
     """Verify using recipient-owned key, complete-run digests and policy bytes."""
     if not isinstance(public_key, Ed25519PublicKey):
@@ -84,7 +90,12 @@ def verify_evidence(
         )
     except (InvalidSignature, ValueError) as exc:
         raise PipelineError("pipeline evidence signature is invalid") from exc
-    replayed = compare_runs(evidence["baseline"], evidence["candidate"], policy)
+    replayed = compare_runs(
+        evidence["baseline"],
+        evidence["candidate"],
+        policy,
+        max_bootstrap_draws=max_bootstrap_draws,
+    )
     if canonical_json_bytes(replayed) != canonical_json_bytes(evidence["comparison"]):
         raise PipelineError(
             "signed comparison differs from independent arithmetic replay"

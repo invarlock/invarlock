@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import read_regular_file_bytes
 from invarlock.pipeline.adapters import load_run
+from invarlock.pipeline.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.pipeline.cases import (
     canonical_case_set,
     case_set_digest,
@@ -180,6 +181,12 @@ def compare(
     ),
     baseline: Path | None = typer.Option(None, "--baseline"),
     candidate: Path | None = typer.Option(None, "--candidate"),
+    max_bootstrap_draws: int = typer.Option(
+        DEFAULT_MAX_BOOTSTRAP_DRAWS,
+        "--max-bootstrap-draws",
+        min=0,
+        help="Local total bootstrap draw budget across every metric and slice.",
+    ),
 ) -> None:
     """Check all metrics/slices and write JSON, HTML, Markdown and JUnit reports."""
     try:
@@ -193,7 +200,11 @@ def compare(
             for run in (base, subject):
                 validate_run_case_set(run, policy["expected_case_set_digest"])
         evidence = create_evidence(
-            base, subject, policy, _private(signing_key) if signing_key else None
+            base,
+            subject,
+            policy,
+            _private(signing_key) if signing_key else None,
+            max_bootstrap_draws=max_bootstrap_draws,
         )
         result = evidence["comparison"]
         artifacts = {
@@ -253,6 +264,12 @@ def verify(
     policy: Path = typer.Option(..., "--policy"),
     expected_baseline: str = typer.Option(..., "--expected-baseline"),
     expected_candidate: str = typer.Option(..., "--expected-candidate"),
+    max_bootstrap_draws: int = typer.Option(
+        DEFAULT_MAX_BOOTSTRAP_DRAWS,
+        "--max-bootstrap-draws",
+        min=0,
+        help="Recipient-owned total bootstrap draw budget for complete replay.",
+    ),
 ) -> None:
     """Authenticate and replay using recipient-owned expected inputs, never pack keys."""
     try:
@@ -267,6 +284,7 @@ def verify(
             policy=read_json(policy),
             expected_baseline=expected_baseline,
             expected_candidate=expected_candidate,
+            max_bootstrap_draws=max_bootstrap_draws,
         )
         typer.echo(
             canonical_json_bytes(

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added caller-owned bootstrap work budgets to pipeline comparison and signed
+  replay, with a default of 102,400,000 planned draws. Excessive combined metric
+  and slice work is rejected before scoring; callers can explicitly override
+  their own local budget without changing the signed acceptance policy.
+- Added early rejection of missing-result ID arrays that would exceed the
+  comparison byte limit across overlapping metrics and slices.
+- Added early record-count rejection and bounded validation diagnostics so
+  oversized schedules do not print their complete contents in errors.
+
+- Expanded pipeline comparisons and signed evidence to 50,000 planned cases,
+  including binary paired intervals, with separate 128 MiB input and 384 MiB
+  complete evidence limits. Runtime schedules retain their separate limits.
+
 - Added optional policy pins for planned case membership, rejecting shared
   omissions and changed references during comparison and signed replay.
 - Added `json_exact` whole-document structured-output scoring with binary paired
@@ -47,6 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime readiness blocked; CPU success does not qualify a GPU model.
 
 ### Changed
+
+- Clarified fixed pipeline capacity limits, caller-owned work budgets and
+  capacity-error recovery in the public reference documentation. Package
+  availability remains documented at the installation entry points.
+- Pipeline digest and size checks encode canonical JSON incrementally, reducing
+  whole-artifact allocations while preserving existing digests and signatures.
 
 - Added full H100 80GB HBM3 devices to the K2 candidate hardware checks alongside
   H200, requiring matching devices with MIG disabled and the existing security

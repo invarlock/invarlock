@@ -168,7 +168,7 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 10000
+          "maxItems": 50000
         }
       },
       "required": [
@@ -342,7 +342,7 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 10000
+          "maxItems": 50000
         }
       },
       "required": [
@@ -408,7 +408,7 @@
               "minimum_count": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 10000
+                "maximum": 50000
               },
               "maximum_regression": {
                 "type": "number",

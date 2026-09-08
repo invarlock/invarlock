@@ -208,5 +208,16 @@ def test_paired_statistics_fail_closed_on_malformed_inputs(
 def test_paired_statistics_enforce_the_authenticated_record_limit() -> None:
     outcomes = [False] * (MAX_PAIRED_EXACT_MATCH_OUTCOMES + 1)
 
-    with pytest.raises(PairedExactMatchError, match="10_000-pair limit"):
+    with pytest.raises(PairedExactMatchError, match="50_000-pair limit"):
         paired_exact_match_statistics(outcomes, outcomes)
+
+
+@pytest.mark.parametrize("count", [12_000, 50_000])
+def test_paired_statistics_accept_full_pipeline_endpoint(count: int) -> None:
+    baseline = [True] * count
+    failures = count // 1000
+    candidate = [True] * (count - failures) + [False] * failures
+    result = paired_exact_match_statistics(baseline, candidate)
+    assert result.pair_count == count
+    assert result.baseline_pass_subject_fail_count == failures
+    assert result.effect_size_pp == pytest.approx(-0.1)
