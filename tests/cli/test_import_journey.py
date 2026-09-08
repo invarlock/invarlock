@@ -12,6 +12,7 @@ import pytest
 import yaml
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
+from rich.console import Console
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
@@ -704,18 +705,41 @@ def test_text_scorer_extension_rejects_stored_result_tampering(
     assert verified.payload["errors"]
 
 
-def test_cli_import_verify_report_is_a_real_signed_transaction(tmp_path: Path) -> None:
+@pytest.mark.parametrize("terminal_width", [80, 120])
+def test_cli_import_verify_report_is_a_real_signed_transaction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, terminal_width: int
+) -> None:
+    monkeypatch.setattr(
+        importlib.import_module("invarlock.cli.app"),
+        "console",
+        Console(width=terminal_width, markup=False, highlight=False),
+    )
     material = _materialize_request(tmp_path)
     evidence_key, evidence_fingerprint = _key(tmp_path / "evidence.pem")
     verifier_key, verifier_fingerprint = _key(tmp_path / "verifier.pem")
     runner = CliRunner()
+
+    evidence = tmp_path / "artifacts/evidence"
+    preflight = runner.invoke(
+        app,
+        [
+            "evaluate",
+            str(material["request"]),
+            "--signing-key",
+            str(evidence_key),
+            "--preflight",
+        ],
+    )
+    assert preflight.exit_code == 0, preflight.stdout
+    assert "Evidence destination: artifacts/evidence" in preflight.stdout.splitlines()
+    assert not evidence.exists()
 
     evaluated = runner.invoke(
         app,
         ["evaluate", str(material["request"]), "--signing-key", str(evidence_key)],
     )
     assert evaluated.exit_code == 0, evaluated.stdout
-    evidence = tmp_path / "artifacts/evidence"
+    assert f"Evidence: {evidence}" in evaluated.stdout.splitlines()
     normalized_request = json.loads(
         (evidence / "request.json").read_text(encoding="utf-8")
     )
@@ -790,6 +814,8 @@ def test_cli_import_verify_report_is_a_real_signed_transaction(tmp_path: Path) -
         ],
     )
     assert verified.exit_code == 0, verified.stdout
+    assert f"Receipt: {receipt}" in verified.stdout.splitlines()
+    assert f"Evidence: {evidence}" in verified.stdout.splitlines()
     independent = verify_signed_verification_receipt(
         receipt,
         evidence,
@@ -806,11 +832,16 @@ def test_cli_import_verify_report_is_a_real_signed_transaction(tmp_path: Path) -
     )
     assert independent.ok is True
 
-    rendered = runner.invoke(app, ["report", str(evidence), "--explain"])
+    html_path = tmp_path / "comparison.report.html"
+    rendered = runner.invoke(
+        app, ["report", str(evidence), "--explain", "--html", str(html_path)]
+    )
     assert rendered.exit_code == 0, rendered.stdout
+    assert html_path.is_file()
+    assert f"HTML {html_path}" in rendered.stdout.splitlines()
     assert "Policy satisfied" in rendered.stdout
     assert "subject-variance" in rendered.stdout
-    assert "complete acceptance calculation" in rendered.stdout
+    assert "complete acceptance calculation" in " ".join(rendered.stdout.split())
 
 
 @pytest.mark.parametrize(
@@ -1289,7 +1320,15 @@ def test_output_parent_inode_anchor_rejects_parent_swap(tmp_path: Path) -> None:
         anchor.close()
 
 
-def test_failed_verdict_still_discloses_its_signed_receipt(tmp_path: Path) -> None:
+@pytest.mark.parametrize("terminal_width", [40, 80, 120])
+def test_failed_verdict_still_discloses_its_signed_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, terminal_width: int
+) -> None:
+    monkeypatch.setattr(
+        importlib.import_module("invarlock.cli.app"),
+        "console",
+        Console(width=terminal_width, markup=False, highlight=False),
+    )
     material = _materialize_request(tmp_path)
     evidence_key, evidence_fingerprint = _key(tmp_path / "evidence.pem")
     verifier_key, _verifier_fingerprint = _key(tmp_path / "verifier.pem")
@@ -1342,5 +1381,4 @@ def test_failed_verdict_still_discloses_its_signed_receipt(tmp_path: Path) -> No
 
     assert result.exit_code != 0
     assert receipt.is_file()
-    assert "Receipt" in result.stdout
-    assert receipt.name in result.stdout
+    assert f"Receipt {receipt}" in result.stdout.splitlines()

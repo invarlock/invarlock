@@ -399,7 +399,7 @@ def evaluate(
             console.print(
                 f"Mode: {result.execution_mode}; paired records: {result.record_count}"
             )
-            console.print(f"Evidence destination: {result.output}")
+            console.print(f"Evidence destination: {result.output}", soft_wrap=True)
             console.print(f"Validated checks: {len(result.checks)}")
         if profile is not None and profile_context is not None and launch is not None:
             console.print(f"Runtime profile: {profile.digest}")
@@ -424,7 +424,7 @@ def evaluate(
             f"Recorded policy result: {result.policy_verdict or 'unavailable'}"
         )
         console.print("Recipient verification: not performed")
-        console.print(f"Evidence: {result.evidence_path}")
+        console.print(f"Evidence: {result.evidence_path}", soft_wrap=True)
         console.print(
             "Next: verify with independently approved trust inputs; use report to inspect the recorded checks."
         )
@@ -670,7 +670,9 @@ def verify(
                 console.print(detail)
             signed_receipt = exc.payload.get("signed_receipt")
             if isinstance(signed_receipt, str):
-                console.print(f"Receipt {exc.receipt_path or signed_receipt}")
+                console.print(
+                    f"Receipt {exc.receipt_path or signed_receipt}", soft_wrap=True
+                )
         raise typer.Exit(exc.exit_code) from exc
     if json_out:
         typer.echo(result.as_json())
@@ -679,7 +681,7 @@ def verify(
         console.print("Evidence integrity: verified")
         if result.payload.get("policy_verdict") in {"pass", "fail"}:
             console.print(f"Policy result: {result.payload['policy_verdict']}")
-        console.print(result.summary)
+        console.print(result.summary, soft_wrap=True)
 
 
 @app.command(
@@ -758,7 +760,7 @@ def report(
     else:
         console.print(Markdown(result.text))
         if result.html_path is not None:
-            console.print(f"HTML {result.html_path}")
+            console.print(f"HTML {result.html_path}", soft_wrap=True)
 
 
 def main() -> None:
