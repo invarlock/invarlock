@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import errno
 import hashlib
-import json
 import math
 import os
 from dataclasses import dataclass
-from html import escape
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +17,7 @@ from invarlock.core.scorer_extension import (
     ScorerExtensionError,
     decode_scorer_binding,
 )
+from invarlock.evidence_explanation import core_policy_checks
 from invarlock.evidence_pack_contract import (
     COMPARISON_REPORT_FORMAT,
     COMPARISON_REPORT_FORMATS,
@@ -40,6 +39,19 @@ from invarlock.paired_exact_match import (
     paired_exact_match_statistics,
 )
 from invarlock.public_contracts import load_evidence_pack_schema
+from invarlock.report_presentation import (
+    CheckView,
+    IntervalView,
+    MetricView,
+    ReportView,
+    number,
+)
+from invarlock.report_presentation import (
+    render_html as render_report_html,
+)
+from invarlock.report_presentation import (
+    render_markdown as render_report_markdown,
+)
 
 _MAX_MANIFEST_BYTES = 256 * 1024
 _MAX_REPORT_BYTES = 64 * 1024 * 1024
@@ -968,17 +980,19 @@ def _comparison_acceptance(
             "canonical report comparison value does not match the side means"
         )
     if "sample_qualification" in report:
-        passed = passed and _validate_sample_qualification(
+        sample_passed = _validate_sample_qualification(
             report["sample_qualification"],
             metric=metric,
             record_count=count,
             interval_lower=lower,
             interval_upper=upper,
         )
+        passed = passed and sample_passed
     if "side_accuracy" in report:
-        passed = passed and _validate_side_accuracy(
+        accuracy_passed = _validate_side_accuracy(
             report["side_accuracy"], metric=metric, side_means=side_means
         )
+        passed = passed and accuracy_passed
     return passed
 
 
@@ -1020,6 +1034,148 @@ def _format_number(value: object) -> str:
     return format(_number(value, field="numeric value"), ".8g")
 
 
+def _report_view(
+    report: dict[str, Any],
+    *,
+    evidence_signer: str,
+    observations: list[dict[str, Any]],
+    subjects: tuple[tuple[str, str], ...] = (),
+) -> ReportView:
+    """Explain validated canonical facts without creating acceptance authority."""
+    comparison = report["comparison"]
+    uncertainty = report["uncertainty"]
+    kind = comparison["kind"]
+    exact = kind == "exact_match_delta_pp"
+    ratio = kind == "normalized_nll_ratio"
+    checks = tuple(CheckView(**check) for check in core_policy_checks(report))
+    unmet = [check.name for check in checks if not check.passed]
+    summary = (
+        "Every configured check passed for this paired evaluation. Independent recipient acceptance is a separate step."
+        if report["verdict"] == "pass"
+        else "This evaluation did not meet its recorded policy. Checks not met: "
+        + ", ".join(unmet)
+        + "."
+    )
+    label = (
+        "Paired 95% confidence interval"
+        if uncertainty["scope"] == "paired_binary_outcomes"
+        else "95% finite-schedule resampling interval"
+    )
+    unit = "ratio" if ratio else "pp"
+    names = {
+        "exact_match": "Exact-match accuracy",
+        "normalized_nll_per_utf8_byte": "Normalized negative log-likelihood",
+    }
+    notes = [
+        "Lower scores are better; the change is the candidate-to-baseline ratio."
+        if ratio
+        else "Higher scores are better; the change is candidate minus baseline in percentage points.",
+        "The policy tests the interval bound, not just the observed change.",
+    ]
+    if "sample_qualification" not in report:
+        notes.append(
+            "This policy does not specify a minimum sample count or interval-width requirement."
+        )
+    if exact and "side_accuracy" not in report:
+        notes.append("This policy does not specify an absolute accuracy floor.")
+    details: list[tuple[str, Any]] = []
+    if "paired_binary" in report:
+        details.append(("Paired outcome analysis", report["paired_binary"]))
+    if "derived_measurements" in report:
+        details.append(
+            ("Derived likelihood interpretation", report["derived_measurements"])
+        )
+        measurement = report["derived_measurements"]["perplexity_ratio"]
+        if measurement["status"] == "available":
+            notes.extend(
+                (
+                    "Baseline perplexity: "
+                    + number(measurement["baseline_perplexity"])
+                    + ".",
+                    "Candidate perplexity: "
+                    + number(measurement["subject_perplexity"])
+                    + ".",
+                    "Perplexity ratio: "
+                    + number(measurement["ratio"])
+                    + ". These derived values do not affect acceptance.",
+                )
+            )
+        else:
+            notes.append(
+                "Perplexity interpretation unavailable: "
+                + measurement["reason"].replace("_", " ")
+                + ". Acceptance uses normalized NLL per expected UTF-8 byte."
+            )
+    if observations:
+        details.append(("Authenticated observations", observations))
+        notes.append(
+            "Authenticated observations are supplementary; the paired metric and policy remain the complete acceptance calculation."
+        )
+    value_scale = 100 if exact else 1
+    suffix = "%" if exact else " nats / byte" if ratio else " score"
+    metric = MetricView(
+        name=names.get(report["metric"], report["metric"]),
+        scope="All paired records",
+        decision=report["verdict"],
+        baseline=number(report["baseline"]["mean_score"] * value_scale) + suffix,
+        candidate=number(report["subject"]["mean_score"] * value_scale) + suffix,
+        change=number(comparison["value"], signed=not ratio) + " " + unit,
+        count=f"{report['record_count']:,}",
+        explanation="All configured checks passed."
+        if not unmet
+        else "Checks not met: " + ", ".join(unmet) + ".",
+        checks=checks,
+        interval=IntervalView(
+            lower=uncertainty["lower"],
+            upper=uncertainty["upper"],
+            estimate=comparison["value"],
+            threshold=comparison["maximum" if ratio else "minimum"],
+            label=label,
+            unit=unit,
+        ),
+        notes=tuple(notes),
+    )
+    return ReportView(
+        title="InvarLock comparison report",
+        family="Runtime evaluation evidence",
+        decision=report["verdict"],
+        summary=summary,
+        metrics=(metric,),
+        assurance=(
+            (
+                "Bundle integrity",
+                "Inventory, checksums and embedded evidence signature verified.",
+            ),
+            ("Recorded policy result", "Read from the authenticated canonical report."),
+            (
+                "Independent recipient acceptance",
+                "Not performed by report. An embedded signer is not a recipient-owned trust anchor.",
+            ),
+        ),
+        identity=(
+            ("Comparison", report["comparison_id"]),
+            ("Metric", report["metric"]),
+            ("Policy", report["policy_digest"]),
+            ("Evidence signer", evidence_signer),
+        ),
+        subjects=subjects,
+        next_steps=(
+            "Review the decision checks and their requirements.",
+            "Run invarlock verify with your independently supplied trust profile and receipt destination to create the signed acceptance or rejection receipt.",
+            "Keep this report alongside the original immutable evidence and the separate verification receipt.",
+        ),
+        limitations=(
+            "This is a human rendering of the signature-authenticated evidence bundle; rendering does not establish independent acceptance.",
+            "Results apply to the recorded cases, metric and policy. A pass does not establish general model quality, safety or representative production performance.",
+            "The interval describes paired binary outcomes under its stated method. Population interpretation requires an appropriate sampling design."
+            if exact
+            else "The resampling interval describes stability on the authenticated schedule, not population uncertainty or representativeness.",
+        ),
+        details=tuple(details),
+        technical=report,
+    )
+
+
 def _render_markdown(
     report: dict[str, Any],
     *,
@@ -1027,202 +1183,12 @@ def _render_markdown(
     evidence_signer: str,
     observations: list[dict[str, Any]],
 ) -> str:
-    comparison = cast(dict[str, Any], report["comparison"])
-    uncertainty = cast(dict[str, Any], report["uncertainty"])
-    baseline = cast(dict[str, Any], report["baseline"])
-    subject = cast(dict[str, Any], report["subject"])
-    if comparison["kind"] == "exact_match_delta_pp":
-        comparison_label = "Exact-match delta (pp)"
-        limit_label = "Minimum allowed (pp)"
-        limit_value = comparison["minimum"]
-    elif comparison["kind"] == "normalized_nll_ratio":
-        comparison_label = "Normalized NLL ratio"
-        limit_label = "Maximum allowed ratio"
-        limit_value = comparison["maximum"]
-    elif comparison["kind"] == "scorer_extension_delta_pp":
-        comparison_label = "Extension scorer delta (pp)"
-        limit_label = "Minimum allowed (pp)"
-        limit_value = comparison["minimum"]
-    else:  # pragma: no cover - closed report validation rejects other kinds
-        raise EvidenceReportError("canonical report comparison kind is invalid")
-    interval_label = (
-        "Paired 95% confidence interval"
-        if comparison["kind"] in {"exact_match_delta_pp", "scorer_extension_delta_pp"}
-        else "Paired resampling interval (authenticated schedule)"
+    return render_report_markdown(
+        _report_view(
+            report, evidence_signer=evidence_signer, observations=observations
+        ),
+        include_details=explain,
     )
-    lines = [
-        "# InvarLock comparison report",
-        "",
-        f"- **Comparison:** `{report['comparison_id']}`",
-        f"- **Metric:** `{report['metric']}`",
-        f"- **Records:** {report['record_count']}",
-        f"- **Verdict:** **{str(report['verdict']).upper()}**",
-        "- **Bundle integrity:** embedded evidence signature verified",
-        "- **Acceptance path:** `invarlock verify` records the expected signer and "
-        + "independent anchors in a signed receipt",
-        f"- **Evidence signer:** `{evidence_signer}`",
-        "",
-        "| Measure | Value |",
-        "| --- | ---: |",
-        f"| Baseline mean | {_format_number(baseline['mean_score'])} |",
-        f"| Subject mean | {_format_number(subject['mean_score'])} |",
-        f"| {comparison_label} | {_format_number(comparison['value'])} |",
-        f"| {interval_label} | "
-        + f"[{_format_number(uncertainty['lower'])}, "
-        + f"{_format_number(uncertainty['upper'])}] |",
-        f"| {limit_label} | {_format_number(limit_value)} |",
-        "",
-        f"Policy: `{report['policy_digest']}`",
-        "",
-        "This report is a human rendering of the signature-authenticated "
-        + "evidence bundle. Run `invarlock verify` with independently supplied "
-        + "anchors to create the signed acceptance receipt.",
-    ]
-    paired_binary = report.get("paired_binary")
-    if isinstance(paired_binary, dict):
-        lines.extend(
-            [
-                "",
-                "## Paired outcome analysis",
-                "",
-                "| Paired outcome | Count |",
-                "| --- | ---: |",
-                "| Baseline pass → subject fail | "
-                + f"{paired_binary['baseline_pass_subject_fail']} |",
-                "| Baseline fail → subject pass | "
-                + f"{paired_binary['baseline_fail_subject_pass']} |",
-                f"| Both pass | {paired_binary['both_pass']} |",
-                f"| Both fail | {paired_binary['both_fail']} |",
-                "",
-                "McNemar exact two-sided p-value: "
-                + f"`{_format_number(paired_binary['mcnemar_exact_two_sided_p_value'])}`.",
-                "The p-value describes paired asymmetry; the policy verdict uses the "
-                + "effect-size confidence bound above.",
-            ]
-        )
-    sample_qualification = report.get("sample_qualification")
-    if isinstance(sample_qualification, dict):
-        count_qualification = cast(dict[str, Any], sample_qualification["record_count"])
-        width_qualification = cast(
-            dict[str, Any], sample_qualification["interval_width"]
-        )
-        width_label = (
-            "Confidence-interval width (pp)"
-            if width_qualification["unit"] == "percentage_points"
-            else "Resampling-interval width (ratio)"
-        )
-        lines.extend(
-            [
-                "",
-                "## Sample qualification",
-                "",
-                "The authenticated policy requires both enough paired records and "
-                + "a sufficiently precise interval before the metric can pass.",
-                "",
-                "| Qualification | Observed | Required | Result |",
-                "| --- | ---: | ---: | --- |",
-                "| Paired records | "
-                + f"{count_qualification['observed']} | "
-                + f"≥ {count_qualification['minimum']} | "
-                + f"{'pass' if count_qualification['passed'] else 'fail'} |",
-                f"| {width_label} | "
-                + f"{_format_number(width_qualification['observed'])} | "
-                + f"≤ {_format_number(width_qualification['maximum'])} | "
-                + f"{'pass' if width_qualification['passed'] else 'fail'} |",
-            ]
-        )
-    side_accuracy = report.get("side_accuracy")
-    if isinstance(side_accuracy, dict):
-        baseline_accuracy = cast(dict[str, Any], side_accuracy["baseline"])
-        subject_accuracy = cast(dict[str, Any], side_accuracy["subject"])
-        lines.extend(
-            [
-                "",
-                "## Side accuracy qualification",
-                "",
-                "The authenticated policy requires each side to meet an absolute "
-                + "exact-match accuracy floor in addition to the paired comparison.",
-                "",
-                "| Side | Observed | Required | Result |",
-                "| --- | ---: | ---: | --- |",
-                "| Baseline | "
-                + f"{_format_number(baseline_accuracy['observed'])} | "
-                + f"≥ {_format_number(side_accuracy['minimum'])} | "
-                + f"{'pass' if baseline_accuracy['passed'] else 'fail'} |",
-                "| Subject | "
-                + f"{_format_number(subject_accuracy['observed'])} | "
-                + f"≥ {_format_number(side_accuracy['minimum'])} | "
-                + f"{'pass' if subject_accuracy['passed'] else 'fail'} |",
-            ]
-        )
-    derived = report.get("derived_measurements")
-    if isinstance(derived, dict):
-        measurement = cast(dict[str, Any], derived["perplexity_ratio"])
-        lines.extend(["", "## Derived likelihood interpretation", ""])
-        if measurement["status"] == "available":
-            lines.extend(
-                [
-                    "The authenticated tokenizer and target token counts are comparable. "
-                    + "These values are derived from the same expected-continuation "
-                    + "likelihood facts but do not affect acceptance.",
-                    "",
-                    "| Derived measure | Value |",
-                    "| --- | ---: |",
-                    "| Baseline perplexity | "
-                    + f"{_format_number(measurement['baseline_perplexity'])} |",
-                    "| Subject perplexity | "
-                    + f"{_format_number(measurement['subject_perplexity'])} |",
-                    f"| Perplexity ratio | {_format_number(measurement['ratio'])} |",
-                ]
-            )
-        else:
-            lines.append(
-                "Perplexity interpretation is unavailable: "
-                + f"`{measurement['reason']}`. Acceptance remains based on "
-                + "normalized NLL per expected UTF-8 byte."
-            )
-    if observations:
-        lines.extend(
-            [
-                "",
-                "## Authenticated observations",
-                "",
-                "These authenticated observations provide supplementary context. "
-                + "The paired metric and policy remain the complete acceptance calculation.",
-                "",
-                "| Observation | Kind | Scope |",
-                "| --- | --- | --- |",
-            ]
-        )
-        for observation in observations:
-            lines.append(
-                f"| `{observation['observation_id']}` | "
-                + f"`{observation['kind']}` | `{observation['scope']}` |"
-            )
-        for observation in observations:
-            payload = json.dumps(
-                observation["payload"],
-                ensure_ascii=False,
-                indent=2,
-                sort_keys=True,
-            )
-            lines.extend(
-                [
-                    "",
-                    f"### `{observation['observation_id']}`",
-                    "",
-                    *(f"    {line}" for line in payload.splitlines()),
-                ]
-            )
-    if explain:
-        lines.extend(
-            [
-                "",
-                "The displayed verdict is the canonical report bound by the "
-                + "manifest, checksums, and embedded evidence signature.",
-            ]
-        )
-    return "\n".join(lines) + "\n"
 
 
 def _render_html(
@@ -1232,143 +1198,9 @@ def _render_html(
     evidence_signer: str,
     observations: list[dict[str, Any]],
 ) -> str:
-    comparison = cast(dict[str, Any], report["comparison"])
-    uncertainty = cast(dict[str, Any], report["uncertainty"])
-    baseline = cast(dict[str, Any], report["baseline"])
-    subject = cast(dict[str, Any], report["subject"])
-    limit_field = (
-        "minimum"
-        if comparison["kind"] in {"exact_match_delta_pp", "scorer_extension_delta_pp"}
-        else "maximum"
-    )
-    comparison_label = {
-        "exact_match_delta_pp": "Exact-match delta (pp)",
-        "normalized_nll_ratio": "Normalized NLL ratio",
-        "scorer_extension_delta_pp": "Extension scorer delta (pp)",
-    }[comparison["kind"]]
-    interval_label = (
-        "Paired 95% confidence interval"
-        if comparison["kind"] in {"exact_match_delta_pp", "scorer_extension_delta_pp"}
-        else "Paired resampling interval (authenticated schedule)"
-    )
-    note = (
-        "<p>The displayed verdict is the canonical report bound by the "
-        "manifest, checksums, and embedded evidence signature.</p>"
-        if explain
-        else ""
-    )
-    observations_html = ""
-    paired_html = ""
-    paired_binary = report.get("paired_binary")
-    if isinstance(paired_binary, dict):
-        paired_html = (
-            "<h2>Paired outcome analysis</h2>"
-            "<table><thead><tr><th>Paired outcome</th><th>Count</th></tr></thead>"
-            "<tbody>"
-            "<tr><td>Baseline pass → subject fail</td><td>"
-            f"{paired_binary['baseline_pass_subject_fail']}</td></tr>"
-            "<tr><td>Baseline fail → subject pass</td><td>"
-            f"{paired_binary['baseline_fail_subject_pass']}</td></tr>"
-            f"<tr><td>Both pass</td><td>{paired_binary['both_pass']}</td></tr>"
-            f"<tr><td>Both fail</td><td>{paired_binary['both_fail']}</td></tr>"
-            "</tbody></table>"
-            "<p>McNemar exact two-sided p-value: <code>"
-            f"{_format_number(paired_binary['mcnemar_exact_two_sided_p_value'])}"
-            "</code>. The p-value describes paired asymmetry; the policy verdict "
-            "uses the effect-size confidence bound above.</p>"
-        )
-    derived_html = ""
-    derived = report.get("derived_measurements")
-    if isinstance(derived, dict):
-        measurement = cast(dict[str, Any], derived["perplexity_ratio"])
-        if measurement["status"] == "available":
-            derived_html = (
-                "<h2>Derived likelihood interpretation</h2>"
-                "<p>The authenticated tokenizer and target token counts are "
-                "comparable. These values are derived from expected-continuation "
-                "likelihood facts and do not affect acceptance.</p>"
-                "<table><thead><tr><th>Derived measure</th><th>Value</th></tr>"
-                "</thead><tbody>"
-                "<tr><td>Baseline perplexity</td><td>"
-                f"{_format_number(measurement['baseline_perplexity'])}</td></tr>"
-                "<tr><td>Subject perplexity</td><td>"
-                f"{_format_number(measurement['subject_perplexity'])}</td></tr>"
-                "<tr><td>Perplexity ratio</td><td>"
-                f"{_format_number(measurement['ratio'])}</td></tr>"
-                "</tbody></table>"
-            )
-        else:
-            derived_html = (
-                "<h2>Derived likelihood interpretation</h2>"
-                "<p>Perplexity interpretation is unavailable: <code>"
-                f"{escape(str(measurement['reason']))}</code>. Acceptance remains "
-                "based on normalized NLL per expected UTF-8 byte.</p>"
-            )
-    if observations:
-        rows = "".join(
-            "<tr>"
-            f"<td><code>{escape(str(item['observation_id']))}</code></td>"
-            f"<td><code>{escape(str(item['kind']))}</code></td>"
-            f"<td><code>{escape(str(item['scope']))}</code></td>"
-            "</tr>"
-            for item in observations
-        )
-        details = "".join(
-            f"<h3><code>{escape(str(item['observation_id']))}</code></h3>"
-            "<pre>"
-            + escape(
-                json.dumps(
-                    item["payload"],
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            + "</pre>"
-            for item in observations
-        )
-        observations_html = (
-            "<h2>Authenticated observations</h2>"
-            "<p>These authenticated observations provide supplementary context. "
-            "The paired metric and policy remain the complete acceptance calculation.</p>"
-            "<table><thead><tr><th>Observation</th><th>Kind</th><th>Scope</th>"
-            f"</tr></thead><tbody>{rows}</tbody></table>{details}"
-        )
-    return (
-        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>InvarLock comparison report</title>"
-        "<style>body{font-family:system-ui,sans-serif;max-width:52rem;margin:3rem auto;"
-        "padding:0 1rem;color:#17202a}table{border-collapse:collapse;width:100%}"
-        "th,td{border-bottom:1px solid #d5d8dc;padding:.65rem;text-align:left}"
-        "td:last-child{text-align:right}code{overflow-wrap:anywhere}</style></head><body>"
-        "<h1>InvarLock comparison report</h1>"
-        f"<p><strong>Comparison:</strong> <code>{escape(str(report['comparison_id']))}</code>"
-        f"<br><strong>Metric:</strong> <code>{escape(str(report['metric']))}</code>"
-        f"<br><strong>Records:</strong> {report['record_count']}"
-        f"<br><strong>Verdict:</strong> {escape(str(report['verdict']).upper())}"
-        "<br><strong>Bundle integrity:</strong> embedded evidence signature verified"
-        "<br><strong>Acceptance path:</strong> <code>invarlock verify</code> records "
-        "the expected signer and independent anchors in a signed receipt"
-        f"<br><strong>Evidence signer:</strong> <code>{escape(evidence_signer)}</code>"
-        "</p>"
-        "<table><thead><tr><th>Measure</th><th>Value</th></tr></thead><tbody>"
-        f"<tr><td>Baseline mean</td><td>{_format_number(baseline['mean_score'])}</td></tr>"
-        f"<tr><td>Subject mean</td><td>{_format_number(subject['mean_score'])}</td></tr>"
-        f"<tr><td>{comparison_label}</td><td>{_format_number(comparison['value'])}</td></tr>"
-        f"<tr><td>{interval_label}</td><td>"
-        f"[{_format_number(uncertainty['lower'])}, "
-        f"{_format_number(uncertainty['upper'])}]</td></tr>"
-        f"<tr><td>{limit_field.title()}</td><td>{_format_number(comparison[limit_field])}</td></tr>"
-        "</tbody></table>"
-        f"<p><strong>Policy:</strong> <code>{escape(str(report['policy_digest']))}</code></p>"
-        "<p>This report is a human rendering of the signature-authenticated "
-        "evidence bundle. Run <code>invarlock verify</code> with independently "
-        "supplied anchors to create the signed acceptance receipt.</p>"
-        f"{paired_html}"
-        f"{derived_html}"
-        f"{observations_html}"
-        f"{note}</body></html>\n"
+    del explain  # Every HTML report includes collapsible technical details.
+    return render_report_html(
+        _report_view(report, evidence_signer=evidence_signer, observations=observations)
     )
 
 
@@ -1402,22 +1234,31 @@ def render_evidence(
             report, evidence_signer, observations = _signature_verified_report(
                 snapshot_root
             )
-            text = _render_markdown(
+            subjects = []
+            for role, label in (
+                ("baseline", "Baseline artifact"),
+                ("subject", "Candidate artifact"),
+            ):
+                identity, _ = _load_object_with_bytes(
+                    snapshot_root / "inputs" / f"{role}.json",
+                    label=f"{role} identity",
+                    max_bytes=_MAX_REPORT_BYTES,
+                )
+                locator = identity.get("locator")
+                display = (
+                    locator
+                    if isinstance(locator, str) and locator
+                    else str(identity["digest"])
+                )
+                subjects.append((label, display))
+            view = _report_view(
                 report,
-                explain=explain,
                 evidence_signer=evidence_signer,
                 observations=observations,
+                subjects=tuple(subjects),
             )
-            rendered_html = (
-                _render_html(
-                    report,
-                    explain=explain,
-                    evidence_signer=evidence_signer,
-                    observations=observations,
-                )
-                if html_path is not None
-                else None
-            )
+            text = render_report_markdown(view, include_details=explain)
+            rendered_html = render_report_html(view) if html_path is not None else None
             materialized_errors = snapshot.files.materialized_stability_errors(
                 snapshot_root
             )

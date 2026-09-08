@@ -276,14 +276,14 @@ def test_render_markdown_from_complete_evidence_signed_pack(
     result = render_evidence(evidence, explain=True)
 
     assert "# InvarLock comparison report" in result.text
-    assert "**Verdict:** **PASS**" in result.text
-    assert "| Exact-match delta (pp) | 50 |" in result.text
+    assert "**Recorded policy result: Policy satisfied**" in result.text
+    assert "| 50% | 100% | +50 pp | 2 |" in result.text
     assert (
         "human rendering of the signature-authenticated evidence bundle" in result.text
     )
     assert "embedded evidence signature verified" in result.text
-    assert "records the expected signer" in result.text
-    assert "create the signed acceptance receipt" in result.text
+    assert "independently supplied trust profile" in result.text
+    assert "create the signed acceptance or rejection receipt" in result.text
     assert signer in result.text
     assert result.evidence_signer == signer
     assert result.pack_manifest_digest == (
@@ -291,6 +291,8 @@ def test_render_markdown_from_complete_evidence_signed_pack(
         + hashlib.sha256((evidence / "manifest.json").read_bytes()).hexdigest()
     )
     assert result.html_path is None
+    assert "**Baseline artifact:** fixture://baseline" in result.text
+    assert "**Candidate artifact:** fixture://subject" in result.text
 
 
 def test_render_html_is_self_contained_and_no_clobber(tmp_path: Path) -> None:
@@ -301,11 +303,86 @@ def test_render_html_is_self_contained_and_no_clobber(tmp_path: Path) -> None:
 
     assert result.html_path == html.absolute()
     rendered = html.read_text(encoding="utf-8")
-    assert "<h1>InvarLock comparison report</h1>" in rendered
+    assert '<h1 id="decision">Policy satisfied</h1>' in rendered
     assert "human rendering of the signature-authenticated evidence bundle" in rendered
     assert signer in rendered
+    assert "fixture://baseline" in rendered
+    assert rendered.index("fixture://subject") < rendered.index(
+        "Results and requirements"
+    )
     with pytest.raises(EvidenceReportError, match="already exists"):
         render_evidence(evidence, html_path=html)
+
+
+def test_html_and_markdown_explain_every_configured_policy_check(
+    tmp_path: Path,
+) -> None:
+    report = build_comparison_report(
+        comparison_id="qualified-example",
+        paired_records={
+            "format": "invarlock/paired-records-v1",
+            "metric": "exact_match",
+            "schedule_sha256": "0" * 64,
+            "records": [
+                {
+                    "record_id": "one",
+                    "baseline": {"score": 1.0},
+                    "subject": {"score": 1.0},
+                },
+                {
+                    "record_id": "two",
+                    "baseline": {"score": 0.0},
+                    "subject": {"score": 1.0},
+                },
+            ],
+        },
+        policy={
+            "resolved_policy": {
+                "metrics": {
+                    "exact_match": {
+                        "delta_min_pp": -100.0,
+                        "minimum_record_count": 3,
+                        "maximum_interval_width_pp": 200.0,
+                        "minimum_side_accuracy": 0.8,
+                    }
+                }
+            }
+        },
+        policy_digest="sha256:" + "a" * 64,
+    )
+    assert report["verdict"] == "fail"
+    evidence, _ = _evidence(tmp_path, report_payload=report)
+    destination = tmp_path / "qualified.html"
+    rendered = render_evidence(evidence, html_path=destination)
+    html = destination.read_text()
+    for name in (
+        "Paired lower bound",
+        "Record count",
+        "Interval width",
+        "Baseline accuracy",
+        "Candidate accuracy",
+    ):
+        assert name in rendered.text
+        assert name in html
+    assert "Policy not met" in html
+    assert "50%" in html and "80%" in html and "100%" in html
+    assert "Not met" in html and "Passed" in html
+    assert "Content-Security-Policy" in html
+    assert "<script" not in html
+
+
+@pytest.mark.parametrize("field", ["sample_qualification", "side_accuracy"])
+def test_failed_relative_bound_still_validates_optional_checks(
+    tmp_path: Path, field: str
+) -> None:
+    report = _report()
+    report["comparison"]["minimum"] = 100.0
+    report["verdict"] = "fail"
+    report[field] = {"malformed": True}
+    evidence, _ = _evidence(tmp_path, report_payload=report)
+    with pytest.raises(EvidenceReportError, match=field):
+        render_evidence(evidence, html_path=tmp_path / "invalid.html")
+    assert not (tmp_path / "invalid.html").exists()
 
 
 def test_render_html_rejects_a_destination_inside_the_evidence_pack(
@@ -325,19 +402,19 @@ def test_render_authenticated_observations_separately_from_verdict(
     evidence, _signer = _evidence(tmp_path, with_observation=True)
     html = tmp_path / "observations.html"
 
-    result = render_evidence(evidence, html_path=html)
+    result = render_evidence(evidence, html_path=html, explain=True)
 
-    assert "**Verdict:** **PASS**" in result.text
+    assert "**Recorded policy result: Policy satisfied**" in result.text
     assert "## Authenticated observations" in result.text
     assert (
         "paired metric and policy remain the complete acceptance calculation"
         in result.text
     )
-    assert "`spectral-summary`" in result.text
+    assert "spectral-summary" in result.text
     assert '"verdict": "fail"' in result.text
     assert result.observations[0]["authority"] == "observation"
     rendered = html.read_text(encoding="utf-8")
-    assert "<h2>Authenticated observations</h2>" in rendered
+    assert "<summary>Authenticated observations</summary>" in rendered
     assert (
         "paired metric and policy remain the complete acceptance calculation"
         in rendered

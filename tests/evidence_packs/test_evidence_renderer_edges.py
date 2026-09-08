@@ -67,11 +67,20 @@ def test_closed_report_renderer_covers_normalized_nll_and_html_escaping() -> Non
         observations=(),
     )
 
-    assert "Normalized NLL ratio" in markdown
-    assert "Maximum allowed ratio" in markdown
+    assert "Normalized negative log-likelihood" in markdown
+    assert "| 1 nats / byte | 1.05 nats / byte | 1.05 ratio | 2 |" in markdown
+    assert (
+        "| Finite-schedule upper ratio bound | 1.05 | &lt;= 1.1 | Passed |" in markdown
+    )
     assert "&lt;comparison&gt;" in html
     assert "&lt;unsafe-signer&gt;" in html
-    assert "manifest, checksums" in html
+    assert "Inventory, checksums and embedded evidence signature verified" in html
+    assert "Not performed by report" in html
+    assert (
+        "Perplexity interpretation unavailable: target token counts unavailable"
+        in markdown
+    )
+    assert "Acceptance uses normalized NLL per expected UTF-8 byte" in markdown
 
 
 def test_closed_report_renderer_explains_side_accuracy_qualification() -> None:
@@ -109,9 +118,9 @@ def test_closed_report_renderer_explains_side_accuracy_qualification() -> None:
         observations=(),
     )
 
-    assert "Side accuracy qualification" in markdown
-    assert "| Baseline | 1 | ≥ 0.5 | pass |" in markdown
-    assert "| Subject | 0 | ≥ 0.5 | fail |" in markdown
+    assert "| Baseline accuracy | 100% | &gt;= 50% | Passed |" in markdown
+    assert "| Candidate accuracy | 0% | &gt;= 50% | Not met |" in markdown
+    assert "Checks not met: Candidate accuracy" in markdown
 
 
 @pytest.mark.parametrize(
@@ -424,8 +433,17 @@ def test_renderer_includes_available_perplexity_and_sample_qualification() -> No
         observations=[],
     )
 
+    for renderer in (reporting._render_markdown, reporting._render_html):
+        rendered = renderer(
+            closed, explain=False, evidence_signer="sha256:" + "a" * 64, observations=[]
+        )
+        assert "Baseline perplexity: 2." in rendered
+        assert "Candidate perplexity: 2.1." in rendered
+        assert "Perplexity ratio: 1.05." in rendered
+        assert "These derived values do not affect acceptance" in rendered
+
     qualified = reporting._closed_comparison_report(_qualified_exact_report())
-    assert "Sample qualification" in reporting._render_markdown(
+    assert "| Record count | 2 | &gt;= 2 | Passed |" in reporting._render_markdown(
         qualified,
         explain=False,
         evidence_signer="sha256:" + "a" * 64,
