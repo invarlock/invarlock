@@ -22,11 +22,14 @@ independently supplied trust anchors.
 [Run a paired comparison](user-guide/getting-started.md) ·
 [Read the assurance case](assurance/assurance-case.md)
 
-Already running an evaluator? The unreleased
+Already running an evaluator? The source checkout's
 [existing pipeline workflow](user-guide/pipeline-integration.md) imports per-case
 results, checks multiple metrics and slices, and writes CI reports without model
 execution. It includes runnable classification, extraction and recorded-judge
 examples and an explicit boundary between recomputed and recorded scores.
+Start with `invarlock pipeline --help`; `invarlock-pipeline` is the equivalent
+standalone command. Pipeline commands retain JSON defaults and offer explicit
+human summaries and report regeneration.
 
 ```bash
 invarlock evaluate request.yaml
@@ -62,6 +65,10 @@ Shared image, device, and entrypoint options act as defaults when both sides use
 the same runtime. Workers sharing a generic or identical CUDA device run
 sequentially; explicitly different CUDA indexes can run in parallel. The host
 owns the no-clobber evidence destination and evidence-signing key.
+Run requests can reuse explicit host settings with
+[`--runtime-profile`](reference/cli.md#reusable-runtime-profiles). Preflight
+shows the effective settings before execution; profiles do not supply policy
+or signer authorization.
 
 Import mode is the secondary path for complete provider sidecars created by
 another controlled execution. It publishes the same bundle format and faces
@@ -109,8 +116,10 @@ the result in a separately signed receipt.
 ### `report`
 
 Authenticate the bundle's embedded evidence signature and integrity, then
-render its canonical report. The view includes the point comparison,
-selected paired interval, threshold, and scoped verdict. Evidence
+render its canonical report. The view leads with the recorded policy decision,
+baseline and subject, then shows every configured check, the point comparison,
+selected paired interval, and threshold. Expandable HTML details retain exact
+values and evidence bindings. Evidence
 remains the source of truth and the signed verification receipt remains the
 independent acceptance record.
 

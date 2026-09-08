@@ -14,10 +14,16 @@ from pathlib import Path
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", default="invarlock-pipeline")
+    parser.add_argument(
+        "--pipeline-namespace",
+        action="store_true",
+        help="Use the pipeline subcommand when --cli names the core invarlock executable.",
+    )
     args = parser.parse_args()
     executable = shutil.which(args.cli)
     if executable is None:
         raise SystemExit("Install the candidate wheel before running this example.")
+    prefix = [executable, "pipeline"] if args.pipeline_namespace else [executable]
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
     environment.pop("INVARLOCK_PIPELINE_SIGNING_KEY", None)
@@ -26,7 +32,7 @@ def main() -> None:
 
         def run(*arguments: str, expected: int = 0) -> str:
             result = subprocess.run(
-                [executable, *arguments],
+                [*prefix, *arguments],
                 cwd=root,
                 env=environment,
                 capture_output=True,
@@ -85,6 +91,48 @@ def main() -> None:
             print(
                 f"{example}: installed comparison, reports and independent verification pass"
             )
+        evidence = root / "classification/result/evidence.json"
+        original_evidence = evidence.read_bytes()
+        regenerated = json.loads(run("report", str(evidence), "--output", "rendered"))
+        assert regenerated["recorded_decision"] == "pass"
+        assert regenerated["independent_verification"] == "not_performed"
+        assert regenerated["signing"] == "signature_present_unverified"
+        for name in ("report.html", "summary.md"):
+            assert (root / "rendered" / name).read_bytes() == (
+                root / "classification/result" / name
+            ).read_bytes()
+        assert evidence.read_bytes() == original_evidence
+        human = run(
+            "compare",
+            "classification/pipeline.json",
+            "--output",
+            "human",
+            "--output-format",
+            "human",
+            "--explain",
+        )
+        assert "Policy result: pass" in human
+        assert "40/40 usable pairs, 0 missing" in human
+        assert "Signing: Unsigned local evidence" in human
+        assert "Independent verification: not performed" in human
+        verified = run(
+            "verify",
+            str(evidence),
+            "--public-key",
+            "keys/public.pem",
+            "--policy",
+            "classification/policy.json",
+            "--expected-baseline",
+            run("digest", "classification/baseline.json", "--run"),
+            "--expected-candidate",
+            run("digest", "classification/candidate.json", "--run"),
+            "--output-format",
+            "human",
+            "--explain",
+        )
+        assert "Independent verification: passed" in verified
+        assert "40/40 usable pairs, 0 missing" in verified
+        print("human summaries and rendering without independent verification pass")
         candidate_path = root / "judge/candidate.json"
         candidate_run = json.loads(candidate_path.read_text())
         for row in candidate_run["records"]:

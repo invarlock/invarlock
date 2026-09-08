@@ -9,8 +9,11 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-The separate `invarlock-pipeline` CLI and Python SDK compare existing evaluator
-exports, apply metric and slice policies, and verify signed pipeline evidence.
+The `invarlock pipeline` namespace, equivalent standalone `invarlock-pipeline`
+CLI and Python SDK compare existing evaluator exports, apply metric and slice
+policies, and verify signed pipeline evidence. Use `invarlock pipeline --help`
+for that workflow; `invarlock evaluate --help` describes controlled execution or
+import, including the optional run-mode resource profile.
 See the [pipeline integration guide](docs/user-guide/pipeline-integration.md).
 Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence
@@ -181,6 +184,13 @@ coverage-examples`, and report the full Linux result from CI separately.
 Coverage includes newly added example launchers: successful execution in a
 separate smoke job does not collect their branch coverage. Add meaningful
 tests under `tests/examples/`; do not weaken thresholds to make a change pass.
+
+Changes to command output or reports must preserve policy outcomes, signed bytes,
+recipient-owned trust inputs and documented exit codes. Test human and machine
+modes separately, including policy rejection, missing evidence and malformed
+input. A rendered report must not inherit independent verification status from
+a signature's presence. Retain the distinction between core transaction
+publication and pipeline comparison decisions.
 
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.

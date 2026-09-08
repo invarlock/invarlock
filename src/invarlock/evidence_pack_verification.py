@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -817,6 +817,8 @@ def _verify_comparison_evidence_snapshot(
 ) -> EvidencePackResult:
     """Verify one already materialized immutable bundle snapshot."""
 
+    verified_report: dict[str, Any] | None = None
+
     pack_dir = Path(pack_dir)
     independent = _load_independent_anchors(
         policy_path=policy_path,
@@ -1113,10 +1115,11 @@ def _verify_comparison_evidence_snapshot(
                             verdict = report.get("verdict")
                             if verdict in {"pass", "fail"}:
                                 policy_verdict = verdict
+                                verified_report = expected_report
             except (EvidencePackError, StrictJsonError, ValueError) as exc:
                 errors.append(str(exc))
 
-    return _result(
+    result = _result(
         pack_dir,
         errors=errors,
         signer_fingerprint=signer_fingerprint,
@@ -1133,6 +1136,13 @@ def _verify_comparison_evidence_snapshot(
         policy_verdict=policy_verdict,
         observations=tuple(verified_observations),
     )
+
+    if (
+        result.payload.get("integrity_ok") is True
+        and result.payload.get("reports_verified") is True
+    ):
+        return replace(result, verified_report=verified_report)
+    return result
 
 
 def verify_comparison_evidence(
@@ -1214,7 +1224,9 @@ def verify_comparison_evidence(
         )
     payload = dict(result.payload)
     payload["pack"] = source.name
-    return EvidencePackResult(payload, result.status, manifest_digest)
+    return EvidencePackResult(
+        payload, result.status, manifest_digest, result.verified_report
+    )
 
 
 __all__ = ["verify_comparison_evidence"]

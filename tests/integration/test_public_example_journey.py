@@ -406,7 +406,7 @@ def test_checked_in_example_completes_the_public_signed_journey(
     )
     assert rendered.exit_code == 0, rendered.stdout
     assert html.is_file()
-    assert "PASS" in html.read_text(encoding="utf-8")
+    assert '<h1 id="decision">Policy satisfied</h1>' in html.read_text(encoding="utf-8")
 
     report = json.loads(
         (evidence / "reports/evaluation.report.json").read_text(encoding="utf-8")
@@ -459,7 +459,9 @@ def test_trust_boundary_demo_accepts_rejects_and_detects_tampering(
     assert "PASS byte-tamper rejection" in completed.stdout
     report = workspace / "verifier/reports/accepted.html"
     assert report.is_file()
-    assert "PASS" in report.read_text(encoding="utf-8")
+    assert '<h1 id="decision">Policy satisfied</h1>' in report.read_text(
+        encoding="utf-8"
+    )
 
     receipts = workspace / "verifier/receipts"
     accepted = json.loads(

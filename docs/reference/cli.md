@@ -1,22 +1,30 @@
 # Command-line interface
 
-The public command line is intentionally limited to one ordered journey:
+The public command line supports existing evaluation results and a separate
+controlled evaluation, verification and reporting journey:
 
 !!! info "Reference"
 
-    - **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
+    - **Surface:** `invarlock pipeline`, `invarlock evaluate`, `invarlock verify`, and `invarlock report`
     - **Stability:** Stable public CLI; command help is authoritative for installed options
     - **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
 
 ```text
+invarlock pipeline --help
 invarlock evaluate request.yaml
 invarlock verify evidence/
 invarlock report evidence/
 ```
 
 Use `invarlock --version` for the installed version and `invarlock --help` for
-the authoritative option list. The commands have the same transaction
+the authoritative option list. The core commands have the same transaction
 boundaries as the [Python facade](api-guide.md).
+
+`invarlock pipeline COMMAND` exposes the same commands, defaults, JSON output
+and exit codes as `invarlock-pipeline COMMAND`. It compares existing records
+without inference and uses its own evidence and verification contracts; it does
+not produce the core signed recipient receipt. See the
+[pipeline integration guide](../user-guide/pipeline-integration.md).
 
 External evaluator qualification uses a separate companion executable so the
 three-command release transaction remains unchanged:
@@ -36,7 +44,7 @@ qualification](evaluator-qualification.md).
 | Form | Result |
 | --- | --- |
 | `invarlock` | Show help; no transaction runs |
-| `invarlock --help` | Show the three-command surface and exit |
+| `invarlock --help` | Show both workflow choices and exit |
 | `invarlock --version` | Print `InvarLock <installed-version>` and exit |
 | `invarlock COMMAND --help` | Show the exact arguments and options for one transaction |
 
@@ -50,6 +58,7 @@ command implementation imports a runtime backend.
 invarlock evaluate REQUEST \
   --signing-key PATH \
   [--allow-installed-scorers] \
+  [--runtime-profile FILE] \
   [--runtime-image IMAGE] \
   [--runtime-image-digest sha256:...] \
   [--baseline-runtime-image IMAGE] \
@@ -116,6 +125,7 @@ publishes the evidence directory. Import requests do not launch workers.
 | `REQUEST` | Yes | None | Existing readable YAML governed by `evaluation_request.schema.json`; its parent is the request root |
 | `--signing-key PATH` | Yes | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file |
 | `--allow-installed-scorers` | Only for a scorer-bound request | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
+| `--runtime-profile FILE` | No | None | Explicit closed JSON runtime settings for run requests; maximum 16 KiB |
 | `--runtime-image IMAGE` | Run mode from host | `INVARLOCK_RUNTIME_IMAGE` | Local OCI image reference; must contain a digest or be paired with the digest option |
 | `--runtime-image-digest DIGEST` | When not embedded in image; recommended explicitly | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | Pinned lowercase OCI `sha256:...` identity |
 | `--baseline-runtime-image IMAGE` | No | `INVARLOCK_BASELINE_RUNTIME_IMAGE` | Baseline image override; otherwise the common image is used |
@@ -134,6 +144,63 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
 | `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
 | `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
+
+### Reusable runtime profiles
+
+Use `--runtime-profile runtime.json` to reuse local runtime settings without
+putting host resources into the signed request schema. Profiles are explicit:
+there is no automatic file discovery. Import requests reject this option.
+
+```json
+{
+  "format": "invarlock/runtime-profile-v1",
+  "runtime": {
+    "engine": "docker",
+    "image": "registry.example/runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device": "cpu",
+    "entrypoint": "auto",
+    "cpus": "4",
+    "memory_mib": 65536,
+    "user": "65532:65532"
+  },
+  "subject": {
+    "device": "cuda:0"
+  }
+}
+```
+
+`format` and the `runtime` object are required. `baseline` and `subject` are
+optional objects accepting only `image`, `image_digest`, `device`, and
+`entrypoint`. The common `runtime` object also accepts `engine`, `cpus`,
+`memory_mib`, and `user`. Every value is a nonempty string except `memory_mib`,
+which must be a positive JSON integer; `cpus` is a decimal string. Existing OCI
+validation still enforces pinned local images, supported devices and
+entrypoints, resource limits, and a non-root user. Profiles cannot authorize
+network access, signing keys, or installed scorers.
+
+For each side's field, profile mode uses this precedence:
+
+1. Explicit side-specific command-line option.
+2. Explicit common command-line option.
+3. Side-specific profile value.
+4. Common profile value.
+5. Side-specific environment variable.
+6. Common environment variable.
+7. The existing default.
+
+Engine and resource fields use the applicable common steps. Without a profile,
+existing option and environment resolution stays unchanged. Image and digest
+are resolved independently: if an overridden image embeds a digest that
+conflicts with the selected separate digest, the command fails and asks you to
+update the matching value. It never silently repairs the mismatch.
+
+Profiles must be regular, non-symlink files of at most **16 KiB**. This is a
+configuration-file limit. Unknown fields, duplicate JSON keys, non-finite
+numbers, and invalid value types are rejected. Run `evaluate REQUEST
+--runtime-profile runtime.json --preflight` to validate the complete effective
+launch before execution. Human preflight output shows the profile SHA-256,
+resolved side settings, resource limits and each setting's origin. Existing
+preflight JSON and signed request/evidence formats do not change.
 
 The signing key must be a real regular file. The request and every referenced
 input must remain beneath the request root. Keep the signing key in a separate,
@@ -348,6 +415,30 @@ and the optional HTML path.
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
 safe renderer, not a substitute for `invarlock verify`.
+
+## Human and machine output
+
+Core human output separates operation completion, recorded policy result and
+independent verification. `evaluate` prints `Evidence created` and the recorded
+policy result. A published policy failure still exits `0`; publication does not
+establish recipient acceptance. Preflight shows the mode, paired record count,
+destination and number of validated checks, without execution or publication.
+
+`verify` distinguishes an authentic policy rejection from evidence integrity or
+input failures. On policy rejection, it shows failed checks with observed and
+required values and the signed receipt location. Diagnostic text is rendered
+literally, including brackets in signer fingerprints and paths.
+
+`report` renders Markdown as terminal content and can write self-contained HTML.
+Its `--json` mode emits a rendering result object on success or an application
+error object with `ok: false` and `errors` on failure. Existing evaluate and verify
+JSON contracts are unchanged. CLI syntax, option and path-validation failures
+that occur before the command handler still use usage diagnostics on stderr and
+exit `2`; `--json` does not convert those parser errors into result objects.
+
+Runtime resources and explicit trust anchors are grouped separately in command
+help. Grouping changes presentation only; flag defaults and environment-variable
+resolution remain unchanged.
 
 ## Exit and write behavior
 

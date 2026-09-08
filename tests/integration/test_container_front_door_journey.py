@@ -484,8 +484,17 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         ["report", str(evidence), "--html", str(report_path)],
     )
     assert report.returncode == 0, report.stderr or report.stdout
-    assert "# InvarLock comparison report" in report.stdout
+    # Console output is rendered Markdown; assert the meaning rather than its
+    # former raw heading syntax or terminal-dependent wrapping.
+    report_text = " ".join(report.stdout.split())
+    assert "InvarLock comparison report" in report_text
+    assert "Recorded policy result: Policy satisfied" in report_text
+    assert "Not performed by report" in report_text
     assert report_path.is_file()
+    report_html = report_path.read_text(encoding="utf-8")
+    assert "Original decision: pass" in report_html
+    assert "Independent recipient acceptance" in report_html
+    assert "Not performed by report" in report_html
 
     missing_digest_request = _request(
         workspace,

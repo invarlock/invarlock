@@ -40,6 +40,20 @@ documents a lower-level command for qualified, caller-prepared engines. The
 optional vision-text package keeps its real-model qualification command beside
 its implementation under `addins/multimodal`.
 
+The launchers use machine-readable CLI output where they parse results. When
+inspecting the retained evidence directly, use
+`invarlock report evidence/ --explain` for the human view, or add `--json` for
+machine-readable status.
+Report rendering alone does not perform independent recipient verification.
+
+For your own run-mode requests, the optional
+[runtime profile](../docs/reference/cli.md#reusable-runtime-profiles) keeps
+local image and resource settings outside the evaluation request. Validate it
+with `invarlock evaluate request.yaml --runtime-profile runtime.json --preflight`
+before execution. Profiles are not accepted for import-mode requests such as
+`examples/request.yaml`; the maintained launchers already supply their selected
+runtime settings explicitly.
+
 ## Prerequisites
 
 | Journeys | Requirements |

@@ -397,10 +397,10 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
         == 0
     )
     for cohort in campaign.COHORTS:
-        assert (
-            "Release comparison"
-            in (tmp_path / "reports" / f"{cohort}.html").read_text()
-        )
+        rendered = (tmp_path / "reports" / f"{cohort}.html").read_text()
+        assert "InvarLock pipeline comparison" in rendered
+        assert "Results and requirements" in rendered
+        assert "Not performed by report" in rendered
         assert (
             (tmp_path / "reports" / f"{cohort}.xml").read_bytes().startswith(b"<?xml")
         )

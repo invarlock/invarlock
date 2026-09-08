@@ -3,8 +3,9 @@
 Install the unreleased source checkout or its candidate wheel, then run:
 
 ```bash
-invarlock-pipeline init release-check --example extraction
-invarlock-pipeline compare release-check/pipeline.json --output release-check/result
+invarlock pipeline init release-check --example extraction
+invarlock pipeline compare release-check/pipeline.json \
+  --output release-check/result --output-format human --explain
 ```
 
 The installed command creates a complete 40-case synthetic example, a reusable
@@ -12,15 +13,36 @@ project and policy, and quality plus latency checks on the full dataset and a
 selected category. Also try `--example classification` or `--example judge`.
 The examples are illustrative; they do not establish deployment quality.
 
+The human summary shows the policy decision, usable and missing pair counts,
+reasons, signing status and report paths. Omit `--output-format human` for the
+unchanged JSON default used by automation. `invarlock-pipeline` remains an
+equivalent standalone command.
+
+To regenerate the HTML and Markdown views from the retained evidence:
+
+```bash
+invarlock pipeline report release-check/result/evidence.json \
+  --output release-check/rendered --output-format human --explain
+```
+
+Use a fresh output directory. Rendering checks structure and embedded bindings;
+it does not rerun the evaluator, recompute the decision or independently verify
+the signature. The unsigned starter remains unsigned. For a signed handoff and
+recipient-owned verification inputs, follow the rehearsal below or the
+integration guide.
+
 Follow the [integration guide](../../docs/user-guide/pipeline-integration.md) to
 replace these records with your evaluator's outputs, set approved thresholds,
 use the SDK or native parsers and add the gate to CI.
 
 The distribution smoke test runs outside the source checkout, clears Python's
 source-path override and exercises all examples, signing, independent
-verification, reports, repeated destinations and every decision exit code:
+verification, human summaries, report regeneration, repeated destinations and
+every decision exit code:
 
 ```bash
+python examples/pipeline/wheel_smoke.py --cli invarlock --pipeline-namespace
+# The standalone entry point remains supported:
 python examples/pipeline/wheel_smoke.py --cli invarlock-pipeline
 ```
 

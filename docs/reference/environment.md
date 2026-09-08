@@ -17,6 +17,14 @@ caller-owned provider resources.
 An explicit command option wins over its environment alternative. Empty values
 do not satisfy required paths, digests, fingerprints, or identities.
 
+Run-mode `evaluate --runtime-profile FILE` also accepts explicit host resource
+settings. In profile mode, explicit CLI values take precedence over profile
+values, then environment values and defaults. Per-side resolution is detailed
+in [Runtime profiles](cli.md#reusable-runtime-profiles). There is no profile
+environment variable or automatic discovery. Use `--preflight` to inspect the
+effective settings and their origins. Profiles cannot supply signing keys,
+verification anchors or scorer authorization; import requests reject them.
+
 ## Transaction inputs
 
 | Variable | Command | Meaning |

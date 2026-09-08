@@ -32,8 +32,9 @@ invarlock report evidence/
     keys.
 
 To check results from an existing evaluator without preparing an OCI runtime,
-start with [Existing evaluation pipelines](pipeline-integration.md). That
-unreleased companion workflow supports multiple metrics and slices with its own
+start with [Existing evaluation pipelines](pipeline-integration.md) and
+`invarlock pipeline --help` from the source checkout. This workflow supports
+multiple metrics and slices with its own
 captured-result evidence contract. This page covers the core execution and
 independent receipt path.
 
@@ -244,6 +245,23 @@ pinned images without starting a container or creating output. Rerun the same
 command without `--preflight` only when you deliberately want to continue into
 the evaluation.
 
+For repeated run requests in the source checkout, put the image, device and
+resource settings in an explicit
+[runtime profile](../reference/cli.md#reusable-runtime-profiles), then use:
+
+```bash
+invarlock evaluate release-check/request.yaml \
+  --signing-key evidence-signer.pem \
+  --runtime-profile runtime.json --preflight
+```
+
+Create `runtime.json` using that reference and your actual pinned images before
+running this command. Human preflight output shows the effective settings and
+where they came from. Explicit CLI overrides take precedence over profile
+values. The profile does not contain signing keys or acceptance policy and is
+not accepted for import requests. Remove `--preflight` to execute the same
+resolved setup.
+
 Use `--container-engine podman` when appropriate. Device values are `cpu`,
 `cuda`, or `cuda:<index>`. Shared `--runtime-image`,
 `--runtime-image-digest`, `--runtime-device`, and `--runtime-entrypoint`
@@ -260,7 +278,9 @@ host validates both outputs, atomically publishes
 `release-check/evidence/release-001`, and signs the bundle with its host-only
 key.
 
-A successful command exits `0` and reports the evidence directory. The bundle
+A successful publication exits `0`, prints `Evidence created`, and shows the
+recorded policy result and evidence directory. A policy failure can still be
+published successfully; use independent `verify` to gate acceptance. The bundle
 contains the prepared canonical schedule, both provider observations, paired
 records, the comparison report, runtime bindings, checksums, manifest, and
 evidence signature.
@@ -306,10 +326,16 @@ invarlock report release-check/evidence/release-001/ \
   --explain
 ```
 
-The report shows both side means, the point comparison, the selected paired
-interval, threshold, and canonical verdict. `report` checks the embedded
+The report leads with **Policy satisfied** or **Policy not met** and identifies
+the baseline and subject. It shows both side means, the point comparison, the
+selected paired interval, and every configured metric, count, precision and
+side-accuracy check. HTML details expand to show exact values and bindings.
+`report` checks the embedded
 evidence signature and bundle integrity before rendering, but it does not use
 the independent verifier anchors or replace the signed receipt.
+Successful rendering exits `0` even when the recorded policy failed. Use
+`--json` for a machine-readable rendering status and HTML path; do not parse
+the terminal layout to decide acceptance.
 
 ## Interpret the result
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from invarlock.core.scorer_extension import ScorerExtensionRegistry
+from invarlock.evidence_explanation import core_policy_checks
 from invarlock.evidence_pack import verify_comparison_evidence
 from invarlock.evidence_pack_json import StrictJsonError
 from invarlock.evidence_pack_support import EvidencePackResult
@@ -26,9 +27,13 @@ class EvidenceVerificationError(ValueError):
         *,
         exit_code: int = 2,
         payload: dict[str, Any] | None = None,
+        details: tuple[str, ...] = (),
+        receipt_path: Path | None = None,
     ) -> None:
         super().__init__(message)
         self.exit_code = exit_code
+        self.details = details
+        self.receipt_path = receipt_path
         self.payload = payload or {
             "format_version": "invarlock/evidence-verification-error-v1",
             "ok": False,
@@ -110,17 +115,40 @@ def _require_outside_evidence(
     )
 
 
-def _failed(result: EvidencePackResult, payload: dict[str, Any]) -> None:
+def _failed(
+    result: EvidencePackResult,
+    payload: dict[str, Any],
+    *,
+    receipt_path: Path | None = None,
+) -> None:
     if bool(payload.get("ok")):
         return
     errors = payload.get("errors")
     message = (
         "; ".join(str(item) for item in errors)
         if isinstance(errors, list) and errors
-        else "evidence verification failed"
+        else (
+            "authenticated evidence does not satisfy the approved policy"
+            if payload.get("integrity_ok") is True
+            and payload.get("policy_verdict") == "fail"
+            else "evidence verification failed"
+        )
     )
     exit_code = int(result.status) or 1
-    raise EvidenceVerificationError(message, exit_code=exit_code, payload=payload)
+    details: tuple[str, ...] = ()
+    if result.verified_report is not None:
+        details = tuple(
+            f"{check['name']}: {check['observed']}; required {check['required']}. {check['explanation']}"
+            for check in core_policy_checks(result.verified_report)
+            if not check["passed"]
+        )
+    raise EvidenceVerificationError(
+        message,
+        exit_code=exit_code,
+        payload=payload,
+        details=details,
+        receipt_path=receipt_path,
+    )
 
 
 def verify_evidence(
@@ -268,7 +296,7 @@ def verify_evidence(
     payload["verifier_fingerprint"] = verifier_fingerprint
     if trust_profile_digest is not None:
         payload["trust_profile_digest"] = trust_profile_digest
-    _failed(result, payload)
+    _failed(result, payload, receipt_path=receipt.resolve())
     return EvidenceVerification(evidence.resolve(), payload, receipt.resolve())
 
 
