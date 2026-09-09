@@ -8,7 +8,7 @@ independent acceptance record.
 !!! tip "User guide"
 
     **Outcome:** Verify an immutable evidence bundle against independent
-    anchors, validate its signed receipt, and render a human-readable report.
+    anchors, validate its signed receipt, and render an evidence report.
 
     **Audience:** Verifier operators, decision owners, and downstream receipt
     verifiers deciding whether to rely on one evidence transaction.
@@ -176,7 +176,7 @@ Applying different policy bytes requires a new evidence transaction.
 
 ## Read the verification result
 
-Human output separates evidence integrity from the policy decision. A replayed
+Text output separates evidence integrity from the policy decision. A replayed
 policy rejection includes observed and required values for failed checks and
 the signed receipt path. Evidence, receipt and HTML paths remain complete
 logical lines even on narrow terminals. A readable report or an existing
@@ -298,7 +298,7 @@ successful render exits `0` for both passing and failing recorded policies.
 
 The report verifies the embedded signature without pinning that signer to an
 independent allowlist, and it does not validate a verification receipt. Treat
-it as a human view of signed evidence, not as the independent acceptance result.
+it as a summary of signed evidence, not as the independent acceptance result.
 
 Use the report to answer presentation questions:
 

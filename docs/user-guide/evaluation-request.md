@@ -332,7 +332,7 @@ canonical JSON object. Evaluation reads the bytes without following links,
 requires canonical encoding and a maximum size of 1 MiB, and places the payload
 under `observations/<id>.json`. The signed manifest binds its digest, kind,
 scope, comparison, schedule, policy, and both artifact identities. Strict
-verification replays those bindings, and the human report renders the payload
+verification replays those bindings, and the evidence report renders the payload
 in a separate context section.
 
 Observations are authenticated context. The selected paired comparison, its

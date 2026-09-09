@@ -29,7 +29,7 @@ execution. It includes runnable classification, extraction and recorded-judge
 examples and an explicit boundary between recomputed and recorded scores.
 Start with `invarlock pipeline --help`; `invarlock-pipeline` is the equivalent
 standalone command. Pipeline commands retain JSON defaults and offer explicit
-human summaries and report regeneration.
+text summaries and report regeneration.
 
 ```bash
 invarlock evaluate request.yaml

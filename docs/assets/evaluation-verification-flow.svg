@@ -192,7 +192,7 @@
   <rect x="1010" y="795" width="370" height="56" rx="10" class="box-output" />
   <text x="1195" y="819" text-anchor="middle" class="box-title">Console · optional HTML</text>
   <text x="1195" y="842" text-anchor="middle" class="micro-text">
-    human-readable evidence view
+    evidence summary
   </text>
 
   <path d="M 510 680 L 510 700" class="arrow" />

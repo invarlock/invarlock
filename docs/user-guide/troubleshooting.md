@@ -347,9 +347,9 @@ rejected before a command runs still produce usage diagnostics on stderr.
 
 For the existing-results workflow, `invarlock pipeline compare`, `verify` and
 `report` default to JSON; use `--output-format human --explain` to inspect their
-checks interactively. Human text and HTML are presentation formats and should
+checks interactively. Console text and HTML are presentation formats and should
 not be parsed as stable machine interfaces. See the
-[CLI output contract](../reference/cli.md#human-and-machine-output).
+[CLI output contract](../reference/cli.md#text-and-json-output).
 
 ## Before escalating a bug
 

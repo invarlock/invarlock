@@ -110,7 +110,7 @@ invarlock pipeline compare release-check/pipeline.json \
 ```
 
 `invarlock-pipeline` remains available as the standalone equivalent. Pipeline
-commands default to JSON for automation; the explicit human mode shows policy
+commands default to JSON for automation; the optional text mode shows policy
 checks, usable and missing pairs, and report paths. To recreate HTML and
 Markdown from evidence without rerunning the comparison, use
 `invarlock pipeline report release-check/result/evidence.json --output report-copy`.
@@ -151,7 +151,7 @@ python run.py --fixture golden
 ```
 
 The command prints `Decision: pass` and the paths to the signed receipt,
-machine-readable verification result, and human report. The versioned example
+machine-readable verification result, and evidence report. The versioned example
 files stay outside the package; the command imports only the installed wheel.
 The fuller [offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff)
 also builds fixture evidence and exercises ten fail-closed recipient scenarios.

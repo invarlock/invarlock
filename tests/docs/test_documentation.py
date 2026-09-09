@@ -521,7 +521,7 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
         "scoped pass or rejection",
         "invarlock report",
         "console · optional HTML",
-        "human-readable evidence view",
+        "evidence summary",
     ):
         assert phrase.lower() in diagram
     for stale in (
@@ -599,7 +599,7 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
         "make example-peft-lora",
         "make example-evidence-handoff",
         "separately generated trust inputs",
-        "human-readable report",
+        "evidence report",
     ):
         assert fragment in example
     assert re.search(r"signed evidence\s+pack", example)

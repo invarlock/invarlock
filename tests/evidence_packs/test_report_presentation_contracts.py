@@ -51,7 +51,9 @@ def test_display_without_optional_context_does_not_invent_evidence() -> None:
     assert 'class="limits"' not in html
     assert "Comparison and policy identities" not in html
     assert 'class="subjects"' not in html
-    assert "<svg" not in html
+    assert '<figure class="interval">' not in html
+    assert '<svg class="mark"' in html
+    assert 'aria-hidden="true" focusable="false"' in html
     assert 'class="check-unknown">Unavailable' in html
     for text in (html, markdown):
         assert "More evidence needed" in text

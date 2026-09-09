@@ -325,5 +325,5 @@ The CLI atomically publishes completed result and key directories without
 replacing existing destinations. Files are owner-readable/writable and new
 directories are private. HTML escapes data and runs no scripts; Markdown escapes
 untrusted labels; JUnit reports policy failures and insufficient evidence as
-failures and errors respectively. Human reports present the comparison;
+failures and errors respectively. Reports present the comparison;
 signature authentication requires the separate verify operation.

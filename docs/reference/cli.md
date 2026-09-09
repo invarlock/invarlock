@@ -198,7 +198,7 @@ Profiles must be regular, non-symlink files of at most **16 KiB**. This is a
 configuration-file limit. Unknown fields, duplicate JSON keys, non-finite
 numbers, and invalid value types are rejected. Run `evaluate REQUEST
 --runtime-profile runtime.json --preflight` to validate the complete effective
-launch before execution. Human preflight output shows the profile SHA-256,
+launch before execution. Preflight text output shows the profile SHA-256,
 resolved side settings, resource limits and each setting's origin. Existing
 preflight JSON and signed request/evidence formats do not change.
 
@@ -416,9 +416,9 @@ Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
 safe renderer, not a substitute for `invarlock verify`.
 
-## Human and machine output
+## Text and JSON output
 
-Core human output separates operation completion, recorded policy result and
+Core text output separates operation completion, recorded policy result and
 independent verification. `evaluate` prints `Evidence created` and the recorded
 policy result. A published policy failure still exits `0`; publication does not
 establish recipient acceptance. Preflight shows the mode, paired record count,
@@ -509,4 +509,4 @@ runtime inventory.
   applications.
 - [Evaluation lifecycle](lifecycle.md) explains write boundaries and retry
   behavior.
-- [Reports and receipts](reports.md) defines the machine and human outputs.
+- [Reports and receipts](reports.md) defines JSON results and formatted reports.

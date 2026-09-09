@@ -272,7 +272,7 @@ def test_trust_boundary_demo_runs_the_real_isolated_handoff(
 
     output = capsys.readouterr().out
     assert "PASS accepted evidence and receipt" in output
-    assert "PASS human-readable report" in output
+    assert "PASS evidence report" in output
     assert "PASS authentic policy rejection" in output
     assert "PASS byte-tamper rejection" in output
     accepted = json.loads(

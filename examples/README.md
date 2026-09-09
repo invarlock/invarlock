@@ -2,8 +2,8 @@
 
 The transaction journeys below execute InvarLock's public transaction. Each
 listed command produces a signed evidence
-pack, verifies it against separately generated trust inputs, and renders a
-human-readable report. The self-contained examples create both sets of keys;
+pack, verifies it against separately generated trust inputs, and renders an
+evidence report. The self-contained examples create both sets of keys;
 an acceptance workflow should have the verifier owner choose and hold its own
 trust anchors and signing key.
 
@@ -42,7 +42,7 @@ its implementation under `addins/multimodal`.
 
 The launchers use machine-readable CLI output where they parse results. When
 inspecting the retained evidence directly, use
-`invarlock report evidence/ --explain` for the human view, or add `--json` for
+`invarlock report evidence/ --explain` for the text summary, or add `--json` for
 machine-readable status.
 Report rendering alone does not perform independent recipient verification.
 

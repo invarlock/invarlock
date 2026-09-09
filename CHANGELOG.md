@@ -74,7 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made core command output distinguish publication, recorded policy results and
   independent verification, while preserving transaction and rejection exit
   codes. Grouped help makes runtime configuration easier to find.
-- Redesigned human reports with policy checks, missing counts, absolute floors,
+- Simplified report labels and explanations across CLI help, documentation and
+  examples while preserving integrity checks and independent verification requirements.
+  HTML reports use the InvarLock logo without requiring external assets.
+- Redesigned reports with policy checks, missing counts, absolute floors,
   interval diagrams, readable likelihood interpretation and explicit assurance
   limits. Reports retain recorded decisions, escape external labels, and bound
   configuration and missing-ID previews without changing evidence bytes.
@@ -103,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Kept core report failures in JSON when requested and preserved literal error
-  details such as signer fingerprints in human output.
+  details such as signer fingerprints in text output.
 - Displayed sample-count, precision and side-accuracy requirements in both
   report formats, and matched interval labels and units to the actual scorer.
 
@@ -636,7 +639,7 @@ from the same canonical JSON.
 
 ### Added
 
-- Added restrained InvarLock branding and version metadata to human-readable
+- Added restrained InvarLock branding and version metadata to
   Markdown/HTML reports and evidence-pack verdict summaries while keeping JSON
   reports, manifests, and signed metadata machine-stable.
 - Added first-class baseline-relative guard warnings in reports and verification,
@@ -1119,7 +1122,7 @@ from the same canonical JSON.
   support, implemented coverage, usage-only checkpoints, and
   promotion-candidate inventories, while keeping tracked `public_evidence`
   limited to shipped published-basis fixtures.
-- Standardized the shared human-readable CLI output layer across `verify`,
+- Standardized the shared CLI text output layer across `verify`,
   `report html`, `advanced policy`, `advanced evidence-pack`,
   `advanced runtime-verify`, and the top-level `doctor` findings and health
   summaries so status lines, warnings, and detail rows render consistently.
@@ -1574,7 +1577,7 @@ from the same canonical JSON.
 - Refreshed shipped model lanes and presets around evidence-backed support,
   including `hf_text` causal-eval defaults, updated supported-model coverage,
   and removal of the legacy ONNX adapter surface.
-- Simplified the human-readable Markdown evaluation report by folding the
+- Simplified the Markdown evaluation report by folding the
   dashboard into a single Executive Summary section and removing the
   hand-maintained contents block.
 

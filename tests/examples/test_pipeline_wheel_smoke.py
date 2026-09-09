@@ -192,5 +192,5 @@ def test_wheel_smoke_runs_the_real_core_pipeline_namespace(monkeypatch, capsys):
     calls, roots = _real_cli_transport(monkeypatch, module, namespace=True)
     module.main()
     assert calls and all(call.args[1] == "pipeline" for call in calls)
-    assert "human summaries and rendering" in capsys.readouterr().out
+    assert "text summaries and rendering" in capsys.readouterr().out
     assert not roots[0].exists()
