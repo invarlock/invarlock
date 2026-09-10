@@ -621,3 +621,33 @@ def test_wheel_directory_entries_preserve_exact_payload_inventory(surface) -> No
         surface.dist + "/REQUESTED",
     }
     assert set(receipt["binding"]["installed_component_files"]) == expected
+
+
+def test_report_descriptor_closes_when_stream_adoption_fails(surface, monkeypatch):
+    import errno
+    import os
+
+    opened = []
+    real_open = os.open
+
+    def track_open(path, flags, *args, **kwargs):
+        fd = real_open(path, flags, *args, **kwargs)
+        if Path(path) == surface.report:
+            opened.append(fd)
+        return fd
+
+    def fail_fdopen(*_args, **_kwargs):
+        raise OSError(errno.EIO, "report stream failed")
+
+    monkeypatch.setattr(binding.os, "open", track_open)
+    monkeypatch.setattr(binding.os, "fdopen", fail_fdopen)
+    with pytest.raises(OSError, match="report stream failed"):
+        audit.main(surface.args)
+    assert len(opened) == 1
+    try:
+        os.fstat(opened[0])
+    except OSError as exc:
+        assert exc.errno == errno.EBADF
+    else:
+        os.close(opened[0])
+        pytest.fail("report descriptor leaked when stream creation failed")

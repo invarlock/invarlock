@@ -587,13 +587,17 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
     fd = os.open(
         destination, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600
     )
-    with os.fdopen(fd, "w", encoding="utf-8") as stream:
-        _require(
-            stat.S_ISREG(os.fstat(stream.fileno()).st_mode), "report must be regular"
-        )
-        os.fchmod(stream.fileno(), 0o600)
-        os.ftruncate(stream.fileno(), 0)
-        json.dump(report, stream, indent=2, allow_nan=False)
-        stream.write("\n")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", closefd=False) as stream:
+            _require(
+                stat.S_ISREG(os.fstat(stream.fileno()).st_mode),
+                "report must be regular",
+            )
+            os.fchmod(stream.fileno(), 0o600)
+            os.ftruncate(stream.fileno(), 0)
+            json.dump(report, stream, indent=2, allow_nan=False)
+            stream.write("\n")
+    finally:
+        os.close(fd)
     print(f"Installed audit: {report['status']}; report: {args.report}")
     return 0 if report["status"] in {"clean", "accepted_exception"} else 1
