@@ -5,6 +5,11 @@ InvarLock transaction. Each published entry contains an
 `invarlock/evidence-pack-v1` bundle and its independently signed verification
 receipt.
 
+Separate [retained K2 campaign metadata](../examples/qualification/k2-horizon/retained-results.md)
+records historical prompt-comparison outcomes and source references. Its raw
+payloads remain held for redistribution review; that metadata is not an added
+entry in this signed evidence-pack index.
+
 Every current entry uses a 400-record paired schedule selected from pinned
 public datasets. Text comparisons use a domain-balanced MMLU-Pro suite;
 vision-text comparisons use a subject-balanced MMMU-Pro Vision suite. Both

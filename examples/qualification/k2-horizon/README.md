@@ -7,9 +7,11 @@
     **Prerequisites:** a candidate InvarLock wheel for CPU preparation; a reviewed,
     immutable runtime image and an approved compute budget before GPU execution.
 
-All five configurations are **candidates, not qualified**. No K2 weights have
-been executed to establish the claims described here. The harness can prepare
-and test its protocol on a CPU. The restricted runtime source excludes the
+All five configurations are **candidates, not qualified**. Separate historical
+[prompt comparisons](retained-results.md) retain completed captured studies,
+including regressions and insufficient evidence. They do not qualify the
+maintained runtime or the checkpoint-pair protocol described here. The harness
+can prepare and test this protocol on a CPU. The restricted runtime source excludes the
 optional dependency finding recorded in [runtime readiness](runtime-readiness.json).
 Do not provision GPU time until the exact image passes its build, dependency,
 and native-import checks. Actual GPU startup is the first bounded preflight.
