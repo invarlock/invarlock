@@ -220,8 +220,8 @@ signing keys, and independently derived verifier inputs.
 
 ## The release-regression decision
 
-Both sides score the same authenticated records in the same order. InvarLock
-derives one of two built-in paired comparisons:
+For native run/import requests, both sides score the same authenticated records
+in the same order. InvarLock derives one of two built-in paired comparisons:
 
 | Metric | Point comparison | Policy verdict |
 | --- | --- | --- |

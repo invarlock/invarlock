@@ -17,7 +17,8 @@ cannot substitute a different schema.
 | File | Format | Purpose |
 | --- | --- | --- |
 | `evaluation_request.schema.json` | `invarlock/evaluation-request-v1` | One closed run-or-import request |
-| `evaluation_request_v2.schema.json` | `invarlock/evaluation-request-v2` | Run, import, or captured request discriminator and captured source pins |
+| `evaluation_request_v2.schema.json` | `invarlock/evaluation-request-v2` | Captured-only request with paired source specifications and complete-run pins |
+| `evaluation_setup_result.schema.json` | `invarlock/evaluation-setup-v1` | CLI example, key generation, or case-set preparation result; no evaluation assurance |
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
 | `evidence_pack_v2.schema.json` | `invarlock/evidence-pack-v2` | Captured-only closed directory inventory and explicit signed/unsigned authentication |
 | `evidence_verification_receipt_v3.schema.json` | `invarlock/evidence-verification-receipt-v3` | Captured-only external verifier statement with run/request anchors and per-metric/slice scoring assurance |

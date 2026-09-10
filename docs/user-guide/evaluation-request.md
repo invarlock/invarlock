@@ -1,6 +1,6 @@
 # Evaluation request
 
-An evaluation request closes one baseline-versus-subject release-regression
+A native evaluation request closes one baseline-versus-subject release-regression
 transaction over exact artifacts, a pinned evaluation source, one task,
 runtime settings, one built-in metric or bound scorer extension, one policy,
 optional authenticated observations, and a fresh evidence destination. The schema is
@@ -21,6 +21,11 @@ secrets, or authorize its own runtime digest.
     **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
     a canonical schedule for import mode, a reviewed single-scorer policy,
     provider settings, and a new request-relative evidence destination.
+
+Captured records use the separate `invarlock/evaluation-request-v2` contract
+with `execution.mode: captured` through the same `evaluate` command. Follow
+[Captured results](captured-results.md) for that request, run pins, and independent
+verification. The native v1 shapes below remain unchanged.
 
 ## Choose the execution mode
 

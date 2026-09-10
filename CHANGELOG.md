@@ -101,6 +101,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed the separate captured-comparison command namespace and monolithic
+  project/evidence contracts. Use captured v2 requests with `evaluate`, directory
+  packs with `verify` and `report`, and SDK helpers from `invarlock.engine`.
+  Recreate captured evidence from reviewed source records and independently
+  approve its new run/request pins; there is no automatic legacy conversion.
+  Native v1 packs, v1/v2 receipts, and the v0.13 compatibility covenant remain
+  unchanged.
+
 ### Fixed
 
 - Validate safetensors shard references and storage layout before calling the

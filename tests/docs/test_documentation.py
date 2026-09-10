@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -859,3 +860,41 @@ def test_evaluator_documentation_matrix_matches_retained_manifests() -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_documented_case_freeze_command_writes_schema_valid_setup_result(
+    tmp_path, monkeypatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from invarlock.cli.app import app
+
+    monkeypatch.chdir(tmp_path)
+    cases = {
+        "format": "invarlock/evaluation-case-set-v1",
+        "cases": [
+            {"id": "b", "input": "second", "expected": "yes", "metadata": {}},
+            {"id": "a", "input": "first", "expected": "no", "metadata": {}},
+        ],
+    }
+    (tmp_path / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
+    command = next(
+        line
+        for line in _read("docs/reference/cli.md").splitlines()
+        if line.startswith("invarlock evaluate --freeze-cases ")
+    )
+    result = CliRunner().invoke(app, shlex.split(command)[1:])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    schema = json.loads(_read("contracts/evaluation_setup_result.schema.json"))
+    jsonschema.Draft202012Validator(schema).validate(payload)
+    assert payload["format_version"] in _read("docs/reference/cli.md")
+    assert payload["action"] == "freeze_cases"
+    assert payload["details"]["case_count"] == 2
+    output = json.loads((tmp_path / "frozen-cases.json").read_text(encoding="utf-8"))
+    assert [case["id"] for case in output["cases"]] == ["a", "b"]
+    assert (tmp_path / "cases.json").read_text(encoding="utf-8") == json.dumps(cases)
+    assert {path.name for path in tmp_path.iterdir()} == {
+        "cases.json",
+        "frozen-cases.json",
+    }

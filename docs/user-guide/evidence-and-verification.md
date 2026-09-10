@@ -1,6 +1,7 @@
 # Evidence and verification
 
-`invarlock evaluate` publishes one closed evidence directory governed by
+For native run/import requests, `invarlock evaluate` publishes one closed
+evidence directory governed by
 [`contracts/evidence_pack.schema.json`](https://github.com/invarlock/invarlock/blob/main/contracts/evidence_pack.schema.json).
 The bundle is the portable machine record; a signed verification receipt is the
 independent acceptance record.
@@ -16,6 +17,10 @@ independent acceptance record.
     **Prerequisites:** A complete evidence directory, independently obtained
     policy, runtime digests and evidence-signer fingerprint, plus an independently
     selected verifier key and identity when issuing a receipt.
+
+For captured v2 packs, use the [captured-results guide](captured-results.md)
+for independent run/request pins and captured receipt scope. The native
+artifact, schedule, and runtime bindings below do not apply to that family.
 
 ## Artifact lifecycle at a glance
 

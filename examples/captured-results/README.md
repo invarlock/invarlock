@@ -105,7 +105,8 @@ Independently approve the completed `capture.json` SHA-256 and transfer the
 original capture/protocol bytes with `native_handoff.py` to the recipient:
 
 ```bash
-python native_handoff.py --capture native-capture --protocol protocol.json \
+python examples/captured-results/native_handoff.py \
+  --capture "rehearsal/$EVALUATOR-capture" --protocol rehearsal/protocol.json \
   --expected-protocol "$PROTOCOL_SHA256" --expected-capture "$CAPTURE_SHA256" \
   --output recipient-project
 invarlock evaluate recipient-project/classification/request.yaml \

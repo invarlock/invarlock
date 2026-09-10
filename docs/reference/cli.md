@@ -77,8 +77,8 @@ invarlock evaluate REQUEST \
   [--json]
 ```
 
-`evaluate` loads one closed YAML request and runs the complete execution-free
-preflight before any worker starts. It then prepares or validates the canonical
+For native run/import requests, `evaluate` loads one closed YAML request and runs
+the complete execution-free preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
 applies any coupled count and width controls and exact-match side-accuracy
@@ -120,8 +120,8 @@ publishes the evidence directory. Import requests do not launch workers.
 
 | Input | Required | Environment alternative | Purpose |
 | --- | --- | --- | --- |
-| `REQUEST` | Yes | None | Existing readable YAML governed by `evaluation_request.schema.json`; its parent is the request root |
-| `--signing-key PATH` | Yes | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file |
+| `REQUEST` | Except setup actions | None | Existing readable YAML governed by native `evaluation_request.schema.json` or captured `evaluation_request_v2.schema.json`; its parent is the request root |
+| `--signing-key PATH` | Except captured `--unsigned` and setup actions | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file |
 | `--allow-installed-scorers` | Only for a scorer-bound request | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
 | `--runtime-profile FILE` | No | None | Explicit closed JSON runtime settings for run requests; maximum 16 KiB |
 | `--runtime-image IMAGE` | Run mode from host | `INVARLOCK_RUNTIME_IMAGE` | Local OCI image reference; must contain a digest or be paired with the digest option |
@@ -155,10 +155,14 @@ pins. `--max-bootstrap-draws` controls the caller-owned captured work allowance
 for this mode. Native resource limits are unchanged.
 
 `--init DIRECTORY --example classification|extraction|judge`, `--keygen DIRECTORY`,
-and `--case-set FILE` are mutually exclusive setup actions on `evaluate`, without
+and `--freeze-cases FILE` are mutually exclusive setup actions on `evaluate`, without
 a request argument. `--case-set-output FILE` optionally writes the canonical case
-set. These actions emit `invarlock/evaluation-setup-result-v1` with `--json` and
+set. These actions emit `invarlock/evaluation-setup-v1` with `--json` and
 do not evaluate or establish assurance.
+
+```bash
+invarlock evaluate --freeze-cases cases.json --case-set-output frozen-cases.json --json
+```
 
 Captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
 emits `invarlock/evaluation-result-v2`. The
@@ -347,8 +351,8 @@ options. The request digest is mandatory for captured evidence. Native and
 captured anchor families cannot be mixed. A recipient may independently set
 `--max-bootstrap-draws`, also with a profile; it is local work control, not trust.
 
-`request_digest` is optional for existing non-GGUF evidence and required when
-either request side selects `llama_cpp`. Record it from the execution-free
+For native evidence, `request_digest` is optional for existing non-GGUF evidence
+and required when either request side selects `llama_cpp`. Record it from the execution-free
 `evaluate --preflight --json` result after reviewing the normalized request.
 
 For systems that already keep each anchor separately, the equivalent explicit
@@ -413,8 +417,8 @@ descriptor digest, configuration digest, task, and policy pins bound by the
 transaction. Evaluation and independent verification must authorize and load
 the same scorer identity separately.
 
-`--json` emits `invarlock/evidence-pack-verify-v1`, the signed-receipt path,
-verifier identity, and `pack_manifest_digest`. That digest is the same immutable
+For native evidence, `--json` emits `invarlock/evidence-pack-verify-v1`, the
+signed-receipt path, verifier identity, and `pack_manifest_digest`. That digest is the same immutable
 manifest identity signed into the receipt. Exit status `0` means the evidence
 passed both integrity and policy verification. Any nonzero status must be
 treated as rejection.
@@ -431,8 +435,8 @@ invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit r
 ```
 
 `report` verifies the bundle's closed inventory, checksums, reference digests,
-canonical JSON, and embedded evidence signature before rendering
-`reports/evaluation.report.json`.
+canonical JSON, and the embedded signature when the pack declares signed
+authentication before rendering `reports/evaluation.report.json`.
 
 | Input | Required | Meaning |
 | --- | --- | --- |
@@ -443,8 +447,8 @@ canonical JSON, and embedded evidence signature before rendering
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
-`--html` refuses to overwrite an existing file. By default, `report` emits the
-text view to standard output and prints the written path when HTML is
+Every output option refuses to overwrite an existing file. By default, `report`
+emits the text view to standard output and prints the written path when HTML is
 requested. With `--json`, it instead emits one compact
 `invarlock/evidence-report-v1` object containing `ok`, the pack-manifest digest,
 and `html` (a path or `null`) for native default/HTML-only calls. Captured calls,

@@ -1,7 +1,10 @@
 # Evaluation lifecycle and failure boundaries
 
 The evaluate, verify, and report transactions have deliberately separate read
-and write boundaries.
+and write boundaries. The stages below describe native run/import evidence.
+[Captured results](../user-guide/captured-results.md) use the same transactions
+with paired runs, a captured directory pack, and independent run/request pins
+in place of native provider, schedule, and runtime bindings.
 
 !!! info "Reference"
 
@@ -148,8 +151,11 @@ scores, interval, report, and policy decision under the independent anchors.
 ## 6. Render the authenticated report
 
 Reporting authenticates signed evidence bundle integrity and renders its closed
-canonical report. It can write one new HTML file outside the pack. Independent
-verification and its signed receipt remain the acceptance record.
+canonical report. It can write new HTML, Markdown, and JUnit files outside the
+pack. Independent verification and its signed receipt remain the acceptance
+record. Output destinations are checked together before writing. A later write
+failure can leave earlier completed outputs; the v2 rendering result lists them
+in `written_outputs`.
 
 ## Failure classification
 
@@ -161,22 +167,22 @@ verification and its signed receipt remain the acceptance record.
 | Publication | Destination exists, signing failure, parent changes | No partial destination |
 | Verification integrity | Signature, checksum, inventory, runtime, pairing, or report mismatch | Nonzero; rejection receipt when verification completed |
 | Verification policy | Replayed report verdict is `fail` | Integrity may be true, but command is nonzero and receipt records failure |
-| Reporting | Unauthenticated or malformed bundle, existing HTML destination | No rendered output and no bundle mutation |
+| Reporting | Unauthenticated or malformed bundle, existing destination, later write failure | No bundle mutation; earlier completed outputs may remain after a later write failure |
 
 Retries should use a new output or receipt path after correcting the underlying
 input. InvarLock never treats overwriting an earlier result as a retry.
 
 ## Transaction outputs
 
-| Transaction result | Evidence directory | Receipt | HTML | Exit |
+| Transaction result | Evidence directory | Receipt | Rendered files | Exit |
 | --- | --- | --- | --- | --- |
-| Evaluation succeeds | New immutable directory | None | None | `0` |
+| Evaluation publishes | New immutable directory | None | None | `0`; `--fail-on-policy` returns `7` for adverse policy or `2` for an unavailable decision |
 | Evaluation fails | Absent | None | None | Nonzero |
 | Verification accepts | Unchanged | Signed success receipt | None | `0` |
 | Verification completes rejection | Unchanged | Signed rejection receipt | None | Nonzero |
 | Verification cannot complete safely | Unchanged | May be absent | None | Nonzero |
-| Reporting succeeds | Unchanged | None | Optional new file | `0` |
-| Reporting fails | Unchanged | None | Absent or no replacement | Nonzero |
+| Reporting succeeds | Unchanged | None | Optional new files | `0` |
+| Reporting fails | Unchanged | None | Earlier completed files may remain; no replacement | Nonzero |
 
 For forensic retention, preserve the immutable pack and any external signed
 receipt together. Do not modify either to add annotations; store operator notes

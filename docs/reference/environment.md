@@ -36,10 +36,18 @@ verification anchors or scorer authorization; import requests reject them.
 | `INVARLOCK_EXPECTED_SCHEDULE` | `verify` | Approved canonical schedule `sha256:...` digest |
 | `INVARLOCK_EXPECTED_BASELINE_RUNTIME` | `verify` | Expected baseline `sha256:...` runtime-image digest |
 | `INVARLOCK_EXPECTED_SUBJECT_RUNTIME` | `verify` | Expected subject `sha256:...` runtime-image digest |
+| `INVARLOCK_EXPECTED_BASELINE_RUN` | `verify` | Approved complete baseline run digest for captured evidence |
+| `INVARLOCK_EXPECTED_SUBJECT_RUN` | `verify` | Approved complete subject run digest for captured evidence |
 | `INVARLOCK_EXPECTED_SIGNER` | `verify` | Expected Ed25519 evidence-signer fingerprint |
-| `INVARLOCK_EXPECTED_REQUEST_DIGEST` | `verify` | Approved normalized-request digest; required when either evidence side uses `llama_cpp` |
+| `INVARLOCK_EXPECTED_REQUEST_DIGEST` | `verify` | Approved normalized-request digest; required for captured evidence and when either native evidence side uses `llama_cpp` |
 | `INVARLOCK_VERIFIER_SIGNING_KEY` | `verify` | Ed25519 verifier private-key path |
 | `INVARLOCK_VERIFIER_IDENTITY` | `verify` | Stable verifier identity included in the receipt |
+
+Captured `evaluate --unsigned` ignores the signing-key environment alternative
+and rejects an explicit signing key. Captured verification uses run/request pins;
+native artifact, schedule, and runtime anchors cannot be mixed with them.
+`verify --trust-profile` uses only its own policy, anchors, and verifier inputs;
+environment values do not override the profile.
 
 The receipt destination intentionally has no environment alternative. It must
 be an explicit new path outside the immutable evidence pack.

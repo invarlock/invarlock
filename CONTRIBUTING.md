@@ -231,10 +231,11 @@ same checkout as the wheel. Missing matching archives fail closed without a
 mutable-branch fallback. Preserve schema identifiers, dependency constraints,
 historical evidence provenance, and the v0.13 compatibility covenant.
 
-Documentation lint discovers every tracked Markdown file through Git. It checks
-formatting, spelling, machine-specific paths, credential-like values, and
-review-process wording. Update affected public surfaces together when a product
-or release boundary changes. Stage intended new source and documentation files
+Formatting and spelling lint discover every tracked Markdown file through Git.
+The public-text check also includes new Markdown files that Git does not ignore
+and excludes Git-reported deletions. It rejects machine-specific paths, credential-like
+values, and review-process wording. Update affected public surfaces together when
+a product or release boundary changes. Stage intended new source and documentation files
 before the final gates so checks that enumerate Git's file inventory include
 them. Inspect the staged diff to keep generated artifacts, local evidence, and
 secrets out of the change.

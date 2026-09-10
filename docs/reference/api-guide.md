@@ -134,8 +134,10 @@ Applications should treat every exception or verification payload with
 processing. Ordinary receipt authenticity or anchor mismatches are reported in
 `ReceiptVerification.errors` with `ok` set to false.
 
-`render_evidence` authenticates the bundle's internal evidence signature but
-does not take independent artifact, schedule, policy, runtime, or signer
+`render_evidence` checks the closed bundle and authenticates its internal
+evidence signature when the manifest declares signed authentication. Unsigned
+captured packs retain their explicit local assurance label. Rendering does not
+take independent artifact, schedule, policy, runtime, run, request, or signer
 anchors. Call `verify_evidence` when an independent acceptance decision is
 required.
 
