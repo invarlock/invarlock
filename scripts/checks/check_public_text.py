@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan tracked Markdown for private details and process-only wording."""
+"""Scan working-tree Markdown for private details and process-only wording."""
 
 from __future__ import annotations
 
@@ -153,6 +153,30 @@ def findings_for_text(source: str, text: str) -> list[Finding]:
     return sorted(findings, key=lambda finding: (finding.line, finding.rule.name))
 
 
+def working_tree_markdown_paths(root: Path) -> list[Path]:
+    """Include nonignored additions and exclude only Git-reported deletions."""
+    pathspec = ["--", ":(icase,glob)**/*.md"]
+    additions = subprocess.run(
+        ["git", "ls-files", "-z", "--others", "--exclude-standard", *pathspec],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    deletions = subprocess.run(
+        ["git", "ls-files", "-z", "--deleted", *pathspec],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    added = {
+        root / name.decode("utf-8") for name in additions.stdout.split(b"\0") if name
+    }
+    deleted = {
+        root / name.decode("utf-8") for name in deletions.stdout.split(b"\0") if name
+    }
+    return sorted((set(tracked_markdown_paths(root)) | added) - deleted)
+
+
 def scan_paths(paths: list[Path], root: Path) -> list[Finding]:
     """Scan *paths*, using repository-relative names where possible."""
 
@@ -169,7 +193,7 @@ def scan_paths(paths: list[Path], root: Path) -> list[Finding]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Scan tracked Markdown for private operational details and "
+            "Scan working-tree Markdown for private operational details and "
             "process-only wording."
         )
     )
@@ -177,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
         "paths",
         nargs="*",
         type=Path,
-        help="Optional files to scan; defaults to every tracked Markdown file.",
+        help="Optional files to scan; defaults to tracked and nonignored new Markdown, excluding Git-reported deletions.",
     )
     parser.add_argument(
         "--root",
@@ -191,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         paths = [path.resolve() for path in args.paths]
         if not paths:
-            paths = tracked_markdown_paths(root)
+            paths = working_tree_markdown_paths(root)
         findings = scan_paths(paths, root)
     except (OSError, UnicodeError, subprocess.CalledProcessError) as exc:
         print(
