@@ -534,8 +534,13 @@ def test_vision_text_model_loader_failure_names_supported_apis() -> None:
 def test_prepare_open_score_receipt_and_close_lifecycle(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
     checkpoint = tmp_path / "checkpoint"
     checkpoint.mkdir()
+    safetensors_torch.save_file(
+        {"weight": torch.tensor([1.0])}, checkpoint / "model.safetensors"
+    )
     checkpoint.joinpath("config.json").write_text(
         '{"model_type":"vision-test"}\n', encoding="utf-8"
     )
