@@ -12,7 +12,7 @@ from types import ModuleType
 
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples" / "policy-engine-interop"
@@ -239,6 +239,48 @@ def test_standalone_verifier_rejects_malformed_envelope_structures(
         path.write_text(json.dumps(envelope), encoding="utf-8")
         with pytest.raises(ValueError, match=message):
             module.verify_envelope(envelope_path=path, envelope_key_path=key)
+
+
+@pytest.mark.parametrize(
+    ("version", "scope"),
+    [
+        ("v3", "captured_comparison"),
+        ("v1", "captured_comparison"),
+        ("v2", "captured_comparison"),
+        ("unknown", None),
+    ],
+)
+def test_standalone_verifier_rejects_signed_non_native_receipt_scope(version, scope):
+    import hashlib
+
+    module = _verifier_module()
+    statement, _ = module.verify_envelope(
+        envelope_path=GOLDEN / "acceptance.dsse.json",
+        envelope_key_path=GOLDEN / "envelope-signer.public.pem",
+    )
+    receipt = statement["predicate"]["receipt"]
+    content = receipt["content"]
+    content["statement"]["format"] = (
+        f"invarlock/evidence-verification-receipt-{version}"
+    )
+    if scope is not None:
+        content["statement"]["verification_scope"] = scope
+    key = ed25519.Ed25519PrivateKey.generate()
+    content["signature"]["public_key"]["value"] = (
+        key.public_key()
+        .public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        .decode()
+    )
+    content["signature"]["value"] = base64.b64encode(
+        key.sign(module.canonical_bytes(content["statement"]))
+    ).decode()
+    raw = module.canonical_bytes(content)
+    receipt["raw_base64"] = base64.b64encode(raw).decode()
+    receipt["digest"] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    with pytest.raises(ValueError, match="native receipt"):
+        module.verify_receipt(statement)
 
 
 def test_standalone_verifier_rejects_inconsistent_receipt_projections() -> None:
