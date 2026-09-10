@@ -1,4 +1,57 @@
 {
   "owner": "security-maintainers",
-  "entries": []
+  "entries": [
+    {
+      "advisory": "GHSA-4j2p-28q2-5m79",
+      "packages": [
+        "accelerate"
+      ],
+      "versions": [
+        "1.14.0"
+      ],
+      "allowed_sources": [
+        "requirements/workflows/ci-hf-py312.txt",
+        "requirements/workflows/ci-hf-py313.txt",
+        "requirements/workflows/hf-py313.txt",
+        "requirements/workflows/lm-evaluation-harness-py312-cu129.txt",
+        "requirements/workflows/lm-evaluation-harness-py312.txt",
+        "requirements/workflows/runtime-image-py312-aarch64.txt",
+        "requirements/workflows/runtime-image-py312-cu126.txt",
+        "requirements/workflows/runtime-image-py312-cu129.txt",
+        "requirements/workflows/runtime-image-py312.txt",
+        "uv.lock"
+      ],
+      "owner": "MLPulse",
+      "expires": "2026-09-24",
+      "tracking_issue": "https://github.com/invarlock/invarlock/issues/227",
+      "reason": "Release-owner-approved temporary acceptance for the maintained entrypoints while no complete fixed upstream release is verified. Accelerate remains vulnerable; arbitrary direct checkpoint dispatch, unrestricted plugins and attacker-writable checkpoint trees are outside this rationale. Installed-environment audits are not broadly excepted.",
+      "compensating_control": "Strict HF and vision-text loaders authenticate local checkpoint material and validate canonical safetensors references and regular shard files before native loading, with remote code disabled and filesystem control required throughout loading. Maintained PEFT artifacts are generated locally; maintained Harness inputs are pinned and workers isolated and bounded. Inspected pinned implementations do not directly call the affected dispatch APIs; this is bounded reachability evidence, not universal protection."
+    },
+    {
+      "advisory": "PYSEC-2026-3804",
+      "packages": [
+        "accelerate"
+      ],
+      "versions": [
+        "1.14.0"
+      ],
+      "allowed_sources": [
+        "requirements/workflows/ci-hf-py312.txt",
+        "requirements/workflows/ci-hf-py313.txt",
+        "requirements/workflows/hf-py313.txt",
+        "requirements/workflows/lm-evaluation-harness-py312-cu129.txt",
+        "requirements/workflows/lm-evaluation-harness-py312.txt",
+        "requirements/workflows/runtime-image-py312-aarch64.txt",
+        "requirements/workflows/runtime-image-py312-cu126.txt",
+        "requirements/workflows/runtime-image-py312-cu129.txt",
+        "requirements/workflows/runtime-image-py312.txt",
+        "uv.lock"
+      ],
+      "owner": "MLPulse",
+      "expires": "2026-09-24",
+      "tracking_issue": "https://github.com/invarlock/invarlock/issues/227",
+      "reason": "Release-owner-approved temporary acceptance for the maintained entrypoints while no complete fixed upstream release is verified. Accelerate remains vulnerable; arbitrary direct checkpoint dispatch, unrestricted plugins and attacker-writable checkpoint trees are outside this rationale. Installed-environment audits are not broadly excepted.",
+      "compensating_control": "Strict HF and vision-text loaders authenticate local checkpoint material and validate canonical safetensors references and regular shard files before native loading, with remote code disabled and filesystem control required throughout loading. Maintained PEFT artifacts are generated locally; maintained Harness inputs are pinned and workers isolated and bounded. Inspected pinned implementations do not directly call the affected dispatch APIs; this is bounded reachability evidence, not universal protection."
+    }
+  ]
 }
