@@ -160,7 +160,34 @@ def main(argv: list[str] | None = None) -> int:
             "May be supplied multiple times."
         ),
     )
+    for option in (
+        "installed-lock",
+        "installed-lock-sha256",
+        "installed-wheel",
+        "installed-bootstrap-lock",
+        "installed-bootstrap-lock-sha256",
+        "installed-project-wheel",
+        "report",
+    ):
+        parser.add_argument("--" + option)
     args = parser.parse_args(argv)
+    if any(
+        getattr(args, option)
+        for option in (
+            "installed_lock",
+            "installed_lock_sha256",
+            "installed_wheel",
+            "installed_bootstrap_lock",
+            "installed_bootstrap_lock_sha256",
+            "installed_project_wheel",
+            "report",
+        )
+    ):
+        if __package__:
+            from .installed_audit_binding import run_bound_audit
+        else:
+            from installed_audit_binding import run_bound_audit
+        return run_bound_audit(args, load_pip_audit_allowlist)
 
     owner, entries = load_pip_audit_allowlist(Path(args.allowlist))
     print(f"Using pip-audit allowlist owned by {owner}", file=sys.stderr)
