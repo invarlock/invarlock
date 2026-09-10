@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import shutil
+import stat
 import zipfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -216,6 +217,17 @@ def test_exact_bound_finding_is_retained_and_separately_accepted(surface) -> Non
     assert surface.calls == [
         ["pip-audit", "--path", str(surface.root), "--format", "json"]
     ]
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_report_is_private_on_creation_and_replacement(surface, existing) -> None:
+    if existing:
+        surface.report.parent.mkdir()
+        surface.report.write_text("previous report" * 50000)
+        surface.report.chmod(0o666)
+    assert audit.main(surface.args) == 0
+    assert stat.S_IMODE(surface.report.stat().st_mode) == 0o600
+    assert json.loads(surface.report.read_text())["status"] == "accepted_exception"
 
 
 @pytest.mark.parametrize(
