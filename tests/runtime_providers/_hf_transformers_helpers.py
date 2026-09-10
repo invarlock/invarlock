@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from invarlock.core.runtime_provider import (
@@ -21,6 +23,12 @@ _IMAGE_DIGEST = "sha256:" + "2" * 64
 _REAL_BACKEND_IDENTITY = hf_transformers._installed_backend_identity
 _REAL_DEVICE_FACTS = hf_transformers._observed_device_facts
 _REAL_STRICT_EXECUTION_BINDING = hf_transformers._require_strict_execution_binding
+
+
+def _save_safetensors(path: Path, *keys: str) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    safetensors_torch.save_file({key: torch.tensor([1.0]) for key in keys}, path)
 
 
 class _BindingTokenizer:

@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added a complete multi-result overview and metric tabs to HTML reports, with
+  scope grouping, keyboard navigation, direct links and a Show all view. All
+  outcomes remain visible in the overview and every metric is included in print.
+
 - Made core command output distinguish publication, recorded policy results and
   independent verification, while preserving transaction and rejection exit
   codes. Grouped help makes runtime configuration easier to find.
@@ -104,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- Validate safetensors shard references and storage layout before calling the
+  strict HF model loader, rejecting traversal, symbolic links and special files
+  before native weight loading. Retain the separate loaded-state identity check.
 
 - Kept core report failures in JSON when requested and preserved literal error
   details such as signer fingerprints in text output.

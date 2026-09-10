@@ -266,3 +266,117 @@ def test_configuration_preview_bounds_depth_nodes_strings_and_retains_numbers():
     assert "x" * 1000 not in preview["text"]
     assert len(preview["text"]) < 70_000
     assert value == before
+
+
+@pytest.mark.parametrize("outcome", ["regression", "missing"])
+def test_multi_metric_overview_keeps_every_scope_and_adverse_check_visible(outcome):
+    import re
+    from html import escape
+
+    from invarlock.evidence_pack_contract import canonical_json_bytes
+    from invarlock.report_presentation import decision_label
+
+    baseline, candidate, policy = example_project("classification")
+    if outcome == "regression":
+        for row in candidate["records"][:10]:
+            row["output"] = "wrong"
+    else:
+        candidate["records"][0]["error"] = "upstream capture missing"
+        candidate["records"][0]["output"] = None
+    value = create_evidence(baseline, candidate, policy)
+    before = canonical_json_bytes(value)
+    view = _view(value["comparison"], value)
+    html = render_html(value["comparison"], evidence=value)
+
+    overview = html.split('<section class="results-overview"', 1)[1].split(
+        "</section>", 1
+    )[0]
+    rows = re.findall(r"<tr\b[^>]*>(.*?)</tr>", overview, re.S)[1:]
+    assert len(rows) == len(view.metrics) == 4
+    assert "<details" not in overview and " hidden" not in overview
+    for row, metric in zip(rows, view.metrics, strict=True):
+        for text in (
+            metric.name,
+            metric.scope,
+            metric.baseline,
+            metric.candidate,
+            metric.change,
+            metric.count,
+            decision_label(metric.decision),
+        ):
+            assert escape(text, quote=True) in row
+        for check in metric.checks:
+            if check.passed is not True:
+                assert escape(check.name, quote=True) in row
+    assert any(m.decision != "pass" for m in view.metrics)
+    assert canonical_json_bytes(value) == before
+    assert "Not performed by report" in html
+
+
+def test_multi_metric_navigation_escapes_labels_and_authorizes_only_fixed_script():
+    import re
+
+    baseline, candidate, policy = example_project("classification")
+    attack = '<img src=x onerror="alert(1)">'
+    policy["metrics"][0]["name"] = attack
+    value = create_evidence(baseline, candidate, policy)
+    html = render_html(value["comparison"], evidence=value)
+    parsed = Tags()
+    parsed.feed(html)
+    assert parsed.tags.count("script") == 1 and "img" not in parsed.tags
+    ids = [value for name, value in parsed.attributes if name == "id"]
+    assert len(ids) == len(set(ids))
+    links = [value for name, value in parsed.attributes if name == "href"]
+    assert links and all(link.startswith("#") and link[1:] in ids for link in links)
+    assert not any(name.startswith("on") for name, _ in parsed.attributes)
+    assert not any(
+        value in {"tab", "tablist", "tabpanel"} for _, value in parsed.attributes
+    )
+    navigation = re.search(r'<nav class="metric-navigation".*?</nav>', html, re.S)
+    assert navigation is not None
+    assert navigation.group().count('href="#metric-group-') == 2
+    assert html.count('id="metric-result-') == 4
+    assert "&lt;img" in navigation.group()
+    assert html.index('id="metric-result-1"') < html.index('id="metric-result-3"')
+    assert html.index('id="metric-result-3"') < html.index('id="metric-result-2"')
+    assert html.index('id="metric-result-2"') < html.index('id="metric-result-4"')
+    assert not re.search(r"<section[^>]*\bhidden(?:[\s=>])", html)
+
+    import base64
+    import hashlib
+
+    script = re.search(r"<script>(.*?)</script>", html, re.S).group(1)
+    digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+    csp = next(
+        value
+        for name, value in parsed.attributes
+        if name == "content" and "default-src" in value
+    )
+    assert f"script-src 'sha256-{digest}'" in csp
+    assert "script-src 'unsafe-inline'" not in csp
+    assert "unsafe-eval" not in csp
+    assert attack not in script
+    normal_baseline, normal_candidate, normal_policy = example_project("classification")
+    normal = create_evidence(normal_baseline, normal_candidate, normal_policy)
+    normal_html = render_html(normal["comparison"], evidence=normal)
+    assert re.search(r"<script>(.*?)</script>", normal_html, re.S).group(1) == script
+
+
+def test_single_metric_uses_simple_detail_without_navigation():
+    value = evidence()
+    html = render_html(value["comparison"], evidence=value)
+    assert 'class="results-overview"' not in html
+    assert 'class="metric-navigation"' not in html
+    assert "Decision checks" in html
+
+
+def test_multiple_scopes_of_one_metric_need_no_tabs_or_script():
+    baseline, candidate, policy = example_project("classification")
+    policy["metrics"] = policy["metrics"][:1]
+    value = create_evidence(baseline, candidate, policy)
+    html = render_html(value["comparison"], evidence=value)
+    assert 'class="results-overview"' in html
+    assert 'class="metric-navigation"' not in html
+    assert "<script" not in html
+    assert html.count('id="metric-result-') == 2
+    assert "overall" in html and "exceptions" in html

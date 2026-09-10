@@ -426,6 +426,26 @@ analysis where available, and supplementary authenticated observations.
 include improvement and regression counts, discordant pairs and the exact
 McNemar probability; those diagnostics do not replace the configured decision.
 
+### Compare multiple metrics and scopes
+
+Reports with multiple results start with an overview of every metric and scope.
+It shows the baseline, candidate, change, observed pair count, decision and any
+failed or unavailable checks. The overview stays visible when choosing a metric;
+a failure in another metric is never hidden by the selection.
+
+Metric tabs group related scopes together. For example, quality and latency
+measured overall and on an exceptions slice produce four results under two
+metrics. Select a tab or an overview result to inspect its details. Use the arrow
+keys, Home and End to move between tabs, or **Show all** to read every metric in
+one page. Reports with one metric do not need tabs. Overlapping scope counts
+must not be added together as though they were separate cases.
+
+The report remains one offline HTML file. A fixed, hash-authorized script handles
+navigation only; no evidence labels or values are inserted into executable code.
+Without JavaScript, all metric details remain visible and section links still
+work. Printing includes every metric, even when only one tab is selected.
+Navigation does not score results, change policy decisions or verify evidence.
+
 ### Keep rendering separate from recipient acceptance
 
 The assurance panel distinguishes embedded bundle authentication from

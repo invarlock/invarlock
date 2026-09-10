@@ -274,6 +274,7 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		tests/scripts/test_cve_audit.py \
 		tests/scripts/test_filter_scorecard_sarif.py \
 		tests/scripts/test_run_pip_audit.py \
+		tests/scripts/test_installed_pip_audit.py \
 		--cov --cov-config=scripts/maintenance.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/maintenance-cov.xml \

@@ -18,6 +18,10 @@ reasons, signing status and report paths. Omit `--output-format human` for the
 unchanged JSON default used by automation. `invarlock-pipeline` remains an
 equivalent standalone command.
 
+The HTML comparison report keeps every metric and scope in its results overview.
+Select a metric tab for its detailed checks, or choose **Show all** to compare
+them on one page. Reports work offline and print every metric.
+
 To regenerate the HTML and Markdown views from the retained evidence:
 
 ```bash

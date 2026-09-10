@@ -323,7 +323,9 @@ fact. This format is separate from the core runtime evidence and signed receipt.
 
 The CLI atomically publishes completed result and key directories without
 replacing existing destinations. Files are owner-readable/writable and new
-directories are private. HTML escapes data and runs no scripts; Markdown escapes
-untrusted labels; JUnit reports policy failures and insufficient evidence as
+directories are private. HTML escapes data; multi-metric navigation uses a fixed script authorized by
+its Content Security Policy hash, with no network access or evidence code
+execution. All metrics remain visible without JavaScript and in print. Markdown
+escapes untrusted labels; JUnit reports policy failures and insufficient evidence as
 failures and errors respectively. Reports present the comparison;
 signature authentication requires the separate verify operation.

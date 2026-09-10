@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import math
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -94,6 +96,26 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
                     offenders.append(f"{path.name}: {line}")
 
     assert offenders == []
+
+
+def test_hf_installed_audit_binds_reviewed_locks_and_preserves_report() -> None:
+    steps = _steps(_load(WORKFLOWS / "supply-chain-pr.yml"))
+    arguments = shlex.split(_step(steps, "Run HF surface pip-audit")["run"])
+    for flag in ("installed-lock", "installed-bootstrap-lock"):
+        path = Path(arguments[arguments.index(f"--{flag}") + 1])
+        expected = arguments[arguments.index(f"--{flag}-sha256") + 1]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected
+    install = _step(steps, "Create HF surface venv")["run"]
+    for line in install.splitlines():
+        if "pip install" in line and "pip-bootstrap" not in line:
+            assert "--no-compile" in line
+    assert "--ignore-vuln" not in arguments
+    assert "--installed-project-wheel" in arguments
+    assert "--installed-wheel" in arguments
+    report = arguments[arguments.index("--report") + 1]
+    upload = _step(steps, "Upload HF installed audit")
+    assert upload["if"] == "${{ always() }}"
+    assert upload["with"]["path"] == report
 
 
 def test_container_front_door_authenticates_its_runtime_source_bundle() -> None:

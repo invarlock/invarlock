@@ -279,8 +279,10 @@ jobs:
           python -m venv .hf-venv
           . .hf-venv/bin/activate
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
-          python -m pip install dist/*.whl --no-deps
-          python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
+          python -m pip install dist/*.whl --no-deps --no-compile
+          python -m pip install --no-compile --require-hashes -r requirements/workflows/hf-py313.txt
+          python -m pip download --no-deps --only-binary=:all: \
+            --dest .hf-audit-wheels accelerate==1.14.0
           site_packages="$(python - <<'PY'
           import site
           paths = site.getsitepackages()
@@ -290,7 +292,25 @@ jobs:
           echo "site_packages=${site_packages}" >> "$GITHUB_OUTPUT"
 
       - name: Run HF surface pip-audit
-        run: python scripts/security/run_pip_audit.py --path "${{ steps.hf_surface.outputs.site_packages }}"
+        run: |
+          python scripts/security/run_pip_audit.py \
+            --path "${{ steps.hf_surface.outputs.site_packages }}" \
+            --installed-lock requirements/workflows/hf-py313.txt \
+            --installed-lock-sha256 e7e1564252e03538f2ff66c730db66ff1478de66777beb621e129264a66a310e \
+            --installed-bootstrap-lock requirements/workflows/pip-bootstrap.txt \
+            --installed-bootstrap-lock-sha256 8639968bea3cd8bc234d2a6d38f2c54e5d1b09c3474ac954278c99c2fa44e944 \
+            --installed-project-wheel dist/*.whl \
+            --installed-wheel .hf-audit-wheels/accelerate-1.14.0-py3-none-any.whl \
+            --report artifacts/supply-chain/hf-pip-audit.json
+
+      - name: Upload HF installed audit
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hf-installed-audit
+          path: artifacts/supply-chain/hf-pip-audit.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Remove HF surface venv
-        run: rm -rf .hf-venv
+        run: rm -rf .hf-venv .hf-audit-wheels

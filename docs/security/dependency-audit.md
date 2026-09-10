@@ -89,6 +89,33 @@ Each entry must answer:
 Never place unpublished exploit details, credentials, private hosts, or private
 artifact locations in the allowlist or issue.
 
+## Installed packages and approved locks
+
+An ordinary installed-package audit does not inherit a requirements-file
+exception. The HF audit can bind one installed package to an approved lock
+using `--installed-lock`, its literal `--installed-lock-sha256`, and an
+`--installed-wheel`. The wheel must match the package name, version and SHA-256
+recorded in that exact lock. Its authenticated payload must match the installed
+files. Missing, changed, unexpected or symbolic-link payloads, duplicate package
+metadata and unexpected compiled bytecode reject the binding.
+
+The installed distribution names and versions must also match the complete HF
+lock, the separately pinned bootstrap lock and the built project wheel. Extra
+plugins, duplicate distributions, and missing or different versions reject the
+binding. This checks inventory; it does not authenticate every dependency file.
+
+The HF installation uses `--no-compile` so unverified bytecode cannot substitute
+for the authenticated Python source. The full installed `pip-audit` scan still
+runs without advisory-ignore flags. The report preserves its raw findings and
+separately identifies accepted and blocking findings. Only the matching package,
+version and advisory can receive the existing approved decision; other installed
+surfaces, changed locks and unmatched findings remain blocking. Scanner errors
+and invalid output cannot become successful audits.
+
+Changing the HF lock requires reviewing and updating its literal audit digest.
+A successful bound audit means the approved exception applies to those exact
+installed bytes. It does not mean the upstream vulnerability has been fixed.
+
 ## Review and removal
 
 - Review every entry when dependency locks change and at least once before a

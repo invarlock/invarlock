@@ -301,6 +301,6 @@ def test_rendering_does_not_execute_or_hide_untrusted_metric_names():
     policy["metrics"][0]["name"] = '<script>alert("unsafe")</script>'
     comparison = compare_runs(base, candidate, policy)
     html = render_html(comparison)
-    assert "<script>" not in html
+    assert '<script>alert("unsafe")</script>' not in html
     assert "&lt;script&gt;" in html
     assert b'failures="0"' in render_junit(comparison)
