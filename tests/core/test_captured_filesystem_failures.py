@@ -3,7 +3,7 @@
 import errno
 import os
 import stat
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -120,6 +120,67 @@ def test_replacement_between_stat_and_open_closes_all_descriptors(
     for descriptor in opened:
         with pytest.raises(OSError, match="Bad file descriptor"):
             os.fstat(descriptor)
+
+
+@pytest.mark.parametrize("phase", ["success", "setup", "body"])
+@pytest.mark.parametrize("close_error", [False, True])
+def test_directory_cleanup_releases_ancestors_even_when_close_fails(
+    tmp_path, monkeypatch, phase, close_error
+):
+    target = tmp_path / "target"
+    target.mkdir()
+    original_open, original_close, original_fstat = os.open, os.close, os.fstat
+    opened = []
+    target_descriptor = None
+    operation_error = RuntimeError(f"{phase} failed")
+    cleanup_error = OSError(errno.EIO, "directory close failed")
+
+    def track_open(name, flags, *args, **kwargs):
+        nonlocal target_descriptor
+        descriptor = original_open(name, flags, *args, **kwargs)
+        opened.append(descriptor)
+        if name == "target":
+            target_descriptor = descriptor
+        return descriptor
+
+    def fail_setup(descriptor):
+        if phase == "setup" and descriptor == target_descriptor:
+            raise operation_error
+        return original_fstat(descriptor)
+
+    def close_directory(descriptor):
+        original_close(descriptor)
+        if close_error and descriptor == target_descriptor:
+            raise cleanup_error
+
+    monkeypatch.setattr(contracts.os, "open", track_open)
+    monkeypatch.setattr(contracts.os, "close", close_directory)
+    monkeypatch.setattr(contracts.os, "fstat", fail_setup)
+    expected = cleanup_error if close_error else operation_error
+    context = (
+        pytest.raises(type(expected))
+        if close_error or phase != "success"
+        else nullcontext()
+    )
+    with context as failure:
+        with contracts.secure_directory(target) as descriptor:
+            assert phase != "setup", "setup failure reached caller"
+            assert stat.S_ISDIR(original_fstat(descriptor).st_mode)
+            if phase == "body":
+                raise operation_error
+    if close_error or phase != "success":
+        assert failure.value is expected
+    assert len(opened) > 1
+    leaked = []
+    for descriptor in opened:
+        try:
+            original_fstat(descriptor)
+        except OSError as exc:
+            assert exc.errno == errno.EBADF
+        else:
+            leaked.append(descriptor)
+            original_close(descriptor)
+    assert leaked == [], "directory cleanup leaked ancestor descriptors"
 
 
 def test_directory_removed_during_use_is_not_a_stable_source(tmp_path):

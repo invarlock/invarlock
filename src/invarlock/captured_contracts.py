@@ -9,7 +9,7 @@ import os
 import secrets
 import stat
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -141,17 +141,30 @@ def _identity(value: os.stat_result) -> tuple[int, ...]:
 
 
 @contextmanager
+def _directory_descriptor(
+    path: str, flags: int, *, dir_fd: int | None = None
+) -> Iterator[int]:
+    descriptor = os.open(path, flags, dir_fd=dir_fd)
+    try:
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
 def secure_directory(path: Path, *, create: bool = False) -> Iterator[int]:
     """Pin every directory component; never resolve away a submitted symlink."""
     path = Path(path).absolute()
     if ".." in path.parts:
         raise CapturedContractError("directory must not contain parent traversal")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-    descriptors = [os.open(path.anchor, flags)]
     bindings: list[tuple[int, str, tuple[int, ...]]] = []
-    try:
+    with ExitStack() as descriptors:
+        current_descriptor = descriptors.enter_context(
+            _directory_descriptor(path.anchor, flags)
+        )
         for name in path.parts[1:]:
-            parent = descriptors[-1]
+            parent = current_descriptor
             if create:
                 try:
                     os.mkdir(name, mode=0o700, dir_fd=parent)
@@ -161,20 +174,22 @@ def secure_directory(path: Path, *, create: bool = False) -> Iterator[int]:
             if not stat.S_ISDIR(before.st_mode):
                 raise CapturedContractError("path must use non-symlink directories")
             try:
-                child = os.open(name, flags, dir_fd=parent)
+                child = descriptors.enter_context(
+                    _directory_descriptor(name, flags, dir_fd=parent)
+                )
             except OSError as exc:
                 if exc.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
                     raise CapturedIntegrityError(
                         "directory changed while opening"
                     ) from exc
                 raise
-            descriptors.append(child)
+            current_descriptor = child
             identity = _identity(before)[:3]
             if identity != _identity(os.fstat(child))[:3]:
                 raise CapturedIntegrityError("directory changed while opening")
             bindings.append((parent, name, identity))
         try:
-            yield descriptors[-1]
+            yield current_descriptor
         finally:
             for parent, name, identity in bindings:
                 try:
@@ -185,9 +200,6 @@ def secure_directory(path: Path, *, create: bool = False) -> Iterator[int]:
                     ) from exc
                 if _identity(current)[:3] != identity:
                     raise CapturedIntegrityError("directory source was replaced")
-    finally:
-        for descriptor in reversed(descriptors):
-            os.close(descriptor)
 
 
 def _read_at(parent: int, name: str, limit: int) -> tuple[bytes, tuple[int, ...]]:
@@ -339,7 +351,7 @@ def captured_snapshot(pack: Path) -> Iterator[CapturedSnapshot]:
             raw, detector_identity = _read_at(root, "manifest.json", DETECTOR_LIMIT)
         except FileNotFoundError as exc:
             raise CapturedContractError("captured manifest is missing") from exc
-        manifest = detect_manifest(raw)
+        detect_manifest(raw)
         try:
             manifest = json_object(raw, "captured manifest")
             validate_contract(manifest)

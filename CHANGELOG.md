@@ -111,6 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Close all pinned captured-evidence directory descriptors even when one close
+  reports an error, including failures during input setup or caller execution.
+
 - Validate safetensors shard references and storage layout before calling the
   strict HF model loader, rejecting traversal, symbolic links and special files
   before native weight loading. Retain the separate loaded-state identity check.
