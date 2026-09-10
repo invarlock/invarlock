@@ -105,6 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Validate safetensors shard references and storage layout before calling the
+  strict HF model loader, rejecting traversal, symbolic links and special files
+  before native weight loading. Retain the separate loaded-state identity check.
+
 - Kept core report failures in JSON when requested and preserved literal error
   details such as signer fingerprints in text output.
 - Displayed sample-count, precision and side-accuracy requirements in both
