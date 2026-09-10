@@ -30,9 +30,13 @@ from invarlock.core.scorer_extension import (
 )
 from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
 from invarlock.public_contracts import (
+    CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION,
+    load_captured_evaluation_request_schema,
+    load_evaluation_request_schema,
+)
+from invarlock.public_contracts import (
     EVALUATION_REQUEST_FORMAT_VERSION as EVALUATION_REQUEST_FORMAT,
 )
-from invarlock.public_contracts import load_evaluation_request_schema
 
 from .schedule_preparation import LocalDatasetRequest
 
@@ -58,7 +62,10 @@ _DIRECTORY_OPEN_FLAGS = (
     | getattr(os, "O_NOFOLLOW", 0)
 )
 _FILE_OPEN_FLAGS = (
-    os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    os.O_RDONLY
+    | getattr(os, "O_CLOEXEC", 0)
+    | getattr(os, "O_NOFOLLOW", 0)
+    | getattr(os, "O_NONBLOCK", 0)
 )
 
 
@@ -220,6 +227,28 @@ class EvaluationRequest:
     observations: tuple[ObservationRequest, ...] = ()
 
 
+@dataclass(frozen=True)
+class CapturedSourceRequest:
+    path: Path
+    adapter: str
+    source: Mapping[str, str] | None = None
+    run_id: str | None = None
+    artifact_digest: str | None = None
+    score_provenance: Mapping[str, Mapping[str, str | None]] | None = None
+    expected_run_digest: str | None = None
+
+
+@dataclass(frozen=True)
+class CapturedEvaluationRequest:
+    format_version: str
+    root: Path
+    baseline: CapturedSourceRequest
+    subject: CapturedSourceRequest
+    policy: Path
+    evidence: Path
+    execution_mode: Literal["captured"] = "captured"
+
+
 def _scan_yaml_limits_and_features(text: str) -> None:
     collection_starts = (
         yaml.tokens.BlockMappingStartToken,
@@ -323,6 +352,22 @@ def _validate_schema(value: Any) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _validate_captured_schema(value: Any) -> dict[str, Any]:
+    validator = jsonschema.Draft202012Validator(
+        load_captured_evaluation_request_schema()
+    )
+    errors = sorted(
+        validator.iter_errors(value),
+        key=lambda error: tuple(str(component) for component in error.absolute_path),
+    )
+    if errors:
+        raise EvaluationRequestError(
+            "request does not match evaluation_request_v2.schema.json: "
+            + _schema_error_message(errors[0])
+        )
+    return cast(dict[str, Any], value)
+
+
 def _reference_parts(reference: str, *, label: str) -> tuple[str, ...]:
     if (
         not reference
@@ -330,6 +375,7 @@ def _reference_parts(reference: str, *, label: str) -> tuple[str, ...]:
         or _WINDOWS_DRIVE_RE.match(reference) is not None
         or "://" in reference
         or "\\" in reference
+        or any(ord(character) < 32 or ord(character) == 127 for character in reference)
     ):
         raise EvaluationRequestError(f"{label} must be a safe relative reference")
     parts = PurePosixPath(reference).parts
@@ -801,12 +847,60 @@ def _build_request(
     )
 
 
+def _build_captured_request(
+    value: dict[str, Any], *, root: Path
+) -> CapturedEvaluationRequest:
+    comparison = cast(dict[str, Any], value["comparison"])
+    output = cast(dict[str, Any], value["output"])
+
+    def source_request(name: Literal["baseline", "subject"]) -> CapturedSourceRequest:
+        source = cast(dict[str, Any], comparison[name])
+        provenance = source.get("score_provenance")
+        return CapturedSourceRequest(
+            path=_resolve_existing_reference(
+                root,
+                cast(str, source["path"]),
+                label=f"comparison.{name}.path",
+                expected="file",
+            ),
+            adapter=cast(str, source["adapter"]),
+            source=cast(Mapping[str, str] | None, source.get("source")),
+            run_id=cast(str | None, source.get("run_id")),
+            artifact_digest=cast(str | None, source.get("artifact_digest")),
+            score_provenance=cast(
+                Mapping[str, Mapping[str, str | None]] | None, provenance
+            ),
+            expected_run_digest=cast(str | None, source.get("expected_run_digest")),
+        )
+
+    return CapturedEvaluationRequest(
+        format_version=cast(str, value["format_version"]),
+        root=root,
+        baseline=source_request("baseline"),
+        subject=source_request("subject"),
+        policy=_resolve_existing_reference(
+            root,
+            cast(str, comparison["policy"]),
+            label="comparison.policy",
+            expected="file",
+        ),
+        evidence=_resolve_output_reference(
+            root,
+            cast(str, output["evidence"]),
+            label="output.evidence",
+        ),
+    )
+
+
 def load_evaluation_request(
     path: str | Path,
     *,
     provider_resolver: ProviderResolver | None = None,
     request_root: Path | None = None,
-) -> EvaluationRequest:
+    baseline_run: str | Path | None = None,
+    subject_run: str | Path | None = None,
+    output: str | Path | None = None,
+) -> EvaluationRequest | CapturedEvaluationRequest:
     """Load one strict request anchored to its file's real parent directory.
 
     The built-in resolver intentionally exposes only the canonical Hugging Face
@@ -827,12 +921,85 @@ def load_evaluation_request(
         raise EvaluationRequestError(str(exc)) from exc
     value = _load_yaml(payload)
     _reject_include_directives(value)
-    validated = _validate_schema(value)
+    if not isinstance(value, dict):
+        raise EvaluationRequestError("request must be a YAML object")
+    format_version = value.get("format_version")
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        validated = _validate_captured_schema(value)
+    elif format_version == EVALUATION_REQUEST_FORMAT:
+        validated = _validate_schema(value)
+        if baseline_run is not None or subject_run is not None:
+            raise EvaluationRequestError("run overrides require a captured request")
+    else:
+        raise EvaluationRequestError(
+            f"unsupported evaluation request format {format_version!r}"
+        )
+    # Shape and authored path syntax are checked before superseded references are
+    # replaced. Overrides are caller-relative, never request-relative.
+    _reference_parts(validated["output"]["evidence"], label="output.evidence")
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        for side in ("baseline", "subject"):
+            _reference_parts(
+                validated["comparison"][side]["path"], label=f"comparison.{side}.path"
+            )
+        _reference_parts(validated["comparison"]["policy"], label="comparison.policy")
+    for override, target, key in (
+        (baseline_run, validated["comparison"].get("baseline"), "path"),
+        (subject_run, validated["comparison"].get("subject"), "path"),
+        (output, validated["output"], "evidence"),
+    ):
+        if override is None:
+            continue
+        candidate = Path(override).absolute()
+        try:
+            reference = candidate.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise EvaluationRequestError(
+                "override must remain within request root"
+            ) from exc
+        _reference_parts(reference, label="override")
+        target[key] = reference
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        return _build_captured_request(_validate_captured_schema(validated), root=root)
     return _build_request(
-        validated,
+        _validate_schema(validated),
         root=root,
         provider_resolver=provider_resolver or _default_provider_resolver,
     )
+
+
+def evaluation_request_mode(path: str | Path) -> Literal["captured", "run", "import"]:
+    """Read only the closed request discriminator before provider discovery."""
+    try:
+        payload = read_regular_file_bytes(
+            Path(path),
+            label="evaluation request",
+            max_bytes=MAX_EVALUATION_REQUEST_BYTES,
+        )
+    except (OSError, StrictJsonError) as exc:
+        raise EvaluationRequestError(
+            f"evaluation request is unavailable: {exc}"
+        ) from exc
+    value = _load_yaml(payload)
+    if not isinstance(value, dict):
+        raise EvaluationRequestError("request must be a YAML object")
+    format_version = value.get("format_version")
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        execution = value.get("execution")
+        if not isinstance(execution, dict) or execution.get("mode") != "captured":
+            raise EvaluationRequestError("captured request execution mode is invalid")
+        return "captured"
+    if format_version != EVALUATION_REQUEST_FORMAT:
+        raise EvaluationRequestError(
+            f"unsupported evaluation request format {format_version!r}"
+        )
+    execution = value.get("execution")
+    if not isinstance(execution, dict) or execution.get("mode") not in {
+        "run",
+        "import",
+    }:
+        raise EvaluationRequestError("runtime request execution mode is invalid")
+    return cast(Literal["run", "import"], execution["mode"])
 
 
 __all__ = [
@@ -841,8 +1008,12 @@ __all__ = [
     "MAX_EVALUATION_REQUEST_DEPTH",
     "MAX_EVALUATION_REQUEST_NODES",
     "ArtifactRequest",
+    "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
+    "CapturedEvaluationRequest",
+    "CapturedSourceRequest",
     "ComparisonRequest",
     "ComparisonSideRequest",
+    "evaluation_request_mode",
     "EvaluationRequest",
     "EvaluationRequestError",
     "ExecutionRequest",

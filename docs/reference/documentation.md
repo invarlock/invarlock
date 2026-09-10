@@ -61,6 +61,11 @@ Describe the current repository state without calendar dates, dated status
 updates or development history. Use Git history and the changelog to trace
 changes. Keep public prose focused on the reader's task and supported behavior;
 internal experiment logs do not belong in an interface reference.
+Do not scatter publication-availability notices or hard-coded product pins across
+guides. Follow [Matching wheels and examples](../user-guide/getting-started.md#matching-wheels-and-examples):
+released wheels use their installed-version tag archive, and local wheels use
+their exact build checkout. Preserve contract versions, dependency constraints,
+historical evidence provenance, and v0.13 compatibility semantics.
 
 ## Links and versioned contracts
 

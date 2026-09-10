@@ -9,12 +9,11 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-The `invarlock pipeline` namespace, equivalent standalone `invarlock-pipeline`
-CLI and Python SDK compare existing evaluator exports, apply metric and slice
-policies, and verify signed pipeline evidence. Use `invarlock pipeline --help`
-for that workflow; `invarlock evaluate --help` describes controlled execution or
+The `invarlock evaluate`, `invarlock verify`, and `invarlock report` commands
+compare captured evaluator exports, apply metric and slice policies, and verify
+signed evidence. Use `invarlock --help` for that workflow; `invarlock evaluate --help` describes controlled execution or
 import, including the optional run-mode resource profile.
-See the [pipeline integration guide](docs/user-guide/pipeline-integration.md).
+See the [captured-results guide](docs/user-guide/captured-results.md).
 Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence
 format.
@@ -81,8 +80,9 @@ listed below. Run them for the affected surface before requesting review.
 ## Repository shape
 
 - `src/invarlock/` contains the request transaction, provider ABI, canonical
-  evidence bundle, independent verifier, and report renderer. Its `pipeline/`
-  package contains the separate paired-export workflow.
+  evidence bundle, independent verifier, and report renderer. Captured records,
+  comparison, and record contracts have evaluator-neutral implementation owners
+  behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
   Hugging Face vision-text, and diagnostics packages.
@@ -99,7 +99,7 @@ specific dependencies out of the core distribution.
 ## Contract changes
 
 The request, runtime manifest, provider evidence, evidence pack, signed
-verification receipt, and pipeline run, policy, and evidence formats are
+verification receipt, and captured run, policy, and evidence formats are
 security boundaries. Contract changes must:
 
 1. start with adversarial tests that demonstrate the intended failure mode;
@@ -158,8 +158,8 @@ as the complete pull-request check:
 | Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
 | Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
 | Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
-| Pipeline CLI or evidence behavior | Build and install the candidate wheel, then run `python examples/pipeline/wheel_smoke.py` |
-| Native evaluator capture or mapping | Follow the [real native rehearsal](examples/pipeline/README.md#real-native-evaluator-rehearsal), including the explicit model, protocol and environment inputs for `INVARLOCK_RUN_NATIVE_PIPELINE=1`; verify the captured outputs in a separate wheel-only recipient |
+| Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` |
+| Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient |
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
@@ -189,8 +189,8 @@ Changes to command output or reports must preserve policy outcomes, signed bytes
 recipient-owned trust inputs and documented exit codes. Test text and JSON
 modes separately, including policy rejection, missing evidence and malformed
 input. A rendered report must not inherit independent verification status from
-a signature's presence. Retain the distinction between core transaction
-publication and pipeline comparison decisions.
+a signature's presence. Retain the distinction between transaction publication,
+recorded comparison decisions, and independent verification.
 
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
@@ -224,11 +224,12 @@ Describe current behavior; use Git history and the changelog for the sequence
 of changes. Public reference pages explain supported interfaces and failure
 behavior, rather than narrating development experiments or internal reviews.
 
-Keep package availability notices in the README and installation instructions.
-Reference pages describe format versions and compatibility, rather than a
-temporary publication stage. Before publishing a release, check those notices
-and installation commands against its versioned wheel; update development-build
-instructions when the functionality becomes available in the published package.
+Describe the current revision without temporary publication-availability notices.
+Keep the installation convention in getting-started: released wheels use the tag
+archive matching `importlib.metadata.version("invarlock")`; local builds use the
+same checkout as the wheel. Missing matching archives fail closed without a
+mutable-branch fallback. Preserve schema identifiers, dependency constraints,
+historical evidence provenance, and the v0.13 compatibility covenant.
 
 Documentation lint discovers every tracked Markdown file through Git. It checks
 formatting, spelling, machine-specific paths, credential-like values, and

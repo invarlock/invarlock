@@ -5,15 +5,18 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
 from invarlock.core.scorer_extension import ScorerExtensionRegistry
+from invarlock.evaluation_comparison.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.evidence_explanation import core_policy_checks
 from invarlock.evidence_pack import verify_comparison_evidence
 from invarlock.evidence_pack_json import StrictJsonError
 from invarlock.evidence_pack_support import EvidencePackResult
 from invarlock.evidence_receipt import (
+    _OMITTED,
     EvidenceReceiptError,
+    _Omitted,
     write_signed_verification_receipt,
 )
 
@@ -29,17 +32,31 @@ class EvidenceVerificationError(ValueError):
         payload: dict[str, Any] | None = None,
         details: tuple[str, ...] = (),
         receipt_path: Path | None = None,
+        captured: bool = False,
     ) -> None:
         super().__init__(message)
         self.exit_code = exit_code
         self.details = details
         self.receipt_path = receipt_path
-        self.payload = payload or {
+        default_payload: dict[str, Any] = {
             "format_version": "invarlock/evidence-verification-error-v1",
             "ok": False,
             "errors": [message],
             "warnings": [],
         }
+        if captured:
+            default_payload = {
+                "format_version": "invarlock/evidence-pack-verify-v2",
+                "kind": "captured",
+                "ok": False,
+                "integrity_ok": None,
+                "policy_verdict": None,
+                "decision": None,
+                "scoring_assurance": None,
+                "signed_receipt": None,
+                "errors": [message[:1024]],
+            }
+        self.payload = payload or default_payload
 
     def as_json(self) -> str:
         return json.dumps(
@@ -151,6 +168,7 @@ def _failed(
     )
 
 
+@overload
 def verify_evidence(
     evidence_path: Path,
     *,
@@ -165,10 +183,53 @@ def verify_evidence(
     receipt_path: Path | None = None,
     verifier_signing_key_path: Path | None = None,
     verifier_identity: str | None = None,
+    scorer_registry: ScorerExtensionRegistry | None = None,
+    trust_profile_digest: str | None = None,
+    policy_bytes: bytes | None = None,
+    verifier_signing_key_bytes: bytes | None = None,
+) -> EvidenceVerification: ...
+
+
+@overload
+def verify_evidence(
+    evidence_path: Path,
+    *,
+    policy_path: Path | None,
+    expected_baseline_run: str | None,
+    expected_subject_run: str | None,
+    expected_signer: str | None,
+    expected_request_digest: str | None,
+    receipt_path: Path | None = None,
+    verifier_signing_key_path: Path | None = None,
+    verifier_identity: str | None = None,
+    trust_profile_digest: str | None = None,
+    policy_bytes: bytes | None = None,
+    verifier_signing_key_bytes: bytes | None = None,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvidenceVerification: ...
+
+
+def verify_evidence(
+    evidence_path: Path,
+    *,
+    policy_path: Path | None,
+    expected_baseline_artifact: str | None | _Omitted = _OMITTED,
+    expected_subject_artifact: str | None | _Omitted = _OMITTED,
+    expected_schedule: str | None | _Omitted = _OMITTED,
+    expected_baseline_runtime: str | None | _Omitted = _OMITTED,
+    expected_subject_runtime: str | None | _Omitted = _OMITTED,
+    expected_signer: str | None,
+    expected_request_digest: str | None = None,
+    receipt_path: Path | None = None,
+    verifier_signing_key_path: Path | None = None,
+    verifier_identity: str | None = None,
     trust_profile_digest: str | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
     policy_bytes: bytes | None = None,
     verifier_signing_key_bytes: bytes | None = None,
+    expected_baseline_run: str | None = None,
+    expected_subject_run: str | None = None,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
 ) -> EvidenceVerification:
     """Verify one pack with roots that cannot be selected by that pack.
 
@@ -181,6 +242,112 @@ def verify_evidence(
     evidence = Path(evidence_path)
     if not evidence.is_dir() or evidence.is_symlink():
         raise EvidenceVerificationError("evidence must be a real directory")
+    from invarlock.captured_reporting import CapturedReportError, is_captured_manifest
+
+    try:
+        captured = is_captured_manifest(evidence)
+    except CapturedReportError as exc:
+        raise EvidenceVerificationError(str(exc), exit_code=4) from exc
+    native_anchors = (
+        expected_baseline_artifact,
+        expected_subject_artifact,
+        expected_schedule,
+        expected_baseline_runtime,
+        expected_subject_runtime,
+    )
+    if captured:
+        from invarlock.captured_verification import (
+            CapturedVerificationError,
+            CapturedVerificationIncomplete,
+            verify_captured_evidence,
+        )
+
+        if (
+            any(not isinstance(value, _Omitted) for value in native_anchors)
+            or scorer_registry is not None
+        ):
+            raise EvidenceVerificationError(
+                "native anchors/scorers are not valid for captured verification",
+                captured=True,
+            )
+        if policy_path is None:
+            raise EvidenceVerificationError(
+                "independent captured policy path is required",
+                captured=True,
+            )
+        try:
+            _require_outside_evidence(evidence, policy_path, label="independent policy")
+            if verifier_signing_key_path is not None:
+                _require_outside_evidence(
+                    evidence, verifier_signing_key_path, label="verifier signing key"
+                )
+        except EvidenceVerificationError as exc:
+            raise EvidenceVerificationError(str(exc), captured=True) from exc
+        try:
+            payload = verify_captured_evidence(
+                evidence,
+                policy_path=policy_path,
+                expected_baseline_run=expected_baseline_run,
+                expected_subject_run=expected_subject_run,
+                expected_request_digest=expected_request_digest,
+                expected_signer=expected_signer,
+                receipt_path=receipt_path,
+                verifier_signing_key_path=verifier_signing_key_path,
+                verifier_identity=verifier_identity,
+                trust_profile_digest=trust_profile_digest,
+                max_bootstrap_draws=max_bootstrap_draws,
+                policy_bytes=policy_bytes,
+                verifier_signing_key_bytes=verifier_signing_key_bytes,
+            )
+        except (CapturedVerificationIncomplete, CapturedVerificationError) as exc:
+            incomplete = isinstance(exc, CapturedVerificationIncomplete)
+            rejection_receipt = (
+                receipt_path
+                if not incomplete
+                and getattr(exc.__cause__, "manifest_bytes", None) is not None
+                else None
+            )
+            failure_payload = {
+                "format_version": "invarlock/evidence-pack-verify-v2",
+                "kind": "captured",
+                "ok": False,
+                "integrity_ok": None if incomplete else False,
+                "policy_verdict": None,
+                "decision": None,
+                "scoring_assurance": None,
+                "signed_receipt": rejection_receipt.name if rejection_receipt else None,
+                "errors": [str(exc)[:1024]],
+            }
+            if incomplete:
+                failure_payload["reason"] = str(exc)[:240]
+            raise EvidenceVerificationError(
+                str(exc),
+                exit_code=exc.exit_code,
+                payload=failure_payload,
+                receipt_path=rejection_receipt,
+            ) from exc
+        receipt = receipt_path.resolve() if receipt_path is not None else None
+        if not payload["ok"]:
+            raise EvidenceVerificationError(
+                "captured evidence does not satisfy the approved policy",
+                exit_code=7,
+                payload=payload,
+                receipt_path=receipt,
+            )
+        return EvidenceVerification(evidence.resolve(), payload, receipt)
+    if any(isinstance(value, _Omitted) for value in native_anchors):
+        raise TypeError(
+            "native verification requires artifact, schedule and runtime anchors"
+        )
+    if (
+        expected_baseline_run is not None
+        or expected_subject_run is not None
+        or type(max_bootstrap_draws) is not int
+        or max_bootstrap_draws != DEFAULT_MAX_BOOTSTRAP_DRAWS
+    ):
+        raise EvidenceVerificationError(
+            "captured anchors/work controls require captured evidence"
+        )
     if policy_bytes is None:
         policy = _require_outside_evidence(
             evidence,

@@ -175,7 +175,7 @@ def test_readiness_cannot_be_obtained_by_omitting_materialization_or_changing_po
     elif mutation == "budget":
         plan["budget"]["maximum_wall_seconds"] = True
     else:
-        plan["policies"]["classification"]["metrics"][0]["candidate_minimum"] = 0
+        plan["policies"]["classification"]["metrics"][0]["subject_minimum"] = 0
     with pytest.raises(ValueError, match=message):
         campaign.require_ready(plan)
 
@@ -189,7 +189,9 @@ def test_latency_must_be_a_finite_measurement(latency):
         campaign.project_capture(plan, captured)
 
 
-def test_native_settings_and_wrong_recipient_key_are_rejected():
+def test_native_settings_and_wrong_recipient_key_are_rejected(tmp_path):
+    from tests.examples.test_k2_campaign import _key_file
+
     plan = _ready_plan()
     a, b = _capture(plan, "baseline"), _capture(plan, "candidate")
     changed = copy.deepcopy(a)
@@ -197,22 +199,36 @@ def test_native_settings_and_wrong_recipient_key_are_rejected():
     with pytest.raises(ValueError, match="runtime"):
         campaign.project_capture(plan, changed)
     with pytest.raises(ValueError, match="reversed"):
-        campaign.publish(plan, b, a, Ed25519PrivateKey.generate())
-    evidence = campaign.publish(plan, a, b, Ed25519PrivateKey.generate())
+        campaign.publish(plan, b, a, tmp_path / "signer.pem", tmp_path / "reversed")
+    evidence = tmp_path / "evidence"
+    campaign.publish(
+        plan,
+        a,
+        b,
+        _key_file(tmp_path / "signer.pem", Ed25519PrivateKey.generate()),
+        evidence,
+    )
     expected = {
         "expected_plan": campaign.digest(plan),
         "expected_baseline_capture": campaign.digest(a),
         "expected_candidate_capture": campaign.digest(b),
+        "receipts": tmp_path / "receipts",
+        "verifier_identity": "k2-test",
+        "verifier_signing_key_path": _key_file(
+            tmp_path / "verifier.pem", Ed25519PrivateKey.generate()
+        ),
     }
     key = Ed25519PrivateKey.generate().public_key()
-    with pytest.raises(ValueError, match="signature"):
+    with pytest.raises(ValueError, match="signer.*expected anchor"):
         campaign.verify(plan, a, b, evidence, key, **expected)
     with pytest.raises(ValueError, match="expected plan"):
         campaign.verify(
             plan, a, b, evidence, key, **{**expected, "expected_plan": "wrong"}
         )
     with pytest.raises(ValueError, match="cohorts"):
-        campaign.verify(plan, a, b, {}, key, **expected)
+        incomplete = tmp_path / "incomplete"
+        incomplete.mkdir()
+        campaign.verify(plan, a, b, incomplete, key, **expected)
 
 
 def test_download_authenticates_only_enumerated_pinned_files(tmp_path, monkeypatch):
@@ -322,6 +338,10 @@ def test_freeze_requires_validated_build_and_preserves_candidate_status(tmp_path
     "outcome,expected", [("pass", 0), ("regression", 1), ("incomplete", 3)]
 )
 def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
+    from invarlock.captured_verification import verify_captured_receipt
+    from invarlock.evidence_pack_integrity import public_key_fingerprint
+    from tests.examples.test_k2_campaign import _key_file
+
     plan = _ready_plan()
     left, right = (
         _capture(plan, "baseline"),
@@ -330,6 +350,8 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
     if outcome == "incomplete":
         right["rows"][0]["error"] = "native timeout"
     key = Ed25519PrivateKey.generate()
+    verifier = Ed25519PrivateKey.generate()
+    verifier_path = _key_file(tmp_path / "verifier.pem", verifier)
     (tmp_path / "private.pem").write_bytes(
         key.private_bytes(
             serialization.Encoding.PEM,
@@ -357,7 +379,7 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
                 "--key",
                 str(tmp_path / "private.pem"),
                 "--output",
-                str(tmp_path / "evidence.json"),
+                str(tmp_path / "evidence"),
             ]
         )
         == expected
@@ -370,7 +392,13 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
                 "--key",
                 str(tmp_path / "public.pem"),
                 "--evidence",
-                str(tmp_path / "evidence.json"),
+                str(tmp_path / "evidence"),
+                "--receipts",
+                str(tmp_path / "receipts"),
+                "--verifier-signing-key",
+                str(verifier_path),
+                "--verifier-identity",
+                "k2-test",
                 "--output",
                 str(tmp_path / "verified.json"),
                 "--expected-plan",
@@ -389,7 +417,7 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
             [
                 "report",
                 "--evidence",
-                str(tmp_path / "evidence.json"),
+                str(tmp_path / "evidence"),
                 "--output",
                 str(tmp_path / "reports"),
             ]
@@ -398,9 +426,30 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
     )
     for cohort in campaign.COHORTS:
         rendered = (tmp_path / "reports" / f"{cohort}.html").read_text()
-        assert "InvarLock pipeline comparison" in rendered
+        assert "InvarLock captured comparison report" in rendered
         assert "Results and requirements" in rendered
         assert "Not performed by report" in rendered
         assert (
             (tmp_path / "reports" / f"{cohort}.xml").read_bytes().startswith(b"<?xml")
         )
+        baseline = campaign.project_capture(plan, left)[cohort]
+        subject = campaign.project_capture(plan, right)[cohort]
+        receipt = verify_captured_receipt(
+            tmp_path / "receipts" / f"{cohort}.receipt.json",
+            tmp_path / "evidence" / cohort / "pack",
+            policy_path=tmp_path / "receipts" / f"{cohort}.policy.json",
+            expected_baseline_run=campaign.digest(baseline),
+            expected_subject_run=campaign.digest(subject),
+            expected_request_digest=campaign.captured_request_digest(
+                campaign.normalize_captured_request(
+                    campaign._captured_request(),
+                    baseline=baseline,
+                    subject=subject,
+                    policy=plan["policies"][cohort],
+                )
+            ),
+            expected_signer=public_key_fingerprint(key.public_key()),
+            expected_verifier_identity="k2-test",
+            expected_verifier_fingerprint=public_key_fingerprint(verifier.public_key()),
+        )
+        assert receipt.ok, receipt.errors

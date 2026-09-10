@@ -12,7 +12,7 @@ from invarlock.core.scorer_extension import (
     build_scorer_result,
     scorer_configuration_schema_sha256,
 )
-from invarlock.pipeline.metrics import KINDS, SCORER_VERSION, score
+from invarlock.core.scoring import KINDS, SCORER_VERSION, score
 
 BUILTIN_SCORER_IDS = tuple(
     f"invarlock.{kind}" for kind in KINDS if kind != "exact_match"

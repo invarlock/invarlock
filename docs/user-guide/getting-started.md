@@ -32,11 +32,28 @@ invarlock report evidence/
     keys.
 
 To check results from an existing evaluator without preparing an OCI runtime,
-start with [Existing evaluation pipelines](pipeline-integration.md) and
-`invarlock pipeline --help` from the source checkout. This workflow supports
-multiple metrics and slices with its own
-captured-result evidence contract. This page covers the core execution and
-independent receipt path.
+start with [Captured results](captured-results.md). The same commands and SDK
+support multiple metrics and slices with explicit captured assurance. This page
+walks through native execution and its independent receipt.
+
+## Matching wheels and examples
+
+For a released wheel, install `invarlock` and obtain its version with
+`importlib.metadata.version("invarlock")`. The root README and
+[quickstart](https://github.com/invarlock/invarlock/tree/main/examples/quickstart)
+download the GitHub tag archive `v${INVARLOCK_VERSION}` and extract
+`invarlock-${INVARLOCK_VERSION}/examples/quickstart` and
+`invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden`. Stop if that
+matching archive is unavailable; never substitute `main` or another version.
+
+For a locally built wheel, use examples from the exact checkout used for the
+build. A package version does not identify a local commit or uncommitted source.
+Copy `examples/quickstart/run.py` and `examples/acceptance-handoff/golden` to an
+empty directory outside the checkout, clear `PYTHONPATH`, and run with the
+interpreter that installed the wheel. `make quickstart-wheel-smoke` automates
+the isolated local-build checks, including captured evaluation/recipient commands
+before optional add-ins are installed. Never regenerate retained evidence to
+make a recipe pass.
 
 ## What each command owns
 
@@ -245,7 +262,7 @@ pinned images without starting a container or creating output. Rerun the same
 command without `--preflight` only when you deliberately want to continue into
 the evaluation.
 
-For repeated run requests in the source checkout, put the image, device and
+For repeated run requests, put the image, device and
 resource settings in an explicit
 [runtime profile](../reference/cli.md#reusable-runtime-profiles), then use:
 

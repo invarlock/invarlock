@@ -108,17 +108,17 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
     )
 
 
-def test_pipeline_annotation_allowance_requires_exact_path_and_empty_default() -> None:
+def test_capture_annotation_allowance_requires_exact_path_and_empty_default() -> None:
     config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
     allowance = next(
         item
         for item in config["allowlists"]
-        if "pipeline signing-key" in item["description"]
+        if "captured-evaluation signing-key" in item["description"]
     )
     assert allowance["condition"] == "AND"
     assert allowance["regexTarget"] == "line"
     assert allowance["targetRules"] == ["generic-api-key"]
-    path = "src/invarlock/pipeline/evidence.py"
+    path = "src/invarlock/captured_evidence_publication.py"
     name = "_".join(("signing", "key"))
     annotation = "Ed25519" + "PrivateKey"
     line = f"    {name}: {annotation} | None = None,"
@@ -144,14 +144,14 @@ def test_pipeline_annotation_allowance_requires_exact_path_and_empty_default() -
         )
 
 
-def test_gitleaks_still_detects_credentials_on_pipeline_annotation_path(
+def test_gitleaks_still_detects_credentials_on_capture_annotation_path(
     tmp_path: Path,
 ) -> None:
     executable = shutil.which("gitleaks")
     if executable is None:
         pytest.skip("the pinned Gitleaks executable is required for the scanner probe")
     config = Path(".gitleaks.toml").resolve()
-    relative = Path("src/invarlock/pipeline/evidence.py")
+    relative = Path("src/invarlock/captured_evidence_publication.py")
     source = tmp_path / relative
     source.parent.mkdir(parents=True)
     name = "_".join(("signing", "key"))

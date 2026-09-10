@@ -1,16 +1,16 @@
 # Command-line interface
 
-The public command line supports existing evaluation results and a separate
-controlled evaluation, verification and reporting journey:
+The public command line supports one evaluation, verification and reporting
+journey for native execution, authenticated imports, and captured results:
 
 !!! info "Reference"
 
-    - **Surface:** `invarlock pipeline`, `invarlock evaluate`, `invarlock verify`, and `invarlock report`
+    - **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
     - **Stability:** Stable public CLI; command help is authoritative for installed options
     - **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
 
 ```text
-invarlock pipeline --help
+invarlock --help
 invarlock evaluate request.yaml
 invarlock verify evidence/
 invarlock report evidence/
@@ -20,11 +20,9 @@ Use `invarlock --version` for the installed version and `invarlock --help` for
 the authoritative option list. The core commands have the same transaction
 boundaries as the [Python facade](api-guide.md).
 
-`invarlock pipeline COMMAND` exposes the same commands, defaults, JSON output
-and exit codes as `invarlock-pipeline COMMAND`. It compares existing records
-without inference and uses its own evidence and verification contracts; it does
-not produce the core signed recipient receipt. See the
-[pipeline integration guide](../user-guide/pipeline-integration.md).
+The captured-results flow compares existing records without inference while
+retaining an explicit captured-evidence and verifier-receipt scope. See the
+[captured-results guide](../user-guide/captured-results.md).
 
 External evaluator qualification uses a separate companion executable so the
 three-command release transaction remains unchanged:
@@ -44,7 +42,7 @@ qualification](evaluator-qualification.md).
 | Form | Result |
 | --- | --- |
 | `invarlock` | Show help; no transaction runs |
-| `invarlock --help` | Show both workflow choices and exit |
+| `invarlock --help` | Show the three transactions and exit |
 | `invarlock --version` | Print `InvarLock <installed-version>` and exit |
 | `invarlock COMMAND --help` | Show the exact arguments and options for one transaction |
 
@@ -144,6 +142,31 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
 | `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
 | `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
+
+### Captured evaluation controls
+
+Captured requests use `invarlock/evaluation-request-v2` with
+`execution.mode: captured`. Use `--signing-key` (or `INVARLOCK_SIGNING_KEY`) for
+handoff, or explicit `--unsigned` for local reporting. The latter rejects an
+explicit key. `--baseline-run`, `--subject-run`, and `--output` are caller-relative
+path overrides confined to the request root; they do not change source identity
+pins. `--max-bootstrap-draws` controls the caller-owned captured work allowance
+(default 102,400,000). Runtime, container, and scorer-extension flags are rejected
+for this mode. Native resource limits are unchanged.
+
+`--init DIRECTORY --example classification|extraction|judge`, `--keygen DIRECTORY`,
+and `--case-set FILE` are mutually exclusive setup actions on `evaluate`, without
+a request argument. `--case-set-output FILE` optionally writes the canonical case
+set. These actions emit `invarlock/evaluation-setup-result-v1` with `--json` and
+do not evaluate or establish assurance.
+
+Captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
+emits `invarlock/evaluation-result-v2`. The
+[captured-results guide](../user-guide/captured-results.md) gives the request,
+complete trust profile, and output fields. `--fail-on-policy` applies after either
+native or captured publication, retaining its success JSON: passing decisions
+exit `0`, adverse decisions exit `7`, and unknown/unavailable decisions exit `2`.
+It cannot be combined with preflight or setup actions.
 
 ### Reusable runtime profiles
 
@@ -281,7 +304,7 @@ invarlock verify EVIDENCE \
   [--json]
 ```
 
-The preferred form uses one closed `invarlock/trust-inputs-v1` object:
+Native evidence uses one closed `invarlock/trust-inputs-v1` object:
 
 ```json
 {
@@ -311,6 +334,18 @@ profile. Supplying any explicit trust-anchor option with `--trust-profile` is
 an error. The profile, its policy, and its verifier key must remain outside the
 submitted evidence directory. The canonical profile digest is included in the
 signed receipt.
+
+Captured evidence instead requires a `kind: captured`
+`invarlock/trust-inputs-v2` profile with `baseline_run_digest`,
+`subject_run_digest`, `request_digest`, and `evidence_signer_fingerprint` anchors,
+plus policy and verifier fields. It has no runtime anchors or installed-scorer
+authorization. See the [complete captured profile](../user-guide/captured-results.md#signed-handoff).
+Without a profile, use `--expected-baseline-run` and `--expected-subject-run`
+(environment alternatives `INVARLOCK_EXPECTED_BASELINE_RUN` and
+`INVARLOCK_EXPECTED_SUBJECT_RUN`) along with policy, request, signer and verifier
+options. The request digest is mandatory for captured evidence. Native and
+captured anchor families cannot be mixed. A recipient may independently set
+`--max-bootstrap-draws`, also with a profile; it is local work control, not trust.
 
 `request_digest` is optional for existing non-GGUF evidence and required when
 either request side selects `llama_cpp`. Record it from the execution-free
@@ -392,7 +427,7 @@ receipts](reports.md#verification-result) for the complete field matrix.
 ## `report`
 
 ```text
-invarlock report EVIDENCE [--html report.html] [--explain] [--json]
+invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--json]
 ```
 
 `report` verifies the bundle's closed inventory, checksums, reference digests,
@@ -403,6 +438,8 @@ canonical JSON, and embedded evidence signature before rendering
 | --- | --- | --- |
 | `EVIDENCE` | Yes | Existing readable evidence-pack directory |
 | `--html PATH` | No | Write a new self-contained HTML report outside the pack |
+| `--markdown PATH` | No | Write Markdown outside the pack |
+| `--junit PATH` | No | Write recorded policy checks as JUnit XML outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
@@ -410,7 +447,13 @@ canonical JSON, and embedded evidence signature before rendering
 text view to standard output and prints the written path when HTML is
 requested. With `--json`, it instead emits one compact
 `invarlock/evidence-report-v1` object containing `ok`, the pack-manifest digest,
-and the optional HTML path.
+and `html` (a path or `null`) for native default/HTML-only calls. Captured calls,
+and native calls requesting Markdown or JUnit, emit
+`invarlock/evidence-report-v2` with `kind`, `ok`, `pack_manifest_digest`,
+`requested_outputs`, `written_outputs`, `failed_output`, and `errors`.
+All destinations are checked up front; a later write failure leaves earlier
+completed outputs accurately listed. There is no automatic receipt discovery.
+Unsigned captured reports remain explicitly local, without independent assurance.
 
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
@@ -431,8 +474,9 @@ literally, including brackets in signer fingerprints and paths.
 
 `report` renders Markdown as terminal content and can write self-contained HTML.
 Its `--json` mode emits a rendering result object on success or an application
-error object with `ok: false` and `errors` on failure. Existing evaluate and verify
-JSON contracts are unchanged. CLI syntax, option and path-validation failures
+error object with `ok: false` and `errors` on failure. Native evaluate and verify
+JSON contracts are unchanged; captured evaluation and verification use v2 result
+formats. CLI syntax, option and path-validation failures
 that occur before the command handler still use usage diagnostics on stderr and
 exit `2`; `--json` does not convert those parser errors into result objects.
 
@@ -452,6 +496,9 @@ bytes. Output files and directories are no-clobber by design.
 | `0` | Requested transaction completed successfully |
 | `1` | Operational write failure where the command reports one explicitly, such as an HTML output error |
 | `2` | Invalid invocation, missing trust input, request/evaluation failure, or high-level verification/report rejection |
+| `4` | Captured evidence structural/contract rejection |
+| `6` | Captured authenticated binding or source-integrity rejection |
+| `7` | Completed captured verification policy rejection, or CLI evaluation policy gate after successful publication |
 | Other nonzero | A lower-level evidence-pack status surfaced by a transaction; reject and inspect machine output |
 
 Do not build automation that accepts a particular nonzero value. The

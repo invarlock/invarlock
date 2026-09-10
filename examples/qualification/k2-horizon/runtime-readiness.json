@@ -3,7 +3,7 @@
   "status": "blocked",
   "source_repository": "https://github.com/sgl-project/sglang",
   "source_commit": "392841f47cb7ef214601eeb528906a0abba02471",
-  "route": "external_sglang_pipeline_capture",
+  "route": "external_sglang_native_capture",
   "precision": "bfloat16",
   "model_repository_code_execution": false,
   "image_digest": null,

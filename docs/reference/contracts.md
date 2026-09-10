@@ -17,9 +17,13 @@ cannot substitute a different schema.
 | File | Format | Purpose |
 | --- | --- | --- |
 | `evaluation_request.schema.json` | `invarlock/evaluation-request-v1` | One closed run-or-import request |
+| `evaluation_request_v2.schema.json` | `invarlock/evaluation-request-v2` | Run, import, or captured request discriminator and captured source pins |
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
+| `evidence_pack_v2.schema.json` | `invarlock/evidence-pack-v2` | Captured-only closed directory inventory and explicit signed/unsigned authentication |
+| `evidence_verification_receipt_v3.schema.json` | `invarlock/evidence-verification-receipt-v3` | Captured-only external verifier statement with run/request anchors and per-metric/slice scoring assurance |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
+| `trust_inputs_v2.schema.json` | `invarlock/trust-inputs-v2` | Captured independent policy, complete-run/request/signer anchors and verifier identity/key path |
 | `acceptance_predicate.schema.json` | `invarlock/acceptance-predicate-v2` | Portable projection of one technical decision in an in-toto Statement |
 | `recipient_acceptance_policy.schema.json` | `invarlock/recipient-acceptance-policy-v2` | Current recipient trust, freshness, version, signer, and verdict rules |
 | `evaluator_qualification_profile.schema.json` | `invarlock/evaluator-qualification-profile-v1` | Evaluator identity, execution provenance, and authority classification |
@@ -30,6 +34,13 @@ cannot substitute a different schema.
 The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
 receipt remains the authoritative replayable result.
+Native pack v1 and receipt v1/v2 retain their published meanings. Captured pack
+v2 and receipt v3 are the only captured evidence family; legacy monolithic
+comparison evidence is not accepted. A captured receipt's
+`verification_scope: captured_comparison` does not qualify native execution,
+acceptance attestations, ModelKit acceptance, or deployment approval. See
+[Captured records](evaluation-records.md) for run, case-set, policy and request
+normalization contracts; these schema identifiers are not product-release pins.
 
 Evaluator qualification has two stable wire classifications:
 
@@ -83,10 +94,10 @@ complete normalized-request digest inside a payload already hashed by that
 request; bind component identities first and let the envelope add comparison
 bindings after normalization.
 
-The separate [pipeline contracts](pipeline-contracts.md) bind complete captured
+The [evaluation-record contracts](evaluation-records.md) bind complete captured
 runs and policy bytes, including source versions and per-record context. Their
 independent run digests include outputs, so they are not pre-execution context
-identities. Replaying signed pipeline evidence verifies the captured comparison;
+identities. Replaying signed captured evidence verifies the comparison;
 it does not prove that an untrusted capture worker executed the declared model.
 The native rehearsal's recipient independently pins the protocol and capture
 before reconstructing those runs.

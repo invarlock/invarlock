@@ -345,11 +345,26 @@ receipt. The canonical report remains inside the authenticated bundle.
 Application errors use structured output; invalid CLI options and path arguments
 rejected before a command runs still produce usage diagnostics on stderr.
 
-For the existing-results workflow, `invarlock pipeline compare`, `verify` and
-`report` default to JSON; use `--output-format human --explain` to inspect their
-checks interactively. Console text and HTML are presentation formats and should
+Captured results also use `evaluate`, `verify`, and `report`, with text by default
+and `--json` for automation. Use `report --explain` to inspect checks interactively.
+Console text and HTML are presentation formats and should
 not be parsed as stable machine interfaces. See the
 [CLI output contract](../reference/cli.md#text-and-json-output).
+
+For captured handoffs, use `--trust-profile` with a recipient-owned
+`invarlock/trust-inputs-v2` profile, not native artifact/runtime anchors. Unsigned
+local packs cannot yield positive verification; a signed rejection receipt may
+record the refusal (exit `6`). A local work-budget refusal
+exits `2` without a receipt; retry with an explicitly reviewed
+`--max-bootstrap-draws` allowance. An authenticated policy rejection exits `7`
+and can still carry a valid rejection receipt. Do not treat receipt authenticity
+as a passing technical verdict.
+
+Captured reports and native reports requesting Markdown or JUnit emit
+`invarlock/evidence-report-v2`. Inspect `requested_outputs`, `written_outputs`,
+`failed_output`, and `errors` after a write failure; earlier completed outputs
+may remain. Default and HTML-only native report calls retain v1 JSON. Never
+render stale evidence after a failed evaluation publication.
 
 ## Before escalating a bug
 

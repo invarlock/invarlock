@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evidence_pack_v2.schema.json",
+  "description": "Closed captured directory manifest. Digests hash exact canonical JSON bytes (UTF-8, sorted keys, compact separators, final LF). comparison_id is the report digest. The ledger is sorted by fixed payload path, with lowercase SHA-256 hex, two spaces, path, and LF per entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "kind", "authentication", "comparison_id", "request_digest", "signing_key_fingerprint", "files", "checksums", "checksums_sha256_digest"],
+  "properties": {
+    "format": {"const": "invarlock/evidence-pack-v2"},
+    "kind": {"const": "captured"},
+    "authentication": {"enum": ["signed", "unsigned_local"]},
+    "comparison_id": {"$ref": "#/$defs/digest"},
+    "request_digest": {"$ref": "#/$defs/digest"},
+    "signing_key_fingerprint": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "checksums": {"const": "checksums.sha256"},
+    "checksums_sha256_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "signature": {"const": "manifest.signature.json"},
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "policy", "baseline", "subject", "report"],
+      "properties": {
+        "request": {"allOf": [{"$ref": "#/$defs/reference"}, {"properties": {"path": {"const": "request.json"}}}]},
+        "policy": {"allOf": [{"$ref": "#/$defs/reference"}, {"properties": {"path": {"const": "inputs/policy.json"}}}]},
+        "baseline": {"allOf": [{"$ref": "#/$defs/reference"}, {"properties": {"path": {"const": "records/baseline.json"}}}]},
+        "subject": {"allOf": [{"$ref": "#/$defs/reference"}, {"properties": {"path": {"const": "records/subject.json"}}}]},
+        "report": {"allOf": [{"$ref": "#/$defs/reference"}, {"properties": {"path": {"const": "reports/evaluation.report.json"}}}]}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"authentication": {"const": "signed"}}},
+      "then": {"required": ["signature"], "properties": {"signing_key_fingerprint": {"$ref": "#/$defs/digest"}}},
+      "else": {"not": {"required": ["signature"]}, "properties": {"signing_key_fingerprint": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {"path": {"type": "string"}, "digest": {"$ref": "#/$defs/digest"}}
+    }
+  }
+}

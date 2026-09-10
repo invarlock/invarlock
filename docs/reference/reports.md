@@ -288,7 +288,7 @@ authority.
 
 ## Verification result
 
-`invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
+Native `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
 fields include:
 
 | Field | Meaning |
@@ -309,6 +309,14 @@ The high-level transaction adds `signed_receipt`, `verifier_identity`, and
 `trust_profile_digest`. Stdout is useful process output; the separately signed
 receipt is the portable verifier assertion.
 
+Captured verification emits `invarlock/evidence-pack-verify-v2` with
+`kind: captured`, `ok`, `integrity_ok`, `policy_verdict`, `decision`,
+`replay_status`, `signed_receipt`, `pack_manifest_digest`, and `metric_summaries`.
+A completed `regression` or `insufficient_evidence` decision has
+`policy_verdict: fail`, `integrity_ok: true`, and `ok: false` (exit `7`).
+Local work-budget or unsupported-scoring-environment refusal is incomplete
+verification (exit `2`) without a receipt, not evidence corruption.
+
 Do not infer acceptance from `integrity_ok` alone. Require status `0`,
 `ok: true`, the expected `assurance_status`, exact anchors, and a valid receipt
 when the result crosses a process boundary.
@@ -316,7 +324,8 @@ when the result crosses a process boundary.
 ## Signed verification receipt
 
 The receipt contains a `statement` and `signature`. The statement format is
-`invarlock/evidence-verification-receipt-v1`:
+`invarlock/evidence-verification-receipt-v1` for native evidence without a request
+anchor; v2 additionally binds an independently supplied request digest. Example v1:
 
 ```json
 {
@@ -368,6 +377,21 @@ Downstream readers use
 `invarlock.engine.verify_signed_verification_receipt`. The stable API returns a
 `ReceiptVerification`; acceptance requires its `ok` field to be true.
 
+Captured packs use only `invarlock/evidence-verification-receipt-v3`. Its
+`verification_scope: captured_comparison` cannot authorize native acceptance or
+deployment. Anchors bind the expected complete baseline/subject runs, policy,
+normalized request, and signer; `pack_manifest_digest` identifies the manifest
+actually examined, even if it differs from those expectations. `replay_status`
+is `not_started`, `failed`, or `completed`. `scoring_assurance` is an ordered
+array of `{name, slice, kind, scoring_assurance}` entries with each assurance
+`recomputed` or `recorded`, populated only for complete matching replay under
+intact bindings; integrity rejection carries `null`, even after replay completed.
+A signed rejection may record an unsigned input pack without authenticating it.
+A valid signature on a rejection receipt may authenticate successfully while
+`statement.verdict.ok` remains false. Receipt authentication does not replay
+payloads or promote a rejection to acceptance. Native receipt v1/v2 semantics
+and historical bytes remain unchanged.
+
 | Caller-supplied receipt anchor | Compared with |
 | --- | --- |
 | Evidence pack directory | Receipt manifest digest and pack's canonical manifest |
@@ -396,6 +420,32 @@ summary; the self-contained HTML works offline and can be printed. The HTML
 file must be outside the evidence pack. Rendering preserves every bundle byte.
 `--json` emits a rendering result object, including the HTML path when requested;
 it does not turn the report into an independent acceptance receipt.
+
+Native default/HTML-only CLI calls retain the exact
+`invarlock/evidence-report-v1` result (`ok`, `pack_manifest_digest`, and `html`,
+which is `null` when not requested). All captured report calls, and native calls
+requesting Markdown or JUnit, return `invarlock/evidence-report-v2`:
+
+```json
+{
+  "format_version": "invarlock/evidence-report-v2",
+  "kind": "captured",
+  "ok": true,
+  "pack_manifest_digest": "sha256:...",
+  "requested_outputs": {"html": "report.html", "junit": "results.xml"},
+  "written_outputs": {"html": "report.html", "junit": "results.xml"},
+  "failed_output": null,
+  "errors": []
+}
+```
+
+`kind` is `runtime` for native v2 output. Destination maps can contain `html`,
+`markdown`, and `junit`. All paths must be distinct, new, and outside the evidence
+directory. Upfront collision refusal writes nothing; a later write failure
+returns `ok: false`, lists completed files in `written_outputs`, and identifies
+the failed format. Rendering does not discover or authenticate adjacent receipts.
+Unsigned captured packs remain explicitly unsigned local reports. JUnit records
+regression as failure and insufficient evidence as error.
 
 ### Read the result and its requirements
 
@@ -459,23 +509,19 @@ when the recorded policy verdict is `fail`. Automation should parse verified
 JSON or validate a receipt, never scrape the console or HTML. Renderer failures
 use the selected text or JSON mode; argument-parser errors remain usage errors.
 
-### Reports from existing evaluation exports
-
-Pipeline comparisons use their separate evidence contract and commands:
+### Reports from captured evaluation exports
 
 ```bash
-invarlock pipeline compare release-check/pipeline.json \
-  --output result --output-format human --explain
-invarlock pipeline report result/evidence.json --output report-copy
+invarlock evaluate request.yaml --signing-key signing-key.pem
+invarlock verify evidence/ --policy policy.json --receipt verification.receipt.json
+invarlock report evidence/
 ```
 
-The standalone `invarlock-pipeline` command exposes the same pipeline commands.
-Both `compare` and `verify` retain JSON output by default; text output is an
-explicit option. `report` regenerates HTML and Markdown from bounded, structurally
-validated evidence and checks embedded input bindings. It does not score,
-replay arithmetic, verify a signature or authorize a signer.
+The core commands retain JSON output for automation. `report` regenerates HTML
+and Markdown from bounded, structurally validated evidence and does not score,
+replay arithmetic, verify a signature, or authorize a signer.
 
-Pipeline reports distinguish unsigned local evidence, a signature that has not
+Captured reports distinguish unsigned local evidence, a signature that has not
 been independently verified, and unavailable signing information in a
 comparison-only view. They preserve `pass`, `regression` and
 `insufficient_evidence` as the recorded decisions. A `regression` decision means
@@ -484,11 +530,12 @@ candidate improved. Missing paired results remain missing; overlapping scope
 counts are not independent samples. Advanced configuration and missing-ID lists
 use labeled previews while the original values remain in bound evidence.
 
-Use `invarlock pipeline verify` with a recipient-owned key, policy and complete-run
-digests for independent authentication and replay. Successful pipeline report
-regeneration exits `0` regardless of the stored policy decision; comparison and
-verification keep their decision-specific exit codes. See the
-[pipeline integration guide](../user-guide/pipeline-integration.md) for the full
+Use `invarlock verify` with recipient-owned policy and complete-run digests for
+independent authentication and replay. Successful captured report
+regeneration exits `0` regardless of the stored policy decision. Evaluation exits
+`0` on publication unless `--fail-on-policy` requests the local gate; independent
+verification rejects adverse decisions. See the
+[captured-results guide](../user-guide/captured-results.md) for the full
 workflow and its assurance limits.
 
 ## Failure-state interpretation

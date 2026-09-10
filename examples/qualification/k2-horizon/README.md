@@ -2,7 +2,7 @@
 
 !!! tip "User guide"
     **Outcome:** prepare frozen comparisons, capture native responses, and verify
-    signed pipeline results independently.
+    signed captured results independently.
     **Audience:** maintainers qualifying the declared K2 configurations.
     **Prerequisites:** a candidate InvarLock wheel for CPU preparation; a reviewed,
     immutable runtime image and an approved compute budget before GPU execution.
@@ -15,7 +15,7 @@ Do not provision GPU time until the exact image passes its build, dependency,
 and native-import checks. Actual GPU startup is the first bounded preflight.
 
 This route uses SGLang's native K2 implementation to generate responses and
-InvarLock's public pipeline interface to compare the captures. A signed result
+InvarLock's public evaluation interface to compare the captures. A signed result
 authenticates the captured inputs, attributed measurements, and deterministic
 scoring. It is not native InvarLock isolated-transaction evidence, proof of GPU
 execution, or a general endorsement of a model's quality. The core provider's
@@ -435,35 +435,46 @@ its output retains each cohort decision. Invalid evidence exits 2.
 python -m examples.qualification.k2_campaign publish \
   --plan plan.json --baseline baseline-decision/capture.json \
   --candidate candidate-decision/capture.json \
-  --key evidence-private.pem --output evidence.json
+  --key evidence-private.pem --output evidence
 
 python -m examples.qualification.k2_campaign report \
-  --evidence evidence.json --output reports
+  --evidence evidence --output reports
 ```
 
 Transfer the plan, raw captures, evidence, and separately trusted public key to
 a clean recipient environment containing the installed candidate wheel and
 this example. Supply independently obtained canonical digests for the plan
 and both captures. Do not derive those expected values from the evidence being
-verified. The public SDK's `invarlock.pipeline.contracts.digest` computes this
+verified. The public SDK's captured-record contract computes this
 canonical JSON identity; a raw-file `sha256sum` has different semantics.
 
 ```bash
 python -m examples.qualification.k2_campaign verify \
   --plan plan.json --baseline baseline-decision/capture.json \
-  --candidate candidate-decision/capture.json --evidence evidence.json \
+  --candidate candidate-decision/capture.json --evidence evidence \
   --key evidence-public.pem --expected-plan "$EXPECTED_PLAN" \
   --expected-baseline-capture "$EXPECTED_BASELINE_CAPTURE" \
   --expected-candidate-capture "$EXPECTED_CANDIDATE_CAPTURE" \
+  --verifier-signing-key verifier-private.pem --verifier-identity k2-recipient \
+  --receipts verification-receipts \
   --output verification.json
 ```
 
-Verification reconstructs each public pipeline run from the raw native
+Publication uses the shared evaluate service to produce one captured directory
+pack v2 under `evidence/<cohort>/pack`, with its request and source inputs beside
+it. There is no standalone signed results JSON. Reporting uses the shared report
+service and does not replay or claim independent acceptance.
+
+Verification reconstructs each captured run from the independently pinned raw native
 response, checks the frozen request and configuration, verifies the signature
 against the recipient's key, and replays each declared policy. It must reject
 wrong keys, changed requests, substituted captures, changed model bindings,
 and reordered or missing records. The tests include these boundary controls
-and synthetic rejection/error cases; they are not K2 inference evidence.
+and synthetic rejection/error cases; they are not K2 inference evidence. The
+shared verify service derives run and normalized-request anchors from those
+inputs and writes verifier-signed receipt v3 files outside each immutable pack,
+including authenticated policy rejections. The verifier key is independent of
+the publisher key. Historical K2 capture role names and raw responses are unchanged.
 
 Retain the exact source, image, dependency inventory, materializations, frozen
 plan, preflights, raw captures, signed results, independent verification,

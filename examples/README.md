@@ -8,7 +8,7 @@ an acceptance workflow should have the verifier owner choose and hold its own
 trust anchors and signing key.
 
 To gate results from an existing evaluator, start with the separate
-[pipeline examples](pipeline/README.md). For an artifact handoff, the
+[captured-results examples](captured-results/README.md). For an artifact handoff, the
 [ModelKit guide](../docs/user-guide/modelkit-handoff.md) checks delivered
 package contents and recipient acceptance at the actual model directories.
 

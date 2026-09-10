@@ -47,7 +47,9 @@ repository workflow:
    evaluator-qualification transactions through the isolated candidate-wheel
    CLI;
 7. runs `twine check` on every distribution;
-8. installs the built wheels together in a clean environment;
+8. installs the core wheel alone in a clean environment outside the checkout,
+   exercises its native quickstart and captured evaluation/verification/report
+   consumers, then installs the coordinated add-ins;
 9. exercises the public CLI, all provider conformance commands, diagnostics,
    and entry-point discovery;
 10. audits the installed dependency surface and generates an SBOM;
@@ -164,6 +166,22 @@ The local preflight intentionally validates the core pair in depth while
 five-package install. Keep both kinds of gate; do not describe the core-only
 JSON result as proof that every add-in archive was independently inspected by
 preflight.
+
+The captured core-wheel consumer checks the exact three-command root before
+add-ins, all three synthetic starters, signed trust-v2 handoffs and receipt-v3
+authentication, unsigned rejection, adverse policy gates, repeated destinations,
+unchanged evidence bytes, and report-v2 `requested_outputs`/`written_outputs`.
+Retained native release consumers request HTML and Markdown and validate report
+v2 with `kind: runtime`; ordinary native default/HTML-only callers keep v1 JSON.
+Validation preserves historical native receipts, upstream fixture bytes, and
+recorded K2 qualification status. Optional runtime tests are not
+substitutes for observed inference.
+
+For released-wheel examples, follow
+[Matching wheels and examples](../user-guide/getting-started.md#matching-wheels-and-examples):
+select the tag archive from `importlib.metadata.version("invarlock")`. Local
+wheels require their exact build checkout's examples, with no mutable-branch
+fallback when a matching release archive is unavailable.
 
 ## Test index and production publication
 

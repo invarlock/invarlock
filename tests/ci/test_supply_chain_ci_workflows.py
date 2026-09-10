@@ -202,7 +202,7 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
     "excluded_path",
     [
         None,
-        "src/invarlock/pipeline/evidence.py",
+        "src/invarlock/captured_evidence_publication.py",
         "examples/qualification/k2-horizon/model-card-observations.json",
         "examples/qualification/k2_runtime_expat.py",
     ],

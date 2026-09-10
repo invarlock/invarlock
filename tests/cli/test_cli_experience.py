@@ -1,4 +1,4 @@
-"""Production-path checks for command outcomes and existing-pipeline discovery."""
+"""Production-path checks for command outcomes and captured evidence."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.evidence_pack_integrity import public_key_fingerprint
-from invarlock.pipeline.cli import app as pipeline_app
 
 RUNNER = CliRunner()
 
@@ -170,26 +169,6 @@ def test_real_report_json_failure_is_a_result_object(tmp_path):
     assert value["format_version"] == "invarlock/evidence-report-v1"
     assert value["ok"] is False
     assert value["errors"]
-
-
-def test_pipeline_namespace_keeps_existing_machine_defaults(tmp_path):
-    init = RUNNER.invoke(app, ["pipeline", "init", str(tmp_path / "example")])
-    assert init.exit_code == 0, init.output
-    project = str(tmp_path / "example/pipeline.json")
-    nested = RUNNER.invoke(
-        app, ["pipeline", "compare", project, "--output", str(tmp_path / "nested")]
-    )
-    legacy = RUNNER.invoke(
-        pipeline_app, ["compare", project, "--output", str(tmp_path / "legacy")]
-    )
-    assert nested.exit_code == legacy.exit_code == 0
-    a, b = json.loads(nested.stdout), json.loads(legacy.stdout)
-    assert a.pop("output") != b.pop("output")
-    assert a == b
-    for name in ("comparison.json", "evidence.json", "junit.xml"):
-        assert (tmp_path / "nested" / name).read_bytes() == (
-            tmp_path / "legacy" / name
-        ).read_bytes()
 
 
 def test_verified_report_is_not_exposed_after_tampering(imported_example, monkeypatch):

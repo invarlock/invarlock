@@ -213,7 +213,7 @@ def test_paired_statistics_enforce_the_authenticated_record_limit() -> None:
 
 
 @pytest.mark.parametrize("count", [12_000, 50_000])
-def test_paired_statistics_accept_full_pipeline_endpoint(count: int) -> None:
+def test_paired_statistics_accept_full_capture_endpoint(count: int) -> None:
     baseline = [True] * count
     failures = count // 1000
     candidate = [True] * (count - failures) + [False] * failures

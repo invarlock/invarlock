@@ -17,25 +17,40 @@ invarlock report evidence/
 
 ![InvarLock paired release-regression architecture](../assets/evaluation-verification-flow.svg)
 
-`evaluate` executes or imports one baseline-versus-subject comparison and
-publishes one signed evidence bundle. `verify` replays that bundle against
-independent artifact, schedule, policy, runtime, and signer anchors and writes
-a separately signed receipt. `report` authenticates the bundle's closed inventory and embedded
-evidence signature, then renders the canonical comparison report without changing the
-bundle.
+`evaluate` executes, imports, or compares captured baseline-versus-subject
+records and publishes one atomic evidence directory. Native execution/import
+retains pack v1, native artifact/schedule/runtime anchors, and receipt v1/v2.
+Captured comparison uses pack v2, complete-run/request/policy/signer anchors,
+trust profile v2, and receipt v3 scoped to `captured_comparison`. Both use the
+same CLI and `invarlock.engine` SDK facade. Native-only acceptance APIs reject
+captured scope. `report` renders the stored result without changing the pack or
+discovering an adjacent receipt; unsigned captured packs remain local reports.
 
 ## Transaction boundaries
+
+For native execution/import:
 
 | Transaction | Reads | Writes | Independent trust required | Acceptance authority |
 | --- | --- | --- | --- | --- |
 | `evaluate` | Closed request, referenced inputs, caller runtime resources or imported sidecars | One immutable evidence directory | Evidence-signing private key; authenticated runtime/material inputs | Creates paired measurements, a finite-schedule policy result, and signed evidence |
 | `verify` | Untrusted evidence directory plus independent artifact/schedule/policy/runtime/signer anchors and the request anchor required for GGUF | One signed receipt outside the pack | Expected artifacts, schedule, policy, runtimes, evidence signer, GGUF request when applicable, verifier identity, and private key | Yes, for the exact bound comparison |
-| `report` | Signature-authenticated evidence directory | Console and optional HTML outside the pack | None beyond embedded evidence signature | Presents the canonical report; the verification receipt carries acceptance authority |
+| `report` | Signature-authenticated evidence directory | Console, HTML, Markdown, or JUnit outside the pack | None beyond embedded evidence signature | Presents the canonical report; the verification receipt carries acceptance authority |
 
 The same pack can be rendered many times and verified by many independent
 authorities without changing a byte in the evidence directory.
 
+Captured evaluation recomputes supported deterministic scores or carries
+explicitly attributed recorded scores; it does not execute a runtime or confer
+verdict authority on external evaluator observations. Signed captured verification
+replays the complete comparison under independent pins and a recipient-owned
+work budget. An unsigned pack is not independently authenticated, though an
+attempt to verify it can produce an external signed rejection. A valid receipt
+signature does not mean the technical verdict passes. The
+[captured-results guide](../user-guide/captured-results.md) defines both paths.
+
 ## Core layers
+
+The native runtime layers are:
 
 | Layer | Responsibility |
 | --- | --- |
@@ -44,9 +59,11 @@ authorities without changing a byte in the evidence directory.
 | Paired transaction | Prepare or authenticate the schedule, cross-bind both sides, derive built-in scores or replay an authorized scorer, replay the paired interval, and qualify optional count/width and exact-match side-accuracy controls |
 | Canonical bundle | Bind normalized intent, identities, provider material, paired records, report, checksums, and evidence signature |
 | Independent verifier | Recompute integrity, identities, pairs, scores, report, and policy verdict under caller-owned trust anchors |
-| Report renderer | Produce a console view and optional self-contained HTML from the authenticated canonical report |
+| Report renderer | Produce console, HTML, Markdown, and JUnit views from the authenticated canonical report |
 
 ## Trust boundaries
+
+The following native anchors are not substitutes for captured run/request pins.
 
 The evidence-signing key authenticates the bundle bytes and identifies the
 signer. It does not make the submitted assertions true. Verification therefore requires inputs that

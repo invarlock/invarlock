@@ -1,6 +1,6 @@
 """Prepare and independently replay a candidate K2 external-capture campaign.
 
-This example does not implement an InvarLock runtime provider. Pipeline evidence
+This example does not implement an InvarLock runtime provider. Captured evidence
 authenticates attributed captures and deterministic scoring, not GPU execution.
 """
 
@@ -18,8 +18,17 @@ import struct
 from pathlib import Path
 from typing import Any
 
-from invarlock.pipeline import create_evidence, make_run, verify_evidence
-from invarlock.pipeline.contracts import digest
+from invarlock.engine import (
+    EvidenceVerificationError,
+    captured_request_digest,
+    evaluate_request_file,
+    normalize_captured_request,
+    render_evidence,
+    verify_evidence,
+)
+from invarlock.evaluation_comparison.comparison import make_run
+from invarlock.evaluation_record_contracts.contracts import digest
+from invarlock.evidence_pack_integrity import public_key_fingerprint
 
 DIRECTORY = Path(__file__).resolve().with_name("k2-horizon")
 CAPTURE_FORMAT = "invarlock/k2-native-capture-v1"
@@ -124,7 +133,7 @@ def policies() -> dict[str, Any]:
             "minimum_count": 96,
             "maximum_regression": 0.05,
             "maximum_interval_width": 0.25,
-            "candidate_minimum": 0.8,
+            "subject_minimum": 0.8,
         }
         if cohort == "extraction":
             quality.update(
@@ -145,12 +154,12 @@ def policies() -> dict[str, Any]:
             "minimum_count": 96,
             "maximum_regression": 5000,
             "maximum_interval_width": 10000,
-            "candidate_maximum": 30000,
+            "subject_maximum": 30000,
             "score_key": "latency_ms",
             "accepted_provenance": LATENCY_PROVENANCE,
         }
         result[cohort] = {
-            "format": "invarlock/pipeline-policy-v1",
+            "format": "invarlock/comparison-policy-v1",
             "metrics": [quality, latency],
             "slices": [
                 {"name": key, "where": {"context": key}}
@@ -197,7 +206,7 @@ def draft_plans() -> list[dict[str, Any]]:
             {
                 "format": "invarlock/k2-campaign-plan-v1",
                 "status": "candidate_not_qualified",
-                "route": "external_sglang_pipeline_capture",
+                "route": "external_sglang_native_capture",
                 "model": model,
                 "runtime": runtime,
                 "budget": None,
@@ -564,16 +573,39 @@ def project_capture(plan: dict[str, Any], capture: dict[str, Any]) -> dict[str, 
     }
 
 
-def publish(plan, baseline, candidate, key):
+def _captured_request():
+    return {
+        "format_version": "invarlock/evaluation-request-v2",
+        "execution": {"mode": "captured"},
+        "comparison": {
+            "baseline": {"path": "baseline.json", "adapter": "invarlock"},
+            "subject": {"path": "subject.json", "adapter": "invarlock"},
+            "policy": "policy.json",
+        },
+        "output": {"evidence": "pack"},
+    }
+
+
+def publish(plan, baseline, candidate, signing_key_path, output):
     if (baseline["role"], candidate["role"]) != ROLES:
         raise ValueError("capture roles are reversed")
     left, right = project_capture(plan, baseline), project_capture(plan, candidate)
-    return {
-        cohort: create_evidence(
-            left[cohort], right[cohort], plan["policies"][cohort], key
+    output.mkdir(exist_ok=False)
+    result = {}
+    for cohort in COHORTS:
+        root = output / cohort
+        root.mkdir()
+        for name, value in (
+            ("baseline.json", left[cohort]),
+            ("subject.json", right[cohort]),
+            ("policy.json", plan["policies"][cohort]),
+            ("request.json", _captured_request()),
+        ):
+            write_json(root / name, value)
+        result[cohort] = evaluate_request_file(
+            root / "request.json", signing_key_path=signing_key_path
         )
-        for cohort in COHORTS
-    }
+    return result
 
 
 def verify(
@@ -586,6 +618,9 @@ def verify(
     expected_plan,
     expected_baseline_capture,
     expected_candidate_capture,
+    receipts,
+    verifier_signing_key_path,
+    verifier_identity,
 ):
     if digest(plan) != expected_plan:
         raise ValueError("plan differs from independent expected plan")
@@ -594,19 +629,41 @@ def verify(
         or digest(candidate) != expected_candidate_capture
     ):
         raise ValueError("capture differs from independent expected capture")
-    if (baseline["role"], candidate["role"]) != ROLES or set(evidence) != set(COHORTS):
+    if (baseline["role"], candidate["role"]) != ROLES or {
+        path.name for path in evidence.iterdir()
+    } != set(COHORTS):
         raise ValueError("campaign roles or cohorts differ")
     left, right = project_capture(plan, baseline), project_capture(plan, candidate)
-    return {
-        cohort: verify_evidence(
-            evidence[cohort],
-            public_key=public_key,
-            expected_baseline=digest(left[cohort]),
-            expected_candidate=digest(right[cohort]),
-            policy=plan["policies"][cohort],
-        )["decision"]
-        for cohort in COHORTS
-    }
+    receipts.mkdir(exist_ok=False)
+    result = {}
+    for cohort in COHORTS:
+        policy = plan["policies"][cohort]
+        policy_path = receipts / f"{cohort}.policy.json"
+        write_json(policy_path, policy)
+        normalized = normalize_captured_request(
+            _captured_request(),
+            baseline=left[cohort],
+            subject=right[cohort],
+            policy=policy,
+        )
+        try:
+            verified = verify_evidence(
+                evidence / cohort / "pack",
+                policy_path=policy_path,
+                expected_baseline_run=digest(left[cohort]),
+                expected_subject_run=digest(right[cohort]),
+                expected_request_digest=captured_request_digest(normalized),
+                expected_signer=public_key_fingerprint(public_key),
+                receipt_path=receipts / f"{cohort}.receipt.json",
+                verifier_signing_key_path=verifier_signing_key_path,
+                verifier_identity=verifier_identity,
+            )
+            result[cohort] = verified.payload["decision"]
+        except EvidenceVerificationError as exc:
+            if exc.exit_code != 7 or exc.payload.get("integrity_ok") is not True:
+                raise
+            result[cohort] = exc.payload["decision"]
+    return result
 
 
 def main(argv=None) -> int:
@@ -644,6 +701,9 @@ def main(argv=None) -> int:
             command.add_argument(f"--{item}", type=Path, required=True)
         if name == "verify":
             command.add_argument("--evidence", type=Path, required=True)
+            command.add_argument("--receipts", type=Path, required=True)
+            command.add_argument("--verifier-signing-key", type=Path, required=True)
+            command.add_argument("--verifier-identity", required=True)
             for item in ("plan", "baseline-capture", "candidate-capture"):
                 command.add_argument(f"--expected-{item}", required=True)
     args = parser.parse_args(argv)
@@ -658,28 +718,16 @@ def main(argv=None) -> int:
             download_snapshot(args.model, args.role, args.output)
             return 0
         elif args.command == "report":
-            from invarlock.pipeline.report import (
-                render_html,
-                render_junit,
-                render_markdown,
-            )
-
-            evidence = read_json(args.evidence)
-            if set(evidence) != set(COHORTS):
+            if {path.name for path in args.evidence.iterdir()} != set(COHORTS):
                 raise ValueError("report requires all campaign cohorts")
-            rendered = {
-                cohort: {
-                    "html": render_html(evidence[cohort]["comparison"]).encode(),
-                    "md": render_markdown(evidence[cohort]["comparison"]).encode(),
-                    "xml": render_junit(evidence[cohort]["comparison"]),
-                }
-                for cohort in COHORTS
-            }
             args.output.mkdir(exist_ok=False)
-            for cohort, formats in rendered.items():
-                for suffix, payload in formats.items():
-                    with (args.output / f"{cohort}.{suffix}").open("xb") as stream:
-                        stream.write(payload)
+            for cohort in COHORTS:
+                render_evidence(
+                    args.evidence / cohort / "pack",
+                    html_path=args.output / f"{cohort}.html",
+                    markdown_path=args.output / f"{cohort}.md",
+                    junit_path=args.output / f"{cohort}.xml",
+                )
             return 0
         elif args.command == "freeze":
             result = select_plan(args.model)
@@ -713,25 +761,24 @@ def main(argv=None) -> int:
                 for name in ("plan", "baseline", "candidate")
             )
             if args.command == "publish":
-                key = serialization.load_pem_private_key(
-                    args.key.read_bytes(), password=None
-                )
-                result = publish(plan, baseline, candidate, key)
+                result = publish(plan, baseline, candidate, args.key, args.output)
             else:
                 key = serialization.load_pem_public_key(args.key.read_bytes())
                 result = verify(
                     plan,
                     baseline,
                     candidate,
-                    read_json(args.evidence),
+                    args.evidence,
                     key,
                     expected_plan=args.expected_plan,
                     expected_baseline_capture=args.expected_baseline_capture,
                     expected_candidate_capture=args.expected_candidate_capture,
+                    receipts=args.receipts,
+                    verifier_signing_key_path=args.verifier_signing_key,
+                    verifier_identity=args.verifier_identity,
                 )
-        write_json(args.output, result)
         if args.command == "publish":
-            decisions = [v["comparison"]["decision"] for v in result.values()]
+            decisions = [v.policy_verdict for v in result.values()]
             return (
                 3
                 if "insufficient_evidence" in decisions
@@ -739,6 +786,7 @@ def main(argv=None) -> int:
                 if "regression" in decisions
                 else 0
             )
+        write_json(args.output, result)
         return 0
     except (ValueError, KeyError, OSError) as error:
         parser.exit(2, f"k2 campaign: {error}\n")

@@ -46,7 +46,7 @@ distributions: `invarlock`, `invarlock-diagnostics`,
 `invarlock-runtime-tensorrt-llm`. The optional
 packages live under `addins/`; their provider-specific runtime dependencies
 stay outside the core wheel.
-Candidate and published core wheels exercise the standalone pipeline workflow,
+Candidate and published core wheels exercise the standalone captured-evaluation workflow,
 including signing, independent verification, reports, and rejection exit codes,
 before the optional packages are installed.
 

@@ -22,13 +22,17 @@ def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
     assert "--cov=src/invarlock" in block
     assert "--cov-branch" in block
     assert "--cov-fail-under=95" in block
-    assert "git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py'" in block
-    assert "grep -v '/__init__.py$$'" in block
-    assert '--include="$$source" --fail-under=95' in block
+    assert "$(MAKE) coverage-check-files" in block
+    file_gate = MAKE.target("coverage-check-files").text
+    assert 'Path("src/invarlock").rglob("*.py")' in file_gate
+    assert 'path.name != "__init__.py"' in file_gate
+    assert "git ls-files" not in file_gate
+    assert '--include="$$source" --fail-under=95' in file_gate
     assert "check_coverage_thresholds.py" not in MAKEFILE
     assert "scripts/evidence_packs" not in MAKEFILE
     assert "--fail-under=80" not in MAKEFILE
     assert "COVERAGE_FILE=$(COVERAGE_CORE_FILE)" in block
+    assert "COVERAGE_FILE=$(COVERAGE_CORE_FILE)" in file_gate
 
 
 def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:

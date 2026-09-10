@@ -10,15 +10,22 @@ import stat
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from invarlock.captured_evaluation import (
+    CapturedEvaluationError,
+    CapturedEvaluationPreflightResult,
+    CapturedEvaluationTransactionResult,
+)
 from invarlock.core.evaluation_request import (
+    CapturedEvaluationRequest,
     ComparisonSideRequest,
     EvaluationRequest,
     EvaluationRequestError,
     ImportSideRequest,
+    evaluation_request_mode,
     load_evaluation_request,
 )
 from invarlock.core.registry import CoreRegistry
@@ -42,6 +49,7 @@ from invarlock.core.scorer_extension import (
     ScorerExtensionRegistry,
     scorer_binding_payload,
 )
+from invarlock.evaluation_comparison.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.evaluation_run import (
     RuntimeComparisonExecutor,
     execute_runtime_comparison,
@@ -74,6 +82,7 @@ from invarlock.evidence_pack_contract import (
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.evidence_pack_publication import _load_private_key
+from invarlock.evidence_receipt import _OMITTED, _Omitted
 from invarlock.runtime_provider_evidence import (
     RuntimeProviderEvidenceError,
     decode_artifact_identity,
@@ -102,6 +111,8 @@ _FILE_FLAGS = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLO
 class EvaluationTransactionError(ValueError):
     """Raised when a request cannot produce authenticated evidence."""
 
+    captured = False
+
     def __init__(self, message: str, *, exit_code: int = 2) -> None:
         super().__init__(message)
         self.exit_code = exit_code
@@ -109,9 +120,12 @@ class EvaluationTransactionError(ValueError):
     def as_json(self) -> str:
         return json.dumps(
             {
-                "format_version": "invarlock/evaluation-result-v1",
+                "format_version": "invarlock/evaluation-result-v2"
+                if self.captured
+                else "invarlock/evaluation-result-v1",
+                **({"kind": "captured"} if self.captured else {}),
                 "ok": False,
-                "errors": [str(self)],
+                "errors": [str(self)[:1024] if self.captured else str(self)],
             },
             allow_nan=False,
             ensure_ascii=False,
@@ -124,13 +138,28 @@ class EvaluationPreflightError(ValueError):
     """Raised when execution-free evaluation qualification fails."""
 
     exit_code = 2
+    captured = False
+    unsigned = False
 
     def as_json(self) -> str:
         return json.dumps(
             {
-                "format_version": "invarlock/evaluation-preflight-v2",
+                "format_version": "invarlock/evaluation-preflight-v3"
+                if self.captured
+                else "invarlock/evaluation-preflight-v2",
+                **(
+                    {
+                        "kind": "captured",
+                        "execution_mode": "captured",
+                        "requested_authentication": "unsigned_local"
+                        if self.unsigned
+                        else "signed",
+                    }
+                    if self.captured
+                    else {}
+                ),
                 "ok": False,
-                "errors": [str(self)],
+                "errors": [str(self)[:1024] if self.captured else str(self)],
             },
             allow_nan=False,
             ensure_ascii=False,
@@ -802,6 +831,10 @@ def _prepare_evaluation_inputs(
             provider_resolver=selected_registry.get_runtime_provider,
         )
     )
+    if isinstance(request, CapturedEvaluationRequest):
+        raise EvaluationTransactionError(
+            "captured evaluation requests must use the captured evaluation path"
+        )
     artifact_digests: dict[str, str] | None = None
     if authenticate_artifacts and request.execution.mode == "run":
         artifact_digests = {}
@@ -935,18 +968,123 @@ def _prepare_evaluation_inputs(
     )
 
 
+def _captured_request(
+    request: Path | EvaluationRequest | CapturedEvaluationRequest,
+) -> CapturedEvaluationRequest | None:
+    if isinstance(request, CapturedEvaluationRequest):
+        return request
+    if isinstance(request, EvaluationRequest):
+        return None
+    if not Path(request).exists():
+        # No discriminator is available. Retain the native key/security checks
+        # before its existing unavailable-request diagnostic.
+        return None
+    if evaluation_request_mode(request) != "captured":
+        return None
+    try:
+        loaded = load_evaluation_request(request)
+    except EvaluationRequestError as exc:
+        raise CapturedEvaluationError(str(exc)) from exc
+    if not isinstance(loaded, CapturedEvaluationRequest):
+        raise EvaluationRequestError("request mode changed during loading")
+    return loaded
+
+
+@overload
 def preflight_evaluation_request(
-    request_path: Path | EvaluationRequest,
+    request_path: EvaluationRequest,
     *,
     signing_key_path: Path | None,
     scorer_registry: ScorerExtensionRegistry | None = None,
     runtime_image_digests: Mapping[str, str] | None = None,
     resource_resolver: RuntimeResourceResolver | None = None,
     registry: CoreRegistry | None = None,
-) -> EvaluationPreflightResult:
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationPreflightResult: ...
+
+
+@overload
+def preflight_evaluation_request(
+    request_path: CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> CapturedEvaluationPreflightResult: ...
+
+
+@overload
+def preflight_evaluation_request(
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    scorer_registry: ScorerExtensionRegistry | None = None,
+    runtime_image_digests: Mapping[str, str] | None = None,
+    resource_resolver: RuntimeResourceResolver | None = None,
+    registry: CoreRegistry | None = None,
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult: ...
+
+
+def preflight_evaluation_request(
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    scorer_registry: ScorerExtensionRegistry | None | _Omitted = _OMITTED,
+    runtime_image_digests: Mapping[str, str] | None | _Omitted = _OMITTED,
+    resource_resolver: RuntimeResourceResolver | None | _Omitted = _OMITTED,
+    registry: CoreRegistry | None | _Omitted = _OMITTED,
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult:
     """Validate an evaluation transaction without execution or filesystem mutation."""
 
     try:
+        captured = _captured_request(request_path)
+        if captured is not None:
+            from invarlock.captured_evaluation import preflight_captured_request
+
+            if any(
+                not isinstance(value, _Omitted)
+                for value in (
+                    scorer_registry,
+                    runtime_image_digests,
+                    resource_resolver,
+                    registry,
+                )
+            ):
+                raise CapturedEvaluationError(
+                    "runtime/scorer arguments are not valid for captured requests"
+                )
+            return preflight_captured_request(
+                captured,
+                signing_key_path=signing_key_path,
+                unsigned=unsigned,
+                max_bootstrap_draws=max_bootstrap_draws,
+            )
+        if (
+            unsigned
+            or type(max_bootstrap_draws) is not int
+            or max_bootstrap_draws != DEFAULT_MAX_BOOTSTRAP_DRAWS
+        ):
+            raise EvaluationPreflightError(
+                "captured controls are not valid for runtime requests"
+            )
+        assert not isinstance(request_path, CapturedEvaluationRequest)
+        scorer_registry = (
+            None if isinstance(scorer_registry, _Omitted) else scorer_registry
+        )
+        runtime_image_digests = (
+            None
+            if isinstance(runtime_image_digests, _Omitted)
+            else runtime_image_digests
+        )
+        resource_resolver = (
+            None if isinstance(resource_resolver, _Omitted) else resource_resolver
+        )
+        registry = None if isinstance(registry, _Omitted) else registry
         prepared = _prepare_evaluation_inputs(
             request_path,
             signing_key_path=signing_key_path,
@@ -1160,6 +1298,11 @@ def preflight_evaluation_request(
             runtime_image_digests=normalized_runtime_digests,
             sample_qualification=sample_qualification,
         )
+    except CapturedEvaluationError as exc:
+        error = EvaluationPreflightError(str(exc))
+        error.captured = True
+        error.unsigned = unsigned
+        raise error from exc
     except EvaluationPreflightError:
         raise
     except (
@@ -1174,8 +1317,9 @@ def preflight_evaluation_request(
         raise EvaluationPreflightError(str(exc)) from exc
 
 
+@overload
 def evaluate_request_file(
-    request_path: Path | EvaluationRequest,
+    request_path: EvaluationRequest,
     *,
     signing_key_path: Path | None,
     resource_resolver: RuntimeResourceResolver | None = None,
@@ -1183,10 +1327,98 @@ def evaluate_request_file(
     runtime_image_digests: Mapping[str, str] | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
     registry: CoreRegistry | None = None,
-) -> EvaluationTransactionResult:
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationTransactionResult: ...
+
+
+@overload
+def evaluate_request_file(
+    request_path: CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> CapturedEvaluationTransactionResult: ...
+
+
+@overload
+def evaluate_request_file(
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    resource_resolver: RuntimeResourceResolver | None = None,
+    runtime_executor: RuntimeComparisonExecutor | None = None,
+    runtime_image_digests: Mapping[str, str] | None = None,
+    scorer_registry: ScorerExtensionRegistry | None = None,
+    registry: CoreRegistry | None = None,
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationTransactionResult | CapturedEvaluationTransactionResult: ...
+
+
+def evaluate_request_file(
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    resource_resolver: RuntimeResourceResolver | None | _Omitted = _OMITTED,
+    runtime_executor: RuntimeComparisonExecutor | None | _Omitted = _OMITTED,
+    runtime_image_digests: Mapping[str, str] | None | _Omitted = _OMITTED,
+    scorer_registry: ScorerExtensionRegistry | None | _Omitted = _OMITTED,
+    registry: CoreRegistry | None | _Omitted = _OMITTED,
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationTransactionResult | CapturedEvaluationTransactionResult:
     """Execute or import, authenticate, and publish one closed request."""
 
     try:
+        captured = _captured_request(request_path)
+        if captured is not None:
+            from invarlock.captured_evaluation import evaluate_captured_request
+
+            if any(
+                not isinstance(value, _Omitted)
+                for value in (
+                    resource_resolver,
+                    runtime_executor,
+                    runtime_image_digests,
+                    scorer_registry,
+                    registry,
+                )
+            ):
+                raise CapturedEvaluationError(
+                    "runtime/scorer arguments are not valid for captured requests"
+                )
+            return evaluate_captured_request(
+                captured,
+                signing_key_path=signing_key_path,
+                unsigned=unsigned,
+                max_bootstrap_draws=max_bootstrap_draws,
+            )
+        if (
+            unsigned
+            or type(max_bootstrap_draws) is not int
+            or max_bootstrap_draws != DEFAULT_MAX_BOOTSTRAP_DRAWS
+        ):
+            raise EvaluationTransactionError(
+                "captured controls are not valid for runtime requests"
+            )
+        assert not isinstance(request_path, CapturedEvaluationRequest)
+        resource_resolver = (
+            None if isinstance(resource_resolver, _Omitted) else resource_resolver
+        )
+        runtime_executor = (
+            None if isinstance(runtime_executor, _Omitted) else runtime_executor
+        )
+        runtime_image_digests = (
+            None
+            if isinstance(runtime_image_digests, _Omitted)
+            else runtime_image_digests
+        )
+        scorer_registry = (
+            None if isinstance(scorer_registry, _Omitted) else scorer_registry
+        )
+        registry = None if isinstance(registry, _Omitted) else registry
         prepared = _prepare_evaluation_inputs(
             request_path,
             signing_key_path=signing_key_path,
@@ -1413,6 +1645,10 @@ def evaluate_request_file(
             )
         finally:
             output_anchor.close()
+    except CapturedEvaluationError as exc:
+        error = EvaluationTransactionError(str(exc))
+        error.captured = True
+        raise error from exc
     except EvaluationTransactionError:
         raise
     except (

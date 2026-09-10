@@ -8,16 +8,13 @@
 >
   <title id="title">InvarLock evaluate, verify, and report flow</title>
   <desc id="desc">
-    A closed request declares the baseline, subject, pinned JSONL source or
-    canonical schedule, runtime integrations, policy, execution mode, and
-    output. Evaluation prepares the schedule, executes each side in its pinned
-    OCI runtime or imports complete observations, derives the selected built-in
-    metric or replays an authorized text scorer, derives its paired interval,
-    and publishes a signed evidence bundle. Independent
-    verification applies caller-owned artifact, schedule, policy, runtime, and
-    expected-signer anchors, replays the comparison, and signs a completed
-    verification statement when one can be formed. Reporting verifies the
-    bundle's embedded signature and renders its canonical comparison report.
+    One evaluate, verify, report surface supports native run/import and captured
+    records. Native evidence retains pack v1 and receipt v1/v2. Captured records
+    use pack v2, recipient run/request/policy/signer anchors, and receipt v3 scoped
+    to captured comparison. Only native scope can authorize native acceptance.
+    Unsigned captured packs are local reports; signed captured records authenticate
+    submitted inputs and arithmetic, not model execution or recorded judgments.
+    Reports render HTML, Markdown, or JUnit without modifying evidence.
   </desc>
   <defs>
     <marker
@@ -107,10 +104,10 @@
   <rect x="565" y="57" width="500" height="84" rx="10" class="box-input" />
   <text x="815" y="84" text-anchor="middle" class="box-title">request.yaml</text>
   <text x="815" y="108" text-anchor="middle" class="micro-text">
-    artifacts · JSONL or schedule · metric or scorer · policy
+    artifacts or captured runs · metrics · policy
   </text>
   <text x="815" y="128" text-anchor="middle" class="micro-text">
-    runtime settings · run/import mode · output
+    run / import / captured · output
   </text>
 
   <rect x="1100" y="71" width="270" height="56" rx="10" class="box-input" />
@@ -119,7 +116,7 @@
   <rect x="515" y="163" width="600" height="78" rx="12" class="box-input" />
   <text x="815" y="196" text-anchor="middle" class="box-title">invarlock evaluate</text>
   <text x="815" y="222" text-anchor="middle" class="micro-text">
-    prepare schedule · run pinned OCI sides or import evidence
+    execute native / import observations / compare captured runs
   </text>
 
   <rect x="385" y="263" width="860" height="66" rx="12" class="box-input" />
@@ -127,7 +124,7 @@
     Paired comparison and interval
   </text>
   <text x="815" y="315" text-anchor="middle" class="micro-text">
-    built-in metric or authorized text scorer → paired interval
+    native scorer or captured metrics/slices → paired intervals
   </text>
 
   <path d="M 530 99 L 565 99" class="arrow" />
@@ -140,13 +137,13 @@
   <text x="105" y="469" class="section-label" fill="#2d7a5f">Evidence</text>
 
   <rect x="355" y="382" width="920" height="136" rx="12" class="box-output" />
-  <text x="815" y="416" text-anchor="middle" class="box-title">Canonical signed evidence bundle</text>
-  <text x="815" y="449" text-anchor="middle" class="box-text">evidence directory · invarlock/evidence-pack-v1</text>
+  <text x="815" y="416" text-anchor="middle" class="box-title">Canonical evidence directory</text>
+  <text x="815" y="449" text-anchor="middle" class="box-text">native pack v1 · captured pack v2 (signed or unsigned local)</text>
   <text x="815" y="478" text-anchor="middle" class="micro-text">
-    normalized request · artifact/runtime/dataset identities · policy/schedule
+    normalized request · complete native or captured identities · policy
   </text>
   <text x="815" y="500" text-anchor="middle" class="micro-text">
-    runtime evidence · paired records/report · manifest/checksums/signature
+    records/report · closed inventory · checksums · explicit authentication
   </text>
 
   <path d="M 815 329 L 815 382" class="arrow" />
@@ -158,10 +155,10 @@
   <rect x="260" y="575" width="500" height="105" rx="12" class="box-verify" />
   <text x="510" y="608" text-anchor="middle" class="box-title">Independent trust inputs</text>
   <text x="510" y="633" text-anchor="middle" class="micro-text">
-    baseline + subject artifact digests · schedule digest
+    native artifact/runtime/schedule or captured run/request pins
   </text>
   <text x="510" y="654" text-anchor="middle" class="micro-text">
-    policy · runtime digests · signer fingerprint
+    independent policy · evidence-signer fingerprint
   </text>
   <text x="510" y="675" text-anchor="middle" class="micro-text">
     verifier key · verifier identity
@@ -170,27 +167,27 @@
   <rect x="260" y="700" width="500" height="75" rx="12" class="box-verify" />
   <text x="510" y="730" text-anchor="middle" class="box-title">invarlock verify</text>
   <text x="510" y="754" text-anchor="middle" class="micro-text">
-    authenticate pack · replay pairs and interval under anchors
+    authenticate signed pack · replay under independent anchors
   </text>
 
   <rect x="840" y="700" width="500" height="75" rx="12" class="box-output" />
   <text x="1090" y="730" text-anchor="middle" class="box-title">invarlock report</text>
   <text x="1090" y="754" text-anchor="middle" class="micro-text">
-    authenticate signed bundle · render canonical report
+    inspect pack · render stored result · no implicit receipt
   </text>
 
   <rect x="210" y="795" width="460" height="56" rx="10" class="box-output" />
   <text x="440" y="819" text-anchor="middle" class="box-title">Signed verification receipt</text>
   <text x="440" y="842" text-anchor="middle" class="micro-text">
-    anchors · replay verdict · verifier signature
+    native v1/v2 or captured-scoped v3 · verdict
   </text>
 
   <rect x="690" y="795" width="300" height="56" rx="10" class="box-verify" />
-  <text x="840" y="819" text-anchor="middle" class="box-title">Acceptance result</text>
-  <text x="840" y="842" text-anchor="middle" class="micro-text">scoped pass or rejection</text>
+  <text x="840" y="819" text-anchor="middle" class="box-title">Technical result</text>
+  <text x="840" y="842" text-anchor="middle" class="micro-text">native-only acceptance stays separate</text>
 
   <rect x="1010" y="795" width="370" height="56" rx="10" class="box-output" />
-  <text x="1195" y="819" text-anchor="middle" class="box-title">Console · optional HTML</text>
+  <text x="1195" y="819" text-anchor="middle" class="box-title">HTML · Markdown · JUnit</text>
   <text x="1195" y="842" text-anchor="middle" class="micro-text">
     evidence summary
   </text>

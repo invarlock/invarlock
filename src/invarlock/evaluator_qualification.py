@@ -369,7 +369,7 @@ def _deterministic_result(
     runner_sha256: str,
     dependency_lock_sha256: str,
 ) -> EvaluatorQualificationResult:
-    from invarlock.pipeline.metrics import MetricError, score, validate_configuration
+    from invarlock.core.scoring import MetricError, score, validate_configuration
 
     metric = _object(
         _object(profile["authority"], field="authority")["metric"], field="metric"

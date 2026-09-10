@@ -52,8 +52,8 @@ EXPECTED_DOC_PAGES = {
     "reference/cli.md",
     "reference/compatibility.md",
     "reference/contracts.md",
-    "reference/pipeline-contracts.md",
-    "reference/pipeline-capacity.md",
+    "reference/evaluation-records.md",
+    "reference/evaluation-capacity.md",
     "reference/evaluator-qualification.md",
     "reference/environment.md",
     "reference/lifecycle.md",
@@ -74,7 +74,7 @@ EXPECTED_DOC_PAGES = {
     "user-guide/evidence-and-verification.md",
     "user-guide/public-evidence.md",
     "user-guide/getting-started.md",
-    "user-guide/pipeline-integration.md",
+    "user-guide/captured-results.md",
     "user-guide/key-management.md",
     "user-guide/modelkit-handoff.md",
     "user-guide/runtime-providers.md",
@@ -508,19 +508,19 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
         "request.yaml",
         "baseline artifact",
         "subject artifact",
-        "prepare schedule · run pinned oci sides or import evidence",
+        "execute native / import observations / compare captured runs",
         "invarlock evaluate",
         "paired comparison and interval",
-        "invarlock/evidence-pack-v1",
-        "canonical signed evidence bundle",
-        "baseline + subject artifact digests · schedule digest",
+        "native pack v1 · captured pack v2",
+        "canonical evidence directory",
+        "native artifact/runtime/schedule or captured run/request pins",
         "invarlock verify",
-        "authenticate pack · replay pairs and interval under anchors",
+        "authenticate signed pack · replay under independent anchors",
         "signed verification receipt",
-        "acceptance result",
-        "scoped pass or rejection",
+        "technical result",
+        "native-only acceptance stays separate",
         "invarlock report",
-        "console · optional HTML",
+        "HTML · Markdown · JUnit",
         "evidence summary",
     ):
         assert phrase.lower() in diagram
@@ -582,6 +582,47 @@ def test_example_request_conforms_to_the_closed_schema_surface() -> None:
     assert request["comparison"]["subject"]["runtime"]["provider"] == (
         "hf_transformers"
     )
+
+
+def test_released_quickstarts_match_installed_version_without_branch_fallback() -> None:
+    for path in ("README.md", "examples/quickstart/README.md"):
+        text = _read(path)
+        assert (
+            'from importlib.metadata import version; print(version("invarlock"))'
+            in text
+        )
+        assert 'archive/refs/tags/v${INVARLOCK_VERSION}.tar.gz" &&' in text
+        assert "invarlock-${INVARLOCK_VERSION}/examples/quickstart" in text
+        assert (
+            "invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden" in text
+        )
+        assert "archive/refs/heads/" not in text
+        assert "invarlock==0.15.0" not in text
+        assert "local build" in text.lower()
+
+
+def test_captured_guide_describes_the_actual_trust_and_json_cutover() -> None:
+    guide = _read("docs/user-guide/captured-results.md")
+    for phrase in (
+        "--trust-profile",
+        "invarlock/trust-inputs-v2",
+        "baseline_run_digest",
+        "subject_run_digest",
+        "request_digest",
+        "signing_key_path",
+        "--unsigned",
+        "--fail-on-policy",
+        "--max-bootstrap-draws",
+        "requested_outputs",
+        "written_outputs",
+        "failed_output",
+        "invarlock/evidence-pack-v2",
+        "invarlock/evidence-verification-receipt-v3",
+        "captured_comparison",
+        "native-only",
+        "exit `6`",
+    ):
+        assert phrase in guide
 
 
 def test_public_example_includes_every_required_input_and_verify_anchor() -> None:
