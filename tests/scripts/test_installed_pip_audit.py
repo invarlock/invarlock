@@ -582,3 +582,42 @@ def test_declared_console_script_record_is_not_component_payload(surface) -> Non
     )
     assert audit.main(surface.args) == 1
     assert "unexpected installed RECORD entry" in surface.report.read_text()
+
+
+def test_valid_install_without_optional_pip_metadata(surface) -> None:
+    dist = surface.root / surface.dist
+    (dist / "INSTALLER").unlink()
+    (dist / "REQUESTED").unlink()
+    (dist / "RECORD").write_bytes(_record(surface.files, surface.dist))
+    assert audit.main(surface.args) == 0
+    receipt = json.loads(surface.report.read_text())
+    assert receipt["status"] == "accepted_exception"
+    assert set(receipt["binding"]["installed_component_files"]) == set(surface.files)
+
+
+def test_commented_multiline_lock_preserves_exact_artifact_binding(surface) -> None:
+    surface.lock.write_text(
+        "# Locked dependency generated for the approved workflow.\n\n"
+        "accelerate==1.14.0 \\\n"
+        "    # Retain the approved wheel digest.\n"
+        f"    --hash=sha256:{_digest(surface.wheel.read_bytes())}\n"
+    )
+    _set(surface, "--installed-lock-sha256", _digest(surface.lock.read_bytes()))
+    assert audit.main(surface.args) == 0
+    receipt = json.loads(surface.report.read_text())
+    assert receipt["binding"]["lock_sha256"] == _digest(surface.lock.read_bytes())
+    assert receipt["binding"]["wheel_sha256"] == _digest(surface.wheel.read_bytes())
+
+
+def test_wheel_directory_entries_preserve_exact_payload_inventory(surface) -> None:
+    with zipfile.ZipFile(surface.wheel, "a") as archive:
+        archive.writestr("accelerate/", b"")
+        archive.writestr(surface.dist + "/", b"")
+    _refresh_lock(surface)
+    assert audit.main(surface.args) == 0
+    receipt = json.loads(surface.report.read_text())
+    expected = set(surface.files) | {
+        surface.dist + "/INSTALLER",
+        surface.dist + "/REQUESTED",
+    }
+    assert set(receipt["binding"]["installed_component_files"]) == expected
