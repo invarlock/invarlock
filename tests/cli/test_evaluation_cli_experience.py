@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from invarlock import (
@@ -223,23 +224,40 @@ def test_human_adverse_decisions_preserve_recorded_verdict(project, missing, exp
 @pytest.mark.parametrize(
     "missing", [True, False], ids=["missing-file", "malformed-yaml"]
 )
+@pytest.mark.parametrize("color", [False, True], ids=["plain", "colored"])
 def test_evaluate_bad_request_is_a_machine_readable_failure(
-    tmp_path, monkeypatch, missing
+    tmp_path, monkeypatch, missing, color
 ):
+    monkeypatch.setenv("COLUMNS", "80")
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    if color:
+        monkeypatch.delenv("NO_COLOR", raising=False)
+    else:
+        monkeypatch.setenv("NO_COLOR", "1")
     runner = CliRunner()
-    path = tmp_path / "absent[red].yaml"
+    # Place the opening bracket at the last column, regardless of pytest's root.
+    padding = (80 - len("absent[") - len(str(tmp_path)) - 2) % 80 + 80
+    directory = tmp_path / ("x" * padding)
+    directory.mkdir()
+    path = directory / "absent[red].yaml"
     if not missing:
         path.write_text("not: [valid")
     original = _inventory(tmp_path)
     forbidden = _forbid_report_work(monkeypatch)
-    human = runner.invoke(app, ["evaluate", str(path), "--unsigned"])
+    human = runner.invoke(
+        app, ["evaluate", str(path), "--unsigned"], color=color, terminal_width=80
+    )
     machine = runner.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
     assert human.exit_code == machine.exit_code == 2
     forbidden.assert_not_called()
-    assert "FAIL" in human.output
-    assert json.loads(machine.stdout)["errors"]
+    rendered = Text.from_ansi(human.output).plain
+    assert "FAIL" in rendered
+    errors = json.loads(machine.stdout)["errors"]
+    assert errors
     if missing:
-        assert "absent[red].yaml" in human.output
+        assert errors == [f"evaluation request is unavailable: {path}"]
+        # Remove display line breaks only; every literal path character must remain.
+        assert rendered.replace("\n", "") == f"FAIL {errors[0]}"
         assert not path.exists()
     assert _inventory(tmp_path) == original
 
@@ -472,7 +490,7 @@ def test_explain_keeps_json_metadata_and_entire_evidence_unchanged(
             if machine:
                 metadata.append(json.loads(rendered.stdout))
             else:
-                text = " ".join(rendered.stdout.split())
+                text = " ".join(Text.from_ansi(rendered.stdout).plain.split())
                 assert "Policy satisfied" in text
                 if signed:
                     assert "Signed manifest verified." in text
@@ -534,7 +552,7 @@ def test_report_signed_manifest_presents_recorded_adverse_result_without_replay(
         app, ["report", str(source), *(["--explain"] if explain else [])]
     )
     assert human.exit_code == 0, human.output
-    text = " ".join(human.stdout.split())
+    text = " ".join(Text.from_ansi(human.stdout).plain.split())
     assert ("More evidence needed" if missing else "Policy not met") in text
     if missing:
         assert "Unavailable" in text
@@ -697,7 +715,7 @@ def test_generated_starter_directory_runs_neutral_commands(tmp_path, monkeypatch
     forbidden = _forbid_report_work(monkeypatch)
     rendered = runner.invoke(app, commands[1])
     assert rendered.exit_code == 0, rendered.output
-    text = " ".join(rendered.stdout.split())
+    text = " ".join(Text.from_ansi(rendered.stdout).plain.split())
     assert "Unsigned local evidence" in text
     assert "Independent acceptance: Not performed by report." in text
     assert "Replay and scoring: Not performed by report." in text

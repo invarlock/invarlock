@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from invarlock import engine
@@ -363,7 +364,14 @@ def test_setup_error_is_literal_in_human_output(tmp_path):
     assert result.stdout.strip() == "FAIL planned case set must be an object"
 
 
-def test_preflight_cannot_be_combined_with_policy_gate(tmp_path):
+@pytest.mark.parametrize("color", [False, True], ids=["plain", "colored"])
+def test_preflight_cannot_be_combined_with_policy_gate(tmp_path, monkeypatch, color):
+    monkeypatch.setenv("COLUMNS", "80")
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    if color:
+        monkeypatch.delenv("NO_COLOR", raising=False)
+    else:
+        monkeypatch.setenv("NO_COLOR", "1")
     _inputs(tmp_path)
     result = RUNNER.invoke(
         app,
@@ -374,9 +382,14 @@ def test_preflight_cannot_be_combined_with_policy_gate(tmp_path):
             "--preflight",
             "--fail-on-policy",
         ],
+        color=color,
+        terminal_width=80,
     )
     assert result.exit_code == 2
-    assert "--fail-on-policy cannot be used with --preflight" in result.output
+    assert (
+        "--fail-on-policy cannot be used with --preflight"
+        in Text.from_ansi(result.output).plain
+    )
     assert not (tmp_path / "artifacts").exists()
 
 
