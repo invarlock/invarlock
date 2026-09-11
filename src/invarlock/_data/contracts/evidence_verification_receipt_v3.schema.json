@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evidence_verification_receipt_v3.schema.json",
+  "description": "Verifier-signed captured-comparison statement, not a model-execution certificate. Expected anchors are independent of the examined manifest. Assurance follows policy slice order (overall first), then metric order; only complete matching replay carries it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["statement", "signature"],
+  "properties": {
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "kind", "pack_format", "pack_manifest_digest", "anchors", "subject", "verifier", "verification_scope", "replay_status", "scoring_assurance", "verdict"],
+      "properties": {
+        "format": {"const": "invarlock/evidence-verification-receipt-v3"},
+        "kind": {"const": "captured"},
+        "pack_format": {"const": "invarlock/evidence-pack-v2"},
+        "pack_manifest_digest": {"$ref": "#/$defs/digest"},
+        "anchors": {
+          "type": "object", "additionalProperties": false,
+          "required": ["baseline_run_digest", "subject_run_digest", "policy_digest", "request_digest", "signer_fingerprint"],
+          "properties": {
+            "baseline_run_digest": {"$ref": "#/$defs/digest"},
+            "subject_run_digest": {"$ref": "#/$defs/digest"},
+            "policy_digest": {"$ref": "#/$defs/digest"},
+            "request_digest": {"$ref": "#/$defs/digest"},
+            "signer_fingerprint": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "subject": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "run_digest"],
+          "properties": {"kind": {"const": "captured_run"}, "run_digest": {"$ref": "#/$defs/digest"}}
+        },
+        "verifier": {
+          "type": "object", "additionalProperties": false,
+          "required": ["identity", "signing_key_fingerprint", "trust_profile_digest"],
+          "properties": {
+            "identity": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"},
+            "signing_key_fingerprint": {"$ref": "#/$defs/digest"},
+            "trust_profile_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+          }
+        },
+        "verification_scope": {"const": "captured_comparison"},
+        "replay_status": {"enum": ["not_started", "failed", "completed"]},
+        "scoring_assurance": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/assurances"}]},
+        "verdict": {
+          "type": "object", "additionalProperties": false,
+          "required": ["ok", "integrity_ok", "decision", "policy_verdict", "verification_status"],
+          "properties": {
+            "ok": {"type": "boolean"}, "integrity_ok": {"type": "boolean"},
+            "decision": {"enum": ["pass", "regression", "insufficient_evidence", null]},
+            "policy_verdict": {"enum": ["pass", "fail", null]},
+            "verification_status": {"type": "integer", "enum": [0, 4, 6, 7]}
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"replay_status": {"enum": ["failed", "completed"]}, "verdict": {"properties": {"integrity_ok": {"const": false}}}}},
+          "then": {"properties": {"verdict": {"properties": {"verification_status": {"const": 6}}}}}
+        },
+        {
+          "if": {"properties": {"verdict": {"properties": {"integrity_ok": {"const": true}}}}},
+          "then": {
+            "properties": {
+              "replay_status": {"const": "completed"},
+              "scoring_assurance": {"$ref": "#/$defs/assurances"},
+              "verdict": {"oneOf": [
+                {"properties": {"ok": {"const": true}, "decision": {"const": "pass"}, "policy_verdict": {"const": "pass"}, "verification_status": {"const": 0}}},
+                {"properties": {"ok": {"const": false}, "decision": {"enum": ["regression", "insufficient_evidence"]}, "policy_verdict": {"const": "fail"}, "verification_status": {"const": 7}}}
+              ]}
+            }
+          },
+          "else": {
+            "properties": {
+              "scoring_assurance": {"type": "null"},
+              "verdict": {"properties": {"ok": {"const": false}, "decision": {"type": "null"}, "policy_verdict": {"type": "null"}, "verification_status": {"enum": [4, 6]}}}
+            }
+          }
+        }
+      ]
+    },
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["format", "algorithm", "public_key", "value"],
+      "properties": {
+        "format": {"const": "invarlock/evidence-verification-receipt-signature-v1"},
+        "algorithm": {"const": "ed25519"},
+        "public_key": {
+          "type": "object", "additionalProperties": false,
+          "required": ["encoding", "value"],
+          "properties": {"encoding": {"const": "pem"}, "value": {"type": "string", "minLength": 1, "maxLength": 4096}}
+        },
+        "value": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\x00-\\x1f\\x7f]+$"},
+    "assurances": {
+      "type": "array", "minItems": 1, "maxItems": 272, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "slice", "kind", "scoring_assurance"],
+        "properties": {
+          "name": {"$ref": "#/$defs/name"}, "slice": {"$ref": "#/$defs/name"},
+          "kind": {"enum": ["exact_match", "normalized_match", "numeric_tolerance", "json_exact", "json_fields", "token_f1", "recorded"]},
+          "scoring_assurance": {"enum": ["recorded", "recomputed"]}
+        },
+        "allOf": [{
+          "if": {"properties": {"kind": {"const": "recorded"}}},
+          "then": {"properties": {"scoring_assurance": {"const": "recorded"}}},
+          "else": {"properties": {"scoring_assurance": {"const": "recomputed"}}}
+        }]
+      }
+    }
+  }
+}

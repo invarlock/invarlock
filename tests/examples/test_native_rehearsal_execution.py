@@ -18,7 +18,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "examples/pipeline/native_rehearsal.py"
+SCRIPT = ROOT / "examples/captured-results/native_rehearsal.py"
 
 
 def load():

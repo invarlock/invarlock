@@ -2,11 +2,62 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from invarlock_addins.tensorrt_llm import runner
+
+
+@pytest.mark.parametrize("failure", ["second_dup", "sink_open", "restore_stdout"])
+def test_backend_output_cleanup_survives_acquisition_and_restore_errors(
+    monkeypatch, failure
+):
+    real_dup, real_open, real_stat = os.dup, os.open, os.fstat
+    acquired = []
+    restored = []
+
+    def duplicate(descriptor):
+        if failure == "second_dup" and acquired:
+            raise OSError("second_dup")
+        result = real_dup(descriptor)
+        acquired.append(result)
+        return result
+
+    def open_sink(*args, **kwargs):
+        if failure == "sink_open":
+            raise OSError("sink_open")
+        result = real_open(*args, **kwargs)
+        acquired.append(result)
+        return result
+
+    def redirect(source, destination):
+        if source == acquired[-1]:
+            return
+        restored.append(destination)
+        if failure == "restore_stdout" and destination == 1:
+            raise OSError("restore_stdout")
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "dup", duplicate)
+            patch.setattr(os, "open", open_sink)
+            patch.setattr(os, "dup2", redirect)
+            with pytest.raises(OSError, match=failure):
+                with runner._silence_backend_output():
+                    pass
+        for descriptor in acquired:
+            with pytest.raises(OSError):
+                real_stat(descriptor)
+        if failure == "restore_stdout":
+            assert set(restored) == {1, 2}
+    finally:
+        for descriptor in acquired:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
 
 
 def test_canonical_request_and_text_identifiers_reject_unsafe_unicode(

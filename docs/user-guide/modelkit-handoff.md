@@ -4,12 +4,12 @@
     **Outcome:** Check the exact delivered package, both actual model directories,
     signed evaluation evidence, and the recipient's current acceptance policy.
     **Audience:** Model publishers and recipients integrating an artifact handoff.
-    **Prerequisites:** Python 3.12 or newer, the current source candidate's installed
+    **Prerequisites:** Python 3.12 or newer, the installed
     InvarLock wheel, a separately reviewed copy of the example script, complete
     local package blobs, and independently selected trust inputs.
 
-The example is available in the unreleased source checkout. It uses the public
-InvarLock verifier and needs no service account. Its result is a check at the time
+Use the [matching wheel and examples](getting-started.md#matching-wheels-and-examples).
+The example uses the public InvarLock verifier and needs no service account. Its result is a check at the time
 of invocation. A deployment consumer must use the checked directories and prevent
 later writes or substitutions before loading them.
 

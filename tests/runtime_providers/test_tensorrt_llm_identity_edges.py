@@ -14,6 +14,49 @@ def _error(message: str):
     return pytest.raises(identity.TensorRTLLMIdentityError, match=message)
 
 
+@pytest.mark.parametrize("operation", ["root", "tree"])
+@pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt])
+def test_directory_stat_failure_releases_new_descriptors(
+    tmp_path, monkeypatch, operation, failure
+):
+    (tmp_path / "child").mkdir()
+    original_open, original_stat = os.open, os.fstat
+    root = original_open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    opened = []
+
+    def open_tracked(*args, **kwargs):
+        descriptor = original_open(*args, **kwargs)
+        opened.append(descriptor)
+        return descriptor
+
+    def fail_stat(descriptor):
+        raise failure("directory stat failed")
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "open", open_tracked)
+            patch.setattr(os, "fstat", fail_stat)
+            expected = (
+                identity.TensorRTLLMIdentityError if failure is OSError else failure
+            )
+            with pytest.raises(expected):
+                if operation == "root":
+                    identity._open_root_without_symlinks(tmp_path)
+                else:
+                    identity._collect_files(root)
+        assert opened
+        for descriptor in opened:
+            with pytest.raises(OSError):
+                original_stat(descriptor)
+    finally:
+        for descriptor in opened:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        os.close(root)
+
+
 def test_logical_names_and_root_paths_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -302,3 +345,50 @@ def test_empty_authenticated_bundle_is_rejected(tmp_path: Path) -> None:
     bundle.mkdir()
     with _error("engine bundle is empty"):
         identity.read_tensorrt_llm_engine_tree_sha256(bundle)
+
+
+@pytest.mark.parametrize("failure_type", [OSError, KeyboardInterrupt])
+def test_leaf_open_failure_releases_duplicate_but_preserves_caller_root(
+    tmp_path, monkeypatch, failure_type
+):
+    root = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    original_dup = os.dup
+    duplicates = []
+    failure = failure_type("leaf open interrupted")
+
+    def track_dup(descriptor):
+        duplicate = original_dup(descriptor)
+        duplicates.append(duplicate)
+        return duplicate
+
+    def fail_leaf(*args, **kwargs):
+        raise failure
+
+    expected = (
+        identity.TensorRTLLMIdentityError if failure_type is OSError else failure_type
+    )
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "dup", track_dup)
+            patch.setattr(os, "open", fail_leaf)
+            with pytest.raises(expected) as raised:
+                identity._open_file_by_components(root, "rank0.engine")
+        if failure_type is OSError:
+            assert (
+                str(raised.value)
+                == "engine bundle entry 'rank0.engine' cannot be opened safely"
+            )
+            assert raised.value.__cause__ is failure
+        else:
+            assert raised.value is failure
+        assert os.fstat(root).st_ino == tmp_path.stat().st_ino
+        assert len(duplicates) == 1
+        with pytest.raises(OSError):
+            os.fstat(duplicates[0])
+    finally:
+        for descriptor in duplicates:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        os.close(root)

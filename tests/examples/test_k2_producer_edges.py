@@ -306,3 +306,31 @@ def test_failed_container_cleanup_is_reported(tmp_path, monkeypatch):
         capture_worker.run_container(
             tmp_path / "plan.json", "baseline", tmp_path, tmp_path / "out", "preflight"
         )
+
+
+def test_thread_start_failure_stops_server_and_closes_output(tmp_path, monkeypatch):
+    process = SimpleNamespace(
+        pid=654321, stdout=io.BytesIO(b"diagnostic"), poll=lambda: None
+    )
+    waits, signals = [], []
+    process.wait = lambda timeout: waits.append(timeout)
+    monkeypatch.setattr(capture_worker.subprocess, "Popen", lambda *a, **k: process)
+    monkeypatch.setattr(
+        capture_worker.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(
+            stdout="NVIDIA H100 80GB HBM3, 81559, 580.173.02, Disabled\n"
+        ),
+    )
+    monkeypatch.setattr(capture_worker.os, "killpg", lambda *args: signals.append(args))
+
+    def fail_start(self):
+        raise RuntimeError("thread start failed")
+
+    monkeypatch.setattr(capture_worker.threading.Thread, "start", fail_start)
+    with pytest.raises(RuntimeError, match="thread start failed"):
+        capture_worker.worker(_ready_plan(), "baseline", "preflight", tmp_path)
+    assert signals == [(process.pid, signal.SIGTERM)]
+    assert waits == [10]
+    assert process.stdout.closed
+    assert not (tmp_path / "capture.json").exists()

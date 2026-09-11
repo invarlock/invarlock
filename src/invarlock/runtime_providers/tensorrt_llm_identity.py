@@ -146,7 +146,11 @@ def _open_root_without_symlinks(path: str | os.PathLike[str]) -> int:
                     follow_symlinks=False,
                 )
                 next_descriptor = os.open(component, flags, dir_fd=descriptor)
-                opened = os.fstat(next_descriptor)
+                try:
+                    opened = os.fstat(next_descriptor)
+                except BaseException:
+                    os.close(next_descriptor)
+                    raise
             except OSError as exc:
                 raise TensorRTLLMIdentityError(
                     "engine bundle path contains a symlink or inaccessible directory"
@@ -160,10 +164,11 @@ def _open_root_without_symlinks(path: str | os.PathLike[str]) -> int:
                 raise TensorRTLLMIdentityError(
                     "engine bundle directory changed while being opened"
                 )
-            os.close(descriptor)
+            previous_descriptor = descriptor
             descriptor = next_descriptor
+            os.close(previous_descriptor)
         return descriptor
-    except Exception:
+    except BaseException:
         os.close(descriptor)
         raise
 
@@ -226,12 +231,17 @@ def _collect_files(root_descriptor: int) -> tuple[_FileRecord, ...]:
                         flags,
                         dir_fd=directory_descriptor,
                     )
-                    opened = os.fstat(child_descriptor)
                 except OSError as exc:
                     raise TensorRTLLMIdentityError(
                         f"engine bundle directory {logical_name!r} cannot be opened safely"
                     ) from exc
                 try:
+                    try:
+                        opened = os.fstat(child_descriptor)
+                    except OSError as exc:
+                        raise TensorRTLLMIdentityError(
+                            f"engine bundle directory {logical_name!r} cannot be opened safely"
+                        ) from exc
                     if not stat.S_ISDIR(opened.st_mode) or _stat_identity(
                         before
                     ) != _stat_identity(opened):
@@ -315,8 +325,9 @@ def _open_file_by_components(
                 raise TensorRTLLMIdentityError(
                     f"engine bundle directory for {logical_name!r} changed"
                 ) from exc
-            os.close(directory_descriptor)
+            previous_descriptor = directory_descriptor
             directory_descriptor = next_descriptor
+            os.close(previous_descriptor)
         file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
         try:
             file_descriptor = os.open(
@@ -329,7 +340,7 @@ def _open_file_by_components(
                 f"engine bundle entry {logical_name!r} cannot be opened safely"
             ) from exc
         return directory_descriptor, file_descriptor
-    except Exception:
+    except BaseException:
         os.close(directory_descriptor)
         raise
 
@@ -385,8 +396,10 @@ def _hash_file(root_descriptor: int, record: _FileRecord) -> _HashedFile:
             sha256=digest.hexdigest(),
         )
     finally:
-        os.close(file_descriptor)
-        os.close(parent_descriptor)
+        try:
+            os.close(file_descriptor)
+        finally:
+            os.close(parent_descriptor)
 
 
 def _read_bounded_file(
@@ -424,8 +437,10 @@ def _read_bounded_file(
             )
         return b"".join(chunks)
     finally:
-        os.close(file_descriptor)
-        os.close(parent_descriptor)
+        try:
+            os.close(file_descriptor)
+        finally:
+            os.close(parent_descriptor)
 
 
 def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

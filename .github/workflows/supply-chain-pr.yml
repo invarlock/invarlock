@@ -81,7 +81,7 @@ jobs:
           import sys
           from pathlib import Path
 
-          source = Path(sys.argv[1]) / "src/invarlock/pipeline/evidence.py"
+          source = Path(sys.argv[1]) / "src/invarlock/captured_evidence_publication.py"
           source.parent.mkdir(parents=True)
           name = "_".join(("signing", "key"))
           annotation = "Ed25519" + "PrivateKey"
@@ -144,8 +144,8 @@ jobs:
           findings = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
           expected = Counter([
               ("public_evidence/evidence/example/evidence/request.json", 1),
-              ("src/invarlock/pipeline/evidence.py", 3),
-              ("src/invarlock/pipeline/evidence.py", 4),
+              ("src/invarlock/captured_evidence_publication.py", 3),
+              ("src/invarlock/captured_evidence_publication.py", 4),
               ("examples/qualification/k2-horizon/model-card-observations.json", 2),
               ("examples/qualification/k2-horizon/unrelated.json", 1),
               ("examples/qualification/k2_runtime_expat.py", 3),

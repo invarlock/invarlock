@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evaluation_request_v2.schema.json",
+  "title": "InvarLock Captured Evaluation Request",
+  "type": "object",
+  "required": ["format_version", "execution", "comparison", "output"],
+  "properties": {
+    "format_version": {"const": "invarlock/evaluation-request-v2"},
+    "execution": {"$ref": "#/$defs/execution"},
+    "comparison": {"$ref": "#/$defs/comparison"},
+    "output": {"$ref": "#/$defs/output"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "source": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {"name": {"$ref": "#/$defs/text"}, "version": {"$ref": "#/$defs/text"}},
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "maxProperties": 100,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "source", "version", "unit", "rubric_digest"],
+        "properties": {
+          "kind": {"enum": ["judge", "human", "measurement", "external_metric"]},
+          "source": {"$ref": "#/$defs/text"},
+          "version": {"$ref": "#/$defs/text"},
+          "unit": {"$ref": "#/$defs/text"},
+          "rubric_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "source_spec": {
+      "type": "object",
+      "required": ["path", "adapter"],
+      "properties": {
+        "path": {"$ref": "#/$defs/reference"},
+        "adapter": {"enum": ["invarlock", "jsonl", "inspect-json", "lm-eval-samples", "promptfoo-jsonl"]},
+        "source": {"$ref": "#/$defs/source"},
+        "run_id": {"$ref": "#/$defs/text"},
+        "artifact_digest": {"$ref": "#/$defs/digest"},
+        "score_provenance": {"$ref": "#/$defs/provenance"},
+        "expected_run_digest": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {"mode": {"const": "captured"}},
+      "additionalProperties": false
+    },
+    "comparison": {
+      "type": "object",
+      "required": ["baseline", "subject", "policy"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/source_spec"},
+        "subject": {"$ref": "#/$defs/source_spec"},
+        "policy": {"$ref": "#/$defs/reference"}
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "required": ["evidence"],
+      "properties": {"evidence": {"$ref": "#/$defs/reference"}},
+      "additionalProperties": false
+    }
+  }
+}

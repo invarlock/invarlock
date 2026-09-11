@@ -9,7 +9,9 @@ import yaml
 
 import invarlock.core.evaluation_request as evaluation_request
 from invarlock.core.evaluation_request import (
+    CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION,
     EVALUATION_REQUEST_FORMAT,
+    CapturedEvaluationRequest,
     EvaluationRequestError,
     ProviderResolver,
     load_evaluation_request,
@@ -1082,3 +1084,85 @@ def test_request_rejects_files_over_one_mibibyte(tmp_path: Path) -> None:
 
     with pytest.raises(EvaluationRequestError, match="1048576-byte size limit"):
         load_evaluation_request(path)
+
+
+def _captured_payload() -> dict[str, object]:
+    source = {"path": "inputs/run.json", "adapter": "invarlock"}
+    return {
+        "format_version": CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION,
+        "execution": {"mode": "captured"},
+        "comparison": {
+            "baseline": dict(source),
+            "subject": dict(source, path="inputs/subject.json"),
+            "policy": "policy.json",
+        },
+        "output": {"evidence": "artifacts/evidence"},
+    }
+
+
+def test_captured_request_dispatches_without_provider_resolution(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs/run.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "inputs/subject.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "policy.json").write_text("{}\n", encoding="utf-8")
+
+    request = load_evaluation_request(
+        _write_request(tmp_path / "request.yaml", _captured_payload())
+    )
+
+    assert isinstance(request, CapturedEvaluationRequest)
+    assert request.execution_mode == "captured"
+    assert request.baseline.path == tmp_path / "inputs/run.json"
+    assert request.subject.path == tmp_path / "inputs/subject.json"
+    assert request.policy == tmp_path / "policy.json"
+    assert request.evidence == tmp_path / "artifacts/evidence"
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("execution", "mode"), "run"),
+        (("execution", "unknown"), True),
+        (("comparison", "baseline", "unknown"), True),
+    ],
+)
+def test_captured_request_rejects_unknown_modes_and_fields(
+    tmp_path: Path, path: tuple[str, ...], value: object
+) -> None:
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs/run.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "inputs/subject.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "policy.json").write_text("{}\n", encoding="utf-8")
+    payload = _captured_payload()
+    cursor: object = payload
+    for key in path[:-1]:
+        assert isinstance(cursor, dict)
+        cursor = cursor[key]
+    assert isinstance(cursor, dict)
+    cursor[path[-1]] = value
+
+    with pytest.raises(EvaluationRequestError, match="does not match"):
+        load_evaluation_request(_write_request(tmp_path / "request.yaml", payload))
+
+
+@pytest.mark.parametrize(
+    "reference", ["../outside.json", "/outside.json", "inputs/../outside.json"]
+)
+def test_captured_request_rejects_paths_that_escape_request_root(
+    tmp_path: Path, reference: str
+) -> None:
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs/run.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "inputs/subject.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "policy.json").write_text("{}\n", encoding="utf-8")
+    payload = _captured_payload()
+    comparison = payload["comparison"]
+    assert isinstance(comparison, dict)
+    baseline = comparison["baseline"]
+    assert isinstance(baseline, dict)
+    baseline["path"] = reference
+
+    with pytest.raises(EvaluationRequestError):
+        load_evaluation_request(_write_request(tmp_path / "request.yaml", payload))

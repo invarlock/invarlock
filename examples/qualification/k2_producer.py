@@ -248,13 +248,16 @@ def worker(plan, role, phase, output):
         env=environment,
         start_new_session=True,
     )
-    assert process.stdout is not None
-    drainer = threading.Thread(
-        target=_drain, args=(process.stdout, output / "server.log"), daemon=True
-    )
-    drainer.start()
-    started = time.monotonic()
+    drainer = None
+    drainer_started = False
     try:
+        assert process.stdout is not None
+        drainer = threading.Thread(
+            target=_drain, args=(process.stdout, output / "server.log"), daemon=True
+        )
+        drainer.start()
+        drainer_started = True
+        started = time.monotonic()
         while True:
             if process.poll() is not None:
                 raise ValueError(
@@ -278,14 +281,21 @@ def worker(plan, role, phase, output):
         if phase == "preflight":
             campaign.write_json(output / "preflight.json", preflight_summary(captured))
     finally:
-        if process.poll() is None:
-            os.killpg(process.pid, signal.SIGTERM)
+        try:
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait(timeout=10)
+        finally:
             try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=10)
-        drainer.join(timeout=5)
+                if drainer_started:
+                    drainer.join(timeout=5)
+            finally:
+                if process.stdout is not None:
+                    process.stdout.close()
 
 
 def run_container(

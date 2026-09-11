@@ -1105,6 +1105,51 @@ def test_paired_records_no_clobber_preserves_existing_evidence(tmp_path: Path) -
     assert destination.read_text(encoding="utf-8") == '{"owner":"existing"}\n'
 
 
+def test_paired_records_cleanup_failure_closes_parent(tmp_path, monkeypatch):
+    sides = [
+        _write_side(
+            tmp_path / role,
+            role=role,
+            artifact=_artifact(f"{role}.gguf", marker),
+            outputs=("A", "B"),
+            image_marker=marker,
+        )
+        for role, marker in (("baseline", "a"), ("subject", "b"))
+    ]
+    original_open = os.open
+    parents = []
+
+    def open_parent(path, *args, **kwargs):
+        descriptor = original_open(path, *args, **kwargs)
+        if path == tmp_path:
+            parents.append(descriptor)
+        return descriptor
+
+    def fail_cleanup(*args, **kwargs):
+        raise PermissionError("staging cleanup denied")
+
+    monkeypatch.setattr(os, "open", open_parent)
+    monkeypatch.setattr(os, "unlink", fail_cleanup)
+    try:
+        with pytest.raises(PermissionError, match="staging cleanup denied"):
+            write_runtime_import_paired_records(
+                tmp_path / "paired.json",
+                schedule=_schedule(),
+                metric="exact_match",
+                baseline=sides[0],
+                subject=sides[1],
+            )
+        assert len(parents) == 1
+        with pytest.raises(OSError):
+            os.fstat(parents[0])
+    finally:
+        for descriptor in parents:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
 def test_paired_records_detect_post_link_publication_change(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

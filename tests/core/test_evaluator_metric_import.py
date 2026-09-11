@@ -5,11 +5,11 @@ import json
 
 import pytest
 
+from invarlock.core.scoring import UNICODE_VERSION
 from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
 )
-from invarlock.pipeline.metrics import UNICODE_VERSION
 from tests.core.test_evaluator_qualification import _write_json, qualification_fixture
 
 

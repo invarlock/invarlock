@@ -175,3 +175,50 @@ def test_stream_hash_detects_truncation_and_growth(
             identity._stream_file_sha256(descriptor, 1)
     finally:
         os.close(descriptor)
+
+
+@pytest.mark.parametrize("failure_type", [OSError, KeyboardInterrupt])
+def test_leaf_inspection_failure_releases_file_and_parent(
+    tmp_path, monkeypatch, failure_type
+):
+    path = tmp_path / "value.gguf"
+    path.write_bytes(b"GGUF")
+    original_open, original_close = os.open, os.close
+    live = set()
+    leaf = None
+    failure = failure_type("leaf inspection interrupted")
+
+    def track_open(name, *args, **kwargs):
+        nonlocal leaf
+        descriptor = original_open(name, *args, **kwargs)
+        live.add(descriptor)
+        if name == path.name:
+            leaf = descriptor
+        return descriptor
+
+    def track_close(descriptor):
+        original_close(descriptor)
+        live.remove(descriptor)
+
+    def fail_inspection(descriptor):
+        assert descriptor == leaf
+        raise failure
+
+    expected = identity.GGUFIdentityError if failure_type is OSError else failure_type
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "open", track_open)
+            patch.setattr(os, "close", track_close)
+            patch.setattr(os, "fstat", fail_inspection)
+            with pytest.raises(expected) as raised:
+                identity._open_regular_without_symlinks(path)
+        if failure_type is OSError:
+            assert str(raised.value) == "GGUF artifact cannot be inspected safely"
+            assert raised.value.__cause__ is failure
+        else:
+            assert raised.value is failure
+        assert leaf is not None
+        assert not live, "file or parent descriptor leaked after inspection failure"
+    finally:
+        for descriptor in live:
+            original_close(descriptor)

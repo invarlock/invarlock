@@ -37,12 +37,12 @@ regexes = [
 ]
 
 [[allowlists]]
-description = "The pipeline signing-key parameter defaults to None and contains no key material."
+description = "The captured-evaluation signing-key parameter defaults to None and contains no key material."
 targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "line"
 paths = [
-  '''^src/invarlock/pipeline/evidence\.py$''',
+  '''^src/invarlock/captured_evidence_publication\.py$''',
 ]
 regexes = [
   # Gitleaks retains the preceding newline for findings after the first line.

@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+from xml.etree.ElementTree import Element, SubElement, tostring
 
 from jsonschema import Draft202012Validator
 
@@ -66,9 +67,16 @@ _DIRECTORY_FLAGS = (
 class EvidenceReportError(ValueError):
     """Raised when canonical evidence cannot be rendered safely."""
 
-    def __init__(self, message: str, *, exit_code: int = 2) -> None:
+    def __init__(
+        self, message: str, *, exit_code: int = 2, payload: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(message)
         self.exit_code = exit_code
+        self.payload = payload
+        self.written_outputs = (
+            dict(payload.get("written_outputs", {})) if payload else {}
+        )
+        self.failed_output = payload.get("failed_output") if payload else None
 
 
 @dataclass(frozen=True)
@@ -78,6 +86,31 @@ class EvidenceReport:
     evidence_signer: str
     pack_manifest_digest: str
     observations: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class EvidenceReportV2:
+    text: str
+    kind: str
+    pack_manifest_digest: str
+    requested_outputs: dict[str, str]
+    written_outputs: dict[str, str]
+    failed_output: str | None = None
+    errors: tuple[str, ...] = ()
+
+    def as_json(self) -> str:
+        return canonical_json_bytes(
+            {
+                "format_version": "invarlock/evidence-report-v2",
+                "kind": self.kind,
+                "ok": not self.errors,
+                "pack_manifest_digest": self.pack_manifest_digest,
+                "requested_outputs": self.requested_outputs,
+                "written_outputs": self.written_outputs,
+                "failed_output": self.failed_output,
+                "errors": list(self.errors),
+            }
+        ).decode("utf-8")
 
 
 def _load_object_with_bytes(
@@ -450,9 +483,10 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             except FileNotFoundError:
                 os.mkdir(component, mode=0o755, dir_fd=current_fd)
                 child_fd = os.open(component, _DIRECTORY_FLAGS, dir_fd=current_fd)
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         flags = (
             os.O_WRONLY
             | os.O_CREAT
@@ -477,9 +511,11 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             f"could not write HTML report: {exc}", exit_code=1
         ) from exc
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
     return destination
 
 
@@ -1204,11 +1240,12 @@ def _render_html(
     )
 
 
-def render_evidence(
+def _render_native_evidence(
     evidence_path: Path,
     *,
     html_path: Path | None = None,
     explain: bool = False,
+    _view_sink: list[ReportView] | None = None,
 ) -> EvidenceReport:
     """Render the signature-authenticated canonical report without mutation."""
 
@@ -1267,6 +1304,8 @@ def render_evidence(
     stability_errors = [*materialized_errors, *snapshot.stability_errors()]
     if stability_errors:
         raise EvidenceReportError("; ".join(stability_errors))
+    if _view_sink is not None:
+        _view_sink.append(view)
     manifest_entry = snapshot.files.entry("manifest.json")
     if manifest_entry is None:  # pragma: no cover - capture contract owns inventory
         raise EvidenceReportError("evidence manifest snapshot is unavailable")
@@ -1284,4 +1323,144 @@ def render_evidence(
     )
 
 
-__all__ = ["EvidenceReport", "EvidenceReportError", "render_evidence"]
+def render_evidence(
+    evidence_path: Path,
+    *,
+    html_path: Path | None = None,
+    explain: bool = False,
+    markdown_path: Path | None = None,
+    junit_path: Path | None = None,
+) -> EvidenceReport | EvidenceReportV2:
+    """Render either evidence family without replay or implicit receipt discovery."""
+    from invarlock.captured_contracts import atomic_write, sha
+    from invarlock.captured_reporting import (
+        CapturedReportError,
+        _load,
+        _view,
+        is_captured_manifest,
+    )
+
+    evidence = Path(evidence_path)
+    if not evidence.is_dir() or evidence.is_symlink():
+        raise EvidenceReportError("evidence must be a real directory")
+    try:
+        captured = is_captured_manifest(evidence)
+    except CapturedReportError as exc:
+        raise EvidenceReportError(
+            f"evidence manifest schema failed: {exc}", exit_code=exc.exit_code
+        ) from exc
+    if not captured and markdown_path is None and junit_path is None:
+        return _render_native_evidence(evidence, html_path=html_path, explain=explain)
+    requested = {
+        name: str(path)
+        for name, path in (
+            ("html", html_path),
+            ("markdown", markdown_path),
+            ("junit", junit_path),
+        )
+        if path is not None
+    }
+    payload: dict[str, Any] = {
+        "format_version": "invarlock/evidence-report-v2",
+        "kind": "captured" if captured else "runtime",
+        "ok": False,
+        "pack_manifest_digest": None,
+        "requested_outputs": requested,
+        "written_outputs": {},
+        "failed_output": None,
+        "errors": [],
+    }
+    try:
+        resolved: set[Path] = set()
+        for value in requested.values():
+            destination = Path(value).absolute()
+            if destination.name in {"", ".", ".."}:
+                raise EvidenceReportError("report destination must name a file")
+            canonical = destination.resolve()
+            if canonical.is_relative_to(
+                evidence.resolve()
+            ) or destination.is_relative_to(evidence.absolute()):
+                raise EvidenceReportError(
+                    "report destination must remain outside the immutable evidence pack"
+                )
+            if any(
+                canonical.is_relative_to(other) or other.is_relative_to(canonical)
+                for other in resolved
+            ):
+                raise EvidenceReportError("report destinations collide")
+            resolved.add(canonical)
+            if destination.exists() or destination.is_symlink():
+                raise EvidenceReportError(
+                    f"report destination already exists: {destination}"
+                )
+            for parent in destination.parents:
+                if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                    raise EvidenceReportError(
+                        "report destination parent must be a real directory"
+                    )
+        if captured:
+            manifest, values, signer, _ = _load(evidence)
+            view = _view(manifest, values, signer)
+            manifest_digest = sha(canonical_json_bytes(manifest))
+        else:
+            views: list[ReportView] = []
+            native = _render_native_evidence(
+                evidence, explain=explain, _view_sink=views
+            )
+            view = views[0]
+            manifest_digest = native.pack_manifest_digest
+        payload["pack_manifest_digest"] = manifest_digest
+        text = render_report_markdown(view, include_details=explain)
+        rendered = {}
+        if "html" in requested:
+            rendered["html"] = render_report_html(view).encode("utf-8")
+        if "markdown" in requested:
+            rendered["markdown"] = text.encode("utf-8")
+        if "junit" in requested:
+            suite = Element(
+                "testsuite",
+                name="InvarLock recorded policy checks",
+                tests=str(len(view.metrics)),
+                failures=str(
+                    sum(m.decision in {"fail", "regression"} for m in view.metrics)
+                ),
+                errors=str(
+                    sum(m.decision == "insufficient_evidence" for m in view.metrics)
+                ),
+            )
+            for metric in view.metrics:
+                case = SubElement(
+                    suite, "testcase", name=metric.name, classname=metric.scope
+                )
+                if metric.decision != "pass":
+                    SubElement(
+                        case,
+                        "error"
+                        if metric.decision == "insufficient_evidence"
+                        else "failure",
+                        message=metric.explanation,
+                    )
+            rendered["junit"] = tostring(suite, encoding="utf-8", xml_declaration=True)
+        for name, raw in rendered.items():
+            payload["failed_output"] = name
+            atomic_write(Path(requested[name]), raw)
+            payload["written_outputs"][name] = requested[name]
+        payload["failed_output"] = None
+    except (OSError, ValueError, RuntimeError) as exc:
+        payload["errors"] = [str(exc)[:1024]]
+        raise EvidenceReportError(str(exc), payload=payload) from exc
+    return EvidenceReportV2(
+        text=text,
+        kind=payload["kind"],
+        pack_manifest_digest=manifest_digest,
+        requested_outputs=requested,
+        written_outputs=dict(payload["written_outputs"]),
+    )
+
+
+__all__ = [
+    "EvidenceReport",
+    "EvidenceReportV2",
+    "EvidenceReportError",
+    "render_evidence",
+]

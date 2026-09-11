@@ -46,7 +46,6 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/evaluation_request.py \
 	src/invarlock/core/runtime_provider \
 	src/invarlock/evaluator_qualification.py \
-	src/invarlock/pipeline \
 	src/invarlock/core/builtin_scorers.py \
 	src/invarlock/evaluation_run.py \
 	src/invarlock/evaluation_runtime.py \
@@ -69,7 +68,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
-.PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
+.PHONY: cli-smoke-core hf-provider-smoke local-hf-capture-smoke local-hf-capture-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
 .PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
 .PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
@@ -131,8 +130,11 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/cov.xml --cov-fail-under=95
-	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
-		grep -v '/__init__.py$$' | \
+	$(MAKE) coverage-check-files
+
+.PHONY: coverage-check-files
+coverage-check-files:  ## Enforce per-file thresholds against collected core coverage
+	@$(PYTHON) -c 'from pathlib import Path; print("\n".join(str(path) for path in sorted(Path("src/invarlock").rglob("*.py")) if path.name != "__init__.py"))' | \
 		while IFS= read -r source; do \
 			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
@@ -684,12 +686,12 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		consumer_root="$$smoke_venv/quickstart-consumer"; \
 		mkdir "$$consumer_root"; \
 		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
-		cp examples/pipeline/wheel_smoke.py "$$consumer_root/pipeline-wheel-smoke.py"; \
+		cp examples/captured-results/wheel_smoke.py "$$consumer_root/captured-wheel-smoke.py"; \
 		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
 		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
 			"$$smoke_venv/bin/python" run.py --fixture golden ); \
 		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" pipeline-wheel-smoke.py --cli "$$smoke_venv/bin/invarlock-pipeline" ); \
+			"$$smoke_venv/bin/python" captured-wheel-smoke.py --cli "$$smoke_venv/bin/invarlock" ); \
 		approval_root="$$smoke_venv/deployment-consumer"; \
 		cp -R examples/ci/standalone-consumer "$$approval_root"; \
 		mkdir "$$approval_root/incoming"; \

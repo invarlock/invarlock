@@ -18,6 +18,8 @@ The facade deliberately groups these stable surfaces:
 | --- | --- |
 | Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt`, `write_acceptance_attestation`, `verify_acceptance_attestation` |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
+| Captured authoring | `CapturedEvaluationRequest`, `make_run`, `load_run`, `write_run`, `run_digest`, `physical_file_digest`, `freeze_case_set`, `case_set_digest`, `validate_run_case_set`, `compare_runs`, `comparison_policy_digest`, `normalize_captured_request`, `captured_request_digest`, `EvaluationRecordsError`, `DEFAULT_MAX_BOOTSTRAP_DRAWS` |
+| Trust profiles | `load_trust_inputs`, `TrustInputs`, `CapturedTrustInputs`, `TrustInputsError` |
 | Results and errors | Evaluation, verification, reporting, receipt, and evidence-pack result types |
 | OCI host execution | Per-side launch values, host executor, and environment-backed launch resolution |
 | Provider ABI | ABI constant, provider/session protocols, capabilities, runtime specs/resources/context, resolver protocols, batches, identities, receipts, and observations |
@@ -30,10 +32,11 @@ Imports from other `invarlock.*` modules are not stable merely because they are
 importable. Use the facade unless implementing the provider protocol documented
 in [Runtime providers](runtime-providers.md).
 
-The unreleased `invarlock.pipeline` module is an additional documented SDK for
-captured-result comparisons. It exports `make_run`, `load_run`, `compare_runs`,
-`create_evidence`, `verify_evidence` and `PipelineError`. Its evidence format and
-recorded-score semantics are described in [Pipeline contracts](pipeline-contracts.md).
+The captured evaluation helpers are part of the documented SDK for
+captured-result comparisons. They expose normalized run construction and loading,
+multi-metric comparison, evidence publication, independent verification, and
+scoped receipt handling through the same evaluation transaction surface. Their
+evidence and recorded-score semantics are described in [evaluation records](evaluation-records.md).
 
 ## Transactions
 
@@ -109,6 +112,9 @@ The result types are:
 | `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, optional `policy_verdict`, `as_json()` |
 | `EvidenceVerification` | `evidence_path`, `payload`, `receipt_path`, `summary`, `as_json()` |
 | `EvidenceReport` | `text`, `html_path`, `evidence_signer` |
+| `EvidenceReportV2` | `text`, `kind`, `pack_manifest_digest`, `requested_outputs`, `written_outputs`, `failed_output`, `errors`, `as_json()` |
+| `CapturedEvaluationPreflightResult` | `requested_authentication`, run/policy/request digests, record/scope counts, required/allowed draws, `output`, `checks`, `as_json()` |
+| `CapturedEvaluationTransactionResult` | `evidence_path`, `comparison_id`, run/policy/request/manifest digests, `authentication`, `policy_verdict`, `as_json()` |
 | `ReceiptVerification` | `ok`, `signed`, `statement`, `verifier_fingerprint`, `errors` |
 
 `EvaluationTransactionResult.policy_verdict` is optional presentation metadata
@@ -128,8 +134,10 @@ Applications should treat every exception or verification payload with
 processing. Ordinary receipt authenticity or anchor mismatches are reported in
 `ReceiptVerification.errors` with `ok` set to false.
 
-`render_evidence` authenticates the bundle's internal evidence signature but
-does not take independent artifact, schedule, policy, runtime, or signer
+`render_evidence` checks the closed bundle and authenticates its internal
+evidence signature when the manifest declares signed authentication. Unsigned
+captured packs retain their explicit local assurance label. Rendering does not
+take independent artifact, schedule, policy, runtime, run, request, or signer
 anchors. Call `verify_evidence` when an independent acceptance decision is
 required.
 
@@ -184,29 +192,37 @@ policy.
 
 ```python
 evaluate_request_file(
-    request_path: Path,
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
     *,
     signing_key_path: Path | None,
     resource_resolver: RuntimeResourceResolver | None = None,
     runtime_executor: OciRuntimeExecutor | None = None,
     runtime_image_digests: Mapping[str, str] | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
-) -> EvaluationTransactionResult
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationTransactionResult | CapturedEvaluationTransactionResult
 
 preflight_evaluation_request(
-    request_path: Path,
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
     *,
     signing_key_path: Path | None,
     scorer_registry: ScorerExtensionRegistry | None = None,
     runtime_image_digests: Mapping[str, str] | None = None,
     resource_resolver: RuntimeResourceResolver | None = None,
-) -> EvaluationPreflightResult
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult
 
 load_evaluation_request(
     path: str | Path,
     *,
     provider_resolver: ProviderResolver | None = None,
-) -> EvaluationRequest
+    request_root: Path | None = None,
+    baseline_run: Path | None = None,
+    subject_run: Path | None = None,
+    output: Path | None = None,
+) -> EvaluationRequest | CapturedEvaluationRequest
 
 verify_evidence(
     evidence_path: Path,
@@ -233,8 +249,42 @@ render_evidence(
     *,
     html_path: Path | None = None,
     explain: bool = False,
-) -> EvidenceReport
+    markdown_path: Path | None = None,
+    junit_path: Path | None = None,
+) -> EvidenceReport | EvidenceReportV2
 ```
+
+Typed native requests return native evaluation/preflight results; typed captured
+requests return captured results. A path is dispatched after loading and returns
+the corresponding union. The signatures above summarize both families: omit
+native runtime/executor/registry/scorer keywords entirely for captured calls,
+including explicit `None`. Omission and explicit null preserve their distinct
+native validation semantics; do not forward a bag of unrelated keyword defaults.
+
+Captured `verify_evidence` uses `policy_path`, `expected_baseline_run`,
+`expected_subject_run`, `expected_request_digest`, `expected_signer`,
+`receipt_path`, `verifier_signing_key_path`, and `verifier_identity`, plus optional
+`trust_profile_digest`, immutable `policy_bytes`/`verifier_signing_key_bytes`, and
+the recipient's `max_bootstrap_draws`. It does not accept native artifact,
+schedule, runtime, or scorer anchors. `load_trust_inputs` returns
+`CapturedTrustInputs` for a v2 captured profile and `TrustInputs` for native v1;
+the CLI's `--trust-profile` resolves those inputs through the same facade.
+
+For captured receipt authentication, `verify_signed_verification_receipt` takes
+`expected_run_digests={"baseline": ..., "subject": ...}` and
+`expected_request_digest` instead of native artifact/schedule/runtime digests.
+It still requires independent policy, evidence-signer fingerprint, verifier
+identity/fingerprint, and the expected profile digest when used. Its `ok` means
+the receipt authenticates, not that the embedded technical verdict passes.
+Native-only acceptance and deployment APIs reject captured scope.
+
+`compare_runs` takes baseline, subject, policy and a local work budget; it does
+not publish or gate. `EvaluationRecordsError` is the canonical record validation,
+adapter, capacity, and safe-I/O exception. `normalize_captured_request`,
+`captured_request_digest`, `run_digest`, and `comparison_policy_digest` derive
+portable pins without signing keys, scoring, or publication. A local SDK budget
+of `None` explicitly removes the work allowance, not byte/record limits. The CLI
+accepts only integer allowances and never infers an unlimited value from evidence.
 
 The optional annotations on `verify_evidence` support a uniform Python
 signature; the public evidence-pack v1 transaction requires every artifact,
@@ -278,7 +328,7 @@ Neither an installed package nor a binding inside the submitted evidence
 authorizes scorer code by itself. Strict verification resolves the policy-
 pinned scorer through this registry and replays it deterministically.
 
-The unreleased registry includes five shipped deterministic scorers:
+The registry includes five built-in deterministic scorers:
 `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
 `invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1`. Pass
 `ScorerExtensionRegistry(allow_installed=False)` to use these through the SDK
@@ -293,7 +343,8 @@ from invarlock.engine import load_evaluation_request
 request = load_evaluation_request(Path("request.yaml"))
 ```
 
-The loader returns an immutable `EvaluationRequest` whose paths are resolved
+The loader returns an immutable native `EvaluationRequest` or
+`CapturedEvaluationRequest` whose paths are resolved
 beneath the request root. Its default provider resolver exposes only the
 built-in Hugging Face provider. `evaluate_request_file` uses the core registry,
 which also discovers installed first-party add-ins.

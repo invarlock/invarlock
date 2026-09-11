@@ -9,17 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added `invarlock pipeline` as an equivalent front door to the standalone
-  pipeline CLI, with explicit human or JSON output and detailed explanations
-  for comparison and independent verification. JSON remains the default.
-- Added pipeline report regeneration from existing bounded evidence without
-  scoring or replay, with explicit unsigned, unverified-signature and
-  comparison-only assurance states.
+- Extended `evaluate`, `verify`, and `report` with captured-result comparison,
+  bounded report regeneration, and explicit unsigned-local assurance states.
 - Added an explicit run-mode runtime resource profile with closed fields,
   command-line overrides and visible configuration origins during preflight.
   Resource selection does not change policy or signer authorization.
 
-- Added caller-owned bootstrap work budgets to pipeline comparison and signed
+- Added caller-owned bootstrap work budgets to captured comparison and signed
   replay, with a default of 102,400,000 planned draws. Excessive combined metric
   and slice work is rejected before scoring; callers can explicitly override
   their own local budget without changing the signed acceptance policy.
@@ -28,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added early record-count rejection and bounded validation diagnostics so
   oversized schedules do not print their complete contents in errors.
 
-- Expanded pipeline comparisons and signed evidence to 50,000 planned cases,
+- Expanded captured comparisons and signed evidence to 50,000 planned cases,
   including binary paired intervals, with separate 128 MiB input and 384 MiB
   complete evidence limits. Runtime schedules retain their separate limits.
 
@@ -37,18 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `json_exact` whole-document structured-output scoring with binary paired
   intervals, signed replay and a separate built-in scorer identity.
 
-- Added optional project run-digest pins that reject changed evaluation inputs,
-  including path overrides, before signing or publishing pipeline results.
+- Added optional complete-run digest pins that reject changed evaluation inputs,
+  including path overrides, before signing or publishing captured results.
 
-- Added the `invarlock-pipeline` companion CLI and SDK for captured evaluation
-  results, with reusable projects, native export parsers, multiple typed metrics,
-  data slices, explicit recorded-score provenance, CI exit codes and JSON, HTML,
-  Markdown and JUnit reports.
-- Added optional signed pipeline evidence with independently supplied run
+- Added reusable captured-evaluation SDK helpers for native export parsers,
+  multiple typed metrics, data slices, explicit recorded-score provenance, and
+  JSON, HTML, Markdown and JUnit reports behind the core commands.
+- Added optional signed captured evidence with independently supplied run
   identities and policy, full arithmetic replay, bounded inputs and atomic
   publication without replacing previous results.
 - Added shared normalized-match, numeric-tolerance, structured-field and token-F1
-  scorers to pipeline comparisons, the core scorer registry and deterministic
+  scorers to captured comparisons, the core scorer registry and deterministic
   evaluator qualification with independently bound reference text.
 - Added runnable classification, extraction and recorded-judge onboarding
   examples and an integration guide for existing evaluation pipelines.
@@ -62,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repackaging and an independent recipient.
 - Added a five-model K2 Horizon campaign harness with immutable model pairs,
   logical tensor measurements, frozen workflow cases, bounded native capture,
-  and independent pipeline replay. The configurations remain unqualified
+  and independent captured-result replay. The configurations remain unqualified
   candidates until the runtime and actual GPU campaigns pass their gates.
 - Added a native K2 image verification helper that reconstructs inputs, observes
   installed dependencies and CPU execution, and retains raw security findings
@@ -86,10 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limits. Reports retain recorded decisions, escape external labels, and bound
   configuration and missing-ID previews without changing evidence bytes.
 
-- Clarified fixed pipeline capacity limits, caller-owned work budgets and
-  capacity-error recovery in the public reference documentation. Package
-  availability remains documented at the installation entry points.
-- Pipeline digest and size checks encode canonical JSON incrementally, reducing
+- Clarified captured-comparison capacity limits, caller-owned work budgets and
+  capacity-error recovery in the public reference documentation.
+- Captured digest and size checks encode canonical JSON incrementally, reducing
   whole-artifact allocations while preserving existing digests and signatures.
 
 - Added full H100 80GB HBM3 devices to the K2 candidate hardware checks alongside
@@ -101,13 +95,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI actions. Python dependency updates now use the uv ecosystem so the root
   manifest and lock are proposed together; hashed workflow locks remain
   separately checked.
-- Added installed pipeline signing, verification, report, and rejection checks
+- Added installed captured signing, verification, report, and rejection checks
   to both candidate and published wheel validation before optional packages
   are installed.
 
 ### Removed
 
+- Removed the separate captured-comparison command namespace and monolithic
+  project/evidence contracts. Use captured v2 requests with `evaluate`, directory
+  packs with `verify` and `report`, and SDK helpers from `invarlock.engine`.
+  Recreate captured evidence from reviewed source records and independently
+  approve its new run/request pins; there is no automatic legacy conversion.
+  Native v1 packs, v1/v2 receipts, and the v0.13 compatibility covenant remain
+  unchanged.
+
 ### Fixed
+
+- Close all pinned captured-evidence directory descriptors even when one close
+  reports an error, including failures during input setup or caller execution.
+- Release owned files, subprocess streams and runtime resources when setup or
+  cleanup fails across evaluation, provider integrations and maintained examples.
+  Preserve output cleanup and environment restoration after earlier errors.
 
 - Validate safetensors shard references and storage layout before calling the
   strict HF model loader, rejecting traversal, symbolic links and special files

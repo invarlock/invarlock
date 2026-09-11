@@ -4,15 +4,56 @@ import subprocess
 import sys
 from collections.abc import Callable
 from io import BytesIO
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+import invarlock._bounded_subprocess as bounded
 from invarlock._bounded_subprocess import close_selector_stream, communicate_bounded
 
 
 class BoundedProcessError(RuntimeError):
     pass
+
+
+@pytest.mark.parametrize("failure", ["terminate", "selector", "stdin"])
+def test_cleanup_failure_still_closes_remaining_pipes(monkeypatch, failure):
+    class Stream(BytesIO):
+        def fileno(self):
+            return 100
+
+        def close(self):
+            super().close()
+            if self is process.stdin and failure == "stdin":
+                raise OSError("stdin")
+
+    class Selector:
+        closed = False
+
+        def register(self, *args):
+            raise ValueError("registration failed")
+
+        def close(self):
+            self.closed = True
+            if failure == "selector":
+                raise OSError("selector")
+
+    process = SimpleNamespace(stdin=Stream(), stdout=Stream(), stderr=Stream())
+    selector = Selector()
+    monkeypatch.setattr(bounded.selectors, "DefaultSelector", lambda: selector)
+    monkeypatch.setattr(bounded.os, "set_blocking", lambda *_args: None)
+
+    def terminate(_process):
+        if failure == "terminate":
+            raise OSError("terminate")
+
+    with pytest.raises(OSError, match=failure):
+        _communicate(process, terminate=terminate)
+    assert selector.closed
+    assert all(
+        stream.closed for stream in (process.stdin, process.stdout, process.stderr)
+    )
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:

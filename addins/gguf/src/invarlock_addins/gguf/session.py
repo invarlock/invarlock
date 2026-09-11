@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import threading
 from collections.abc import Sequence
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -157,8 +158,9 @@ class _PinnedFile:
                     raise LlamaCppExecutionError(
                         "pinned file path contains a symlink or inaccessible directory"
                     ) from exc
-                os.close(parent_descriptor)
+                previous_descriptor = parent_descriptor
                 parent_descriptor = next_descriptor
+                os.close(previous_descriptor)
 
             try:
                 named = os.stat(
@@ -198,10 +200,10 @@ class _PinnedFile:
                     initial_stat=opened,
                     sha256=observed_sha256,
                 )
-            except Exception:
+            except BaseException:
                 os.close(descriptor)
                 raise
-        except Exception:
+        except BaseException:
             os.close(parent_descriptor)
             raise
 
@@ -238,8 +240,10 @@ class _PinnedFile:
         if self._closed:
             return
         self._closed = True
-        os.close(self.descriptor)
-        os.close(self.parent_descriptor)
+        try:
+            os.close(self.descriptor)
+        finally:
+            os.close(self.parent_descriptor)
 
 
 @dataclass
@@ -305,8 +309,10 @@ class _RunDirectory:
         if self._closed:
             return
         self._closed = True
-        os.close(self.descriptor)
-        shutil.rmtree(self.path, ignore_errors=True)
+        try:
+            os.close(self.descriptor)
+        finally:
+            shutil.rmtree(self.path, ignore_errors=True)
 
 
 def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
@@ -618,7 +624,7 @@ class LlamaCppSession:
                     "llama.cpp observed version does not match the pinned version"
                 )
             self._recheck_runtime()
-        except Exception:
+        except BaseException:
             self.close()
             raise
 
@@ -807,13 +813,11 @@ class LlamaCppSession:
         if self._closed:
             return
         self._closed = True
-        if self._model is not None:
-            self._model.close()
-        if self._source_archive is not None:
-            self._source_archive.close()
-        if self._executable is not None:
-            self._executable.close()
-        self._run_directory.close()
+        with ExitStack() as cleanup:
+            cleanup.callback(self._run_directory.close)
+            for resource in (self._executable, self._source_archive, self._model):
+                if resource is not None:
+                    cleanup.callback(resource.close)
 
 
 __all__ = [

@@ -16,6 +16,7 @@ PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
 )
 
 EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v1"
+CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v2"
 EVIDENCE_PACK_FORMAT_VERSION = "invarlock/evidence-pack-v1"
 EVIDENCE_OBSERVATION_FORMAT_VERSION = "invarlock/evidence-observation-v1"
 TRUST_INPUTS_FORMAT_VERSION = "invarlock/trust-inputs-v1"
@@ -79,8 +80,20 @@ def load_evaluation_request_schema() -> dict[str, Any]:
     return _load_object_contract("evaluation_request.schema.json")
 
 
+def load_captured_evaluation_request_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluation_request_v2.schema.json")
+
+
 def load_evidence_pack_schema() -> dict[str, Any]:
     return _load_object_contract("evidence_pack.schema.json")
+
+
+def load_evidence_pack_v2_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_pack_v2.schema.json")
+
+
+def load_evidence_verification_receipt_v3_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_verification_receipt_v3.schema.json")
 
 
 def load_evidence_observation_schema() -> dict[str, Any]:
@@ -89,6 +102,18 @@ def load_evidence_observation_schema() -> dict[str, Any]:
 
 def load_trust_inputs_schema() -> dict[str, Any]:
     return _load_object_contract("trust_inputs.schema.json")
+
+
+def load_trust_inputs_v2_schema() -> dict[str, Any]:
+    return _load_object_contract("trust_inputs_v2.schema.json")
+
+
+def load_normalized_captured_request_schema() -> dict[str, Any]:
+    return _load_object_contract("normalized_captured_request.schema.json")
+
+
+def load_evaluation_setup_result_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluation_setup_result.schema.json")
 
 
 def load_runtime_manifest_schema() -> dict[str, Any]:
@@ -154,6 +179,7 @@ def load_evaluator_qualification_result_schema() -> dict[str, Any]:
 __all__ = [
     "ContractLoadError",
     "ACCEPTANCE_PREDICATE_FORMAT_VERSION",
+    "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
     "EVALUATION_REQUEST_FORMAT_VERSION",
     "EVIDENCE_PACK_FORMAT_VERSION",
     "EVIDENCE_OBSERVATION_FORMAT_VERSION",
@@ -175,14 +201,20 @@ __all__ = [
     "SCORER_EXTENSION_RESULT_FORMAT_VERSION",
     "TRUST_INPUTS_FORMAT_VERSION",
     "load_evaluation_request_schema",
+    "load_captured_evaluation_request_schema",
     "load_acceptance_predicate_schema",
     "load_evidence_pack_schema",
+    "load_evidence_pack_v2_schema",
+    "load_evidence_verification_receipt_v3_schema",
     "load_evidence_observation_schema",
     "load_evaluator_qualification_export_schema",
     "load_evaluator_qualification_profile_schema",
     "load_evaluator_qualification_result_schema",
     "load_evaluator_qualification_schedule_schema",
     "load_trust_inputs_schema",
+    "load_trust_inputs_v2_schema",
+    "load_normalized_captured_request_schema",
+    "load_evaluation_setup_result_schema",
     "load_model_artifact_identity_schema",
     "load_runtime_behavioral_schedule_schema",
     "load_runtime_manifest_schema",

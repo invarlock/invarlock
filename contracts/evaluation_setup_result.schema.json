@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evaluation_setup_result.schema.json",
+  "title": "InvarLock Evaluation Setup Result",
+  "type": "object",
+  "required": ["format_version", "action", "ok", "details", "errors"],
+  "additionalProperties": false,
+  "properties": {
+    "format_version": {"const": "invarlock/evaluation-setup-v1"},
+    "action": {"enum": ["init", "keygen", "freeze_cases", null]},
+    "ok": {"type": "boolean"},
+    "details": {"type": ["object", "null"]},
+    "errors": {"type": "array", "maxItems": 16, "items": {"type": "string", "maxLength": 1024}}
+  },
+  "if": {"properties": {"ok": {"const": true}}},
+  "then": {
+    "properties": {"errors": {"maxItems": 0}},
+    "oneOf": [
+      {
+        "properties": {
+          "action": {"const": "init"},
+          "details": {
+            "type": "object", "required": ["directory", "request", "example"], "additionalProperties": false,
+            "properties": {"directory": {"type": "string"}, "request": {"type": "string"}, "example": {"enum": ["classification", "extraction", "judge"]}}
+          }
+        }
+      },
+      {
+        "properties": {
+          "action": {"const": "keygen"},
+          "details": {
+            "type": "object", "required": ["private_key", "public_key", "public_key_fingerprint"], "additionalProperties": false,
+            "properties": {"private_key": {"type": "string"}, "public_key": {"type": "string"}, "public_key_fingerprint": {"$ref": "#/$defs/digest"}}
+          }
+        }
+      },
+      {
+        "properties": {
+          "action": {"const": "freeze_cases"},
+          "details": {
+            "type": "object", "required": ["case_count", "case_set_digest", "output"], "additionalProperties": false,
+            "properties": {"case_count": {"type": "integer", "minimum": 1, "maximum": 50000}, "case_set_digest": {"$ref": "#/$defs/digest"}, "output": {"type": ["string", "null"]}}
+          }
+        }
+      }
+    ]
+  },
+  "else": {"properties": {"details": {"type": "null"}, "errors": {"minItems": 1}}},
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"}}
+}

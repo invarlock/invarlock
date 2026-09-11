@@ -98,7 +98,7 @@ def test_tracked_markdown_discovery_includes_every_repository_document(
 
 
 def test_repository_markdown_passes_the_public_text_check(public_text) -> None:
-    paths = public_text.tracked_markdown_paths(ROOT)
+    paths = public_text.working_tree_markdown_paths(ROOT)
 
     assert public_text.scan_paths(paths, ROOT) == []
 
@@ -136,7 +136,7 @@ def test_cli_reports_findings_and_fails(tmp_path: Path) -> None:
 
 
 def test_main_scans_the_tracked_repository(public_text, capsys) -> None:
-    expected_count = len(public_text.tracked_markdown_paths(ROOT))
+    expected_count = len(public_text.working_tree_markdown_paths(ROOT))
 
     result = public_text.main(["--root", str(ROOT)])
 
@@ -155,3 +155,56 @@ def test_main_fails_closed_without_a_git_repository(
     assert result == 2
     assert "CalledProcessError" in captured.err
     assert str(tmp_path) not in captured.err
+
+
+@pytest.mark.parametrize("kind", ["missing", "directory", "dangling-symlink"])
+def test_explicit_inputs_fail_closed(public_text, tmp_path, capsys, kind):
+    path = tmp_path / "input.md"
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "dangling-symlink":
+        path.symlink_to(tmp_path / "absent.md")
+    assert public_text.main([str(path)]) == 2
+    captured = capsys.readouterr()
+    assert "could not run" in captured.err
+    assert "passed" not in captured.out
+    assert str(tmp_path) not in captured.err
+
+
+def test_working_tree_inventory_uses_git_deletions_not_file_existence(
+    public_text, tmp_path, monkeypatch
+):
+    from types import SimpleNamespace
+
+    calls = []
+
+    def git(command, **kwargs):
+        calls.append(command)
+        assert kwargs["cwd"] == tmp_path
+        if "--others" in command:
+            assert "--exclude-standard" in command
+            return SimpleNamespace(stdout=b"new.md\0new.MD\0")
+        if "--deleted" in command:
+            return SimpleNamespace(stdout=b"deleted.md\0")
+        return SimpleNamespace(stdout=b"tracked.md\0deleted.md\0missing.md\0")
+
+    monkeypatch.setattr(public_text.subprocess, "run", git)
+    paths = public_text.working_tree_markdown_paths(tmp_path)
+    assert paths == [
+        tmp_path / name for name in ("missing.md", "new.MD", "new.md", "tracked.md")
+    ]
+    assert len(calls) == 3
+    with pytest.raises(FileNotFoundError):
+        public_text.scan_paths(paths, tmp_path)
+
+
+def test_discovery_race_and_explicit_deleted_path_fail_closed(
+    public_text, tmp_path, monkeypatch, capsys
+):
+    missing = tmp_path / "deleted.md"
+    monkeypatch.setattr(
+        public_text, "working_tree_markdown_paths", lambda root: [missing]
+    )
+    assert public_text.main(["--root", str(tmp_path)]) == 2
+    assert public_text.main([str(missing)]) == 2
+    assert "passed" not in capsys.readouterr().out

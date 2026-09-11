@@ -22,18 +22,20 @@ independently supplied trust anchors.
 [Run a paired comparison](user-guide/getting-started.md) ·
 [Read the assurance case](assurance/assurance-case.md)
 
-Already running an evaluator? The source checkout's
-[existing pipeline workflow](user-guide/pipeline-integration.md) imports per-case
+Already running an evaluator? The
+[captured-results workflow](user-guide/captured-results.md) imports per-case
 results, checks multiple metrics and slices, and writes CI reports without model
 execution. It includes runnable classification, extraction and recorded-judge
 examples and an explicit boundary between recomputed and recorded scores.
-Start with `invarlock pipeline --help`; `invarlock-pipeline` is the equivalent
-standalone command. Pipeline commands retain JSON defaults and offer explicit
-text summaries and report regeneration.
+Start with `invarlock --help` and use `evaluate`, `verify`, or `report`.
+All three default to readable text; add `--json` for machine-readable status.
+Signed captured evidence uses independent run/request anchors and a scoped
+receipt. Explicit `--unsigned` results are local reports, not verification or
+native acceptance evidence.
 
 ```bash
 invarlock evaluate request.yaml
-invarlock verify evidence/
+invarlock verify evidence/ --trust-profile trust/trust-inputs.json --receipt verification.receipt.json
 invarlock report evidence/
 ```
 
@@ -41,7 +43,8 @@ invarlock report evidence/
 
 ## The primary path
 
-Run mode is the normal release-regression path:
+Select native run, authenticated provider import, or captured records in the
+evaluation request. For native run mode:
 
 1. Pin local baseline and subject artifacts, a local JSONL source, provider
    settings, one built-in metric or scorer binding, one policy, and a fresh
@@ -59,7 +62,7 @@ Run mode is the normal release-regression path:
    canonical schedule digest, runtime digests, evidence signer, identity, and
    signing key. `verify` replays the pack and writes a separately signed receipt.
 5. `report` renders the signature-authenticated comparison as console text and,
-   optionally, standalone HTML.
+   optionally, standalone HTML, Markdown, or JUnit.
 
 Shared image, device, and entrypoint options act as defaults when both sides use
 the same runtime. Workers sharing a generic or identical CUDA device run
@@ -121,7 +124,8 @@ baseline and subject, then shows every configured check, the point comparison,
 selected paired interval, and threshold. Expandable HTML details retain exact
 values and evidence bindings. Evidence
 remains the source of truth and the signed verification receipt remains the
-independent acceptance record.
+independent technical record. Captured receipts do not authorize native
+acceptance or deployment; unsigned reports have no independent assurance.
 
 </div>
 

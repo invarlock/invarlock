@@ -13,7 +13,7 @@ import threading
 import time
 from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -301,7 +301,6 @@ def _run_bounded_command(
     """Run one engine control command with bounded pipes and optional streaming."""
 
     destination = None
-    process: subprocess.Popen[bytes] | None = None
     completed = False
     try:
         if stdout_path is not None:
@@ -333,10 +332,12 @@ def _run_bounded_command(
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise OciEvaluationError("bounded engine command could not complete") from exc
     finally:
-        if destination is not None:
-            destination.close()
-        if not completed and stdout_path is not None:
-            stdout_path.unlink(missing_ok=True)
+        try:
+            if destination is not None:
+                destination.close()
+        finally:
+            if not completed and stdout_path is not None:
+                stdout_path.unlink(missing_ok=True)
 
 
 def _normalized_config_id(value: object) -> str:
@@ -1204,11 +1205,13 @@ def run_side_worker(
             daemon=True,
         ),
     )
-    for drain in drains:
-        drain.start()
+    started_drains: list[threading.Thread] = []
     timed_out = False
     cancelled = False
     try:
+        for drain in drains:
+            drain.start()
+            started_drains.append(drain)
         try:
             if cancellation_event is None:
                 returncode = process.wait(timeout=timeout_seconds)
@@ -1244,11 +1247,12 @@ def run_side_worker(
         raise
     finally:
         stop_drains.set()
-        process.stdout.close()
-        process.stderr.close()
-        _join_worker_drains(drains)
-        if cidfile is not None:
-            cidfile.unlink(missing_ok=True)
+        with ExitStack() as cleanup:
+            if cidfile is not None:
+                cleanup.callback(cidfile.unlink, missing_ok=True)
+            cleanup.callback(_join_worker_drains, started_drains)
+            cleanup.callback(process.stderr.close)
+            cleanup.callback(process.stdout.close)
     if timed_out:
         diagnostic = f"worker exceeded its {timeout_seconds}-second outer deadline"
         if stderr:

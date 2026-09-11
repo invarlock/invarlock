@@ -66,8 +66,9 @@ def _open_directory(path: Path, *, label: str) -> int:
                 raise AtomicDirectoryPublicationError(
                     f"{label} must be an existing non-symlink directory"
                 ) from exc
-            os.close(descriptor)
+            previous_descriptor = descriptor
             descriptor = child
+            os.close(previous_descriptor)
         if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
             raise AtomicDirectoryPublicationError(
                 f"{label} must be an existing non-symlink directory"

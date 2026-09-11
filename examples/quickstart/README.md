@@ -10,16 +10,22 @@ From an empty directory:
 ```bash
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install "invarlock==0.15.0"
+python -m pip install invarlock
+INVARLOCK_VERSION="$(python -c 'from importlib.metadata import version; print(version("invarlock"))')"
 
 curl -fsSLO \
-  https://github.com/invarlock/invarlock/archive/refs/tags/v0.15.0.tar.gz
-tar -xzf v0.15.0.tar.gz --strip-components=3 \
-  invarlock-0.15.0/examples/quickstart \
-  invarlock-0.15.0/examples/acceptance-handoff/golden
+  "https://github.com/invarlock/invarlock/archive/refs/tags/v${INVARLOCK_VERSION}.tar.gz" &&
+tar -xzf "v${INVARLOCK_VERSION}.tar.gz" --strip-components=3 \
+  "invarlock-${INVARLOCK_VERSION}/examples/quickstart" \
+  "invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden" &&
 
 python run.py --fixture golden
 ```
+
+This recipe requires the matching released tag archive; a missing archive is an
+error, not permission to use a mutable branch. For local builds, use the examples
+from the exact checkout that built the installed wheel, even if its package
+version has not changed. See [Matching wheels and examples](../../docs/user-guide/getting-started.md#matching-wheels-and-examples).
 
 The successful command prints `Decision: pass` and writes:
 

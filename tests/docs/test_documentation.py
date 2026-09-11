@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -52,8 +53,8 @@ EXPECTED_DOC_PAGES = {
     "reference/cli.md",
     "reference/compatibility.md",
     "reference/contracts.md",
-    "reference/pipeline-contracts.md",
-    "reference/pipeline-capacity.md",
+    "reference/evaluation-records.md",
+    "reference/evaluation-capacity.md",
     "reference/evaluator-qualification.md",
     "reference/environment.md",
     "reference/lifecycle.md",
@@ -74,7 +75,7 @@ EXPECTED_DOC_PAGES = {
     "user-guide/evidence-and-verification.md",
     "user-guide/public-evidence.md",
     "user-guide/getting-started.md",
-    "user-guide/pipeline-integration.md",
+    "user-guide/captured-results.md",
     "user-guide/key-management.md",
     "user-guide/modelkit-handoff.md",
     "user-guide/runtime-providers.md",
@@ -508,19 +509,19 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
         "request.yaml",
         "baseline artifact",
         "subject artifact",
-        "prepare schedule · run pinned oci sides or import evidence",
+        "execute native / import observations / compare captured runs",
         "invarlock evaluate",
         "paired comparison and interval",
-        "invarlock/evidence-pack-v1",
-        "canonical signed evidence bundle",
-        "baseline + subject artifact digests · schedule digest",
+        "native pack v1 · captured pack v2",
+        "canonical evidence directory",
+        "native artifact/runtime/schedule or captured run/request pins",
         "invarlock verify",
-        "authenticate pack · replay pairs and interval under anchors",
+        "authenticate signed pack · replay under independent anchors",
         "signed verification receipt",
-        "acceptance result",
-        "scoped pass or rejection",
+        "technical result",
+        "native-only acceptance stays separate",
         "invarlock report",
-        "console · optional HTML",
+        "HTML · Markdown · JUnit",
         "evidence summary",
     ):
         assert phrase.lower() in diagram
@@ -582,6 +583,47 @@ def test_example_request_conforms_to_the_closed_schema_surface() -> None:
     assert request["comparison"]["subject"]["runtime"]["provider"] == (
         "hf_transformers"
     )
+
+
+def test_released_quickstarts_match_installed_version_without_branch_fallback() -> None:
+    for path in ("README.md", "examples/quickstart/README.md"):
+        text = _read(path)
+        assert (
+            'from importlib.metadata import version; print(version("invarlock"))'
+            in text
+        )
+        assert 'archive/refs/tags/v${INVARLOCK_VERSION}.tar.gz" &&' in text
+        assert "invarlock-${INVARLOCK_VERSION}/examples/quickstart" in text
+        assert (
+            "invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden" in text
+        )
+        assert "archive/refs/heads/" not in text
+        assert "invarlock==0.15.0" not in text
+        assert "local build" in text.lower()
+
+
+def test_captured_guide_describes_the_actual_trust_and_json_cutover() -> None:
+    guide = _read("docs/user-guide/captured-results.md")
+    for phrase in (
+        "--trust-profile",
+        "invarlock/trust-inputs-v2",
+        "baseline_run_digest",
+        "subject_run_digest",
+        "request_digest",
+        "signing_key_path",
+        "--unsigned",
+        "--fail-on-policy",
+        "--max-bootstrap-draws",
+        "requested_outputs",
+        "written_outputs",
+        "failed_output",
+        "invarlock/evidence-pack-v2",
+        "invarlock/evidence-verification-receipt-v3",
+        "captured_comparison",
+        "native-only",
+        "exit `6`",
+    ):
+        assert phrase in guide
 
 
 def test_public_example_includes_every_required_input_and_verify_anchor() -> None:
@@ -818,3 +860,41 @@ def test_evaluator_documentation_matrix_matches_retained_manifests() -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_documented_case_freeze_command_writes_schema_valid_setup_result(
+    tmp_path, monkeypatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from invarlock.cli.app import app
+
+    monkeypatch.chdir(tmp_path)
+    cases = {
+        "format": "invarlock/evaluation-case-set-v1",
+        "cases": [
+            {"id": "b", "input": "second", "expected": "yes", "metadata": {}},
+            {"id": "a", "input": "first", "expected": "no", "metadata": {}},
+        ],
+    }
+    (tmp_path / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
+    command = next(
+        line
+        for line in _read("docs/reference/cli.md").splitlines()
+        if line.startswith("invarlock evaluate --freeze-cases ")
+    )
+    result = CliRunner().invoke(app, shlex.split(command)[1:])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    schema = json.loads(_read("contracts/evaluation_setup_result.schema.json"))
+    jsonschema.Draft202012Validator(schema).validate(payload)
+    assert payload["format_version"] in _read("docs/reference/cli.md")
+    assert payload["action"] == "freeze_cases"
+    assert payload["details"]["case_count"] == 2
+    output = json.loads((tmp_path / "frozen-cases.json").read_text(encoding="utf-8"))
+    assert [case["id"] for case in output["cases"]] == ["a", "b"]
+    assert (tmp_path / "cases.json").read_text(encoding="utf-8") == json.dumps(cases)
+    assert {path.name for path in tmp_path.iterdir()} == {
+        "cases.json",
+        "frozen-cases.json",
+    }

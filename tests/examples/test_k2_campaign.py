@@ -9,9 +9,21 @@ import struct
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from examples.qualification import k2_campaign as campaign
+
+
+def _key_file(path, key):
+    path.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    return path
 
 
 def _tensor_file(path: Path, values: bytes = b"\x80?\x00@"):
@@ -33,7 +45,7 @@ def test_all_five_plans_are_deterministic_and_honestly_unqualified():
     assert plans == campaign.draft_plans()
     for plan in plans:
         assert plan["status"] == "candidate_not_qualified"
-        assert plan["route"] == "external_sglang_pipeline_capture"
+        assert plan["route"] == "external_sglang_native_capture"
         assert plan["runtime"]["dtype"] == "bfloat16"
         assert plan["runtime"]["trust_remote_code"] is False
         assert plan["runtime"]["image_digest"] is None
@@ -158,11 +170,20 @@ def _capture(plan, role, *, wrong=False):
     return captured
 
 
-def test_real_projection_replays_scores_and_rejects_native_capture_changes():
+def test_real_projection_replays_scores_and_rejects_native_capture_changes(tmp_path):
     plan = _ready_plan()
     left, right = _capture(plan, "baseline"), _capture(plan, "candidate")
     key = Ed25519PrivateKey.generate()
-    evidence = campaign.publish(plan, left, right, key)
+    evidence = tmp_path / "evidence"
+    campaign.publish(
+        plan, left, right, _key_file(tmp_path / "signer.pem", key), evidence
+    )
+    verifier = Ed25519PrivateKey.generate()
+    verification = {
+        "receipts": tmp_path / "receipts",
+        "verifier_identity": "k2-test",
+        "verifier_signing_key_path": _key_file(tmp_path / "verifier.pem", verifier),
+    }
     result = campaign.verify(
         plan,
         left,
@@ -172,8 +193,18 @@ def test_real_projection_replays_scores_and_rejects_native_capture_changes():
         expected_plan=campaign.digest(plan),
         expected_baseline_capture=campaign.digest(left),
         expected_candidate_capture=campaign.digest(right),
+        **verification,
     )
     assert set(result.values()) == {"pass"}
+    for cohort in campaign.COHORTS:
+        receipt = campaign.read_json(
+            verification["receipts"] / f"{cohort}.receipt.json"
+        )
+        assert (
+            receipt["statement"]["format"]
+            == "invarlock/evidence-verification-receipt-v3"
+        )
+        assert receipt["statement"]["verdict"]["integrity_ok"] is True
     changed = copy.deepcopy(right)
     changed["rows"][0]["response"]["choices"][0]["message"]["content"] = "wrong"
     with pytest.raises(ValueError, match="capture"):
@@ -186,22 +217,20 @@ def test_real_projection_replays_scores_and_rejects_native_capture_changes():
             expected_plan=campaign.digest(plan),
             expected_baseline_capture=campaign.digest(left),
             expected_candidate_capture=campaign.digest(right),
+            **verification,
         )
 
 
-def test_quality_rejection_and_truncated_generation_are_preserved():
+def test_quality_rejection_and_truncated_generation_are_preserved(tmp_path):
     plan = _ready_plan()
     left, right = _capture(plan, "baseline"), _capture(plan, "candidate", wrong=True)
-    evidence = campaign.publish(plan, left, right, Ed25519PrivateKey.generate())
-    assert all(
-        value["comparison"]["decision"] == "regression" for value in evidence.values()
-    )
+    key = _key_file(tmp_path / "signer.pem", Ed25519PrivateKey.generate())
+    evidence = campaign.publish(plan, left, right, key, tmp_path / "rejected")
+    assert all(value.policy_verdict == "regression" for value in evidence.values())
     right = _capture(plan, "candidate")
     right["rows"][0]["response"]["choices"][0]["finish_reason"] = "length"
-    evidence = campaign.publish(plan, left, right, Ed25519PrivateKey.generate())
-    assert (
-        evidence["classification"]["comparison"]["decision"] == "insufficient_evidence"
-    )
+    evidence = campaign.publish(plan, left, right, key, tmp_path / "incomplete")
+    assert evidence["classification"].policy_verdict == "insufficient_evidence"
 
 
 def test_changed_request_or_missing_case_is_not_silently_paired():

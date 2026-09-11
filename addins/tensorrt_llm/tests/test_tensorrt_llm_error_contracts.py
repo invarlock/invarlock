@@ -972,3 +972,49 @@ def test_inspection_rejects_engine_identity_drift(
         execution.TensorRTLLMExecutionError, match="changed during runtime inspection"
     ):
         session.inspect_tensorrt_llm_inputs(bindings)
+
+
+@pytest.mark.parametrize("failure", ["parent_close", "leaf_close", "hash_interrupt"])
+def test_pinned_file_cleanup_keeps_ownership_on_failures(
+    tmp_path, monkeypatch, failure
+):
+    source = tmp_path / "pinned"
+    source.write_bytes(b"pinned payload")
+    original_open, original_close = os.open, os.close
+    active = set()
+    failed = False
+    armed = failure == "parent_close"
+
+    def open_tracked(*args, **kwargs):
+        descriptor = original_open(*args, **kwargs)
+        active.add(descriptor)
+        return descriptor
+
+    def close_checked(descriptor):
+        nonlocal failed
+        original_close(descriptor)
+        active.discard(descriptor)
+        if not failed and armed and failure in {"parent_close", "leaf_close"}:
+            failed = True
+            raise OSError("close failed")
+
+    def interrupt_hash(*args):
+        raise KeyboardInterrupt("hash interrupted")
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "open", open_tracked)
+            patch.setattr(os, "close", close_checked)
+            if failure == "hash_interrupt":
+                patch.setattr(execution, "_hash_descriptor", interrupt_hash)
+            expected = KeyboardInterrupt if failure == "hash_interrupt" else OSError
+            with pytest.raises(expected):
+                pinned = execution._PinnedFile.open(
+                    source, expected_sha256=None, require_executable=False
+                )
+                armed = True
+                pinned.close()
+        assert not active, f"leaked descriptors {active}"
+    finally:
+        for descriptor in active:
+            original_close(descriptor)

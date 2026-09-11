@@ -36,8 +36,8 @@ against independently supplied trust anchors.
 
 ## Evidence paths
 
-Native execution and independently replayable import converge on the same signed evidence,
-independent verification, and reporting transaction:
+Native execution, independently replayable import, and captured records use the
+same evaluation, independent verification, and reporting transaction:
 
 <p align="center">
   <img
@@ -94,35 +94,30 @@ corresponding controls and reviewers. See the
 and [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md)
 for the complete claim boundary and assumptions.
 
-## Check results from your existing pipeline
+## Check captured evaluation results
 
-The unreleased source checkout includes `invarlock-pipeline`: an installed CLI
-and Python SDK for comparing existing evaluation records without rerunning
-inference. It supports normalized labels, numeric tolerances, structured fields,
-token overlap and explicitly attributed recorded scores, with multiple metrics,
-data slices and JSON, HTML, Markdown and JUnit reports.
+The core wheel compares existing evaluation records without rerunning inference.
+The captured flow supports normalized labels, numeric tolerances, structured
+fields, token overlap, and explicitly attributed recorded scores.
 
 ```bash
-python -m pip install .
-invarlock pipeline init release-check --example extraction
-invarlock pipeline compare release-check/pipeline.json \
-  --output release-check/result --output-format human --explain
+python -m pip install invarlock
+invarlock evaluate request.yaml --signing-key signing-key.pem
+invarlock verify evidence/ --trust-profile trust/trust-inputs.json \
+  --receipt verification.receipt.json
+invarlock report evidence/
 ```
 
-`invarlock-pipeline` remains available as the standalone equivalent. Pipeline
-commands default to JSON for automation; the optional text mode shows policy
-checks, usable and missing pairs, and report paths. To recreate HTML and
-Markdown from evidence without rerunning the comparison, use
-`invarlock pipeline report release-check/result/evidence.json --output report-copy`.
-Rendering does not independently verify or authorize the evidence signer.
+`evaluate` publishes one atomic evidence pack, `verify` checks it with
+recipient-owned anchors, and `report` renders it without changing evidence.
 
-The example uses synthetic records and illustrative thresholds. Follow the
-[pipeline integration guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/pipeline-integration.md)
-to capture real results, use native export adapters and add a CI gate. This
-workflow is not in the published 0.15.0 wheel. Its optional signed comparison
-authenticates captured inputs and arithmetic; recorded judgments remain explicit.
+Prepare the request, independent captured trust profile, and keys using the
+[captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md).
+Its starter records and thresholds are illustrative. Captured verification
+authenticates inputs and arithmetic, not runtime execution; recorded judgments
+remain explicit and cannot authorize native acceptance or deployment.
 
-For controlled evaluations in the source checkout, `invarlock evaluate --help`
+For controlled evaluations, `invarlock evaluate --help`
 groups the main workflow separately from advanced runtime options. Run requests
 can use `--runtime-profile runtime.json` to reuse explicit container resources;
 `--preflight` checks the resolved setup before execution. The profile configures
@@ -139,13 +134,14 @@ report. It needs only Python 3.12 or newer and a regular CPU.
 ```bash
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install "invarlock==0.15.0"
+python -m pip install invarlock
+INVARLOCK_VERSION="$(python -c 'from importlib.metadata import version; print(version("invarlock"))')"
 
 curl -fsSLO \
-  https://github.com/invarlock/invarlock/archive/refs/tags/v0.15.0.tar.gz
-tar -xzf v0.15.0.tar.gz --strip-components=3 \
-  invarlock-0.15.0/examples/quickstart \
-  invarlock-0.15.0/examples/acceptance-handoff/golden
+  "https://github.com/invarlock/invarlock/archive/refs/tags/v${INVARLOCK_VERSION}.tar.gz" &&
+tar -xzf "v${INVARLOCK_VERSION}.tar.gz" --strip-components=3 \
+  "invarlock-${INVARLOCK_VERSION}/examples/quickstart" \
+  "invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden" &&
 
 python run.py --fixture golden
 ```
@@ -153,6 +149,10 @@ python run.py --fixture golden
 The command prints `Decision: pass` and the paths to the signed receipt,
 machine-readable verification result, and evidence report. The versioned example
 files stay outside the package; the command imports only the installed wheel.
+Use this archive recipe for a released wheel only. For a local build, copy the
+examples from the same checkout that built the wheel. A missing matching tag is
+an error, never a reason to fall back to a mutable branch. See the
+[installation convention](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md#matching-wheels-and-examples).
 The fuller [offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff)
 also builds fixture evidence and exercises ten fail-closed recipient scenarios.
 
@@ -220,8 +220,8 @@ signing keys, and independently derived verifier inputs.
 
 ## The release-regression decision
 
-Both sides score the same authenticated records in the same order. InvarLock
-derives one of two built-in paired comparisons:
+For native run/import requests, both sides score the same authenticated records
+in the same order. InvarLock derives one of two built-in paired comparisons:
 
 | Metric | Point comparison | Policy verdict |
 | --- | --- | --- |

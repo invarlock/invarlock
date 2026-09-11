@@ -17,8 +17,8 @@ upstream tools and normalize their results into the same four contracts.
 A matrix row demonstrates the named version and entry point; it does not make
 that evaluator a built-in InvarLock plugin.
 
-The unreleased [pipeline companion](pipeline-contracts.md) adds installed parsers
-for selected native export shapes and a separate multi-metric comparison. The
+The captured-results integration adds installed parsers for selected native export
+shapes and a multi-metric comparison behind the core evaluation commands. The
 qualification boundary documented here also accepts normalized matching, numeric
 tolerance, structured fields and token F1 when independent reference text is
 available for recomputation. Existing retained matrix rows continue to prove
