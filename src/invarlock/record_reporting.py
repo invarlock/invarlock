@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from typing import Any, cast
@@ -86,48 +87,186 @@ def _policy_preview(policy: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> ReportView:
-    validate(comparison, "comparison")
-    policy_metrics: dict[str, dict[str, Any]] = {}
-    identity: list[tuple[str, str]] = []
-    inputs = None
-    if evidence is not None:
-        try:
-            check_sizes(evidence.files)
-            manifest = json_object(evidence.manifest_bytes, "captured manifest")
-            validate_contract(manifest)
-            expected = {"manifest.json", "checksums.sha256", *PAYLOADS.values()}
-            if manifest["authentication"] == "signed":
-                expected.add("manifest.signature.json")
-            if set(evidence.files) != expected:
-                raise CapturedContractError("captured file inventory is invalid")
-            manifest, inputs, _ = load_payloads(evidence)
-        except CapturedContractError as exc:
-            raise EvaluationRecordsError(str(exc)) from exc
-        if canonical_json_bytes(inputs["report"]) != canonical_json_bytes(comparison):
-            raise EvaluationRecordsError(
-                "report comparison differs from supplied evidence"
-            )
-        policy_metrics = {m["name"]: m for m in inputs["policy"]["metrics"]}
-        for role in ("baseline", "subject"):
-            run = inputs[role]
-            identity.extend(
-                (
-                    (role.title() + " run", run["run_id"]),
-                    (role.title() + " artifact", run["artifact_digest"]),
-                )
-            )
-        signing = (
-            "Unsigned local evidence. No signature is available for independent authentication."
-            if manifest["authentication"] == "unsigned_local"
-            else "Signed manifest verified. This rendering has not authenticated it against a recipient-owned key."
+def _short_context(value: str, limit: int = 256) -> str:
+    return value if len(value) <= limit else value[:limit] + "… (truncated)"
+
+
+def _common_context(
+    records: list[dict[str, Any]], key: str, container: str = "context"
+) -> tuple[str | None, str]:
+    first = None
+    present = 0
+    mixed = False
+    for record in records:
+        context = record.get(container)
+        value = context.get(key) if isinstance(context, dict) else None
+        if isinstance(value, str) and value.strip():
+            present += 1
+            if first is None:
+                first = value
+            elif first != value:
+                mixed = True
+    if not present:
+        return None, "Unavailable in recorded context"
+    if mixed or present != len(records):
+        return None, "Mixed or incomplete across records"
+    return first, _short_context(cast(str, first))
+
+
+def _effective_messages(
+    records: list[dict[str, Any]],
+) -> dict[str, tuple[tuple[str, str], ...]] | None:
+    indexed = {}
+    for record in records:
+        context = record.get("context")
+        messages = (
+            context.get("effective_messages") if isinstance(context, dict) else None
         )
+        if not isinstance(messages, list) or not messages:
+            return None
+        parsed = []
+        for message in messages:
+            if (
+                not isinstance(message, dict)
+                or not isinstance(message.get("role"), str)
+                or not message["role"].strip()
+                or not isinstance(message.get("content"), str)
+                or set(message) != {"role", "content"}
+            ):
+                return None
+            parsed.append((message["role"], message["content"]))
+        identity = record["id"]
+        if identity in indexed:
+            return None
+        indexed[identity] = tuple(parsed)
+    return indexed
+
+
+def _prompt_roles(messages: dict[str, tuple[tuple[str, str], ...]] | None) -> str:
+    if not messages:
+        return "Unavailable in recorded context"
+    first = tuple(role for role, _ in next(iter(messages.values())))
+    if any(tuple(role for role, _ in row) != first for row in messages.values()):
+        return "Mixed across records"
+    visible = " → ".join(_short_context(role, 32) for role in first[:8])
+    if len(first) > 8:
+        visible += " → … (truncated)"
+    return visible
+
+
+def _prompt_change(
+    baseline: dict[str, tuple[tuple[str, str], ...]] | None,
+    subject: dict[str, tuple[tuple[str, str], ...]] | None,
+) -> tuple[str, tuple[tuple[str, Any], ...]]:
+    if not baseline or not subject or baseline.keys() != subject.keys():
+        return (
+            "Prompt comparison unavailable: complete, uniquely paired effective messages were not recorded.",
+            (),
+        )
+    changed = sum(baseline[key] != subject[key] for key in baseline)
+    if not changed:
+        return (
+            f"Recorded effective messages are unchanged across all {len(baseline):,} paired cases.",
+            (),
+        )
+    common = None
+    for key, before in baseline.items():
+        after = subject[key]
+        if (
+            len(after) != len(before) + 1
+            or after[0][0] != "system"
+            or after[1:] != before
+        ):
+            break
+        instruction = after[0][1]
+        if common is None:
+            common = instruction
+        elif common != instruction:
+            break
     else:
-        signing = "Signing state unavailable: this view was created from comparison data only."
-    identity.extend(
-        (name.title() + " binding", value)
-        for name, value in comparison["bindings"].items()
+        text = cast(str, common)
+        detail = {
+            "source": "Evaluator-recorded context.effective_messages; not execution attestation",
+            "paired_cases_checked": len(baseline),
+            "system_instruction": text[:4096],
+            "characters": len(text),
+            "truncated": len(text) > 4096,
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "note": "Full messages remain in the signed run records. User messages are not expanded here.",
+        }
+        return (
+            f"The subject adds the same system instruction across all {len(baseline):,} paired cases; all other effective messages are unchanged.",
+            (("Recorded added system instruction", detail),),
+        )
+    return (
+        f"Recorded effective messages differ in {changed:,} of {len(baseline):,} paired cases; the change is not one uniform added system instruction.",
+        (),
     )
+
+
+def _captured_context(
+    inputs: dict[str, dict[str, Any]],
+) -> tuple[
+    tuple[tuple[str, str], ...],
+    tuple[tuple[str, str], ...],
+    tuple[str, ...],
+    tuple[tuple[str, Any], ...],
+]:
+    subjects = []
+    context = [("Evaluation mode", "Captured evaluator outputs")]
+    model_keys = []
+    messages = []
+    for side in ("baseline", "subject"):
+        run = inputs[side]
+        records = run["records"]
+        fields = {
+            key: _common_context(records, key)
+            for key in ("model_key", "model_id", "model_revision", "role")
+        }
+        model_keys.append(fields["model_key"][0])
+        indexed = _effective_messages(records)
+        messages.append(indexed)
+        label = side.title()
+        identity = (
+            "Recorded model ID: " + fields["model_id"][1]
+            if fields["model_id"][0] is not None
+            else "Recorded model key: " + fields["model_key"][1]
+        )
+        subjects.append((label, identity))
+        context.extend(
+            (
+                (label + " model revision", fields["model_revision"][1]),
+                (label + " capture role", fields["role"][1]),
+                (
+                    label + " workflow",
+                    _common_context(records, "workflow", "metadata")[1],
+                ),
+                (
+                    label + " dataset",
+                    _common_context(records, "dataset", "metadata")[1],
+                ),
+                (label + " records", f"{len(records):,}"),
+                (label + " effective message roles", _prompt_roles(indexed)),
+            )
+        )
+    if model_keys[0] is not None and model_keys[0] == model_keys[1]:
+        model = (
+            "Both runs record model key "
+            + _short_context(model_keys[0])
+            + ". This does not establish identical model weights or revisions."
+        )
+    elif all(key is not None for key in model_keys):
+        model = "The runs record different model keys; these labels do not establish checkpoint identities."
+    else:
+        model = "Model-key comparison is unavailable because recorded values are missing or mixed."
+    prompt, details = _prompt_change(*messages)
+    return tuple(subjects), tuple(context), (model, prompt), details
+
+
+def _metric_views(
+    comparison: dict[str, Any], policy_metrics: dict[str, dict[str, Any]]
+) -> tuple[MetricView, ...]:
+    """Project recorded metrics consistently for CLI and SDK presentation."""
     metrics: list[MetricView] = []
     for m in comparison["metrics"]:
         policy = policy_metrics.get(m["name"])
@@ -282,11 +421,14 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
             "Higher values are better."
             if m["direction"] == "higher"
             else "Lower values are better.",
-            "Scoring: recomputed from recorded expected and output values."
+            "Recorded scoring basis: expected and output values, scored when the comparison was created."
             if m["scoring_assurance"] == "recomputed"
-            else "Scoring: recorded external measurements or judgments; aggregation is recomputed.",
-            f"{m['count']:,} included pairs; {missing:,} missing paired results. Counts in overlapping slices must not be added together.",
+            else "Recorded scoring basis: external measurements or judgments, aggregated when the comparison was created.",
+            f"{complete:,} usable pairs; {missing:,} missing results; {m['count']:,} included pairs. Counts in overlapping slices must not be added together.",
+            "Scoring and replay were not performed by report.",
         ]
+        if m["reasons"]:
+            notes.append("Recorded reasons: " + "; ".join(m["reasons"]))
         if policy is None:
             notes.append(
                 "Requirements are unavailable in this comparison-only view. The original decision is displayed without independent replay."
@@ -318,6 +460,52 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
             m.decision
         ]
     )
+    return tuple(metrics)
+
+
+def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> ReportView:
+    validate(comparison, "comparison")
+    policy_metrics: dict[str, dict[str, Any]] = {}
+    identity: list[tuple[str, str]] = []
+    inputs = None
+    if evidence is not None:
+        try:
+            check_sizes(evidence.files)
+            manifest = json_object(evidence.manifest_bytes, "captured manifest")
+            validate_contract(manifest)
+            expected = {"manifest.json", "checksums.sha256", *PAYLOADS.values()}
+            if manifest["authentication"] == "signed":
+                expected.add("manifest.signature.json")
+            if set(evidence.files) != expected:
+                raise CapturedContractError("captured file inventory is invalid")
+            manifest, inputs, _ = load_payloads(evidence)
+        except CapturedContractError as exc:
+            raise EvaluationRecordsError(str(exc)) from exc
+        if canonical_json_bytes(inputs["report"]) != canonical_json_bytes(comparison):
+            raise EvaluationRecordsError(
+                "report comparison differs from supplied evidence"
+            )
+        policy_metrics = {m["name"]: m for m in inputs["policy"]["metrics"]}
+        for role in ("baseline", "subject"):
+            run = inputs[role]
+            identity.extend(
+                (
+                    (role.title() + " run", run["run_id"]),
+                    (role.title() + " artifact", run["artifact_digest"]),
+                )
+            )
+        signing = (
+            "Unsigned local evidence. No signature is available for independent authentication."
+            if manifest["authentication"] == "unsigned_local"
+            else "Signed manifest verified. This rendering has not authenticated it against a recipient-owned key."
+        )
+    else:
+        signing = "Signing state unavailable: this view was created from comparison data only."
+    identity.extend(
+        (name.title() + " binding", value)
+        for name, value in comparison["bindings"].items()
+    )
+    metrics = _metric_views(comparison, policy_metrics)
     failed = sum(m.decision == "regression" for m in metrics)
     insufficient = sum(m.decision == "insufficient_evidence" for m in metrics)
     summary = (
@@ -352,11 +540,16 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
             for m in comparison["metrics"]
         ],
     }
+    subjects, context, changes, context_details = (
+        _captured_context(inputs) if inputs else ((), (), (), ())
+    )
     return ReportView(
         title="InvarLock captured comparison",
         family="Existing evaluation results",
         decision=comparison["decision"],
         summary=summary,
+        context=context,
+        changes=changes,
         metrics=tuple(metrics),
         assurance=(
             (
@@ -372,19 +565,22 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
             ),
         ),
         identity=tuple(identity),
-        subjects=tuple(
-            (role.title() + " run", inputs[role]["run_id"])
-            for role in ("baseline", "subject")
-        )
-        if inputs
-        else (),
+        subjects=subjects,
         next_steps=(
             "Review failed or insufficient checks and their approved requirements.",
             "For a signed handoff, run invarlock verify with independent signer, policy, request and complete-run anchors and an external signed receipt.",
             "Use the comparison JSON and JUnit outputs in CI; preserve missing results and the original policy.",
         ),
-        limitations=tuple(comparison["limitations"]),
-        details=(
+        limitations=tuple(comparison["limitations"])
+        + (
+            (
+                "Model and prompt context is evaluator-recorded provenance, not independent execution or model-identity attestation.",
+            )
+            if inputs
+            else ()
+        ),
+        details=context_details
+        + (
             (
                 "Bound policy (configuration preview)",
                 _policy_preview(inputs["policy"]),

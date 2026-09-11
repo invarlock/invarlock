@@ -8,3 +8,4 @@ verification.receipt.json
 !import/baseline/runtime-provider.receipt.json
 !import/subject/runtime-provider.receipt.json
 !import/rejected-subject/runtime-provider.receipt.json
+!captured-results/references/*/verification.receipt.json

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from invarlock.captured_contracts import (
     CAPTURED_PACK_FORMAT,
@@ -25,9 +25,8 @@ from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
 )
+from invarlock.record_reporting import _captured_context, _metric_views
 from invarlock.report_presentation import (
-    CheckView,
-    MetricView,
     ReportView,
 )
 
@@ -95,7 +94,6 @@ def _view(
         for scope in ("overall", *(item["name"] for item in policy["slices"]))
     }
     seen: set[tuple[str, str]] = set()
-    metrics: list[MetricView] = []
     for item in comparison.get("metrics", []):
         if not isinstance(item, dict):
             raise CapturedReportError("captured report metrics are invalid")
@@ -125,61 +123,23 @@ def _view(
             raise CapturedReportError(
                 "captured report missing result inventory is invalid"
             )
-        checks = [
-            CheckView(
-                "Complete paired results",
-                f"{item.get('count', 0) - len(missing):,} of {item.get('count', 0):,}",
-                "All included pairs",
-                not missing,
-            )
-        ]
-        checks.append(
-            CheckView(
-                "Included pair count",
-                str(item.get("count")),
-                f">= {configured.get('minimum_count')}",
-                item.get("count", 0) >= configured.get("minimum_count", 0),
-            )
-        )
-        metrics.append(
-            MetricView(
-                name=name,
-                scope=str(item.get("slice", "Recorded scope")),
-                decision=decision,
-                baseline="Unavailable"
-                if item["baseline_mean"] is None
-                else str(item["baseline_mean"]),
-                candidate="Unavailable"
-                if item["subject_mean"] is None
-                else str(item["subject_mean"]),
-                change="Unavailable" if item["delta"] is None else str(item["delta"]),
-                count=str(item.get("count", 0) - len(missing)),
-                explanation=(
-                    f"Recorded decision: {decision}. "
-                    + (
-                        "Recorded reasons: " + "; ".join(item["reasons"]) + "."
-                        if item["reasons"]
-                        else "No adverse reasons recorded."
-                    )
-                ),
-                checks=tuple(checks),
-                notes=(
-                    f"{item['count'] - len(missing):,} usable pairs; {len(missing):,} missing results; "
-                    f"{item['count']:,} included pairs. Counts in overlapping slices must not be added together.",
-                    "Scoring and replay were not performed by report.",
-                ),
-            )
-        )
-    if not metrics:
+    if not seen:
         raise CapturedReportError("captured report contains no metrics")
     if seen != expected:
         raise CapturedReportError("captured report omits configured metric scopes")
+    subjects, context, changes, context_details = _captured_context(payloads)
     return ReportView(
         title="InvarLock captured comparison report",
         family="Captured evaluation evidence",
         decision=str(comparison.get("decision")),
-        summary="This report displays the stored captured comparison without replay or rescoring.",
-        metrics=tuple(metrics),
+        summary="Recorded comparison of baseline and candidate results.",
+        context=context,
+        changes=changes,
+        subjects=subjects,
+        details=context_details,
+        metrics=_metric_views(
+            comparison, cast(dict[str, dict[str, Any]], policy_by_name)
+        ),
         assurance=(
             ("Pack format", CAPTURED_PACK_FORMAT),
             (
@@ -201,7 +161,8 @@ def _view(
             "Use independent verification before treating this evidence as accepted.",
         ),
         limitations=(
-            "This is a presentation of captured outputs; report does not replay or score records.",
+            "Scoring and replay were not performed.",
+            "Model and prompt context is evaluator-recorded provenance, not independent execution or model-identity attestation.",
         ),
         technical=comparison,
     )

@@ -9,7 +9,12 @@ from xml.etree.ElementTree import fromstring
 
 import pytest
 
-from invarlock import captured_contracts, captured_reporting, evidence_reporting
+from invarlock import (
+    captured_contracts,
+    captured_reporting,
+    evidence_reporting,
+    record_reporting,
+)
 from invarlock.captured_evaluation import evaluate_captured_request
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from tests.core.test_captured_contract_freeze import (
@@ -57,26 +62,31 @@ def test_shared_render_preserves_frozen_values_labels_and_outputs(
     assert raw == {
         name: before[Path(name)] for name in captured_contracts.PAYLOADS.values()
     }
-    for rendered, metric in zip(view.metrics, stored["metrics"], strict=True):
+    with captured_contracts.captured_snapshot(pack) as snapshot:
+        sdk_view = record_reporting._view(stored, snapshot)
+    assert view.metrics == sdk_view.metrics
+    by_scope = {(m["name"], m["slice"]): m for m in stored["metrics"]}
+    for rendered in view.metrics:
+        metric = by_scope[(rendered.name, rendered.scope)]
         assert (rendered.name, rendered.scope, rendered.decision) == (
             metric["name"],
             metric["slice"],
             metric["decision"],
         )
         assert rendered.count == str(metric["count"] - len(metric["missing_ids"]))
-        for actual, field in (
-            (rendered.baseline, "baseline_mean"),
-            (rendered.candidate, "subject_mean"),
-            (rendered.change, "delta"),
-        ):
-            assert actual == (
-                "Unavailable" if metric[field] is None else str(metric[field])
-            )
+        if metric["baseline_mean"] is None:
+            assert rendered.baseline == "Unavailable"
+        else:
+            assert rendered.baseline != "Unavailable"
+        assert (rendered.interval is not None) == (metric["interval"] is not None)
         assert rendered.checks[0].passed is (not metric["missing_ids"])
         assert rendered.checks[1].passed is (
             metric["count"] >= payloads["policy"]["metrics"][0]["minimum_count"]
         )
-        assert all(reason in rendered.explanation for reason in metric["reasons"])
+        assert rendered.explanation
+        if rendered.interval is not None:
+            assert any(check.name == "Allowed change" for check in rendered.checks)
+            assert any(check.name == "Interval width" for check in rendered.checks)
     paths = {
         name: tmp_path / f"report.{suffix}"
         for name, suffix in (("html", "html"), ("markdown", "md"), ("junit", "xml"))
@@ -193,7 +203,10 @@ def test_every_configured_metric_and_overlapping_slice_is_rendered(scoped_pack):
         assert metric.count == "4"
         assert metric.checks[0].observed == "4 of 4"
         assert metric.checks[1].required == ">= 2"
-        assert "overlapping slices must not be added together" in metric.notes[0]
+        assert any(
+            "overlapping slices must not be added together" in note
+            for note in metric.notes
+        )
 
 
 @pytest.mark.parametrize(

@@ -13,10 +13,10 @@ They are separate from the checkpoint pairs and synthetic protocol in the
 unqualified. This page is a selected evidence inventory, not a complete inventory
 of every campaign study.
 
-Original signed reports and separate recipient receipts are retained outside
-Git. Only metadata is available here: combined source redistribution review
-remains unresolved, and there is no public payload download. These summaries
-are not entries in the [public evidence-pack index](../../../public_evidence/README.md).
+Original historical signed reports and recipient receipts remain in the campaign
+archive. The selected [32B routing reference](../../captured-results/references/k2-32b-routing/README.md)
+publishes the complete comparison as a separately signed current captured pack.
+Other workflows remain represented here by metadata and source references.
 
 ## Recorded decisions
 
@@ -82,12 +82,14 @@ not acquire the software's Apache license. Preserve applicable attribution,
 change notices and share-alike obligations. No source rows, model weights,
 tokenizer payloads or generated outputs are included in this metadata addition.
 
-An authorized recipient needs the original companion artifacts and separately
-approved manifest hashes, policies, run identities and signer keys. Public
-source references alone cannot reconstruct generated outputs. Keep payloads
-held until their distribution is approved; do not silently redact signed bytes
-or omit adverse workflows. A future public carrier must supply a real durable
-locator and verified archive checksum. No such locator is claimed here.
+For historical-format replay, an authorized recipient needs the original
+companion artifacts and separately approved manifest hashes, policies, run
+identities and signer keys. Public
+source references alone cannot reconstruct generated outputs. The selected
+routing reference supplies its complete signed payload, source
+notices, portable repository locator and archive checksum. This does not extend
+to the other datasets or workflows. Do not silently redact signed bytes or omit
+adverse workflows from the campaign inventory.
 
 ## CPU replay and the current interface
 
@@ -134,10 +136,11 @@ insufficient evidence as a JUnit error.
 
 Historical signed JSON reports are not current captured directory packs.
 Current requests use `invarlock/evaluation-request-v2`, captured packs use v2,
-and signed verification receipts use v3. No conversion or current-wheel replay
-of the historical campaign is established by this metadata. Any later projection
-must create separately identified artifacts, preserve original bytes and
-outcomes, and independently bind the projected inputs.
+and signed verification receipts use v3. The [32B routing reference](../../captured-results/references/k2-32b-routing/README.md)
+provides one complete current-format conversion with separately identified
+artifacts, preserved source records and metric outcomes, and independent
+recipient bindings. Other historical comparisons have no published current
+captured pack.
 
 ## Optional studies
 

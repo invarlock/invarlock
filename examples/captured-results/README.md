@@ -1,5 +1,10 @@
 # Captured Results Example
 
+The [retained routing reference](references/k2-32b-routing/README.md) contains
+4,000 paired records from real K2 Horizon 32B model captures. It provides a
+complete signed pack and offline recipient replay of the expected regression,
+with recorded-score assurance and no native runtime qualification claim.
+
 This directory demonstrates the neutral captured-evaluation workflow. The
 wheel smoke invokes the installed core `invarlock` command and checks signed
 `evaluate`, independent `verify`, and non-mutating `report` before add-ins are
