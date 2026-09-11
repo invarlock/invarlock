@@ -205,6 +205,29 @@ def test_cli_discriminator_replacement_does_not_cross_runtime_boundary(
     assert not (tmp_path / "artifacts").exists()
 
 
+def test_cli_discriminator_replacement_does_not_cross_captured_boundary(
+    tmp_path, monkeypatch
+):
+    from invarlock.core import evaluation_request
+
+    native_bytes = _valid_request(tmp_path).read_bytes()
+    _inputs(tmp_path)
+    path = tmp_path / "request.json"
+    original = evaluation_request.evaluation_request_mode
+
+    def discriminate(request_path):
+        mode = original(request_path)
+        assert mode == "captured"
+        request_path.write_bytes(native_bytes)
+        return mode
+
+    monkeypatch.setattr(evaluation_request, "evaluation_request_mode", discriminate)
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
+    assert result.exit_code == 2
+    assert "did not load as captured evidence" in json.loads(result.stdout)["errors"][0]
+    assert not (tmp_path / "artifacts").exists()
+
+
 @pytest.mark.parametrize("verdict,exit_code", [("pass", 0), ("fail", 7), (None, 2)])
 def test_native_policy_gate_preserves_published_json_and_missing_verdict_diagnostic(
     imported_example, monkeypatch, verdict, exit_code

@@ -138,6 +138,22 @@ def test_reference_manifest_and_archive_are_bounded_before_reading(
         module.replay(package, tmp_path / "archive-result")
 
 
+def test_reference_manifest_must_be_an_object(module, package, tmp_path):
+    (package / "reference.json").write_bytes(b"[]")
+    with pytest.raises(ValueError, match="manifest must be an object"):
+        module.replay(package, tmp_path / "result")
+
+
+@pytest.mark.parametrize("size", [None, 0, True])
+def test_archive_declared_size_must_be_a_positive_bounded_integer(
+    module, package, tmp_path, size
+):
+    reference = json.loads((package / "reference.json").read_bytes())
+    reference["archive"]["size_bytes"] = size
+    with pytest.raises(ValueError, match="Unexpected reference archive size"):
+        module.unpack(package, tmp_path / "evidence", reference)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
