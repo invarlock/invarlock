@@ -177,8 +177,9 @@ def _open_checkpoint_root(root: Path) -> int:
                     "local checkpoint could not be securely opened as a regular "
                     "directory without symbolic links"
                 ) from exc
-            os.close(descriptor)
+            previous_descriptor = descriptor
             descriptor = child
+            os.close(previous_descriptor)
         if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
             raise CheckpointIdentityError(
                 "local checkpoint root is not a regular directory"
@@ -262,18 +263,26 @@ def _scan_checkpoint_tree(root_fd: int) -> _TreeSnapshot:
 def _open_checkpoint_file(root_fd: int, relative: str) -> int:
     parts = relative.split("/")
     directory_fd = os.dup(root_fd)
+    file_fd: int | None = None
     try:
-        for part in parts[:-1]:
-            child_fd = os.open(part, _directory_open_flags(), dir_fd=directory_fd)
+        try:
+            for part in parts[:-1]:
+                child_fd = os.open(part, _directory_open_flags(), dir_fd=directory_fd)
+                previous_descriptor = directory_fd
+                directory_fd = child_fd
+                os.close(previous_descriptor)
+            file_fd = os.open(parts[-1], _file_open_flags(), dir_fd=directory_fd)
+        except OSError as exc:
+            raise CheckpointIdentityError(
+                f"checkpoint file changed or could not be securely opened: {relative}"
+            ) from exc
+        finally:
             os.close(directory_fd)
-            directory_fd = child_fd
-        return os.open(parts[-1], _file_open_flags(), dir_fd=directory_fd)
-    except OSError as exc:
-        raise CheckpointIdentityError(
-            f"checkpoint file changed or could not be securely opened: {relative}"
-        ) from exc
-    finally:
-        os.close(directory_fd)
+    except BaseException:
+        if file_fd is not None:
+            os.close(file_fd)
+        raise
+    return file_fd
 
 
 def _hash_checkpoint_file(

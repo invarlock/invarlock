@@ -157,8 +157,9 @@ class _PinnedFile:
                     raise LlamaCppExecutionError(
                         "pinned file path contains a symlink or inaccessible directory"
                     ) from exc
-                os.close(parent_descriptor)
+                previous_descriptor = parent_descriptor
                 parent_descriptor = next_descriptor
+                os.close(previous_descriptor)
 
             try:
                 named = os.stat(
@@ -198,10 +199,10 @@ class _PinnedFile:
                     initial_stat=opened,
                     sha256=observed_sha256,
                 )
-            except Exception:
+            except BaseException:
                 os.close(descriptor)
                 raise
-        except Exception:
+        except BaseException:
             os.close(parent_descriptor)
             raise
 
@@ -238,8 +239,10 @@ class _PinnedFile:
         if self._closed:
             return
         self._closed = True
-        os.close(self.descriptor)
-        os.close(self.parent_descriptor)
+        try:
+            os.close(self.descriptor)
+        finally:
+            os.close(self.parent_descriptor)
 
 
 @dataclass
@@ -618,7 +621,7 @@ class LlamaCppSession:
                     "llama.cpp observed version does not match the pinned version"
                 )
             self._recheck_runtime()
-        except Exception:
+        except BaseException:
             self.close()
             raise
 

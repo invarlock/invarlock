@@ -14,6 +14,49 @@ def _error(message: str):
     return pytest.raises(identity.TensorRTLLMIdentityError, match=message)
 
 
+@pytest.mark.parametrize("operation", ["root", "tree"])
+@pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt])
+def test_directory_stat_failure_releases_new_descriptors(
+    tmp_path, monkeypatch, operation, failure
+):
+    (tmp_path / "child").mkdir()
+    original_open, original_stat = os.open, os.fstat
+    root = original_open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    opened = []
+
+    def open_tracked(*args, **kwargs):
+        descriptor = original_open(*args, **kwargs)
+        opened.append(descriptor)
+        return descriptor
+
+    def fail_stat(descriptor):
+        raise failure("directory stat failed")
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "open", open_tracked)
+            patch.setattr(os, "fstat", fail_stat)
+            expected = (
+                identity.TensorRTLLMIdentityError if failure is OSError else failure
+            )
+            with pytest.raises(expected):
+                if operation == "root":
+                    identity._open_root_without_symlinks(tmp_path)
+                else:
+                    identity._collect_files(root)
+        assert opened
+        for descriptor in opened:
+            with pytest.raises(OSError):
+                original_stat(descriptor)
+    finally:
+        for descriptor in opened:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        os.close(root)
+
+
 def test_logical_names_and_root_paths_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

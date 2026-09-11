@@ -113,6 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Close all pinned captured-evidence directory descriptors even when one close
   reports an error, including failures during input setup or caller execution.
+- Release owned files, subprocess streams and runtime resources when setup or
+  cleanup fails across evaluation, provider integrations and maintained examples.
+  Preserve output cleanup and environment restoration after earlier errors.
 
 - Validate safetensors shard references and storage layout before calling the
   strict HF model loader, rejecting traversal, symbolic links and special files

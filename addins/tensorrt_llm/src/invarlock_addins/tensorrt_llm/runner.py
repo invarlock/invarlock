@@ -18,7 +18,7 @@ import re
 import stat
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Protocol
@@ -857,24 +857,26 @@ def _silence_backend_output() -> Iterator[None]:
             stream.flush()
         except (AttributeError, OSError):
             pass
-    saved_stdout = os.dup(1)
-    saved_stderr = os.dup(2)
-    sink = os.open(os.devnull, os.O_WRONLY)
-    try:
-        os.dup2(sink, 1)
-        os.dup2(sink, 2)
-        yield
-    finally:
-        for stream in (sys.stdout, sys.stderr):
+    with ExitStack() as descriptors:
+        saved_stdout = os.dup(1)
+        descriptors.callback(os.close, saved_stdout)
+        saved_stderr = os.dup(2)
+        descriptors.callback(os.close, saved_stderr)
+        sink = os.open(os.devnull, os.O_WRONLY)
+        descriptors.callback(os.close, sink)
+        with ExitStack() as restore_outputs:
+            restore_outputs.callback(os.dup2, saved_stderr, 2)
+            restore_outputs.callback(os.dup2, saved_stdout, 1)
             try:
-                stream.flush()
-            except (AttributeError, OSError):
-                pass
-        os.dup2(saved_stdout, 1)
-        os.dup2(saved_stderr, 2)
-        os.close(saved_stdout)
-        os.close(saved_stderr)
-        os.close(sink)
+                os.dup2(sink, 1)
+                os.dup2(sink, 2)
+                yield
+            finally:
+                for stream in (sys.stdout, sys.stderr):
+                    try:
+                        stream.flush()
+                    except (AttributeError, OSError):
+                        pass
 
 
 def _tokenizer_from_contract(contract: _TokenizerContract, backend: _Backend) -> object:

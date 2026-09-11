@@ -429,9 +429,10 @@ def _resolve_existing_reference(
                     component=component,
                     exc=exc,
                 ) from exc
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         mode = os.fstat(current_fd).st_mode
         if expected == "file" and not stat.S_ISREG(mode):
             raise EvaluationRequestError(f"{label} must reference a regular file")
@@ -440,9 +441,11 @@ def _resolve_existing_reference(
                 f"{label} must reference a regular file or directory"
             )
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
     return root.joinpath(*parts)
 
 
@@ -463,9 +466,10 @@ def _resolve_output_reference(root: Path, reference: str, *, label: str) -> Path
                     component=component,
                     exc=exc,
                 ) from exc
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         destination = parts[-1]
         try:
             os.stat(destination, dir_fd=current_fd, follow_symlinks=False)
@@ -475,9 +479,11 @@ def _resolve_output_reference(root: Path, reference: str, *, label: str) -> Path
             raise EvaluationRequestError(f"{label} cannot be inspected: {exc}") from exc
         raise EvaluationRequestError(f"{label} already exists")
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
 
 
 def _default_provider_resolver(provider_name: str) -> RuntimeProvider:

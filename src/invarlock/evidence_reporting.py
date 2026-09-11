@@ -483,9 +483,10 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             except FileNotFoundError:
                 os.mkdir(component, mode=0o755, dir_fd=current_fd)
                 child_fd = os.open(component, _DIRECTORY_FLAGS, dir_fd=current_fd)
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         flags = (
             os.O_WRONLY
             | os.O_CREAT
@@ -510,9 +511,11 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             f"could not write HTML report: {exc}", exit_code=1
         ) from exc
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
     return destination
 
 

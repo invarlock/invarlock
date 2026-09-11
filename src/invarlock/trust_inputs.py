@@ -123,8 +123,9 @@ def _open_directory_without_links(path: Path, *, label: str) -> int:
                 raise TrustInputsError(
                     f"{label} parent must be an existing non-symlink directory"
                 ) from exc
-            os.close(descriptor)
+            previous_descriptor = descriptor
             descriptor = child
+            os.close(previous_descriptor)
         if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
             raise TrustInputsError(
                 f"{label} parent must be an existing non-symlink directory"
@@ -164,8 +165,9 @@ def _read_relative_regular_file(
                 raise TrustInputsError(
                     f"{label} could not be opened without following symlinks"
                 ) from exc
-            os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            os.close(previous_descriptor)
         opened = os.fstat(current_fd)
         if not stat.S_ISREG(opened.st_mode):
             raise TrustInputsError(f"{label} must be a real regular file")

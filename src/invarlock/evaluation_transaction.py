@@ -327,9 +327,10 @@ def _read_request_file(
                 raise EvaluationTransactionError(
                     f"{label} could not be opened without following links"
                 ) from exc
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         opened = os.fstat(current_fd)
         if not stat.S_ISREG(opened.st_mode):
             raise EvaluationTransactionError(f"{label} must be a regular file")
@@ -362,9 +363,11 @@ def _read_request_file(
             raise EvaluationTransactionError(f"{label} changed while being read")
         return payload
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
 
 
 def _prepare_output_parent(root: Path, destination: Path) -> _OutputParentAnchor:
@@ -375,41 +378,52 @@ def _prepare_output_parent(root: Path, destination: Path) -> _OutputParentAnchor
     current_fd = root_fd
     anchor_fd: int | None = None
     try:
-        for component in parts[:-1]:
-            try:
-                child_fd = os.open(component, _DIRECTORY_FLAGS, dir_fd=current_fd)
-            except FileNotFoundError:
+        try:
+            for component in parts[:-1]:
                 try:
-                    os.mkdir(component, mode=0o755, dir_fd=current_fd)
                     child_fd = os.open(component, _DIRECTORY_FLAGS, dir_fd=current_fd)
+                except FileNotFoundError:
+                    try:
+                        os.mkdir(component, mode=0o755, dir_fd=current_fd)
+                        child_fd = os.open(
+                            component, _DIRECTORY_FLAGS, dir_fd=current_fd
+                        )
+                    except OSError as exc:
+                        raise EvaluationTransactionError(
+                            "output.evidence parent could not be created safely"
+                        ) from exc
                 except OSError as exc:
                     raise EvaluationTransactionError(
-                        "output.evidence parent could not be created safely"
+                        "output.evidence parent traverses an unsafe component"
                     ) from exc
-            except OSError as exc:
-                raise EvaluationTransactionError(
-                    "output.evidence parent traverses an unsafe component"
-                ) from exc
-            if current_fd != root_fd:
-                os.close(current_fd)
-            current_fd = child_fd
-        try:
-            os.stat(parts[-1], dir_fd=current_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            anchor_fd = os.dup(current_fd)
-            parent_stat = os.fstat(anchor_fd)
-            return _OutputParentAnchor(
-                descriptor=anchor_fd,
-                device=parent_stat.st_dev,
-                inode=parent_stat.st_ino,
-                destination_name=parts[-1],
-            )
-        else:
-            raise EvaluationTransactionError("output.evidence already exists")
-    finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+                previous_descriptor = current_fd
+                current_fd = child_fd
+                if previous_descriptor != root_fd:
+                    os.close(previous_descriptor)
+            try:
+                os.stat(parts[-1], dir_fd=current_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                anchor_fd = os.dup(current_fd)
+                parent_stat = os.fstat(anchor_fd)
+                anchor = _OutputParentAnchor(
+                    descriptor=anchor_fd,
+                    device=parent_stat.st_dev,
+                    inode=parent_stat.st_ino,
+                    destination_name=parts[-1],
+                )
+            else:
+                raise EvaluationTransactionError("output.evidence already exists")
+        finally:
+            try:
+                if current_fd != root_fd:
+                    os.close(current_fd)
+            finally:
+                os.close(root_fd)
+    except BaseException:
+        if anchor_fd is not None:
+            os.close(anchor_fd)
+        raise
+    return anchor
 
 
 def _revalidate_output_parent(

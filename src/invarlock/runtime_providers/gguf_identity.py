@@ -176,8 +176,9 @@ def _open_regular_without_symlinks(path: str | os.PathLike[str]) -> _OpenArtifac
                 raise GGUFIdentityError(
                     "GGUF artifact path contains a symlink or inaccessible directory"
                 ) from exc
-            os.close(directory_descriptor)
+            previous_descriptor = directory_descriptor
             directory_descriptor = next_descriptor
+            os.close(previous_descriptor)
 
         try:
             before = os.stat(
@@ -540,8 +541,10 @@ def read_gguf_artifact_identity(
             tokenizer_metadata_sha256=tokenizer_sha256,
         )
     finally:
-        os.close(artifact.descriptor)
-        os.close(artifact.parent_descriptor)
+        try:
+            os.close(artifact.descriptor)
+        finally:
+            os.close(artifact.parent_descriptor)
 
 
 __all__ = [

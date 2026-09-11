@@ -9,6 +9,36 @@ import invarlock.evaluation_transaction as transaction
 from invarlock.evaluation_transaction import EvaluationTransactionError
 
 
+def test_output_anchor_stat_failure_closes_duplicate(tmp_path, monkeypatch):
+    original_dup, original_stat = os.dup, os.fstat
+    duplicates = []
+
+    def duplicate(descriptor):
+        result = original_dup(descriptor)
+        duplicates.append(result)
+        return result
+
+    def fail_anchor_stat(descriptor):
+        if descriptor in duplicates:
+            raise OSError("anchor stat failed")
+        return original_stat(descriptor)
+
+    monkeypatch.setattr(os, "dup", duplicate)
+    monkeypatch.setattr(os, "fstat", fail_anchor_stat)
+    try:
+        with pytest.raises(OSError, match="anchor stat failed"):
+            transaction._prepare_output_parent(tmp_path, tmp_path / "evidence")
+        assert len(duplicates) == 1
+        with pytest.raises(OSError):
+            original_stat(duplicates[0])
+    finally:
+        for descriptor in duplicates:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
 def test_preflight_json_includes_optional_qualification() -> None:
     result = transaction.EvaluationPreflightResult(
         execution_mode="run",

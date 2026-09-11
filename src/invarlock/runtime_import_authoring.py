@@ -712,15 +712,19 @@ def write_runtime_import_paired_records(
             "runtime import paired-record destination must be new and writable"
         ) from exc
     finally:
-        if staging_fd is not None:
-            os.close(staging_fd)
-        if staging_name is not None and parent_fd is not None:
+        try:
             try:
-                os.unlink(staging_name, dir_fd=parent_fd)
-            except FileNotFoundError:
-                pass
-        if parent_fd is not None:
-            os.close(parent_fd)
+                if staging_fd is not None:
+                    os.close(staging_fd)
+            finally:
+                if staging_name is not None and parent_fd is not None:
+                    try:
+                        os.unlink(staging_name, dir_fd=parent_fd)
+                    except FileNotFoundError:
+                        pass
+        finally:
+            if parent_fd is not None:
+                os.close(parent_fd)
     try:
         reloaded, value = _canonical_object_file(
             output, label="runtime import paired records"
