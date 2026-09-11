@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import threading
 from collections.abc import Sequence
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -308,8 +309,10 @@ class _RunDirectory:
         if self._closed:
             return
         self._closed = True
-        os.close(self.descriptor)
-        shutil.rmtree(self.path, ignore_errors=True)
+        try:
+            os.close(self.descriptor)
+        finally:
+            shutil.rmtree(self.path, ignore_errors=True)
 
 
 def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
@@ -810,13 +813,11 @@ class LlamaCppSession:
         if self._closed:
             return
         self._closed = True
-        if self._model is not None:
-            self._model.close()
-        if self._source_archive is not None:
-            self._source_archive.close()
-        if self._executable is not None:
-            self._executable.close()
-        self._run_directory.close()
+        with ExitStack() as cleanup:
+            cleanup.callback(self._run_directory.close)
+            for resource in (self._executable, self._source_archive, self._model):
+                if resource is not None:
+                    cleanup.callback(resource.close)
 
 
 __all__ = [

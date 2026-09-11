@@ -340,7 +340,7 @@ def _open_file_by_components(
                 f"engine bundle entry {logical_name!r} cannot be opened safely"
             ) from exc
         return directory_descriptor, file_descriptor
-    except Exception:
+    except BaseException:
         os.close(directory_descriptor)
         raise
 

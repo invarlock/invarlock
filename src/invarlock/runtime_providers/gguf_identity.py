@@ -203,23 +203,27 @@ def _open_regular_without_symlinks(path: str | os.PathLike[str]) -> _OpenArtifac
         except OSError as exc:
             raise GGUFIdentityError("GGUF artifact cannot be opened safely") from exc
         try:
-            opened = os.fstat(descriptor)
-        except OSError as exc:
+            try:
+                opened = os.fstat(descriptor)
+            except OSError as exc:
+                raise GGUFIdentityError(
+                    "GGUF artifact cannot be inspected safely"
+                ) from exc
+            if not stat.S_ISREG(opened.st_mode) or _stat_identity(
+                before
+            ) != _stat_identity(opened):
+                raise GGUFIdentityError("GGUF artifact changed while being opened")
+            return _OpenArtifact(
+                absolute_path=absolute,
+                descriptor=descriptor,
+                parent_descriptor=directory_descriptor,
+                basename=absolute.name,
+                initial_stat=opened,
+            )
+        except BaseException:
             os.close(descriptor)
-            raise GGUFIdentityError("GGUF artifact cannot be inspected safely") from exc
-        if not stat.S_ISREG(opened.st_mode) or _stat_identity(before) != _stat_identity(
-            opened
-        ):
-            os.close(descriptor)
-            raise GGUFIdentityError("GGUF artifact changed while being opened")
-        return _OpenArtifact(
-            absolute_path=absolute,
-            descriptor=descriptor,
-            parent_descriptor=directory_descriptor,
-            basename=absolute.name,
-            initial_stat=opened,
-        )
-    except Exception:
+            raise
+    except BaseException:
         os.close(directory_descriptor)
         raise
 
