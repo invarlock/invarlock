@@ -284,6 +284,67 @@ def test_configuration_preview_bounds_depth_nodes_strings_and_retains_numbers():
     assert value == before
 
 
+def test_configuration_preview_does_not_render_value_after_key_exhausts_budget():
+    from invarlock.record_reporting import _configuration_preview
+
+    value = {f"field-{index}": index for index in range(63)}
+    value["last-field"] = "UNRENDERED_VALUE" * 1000
+    before = deepcopy(value)
+    preview = _configuration_preview(value)
+    assert '"last-field": … node budget reached' in preview["text"]
+    assert "UNRENDERED_VALUE" not in preview["text"]
+    assert value == before
+
+
+def test_comparison_only_missing_results_do_not_invent_policy_checks():
+    baseline, candidate, policy = example_project("classification")
+    policy["metrics"] = policy["metrics"][:1]
+    policy["slices"] = []
+    candidate["records"][0]["output"] = None
+    candidate["records"][0]["error"] = "capture unavailable"
+    value = build_pack(baseline, candidate, policy)
+    view = _view(pack_json(value, "report"), None)
+    metric = view.metrics[0]
+    assert metric.decision == "insufficient_evidence"
+    assert metric.interval is None
+    assert [check.name for check in metric.checks] == [
+        "Complete paired results",
+        "Policy thresholds",
+    ]
+    assert metric.checks[1].passed is None
+    assert "Not supplied" in metric.checks[1].observed
+
+
+@pytest.mark.parametrize("outcome", ["pass", "regression", "missing"])
+def test_record_junit_preserves_policy_outcome(outcome):
+    from xml.etree.ElementTree import fromstring
+
+    from invarlock.record_reporting import render_junit
+
+    baseline, candidate, policy = example_project("classification")
+    policy["metrics"] = policy["metrics"][:1]
+    policy["slices"] = []
+    if outcome == "regression":
+        for row in candidate["records"]:
+            row["output"] = "wrong"
+    elif outcome == "missing":
+        candidate["records"][0]["output"] = None
+        candidate["records"][0]["error"] = "capture unavailable"
+    comparison = pack_json(build_pack(baseline, candidate, policy), "report")
+    suite = fromstring(render_junit(comparison))
+    assert suite.attrib["tests"] == "1"
+    assert suite.attrib["failures"] == str(int(outcome == "regression"))
+    assert suite.attrib["errors"] == str(int(outcome == "missing"))
+    case = suite.find("testcase")
+    assert case is not None
+    if outcome == "pass":
+        assert list(case) == []
+    else:
+        issue = case.find("failure" if outcome == "regression" else "error")
+        assert issue is not None
+        assert issue.attrib["message"] == "; ".join(comparison["metrics"][0]["reasons"])
+
+
 @pytest.mark.parametrize("outcome", ["regression", "missing"])
 def test_multi_metric_overview_keeps_every_scope_and_adverse_check_visible(outcome):
     import re
