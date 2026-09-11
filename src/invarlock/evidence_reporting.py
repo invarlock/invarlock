@@ -493,6 +493,8 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
     root_fd = os.open("/", _DIRECTORY_FLAGS)
     current_fd = root_fd
     descriptor: int | None = None
+    created = False
+    completed = False
     try:
         for component in destination.parent.parts[1:]:
             try:
@@ -512,14 +514,20 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             | getattr(os, "O_NOFOLLOW", 0)
         )
         descriptor = os.open(destination.name, flags, 0o600, dir_fd=current_fd)
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+        created = True
+        try:
+            handle = os.fdopen(descriptor, "w", encoding="utf-8", newline="\n")
+        except BaseException:
+            os.close(descriptor)
             descriptor = None
+            raise
+        descriptor = None
+        with handle:
             handle.write(html)
             handle.flush()
             os.fsync(handle.fileno())
+        completed = True
     except OSError as exc:
-        if descriptor is not None:
-            os.close(descriptor)
         if exc.errno == errno.EEXIST:
             raise EvidenceReportError(
                 f"HTML destination already exists: {destination}"
@@ -529,8 +537,17 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
         ) from exc
     finally:
         try:
-            if current_fd != root_fd:
-                os.close(current_fd)
+            try:
+                if descriptor is not None:
+                    os.close(descriptor)
+                if created and not completed:
+                    try:
+                        os.unlink(destination.name, dir_fd=current_fd)
+                    except OSError:
+                        pass
+            finally:
+                if current_fd != root_fd:
+                    os.close(current_fd)
         finally:
             os.close(root_fd)
     return destination

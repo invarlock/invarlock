@@ -675,7 +675,10 @@ def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Pa
         | getattr(os, "O_NOFOLLOW", 0)
     )
     leaf_flags = (
-        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
     )
     root_descriptor: int | None = None
     current_descriptor: int | None = None

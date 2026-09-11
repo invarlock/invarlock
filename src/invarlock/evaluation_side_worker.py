@@ -129,7 +129,7 @@ def _make_output_collectible(directory: Path) -> None:
         for name in sorted(expected_names):
             descriptor = os.open(
                 name,
-                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
                 dir_fd=directory_fd,
             )
             try:

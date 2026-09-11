@@ -79,7 +79,12 @@ def _regular_file_marker_present(path: str) -> bool:
 
 
 def _read_bounded_kernel_file(path: str, *, max_bytes: int = 16 * 1024) -> bytes | None:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(path, flags)
     except OSError:

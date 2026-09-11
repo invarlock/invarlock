@@ -594,6 +594,7 @@ def test_subject_file_hashing_rejects_unsafe_paths_and_detects_change(
     changed = SimpleNamespace(
         st_dev=before.st_dev,
         st_ino=before.st_ino,
+        st_mode=before.st_mode,
         st_size=before.st_size,
         st_mtime_ns=before.st_mtime_ns + 1,
         st_ctime_ns=before.st_ctime_ns,
@@ -601,6 +602,47 @@ def test_subject_file_hashing_rejects_unsafe_paths_and_detects_change(
     monkeypatch.setattr(target.os, "fstat", lambda _fd: changed)
     with pytest.raises(AcceptanceAttestationError, match="changed"):
         target._file_sha256(artifact)
+
+
+def test_subject_file_hashing_rejects_fifo_replacement_without_blocking(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if not hasattr(target.os, "mkfifo") or not hasattr(target.os, "O_NONBLOCK"):
+        pytest.skip("nonblocking named pipes are unavailable")
+    artifact = tmp_path / "model.gguf"
+    artifact.write_bytes(b"artifact")
+    real_open = target.os.open
+
+    def replace_with_fifo(path: Path, flags: int) -> int:
+        assert flags & target.os.O_NONBLOCK
+        artifact.unlink()
+        target.os.mkfifo(artifact)
+        return real_open(path, flags)
+
+    monkeypatch.setattr(target.os, "open", replace_with_fifo)
+    with pytest.raises(AcceptanceAttestationError, match="changed"):
+        target._file_sha256(artifact)
+
+
+def test_subject_file_hashing_closes_descriptor_when_stream_construction_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact = tmp_path / "model.gguf"
+    artifact.write_bytes(b"artifact")
+    opened: list[int] = []
+
+    def fail(descriptor: int, _mode: str):
+        opened.append(descriptor)
+        raise RuntimeError("injected stream construction failure")
+
+    monkeypatch.setattr(target.os, "fdopen", fail)
+    with pytest.raises(RuntimeError, match="stream construction"):
+        target._file_sha256(artifact)
+    assert len(opened) == 1
+    with pytest.raises(OSError):
+        target.os.fstat(opened[0])
 
 
 def test_artifact_path_digest_dispatches_engine_and_rejects_unknown(

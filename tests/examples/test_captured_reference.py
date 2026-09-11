@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -172,7 +173,12 @@ def test_archive_cannot_add_paths_or_expand_unbound_bytes(
     reference = json.loads((package / "reference.json").read_bytes())
     archive = package / "evidence.zip"
     if mutation in ("traversal", "duplicate"):
-        with zipfile.ZipFile(archive, "a") as bundle:
+        expected_warning = (
+            pytest.warns(UserWarning, match="Duplicate name")
+            if mutation == "duplicate"
+            else nullcontext()
+        )
+        with expected_warning, zipfile.ZipFile(archive, "a") as bundle:
             bundle.writestr(
                 "../escaped" if mutation == "traversal" else "request.json", b"bad"
             )

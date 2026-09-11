@@ -744,23 +744,60 @@ def _technical_verdict(predicate: object) -> str | None:
 
 
 def _file_sha256(path: Path) -> str:
-    if path.is_symlink():
-        raise AcceptanceAttestationError("subject artifact must not be a symlink")
+    descriptor: int | None = None
     try:
-        before = path.stat()
+        before = path.lstat()
+        if stat.S_ISLNK(before.st_mode):
+            raise AcceptanceAttestationError("subject artifact must not be a symlink")
         if not stat.S_ISREG(before.st_mode):
             raise AcceptanceAttestationError(
                 "file-bound subject artifact must be a regular file"
             )
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        descriptor = os.open(path, flags)
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_size,
+            opened.st_mtime_ns,
+            opened.st_ctime_ns,
+        ):
+            raise AcceptanceAttestationError(
+                "subject artifact changed before it could be hashed"
+            )
         digest = hashlib.sha256()
-        with path.open("rb") as handle:
+        try:
+            handle = os.fdopen(descriptor, "rb")
+        except BaseException:
+            os.close(descriptor)
+            descriptor = None
+            raise
+        descriptor = None
+        with handle:
             while chunk := handle.read(1024 * 1024):
                 digest.update(chunk)
             after = os.fstat(handle.fileno())
+    except AcceptanceAttestationError:
+        raise
     except OSError as exc:
         raise AcceptanceAttestationError(
             "subject artifact could not be read safely"
         ) from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
     if (
         before.st_dev,
         before.st_ino,

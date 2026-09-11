@@ -457,6 +457,26 @@ def _manifest(evidence: Path) -> dict[str, object]:
     return payload
 
 
+def test_html_writer_cleans_up_when_stream_construction_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+    opened: list[int] = []
+
+    def fail(descriptor: int, *_args: object, **_kwargs: object):
+        opened.append(descriptor)
+        raise RuntimeError("injected stream construction failure")
+
+    monkeypatch.setattr(reporting.os, "fdopen", fail)
+    with pytest.raises(RuntimeError, match="stream construction"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+    assert not destination.exists()
+    assert len(opened) == 1
+    with pytest.raises(OSError):
+        reporting.os.fstat(opened[0])
+
+
 def test_report_json_loader_and_manifest_path_inventory_fail_closed(
     tmp_path: Path,
 ) -> None:

@@ -35,7 +35,7 @@ def _jsonl_rows(raw: bytes, label: str) -> list[dict[str, Any]]:
     """Parse non-empty JSONL rows without expanding work past the record limit."""
     rows: list[dict[str, Any]] = []
     for line_number, line in enumerate(io.BytesIO(raw), 1):
-        if not line.strip():
+        if line.isspace():
             continue
         if len(rows) == MAX_RECORDS:
             raise EvaluationRecordsError(
