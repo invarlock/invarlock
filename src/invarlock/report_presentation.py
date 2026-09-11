@@ -11,8 +11,19 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from html import escape
+from html import escape as html_escape
 from typing import Any
+
+
+def escape(value: str, quote: bool = True) -> str:
+    """Show terminal control bytes literally before escaping report markup."""
+    visible = re.sub(
+        r"[\x00-\x08\x0b-\x1f\x7f-\x9f]",
+        lambda match: f"\\u{ord(match.group()):04x}",
+        value,
+    )
+    return html_escape(visible, quote=quote)
+
 
 # Static mark from docs/assets/invarlock-app-icon.svg; the adjacent name labels it.
 _BRAND_MARK = """<svg class="mark" xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
@@ -180,6 +191,8 @@ class ReportView:
     limitations: tuple[str, ...] = ()
     details: tuple[tuple[str, Any], ...] = ()
     technical: dict[str, Any] = field(default_factory=dict)
+    context: tuple[tuple[str, str], ...] = ()
+    changes: tuple[str, ...] = ()
 
 
 def decision_label(value: str) -> str:
@@ -325,14 +338,35 @@ def render_html(view: ReportView) -> str:
         f'<span class="pill">{len(view.metrics)} metric / scope result{"s" if len(view.metrics) != 1 else ""}</span>',
         f'<span class="pill">Original decision: {e(view.decision)}</span></div></section>',
     ]
-    if view.subjects:
+    if view.subjects or view.context or view.changes:
         parts.append(
-            '<dl class="subjects">'
-            + "".join(
-                f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>" for k, v in view.subjects
-            )
-            + "</dl>"
+            '<section class="panel" aria-labelledby="comparison-context"><h2 id="comparison-context">What was compared</h2>'
         )
+        if view.subjects:
+            parts.append(
+                '<dl class="subjects">'
+                + "".join(
+                    f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>"
+                    for k, v in view.subjects
+                )
+                + "</dl>"
+            )
+        if view.context:
+            parts.append(
+                '<dl class="subjects">'
+                + "".join(
+                    f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>"
+                    for k, v in view.context
+                )
+                + "</dl>"
+            )
+        if view.changes:
+            parts.append(
+                "<h3>Recorded changes</h3><ul>"
+                + "".join(f"<li>{e(change)}</li>" for change in view.changes)
+                + "</ul>"
+            )
+        parts.append("</section>")
     support = [
         '<div class="columns"><section class="panel"><h2>What was checked</h2><dl>'
     ]
@@ -456,13 +490,17 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         "",
         clean(view.summary),
         "",
-        "## What was checked",
-        "",
     ]
+    if view.subjects or view.context or view.changes:
+        lines += ["## What was compared", ""]
+        lines.extend(
+            f"- **{clean(k)}:** {clean(v)}" for k, v in (*view.subjects, *view.context)
+        )
+        if view.changes:
+            lines += ["", "### Recorded changes", ""]
+            lines.extend(f"- {clean(change)}" for change in view.changes)
+    lines += ["", "## What was checked", ""]
     lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.assurance)
-    if view.subjects:
-        lines += ["", "## Compared artifacts", ""]
-        lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.subjects)
     for metric in view.metrics:
         lines += [
             "",

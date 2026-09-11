@@ -90,8 +90,13 @@ corresponding reason uses “subject”. All other metric fields match exactly.
 The independent original input-plan digest and both case-set digests are in
 `reference.json`.
 
-The retained results came from `IFM/K2-Horizon-32B`, revision
-`466db5f23c8a7c96b0b320b688612ee6f4446a35`. They compare prompt roles A and B
+The external [source provenance](../../../qualification/k2-horizon/retained-sources.json)
+identifies `IFM/K2-Horizon-32B`, revision
+`466db5f23c8a7c96b0b320b688612ee6f4446a35`. That repository and revision come
+from the retained campaign source manifest, beyond the signed run's model key.
+The signed records themselves identify `k2-32b` on both sides and record the
+subject's added system instruction. They do not contain a checkpoint revision;
+the report explicitly displays that limitation. They compare prompt roles A and B
 on the same fixed SGD routing schedule: 2,183 training, 932 development and
 885 test examples. The same source rows are paired across prompt roles, and
 multiple rows may share a source dialogue. These record-level intervals do not

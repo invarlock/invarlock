@@ -476,6 +476,31 @@ analysis where available, and supplementary authenticated observations.
 include improvement and regression counts, discordant pairs and the exact
 McNemar probability; those diagnostics do not replace the configured decision.
 
+### Understand the comparison
+
+HTML and Markdown reports put **What was compared** before the results. The
+section identifies the baseline and candidate, the recorded workflow and task,
+and the available dataset and coverage information. **Recorded changes** explains
+what the evidence establishes about the difference between the two sides.
+
+Native run and import reports use the authenticated request and input identities.
+They show recorded model IDs and provider names, dataset preparation and schedule
+identity when available. Different artifact digests establish different artifacts;
+they do not establish which model setting, prompt or weight changed.
+
+Captured reports inspect context across every record. Consistent recorded model
+keys, revisions, capture roles, dataset labels and message structure appear as
+comparison context. Missing or mixed values are explicit. A matching model key is
+a recorded label, not proof that model weights or runtime settings were identical.
+The renderer does not infer a model revision from filenames or external catalogs.
+
+For paired prompt changes, the report compares effective messages by case ID.
+When every pair differs only by one uniform added system instruction, the report
+identifies that change and includes a bounded instruction preview in the details.
+It does not display full case prompts by default. Missing or inconsistent context
+cannot establish a uniform prompt change. Comparison-only SDK reports cannot
+recover record context without the associated evidence.
+
 ### Compare multiple metrics and scopes
 
 Reports with multiple results start with an overview of every metric and scope.

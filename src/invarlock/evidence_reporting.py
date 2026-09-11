@@ -1070,12 +1070,108 @@ def _format_number(value: object) -> str:
     return format(_number(value, field="numeric value"), ".8g")
 
 
+def _native_report_context(
+    evidence: Path,
+    report: dict[str, Any],
+    identities: dict[str, dict[str, Any]],
+) -> tuple[tuple[tuple[str, str], ...], tuple[str, ...]]:
+    """Project descriptive facts only after the materialized pack is authenticated."""
+
+    def mapping(value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def text(value: Any) -> str:
+        if not isinstance(value, str) or not value.strip():
+            return "Unavailable in evidence"
+        return value[:256] + ("… (preview)" if len(value) > 256 else "")
+
+    request_path = evidence / "request.json"
+    request = (
+        _load_object_with_bytes(
+            request_path, label="normalized request", max_bytes=_MAX_REPORT_BYTES
+        )[0]
+        if request_path.exists()
+        else {}
+    )
+    comparison = mapping(request.get("comparison"))
+    mode = mapping(request.get("execution")).get("mode")
+    context = [
+        (
+            "Workflow",
+            {"run": "Runtime execution", "import": "Imported runtime evidence"}.get(
+                mode, "Unavailable in evidence"
+            )
+            if isinstance(mode, str)
+            else "Unavailable in evidence",
+        ),
+        ("Task", text(comparison.get("task"))),
+        ("Paired records", f"{report['record_count']:,}"),
+    ]
+    for side, label in (("baseline", "Baseline"), ("subject", "Candidate")):
+        selected = mapping(comparison.get(side))
+        context.extend(
+            (
+                (
+                    label + " model ID",
+                    text(mapping(selected.get("artifact")).get("model_id")),
+                ),
+                (
+                    label + " provider",
+                    text(mapping(selected.get("runtime")).get("provider")),
+                ),
+            )
+        )
+    dataset, _ = _load_object_with_bytes(
+        evidence / "inputs" / "dataset.json",
+        label="dataset identity",
+        max_bytes=_MAX_REPORT_BYTES,
+    )
+    context.append(("Schedule digest", text(dataset.get("digest"))))
+    preparation = mapping(comparison.get("dataset"))
+    context.extend(
+        (
+            ("Dataset", text(preparation.get("name") or dataset.get("locator"))),
+            ("Dataset split", text(preparation.get("split"))),
+        )
+    )
+    if mode == "run" and preparation:
+        context.extend(
+            (
+                ("Dataset source SHA-256", text(preparation.get("source_sha256"))),
+                ("Dataset source format", text(preparation.get("source_format"))),
+            )
+        )
+        for key, label in (
+            ("selected_record_count", "Selected records"),
+            ("limit", "Selection limit"),
+        ):
+            value = preparation.get(key)
+            context.append(
+                (
+                    label,
+                    f"{value:,}"
+                    if type(value) is int and value >= 0
+                    else "Not specified",
+                )
+            )
+    baseline = identities["baseline"].get("digest")
+    subject = identities["subject"].get("digest")
+    changes = (
+        "Baseline and candidate have the same authenticated artifact digest."
+        if baseline == subject
+        else "Baseline and candidate have different authenticated artifact digests; the evidence does not identify a transformation procedure.",
+    )
+    return tuple(context), changes
+
+
 def _report_view(
     report: dict[str, Any],
     *,
     evidence_signer: str,
     observations: list[dict[str, Any]],
     subjects: tuple[tuple[str, str], ...] = (),
+    context: tuple[tuple[str, str], ...] = (),
+    changes: tuple[str, ...] = (),
 ) -> ReportView:
     """Explain validated canonical facts without creating acceptance authority."""
     comparison = report["comparison"]
@@ -1195,6 +1291,8 @@ def _report_view(
             ("Evidence signer", evidence_signer),
         ),
         subjects=subjects,
+        context=context,
+        changes=changes,
         next_steps=(
             "Review the decision checks and their requirements.",
             "Run invarlock verify with your independently supplied trust profile and receipt destination to create the signed acceptance or rejection receipt.",
@@ -1272,6 +1370,7 @@ def _render_native_evidence(
                 snapshot_root
             )
             subjects = []
+            identities = {}
             for role, label in (
                 ("baseline", "Baseline artifact"),
                 ("subject", "Candidate artifact"),
@@ -1281,6 +1380,7 @@ def _render_native_evidence(
                     label=f"{role} identity",
                     max_bytes=_MAX_REPORT_BYTES,
                 )
+                identities[role] = identity
                 locator = identity.get("locator")
                 display = (
                     locator
@@ -1288,11 +1388,14 @@ def _render_native_evidence(
                     else str(identity["digest"])
                 )
                 subjects.append((label, display))
+            context, changes = _native_report_context(snapshot_root, report, identities)
             view = _report_view(
                 report,
                 evidence_signer=evidence_signer,
                 observations=observations,
                 subjects=tuple(subjects),
+                context=context,
+                changes=changes,
             )
             text = render_report_markdown(view, include_details=explain)
             rendered_html = render_report_html(view) if html_path is not None else None

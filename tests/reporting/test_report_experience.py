@@ -105,7 +105,7 @@ def test_missing_count_is_not_observed_count_and_preview_stays_bounded():
     assert view.technical["metrics"][0]["missing_ids_preview_is_complete"] is False
     for renderer in (render_html, render_markdown):
         result = renderer(pack_json(value, "report"), evidence=value)
-        assert "40 missing paired results" in result
+        assert "40 missing results" in result
         assert "More evidence needed" in result
         assert "case-39" not in result
 
