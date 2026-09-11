@@ -122,6 +122,8 @@ receipt = verify_captured_receipt(
 assert receipt.ok, receipt.errors
 print((root / 'pack/reports/evaluation.report.json').read_text())
 """
+    # This is a liveness watchdog, not a latency assertion. Full-capacity replay
+    # is also traced by subprocess branch coverage while other CI suites run.
     received = subprocess.run(
         [
             sys.executable,
@@ -138,7 +140,7 @@ print((root / 'pack/reports/evaluation.report.json').read_text())
         cwd=tmp_path,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=300,
         check=True,
     )
     assert json.loads(received.stdout) == report
