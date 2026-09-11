@@ -62,6 +62,16 @@ Ministral entry is an independent-family canary outside the evaluator
 qualification matrix. Broader model-quality conclusions require broader,
 task-specific evidence.
 
+## Captured comparison reference
+
+The separate [captured reference index](https://github.com/invarlock/invarlock/tree/main/examples/captured-results/references)
+contains a complete 4,000-pair K2 Horizon 32B routing prompt comparison. Its
+signed captured pack reproduces the original regression through the current
+installed CLI, with independent anchors and an authenticated rejection receipt.
+It recomputes aggregates of recorded scores and does not add a native runtime qualification.
+The reference includes an offline recipient helper, source attribution and the
+full signed payload.
+
 ## Evidence not yet created
 
 The following comparisons have no pack in the current index. They may be added
