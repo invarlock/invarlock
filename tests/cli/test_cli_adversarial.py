@@ -247,7 +247,7 @@ def test_report_json_binds_the_rendered_pack(
 ) -> None:
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    html = tmp_path / "report.html"
+    html = tmp_path / "report\x9b2J.html"
     digest = "sha256:" + "b" * 64
     monkeypatch.setattr(
         evidence_reporting,
@@ -266,6 +266,7 @@ def test_report_json_binds_the_rendered_pack(
     )
 
     assert result.exit_code == 0
+    assert "\x9b" not in result.stdout
     payload = json.loads(result.stdout)
     assert payload == {
         "format_version": "invarlock/evidence-report-v1",

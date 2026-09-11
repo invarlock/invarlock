@@ -6,7 +6,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:  # pragma: no cover - imports exist only for static analysis
     from invarlock.captured_evaluation import (
@@ -51,6 +51,7 @@ RUNTIME_ONLY_OPTIONS = frozenset(
         "runtime_user",
     }
 )
+RUN_ONLY_OPTIONS = RUNTIME_ONLY_OPTIONS - {"allow_installed_scorers"}
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,7 @@ def execute_evaluation(
     )
     from invarlock.core.evaluation_request import (
         CapturedEvaluationRequest,
+        EvaluationRequest,
         EvaluationRequestError,
         load_evaluation_request,
     )
@@ -212,24 +214,37 @@ def execute_evaluation(
         allow_installed=options.allow_installed_scorers
     )
     registry = CoreRegistry()
-    loaded_runtime_request = load_evaluation_request(
-        request_path,
-        provider_resolver=registry.get_runtime_provider,
-        request_root=options.request_root,
-        **overrides,
-    )
+    if loaded_request is None:
+        loaded_runtime_request = load_evaluation_request(
+            request_path,
+            provider_resolver=registry.get_runtime_provider,
+            request_root=options.request_root,
+            **overrides,
+        )
+    else:
+        loaded_runtime_request = cast(EvaluationRequest, loaded_request)
     if isinstance(loaded_runtime_request, CapturedEvaluationRequest):
         raise EvaluationRequestError(
             "captured evaluation requests must use the captured evaluation path"
+        )
+    loaded_mode = loaded_runtime_request.execution.mode
+    if initial_mode in {"run", "import"} and initial_mode != loaded_mode:
+        raise EvaluationRequestError(
+            "evaluation request execution mode changed while loading"
+        )
+    request_mode = loaded_mode
+    invalid_run_options = RUN_ONLY_OPTIONS & command_line
+    if loaded_mode != "run" and invalid_run_options:
+        rendered = ", ".join(
+            f"--{name.replace('_', '-')}" for name in sorted(invalid_run_options)
+        )
+        raise RuntimeProfileError(
+            f"{rendered} applies only to run requests; import evidence already binds its runtime"
         )
 
     profile = None
     profile_context = None
     if options.runtime_profile is not None:
-        if loaded_runtime_request.execution.mode != "run":
-            raise RuntimeProfileError(
-                "--runtime-profile applies only to run requests; import evidence already binds its runtime"
-            )
         profile = load_runtime_profile(options.runtime_profile)
         explicit = {
             name: value
@@ -244,7 +259,7 @@ def execute_evaluation(
 
     launch = None
     runtime_executor = None
-    if loaded_runtime_request.execution.mode == "run":
+    if loaded_mode == "run":
         if profile_context is not None:
             launch = launch_from_environment(**profile_context.arguments)
         else:

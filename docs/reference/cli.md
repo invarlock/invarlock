@@ -143,6 +143,12 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
 | `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
 
+Runtime image, device, entrypoint and resource controls apply only to run-mode
+requests. Import evidence already records its runtime identity, so `evaluate`
+rejects explicit run controls for an import request instead of silently ignoring
+them. The command also fails if the request changes between mode detection and
+full loading.
+
 ### Captured evaluation controls
 
 Captured requests use `invarlock/evaluation-request-v2` with

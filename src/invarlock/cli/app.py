@@ -222,14 +222,14 @@ def _run_setup_action(
     ) as exc:
         setup_result = _setup_result(action, errors=[str(exc)])
     if json_out:
-        typer.echo(canonical_json_bytes(setup_result).decode("utf-8"))
+        _echo_json(canonical_json_bytes(setup_result).decode("utf-8"))
     elif setup_result["ok"]:
         assert setup_result["details"] is not None
         for key, value in setup_result["details"].items():
-            console.print(f"{key}: {value}")
+            console.print(f"{_terminal_text(key)}: {_terminal_text(value)}")
     else:
         for error in setup_result["errors"]:
-            console.print(f"FAIL {error}")
+            console.print(f"FAIL {_terminal_text(error)}")
     if not setup_result["ok"]:
         raise typer.Exit(2)
 
@@ -242,7 +242,7 @@ def _emit_version() -> None:
             from invarlock import __version__ as resolved
         except (ImportError, ModuleNotFoundError):
             resolved = "unknown"
-    console.print(f"InvarLock {resolved}")
+    console.print(f"InvarLock {_terminal_text(resolved)}")
 
 
 def _version_callback(value: bool) -> None:
@@ -263,20 +263,30 @@ def _finish_policy_gate(verdict: str | None) -> None:
     raise typer.Exit(2)
 
 
-def _print_captured_metrics(metrics: tuple[dict[str, Any], ...]) -> None:
+def _terminal_text(value: object) -> str:
+    """Render untrusted dynamic text without active terminal controls."""
     from invarlock.report_presentation import visible_controls
 
+    return visible_controls(str(value))
+
+
+def _echo_json(value: str) -> None:
+    """Escape terminal controls while preserving parsed JSON string values."""
+    typer.echo(_terminal_text(value))
+
+
+def _print_captured_metrics(metrics: tuple[dict[str, Any], ...]) -> None:
     for metric in metrics:
-        name = visible_controls(str(metric["name"]))
-        scope = visible_controls(str(metric["slice"]))
-        decision = visible_controls(str(metric["decision"]))
+        name = _terminal_text(metric["name"])
+        scope = _terminal_text(metric["slice"])
+        decision = _terminal_text(metric["decision"])
         console.print(
             f"{name} / {scope}: {decision}; "
             f"{metric['usable_count']} usable pairs; "
             f"{metric['missing_count']} missing results"
         )
         if metric["reasons"]:
-            reasons = "; ".join(visible_controls(str(v)) for v in metric["reasons"])
+            reasons = "; ".join(_terminal_text(v) for v in metric["reasons"])
             console.print(f"Recorded reasons: {reasons}")
 
 
@@ -633,9 +643,9 @@ def evaluate(  # noqa: C901
         if json_out:
             from invarlock.evidence_pack_contract import canonical_json_bytes
 
-            typer.echo(canonical_json_bytes(result).decode("utf-8"))
+            _echo_json(canonical_json_bytes(result).decode("utf-8"))
         else:
-            console.print(f"FAIL {setup_error}")
+            console.print(f"FAIL {_terminal_text(setup_error)}")
         raise typer.Exit(2)
     if preflight and fail_on_policy:
         raise typer.BadParameter("--fail-on-policy cannot be used with --preflight")
@@ -755,13 +765,13 @@ def evaluate(  # noqa: C901
             if isinstance(failure, EvaluationPreflightError):
                 failure.unsigned = unsigned
         if json_out:
-            typer.echo(failure.as_json())
+            _echo_json(failure.as_json())
         else:
-            console.print(f"FAIL {failure}", markup=False)
+            console.print(f"FAIL {_terminal_text(failure)}", markup=False)
         raise typer.Exit(failure.exit_code) from exc
     if request_mode == "captured":
         if json_out:
-            typer.echo(evaluation_result.as_json())
+            _echo_json(evaluation_result.as_json())
         elif preflight:
             assert isinstance(evaluation_result, CapturedEvaluationPreflightResult)
             console.print("Preflight complete")
@@ -787,13 +797,15 @@ def evaluate(  # noqa: C901
             )
             console.print("Independent verification: not performed")
             _print_captured_metrics(evaluation_result.metric_summaries)
-            console.print(f"Evidence: {evaluation_result.evidence_path}")
+            console.print(
+                f"Evidence: {_terminal_text(evaluation_result.evidence_path)}"
+            )
         if fail_on_policy:
             assert isinstance(evaluation_result, CapturedEvaluationTransactionResult)
             _finish_policy_gate(evaluation_result.policy_verdict)
         return
     if json_out:
-        typer.echo(evaluation_result.as_json())
+        _echo_json(evaluation_result.as_json())
     elif preflight:
         console.print("Preflight complete")
         assert isinstance(evaluation_result, EvaluationPreflightResult)
@@ -801,7 +813,8 @@ def evaluate(  # noqa: C901
             f"Mode: {evaluation_result.execution_mode}; paired records: {evaluation_result.record_count}"
         )
         console.print(
-            f"Evidence destination: {evaluation_result.output}", soft_wrap=True
+            f"Evidence destination: {_terminal_text(evaluation_result.output)}",
+            soft_wrap=True,
         )
         console.print(f"Validated checks: {len(evaluation_result.checks)}")
         if (
@@ -809,19 +822,22 @@ def evaluate(  # noqa: C901
             and outcome.profile_context is not None
             and outcome.launch is not None
         ):
-            console.print(f"Runtime profile: {outcome.profile.digest}")
-            console.print(f"Container engine: {outcome.launch.engine}")
+            console.print(f"Runtime profile: {_terminal_text(outcome.profile.digest)}")
+            console.print(f"Container engine: {_terminal_text(outcome.launch.engine)}")
             for side in ("baseline", "subject"):
                 resolved_side = getattr(outcome.launch, side)
                 console.print(
-                    f"{side.capitalize()}: {resolved_side.image_ref}; device {resolved_side.device}; entrypoint {resolved_side.entrypoint}"
+                    f"{side.capitalize()}: {_terminal_text(resolved_side.image_ref)}; "
+                    f"device {_terminal_text(resolved_side.device)}; "
+                    f"entrypoint {_terminal_text(resolved_side.entrypoint)}"
                 )
             limits = outcome.launch.worker_limits
             console.print(
-                f"Each worker: {limits.cpus} CPUs; {limits.memory_mib} MiB; user {limits.user}"
+                f"Each worker: {limits.cpus} CPUs; {limits.memory_mib} MiB; "
+                f"user {_terminal_text(limits.user)}"
             )
             for field, source in outcome.profile_context.sources.items():
-                console.print(f"  {field}: {source}")
+                console.print(f"  {_terminal_text(field)}: {_terminal_text(source)}")
         console.print("No execution or publication was performed")
         console.print("Next: run the same evaluate command without --preflight.")
     else:
@@ -831,7 +847,10 @@ def evaluate(  # noqa: C901
             f"Recorded policy result: {evaluation_result.policy_verdict or 'unavailable'}"
         )
         console.print("Recipient verification: not performed")
-        console.print(f"Evidence: {evaluation_result.evidence_path}", soft_wrap=True)
+        console.print(
+            f"Evidence: {_terminal_text(evaluation_result.evidence_path)}",
+            soft_wrap=True,
+        )
         console.print(
             "Next: verify with independently approved trust inputs; use report to inspect the recorded checks."
         )
@@ -1037,9 +1056,9 @@ def verify(
                 str(exc), exit_code=exc.exit_code, captured=True
             )
         if json_out:
-            typer.echo(exc.as_json())
+            _echo_json(exc.as_json())
         else:
-            console.print(f"FAIL {exc}")
+            console.print(f"FAIL {_terminal_text(exc)}")
             if exc.payload.get("integrity_ok") is True:
                 console.print("Evidence integrity: verified")
                 verdict = exc.payload.get("policy_verdict")
@@ -1058,15 +1077,16 @@ def verify(
                     "Verification could not complete; check the required inputs and receipt destination."
                 )
             for detail in exc.details:
-                console.print(detail)
+                console.print(_terminal_text(detail))
             signed_receipt = exc.payload.get("signed_receipt")
             if isinstance(signed_receipt, str):
                 console.print(
-                    f"Receipt {exc.receipt_path or signed_receipt}", soft_wrap=True
+                    f"Receipt {_terminal_text(exc.receipt_path or signed_receipt)}",
+                    soft_wrap=True,
                 )
         raise typer.Exit(exc.exit_code) from exc
     if json_out:
-        typer.echo(result.as_json())
+        _echo_json(result.as_json())
     else:
         console.print(
             "PASS Independent captured verification complete"
@@ -1076,7 +1096,7 @@ def verify(
         console.print("Evidence integrity: verified")
         if result.payload.get("policy_verdict") in {"pass", "fail"}:
             console.print(f"Policy result: {result.payload['policy_verdict']}")
-        console.print(result.summary, soft_wrap=True)
+        console.print(_terminal_text(result.summary), soft_wrap=True)
         if result.payload.get("kind") == "captured":
             console.print(f"Recorded decision: {result.payload['decision']}")
             _print_captured_metrics(result.payload["metric_summaries"])
@@ -1143,7 +1163,7 @@ def report(
         )
     except EvidenceReportError as exc:
         if json_out:
-            typer.echo(
+            _echo_json(
                 json.dumps(
                     exc.payload
                     or {
@@ -1157,22 +1177,28 @@ def report(
                 )
             )
         else:
-            console.print(f"FAIL {exc}")
+            console.print(f"FAIL {_terminal_text(exc)}")
             for name, destination in exc.written_outputs.items():
-                console.print(f"Written {name}: {destination}", soft_wrap=True)
+                console.print(
+                    f"Written {_terminal_text(name)}: {_terminal_text(destination)}",
+                    soft_wrap=True,
+                )
             if exc.failed_output is not None:
-                console.print(f"Failed output: {exc.failed_output}")
+                console.print(f"Failed output: {_terminal_text(exc.failed_output)}")
         raise typer.Exit(exc.exit_code) from exc
     if isinstance(result, EvidenceReportV2):
         if json_out:
-            typer.echo(result.as_json())
+            _echo_json(result.as_json())
         else:
             console.print(Markdown(result.text))
             for name, destination in result.written_outputs.items():
-                console.print(f"{name.upper()} {destination}", soft_wrap=True)
+                console.print(
+                    f"{_terminal_text(name.upper())} {_terminal_text(destination)}",
+                    soft_wrap=True,
+                )
         return
     if json_out:
-        typer.echo(
+        _echo_json(
             json.dumps(
                 {
                     "format_version": "invarlock/evidence-report-v1",
@@ -1190,7 +1216,7 @@ def report(
     else:
         console.print(Markdown(result.text))
         if result.html_path is not None:
-            console.print(f"HTML {result.html_path}", soft_wrap=True)
+            console.print(f"HTML {_terminal_text(result.html_path)}", soft_wrap=True)
 
 
 def main() -> None:

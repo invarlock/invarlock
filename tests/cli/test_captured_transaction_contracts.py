@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+import yaml
 from rich.text import Text
 from typer.testing import CliRunner
 
@@ -15,8 +16,14 @@ from invarlock import engine
 from invarlock.cli.app import app
 from tests.cli.test_cli_experience import imported_example as imported_example
 from tests.cli.test_trust_profile_cli import _case
-from tests.core.test_captured_sdk_omissions import _bytes, _inputs, _key, _profile
-from tests.core.test_evaluation_request_contract import _valid_request
+from tests.core.test_captured_sdk_omissions import (
+    _bytes,
+    _digest,
+    _inputs,
+    _key,
+    _profile,
+)
+from tests.core.test_evaluation_request_contract import _request_payload, _valid_request
 
 RUNNER = CliRunner()
 
@@ -226,6 +233,107 @@ def test_cli_discriminator_replacement_does_not_cross_captured_boundary(
     assert result.exit_code == 2
     assert "did not load as captured evidence" in json.loads(result.stdout)["errors"][0]
     assert not (tmp_path / "artifacts").exists()
+
+
+@pytest.mark.parametrize(
+    ("initial", "replacement"), [("run", "import"), ("import", "run")]
+)
+def test_cli_discriminator_replacement_does_not_cross_native_execution_modes(
+    tmp_path, monkeypatch, initial, replacement
+):
+    from invarlock.core import evaluation_request
+
+    path = _valid_request(tmp_path, mode="import")
+    initial_bytes = yaml.safe_dump(
+        _request_payload(mode=initial), sort_keys=False
+    ).encode()
+    replacement_bytes = yaml.safe_dump(
+        _request_payload(mode=replacement), sort_keys=False
+    ).encode()
+    path.write_bytes(initial_bytes)
+    original = evaluation_request.evaluation_request_mode
+
+    def discriminate(request_path):
+        mode = original(request_path)
+        assert mode == initial
+        request_path.write_bytes(replacement_bytes)
+        return mode
+
+    monkeypatch.setattr(evaluation_request, "evaluation_request_mode", discriminate)
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--json"])
+    assert result.exit_code == 2
+    assert (
+        "execution mode changed while loading" in json.loads(result.stdout)["errors"][0]
+    )
+    assert not (tmp_path / "artifacts").exists()
+
+
+def test_failed_discriminator_does_not_reload_a_native_request(
+    imported_example, monkeypatch
+):
+    from invarlock.core import evaluation_request
+
+    root, _ = imported_example
+    path = root / "request.yaml"
+    original = evaluation_request.load_evaluation_request
+    calls = 0
+
+    def load_once(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        loaded = original(*args, **kwargs)
+        path.write_text("replaced after the complete load", encoding="utf-8")
+        return loaded
+
+    monkeypatch.setattr(
+        evaluation_request,
+        "evaluation_request_mode",
+        lambda _path: (_ for _ in ()).throw(
+            engine.EvaluationRequestError("initial discriminator unavailable")
+        ),
+    )
+    monkeypatch.setattr(evaluation_request, "load_evaluation_request", load_once)
+    result = RUNNER.invoke(
+        app,
+        [
+            "evaluate",
+            str(path),
+            "--preflight",
+            "--signing-key",
+            str(root / "evidence.pem"),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == 1
+    assert json.loads(result.stdout)["ok"] is True
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--runtime-image", "registry.example/worker@sha256:" + "a" * 64],
+        ["--runtime-device", "cpu"],
+        ["--runtime-memory-mib", "4096"],
+    ],
+)
+def test_import_request_rejects_explicit_run_controls(imported_example, options):
+    root, _ = imported_example
+    result = RUNNER.invoke(
+        app,
+        [
+            "evaluate",
+            str(root / "request.yaml"),
+            "--signing-key",
+            str(root / "evidence.pem"),
+            "--json",
+            *options,
+        ],
+    )
+    assert result.exit_code == 2
+    assert "applies only to run requests" in json.loads(result.stdout)["errors"][0]
+    assert not (root / "artifacts").exists()
 
 
 @pytest.mark.parametrize("verdict,exit_code", [("pass", 0), ("fail", 7), (None, 2)])
@@ -450,6 +558,44 @@ def test_captured_metric_names_are_safe_in_terminal_output(tmp_path):
     assert result.exit_code == 0, result.output
     assert "\x9b" not in result.stdout
     assert "safe\\u009b2JFAKE_PASS" in result.stdout
+
+
+@pytest.mark.parametrize("preflight", [False, True])
+@pytest.mark.parametrize("json_out", [False, True])
+def test_captured_pairing_errors_escape_controls_without_changing_json_values(
+    tmp_path, preflight, json_out
+):
+    _, baseline, subject, _ = _inputs(tmp_path)
+    subject = json.loads(_bytes(subject))
+    record_id = "case\x9b2JFAKE_PASS"
+    for side, run in (("baseline", baseline), ("subject", subject)):
+        run["records"][0]["id"] = record_id
+        if side == "subject":
+            run["records"][0]["input"] = "different input"
+        (tmp_path / f"{side}.json").write_bytes(_bytes(run))
+    request_path = tmp_path / "request.json"
+    request = json.loads(request_path.read_bytes())
+    request["comparison"]["baseline"]["expected_run_digest"] = _digest(baseline)
+    request["comparison"]["subject"]["expected_run_digest"] = _digest(subject)
+    request_path.write_bytes(_bytes(request))
+    result = RUNNER.invoke(
+        app,
+        [
+            "evaluate",
+            str(request_path),
+            "--unsigned",
+            *(["--preflight"] if preflight else []),
+            *(["--json"] if json_out else []),
+        ],
+    )
+    assert result.exit_code == 2, result.output
+    assert "\x9b" not in result.stdout
+    if json_out:
+        assert record_id in json.loads(result.stdout)["errors"][0]
+    else:
+        assert "case\\u009b2JFAKE_PASS" in result.stdout
+        assert "input changed between" in " ".join(result.stdout.split())
+    assert not (tmp_path / "artifacts").exists()
 
 
 def test_verify_refuses_symlink_evidence_root(tmp_path):

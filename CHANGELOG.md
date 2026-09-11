@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit; report rendering preserves evidence and does not establish
   independent recipient acceptance.
 
-- Hardened captured JSONL imports and the retained-reference replay against
-  oversized or non-regular inputs, made terminal and XML report rendering safe
-  for hostile control characters, and closed raw file descriptors when stream
-  construction fails.
+- Hardened captured JSONL imports, artifact attestation and retained-reference
+  replay against oversized, replaced or non-regular inputs; escaped hostile
+  control characters in dynamic evaluation, verification, setup, reporting,
+  evaluator qualification and XML output; rejected request mode changes during
+  loading and run-only controls on import requests; and closed raw file
+  descriptors and incomplete report outputs when stream construction fails.
 
 - Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
   an unchanged signed pack, independent recipient replay and source attribution.
