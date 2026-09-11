@@ -246,7 +246,12 @@ class EvaluatorQualificationResult:
                 suffix=".tmp",
             )
             temporary = Path(temporary_name)
-            with os.fdopen(descriptor, "wb") as handle:
+            try:
+                handle = os.fdopen(descriptor, "wb")
+            except BaseException:
+                os.close(descriptor)
+                raise
+            with handle:
                 handle.write(self.as_json().encode("utf-8"))
                 handle.flush()
                 os.fsync(handle.fileno())

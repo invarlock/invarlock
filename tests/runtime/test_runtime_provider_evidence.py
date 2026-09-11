@@ -1070,6 +1070,33 @@ def test_atomic_write_failure_removes_temporary_file(
     assert list(tmp_path.iterdir()) == []
 
 
+def test_atomic_write_closes_descriptor_when_stream_creation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    real_mkstemp = evidence_module.tempfile.mkstemp
+    opened: list[int] = []
+
+    def _tracked_mkstemp(*args: object, **kwargs: object) -> tuple[int, str]:
+        descriptor, name = real_mkstemp(*args, **kwargs)
+        opened.append(descriptor)
+        return descriptor, name
+
+    def _fail_fdopen(_descriptor: int, _mode: str):
+        raise RuntimeError("injected stream construction failure")
+
+    monkeypatch.setattr(evidence_module.tempfile, "mkstemp", _tracked_mkstemp)
+    monkeypatch.setattr(evidence_module.os, "fdopen", _fail_fdopen)
+
+    with pytest.raises(RuntimeError, match="stream construction"):
+        evidence_module._atomic_write_bytes(tmp_path / "sidecar.json", b"{}")
+
+    assert len(opened) == 1
+    with pytest.raises(OSError):
+        os.fstat(opened[0])
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_late_publication_failure_rolls_back_earlier_sidecars(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

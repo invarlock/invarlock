@@ -713,7 +713,12 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
             suffix=".tmp",
         )
         temporary = Path(temporary_name)
-        with os.fdopen(descriptor, "wb") as handle:
+        try:
+            handle = os.fdopen(descriptor, "wb")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        with handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())

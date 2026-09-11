@@ -396,6 +396,69 @@ def test_atomic_write_rejects_parent_traversal_before_creating_output(tmp_path):
     assert not list(tmp_path.iterdir())
 
 
+def test_atomic_write_closes_descriptor_when_stream_creation_fails(
+    tmp_path, monkeypatch
+):
+    opened = []
+    original_open = os.open
+
+    def tracked_open(path, flags, *args, **kwargs):
+        descriptor = original_open(path, flags, *args, **kwargs)
+        if isinstance(path, str) and path.startswith(".captured-"):
+            opened.append(descriptor)
+        return descriptor
+
+    monkeypatch.setattr(contracts.os, "open", tracked_open)
+    monkeypatch.setattr(
+        contracts.os,
+        "fdopen",
+        Mock(side_effect=OSError(errno.EMFILE, "cannot create stream")),
+    )
+    with pytest.raises(OSError, match="cannot create stream"):
+        contracts.atomic_write(tmp_path / "result.json", b"payload")
+    assert opened
+    for descriptor in opened:
+        with pytest.raises(OSError) as failure:
+            os.fstat(descriptor)
+        assert failure.value.errno == errno.EBADF
+    assert not list(tmp_path.iterdir())
+
+
+def test_evidence_publication_closes_descriptor_when_stream_creation_fails(
+    tmp_path, monkeypatch, publication_args
+):
+    opened = []
+    original_open = os.open
+    original_fdopen = os.fdopen
+
+    def tracked_open(path, flags, *args, **kwargs):
+        descriptor = original_open(path, flags, *args, **kwargs)
+        if flags & os.O_WRONLY:
+            opened.append(descriptor)
+        return descriptor
+
+    monkeypatch.setattr(publication.os, "open", tracked_open)
+
+    def fail_write_stream(descriptor, mode, *args, **kwargs):
+        if mode == "wb":
+            raise OSError(errno.EMFILE, "cannot create stream")
+        return original_fdopen(descriptor, mode, *args, **kwargs)
+
+    monkeypatch.setattr(
+        publication.os,
+        "fdopen",
+        fail_write_stream,
+    )
+    with pytest.raises(publication.CapturedEvidenceError, match="could not publish"):
+        publication.publish_captured_evidence(tmp_path / "evidence", **publication_args)
+    assert opened
+    for descriptor in opened:
+        with pytest.raises(OSError) as failure:
+            os.fstat(descriptor)
+        assert failure.value.errno == errno.EBADF
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["signer.pem"]
+
+
 @pytest.mark.parametrize("mutation", ["removed", "replaced"])
 def test_atomic_rollback_preserves_original_failure_and_foreign_output(
     tmp_path, monkeypatch, mutation

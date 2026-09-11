@@ -12,7 +12,14 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+from invarlock.captured_contracts import (
+    CONTROL_LIMIT,
+    PAYLOAD_LIMIT,
+    RECEIPT_LIMIT,
+    TOTAL_LIMIT,
+)
 from invarlock.engine import verify_signed_verification_receipt
+from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 
 PACK_FILES = (
     "checksums.sha256",
@@ -30,10 +37,22 @@ COMPANIONS = (
     "verifier.public.pem",
     "SGD-LICENSE.txt",
 )
+REFERENCE_LIMIT = CONTROL_LIMIT
+# The uncompressed captured pack is bounded by TOTAL_LIMIT. Reserve one MiB for
+# the fixed ZIP container's headers and worst-case compression framing.
+ARCHIVE_LIMIT = TOTAL_LIMIT + 1024 * 1024
+COMPANION_LIMITS = {
+    "policy.json": PAYLOAD_LIMIT,
+    "verification.receipt.json": RECEIPT_LIMIT,
+    "verifier.public.pem": CONTROL_LIMIT,
+    "SGD-LICENSE.txt": CONTROL_LIMIT,
+}
 
 
-def checked_bytes(path: Path, digest: str) -> bytes:
-    data = path.read_bytes()
+def checked_bytes(path: Path, digest: str, *, max_bytes: int) -> bytes:
+    data = read_regular_file_bytes(
+        path, label=f"reference file {path.name}", max_bytes=max_bytes
+    )
     if hashlib.sha256(data).hexdigest() != digest:
         raise ValueError(f"Reference digest mismatch: {path.name}")
     return data
@@ -42,7 +61,16 @@ def checked_bytes(path: Path, digest: str) -> bytes:
 def unpack(package: Path, destination: Path, reference: dict) -> None:
     """Write only the eight known pack files; never interpret archive paths."""
     archive = reference["archive"]
-    data = checked_bytes(package / "evidence.zip", archive["sha256"])
+    expected_size = archive["size_bytes"]
+    if (
+        type(expected_size) is not int
+        or expected_size <= 0
+        or expected_size > ARCHIVE_LIMIT
+    ):
+        raise ValueError("Unexpected reference archive size")
+    data = checked_bytes(
+        package / "evidence.zip", archive["sha256"], max_bytes=expected_size
+    )
     if len(data) != archive["size_bytes"] or set(archive["files"]) != set(PACK_FILES):
         raise ValueError("Unexpected reference archive inventory")
     import io
@@ -90,19 +118,40 @@ def authenticate(
 
 
 def replay(package: Path, output: Path) -> dict:
-    reference = json.loads((package / "reference.json").read_bytes())
-    for name in COMPANIONS:
-        checked_bytes(package / name, reference["companions"][name])
+    reference = parse_json_bytes(
+        read_regular_file_bytes(
+            package / "reference.json",
+            label="reference manifest",
+            max_bytes=REFERENCE_LIMIT,
+        ),
+        label="reference manifest",
+    )
+    if not isinstance(reference, dict):
+        raise ValueError("Reference manifest must be an object")
+    companions = {
+        name: checked_bytes(
+            package / name,
+            reference["companions"][name],
+            max_bytes=COMPANION_LIMITS[name],
+        )
+        for name in COMPANIONS
+    }
     output.mkdir(parents=True, exist_ok=False)
     evidence = output / "evidence"
     unpack(package, evidence, reference)
-    authenticate(
-        package / "verification.receipt.json",
-        evidence,
-        package / "policy.json",
-        reference,
-        reference["retained_verifier"],
-    )
+    with tempfile.TemporaryDirectory(prefix="retained-", dir=output) as retained:
+        retained_root = Path(retained)
+        retained_receipt = retained_root / "verification.receipt.json"
+        retained_policy = retained_root / "policy.json"
+        retained_receipt.write_bytes(companions["verification.receipt.json"])
+        retained_policy.write_bytes(companions["policy.json"])
+        authenticate(
+            retained_receipt,
+            evidence,
+            retained_policy,
+            reference,
+            reference["retained_verifier"],
+        )
     environment = {
         key: value
         for key, value in os.environ.items()
@@ -144,7 +193,7 @@ def replay(package: Path, output: Path) -> dict:
                 "signing_key_path": "verifier/private.pem",
             },
         }
-        (workspace / "policy.json").write_bytes((package / "policy.json").read_bytes())
+        (workspace / "policy.json").write_bytes(companions["policy.json"])
         (workspace / "trust.json").write_text(json.dumps(profile))
         receipt = output / "verification.receipt.json"
         verified = command(
@@ -191,8 +240,17 @@ def replay(package: Path, output: Path) -> dict:
             (workspace / key["public_key"]).read_bytes()
         )
     for name in PACK_FILES:
-        checked_bytes(evidence / name, reference["archive"]["files"][name]["sha256"])
-    report = json.loads((evidence / "reports/evaluation.report.json").read_bytes())
+        entry = reference["archive"]["files"][name]
+        checked_bytes(evidence / name, entry["sha256"], max_bytes=entry["size_bytes"])
+    report_entry = reference["archive"]["files"]["reports/evaluation.report.json"]
+    report = parse_json_bytes(
+        checked_bytes(
+            evidence / "reports/evaluation.report.json",
+            report_entry["sha256"],
+            max_bytes=report_entry["size_bytes"],
+        ),
+        label="reference comparison",
+    )
     if report["metrics"] != reference["expected_metrics"]:
         raise ValueError("Reference metric rows changed")
     summary = {

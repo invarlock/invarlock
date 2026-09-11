@@ -200,51 +200,6 @@ def read_json(path: str | Path, *, max_bytes: int = MAX_INPUT_BYTES) -> Any:
         raise EvaluationRecordsError(str(exc)) from exc
 
 
-def write_new(path: str | Path, payload: bytes) -> Path:
-    """Publish an owner-readable new file without replacing user data."""
-    import os
-    import tempfile
-
-    destination = Path(path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        fd, name = tempfile.mkstemp(dir=destination.parent, prefix=".evaluation-")
-        temporary = Path(name)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.link(temporary, destination)
-        finally:
-            temporary.unlink(missing_ok=True)
-    except OSError as exc:
-        raise EvaluationRecordsError(f"cannot create {destination}: {exc}") from exc
-    return destination
-
-
-def write_directory(path: Path, artifacts: dict[str, bytes]) -> None:
-    """Publish a completed private tree using the core no-replace primitive."""
-    import shutil
-    import tempfile
-
-    from invarlock.filesystem import publish_directory_no_replace
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Resolve the caller-selected parent, never an existing destination entry.
-    destination = path.parent.resolve() / path.name
-    staging = Path(tempfile.mkdtemp(dir=destination.parent, prefix=".evaluation-"))
-    try:
-        for name, payload in artifacts.items():
-            if Path(name).name != name or name in (".", ".."):
-                raise EvaluationRecordsError("artifact names must be plain file names")
-            write_new(staging / name, payload)
-        publish_directory_no_replace(staging, destination)
-    finally:
-        if staging.exists():
-            shutil.rmtree(staging)
-
-
 __all__ = [
     "EvaluationRecordsError",
     "MAX_INPUT_BYTES",
@@ -252,6 +207,4 @@ __all__ = [
     "digest",
     "read_json",
     "validate",
-    "write_directory",
-    "write_new",
 ]

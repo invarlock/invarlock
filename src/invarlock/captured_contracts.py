@@ -634,7 +634,12 @@ def atomic_write(path: Path, raw: bytes) -> None:
                 dir_fd=parent,
             )
             try:
-                with os.fdopen(descriptor, "wb") as handle:
+                try:
+                    handle = os.fdopen(descriptor, "wb")
+                except BaseException:
+                    os.close(descriptor)
+                    raise
+                with handle:
                     handle.write(raw)
                     handle.flush()
                     os.fsync(handle.fileno())

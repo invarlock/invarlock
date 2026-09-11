@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -101,8 +102,40 @@ def test_modified_distribution_is_rejected_before_verification(
 ):
     with (package / name).open("ab") as stream:
         stream.write(b"tampered")
-    with pytest.raises(ValueError, match="digest mismatch"):
+    with pytest.raises(ValueError, match="digest mismatch|size limit"):
         module.replay(package, tmp_path / "result")
+
+
+@pytest.mark.parametrize("replacement", ["symlink", "fifo", "directory"])
+def test_reference_inputs_must_be_regular_files(module, package, tmp_path, replacement):
+    archive = package / "evidence.zip"
+    archive.unlink()
+    if replacement == "symlink":
+        archive.symlink_to(package / "policy.json")
+    elif replacement == "fifo":
+        os.mkfifo(archive)
+    else:
+        archive.mkdir()
+    with pytest.raises(ValueError, match="regular file|symlink"):
+        module.replay(package, tmp_path / "result")
+    assert not (tmp_path / "result/evidence").exists()
+
+
+def test_reference_manifest_and_archive_are_bounded_before_reading(
+    module, package, tmp_path
+):
+    manifest = package / "reference.json"
+    with manifest.open("r+b") as stream:
+        stream.truncate(module.REFERENCE_LIMIT + 1)
+    with pytest.raises(ValueError, match="size limit"):
+        module.replay(package, tmp_path / "manifest-result")
+
+    package = Path(shutil.copytree(PACKAGE, tmp_path / "archive-package"))
+    archive = package / "evidence.zip"
+    with archive.open("r+b") as stream:
+        stream.truncate(archive.stat().st_size + 1)
+    with pytest.raises(ValueError, match="size limit"):
+        module.replay(package, tmp_path / "archive-result")
 
 
 @pytest.mark.parametrize(

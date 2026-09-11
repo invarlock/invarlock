@@ -170,7 +170,12 @@ def publish_captured_evidence(
                             0o600,
                             dir_fd=output_parent,
                         )
-                        with os.fdopen(descriptor, "wb") as handle:
+                        try:
+                            handle = os.fdopen(descriptor, "wb")
+                        except BaseException:
+                            os.close(descriptor)
+                            raise
+                        with handle:
                             handle.write(payload)
                             handle.flush()
                             os.fchmod(handle.fileno(), 0o444)
