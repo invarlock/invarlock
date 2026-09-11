@@ -459,6 +459,12 @@ All destinations are checked up front; a later write failure leaves earlier
 completed outputs accurately listed. There is no automatic receipt discovery.
 Unsigned captured reports remain explicitly local, without independent assurance.
 
+Captured text, HTML and Markdown reports include the baseline and subject run
+IDs, complete-run digests, attributed artifact digests and evaluator source
+identities in their technical details. The comparison context also shows the
+recorded model, workflow, dataset and prompt metadata when supplied. These
+details identify what was compared without changing the report's assurance.
+
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
 safe renderer, not a substitute for `invarlock verify`.

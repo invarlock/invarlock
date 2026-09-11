@@ -136,6 +136,36 @@ def test_shared_render_preserves_frozen_values_labels_and_outputs(
     no_replay.assert_not_called()
 
 
+def test_junit_escapes_xml_forbidden_metric_characters(tmp_path):
+    _, baseline, subject, policy = _inputs(tmp_path)
+    policy["metrics"][0]["name"] = "quality\ufffevisible"
+    request = _request(tmp_path, baseline, subject, policy)
+    result = evaluate_captured_request(request, signing_key_path=None, unsigned=True)
+    destination = tmp_path / "junit.xml"
+    rendered = evidence_reporting.render_evidence(
+        result.evidence_path, junit_path=destination
+    )
+    assert rendered.written_outputs["junit"] == str(destination)
+    suite = fromstring(destination.read_bytes())
+    case = next(iter(suite))
+    assert case.get("name") == "quality\\ufffevisible"
+
+
+def test_captured_report_includes_mandatory_run_identities(tmp_path):
+    pack = _pack(tmp_path)
+    manifest, payloads, signer, _ = captured_reporting._load(pack)
+    view = captured_reporting._view(manifest, payloads, signer)
+    identities = dict(view.identity)
+    for role in ("Baseline", "Subject"):
+        run = payloads[role.lower()]
+        assert identities[f"{role} run"] == run["run_id"]
+        assert identities[f"{role} attributed artifact"] == run["artifact_digest"]
+        assert identities[f"{role} evaluator"] == (
+            f"{run['source']['name']} {run['source']['version']}"
+        )
+        assert identities[f"{role} run digest"].startswith("sha256:")
+
+
 @pytest.mark.parametrize(
     "raw",
     [

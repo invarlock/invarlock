@@ -416,6 +416,19 @@ def test_captured_policy_gate_publishes_real_failure_before_exiting(tmp_path):
     assert report["decision"] == "regression"
 
 
+def test_captured_metric_names_are_safe_in_terminal_output(tmp_path):
+    _, _, _, policy = _inputs(tmp_path)
+    policy["metrics"][0]["name"] = "safe\x9b2JFAKE_PASS"
+    (tmp_path / "policy.json").write_bytes(_bytes(policy))
+    result = RUNNER.invoke(
+        app,
+        ["evaluate", str(tmp_path / "request.json"), "--unsigned"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "\x9b" not in result.stdout
+    assert "safe\\u009b2JFAKE_PASS" in result.stdout
+
+
 def test_verify_refuses_symlink_evidence_root(tmp_path):
     evidence = tmp_path / "real"
     evidence.mkdir()

@@ -167,6 +167,12 @@ before writing. If a later write fails, earlier outputs remain and are listed in
 evidence as error. See [reports](../reference/reports.md) and
 [capacity](../reference/evaluation-capacity.md).
 
+The readable views show both run IDs, complete-run digests, attributed artifact
+digests and evaluator name and version. When the records provide model, workflow,
+dataset or prompt metadata, the comparison context makes those changes visible.
+This is enough to tell which inputs produced the recorded decision; use `verify`
+when a recipient also needs authenticated bindings and replay assurance.
+
 The captured record format is intentionally separate from native runtime
 receipts. It authenticates the bytes and policy decision supplied by the
 submission; it does not establish model quality, representativeness, or runtime

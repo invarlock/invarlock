@@ -15,13 +15,18 @@ from html import escape as html_escape
 from typing import Any
 
 
-def escape(value: str, quote: bool = True) -> str:
-    """Show terminal control bytes literally before escaping report markup."""
-    visible = re.sub(
+def visible_controls(value: str) -> str:
+    """Render terminal control characters as visible Unicode escape text."""
+    return re.sub(
         r"[\x00-\x08\x0b-\x1f\x7f-\x9f]",
         lambda match: f"\\u{ord(match.group()):04x}",
         value,
     )
+
+
+def escape(value: str, quote: bool = True) -> str:
+    """Show terminal control bytes literally before escaping report markup."""
+    visible = visible_controls(value)
     return html_escape(visible, quote=quote)
 
 
@@ -551,8 +556,14 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
                 f"## {clean(heading)}",
                 "",
                 "```json",
-                json.dumps(
-                    data, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False
+                visible_controls(
+                    json.dumps(
+                        data,
+                        ensure_ascii=False,
+                        indent=2,
+                        sort_keys=True,
+                        allow_nan=False,
+                    )
                 ).replace("`", "\\u0060"),
                 "```",
             ]

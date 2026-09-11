@@ -78,3 +78,19 @@ def test_context_cannot_emit_terminal_controls(control):
     for output in (render_html(view), markdown, stream.getvalue()):
         assert control not in output
     assert "FAKE_PASS" in stream.getvalue()
+
+
+def test_expanded_json_cannot_emit_terminal_controls():
+    control = "\x9b2J"
+    view = ReportView(
+        title="Comparison",
+        family="Captured",
+        decision="fail",
+        summary="Result",
+        metrics=(),
+        assurance=(),
+        technical={"metric": "safe" + control + "FAKE_PASS"},
+    )
+    markdown = render_markdown(view, include_details=True)
+    assert control not in markdown
+    assert "safe\\u009b2JFAKE_PASS" in markdown

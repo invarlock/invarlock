@@ -10,9 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added shared comparison context to native and captured HTML and Markdown
-  reports, including recorded model identity, workflow, dataset and prompt changes.
-  Missing metadata remains explicit; report rendering preserves evidence and
-  does not establish independent recipient acceptance.
+  reports, including run and artifact digests, evaluator source, recorded model
+  identity, workflow, dataset and prompt changes. Missing metadata remains
+  explicit; report rendering preserves evidence and does not establish
+  independent recipient acceptance.
+
+- Hardened captured JSONL imports and the retained-reference replay against
+  oversized or non-regular inputs, made terminal and XML report rendering safe
+  for hostile control characters, and closed raw file descriptors when stream
+  construction fails.
 
 - Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
   an unchanged signed pack, independent recipient replay and source attribution.
