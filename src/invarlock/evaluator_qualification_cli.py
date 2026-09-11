@@ -23,7 +23,7 @@ app = typer.Typer(
         "or retain it explicitly as observation-only."
     ),
 )
-console = Console()
+console = Console(markup=False, highlight=False)
 
 
 def _terminal_text(value: object) -> str:

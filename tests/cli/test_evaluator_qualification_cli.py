@@ -98,7 +98,7 @@ def test_cli_escapes_controls_in_dynamic_results(
         paths.append(path)
     payload = {
         "authority": "observation_only",
-        "profile_id": "profile\x9b2JFAKE_PASS",
+        "profile_id": "profile\x9b2JFAKE_PASS[bold]literal[/bold]",
         "reason_codes": ["reason\x9b2J"],
     }
     monkeypatch.setattr(
@@ -123,5 +123,5 @@ def test_cli_escapes_controls_in_dynamic_results(
     if json_out:
         assert json.loads(result.stdout) == payload
     else:
-        assert "profile\\u009b2JFAKE_PASS" in result.stdout
+        assert "profile\\u009b2JFAKE_PASS[bold]literal[/bold]" in result.stdout
         assert "reason\\u009b2J" in result.stdout
