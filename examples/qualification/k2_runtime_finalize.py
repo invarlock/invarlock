@@ -50,8 +50,8 @@ def read(path, limit=LIMIT):
             child = os.open(
                 part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
             )
-            os.close(descriptor)
-            descriptor = child
+            previous_descriptor, descriptor = descriptor, child
+            os.close(previous_descriptor)
         leaf = os.open(
             path.name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=descriptor
         )
@@ -295,7 +295,12 @@ def package_inventory(distributions):
 
 def campaign_hash(name):
     descriptor = os.open('/opt/campaign/' + name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
-    with os.fdopen(descriptor, 'rb') as stream:
+    try:
+        stream = os.fdopen(descriptor, 'rb')
+    except BaseException:
+        os.close(descriptor)
+        raise
+    with stream:
         info = os.fstat(stream.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_size > 1024 * 1024:
             raise ValueError('campaign input must be a bounded regular file')

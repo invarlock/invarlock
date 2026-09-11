@@ -29,7 +29,12 @@ def _write_key(path: Path) -> str:
     )
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
-        with os.fdopen(descriptor, "wb") as stream:
+        try:
+            stream = os.fdopen(descriptor, "wb")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        with stream:
             stream.write(payload)
     except BaseException:
         path.unlink(missing_ok=True)

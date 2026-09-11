@@ -101,7 +101,13 @@ def _blob(
 ) -> int:
     path = blobs / _digest(digest).removeprefix("sha256:")
     flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
-    with os.fdopen(os.open(path, flags), "rb") as source:
+    descriptor = os.open(path, flags)
+    try:
+        source = os.fdopen(descriptor, "rb")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    with source:
         before = os.fstat(source.fileno())
         if not stat.S_ISREG(before.st_mode):
             raise ModelKitError("package blob must be a regular file")
@@ -207,7 +213,13 @@ def _inventory(root: Path, limits: Limits) -> dict[str, tuple[str, int]]:
                 raise ModelKitError("candidate directories must not be symlinks")
         for name in files:
             flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
-            with os.fdopen(os.open(name, flags, dir_fd=directory_fd), "rb") as source:
+            descriptor = os.open(name, flags, dir_fd=directory_fd)
+            try:
+                source = os.fdopen(descriptor, "rb")
+            except BaseException:
+                os.close(descriptor)
+                raise
+            with source:
                 before = os.fstat(source.fileno())
                 if not stat.S_ISREG(before.st_mode):
                     raise ModelKitError("candidate files must be regular files")

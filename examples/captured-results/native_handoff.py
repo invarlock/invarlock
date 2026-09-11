@@ -47,7 +47,12 @@ def read(path, max_bytes=MAX_FILE_BYTES):
         descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError as exc:
         raise ValueError(f"expected a bounded regular file: {path.name}") from exc
-    with os.fdopen(descriptor, "rb") as stream:
+    try:
+        stream = os.fdopen(descriptor, "rb")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    with stream:
         info = os.fstat(stream.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
             raise ValueError(f"expected a bounded regular file: {path.name}")

@@ -227,8 +227,10 @@ def test_inspect_runner_binds_each_sample_to_native_output_and_score(
     assert scored[0][1]["value"] == "C"
 
 
+@pytest.mark.parametrize("close_error", [False, True])
 def test_openai_runner_binds_event_identity_and_restores_environment(
     monkeypatch: pytest.MonkeyPatch,
+    close_error: bool,
 ) -> None:
     module = _module()
     records = [json.loads(line) for line in _records_bytes(module).splitlines()]
@@ -244,6 +246,8 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
 
         def close(self) -> None:
             self.closed = True
+            if close_error:
+                raise RuntimeError("generator cleanup failed")
 
     class FakeMatch:
         def __init__(self, *, completion_fns: list[object], **_kwargs: object) -> None:
@@ -296,11 +300,15 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
     monkeypatch.delenv("EVALS_THREADS", raising=False)
     monkeypatch.delenv("EVALS_SHOW_EVAL_PROGRESS", raising=False)
 
-    generated, scored = module.adapters._run_openai_evals(
-        Path("/model"), _records_bytes(module)
-    )
-    assert generated[0]["output"] == records[0]["expected"]
-    assert scored[-1][0] == 1.0
+    if close_error:
+        with pytest.raises(RuntimeError, match="generator cleanup failed"):
+            module.adapters._run_openai_evals(Path("/model"), _records_bytes(module))
+    else:
+        generated, scored = module.adapters._run_openai_evals(
+            Path("/model"), _records_bytes(module)
+        )
+        assert generated[0]["output"] == records[0]["expected"]
+        assert scored[-1][0] == 1.0
     assert module.os.environ["EVALS_SEQUENTIAL"] == "before"
     assert "EVALS_THREADS" not in module.os.environ
 
@@ -2420,3 +2428,23 @@ def test_evaluator_transaction_lock_and_worker_contract_mismatch_guards(
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
     with pytest.raises(module.BridgeError, match="generation defaults"):
         module.adapters._HfGreedyGenerator(model)
+
+
+def test_generation_failure_releases_the_model_owner(tmp_path, monkeypatch):
+    module = _module()
+    error = RuntimeError("generation failed")
+    closed = []
+
+    class Generator:
+        def generate(self, prompts):
+            raise error
+
+        def close(self):
+            closed.append(self)
+
+    generator = Generator()
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", lambda path: generator)
+    with pytest.raises(RuntimeError) as failure:
+        module.adapters._generate(tmp_path, _records_bytes(module))
+    assert failure.value is error
+    assert closed == [generator]

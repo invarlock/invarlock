@@ -251,3 +251,45 @@ def test_bounded_command_timeout_terminates_descendants(tmp_path: Path) -> None:
         time.sleep(0.05)
     else:
         pytest.fail("bounded command left a descendant process running")
+
+
+@pytest.mark.parametrize("failed_stream", ["source", "destination"])
+def test_start_failure_closes_both_streams_and_removes_partial_output_after_close_error(
+    tmp_path, monkeypatch, failed_stream
+):
+    source_path, destination_path = tmp_path / "input", tmp_path / "partial-output"
+    source_path.write_bytes(b"input")
+    original_open = Path.open
+    streams = {}
+
+    class Stream:
+        def __init__(self, file, name):
+            self.file, self.name = file, name
+
+        def close(self):
+            self.file.close()
+            if self.name == failed_stream:
+                raise OSError("stream close failed")
+
+    def open_stream(path, *args, **kwargs):
+        file = original_open(path, *args, **kwargs)
+        name = "source" if path == source_path else "destination"
+        streams[name] = file
+        return Stream(file, name)
+
+    def fail_start(*args, **kwargs):
+        raise OSError("process could not start")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", open_stream)
+        patch.setattr(bounded_command.subprocess, "Popen", fail_start)
+        with pytest.raises(OSError, match="stream close failed"):
+            run_bounded_command(
+                ["unused"], stdin_path=source_path, stdout_path=destination_path
+            )
+    closed = {name: stream.closed for name, stream in streams.items()}
+    for stream in streams.values():
+        stream.close()
+    assert closed == {"source": True, "destination": True}
+    assert source_path.read_bytes() == b"input"
+    assert not destination_path.exists()

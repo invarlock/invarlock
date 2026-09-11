@@ -31,7 +31,12 @@ PIP_WHEEL_SHA256 = "931c303696af6fa3417112103b1cad26890e5a07eccb5b99783700e33f2b
 
 def _read(path, limit):
     descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
-    with os.fdopen(descriptor, "rb") as stream:
+    try:
+        stream = os.fdopen(descriptor, "rb")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    with stream:
         info = os.fstat(stream.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
             raise ValueError("build input is not a bounded regular file")

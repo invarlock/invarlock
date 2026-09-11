@@ -132,8 +132,10 @@ def _generate(model_path: Path, dataset_bytes: bytes) -> list[dict[str, str]]:
 
     records = _records(dataset_bytes)
     generator = _HfGreedyGenerator(model_path)
-    outputs = generator.generate([record["prompt"] for record in records])
-    generator.close()
+    try:
+        outputs = generator.generate([record["prompt"] for record in records])
+    finally:
+        generator.close()
     if len(outputs) != len(records):
         raise BridgeError("the model adapter returned an incomplete result")
     return [
@@ -366,12 +368,14 @@ def _run_openai_evals(
                 scored.append((score, detail))
             return generated, scored
     finally:
-        generator.close()
-        for name, value in previous.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+        try:
+            generator.close()
+        finally:
+            for name, value in previous.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
 
 
 def _run_upstream_evaluator(

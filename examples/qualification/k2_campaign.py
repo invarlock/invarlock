@@ -302,7 +302,12 @@ def measure_snapshot(root: Path, inventory: list[dict[str, Any]]) -> dict[str, A
         if not path.resolve().is_relative_to(root) or path.is_symlink():
             raise ValueError("snapshot path is not regular")
         descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-        with os.fdopen(descriptor, "rb") as stream:
+        try:
+            stream = os.fdopen(descriptor, "rb")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        with stream:
             before = os.fstat(stream.fileno())
             if not stat.S_ISREG(before.st_mode) or before.st_size != item["size_bytes"]:
                 raise ValueError("snapshot file identity differs")

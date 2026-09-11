@@ -63,8 +63,8 @@ def _open_directory(path: Path, *, label: str) -> int:
             if component in {"", ".", ".."}:
                 raise ValueError(f"{label} contains an unsafe directory component")
             next_descriptor = os.open(component, flags, dir_fd=descriptor)
-            os.close(descriptor)
-            descriptor = next_descriptor
+            previous_descriptor, descriptor = descriptor, next_descriptor
+            os.close(previous_descriptor)
         return descriptor
     except (OSError, ValueError) as exc:
         if descriptor is not None:
@@ -286,11 +286,15 @@ def create_trust_material(
     except OSError as exc:
         raise ValueError("trust root could not be created securely") from exc
     finally:
-        if policy_descriptor is not None:
-            os.close(policy_descriptor)
-        if root_descriptor is not None:
-            os.close(root_descriptor)
-        os.close(parent_descriptor)
+        try:
+            if policy_descriptor is not None:
+                os.close(policy_descriptor)
+        finally:
+            try:
+                if root_descriptor is not None:
+                    os.close(root_descriptor)
+            finally:
+                os.close(parent_descriptor)
     verifier_path = root / "verifier.pem"
     policy_path = root / "policy/acceptance.json"
     trust_path = root / "trusted-inputs.json"
