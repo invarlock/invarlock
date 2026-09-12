@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loading and run-only controls on import requests; and closed raw file
   descriptors and incomplete report outputs when stream construction fails.
 
+- Consolidated receipt, report, evaluator-qualification and runtime-sidecar file
+  publication around private staging and retained file descriptors. Publication
+  rejects substituted sources and changed parent directories, synchronizes the
+  destination entry, and preserves completed or competing files on failure.
+  Captured evidence retains its original staging identity through publication;
+  artifact attestation checks both the file and its ancestor directories.
+
 - Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
   an unchanged signed pack, independent recipient replay and source attribution.
   Replay preserves the recorded regression; it adds no native runtime

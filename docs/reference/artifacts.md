@@ -247,8 +247,19 @@ destination. Published files are read-only and directories are non-writable.
 
 Filesystem permissions are a local hardening measure, not the integrity model.
 Any later byte change, missing file, or extra file is detected by strict
-verification. Verification receipts and rendered HTML must remain outside the
+verification. Verification receipts and rendered report files must remain outside the
 bundle so the bundle can stay byte-identical.
+
+Output writers pin directory descriptors and check pathname bindings around
+publication. They reject changes observed at those checks; they cannot prevent
+later changes by a process with the same filesystem permissions. On an ambiguous
+publication failure, a completed or competing file, or private staging directory,
+can remain. Inspect and authenticate any retained evidence before using it.
+Cleanup never recursively follows an old staging pathname.
+
+Runtime-provider sidecars are published individually. If a later sidecar fails,
+earlier completed files remain. Callers that need an all-or-nothing set must use
+a private directory and publish that directory only after all checks succeed.
 
 ## External outputs
 
@@ -257,6 +268,8 @@ bundle so the bundle can stay byte-identical.
 | Signed verification receipt | `invarlock verify` | No | Independent verifier assertion over manifest, anchors, and verdict |
 | Console report | `invarlock report` | Not a file | Summary of canonical content after integrity and embedded-signature checks |
 | Self-contained HTML | `invarlock report --html` | No | Unsigned presentation; not independent acceptance |
+| Markdown report | `invarlock report --markdown` | No | Unsigned presentation; not independent acceptance |
+| JUnit report | `invarlock report --junit` | No | CI test results reflecting the recorded comparison; not independent acceptance |
 
 Multiple verifiers can issue separate receipts for the same immutable manifest.
 They can use distinct verifier identities and keys. Each must independently
