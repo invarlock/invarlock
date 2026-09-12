@@ -453,8 +453,8 @@ The report leads with **Policy satisfied** or **Policy not met**, the recorded
 verdict and the checks responsible for it. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
 requirements. The interval diagram marks the policy boundary, while the table
-shows which numerical checks passed or were not met. Display values are rounded;
-exact recorded values remain available in the evidence and technical details.
+shows which numerical checks passed or were not met. Exact recorded values remain
+available in the evidence and technical details.
 
 For captured comparisons, the technical details identify both recorded runs,
 their complete-run digests, attributed artifact digests and evaluator
@@ -589,3 +589,7 @@ workflow and its assurance limits.
   dependency order.
 - [Command-line interface](cli.md) documents JSON modes and exit status.
 - [Python API](api-guide.md) defines result and signed-receipt types.
+
+For bounded frozen-answer ratings, see [judge measurements](judge-measurements.md).
+Judge reports keep offline replay, signer authentication and recipient acceptance
+distinct and use additive judge-specific JSON formats.

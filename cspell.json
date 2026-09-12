@@ -65,6 +65,7 @@
     "logloss",
     "lognll",
     "Bonferroni",
+    "Hoeffding",
     "Equalisation",
     "behaviour",
     "logits",

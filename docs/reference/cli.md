@@ -573,3 +573,9 @@ runtime inventory.
 - [Evaluation lifecycle](lifecycle.md) explains write boundaries and retry
   behavior.
 - [Reports and receipts](reports.md) defines JSON results and formatted reports.
+
+## Frozen-answer judge evidence
+
+The versioned judge request uses the same `evaluate`, `verify` and `report`
+commands. See [judge measurements](judge-measurements.md) for import preflight,
+bounded reports and independent recipient policy verification.

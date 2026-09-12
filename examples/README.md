@@ -7,6 +7,10 @@ evidence report. The self-contained examples create both sets of keys;
 an acceptance workflow should have the verifier owner choose and hold its own
 trust anchors and signing key.
 
+For a small offline frozen-answer rating example, see
+[judge measurements](judge-measurements/README.md). It intentionally demonstrates
+insufficient evidence and unsigned reporting.
+
 To gate results from an existing evaluator, start with the separate
 [captured-results examples](captured-results/README.md). For an artifact handoff, the
 [ModelKit guide](../docs/user-guide/modelkit-handoff.md) checks delivered

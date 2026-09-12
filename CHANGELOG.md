@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added versioned frozen-answer judge import requests, offline preflight,
+  recipient-policy verification and bounded JSON, HTML, Markdown and JUnit
+  reports that distinguish replay, signer authentication and policy acceptance.
+
 - Added shared comparison context to native and captured HTML and Markdown
   reports, including run and artifact digests, evaluator source, recorded model
   identity, workflow, dataset and prompt changes. Missing metadata remains
