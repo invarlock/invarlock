@@ -84,7 +84,7 @@ def _publish(
         subject_run=runs[1],
         analysis_policy=analysis_policy,
         signing_key=KEY if signed else None,
-        signer_identity="example-producer" if signed else None,
+        signer_identity="example-signer" if signed else None,
     )
     # Test-owned recipient expectations are supplied separately from the evidence.
     public_key = KEY.public_key().public_bytes_raw()
@@ -94,7 +94,7 @@ def _publish(
         "intended_subject": runs[1]["artifact_digest"],
         "required_metric_name": analysis_policy["metric_name"],
         "trusted_signer": {
-            "identity": "example-producer",
+            "identity": "example-signer",
             "public_key_sha256": "sha256:" + hashlib.sha256(public_key).hexdigest(),
         },
         "bindings": copy.deepcopy(publication.envelope["bindings"]),
@@ -165,7 +165,7 @@ def test_each_recipient_binding_is_independently_enforced(tmp_path, field):
     ) + "0" * 64
     _write(policy_path, policy)
     receipt = verify_judge_evidence_with_policy(publication.path, policy_path)
-    assert receipt.authenticated and receipt.replayed
+    assert receipt.authenticated and not receipt.replayed
     assert not receipt.verified and not receipt.accepted
     assert field in receipt.errors[0]
 
@@ -193,7 +193,7 @@ def test_wrong_recipient_subject_metric_scope_or_policy_version_fails(
 
 @pytest.mark.parametrize(
     "field,value",
-    [("identity", "another-producer"), ("public_key_sha256", "sha256:" + "0" * 64)],
+    [("identity", "another-signer"), ("public_key_sha256", "sha256:" + "0" * 64)],
 )
 def test_wrong_signer_pin_fails_even_with_a_valid_embedded_key(tmp_path, field, value):
     publication, policy_path = _publish(tmp_path)
@@ -293,7 +293,7 @@ def test_unsigned_evidence_replays_but_cannot_be_accepted(tmp_path):
     publication, policy_path = _publish(tmp_path, signed=False)
     assert replay_judge_evidence(publication.path).analysis_result.decision == "pass"
     receipt = verify_judge_evidence_with_policy(publication.path, policy_path)
-    assert receipt.replayed and not receipt.authenticated and not receipt.accepted
+    assert not receipt.replayed and not receipt.authenticated and not receipt.accepted
 
 
 def test_producer_owned_policy_and_extra_trust_values_do_not_self_authorize(tmp_path):
@@ -318,13 +318,13 @@ def test_optional_external_key_anchor_must_match_the_recipient_pin(tmp_path):
     assert verify_judge_evidence(
         publication.path,
         recipient_policy_path=policy_path,
-        trusted_public_keys={"example-producer": KEY.public_key()},
+        trusted_public_keys={"example-signer": KEY.public_key()},
     ).accepted
     assert not verify_judge_evidence(
         publication.path,
         recipient_policy_path=policy_path,
         trusted_public_keys={
-            "example-producer": Ed25519PrivateKey.generate().public_key()
+            "example-signer": Ed25519PrivateKey.generate().public_key()
         },
     ).accepted
     assert not verify_judge_evidence(
@@ -341,7 +341,7 @@ def test_stored_receipt_is_recomputed_and_cannot_self_authorize(tmp_path):
         receipt_path, evidence_path=publication.path, recipient_policy_path=policy_path
     ).accepted
     claimed = receipt.to_dict()
-    claimed["signer_identity"] = "another-producer"
+    claimed["signer_identity"] = "another-signer"
     _write(receipt_path, claimed)
     assert not verify_stored_judge_receipt(
         receipt_path, evidence_path=publication.path, recipient_policy_path=policy_path
@@ -365,7 +365,7 @@ def test_native_consumers_reject_new_scopes_and_wrappers(tmp_path):
         ).validate(_json(policy_path))
     legacy = verify_acceptance_attestation(
         publication.path / "envelope.json",
-        trusted_public_keys={"example-producer": KEY.public_key()},
+        trusted_public_keys={"example-signer": KEY.public_key()},
         recipient_policy=policy_path,
     )
     assert not legacy.accepted

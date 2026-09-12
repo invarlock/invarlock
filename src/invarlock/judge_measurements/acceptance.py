@@ -26,6 +26,7 @@ from invarlock.judge_evidence_types import JudgeRecipientPolicy
 from invarlock.judge_measurements.evidence import (
     DECISION_SCOPE,
     JudgeEvidenceError,
+    load_judge_evidence_envelope,
     object_sha256,
     read_object,
     replay_judge_evidence,
@@ -137,13 +138,10 @@ def verify_judge_evidence(
     try:
         policy = load_judge_recipient_policy(recipient_policy_path, evidence_path=root)
         receipt = replace(receipt, recipient_policy_sha256=object_sha256(policy))
-        publication = replay_judge_evidence(root)
-        envelope = publication.envelope
+        envelope = load_judge_evidence_envelope(root)
         receipt = replace(
             receipt,
-            replayed=True,
             envelope_sha256=object_sha256(envelope),
-            decision=publication.analysis_result.decision,
             intended_subject=envelope["intended_subject"],
             bindings=ReceiptBindings(**envelope["bindings"]),
         )
@@ -204,7 +202,11 @@ def verify_judge_evidence(
                 raise JudgeEvidenceError(
                     f"judge evidence {name} differs from recipient policy"
                 )
+        publication = replay_judge_evidence(
+            root, expected_envelope_sha256=receipt.envelope_sha256
+        )
         analysis = publication.analysis_result
+        receipt = replace(receipt, replayed=True, decision=analysis.decision)
         if analysis.policy.metric_name != policy["required_metric_name"]:
             raise JudgeEvidenceError(
                 "judge metric differs from the recipient's required metric"

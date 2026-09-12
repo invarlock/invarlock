@@ -89,11 +89,20 @@ def _view(
     effect = analysis["effect_interval"]
     subject = analysis["subject_interval"]
     counts = analysis["counts"]
+    role = policy["decision_role"]
+    required = role == "required"
+    explanation = {
+        "pass": f"All declared {role} bounds are satisfied.",
+        "regression": f"At least one declared {role} bound is violated.",
+        "insufficient_evidence": f"The declared {role} bounds are not established by the available evidence.",
+    }[analysis["decision"]]
+    if analysis["reasons"]:
+        explanation += " " + ", ".join(analysis["reasons"])
     checks = tuple(
         CheckView(
             name=gate["name"],
             observed=gate["decision"],
-            required="pass",
+            required="pass" if required else "pass (advisory only)",
             passed=True
             if gate["decision"] == "pass"
             else False
@@ -119,17 +128,21 @@ def _view(
         )
     metric = MetricView(
         name=policy["metric_name"],
-        scope="Fixed benchmark; equal independent-unit weights",
+        scope="Fixed benchmark; equal independent-unit weights"
+        if required
+        else "Advisory metric; fixed benchmark; equal independent-unit weights",
         decision=analysis["decision"],
         baseline="Frozen baseline answers",
         candidate=subject["mean"] if subject is not None else "Unavailable",
         change=effect["mean"] if effect is not None else "Unavailable",
         count=f"{counts['scheduled_cases']} cases; {counts['scheduled_units']} independent units; {counts['completed_trials']}/{counts['expected_trials']} completed trials",
-        explanation=", ".join(analysis["reasons"])
-        or "All declared required bounds are satisfied.",
+        explanation=explanation,
         checks=checks,
         interval=interval,
         notes=(
+            "Decision role: required."
+            if required
+            else "Decision role: advisory; this metric does not gate required decisions.",
             f"Allowed degradation: {policy['allowed_degradation']} ({policy['direction']} is better).",
             f"Minimum units: {policy['minimum_units']}; maximum interval width: {policy['maximum_interval_width']}.",
             "Repetitions do not increase the number of independent units.",
@@ -188,6 +201,7 @@ def _view(
         else "unsigned",
         "replay": "completed_without_recipient_authorization",
         "policy_decision": analysis["decision"],
+        "decision_role": role,
         "recipient_acceptance": "not_performed",
         "signer_identity": signer["identity"] if signer is not None else None,
         "signer_public_key_sha256": signer["public_key_sha256"]
@@ -245,7 +259,12 @@ def _view(
         title="InvarLock bounded judge report",
         family="Bounded judge measurement evidence",
         decision=analysis["decision"],
-        summary="Comparison of repeated judgments of frozen baseline and subject answers on the declared benchmark.",
+        summary="Comparison of repeated judgments of frozen baseline and subject answers on the declared benchmark."
+        + (
+            ""
+            if required
+            else " This metric is advisory and does not gate required decisions."
+        ),
         metrics=(metric,),
         assurance=(
             (
@@ -362,20 +381,36 @@ def render_judge_evidence(
         view, facts = _view(publication, artifacts)
         text = render_markdown(view, include_details=explain)
         rendered = {"html": render_html(view).encode(), "markdown": text.encode()}
+        required = facts["assurance"]["decision_role"] == "required"
         suite = Element(
             "testsuite",
             name="InvarLock bounded judge policy",
             tests="1",
-            failures=str(int(view.decision == "regression")),
-            errors=str(int(view.decision == "insufficient_evidence")),
+            failures=str(int(required and view.decision == "regression")),
+            errors=str(int(required and view.decision == "insufficient_evidence")),
+            skipped=str(int(not required)),
         )
+        properties = SubElement(suite, "properties")
+        SubElement(
+            properties,
+            "property",
+            name="decision_role",
+            value="required" if required else "advisory",
+        )
+        SubElement(properties, "property", name="policy_decision", value=view.decision)
         case = SubElement(
             suite,
             "testcase",
             name=xml_text(view.metrics[0].name),
             classname="bounded-judge-fixed-benchmark-v1",
         )
-        if view.decision != "pass":
+        if not required:
+            SubElement(
+                case,
+                "skipped",
+                message=f"Advisory metric: {view.decision}; required decisions are not gated.",
+            )
+        elif view.decision != "pass":
             SubElement(
                 case,
                 "failure" if view.decision == "regression" else "error",

@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from jsonschema import Draft202012Validator
 
 from invarlock.captured_contracts import secure_directory
+from invarlock.evaluation_record_contracts.contracts import MAX_INPUT_BYTES
 from invarlock.evaluation_records.cases import case_set_digest
 from invarlock.evaluation_records.io import run_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
@@ -27,11 +28,14 @@ from invarlock.judge_measurement_types import (
     JudgeMeasurements,
 )
 from invarlock.judge_measurements.analysis import (
+    ANALYSIS_POLICY_MAX_BYTES,
     JudgeAnalysisResult,
     analyze_measurements,
     decode_analysis_policy,
 )
 from invarlock.judge_measurements.contracts import (
+    MEASUREMENTS_MAX_BYTES,
+    PLAN_MAX_BYTES,
     canonical_payload,
     measurement_plan_digest,
 )
@@ -48,8 +52,18 @@ ARTIFACT_FILENAMES = (
     "analysis_policy.json",
     "analysis_result.json",
 )
-_MAX_ARTIFACT_BYTES = 384 * 1024 * 1024
 _MAX_ENVELOPE_BYTES = 64 * 1024
+ANALYSIS_RESULT_MAX_BYTES = 1024 * 1024
+ARTIFACT_BYTE_LIMITS = {
+    "plan.json": PLAN_MAX_BYTES,
+    "measurements.json": MEASUREMENTS_MAX_BYTES,
+    "baseline_run.json": MAX_INPUT_BYTES,
+    "subject_run.json": MAX_INPUT_BYTES,
+    "case_set.json": MAX_INPUT_BYTES,
+    "analysis_policy.json": ANALYSIS_POLICY_MAX_BYTES,
+    "analysis_result.json": ANALYSIS_RESULT_MAX_BYTES,
+    "envelope.json": _MAX_ENVELOPE_BYTES,
+}
 
 
 class JudgeEvidenceError(ValueError):
@@ -73,7 +87,9 @@ def signed_envelope_bytes(envelope: JudgeEvidenceEnvelope) -> bytes:
     return EVIDENCE_FORMAT.encode("ascii") + b"\0" + canonical_payload(statement)
 
 
-def read_object(path: Path, *, maximum: int = _MAX_ARTIFACT_BYTES) -> dict[str, Any]:
+def read_object(path: Path, *, maximum: int | None = None) -> dict[str, Any]:
+    if maximum is None:
+        maximum = ARTIFACT_BYTE_LIMITS.get(path.name, MAX_INPUT_BYTES)
     value = parse_json_bytes(
         read_regular_file_bytes(path, label=path.name, max_bytes=maximum),
         label=path.name,
@@ -94,6 +110,15 @@ def _validate_envelope(envelope: JudgeEvidenceEnvelope) -> None:
         raise JudgeEvidenceError(
             f"judge evidence envelope is invalid: {error.message[:240]}"
         )
+
+
+def load_judge_evidence_envelope(path: Path) -> JudgeEvidenceEnvelope:
+    """Read only the small, closed envelope before authorizing expensive replay."""
+    root = Path(path).absolute()
+    with secure_directory(root):
+        envelope = cast(JudgeEvidenceEnvelope, read_object(root / "envelope.json"))
+    _validate_envelope(envelope)
+    return envelope
 
 
 def _private_key(value: Path | Ed25519PrivateKey) -> Ed25519PrivateKey:
@@ -215,9 +240,14 @@ def publish_judge_evidence(
         ) as stage_name:
             stage = Path(stage_name)
             for name, artifact in artifacts.items():
+                payload = canonical_payload(artifact) + b"\n"
+                if len(payload) > ARTIFACT_BYTE_LIMITS[name]:
+                    raise JudgeEvidenceError(
+                        f"{name} exceeds the {ARTIFACT_BYTE_LIMITS[name]}-byte size limit"
+                    )
                 write_file_no_replace(
                     stage / name,
-                    canonical_payload(artifact) + b"\n",
+                    payload,
                     create_parents=False,
                 )
             write_file_no_replace(
@@ -229,15 +259,19 @@ def publish_judge_evidence(
     return JudgeEvidencePublication(destination, envelope, result)
 
 
-def replay_judge_evidence(path: Path) -> JudgeEvidencePublication:
+def replay_judge_evidence(
+    path: Path, *, expected_envelope_sha256: str | None = None
+) -> JudgeEvidencePublication:
     """Replay fixed artifacts and signed bindings; signer authorization is separate."""
     root = Path(path).absolute()
     with secure_directory(root):
-        envelope = cast(
-            JudgeEvidenceEnvelope,
-            read_object(root / "envelope.json", maximum=_MAX_ENVELOPE_BYTES),
-        )
+        envelope = cast(JudgeEvidenceEnvelope, read_object(root / "envelope.json"))
         _validate_envelope(envelope)
+        if (
+            expected_envelope_sha256 is not None
+            and object_sha256(envelope) != expected_envelope_sha256
+        ):
+            raise JudgeEvidenceError("judge evidence envelope changed before replay")
         artifacts = {name: read_object(root / name) for name in ARTIFACT_FILENAMES}
     actual = _bindings(artifacts)
     if envelope["bindings"] != actual:
