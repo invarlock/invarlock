@@ -124,12 +124,12 @@ def load_judge_evidence_envelope(path: Path) -> JudgeEvidenceEnvelope:
 def _private_key(value: Path | Ed25519PrivateKey) -> Ed25519PrivateKey:
     if isinstance(value, Ed25519PrivateKey):
         return value
-    key = serialization.load_pem_private_key(
-        read_regular_file_bytes(
-            Path(value), label="judge evidence signing key", max_bytes=65536
-        ),
-        password=None,
-    )
+    path = Path(value).absolute()
+    with secure_directory(path.parent):
+        payload = read_regular_file_bytes(
+            path, label="judge evidence signing key", max_bytes=65536
+        )
+    key = serialization.load_pem_private_key(payload, password=None)
     if not isinstance(key, Ed25519PrivateKey):
         raise JudgeEvidenceError("judge evidence signing key must be Ed25519")
     return key

@@ -111,9 +111,11 @@ def _additional_key(
         return value
     if isinstance(value, Path):
         _require_external(value, evidence, label="trusted signer key")
-        value = read_regular_file_bytes(
-            value, label="trusted signer key", max_bytes=65536
-        )
+        path = value.absolute()
+        with secure_directory(path.parent):
+            value = read_regular_file_bytes(
+                path, label="trusted signer key", max_bytes=65536
+            )
     if len(value) == 32:
         return Ed25519PublicKey.from_public_bytes(value)
     key = serialization.load_pem_public_key(value)

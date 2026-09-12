@@ -8,6 +8,7 @@ import socket
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from jsonschema import Draft202012Validator, ValidationError
 
@@ -142,6 +143,63 @@ def test_signed_evidence_is_independently_replayed_and_accepted_offline(
         public_contracts.load_judge_measurement_verification_receipt_schema()
     ).validate(receipt.to_dict())
     assert receipt == verify_judge_evidence_with_policy(publication.path, policy_path)
+
+
+def test_signing_key_rejects_a_symlinked_parent_directory(tmp_path):
+    plan, data = _bundle(baseline=0, subject=1)
+    runs = _runs(plan)
+    policy = _json(FIXTURES / "analysis_policy.json")
+    policy.update(
+        plan_sha256=measurement_plan_digest(plan),
+        minimum_units=1,
+        maximum_interval_width="2",
+    )
+    key_directory = tmp_path / "keys"
+    key_directory.mkdir()
+    key_path = key_directory / "signing.pem"
+    key_path.write_bytes(
+        KEY.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    linked_directory = tmp_path / "linked-keys"
+    linked_directory.symlink_to(key_directory, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="non-symlink directories"):
+        publish_judge_evidence(
+            tmp_path / "evidence",
+            plan=plan,
+            measurements=data,
+            baseline_run=runs[0],
+            subject_run=runs[1],
+            analysis_policy=policy,
+            signing_key=linked_directory / key_path.name,
+            signer_identity="example-signer",
+        )
+
+
+def test_additional_trusted_key_rejects_a_symlinked_parent_directory(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    key_directory = tmp_path / "keys"
+    key_directory.mkdir()
+    key_path = key_directory / "signer.raw"
+    key_path.write_bytes(KEY.public_key().public_bytes_raw())
+    linked_directory = tmp_path / "linked-keys"
+    linked_directory.symlink_to(key_directory, target_is_directory=True)
+
+    receipt = verify_judge_evidence(
+        publication.path,
+        recipient_policy_path=policy_path,
+        trusted_public_keys={
+            "example-signer": linked_directory / key_path.name,
+        },
+    )
+
+    assert not receipt.accepted
+    assert not receipt.verified
+    assert "non-symlink directories" in receipt.errors[0]
 
 
 @pytest.mark.parametrize(
