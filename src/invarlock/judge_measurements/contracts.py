@@ -8,6 +8,7 @@ bindings, retry selection, source replay, and completeness accounting.
 from __future__ import annotations
 
 import hashlib
+import json
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -39,6 +40,7 @@ PLAN_FORMAT = "invarlock/judge-measurement-plan-v1"
 MEASUREMENTS_FORMAT = "invarlock/judge-measurements-v1"
 SOURCE_FORMAT = "invarlock/retained-judge-json-v1"
 TRIAL_ID_SCHEME = "plan-case-side-repetition-sha256-v1"
+JUDGE_REQUEST_MAX_BYTES = 1024 * 1024
 
 
 class JudgeMeasurementContractError(ValueError):
@@ -61,6 +63,29 @@ def canonical_payload(value: object) -> bytes:
     """Return the compact canonical bytes used by judge contract digests."""
 
     return canonical_json_bytes(value, newline=False)
+
+
+def _bounded_canonical_payload(value: object, maximum: int, label: str) -> bytes:
+    """Serialize canonically while refusing growth beyond ``maximum`` bytes."""
+
+    encoder = json.JSONEncoder(
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    result = bytearray()
+    try:
+        for chunk in encoder.iterencode(value):
+            encoded = chunk.encode("utf-8")
+            if len(result) + len(encoded) > maximum:
+                _fail(f"{label} exceeds the {maximum}-byte limit")
+            result.extend(encoded)
+    except JudgeMeasurementContractError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise JudgeMeasurementContractError(f"{label} is not canonical JSON") from exc
+    return bytes(result)
 
 
 def measurement_plan_digest(plan: JudgeMeasurementPlan) -> str:
@@ -93,21 +118,42 @@ def render_judge_request(
         {"id": item["id"], "text": item["text"]} for item in prompt["references"]
     ]
 
+    content_bytes = len(prompt["system"].encode("utf-8"))
+
     def user_content(input_value: str, answer_value: str) -> str:
-        return canonical_payload(
+        nonlocal content_bytes
+        encoded = _bounded_canonical_payload(
             {
                 "answer": answer_value,
                 "input": input_value,
                 "instruction": prompt["template"],
                 "references": references,
                 "rubric": plan["rubric"]["text"],
-            }
-        ).decode("utf-8")
+            },
+            JUDGE_REQUEST_MAX_BYTES,
+            "normalized judge request",
+        )
+        content_bytes += len(encoded)
+        if content_bytes > JUDGE_REQUEST_MAX_BYTES:
+            _fail(
+                f"normalized judge request exceeds the {JUDGE_REQUEST_MAX_BYTES}-byte limit"
+            )
+        return encoded.decode("utf-8")
 
     messages: list[dict[str, str]] = []
     if prompt["system"]:
         messages.append({"role": "system", "content": prompt["system"]})
     for demonstration in prompt["demonstrations"]:
+        assistant = _bounded_canonical_payload(
+            {"rating": demonstration["rating"]},
+            JUDGE_REQUEST_MAX_BYTES,
+            "normalized judge request",
+        ).decode("utf-8")
+        content_bytes += len(assistant.encode("utf-8"))
+        if content_bytes > JUDGE_REQUEST_MAX_BYTES:
+            _fail(
+                f"normalized judge request exceeds the {JUDGE_REQUEST_MAX_BYTES}-byte limit"
+            )
         messages.extend(
             (
                 {
@@ -118,16 +164,14 @@ def render_judge_request(
                 },
                 {
                     "role": "assistant",
-                    "content": canonical_payload(
-                        {"rating": demonstration["rating"]}
-                    ).decode("utf-8"),
+                    "content": assistant,
                 },
             )
         )
     messages.append(
         {"role": "user", "content": user_content(checked_input, checked_answer)}
     )
-    return canonical_payload(
+    return _bounded_canonical_payload(
         {
             "config": plan["judge"]["config"],
             "format": "invarlock/judge-request-v1",
@@ -143,7 +187,9 @@ def render_judge_request(
                 "type": "json_object",
             },
             "tools": [],
-        }
+        },
+        JUDGE_REQUEST_MAX_BYTES,
+        "normalized judge request",
     )
 
 
@@ -165,12 +211,7 @@ def _validate_schema(value: dict[str, Any], kind: str) -> None:
 
 
 def _bounded_canonical(value: object, maximum: int, label: str) -> None:
-    try:
-        size = len(canonical_payload(value))
-    except (TypeError, ValueError) as exc:
-        raise JudgeMeasurementContractError(f"{label} is not canonical JSON") from exc
-    if size > maximum:
-        _fail(f"{label} exceeds the {maximum}-byte limit")
+    _bounded_canonical_payload(value, maximum, label)
 
 
 def _precheck_plan_counts(raw: dict[str, Any]) -> None:
@@ -222,6 +263,12 @@ def _check_trial_integer_types(trial: dict[str, Any]) -> None:
             _fail("attempt source mapping must be an object")
         _require_integer(source.get("record_index"), "source record index")
         _require_integer(source.get("attempt_index"), "source attempt index")
+        usage = attempt.get("usage")
+        if usage is not None:
+            if not isinstance(usage, dict):
+                _fail("attempt usage must be an object or null")
+            _require_integer(usage.get("input_tokens"), "usage input_tokens")
+            _require_integer(usage.get("output_tokens"), "usage output_tokens")
 
 
 def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
@@ -284,6 +331,10 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
     for field in ("repetitions", "max_attempts", "expected_trials"):
         if type(schedule[field]) is not int:
             _fail(f"schedule {field} must be an integer")
+    config = raw["judge"]["config"]
+    _require_integer(config["max_output_tokens"], "judge max_output_tokens")
+    if config["seed"] is not None:
+        _require_integer(config["seed"], "judge seed")
     if schedule.get("trial_id_scheme") != TRIAL_ID_SCHEME:
         _fail("unsupported judge trial ID scheme")
     expected = len(case_units) * 2 * schedule["repetitions"]
@@ -291,6 +342,9 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
         _fail("expected_trials must equal cases × two sides × repetitions")
     if schedule["max_attempts"] > 1 and schedule["retry_on"] != ["transport_error"]:
         _fail("multiple attempts require transport_error as the sole retry condition")
+    # Reject plans whose fixed prompt material already exceeds the request
+    # envelope. Frozen case inputs and answers are checked when rendered.
+    render_judge_request(value, input_text="", answer_text="")
 
 
 def _load_object(path: Path, *, maximum: int, label: str) -> dict[str, Any]:
@@ -475,10 +529,14 @@ def _frozen_run_records(
         raise JudgeMeasurementContractError(
             f"frozen answer run is invalid: {str(exc)[:240]}"
         ) from exc
-    return {
+    records = {
         "baseline": {row["id"]: row for row in baseline_run["records"]},
         "subject": {row["id"]: row for row in subject_run["records"]},
     }
+    planned = {item["case_id"] for item in plan["answer_bindings"]}
+    if any(set(side_records) != planned for side_records in records.values()):
+        _fail("frozen run membership must exactly match the judging plan")
+    return records
 
 
 def validate_measurements(
@@ -498,6 +556,8 @@ def validate_measurements(
     _validate_schema(raw, "measurements")
     for field in ("expected_trials", "recorded_trials", "completed_trials"):
         _require_integer(raw["completeness"][field], f"completeness {field}")
+    for source in raw["sources"]:
+        _require_integer(source["byte_size"], "source byte_size")
     for trial in raw["trials"]:
         _check_trial_integer_types(trial)
 
@@ -644,6 +704,7 @@ def load_measurements(
 
 __all__ = [
     "JudgeMeasurementContractError",
+    "JUDGE_REQUEST_MAX_BYTES",
     "MEASUREMENTS_FORMAT",
     "MEASUREMENTS_MAX_BYTES",
     "PLAN_FORMAT",

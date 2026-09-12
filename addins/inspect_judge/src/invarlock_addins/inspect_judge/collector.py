@@ -15,6 +15,7 @@ from invarlock.judge_measurement_types import (
     JudgeMeasurements,
 )
 from invarlock.judge_measurements.contracts import (
+    JUDGE_REQUEST_MAX_BYTES,
     canonical_payload,
     expected_trial_id,
     measurement_plan_digest,
@@ -146,16 +147,28 @@ def render_request(
     JSON field separation does not establish prompt injection immunity.
     """
     measurement_plan_digest(plan)
+    return _render_request(plan, input_text=input_text, answer=answer)
+
+
+def _render_request(
+    plan: JudgeMeasurementPlan, *, input_text: str, answer: str
+) -> dict[str, Any]:
+    """Render after the caller has validated the plan once."""
     _require(
-        isinstance(input_text, str) and len(input_text) <= 1048576,
+        isinstance(input_text, str)
+        and len(input_text.encode("utf-8")) <= JUDGE_REQUEST_MAX_BYTES,
         "input must be bounded text",
     )
     _require(
-        isinstance(answer, str) and len(answer) <= 1048576,
+        isinstance(answer, str)
+        and len(answer.encode("utf-8")) <= JUDGE_REQUEST_MAX_BYTES,
         "answer must be bounded text",
     )
     content = render_judge_request(plan, input_text=input_text, answer_text=answer)
-    _require(len(content) <= 1048576, "rendered request exceeds byte allowance")
+    _require(
+        len(content) <= JUDGE_REQUEST_MAX_BYTES,
+        "rendered request exceeds byte allowance",
+    )
     return cast(
         dict[str, Any], parse_json_bytes(content, label="normalized judge request")
     )
@@ -176,6 +189,7 @@ def bind_requests(
         == {binding["case_id"] for binding in result["answer_bindings"]},
         "frozen input membership differs from plan",
     )
+    measurement_plan_digest(result)
     for binding in cast(dict[str, Any], result)["answer_bindings"]:
         for side in ("baseline", "subject"):
             binding[f"{side}_request_sha256"] = "0" * 64
@@ -191,7 +205,7 @@ def bind_requests(
                 and _sha(row[side].encode()) == binding[f"{side}_answer_sha256"],
                 "frozen answer digest mismatch",
             )
-            request = render_request(result, input_text=row["input"], answer=row[side])
+            request = _render_request(result, input_text=row["input"], answer=row[side])
             binding[f"{side}_request_sha256"] = _sha(canonical_payload(request))
     measurement_plan_digest(result)
     return result
@@ -454,7 +468,7 @@ def import_export(
             "sample binding mismatch",
         )
         _text(metadata["scorer_id"], 128, "scorer identity")
-        expected_request = render_request(
+        expected_request = _render_request(
             plan,
             input_text=frozen_inputs[case_id]["input"],
             answer=frozen_inputs[case_id][side],
@@ -574,6 +588,25 @@ def import_export(
                     "rating": None,
                     "value": None,
                 }
+            usage = output["usage"]
+            if usage is not None:
+                usage = _object(usage, {"input_tokens", "output_tokens"}, "token usage")
+                _int(
+                    usage["input_tokens"],
+                    0,
+                    options.input_tokens_per_call,
+                    "input token usage",
+                )
+                _int(
+                    usage["output_tokens"],
+                    0,
+                    plan["judge"]["config"]["max_output_tokens"],
+                    "output token usage",
+                )
+            _require(
+                status != "completed" or usage is not None,
+                "completed call requires token usage",
+            )
             if index + 1 < len(events):
                 _require(
                     status == "transport_error"
@@ -591,7 +624,7 @@ def import_export(
                     "request_id": output["request_id"],
                     "finish_reason": output["finish_reason"],
                     "error": error,
-                    "usage": output["usage"],
+                    "usage": usage,
                     "cache": "none",
                     "source": {
                         "source_id": "inspect-export",

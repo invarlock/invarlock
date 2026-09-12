@@ -8,6 +8,8 @@ from typing import Any, cast
 
 import pytest
 
+from invarlock.evaluation_records.cases import case_set_digest
+from invarlock.evaluation_records.io import run_digest
 from invarlock.judge_measurement_types import (
     JudgeMeasurementPlan,
     JudgeMeasurements,
@@ -164,6 +166,10 @@ def test_golden_plan_and_measurements_replay() -> None:
             "repetitions must be an integer",
         ),
         (
+            lambda plan: plan["judge"]["config"].update(max_output_tokens=128.0),
+            "max_output_tokens must be an integer",
+        ),
+        (
             lambda plan: plan["schedule"].update(max_attempts=2, retry_on=[]),
             "multiple attempts",
         ),
@@ -203,6 +209,24 @@ def test_plan_loader_rejects_ambiguous_and_oversized_json(
     monkeypatch.setattr(contracts, "PLAN_MAX_BYTES", 10)
     with pytest.raises(JudgeMeasurementContractError, match="size limit"):
         contracts.load_measurement_plan(FIXTURES / "plan.json")
+
+
+def test_plan_rejects_prompt_expansion_before_large_request_construction() -> None:
+    plan = _plan()
+    reference = "r" * 100_000
+    plan["prompt"]["references"] = [
+        {
+            "id": "large-reference",
+            "text": reference,
+            "sha256": hashlib.sha256(reference.encode()).hexdigest(),
+        }
+    ]
+    plan["prompt"]["demonstrations"] = [
+        {"input": f"example-{index}", "answer": "answer", "rating": "correct"}
+        for index in range(20)
+    ]
+
+    _assert_plan_error(plan, "normalized judge request exceeds")
 
 
 def test_trial_ids_are_stable_and_bound_to_every_slot_dimension() -> None:
@@ -327,6 +351,74 @@ def test_one_model_event_cannot_satisfy_multiple_trials() -> None:
     first_event = measurements["trials"][0]["attempts"][0]["source"]["model_event_id"]
     measurements["trials"][1]["attempts"][0]["source"]["model_event_id"] = first_event
     _assert_measurement_error(measurements, "exactly one attempt", retain=True)
+
+
+def test_all_measurement_integer_fields_reject_integral_floats() -> None:
+    measurements = _measurements()
+    cast(dict[str, Any], measurements["sources"][0])["byte_size"] = float(
+        measurements["sources"][0]["byte_size"]
+    )
+    _assert_measurement_error(
+        measurements, "source byte_size must be an integer", retain=False
+    )
+
+    measurements = _measurements()
+    usage = measurements["trials"][0]["attempts"][0]["usage"]
+    assert usage is not None
+    cast(dict[str, Any], usage)["input_tokens"] = 35.0
+    _retain_trials(measurements)
+    _assert_measurement_error(
+        measurements, "usage input_tokens must be an integer", retain=False
+    )
+
+
+def test_frozen_run_membership_must_exactly_match_plan_cases() -> None:
+    plan = _plan()
+    binding = copy.deepcopy(plan["answer_bindings"][0])
+    binding["case_id"] = "case-2"
+    plan["answer_bindings"].append(binding)
+    plan["sampling"]["case_units"].append({"case_id": "case-2", "unit_id": "unit-2"})
+    plan["schedule"]["expected_trials"] = 4
+    measurements = _measurements()
+    _bind_plan(measurements, plan)
+
+    with pytest.raises(JudgeMeasurementContractError, match="membership"):
+        contracts.validate_measurements(
+            measurements,
+            plan,
+            baseline_run=_run("baseline"),
+            subject_run=_run("subject"),
+        )
+
+
+def test_extra_frozen_run_case_cannot_be_hidden_by_plan_subset() -> None:
+    plan = _plan()
+    runs = {side: _run(side) for side in ("baseline", "subject")}
+    for run in runs.values():
+        extra = copy.deepcopy(run["records"][0])
+        extra["id"] = "case-extra"
+        run["records"].append(extra)
+    plan["baseline_run_sha256"] = run_digest(runs["baseline"])
+    plan["subject_run_sha256"] = run_digest(runs["subject"])
+    plan["case_set_sha256"] = case_set_digest(
+        {
+            "format": "invarlock/evaluation-case-set-v1",
+            "cases": [
+                {key: row[key] for key in ("id", "input", "expected", "metadata")}
+                for row in runs["baseline"]["records"]
+            ],
+        }
+    )
+    measurements = _measurements()
+    _bind_plan(measurements, plan)
+
+    with pytest.raises(JudgeMeasurementContractError, match="membership"):
+        contracts.validate_measurements(
+            measurements,
+            plan,
+            baseline_run=runs["baseline"],
+            subject_run=runs["subject"],
+        )
 
 
 def test_rehashed_unapproved_rendered_request_is_rejected() -> None:

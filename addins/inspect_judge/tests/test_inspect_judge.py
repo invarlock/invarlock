@@ -227,6 +227,30 @@ def test_planning_reserves_bounded_batch_and_budget(data):
     assert prepared["next_batch"] == []
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("input_tokens", 101, "input token usage"),
+        ("output_tokens", 129, "output token usage"),
+        ("input_tokens", 30.0, "input token usage"),
+    ],
+)
+def test_import_rejects_usage_outside_per_call_reservations(
+    data, field, value, message
+):
+    exported = copy.deepcopy(data[1])
+    exported["samples"][0]["events"][0]["output"]["usage"][field] = value
+    with pytest.raises(InspectJudgeError, match=message):
+        ingest(data, exported)
+
+
+def test_completed_call_requires_usage_for_budget_accounting(data):
+    exported = copy.deepcopy(data[1])
+    exported["samples"][0]["events"][0]["output"]["usage"] = None
+    with pytest.raises(InspectJudgeError, match="requires token usage"):
+        ingest(data, exported)
+
+
 def test_sdk_configuration_is_optional_and_uses_no_model_factory(data, monkeypatch):
     captured = {}
 
