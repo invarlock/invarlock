@@ -148,11 +148,9 @@ def test_input_loader_rejects_nonobject_and_enforces_size(tmp_path, collector):
     assert collector._input(path, maximum=100) == {"value": 100}
 
 
-@pytest.mark.parametrize(
-    "close_client,fail", [(True, False), (False, False), (True, True)]
-)
-def test_collector_wires_frozen_inputs_and_closes_client(
-    tmp_path, collector, monkeypatch, close_client, fail
+@pytest.mark.parametrize("fail", [False, True])
+def test_collector_delegates_frozen_inputs_to_installed_api_without_loading_sdk(
+    tmp_path, collector, monkeypatch, fail
 ):
     import argparse
     import asyncio
@@ -163,32 +161,22 @@ def test_collector_wires_frozen_inputs_and_closes_client(
         (tmp_path / f"{name}.json").write_text(json.dumps({"identity": name}))
     observed = {}
 
-    async def close():
-        observed["closed"] = True
-
-    client = SimpleNamespace(close=close) if close_client else object()
-    model = SimpleNamespace(api=SimpleNamespace(client=client))
-
-    def get_model(grader, **options):
-        observed["model_options"] = (grader, options)
-        return model
-
-    model_module = ModuleType("inspect_ai.model")
-    model_module.get_model = get_model
-    monkeypatch.setitem(sys.modules, "inspect_ai.model", model_module)
+    # Model construction and lifetime belong to the installed API. The example
+    # must remain usable with a delegated implementation and no SDK import.
+    monkeypatch.setitem(sys.modules, "inspect_ai.model", None)
     module = ModuleType("invarlock_addins.inspect_judge")
     module.CollectionOptions = SimpleNamespace(
         from_mapping=lambda value: SimpleNamespace(grader="openai/pinned", config=value)
     )
     module.RunnerOptions = lambda **kwargs: kwargs
 
-    async def collect(**kwargs):
+    async def collect_configured(**kwargs):
         observed["call"] = kwargs
         if fail:
             raise ValueError("retained failure")
         return {"completed": 1}
 
-    module.collect = collect
+    module.collect_configured = collect_configured
     monkeypatch.setitem(sys.modules, "invarlock_addins.inspect_judge", module)
     monkeypatch.setenv("OPENAI_API_KEY", "fixture-only")
     args = argparse.Namespace(
@@ -206,15 +194,14 @@ def test_collector_wires_frozen_inputs_and_closes_client(
             asyncio.run(collector._collect(args))
     else:
         assert asyncio.run(collector._collect(args)) == {"completed": 1}
-    assert observed["model_options"] == (
-        "openai/pinned",
-        {
-            "api_key": "fixture-only",
-            "responses_api": False,
-            "max_retries": 0,
-            "memoize": False,
-        },
-    )
+    assert set(observed["call"]) == {
+        "plan",
+        "options",
+        "runner",
+        "baseline_run",
+        "subject_run",
+    }
+    assert observed["call"]["options"].config == {"identity": "collection"}
     assert observed["call"]["plan"] == {"identity": "plan"}
     assert observed["call"]["baseline_run"] == {"identity": "baseline"}
     assert observed["call"]["subject_run"] == {"identity": "subject"}
@@ -223,7 +210,6 @@ def test_collector_wires_frozen_inputs_and_closes_client(
         "scorer_id": "fixed-scorer",
         "invocation_timeout_seconds": 7,
     }
-    assert observed.get("closed", False) == close_client
 
 
 @pytest.mark.parametrize(

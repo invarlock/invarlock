@@ -622,6 +622,7 @@ async def _collect_pinned(
     subject_run: dict[str, Any],
     directory_fd: int,
     directory_bindings: tuple[tuple[Path, tuple[int, int, int]], ...],
+    on_stop: Callable[[str], None] | None = None,
 ) -> JudgeMeasurements:
     """Collect or resume fixed-answer judgments with durable attempt shards.
 
@@ -671,6 +672,12 @@ async def _collect_pinned(
             check_directory()
             return exported, checkpoint
 
+        def stopped(reason: str) -> JudgeMeasurements:
+            result = replay()[1]
+            if on_stop is not None:
+                on_stop(reason)
+            return result
+
         exported, checkpoint = replay()
         state = _LiveCheckpoint(
             plan=plan,
@@ -695,7 +702,13 @@ async def _collect_pinned(
             admitted = min(len(pending), options.concurrency, state.capacity())
             remaining = runner.invocation_timeout_seconds - (time.monotonic() - started)
             if not admitted or remaining <= 0:
-                return replay()[1]
+                return stopped(
+                    "complete"
+                    if not pending
+                    else "capacity_exhausted"
+                    if not admitted
+                    else "deadline"
+                )
 
             scheduled: list[tuple[dict[str, Any], dict[str, Any]]] = []
             for _ in range(admitted):
@@ -800,7 +813,7 @@ async def _collect_pinned(
                         persist(item, event)
             except TimeoutError:
                 await drain()
-                return replay()[1]
+                return stopped("deadline")
             except BaseException:
                 await drain()
                 raise
@@ -816,6 +829,7 @@ async def collect(
     model: Any,
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
+    on_stop: Callable[[str], None] | None = None,
 ) -> JudgeMeasurements:
     """Collect through a checkpoint whose directory ancestry remains pinned."""
     _check_options(plan, options)
@@ -848,4 +862,5 @@ async def collect(
             subject_run=subject_run,
             directory_fd=descriptor,
             directory_bindings=bindings,
+            on_stop=on_stop,
         )

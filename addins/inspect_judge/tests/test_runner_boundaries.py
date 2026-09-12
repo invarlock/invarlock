@@ -230,6 +230,68 @@ class NoCallModel:
 
 
 @pytest.mark.parametrize(
+    ("stop", "expected"),
+    [
+        ("complete", "complete"),
+        ("capacity", "capacity_exhausted"),
+        ("before_deadline", "deadline"),
+        ("during_deadline", "deadline"),
+    ],
+)
+def test_live_stop_reason_reports_actual_admission_boundary(
+    inputs, runner_options, monkeypatch, stop, expected
+):
+    monkeypatch.setattr(live.importlib.metadata, "version", lambda _: "0.3.263")
+    monkeypatch.setattr(live, "prepare_inspect_config", lambda *_: None)
+    calls = []
+
+    async def call_one(*_args, request, **_kwargs):
+        calls.append(request)
+        if stop == "during_deadline":
+            await asyncio.Future()
+        event = copy.deepcopy(inputs["export"]["samples"][0]["events"][0])
+        event["uuid"] = f"event-{len(calls)}"
+        event["input"] = request["messages"]
+        event["call"]["request"]["messages"] = request["messages"]
+        return event
+
+    monkeypatch.setattr(live, "_call_one", call_one)
+    if stop == "capacity":
+        from invarlock_addins.inspect_judge import collector as planning
+
+        # Actual live storage accounting can be stricter than the public batch
+        # planner. The runner must report its own terminal admission boundary.
+        monkeypatch.setattr(planning, "MAX_SOURCES", 2)
+        assert not planning.prepare_collection(inputs["plan"], inputs["options"])[
+            "budget_exhausted"
+        ]
+    elif stop == "before_deadline":
+        times = iter((0, 2))
+        monkeypatch.setattr(
+            live, "time", SimpleNamespace(monotonic=lambda: next(times))
+        )
+    stops = []
+    result = asyncio.run(
+        collect(
+            plan=inputs["plan"],
+            options=inputs["options"],
+            runner=replace(runner_options, invocation_timeout_seconds=1),
+            model=NoCallModel(),
+            baseline_run=inputs["baseline_run"],
+            subject_run=inputs["subject_run"],
+            on_stop=stops.append,
+        )
+    )
+    assert stops == [expected]
+    assert result["completeness"]["completed_trials"] == (
+        2 if stop == "complete" else 0
+    )
+    if stop in {"capacity", "before_deadline"}:
+        assert calls == []
+        assert all(not trial["attempts"] for trial in result["trials"])
+
+
+@pytest.mark.parametrize(
     ("path", "value", "message"),
     [
         (("config",), None, "configuration is unavailable"),

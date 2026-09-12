@@ -22,11 +22,10 @@ def _input(path: Path, *, maximum: int) -> dict[str, Any]:
 
 
 async def _collect(args: argparse.Namespace) -> dict[str, Any]:
-    from inspect_ai.model import get_model
     from invarlock_addins.inspect_judge import (
         CollectionOptions,
         RunnerOptions,
-        collect,
+        collect_configured,
     )
 
     root = args.root.absolute()
@@ -41,27 +40,13 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         scorer_id=args.scorer_id,
         invocation_timeout_seconds=args.invocation_timeout_seconds,
     )
-    model = get_model(
-        options.grader,
-        api_key=os.environ["OPENAI_API_KEY"],
-        responses_api=False,
-        max_retries=0,
-        memoize=False,
+    return await collect_configured(
+        plan=plan,
+        options=options,
+        runner=runner,
+        baseline_run=baseline,
+        subject_run=subject,
     )
-    client = getattr(getattr(model, "api", None), "client", None)
-    try:
-        return await collect(
-            plan=plan,
-            options=options,
-            runner=runner,
-            model=model,
-            baseline_run=baseline,
-            subject_run=subject,
-        )
-    finally:
-        close = getattr(client, "close", None)
-        if close is not None:
-            await close()
 
 
 def main() -> None:
