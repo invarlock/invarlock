@@ -219,3 +219,50 @@ ambient floating-point settings; report plot geometry does not drive decisions.
 A curated fixed benchmark supports a conclusion only for its declared benchmark
 and independence assumptions. It does not establish traffic representativeness,
 provider-hidden reasoning, general model quality or population-wide safety.
+
+## Operational bounds and measured reference workload
+
+The judge contracts use separate limits because a case, trial, attempt, request
+and retained source are different objects. Repetitions multiply trials without
+increasing the number of independent cases.
+
+| Object | Contract ceiling |
+| --- | ---: |
+| Cases / independent-unit mappings | 10,000 |
+| Repetitions per side | 10 |
+| Scheduled trials | 200,000 |
+| Attempts per imported trial | 3 |
+| Live collector attempts per trial | 1 |
+| Normalized request or retained response | 1 MiB |
+| One retained expanded model event | 2 MiB |
+| One retained source shard / source shards | 16 MiB / 1,000 |
+| Canonical plan / measurements | 64 MiB / 384 MiB |
+| Combined judge workflow inputs | 384 MiB |
+
+These are safety ceilings, not recommended workload sizes or evidence-quality
+targets. The 384 MiB aggregate limit normally binds before every field can reach
+its individual maximum. Collection also reserves possible retained growth before
+each active call, so large records can reduce effective concurrency or stop a
+campaign before its call cap.
+
+The K2 extraction final plan is the largest single planned reference pack: 1,288
+cases, three repetitions per side and 7,728 calls. Its rendered grading requests
+have a 3,628-byte median, 4,385-byte 95th percentile and 4,661-byte maximum. The
+separate grounded-QA pack adds 2,532 calls, for 10,260 hosted calls across two
+independently verified workflows. The maintained capacity test exercises 7,728
+completed short trials through construction, source sharding and offline replay.
+
+As an engineering reference, the 7,728-trial construction, sharding and offline
+replay test completed in 8.6 seconds with a 468 MiB process RSS high-water mark
+under CPython 3.12.13 on Darwin arm64. This one-machine observation is not a
+latency or memory service level. It includes fixture construction in the same
+process and excludes provider calls, network limits, checkpoint synchronization,
+signing and report generation. Run the maintained capacity test on the intended
+recipient host before selecting an operational allowance.
+
+No hosted-judge response-size or end-to-end throughput result is published yet.
+The K2 plan caps judge output at 256 tokens, while the retained response contract
+allows up to 1 MiB. The real pilot must measure response token/byte percentiles,
+provider throughput, errors and checkpoint overhead before estimating the final
+collection duration. Until then, preflight call/token/cost ceilings are admission
+bounds rather than a runtime forecast.
