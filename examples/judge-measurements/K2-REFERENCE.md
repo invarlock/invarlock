@@ -106,3 +106,61 @@ and 10,260 final calls across both workflows. The helper performs none of them.
 Retained source notices distinguish the SQuAD software's MIT license from dataset
 and Wikipedia-derived material. Preserve the source terms and attribution;
 source-derived data does not inherit the software repository's Apache license.
+
+## Complete a human review and activate a final plan
+
+The maintained helper `examples/judge_measurements_review.py` accepts one
+reviewer's completed sheet. Give that reviewer only the blinded sheet and have
+them fill both response rating fields for every case. Keep the order, prompts,
+answers, rubric, scale and IDs unchanged. Optional notes are limited to 4,096
+UTF-8 bytes per case. Use a pseudonymous reviewer identifier in retained records.
+
+Before collecting judgments, freeze the descriptive comparison protocol:
+`single-reviewer-exact-label-v1` compares each scheduled judge repetition to the
+one human rating for that answer. It reports exact matches, confusion counts and
+missing-trial coverage. Missing trials are excluded from the agreement denominator
+and remain visible in coverage. Repeated calls do not increase the human sample
+size. This protocol sets no agreement pass threshold and estimates neither
+inter-rater reliability nor population accuracy. The operator must explicitly
+confirm the rubric or require a revision; a numerical agreement score cannot
+make that decision automatically.
+
+After the completed pilot labels are frozen, run:
+
+```bash
+python examples/judge_measurements_review.py \
+  --bundle reference.zip \
+  --expected-sha256 independently-recorded-reference-manifest-sha256 \
+  --completed completed-grounded-qa-pilot.json \
+  --reviewer reviewer-1 \
+  --outcome rubric_confirmed \
+  --measurements grounded-qa-pilot-measurements.json \
+  --activate \
+  --output grounded-qa-pilot-review
+```
+
+Repeat for extraction using its own completed sheet and pilot measurements.
+The helper requires an independently obtained reference-manifest pin, snapshots
+and validates the frozen reference, and rejects any change to the immutable sheet
+fields. It writes the validated completed sheet to a new output directory before
+revealing case IDs and baseline/subject orientation in `reconciled-labels.json`.
+It replays supplied measurements against the exact frozen plan and answer runs;
+measurements from a different plan or answer set cannot be used.
+
+`--activate` requires every pilot response to have an allowed human rating, the
+explicit `rubric_confirmed` outcome and complete retained pilot measurements. It
+copies the exact candidate `plan.json` and `analysis_policy.json` into the review
+output, preserving frozen final membership. Retain `review-record.json` and all
+its hashed inputs alongside those activated files. A successful record is written
+last; a partial directory without that record is not a completed activation.
+This does not authorize provider calls or establish that the reviewer was
+independent or remained blinded; those are operator attestations.
+
+For a rubric needing revision, use `--outcome revision_required` without
+`--activate`. Keep that record, rebind the reference with the revised rubric,
+and repeat pilot collection and review while preserving final membership. For
+untouched final-validation sheets, use the same helper without `--activate` and
+optionally supply the final measurements for descriptive agreement. Omitting
+`--measurements` records the completed review without a judge comparison; it
+cannot activate a plan. Never use final-validation judgments to revise the
+rubric while still describing that final subset as untouched validation.
