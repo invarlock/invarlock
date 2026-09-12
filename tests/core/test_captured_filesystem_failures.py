@@ -672,6 +672,37 @@ def test_publication_rejects_valid_staging_substitute_after_writing(
     } == expected_files
 
 
+def test_publication_rejects_child_directory_substitution_before_publish(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    retained_inputs = tmp_path / "retained-inputs"
+    original_stat = os.stat
+    replacement = None
+
+    def replace_input_directory(name, *args, **kwargs):
+        nonlocal replacement
+        if name == "inputs" and replacement is None:
+            staging = next(tmp_path.glob(".captured-evidence-*"))
+            (staging / "inputs").rename(retained_inputs)
+            (staging / "inputs").mkdir()
+            replacement = staging / "inputs" / "keep"
+            replacement.write_bytes(b"foreign replacement")
+        return original_stat(name, *args, **kwargs)
+
+    monkeypatch.setattr(publication.os, "stat", replace_input_directory)
+    with pytest.raises(
+        publication.CapturedEvidenceError,
+        match="captured staging directory identity changed",
+    ):
+        publication.publish_captured_evidence(destination, **publication_args)
+
+    assert not destination.exists()
+    assert replacement is not None
+    assert replacement.read_bytes() == b"foreign replacement"
+    assert list(retained_inputs.iterdir()) == []
+
+
 def test_publication_leaves_recreated_staging_name_after_success(
     tmp_path, monkeypatch, publication_args
 ):
