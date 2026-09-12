@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
@@ -66,32 +65,26 @@ def _setup_result(
 def _write_setup_file(path: Path, payload: bytes) -> None:
     from invarlock.captured_contracts import atomic_write
 
-    atomic_write(path, payload)
+    try:
+        atomic_write(path, payload)
+    except FileExistsError as exc:
+        raise ValueError(f"setup file already exists: {path.name}") from exc
 
 
 def _publish_setup_directory(directory: Path, artifacts: dict[str, bytes]) -> None:
-    import secrets
-    import shutil
-
-    from invarlock.captured_contracts import secure_directory
     from invarlock.filesystem import publish_directory_no_replace
+    from invarlock.filesystem.staged_directory import staged_directory
 
     directory = directory.absolute()
-    with secure_directory(directory.parent, create=True) as parent:
-        if directory.exists() or directory.is_symlink():
-            raise ValueError("setup directory must not already exist")
-        name = ".evaluation-setup-" + secrets.token_hex(16)
-        os.mkdir(name, mode=0o700, dir_fd=parent)
-        staging = directory.parent / name
-        try:
-            for relative, raw in artifacts.items():
-                _write_setup_file(staging / relative, raw)
-            publish_directory_no_replace(staging, directory)
-        finally:
-            try:
-                shutil.rmtree(name, dir_fd=parent)
-            except FileNotFoundError:
-                pass
+    if directory.exists() or directory.is_symlink():
+        raise ValueError("setup directory must not already exist")
+    with staged_directory(
+        directory, prefix=".evaluation-setup-", create_parents=True
+    ) as stage:
+        for relative, raw in artifacts.items():
+            _write_setup_file(stage.path / relative, raw)
+        stage.require_exact_files(artifacts)
+        stage.publish(publish_directory_no_replace)
 
 
 def _run_setup_action(
