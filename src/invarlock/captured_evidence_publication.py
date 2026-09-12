@@ -117,11 +117,10 @@ def _cleanup_staging(
     for filename in files:
         path = Path(filename)
         descriptor = (
-            stage if path.parent == Path(".") else directories.get(str(path.parent))
+            stage if path.parent == Path(".") else directories[str(path.parent)]
         )
-        if descriptor is not None:
-            with suppress(OSError):
-                os.unlink(path.name, dir_fd=descriptor)
+        with suppress(OSError):
+            os.unlink(path.name, dir_fd=descriptor)
     for directory, descriptor in directories.items():
         with suppress(OSError):
             _remove_empty_bound_directory(stage, directory, descriptor)
