@@ -593,4 +593,7 @@ workflow and its assurance limits.
 
 For bounded frozen-answer ratings, see [judge measurements](judge-measurements.md).
 Judge reports keep offline replay, signer authentication and recipient acceptance
-distinct and use additive judge-specific JSON formats.
+distinct and use additive judge-specific JSON formats. They show the first 50
+case IDs by default; repeat `report --case-id ID` to inspect any retained cases
+without loading every answer and judge response into one report. Case selection
+does not change the complete replay or the recorded policy decision.

@@ -199,3 +199,39 @@ def test_incomplete_report_does_not_infer_a_baseline_from_complete_cases(tmp_pat
     result = render_judge_evidence(publication.path)
     assert "| Unavailable | Unavailable | Unavailable |" in result.text
     assert result.facts["descriptive_means"]["baseline"] is None
+
+
+def test_report_can_select_any_retained_case_without_expanding_default_details(
+    tmp_path,
+):
+    publication, _ = _publish(tmp_path)
+    html = tmp_path / "selected.html"
+    result = render_judge_evidence(
+        publication.path, html_path=html, case_ids=("case-15",)
+    )
+    assert result.facts["detail_limits"] == {
+        "shown_cases": 1,
+        "total_cases": 16,
+        "text_excerpt_characters": 2000,
+        "selection": "requested",
+        "case_ids": ["case-15"],
+    }
+    rendered = html.read_text()
+    assert "<summary>case-15</summary>" in rendered
+    assert "<summary>case-0</summary>" not in rendered
+
+
+@pytest.mark.parametrize(
+    "case_ids,message",
+    [
+        (("case-0", "case-0"), "must be unique"),
+        (("not-retained",), "not in the judge plan"),
+        (tuple(f"case-{index}" for index in range(51)), "at most 50"),
+    ],
+)
+def test_report_rejects_ambiguous_or_unbounded_case_selection(
+    tmp_path, case_ids, message
+):
+    publication, _ = _publish(tmp_path)
+    with pytest.raises(ValueError, match=message):
+        render_judge_evidence(publication.path, case_ids=case_ids)

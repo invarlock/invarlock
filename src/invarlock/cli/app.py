@@ -1235,6 +1235,15 @@ def report(
         help="Include a concise explanation of the decision and evidence bindings.",
         rich_help_panel="Output and workflow",
     ),
+    case_id: list[str] | None = typer.Option(
+        None,
+        "--case-id",
+        help=(
+            "Include one retained judge case in report details; repeat to select up "
+            "to 50 cases. Applies to judge evidence and evidence sets."
+        ),
+        rich_help_panel="Output and workflow",
+    ),
     json_out: bool = typer.Option(
         False,
         "--json",
@@ -1257,7 +1266,11 @@ def report(
             if value is not None
         }
         result = render_evidence(
-            evidence, html_path=html, explain=explain, **destinations
+            evidence,
+            html_path=html,
+            explain=explain,
+            case_ids=tuple(case_id or ()),
+            **destinations,
         )
     except EvidenceReportError as exc:
         if json_out:

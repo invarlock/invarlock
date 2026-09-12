@@ -113,8 +113,30 @@ def _baseline_mean(plan: dict[str, Any], measurements: dict[str, Any]) -> str:
         )
 
 
+def _selected_case_ids(
+    requested: tuple[str, ...], available: tuple[str, ...]
+) -> tuple[str, ...]:
+    if len(requested) > CASE_DETAIL_LIMIT:
+        raise EvidenceReportError(
+            f"at most {CASE_DETAIL_LIMIT} --case-id values may be requested"
+        )
+    if len(set(requested)) != len(requested):
+        raise EvidenceReportError("--case-id values must be unique")
+    missing = sorted(set(requested) - set(available))
+    if missing:
+        preview = ", ".join(repr(value) for value in missing[:5])
+        suffix = "" if len(missing) <= 5 else f" and {len(missing) - 5} more"
+        raise EvidenceReportError(
+            f"requested case IDs are not in the judge plan: {preview}{suffix}"
+        )
+    return requested or available[:CASE_DETAIL_LIMIT]
+
+
 def _view(
-    publication: Any, artifacts: dict[str, dict[str, Any]]
+    publication: Any,
+    artifacts: dict[str, dict[str, Any]],
+    *,
+    case_ids: tuple[str, ...] = (),
 ) -> tuple[ReportView, dict[str, Any]]:
     plan = artifacts["plan"]
     policy = artifacts["analysis_policy"]
@@ -192,32 +214,38 @@ def _view(
     )
     baseline_rows = {row["id"]: row for row in artifacts["baseline_run"]["records"]}
     subject_rows = {row["id"]: row for row in artifacts["subject_run"]["records"]}
+    available_case_ids = tuple(
+        sorted(item["case_id"] for item in plan["sampling"]["case_units"])
+    )
+    selected_case_ids = _selected_case_ids(case_ids, available_case_ids)
+    trials_by_case: dict[str, list[dict[str, Any]]] = {
+        case_id: [] for case_id in selected_case_ids
+    }
+    for trial in artifacts["measurements"]["trials"]:
+        if trial["case_id"] in trials_by_case:
+            trials_by_case[trial["case_id"]].append(
+                {
+                    "side": trial["side"],
+                    "repetition": trial["repetition"],
+                    "status": trial["status"],
+                    "parse": trial["parse"],
+                    "attempts": [
+                        {
+                            "status": attempt["status"],
+                            "resolved_model": attempt["resolved_model"],
+                            "response_excerpt": attempt["response"]["text"][
+                                :TEXT_DETAIL_LIMIT
+                            ]
+                            if attempt["response"] is not None
+                            else None,
+                            "error": attempt["error"],
+                        }
+                        for attempt in trial["attempts"]
+                    ],
+                }
+            )
     details = []
-    for case_id in sorted(baseline_rows)[:CASE_DETAIL_LIMIT]:
-        trials = []
-        for trial in artifacts["measurements"]["trials"]:
-            if trial["case_id"] == case_id:
-                trials.append(
-                    {
-                        "side": trial["side"],
-                        "repetition": trial["repetition"],
-                        "status": trial["status"],
-                        "parse": trial["parse"],
-                        "attempts": [
-                            {
-                                "status": attempt["status"],
-                                "resolved_model": attempt["resolved_model"],
-                                "response_excerpt": attempt["response"]["text"][
-                                    :TEXT_DETAIL_LIMIT
-                                ]
-                                if attempt["response"] is not None
-                                else None,
-                                "error": attempt["error"],
-                            }
-                            for attempt in trial["attempts"]
-                        ],
-                    }
-                )
+    for case_id in selected_case_ids:
         details.append(
             (
                 case_id,
@@ -231,7 +259,7 @@ def _view(
                     "subject_answer_excerpt": str(subject_rows[case_id]["output"])[
                         :TEXT_DETAIL_LIMIT
                     ],
-                    "trials": trials,
+                    "trials": trials_by_case[case_id],
                 },
             )
         )
@@ -299,8 +327,10 @@ def _view(
         },
         "detail_limits": {
             "shown_cases": len(details),
-            "total_cases": len(baseline_rows),
+            "total_cases": len(available_case_ids),
             "text_excerpt_characters": TEXT_DETAIL_LIMIT,
+            "selection": "requested" if case_ids else "first_by_case_id",
+            "case_ids": list(selected_case_ids),
         },
     }
     view = ReportView(
@@ -372,7 +402,11 @@ def _view(
         ),
         limitations=(
             analysis["estimand"],
-            f"Details show at most {CASE_DETAIL_LIMIT} cases and {TEXT_DETAIL_LIMIT} characters per text excerpt; complete data remains in evidence.",
+            (
+                f"Details show the {len(selected_case_ids)} requested cases and at most {TEXT_DETAIL_LIMIT} characters per text excerpt; complete data remains in evidence."
+                if case_ids
+                else f"Details show the first {min(CASE_DETAIL_LIMIT, len(available_case_ids))} cases by case ID and at most {TEXT_DETAIL_LIMIT} characters per text excerpt; use report --case-id to select any retained case."
+            ),
             "A retained judgment does not establish model execution or immunity to prompt injection.",
         ),
         details=tuple(details),
@@ -394,6 +428,7 @@ def render_judge_evidence(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     explain: bool = False,
+    case_ids: tuple[str, ...] = (),
 ) -> JudgeEvidenceReport:
     from invarlock.judge_measurements.evidence import object_sha256
 
@@ -433,7 +468,7 @@ def render_judge_evidence(
                     )
             destinations.add(canonical)
         publication, artifacts = _snapshot(evidence)
-        view, facts = _view(publication, artifacts)
+        view, facts = _view(publication, artifacts, case_ids=case_ids)
         text = render_markdown(view, include_details=explain)
         rendered = {"html": render_html(view).encode(), "markdown": text.encode()}
         required = facts["assurance"]["decision_role"] == "required"

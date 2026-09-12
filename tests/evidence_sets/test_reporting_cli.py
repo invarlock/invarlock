@@ -64,6 +64,32 @@ def test_verify_and_report_cli_dispatch(tmp_path):
     assert json.loads(report.output)["kind"] == "evidence_set"
 
 
+def test_combined_report_selects_requested_judge_case(tmp_path):
+    root, _ = fixture(tmp_path)
+    output = tmp_path / "selected.html"
+    result = CliRunner().invoke(
+        app,
+        [
+            "report",
+            str(root),
+            "--html",
+            str(output),
+            "--case-id",
+            "case-15",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    rendered = output.read_text()
+    assert "<summary>Judge · case-15</summary>" in rendered
+    assert "<summary>Judge · case-0</summary>" not in rendered
+
+
+def test_case_selection_rejects_nonjudge_evidence_before_parsing(tmp_path):
+    with pytest.raises(EvidenceReportError, match="only for judge evidence"):
+        render_evidence(tmp_path, case_ids=("case-0",))
+
+
 def test_cli_missing_profile_and_legacy_override_are_rejected(tmp_path):
     root, policy = fixture(tmp_path)
     runner = CliRunner()

@@ -190,7 +190,10 @@ JSON, HTML and Markdown distinguish replay, signature presence and acceptance.
 They show baseline/subject, requested and observed judge models, rubric, scale,
 prompt summary, signer identity, artifact digests, coverage, interval and
 threshold. Detail views expose at most 50 cases with 2,000-character text
-excerpts; evidence retains the complete bounded records.
+excerpts; evidence retains the complete bounded records. Repeat
+`report --case-id ID` to inspect any retained cases in HTML or with `--explain`;
+selection changes presentation only and the complete measurement set is still
+replayed.
 JUnit records regression as failure and insufficient evidence as error. The
 current request carries one metric; it uses the shared metric presentation.
 

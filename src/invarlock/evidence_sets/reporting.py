@@ -56,7 +56,9 @@ class EvidenceSetReport(EvidenceReportV2):
         ).decode()
 
 
-def build_evidence_set_view(root: Path) -> tuple[ReportView, dict[str, Any], str]:
+def build_evidence_set_view(
+    root: Path, *, case_ids: tuple[str, ...] = ()
+) -> tuple[ReportView, dict[str, Any], str]:
     """Check shared retained inputs; rendering never authorizes recipients."""
     root = Path(root).absolute()
     with secure_directory(root):
@@ -93,7 +95,7 @@ def build_evidence_set_view(root: Path) -> tuple[ReportView, dict[str, Any], str
         if artifacts["analysis_policy"]["decision_role"] != "required":
             raise EvidenceSetError("evidence set requires a required judge policy")
         first = captured_view(manifest, payloads, signer)
-        second, judge_facts = judge_view(publication, artifacts)
+        second, judge_facts = judge_view(publication, artifacts, case_ids=case_ids)
         check_statements(root, index)
         if read_file(root / INDEX_FILE, CONTROL_LIMIT) != raw:
             raise EvidenceSetError("evidence set index changed during rendering")
@@ -200,6 +202,7 @@ def render_evidence_set(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     explain: bool = False,
+    case_ids: tuple[str, ...] = (),
 ) -> EvidenceSetReport:
     requested = {
         name: str(path)
@@ -231,7 +234,7 @@ def render_evidence_set(
                         "report destination parent must be a real directory"
                     )
             destinations.add(resolved)
-        view, facts, digest = build_evidence_set_view(evidence)
+        view, facts, digest = build_evidence_set_view(evidence, case_ids=case_ids)
         text = render_markdown(view, include_details=explain)
         suite = Element(
             "testsuite",

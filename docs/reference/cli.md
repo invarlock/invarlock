@@ -437,7 +437,7 @@ receipts](reports.md#verification-result) for the complete field matrix.
 ## `report`
 
 ```text
-invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--json]
+invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--case-id ID]... [--json]
 ```
 
 `report` verifies the bundle's closed inventory, checksums, reference digests,
@@ -451,6 +451,7 @@ authentication before rendering `reports/evaluation.report.json`.
 | `--markdown PATH` | No | Write Markdown outside the pack |
 | `--junit PATH` | No | Write recorded policy checks as JUnit XML outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
+| `--case-id ID` | No | Select one retained judge case for detailed inspection; repeat for up to 50 cases |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
 Every output option refuses to overwrite an existing file. By default, `report`
@@ -464,6 +465,12 @@ and native calls requesting Markdown or JUnit, emit
 All destinations are checked up front; a later write failure leaves earlier
 completed outputs accurately listed. There is no automatic receipt discovery.
 Unsigned captured reports remain explicitly local, without independent assurance.
+
+Judge evidence and evidence sets show the first 50 case IDs by default. Repeat
+`--case-id` to render any specific retained cases in HTML or in the expanded
+text/Markdown view produced by `--explain`. Selection changes presentation only;
+the report still replays the complete retained measurement set. Other evidence
+formats reject this option.
 
 Captured text, HTML and Markdown reports include the baseline and subject run
 IDs, complete-run digests, attributed artifact digests and evaluator source
