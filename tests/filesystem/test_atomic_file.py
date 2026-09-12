@@ -2,11 +2,53 @@
 
 import errno
 import os
+import sys
 
 import pytest
 
 from invarlock.filesystem import atomic_file as target
-from invarlock.filesystem.paths import PathChangedError
+from invarlock.filesystem.paths import PathChangedError, pinned_directory
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or os.geteuid() == 0,
+    reason="requires Linux directory traversal with non-root permissions",
+)
+@pytest.mark.parametrize("ancestor_mode", [0o100, 0o300])
+def test_publication_and_reading_through_non_listable_ancestor(tmp_path, ancestor_mode):
+    ancestor = tmp_path / "worker-output"
+    directory = ancestor / "sidecars"
+    directory.mkdir(parents=True)
+    destination = directory / "identity.json"
+    ancestor.chmod(ancestor_mode)
+    try:
+        with pytest.raises(PermissionError):
+            os.listdir(ancestor)
+        target.write_file_no_replace(destination, b"complete sidecar")
+        with pinned_directory(directory) as descriptor:
+            assert os.listdir(descriptor) == [destination.name]
+            os.fsync(descriptor)
+            file_fd = os.open(destination.name, os.O_RDONLY, dir_fd=descriptor)
+            with os.fdopen(file_fd, "rb") as handle:
+                assert handle.read() == b"complete sidecar"
+    finally:
+        ancestor.chmod(0o700)
+    assert list(directory.iterdir()) == [destination]
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or os.geteuid() == 0,
+    reason="requires Linux directory traversal with non-root permissions",
+)
+def test_final_directory_still_requires_read_permission(tmp_path):
+    directory = tmp_path / "sidecars"
+    directory.mkdir(mode=0o300)
+    try:
+        with pytest.raises(PermissionError):
+            target.write_file_no_replace(directory / "identity.json", b"sidecar")
+    finally:
+        directory.chmod(0o700)
+    assert not list(directory.iterdir())
 
 
 @pytest.mark.parametrize("replacement", ["source", "destination", "contents"])

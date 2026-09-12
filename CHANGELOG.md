@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   destination entry, and preserves completed or competing files on failure.
   Captured evidence retains its original staging identity through publication;
   artifact attestation checks both the file and its ancestor directories.
+  Linux workers can publish sidecars beneath writable output mounts that allow
+  traversal without directory listing.
 
 - Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
   an unchanged signed pack, independent recipient replay and source attribution.

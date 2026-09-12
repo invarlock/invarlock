@@ -51,16 +51,22 @@ def pinned_directory(path: Path, *, create: bool = False) -> Iterator[int]:
 
     These checks detect changed bindings; they do not lock caller-owned paths
     against changes after the operation returns. Preserve a primary operation
-    failure instead of masking it with a subsequent binding check.
+    failure instead of masking it with a subsequent binding check. On Linux,
+    ancestors need only traversal permission; the final descriptor remains
+    readable for directory listing and synchronization.
     """
     path = Path(path).absolute()
     if ".." in path.parts:
         raise UnsafePathError("directory must not contain parent traversal")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    traversal_flags = flags | getattr(os, "O_PATH", 0)
+    names = path.parts[1:]
     bindings: list[tuple[int, str, tuple[int, int, int]]] = []
     with ExitStack() as descriptors:
-        current = descriptors.enter_context(_directory_descriptor(path.anchor, flags))
-        for name in path.parts[1:]:
+        current = descriptors.enter_context(
+            _directory_descriptor(path.anchor, traversal_flags if names else flags)
+        )
+        for index, name in enumerate(names):
             parent = current
             if create:
                 try:
@@ -72,7 +78,11 @@ def pinned_directory(path: Path, *, create: bool = False) -> Iterator[int]:
                 raise UnsafePathError("path must use non-symlink directories")
             try:
                 current = descriptors.enter_context(
-                    _directory_descriptor(name, flags, dir_fd=parent)
+                    _directory_descriptor(
+                        name,
+                        flags if index == len(names) - 1 else traversal_flags,
+                        dir_fd=parent,
+                    )
                 )
             except OSError as exc:
                 if exc.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
