@@ -1,0 +1,14 @@
+{
+  "format": "invarlock/judge-analysis-policy-v1",
+  "plan_sha256": "edd8f6e442a937b53a2abad3eb0b923c40b0ede2ab170c60c746000d64f653ed",
+  "metric_name": "factual-correctness",
+  "decision_role": "required",
+  "direction": "higher",
+  "method": "fixed-benchmark-hoeffding-v1",
+  "alpha": "0.05",
+  "comparison_family_size": 2,
+  "minimum_units": 20,
+  "maximum_interval_width": "0.3",
+  "allowed_degradation": "0.05",
+  "subject_bound": null
+}

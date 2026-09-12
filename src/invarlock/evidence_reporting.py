@@ -1414,6 +1414,19 @@ def render_evidence(
     evidence = Path(evidence_path)
     if not evidence.is_dir() or evidence.is_symlink():
         raise EvidenceReportError("evidence must be a real directory")
+    from invarlock.judge_measurements.reporting import (
+        is_judge_evidence,
+        render_judge_evidence,
+    )
+
+    if is_judge_evidence(evidence):
+        return render_judge_evidence(
+            evidence,
+            html_path=html_path,
+            markdown_path=markdown_path,
+            junit_path=junit_path,
+            explain=explain,
+        )
     try:
         captured = is_captured_manifest(evidence)
     except CapturedReportError as exc:

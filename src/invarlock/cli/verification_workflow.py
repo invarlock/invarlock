@@ -71,6 +71,15 @@ def execute_verification(
 ) -> EvidenceVerification:
     """Resolve one closed trust source and execute mode-appropriate verification."""
 
+    from invarlock.judge_measurements.reporting import is_judge_evidence
+
+    if is_judge_evidence(options.evidence):
+        from invarlock.judge_measurements.cli_verification import (
+            execute_judge_verification,
+        )
+
+        return execute_judge_verification(options, command_line=command_line)
+
     from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evidence_verification import (
         EvidenceVerificationError,

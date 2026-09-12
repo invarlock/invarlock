@@ -151,11 +151,17 @@
     "output": {
       "type": "object",
       "required": [
-        "evidence"
+        "evidence",
+        "signer_identity"
       ],
       "properties": {
         "evidence": {
           "$ref": "#/$defs/reference"
+        },
+        "signer_identity": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}(?![\\s\\S])",
+          "maxLength": 256
         }
       },
       "additionalProperties": false
