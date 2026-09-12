@@ -5,15 +5,18 @@ import copy
 import hashlib
 import json
 import socket
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
 from jsonschema import Draft202012Validator, ValidationError
 
 from invarlock import public_contracts
 from invarlock.acceptance_attestation import verify_acceptance_attestation
+from invarlock.judge_measurements import acceptance
 from invarlock.judge_measurements.acceptance import (
     replay_signed_judge_verification_receipt,
     verify_judge_evidence,
@@ -407,6 +410,44 @@ def test_optional_external_key_anchor_must_match_the_recipient_pin(tmp_path):
     ).accepted
 
 
+def test_optional_external_key_anchor_accepts_pem_and_rejects_bad_material(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    pem_path = tmp_path / "signer.pem"
+    pem_path.write_bytes(
+        KEY.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    assert verify_judge_evidence(
+        publication.path,
+        recipient_policy_path=policy_path,
+        trusted_public_keys={"example-signer": pem_path},
+    ).accepted
+
+    malformed = verify_judge_evidence(
+        publication.path,
+        recipient_policy_path=policy_path,
+        trusted_public_keys={"example-signer": b"not a PEM public key"},
+    )
+    assert not malformed.accepted
+    assert "could not load" in malformed.errors[0]
+
+    rsa_public = generate_private_key(public_exponent=65537, key_size=2048).public_key()
+    wrong_type = verify_judge_evidence(
+        publication.path,
+        recipient_policy_path=policy_path,
+        trusted_public_keys={
+            "example-signer": rsa_public.public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        },
+    )
+    assert not wrong_type.accepted
+    assert "must be Ed25519" in wrong_type.errors[0]
+
+
 def test_stored_result_is_recomputed_and_cannot_self_authorize(tmp_path):
     publication, policy_path = _publish(tmp_path)
     receipt_path = tmp_path / "receipt.json"
@@ -584,6 +625,255 @@ def test_signed_receipt_rejects_unsupported_public_key_algorithm(tmp_path):
     )
 
     assert not checked.ok and checked.result is None
+
+
+def test_signed_receipt_rejects_a_supported_non_ed25519_public_key(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    value = _json(receipt_path)
+    value["signature"]["public_key"]["value"] = (
+        generate_private_key(public_exponent=65537, key_size=2048)
+        .public_key()
+        .public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
+    )
+    _write(receipt_path, value)
+
+    checked = verify_signed_judge_verification_receipt(
+        receipt_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint="sha256:"
+        + hashlib.sha256(VERIFIER_KEY.public_key().public_bytes_raw()).hexdigest(),
+        expected_recipient_policy_sha256=object_sha256(_json(policy_path)),
+    )
+
+    assert not checked.ok
+    assert "Ed25519" in checked.errors[0]
+
+
+@pytest.mark.parametrize(
+    "field,value,error",
+    [
+        ("identity", "contains spaces", "identity is invalid"),
+        ("fingerprint", "not-a-fingerprint", "sha256"),
+        ("policy", "not-a-digest", "lowercase SHA-256"),
+    ],
+)
+def test_signed_receipt_rejects_malformed_caller_anchors(tmp_path, field, value, error):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    fingerprint = write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    expected = {
+        "expected_verifier_identity": "example-verifier",
+        "expected_verifier_fingerprint": fingerprint,
+        "expected_recipient_policy_sha256": object_sha256(_json(policy_path)),
+    }
+    expected[
+        {
+            "identity": "expected_verifier_identity",
+            "fingerprint": "expected_verifier_fingerprint",
+            "policy": "expected_recipient_policy_sha256",
+        }[field]
+    ] = value
+
+    checked = verify_signed_judge_verification_receipt(receipt_path, **expected)
+
+    assert not checked.ok
+    assert error in checked.errors[0]
+
+
+def test_signed_receipt_rejects_an_internally_inconsistent_policy_digest(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    fingerprint = write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    value = _json(receipt_path)
+    value["statement"]["result"]["recipient_policy_sha256"] = "0" * 64
+    value["signature"]["value"] = base64.b64encode(
+        VERIFIER_KEY.sign(acceptance._signed_receipt_bytes(value["statement"]))
+    ).decode("ascii")
+    _write(receipt_path, value)
+
+    checked = verify_signed_judge_verification_receipt(
+        receipt_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint=fingerprint,
+        expected_recipient_policy_sha256=object_sha256(_json(policy_path)),
+    )
+
+    assert not checked.ok
+    assert "differs from its verification result" in checked.errors[0]
+
+
+@pytest.mark.parametrize(
+    "key_material,error",
+    [
+        ("text", "exact bytes"),
+        (b"x" * 65537, "size limit"),
+        (b"not a PEM private key", "could not load"),
+    ],
+)
+def test_receipt_writer_rejects_invalid_in_memory_private_key(
+    tmp_path, key_material, error
+):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+
+    with pytest.raises(JudgeEvidenceError, match=error):
+        write_signed_judge_verification_receipt(
+            publication.path,
+            local,
+            tmp_path / "signed-receipt.json",
+            recipient_policy_path=policy_path,
+            verifier_identity="example-verifier",
+            verifier_signing_key_path=tmp_path / "unused.pem",
+            verifier_signing_key_bytes=key_material,
+        )
+
+
+def test_receipt_writer_rejects_an_invalid_local_result_or_policy_binding(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    common = {
+        "evidence_path": publication.path,
+        "receipt_path": tmp_path / "signed-receipt.json",
+        "recipient_policy_path": policy_path,
+        "verifier_identity": "example-verifier",
+        "verifier_signing_key_path": _verifier_key_path(tmp_path),
+    }
+
+    with pytest.raises(JudgeEvidenceError, match="result is invalid"):
+        write_signed_judge_verification_receipt(
+            result=replace(local, verified=False), **common
+        )
+    with pytest.raises(JudgeEvidenceError, match="does not bind"):
+        write_signed_judge_verification_receipt(
+            result=replace(local, recipient_policy_sha256="0" * 64), **common
+        )
+
+
+def test_receipt_writer_rejects_a_non_ed25519_private_key(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    rsa_key = generate_private_key(public_exponent=65537, key_size=2048)
+
+    with pytest.raises(JudgeEvidenceError, match="must be Ed25519"):
+        write_signed_judge_verification_receipt(
+            publication.path,
+            local,
+            tmp_path / "signed-receipt.json",
+            recipient_policy_path=policy_path,
+            verifier_identity="example-verifier",
+            verifier_signing_key_path=tmp_path / "unused.pem",
+            verifier_signing_key_bytes=rsa_key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            ),
+        )
+
+
+def test_receipt_writer_enforces_the_serialized_size_bound(tmp_path, monkeypatch):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    monkeypatch.setattr(acceptance, "_MAX_RECEIPT_BYTES", 1)
+
+    with pytest.raises(JudgeEvidenceError, match="byte limit"):
+        write_signed_judge_verification_receipt(
+            publication.path,
+            local,
+            tmp_path / "signed-receipt.json",
+            recipient_policy_path=policy_path,
+            verifier_identity="example-verifier",
+            verifier_signing_key_path=_verifier_key_path(tmp_path),
+        )
+
+
+def test_receipt_replay_rejects_an_invalid_receipt(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    fingerprint = write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    value = _json(receipt_path)
+    value["signature"]["value"] = base64.b64encode(b"x" * 64).decode("ascii")
+    _write(receipt_path, value)
+
+    replayed = replay_signed_judge_verification_receipt(
+        receipt_path,
+        evidence_path=publication.path,
+        recipient_policy_path=policy_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint=fingerprint,
+    )
+
+    assert not replayed.verified
+    assert "signature" in replayed.errors[0]
+
+
+def test_receipt_replay_detects_evidence_changed_after_issuance(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    fingerprint = write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    envelope_path = publication.path / "envelope.json"
+    envelope = _json(envelope_path)
+    envelope["intended_subject"] = "sha256:" + "f" * 64
+    envelope["signature"] = base64.b64encode(
+        KEY.sign(signed_envelope_bytes(envelope))
+    ).decode("ascii")
+    _write(envelope_path, envelope)
+
+    replayed = replay_signed_judge_verification_receipt(
+        receipt_path,
+        evidence_path=publication.path,
+        recipient_policy_path=policy_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint=fingerprint,
+    )
+
+    assert not replayed.verified
+    assert "differs from fresh" in replayed.errors[0]
 
 
 def test_signed_receipt_cannot_be_written_or_replayed_inside_evidence(tmp_path):
