@@ -10,6 +10,7 @@ import pytest
 from invarlock import evidence_reporting as reporting
 from invarlock.evidence_pack_contract import build_comparison_report
 from invarlock.evidence_reporting import EvidenceReportError, render_evidence
+from invarlock.filesystem import atomic_file
 from tests.evidence_packs.test_evidence_reporting import _evidence, _report
 
 
@@ -495,28 +496,30 @@ def test_html_writer_never_removes_a_concurrent_destination(
     assert list(tmp_path.iterdir()) == [destination]
 
 
-def test_html_writer_does_not_report_a_post_publication_failure(
+def test_html_writer_preserves_complete_output_on_postpublication_sync_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     destination = tmp_path / "report.html"
     published = False
     real_fsync = reporting.os.fsync
-    real_link = reporting.os.link
+    real_rename = atomic_file._rename_no_replace
 
-    def track_link(*args: object, **kwargs: object) -> None:
+    def track_rename(**kwargs: object) -> int:
         nonlocal published
-        real_link(*args, **kwargs)
+        result = real_rename(**kwargs)
         published = True
+        return result
 
     def fail_after_publication(descriptor: int) -> None:
         if published:
             raise OSError(errno.EIO, "injected post-publication failure")
         real_fsync(descriptor)
 
-    monkeypatch.setattr(reporting.os, "link", track_link)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", track_rename)
     monkeypatch.setattr(reporting.os, "fsync", fail_after_publication)
-    assert reporting._write_html_no_clobber(destination, "<p>report</p>") == destination
+    with pytest.raises(EvidenceReportError, match="post-publication failure"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
     assert destination.read_text(encoding="utf-8") == "<p>report</p>"
     assert list(tmp_path.iterdir()) == [destination]
 
@@ -525,28 +528,30 @@ def test_html_writer_retries_a_private_name_collision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    occupied = tmp_path / ".invarlock-report-occupied"
+    occupied = tmp_path / ".invarlock-write-occupied"
     occupied.write_text("independent output", encoding="utf-8")
     names = iter(("occupied", "available"))
-    monkeypatch.setattr(reporting.secrets, "token_hex", lambda _length: next(names))
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", lambda _length: next(names))
 
     destination = tmp_path / "report.html"
     reporting._write_html_no_clobber(destination, "<p>report</p>")
 
     assert occupied.read_text(encoding="utf-8") == "independent output"
     assert destination.read_text(encoding="utf-8") == "<p>report</p>"
-    assert not (tmp_path / ".invarlock-report-available").exists()
+    assert not (tmp_path / ".invarlock-write-available").exists()
 
 
 def test_html_writer_rejects_exhausted_private_names(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    occupied = tmp_path / ".invarlock-report-occupied"
+    occupied = tmp_path / ".invarlock-write-occupied"
     occupied.write_text("independent output", encoding="utf-8")
-    monkeypatch.setattr(reporting.secrets, "token_hex", lambda _length: "occupied")
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", lambda _length: "occupied")
 
-    with pytest.raises(EvidenceReportError, match="allocate a temporary report"):
+    with pytest.raises(
+        EvidenceReportError, match="allocate a private staging directory"
+    ):
         reporting._write_html_no_clobber(tmp_path / "report.html", "<p>report</p>")
 
     assert occupied.read_text(encoding="utf-8") == "independent output"
@@ -557,11 +562,11 @@ def test_html_writer_does_not_unlink_an_unopened_candidate(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    occupied = tmp_path / ".invarlock-report-occupied"
+    occupied = tmp_path / ".invarlock-write-occupied"
     occupied.write_text("independent output", encoding="utf-8")
     real_open = reporting.os.open
 
-    monkeypatch.setattr(reporting.secrets, "token_hex", lambda _length: "occupied")
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", lambda _length: "occupied")
 
     def fail_candidate_open(
         path: object, flags: int, *args: object, **kwargs: object
@@ -578,18 +583,18 @@ def test_html_writer_does_not_unlink_an_unopened_candidate(
     assert list(tmp_path.iterdir()) == [occupied]
 
 
-def test_html_writer_preserves_a_link_time_destination(
+def test_html_writer_preserves_a_rename_time_destination(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     destination = tmp_path / "report.html"
-    real_link = reporting.os.link
+    real_rename = atomic_file._rename_no_replace
 
-    def occupy_then_link(*args: object, **kwargs: object) -> None:
+    def occupy_then_rename(**kwargs: object) -> int:
         destination.write_text("independent output", encoding="utf-8")
-        real_link(*args, **kwargs)
+        return real_rename(**kwargs)
 
-    monkeypatch.setattr(reporting.os, "link", occupy_then_link)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", occupy_then_rename)
     with pytest.raises(EvidenceReportError, match="destination already exists"):
         reporting._write_html_no_clobber(destination, "<p>report</p>")
 

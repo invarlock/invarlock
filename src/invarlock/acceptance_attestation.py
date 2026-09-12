@@ -36,6 +36,8 @@ from invarlock.evidence_receipt import (
     SIGNED_RECEIPT_FORMAT_V2,
     SIGNED_RECEIPT_SIGNATURE_FORMAT,
 )
+from invarlock.filesystem.atomic_file import write_file_no_replace
+from invarlock.filesystem.paths import UnsafePathError, pinned_directory
 from invarlock.public_contracts import (
     ACCEPTANCE_PREDICATE_FORMAT_VERSION,
     RECIPIENT_ACCEPTANCE_POLICY_FORMAT_VERSION,
@@ -232,22 +234,13 @@ def _dsse_pae(payload_type: str, payload: bytes) -> bytes:
 
 
 def _write_no_clobber(path: Path, payload: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    created = False
     try:
-        with path.open("xb") as handle:
-            created = True
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        path.chmod(0o444)
+        write_file_no_replace(path, payload, mode=0o444)
     except FileExistsError as exc:
         raise AcceptanceAttestationError(
             f"attestation destination already exists: {path.name}"
         ) from exc
     except OSError as exc:
-        if created:
-            path.unlink(missing_ok=True)
         raise AcceptanceAttestationError(
             "could not write acceptance attestation"
         ) from exc
@@ -744,54 +737,61 @@ def _technical_verdict(predicate: object) -> str | None:
 
 
 def _file_sha256(path: Path) -> str:
+    def identity(value: os.stat_result) -> tuple[int, ...]:
+        return (
+            value.st_dev,
+            value.st_ino,
+            value.st_mode,
+            value.st_size,
+            value.st_mtime_ns,
+            value.st_ctime_ns,
+        )
+
     descriptor: int | None = None
     try:
-        before = path.lstat()
-        if stat.S_ISLNK(before.st_mode):
-            raise AcceptanceAttestationError("subject artifact must not be a symlink")
-        if not stat.S_ISREG(before.st_mode):
-            raise AcceptanceAttestationError(
-                "file-bound subject artifact must be a regular file"
-            )
-        flags = (
-            os.O_RDONLY
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
-            | getattr(os, "O_NONBLOCK", 0)
-        )
-        descriptor = os.open(path, flags)
-        opened = os.fstat(descriptor)
-        if not stat.S_ISREG(opened.st_mode) or (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-            before.st_mtime_ns,
-            before.st_ctime_ns,
-        ) != (
-            opened.st_dev,
-            opened.st_ino,
-            opened.st_size,
-            opened.st_mtime_ns,
-            opened.st_ctime_ns,
-        ):
-            raise AcceptanceAttestationError(
-                "subject artifact changed before it could be hashed"
-            )
-        digest = hashlib.sha256()
-        try:
-            handle = os.fdopen(descriptor, "rb")
-        except BaseException:
-            owned_descriptor = descriptor
+        with pinned_directory(path.parent) as parent:
+            before = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+            if stat.S_ISLNK(before.st_mode):
+                raise AcceptanceAttestationError(
+                    "subject artifact must not be a symlink"
+                )
+            if not stat.S_ISREG(before.st_mode):
+                raise AcceptanceAttestationError(
+                    "file-bound subject artifact must be a regular file"
+                )
+            flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+            descriptor = os.open(path.name, flags, dir_fd=parent)
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode) or identity(before) != identity(opened):
+                raise AcceptanceAttestationError(
+                    "subject artifact changed before it could be hashed"
+                )
+            digest = hashlib.sha256()
+            try:
+                handle = os.fdopen(descriptor, "rb")
+            except BaseException:
+                owned_descriptor = descriptor
+                descriptor = None
+                os.close(owned_descriptor)
+                raise
             descriptor = None
-            os.close(owned_descriptor)
-            raise
-        descriptor = None
-        with handle:
-            while chunk := handle.read(1024 * 1024):
-                digest.update(chunk)
-            after = os.fstat(handle.fileno())
+            with handle:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+                after = os.fstat(handle.fileno())
+                rebound = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+                if identity(before) != identity(after) or identity(before) != identity(
+                    rebound
+                ):
+                    raise AcceptanceAttestationError(
+                        "subject artifact changed while it was being hashed"
+                    )
     except AcceptanceAttestationError:
         raise
+    except UnsafePathError as exc:
+        raise AcceptanceAttestationError(
+            f"subject artifact could not be read safely: {exc}"
+        ) from exc
     except OSError as exc:
         raise AcceptanceAttestationError(
             "subject artifact could not be read safely"
@@ -799,22 +799,6 @@ def _file_sha256(path: Path) -> str:
     finally:
         if descriptor is not None:
             os.close(descriptor)
-    if (
-        before.st_dev,
-        before.st_ino,
-        before.st_size,
-        before.st_mtime_ns,
-        before.st_ctime_ns,
-    ) != (
-        after.st_dev,
-        after.st_ino,
-        after.st_size,
-        after.st_mtime_ns,
-        after.st_ctime_ns,
-    ):
-        raise AcceptanceAttestationError(
-            "subject artifact changed while it was being hashed"
-        )
     return "sha256:" + digest.hexdigest()
 
 

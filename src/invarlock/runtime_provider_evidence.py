@@ -12,7 +12,6 @@ import json
 import os
 import re
 import stat
-import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -59,6 +58,7 @@ from invarlock.evidence_pack_json import (
     parse_json_bytes,
     read_regular_file_bytes,
 )
+from invarlock.filesystem.atomic_file import write_file_no_replace
 from invarlock.public_contracts import (
     load_model_artifact_identity_schema,
     load_runtime_provider_capabilities_schema,
@@ -703,36 +703,13 @@ def _checked_sibling_paths(
 
 
 def _atomic_write_bytes(path: Path, payload: bytes) -> None:
-    """Publish one new sidecar without ever replacing an existing directory entry."""
-
-    temporary: Path | None = None
+    """Publish one new sidecar without replacing an existing directory entry."""
     try:
-        descriptor, temporary_name = tempfile.mkstemp(
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-        )
-        temporary = Path(temporary_name)
-        try:
-            handle = os.fdopen(descriptor, "wb")
-        except BaseException:
-            os.close(descriptor)
-            raise
-        with handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(temporary, 0o600)
-        os.link(temporary, path, follow_symlinks=False)
-        temporary.unlink()
-        temporary = None
+        write_file_no_replace(path, payload, create_parents=False)
     except OSError as exc:
         raise RuntimeProviderEvidenceError(
             f"could not atomically write runtime provider evidence: {path.name}"
         ) from exc
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
 
 
 def write_runtime_provider_evidence(
@@ -775,19 +752,12 @@ def write_runtime_provider_evidence(
         expected_outer_image_digest=expected_outer_image_digest,
     )
 
-    committed: list[Path] = []
-    try:
-        for path, payload in zip(
-            candidates,
-            (artifact_bytes, observation_bytes, receipt_bytes),
-            strict=True,
-        ):
-            _atomic_write_bytes(path, payload)
-            committed.append(path)
-    except RuntimeProviderEvidenceError:
-        for path in reversed(committed):
-            path.unlink(missing_ok=True)
-        raise
+    for path, payload in zip(
+        candidates, (artifact_bytes, observation_bytes, receipt_bytes), strict=True
+    ):
+        _atomic_write_bytes(path, payload)
+    # Earlier sidecars remain on failure: removing their current pathnames could
+    # delete another writer's replacement. The caller owns directory transactions.
     return load_runtime_provider_evidence(
         paths,
         expected_outer_image_digest=expected_outer_image_digest,

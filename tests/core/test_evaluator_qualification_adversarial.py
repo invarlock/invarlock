@@ -11,6 +11,7 @@ from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
 )
+from invarlock.filesystem import atomic_file
 from tests.core.test_evaluator_qualification import (
     _digest_text,
     _write_json,
@@ -206,19 +207,20 @@ def test_result_write_closes_descriptor_when_stream_creation_fails(
     tmp_path: Path,
 ) -> None:
     result = _qualify(qualification_fixture(tmp_path / "inputs"))
-    real_mkstemp = qualification.tempfile.mkstemp
+    real_open = atomic_file.os.open
     opened: list[int] = []
 
-    def _tracked_mkstemp(*args: object, **kwargs: object) -> tuple[int, str]:
-        descriptor, name = real_mkstemp(*args, **kwargs)
-        opened.append(descriptor)
-        return descriptor, name
+    def _tracked_open(path, flags, *args, **kwargs):
+        descriptor = real_open(path, flags, *args, **kwargs)
+        if path == "payload":
+            opened.append(descriptor)
+        return descriptor
 
-    def _fail_fdopen(_descriptor: int, _mode: str):
+    def _fail_fdopen(_descriptor: int, _mode: str, **_kwargs):
         raise RuntimeError("injected stream construction failure")
 
-    monkeypatch.setattr(qualification.tempfile, "mkstemp", _tracked_mkstemp)
-    monkeypatch.setattr(qualification.os, "fdopen", _fail_fdopen)
+    monkeypatch.setattr(atomic_file.os, "open", _tracked_open)
+    monkeypatch.setattr(atomic_file.os, "fdopen", _fail_fdopen)
 
     with pytest.raises(RuntimeError, match="stream construction"):
         result.write(tmp_path / "result.json")

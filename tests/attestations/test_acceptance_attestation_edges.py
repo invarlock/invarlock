@@ -6,6 +6,7 @@ import errno
 import hashlib
 import json
 import shutil
+import stat
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -600,7 +601,12 @@ def test_subject_file_hashing_rejects_unsafe_paths_and_detects_change(
         st_mtime_ns=before.st_mtime_ns + 1,
         st_ctime_ns=before.st_ctime_ns,
     )
-    monkeypatch.setattr(target.os, "fstat", lambda _fd: changed)
+    real_fstat = target.os.fstat
+    monkeypatch.setattr(
+        target.os,
+        "fstat",
+        lambda fd: changed if stat.S_ISREG(real_fstat(fd).st_mode) else real_fstat(fd),
+    )
     with pytest.raises(AcceptanceAttestationError, match="changed"):
         target._file_sha256(artifact)
 
@@ -615,15 +621,79 @@ def test_subject_file_hashing_rejects_fifo_replacement_without_blocking(
     artifact.write_bytes(b"artifact")
     real_open = target.os.open
 
-    def replace_with_fifo(path: Path, flags: int) -> int:
-        assert flags & target.os.O_NONBLOCK
-        artifact.unlink()
-        target.os.mkfifo(artifact)
-        return real_open(path, flags)
+    def replace_with_fifo(path: str, flags: int, *, dir_fd: int | None = None) -> int:
+        if path == artifact.name:
+            assert dir_fd is not None
+            assert flags & target.os.O_NONBLOCK
+            assert flags & target.os.O_NOFOLLOW
+            artifact.unlink()
+            target.os.mkfifo(artifact)
+        return real_open(path, flags, dir_fd=dir_fd)
 
     monkeypatch.setattr(target.os, "open", replace_with_fifo)
     with pytest.raises(AcceptanceAttestationError, match="changed"):
         target._file_sha256(artifact)
+
+
+@pytest.mark.parametrize("replacement", ["parent", "ancestor", "leaf", "symlink"])
+def test_subject_file_hashing_rejects_path_replacement_during_streaming(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement: str,
+) -> None:
+    ancestor = tmp_path / "artifacts"
+    parent = ancestor / "release"
+    parent.mkdir(parents=True)
+    artifact = parent / "model.gguf"
+    original = b"a" * (2 * 1024 * 1024 + 1)
+    artifact.write_bytes(original)
+    replacement_bytes = b"b" * len(original)
+    real_sha256 = hashlib.sha256
+    chunk_sizes: list[int] = []
+
+    class ReplacingDigest:
+        def __init__(self) -> None:
+            self.digest = real_sha256()
+
+        def update(self, chunk: bytes) -> None:
+            self.digest.update(chunk)
+            chunk_sizes.append(len(chunk))
+            if len(chunk_sizes) != 1:
+                return
+            if replacement in {"parent", "ancestor"}:
+                directory = parent if replacement == "parent" else ancestor
+                directory.rename(directory.with_name("previous"))
+                parent.mkdir(parents=True)
+                artifact.write_bytes(replacement_bytes)
+            else:
+                previous = artifact.with_name("previous.gguf")
+                artifact.rename(previous)
+                if replacement == "symlink":
+                    artifact.symlink_to(previous)
+                else:
+                    artifact.write_bytes(replacement_bytes)
+
+        def hexdigest(self) -> str:
+            return self.digest.hexdigest()
+
+    monkeypatch.setattr(target.hashlib, "sha256", ReplacingDigest)
+    with pytest.raises(AcceptanceAttestationError, match="changed|read safely"):
+        target._file_sha256(artifact)
+    assert chunk_sizes == [1024 * 1024, 1024 * 1024, 1]
+    if replacement == "symlink":
+        assert artifact.is_symlink()
+    else:
+        assert artifact.read_bytes() == replacement_bytes
+
+
+def test_subject_file_hashing_rejects_symlink_ancestor(tmp_path: Path) -> None:
+    parent = tmp_path / "artifacts"
+    parent.mkdir()
+    (parent / "model.gguf").write_bytes(b"artifact")
+    symlink = tmp_path / "linked-artifacts"
+    symlink.symlink_to(parent, target_is_directory=True)
+    with pytest.raises(AcceptanceAttestationError, match="symlink"):
+        target._file_sha256(symlink / "model.gguf")
 
 
 def test_subject_file_hashing_closes_descriptor_when_stream_construction_fails(
@@ -654,11 +724,17 @@ def test_subject_file_hashing_does_not_retry_an_uncertain_close(
     artifact.write_bytes(b"artifact")
     real_close = target.os.close
     close_calls: list[int] = []
+    artifact_descriptor: int | None = None
 
-    def fail_stream(_descriptor: int, _mode: str) -> object:
+    def fail_stream(descriptor: int, _mode: str) -> object:
+        nonlocal artifact_descriptor
+        artifact_descriptor = descriptor
         raise RuntimeError("injected stream construction failure")
 
     def release_then_fail(descriptor: int) -> None:
+        if descriptor != artifact_descriptor:
+            real_close(descriptor)
+            return
         close_calls.append(descriptor)
         real_close(descriptor)
         raise OSError(errno.EIO, "injected uncertain close failure")
