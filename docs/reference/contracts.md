@@ -22,6 +22,9 @@ cannot substitute a different schema.
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
 | `evidence_pack_v2.schema.json` | `invarlock/evidence-pack-v2` | Captured-only closed directory inventory and explicit signed/unsigned authentication |
 | `evidence_verification_receipt_v3.schema.json` | `invarlock/evidence-verification-receipt-v3` | Captured-only external verifier statement with run/request anchors and per-metric/slice scoring assurance |
+| `evidence_set.schema.json` | `invarlock/evidence-set-v1` | Unsigned index of one deterministic captured pack and one bounded judge pack |
+| `evidence_set_recipient_policy.schema.json` | `invarlock/evidence-set-recipient-policy-v1` | Independent shared-run and component-policy pins for required conjunction |
+| `evidence_set_verification.schema.json` | `invarlock/evidence-set-verification-v1` | Fresh local conjunction result retaining distinct component receipts |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
 | `trust_inputs_v2.schema.json` | `invarlock/trust-inputs-v2` | Captured independent policy, complete-run/request/signer anchors and verifier identity/key path |
@@ -42,6 +45,10 @@ comparison evidence is not accepted. A captured receipt's
 acceptance attestations, ModelKit acceptance, or deployment approval. See
 [Captured records](evaluation-records.md) for run, case-set, policy and request
 normalization contracts; these schema identifiers are not product-release pins.
+
+[Evidence sets](evidence-sets.md) compose existing deterministic and judge
+components over the same original runs. Their combined decision does not add a
+joint confidence guarantee or change either component's acceptance scope.
 
 Evaluator qualification has two stable wire classifications:
 

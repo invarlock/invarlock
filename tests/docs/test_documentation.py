@@ -61,6 +61,7 @@ EXPECTED_DOC_PAGES = {
     "reference/release-verification.md",
     "reference/reports.md",
     "reference/judge-measurements.md",
+    "reference/evidence-sets.md",
     "reference/policy-engine-interop.md",
     "reference/runtime-security.md",
     "reference/runtime-providers.md",

@@ -141,6 +141,13 @@ of fixed answers; it does not turn arbitrary evaluator scores into replayable
 judge evidence. See the
 [judge measurement reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md).
 
+[Evidence sets](https://github.com/invarlock/invarlock/blob/main/docs/reference/evidence-sets.md)
+let a recipient require deterministic and bounded judge checks on the same
+frozen answers, while preserving each component's statistical meaning. Start
+with the [answer capture example](https://github.com/invarlock/invarlock/blob/main/examples/answer-capture/README.md)
+when baseline and subject answers have not yet been collected.
+
+
 For controlled evaluations, `invarlock evaluate --help`
 groups the main workflow separately from advanced runtime options. Run requests
 can use `--runtime-profile runtime.json` to reuse explicit container resources;

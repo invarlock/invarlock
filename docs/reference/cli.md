@@ -579,3 +579,12 @@ runtime inventory.
 The versioned judge request uses the same `evaluate`, `verify` and `report`
 commands. See [judge measurements](judge-measurements.md) for import preflight,
 bounded reports and independent recipient policy verification.
+
+
+## Deterministic and judge evidence sets
+
+Use the existing `evaluate` requests for each component, then index the two
+packs and run `verify` with an independent composition recipient policy.
+`report` shows their metrics together. Both components must bind the same
+original runs and case set; their statistical methods retain separate meanings.
+See [evidence sets](evidence-sets.md) for commands, policies and exit codes.

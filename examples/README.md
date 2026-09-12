@@ -114,3 +114,12 @@ The [K2 Horizon campaign](qualification/k2-horizon/README.md) is a separate
 maintainer qualification protocol with CPU preparation and tests. Its five
 model configurations remain candidates pending a reviewed runtime and actual
 GPU execution; they do not replace the established examples above.
+
+## Frozen answers and combined checks
+
+The [answer capture example](answer-capture/README.md) prepares the baseline and
+subject generation stage before answers are frozen. The
+[deterministic and judge example](judge-with-deterministic/README.md) then shows
+how the same original runs can support both existing evidence formats and one
+independent recipient decision. Its offline fixture is deliberately synthetic
+and makes no model-quality claim.
