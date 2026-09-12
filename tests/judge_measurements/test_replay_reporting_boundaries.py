@@ -144,3 +144,58 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
         assert "bounds are satisfied" not in result.text
         if role == "required":
             assert "bound is violated" in case.find("failure").get("message")
+
+
+@pytest.mark.parametrize("signed", [True, False])
+def test_reports_show_descriptive_baseline_and_correct_signing_next_step(
+    tmp_path, signed
+):
+    publication, _ = _publish(tmp_path, baseline=1, subject=0, signed=signed)
+    result = render_judge_evidence(publication.path)
+    assert "| 1.000000000000000 | 0" in result.text
+    assert "equal independent-unit weights" in result.text
+    assert result.facts["descriptive_means"]["baseline"] == "1.000000000000000"
+    signing_step = "republish the same retained inputs"
+    assert (signing_step in result.text) is not signed
+    if not signed:
+        assert result.text.index(signing_step) < result.text.index("Use verify")
+        assert "new evidence destination" in result.text
+
+
+def test_baseline_display_uses_equal_unit_weights_and_fixed_rounding():
+    from decimal import localcontext
+
+    from invarlock.judge_measurements.reporting import _baseline_mean
+
+    plan = {
+        "sampling": {
+            "case_units": [
+                {"case_id": "a", "unit_id": "one"},
+                {"case_id": "b", "unit_id": "two"},
+                {"case_id": "c", "unit_id": "two"},
+            ]
+        }
+    }
+    measurements = {
+        "trials": [
+            {"case_id": case, "side": "baseline", "parse": {"value": score}}
+            for case, score in (
+                ("a", "1"),
+                ("a", "0"),
+                ("b", "0"),
+                ("b", "0"),
+                ("c", "0"),
+                ("c", "0"),
+            )
+        ]
+    }
+    with localcontext() as context:
+        context.prec = 2
+        assert _baseline_mean(plan, measurements) == "0.250000000000000"
+
+
+def test_incomplete_report_does_not_infer_a_baseline_from_complete_cases(tmp_path):
+    publication, _ = _publish(tmp_path, incomplete=True)
+    result = render_judge_evidence(publication.path)
+    assert "| Unavailable | Unavailable | Unavailable |" in result.text
+    assert result.facts["descriptive_means"]["baseline"] is None

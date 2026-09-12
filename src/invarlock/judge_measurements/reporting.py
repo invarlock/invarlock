@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
@@ -85,6 +86,33 @@ def _snapshot(path: Path) -> tuple[Any, dict[str, dict[str, Any]]]:
     return publication, artifacts
 
 
+def _baseline_mean(plan: dict[str, Any], measurements: dict[str, Any]) -> str:
+    """Describe a complete replay with the same equal-unit weighting as analysis."""
+    case_units = {
+        case["case_id"]: case["unit_id"] for case in plan["sampling"]["case_units"]
+    }
+    case_scores: dict[str, list[Fraction]] = {case_id: [] for case_id in case_units}
+    for trial in measurements["trials"]:
+        if trial["side"] == "baseline":
+            case_scores[trial["case_id"]].append(Fraction(trial["parse"]["value"]))
+    unit_scores: dict[str, list[Fraction]] = {}
+    for case_id, scores in case_scores.items():
+        unit_scores.setdefault(case_units[case_id], []).append(
+            sum(scores, Fraction()) / len(scores)
+        )
+    mean = sum(
+        (sum(scores, Fraction()) / len(scores) for scores in unit_scores.values()),
+        Fraction(),
+    ) / len(unit_scores)
+    # Display-only rounding is independent of the caller's Decimal context.
+    with localcontext(Context(prec=100, rounding=ROUND_HALF_EVEN)):
+        return str(
+            (Decimal(mean.numerator) / Decimal(mean.denominator)).quantize(
+                Decimal("0.000000000000001")
+            )
+        )
+
+
 def _view(
     publication: Any, artifacts: dict[str, dict[str, Any]]
 ) -> tuple[ReportView, dict[str, Any]]:
@@ -131,13 +159,16 @@ def _view(
             label="Paired independent-unit effect interval",
             unit="normalized rating",
         )
+    baseline_mean = (
+        _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
+    )
     metric = MetricView(
         name=policy["metric_name"],
         scope="Fixed benchmark; equal independent-unit weights"
         if required
         else "Advisory metric; fixed benchmark; equal independent-unit weights",
         decision=analysis["decision"],
-        baseline="Frozen baseline answers",
+        baseline=baseline_mean if baseline_mean is not None else "Unavailable",
         candidate=subject["mean"] if subject is not None else "Unavailable",
         change=effect["mean"] if effect is not None else "Unavailable",
         count=(
@@ -155,6 +186,7 @@ def _view(
             else "Decision role: advisory; this metric does not gate required decisions.",
             f"Allowed degradation: {policy['allowed_degradation']} ({policy['direction']} is better).",
             f"Minimum units: {policy['minimum_units']}; maximum interval width: {policy['maximum_interval_width']}.",
+            "Baseline and subject means describe the same complete schedule with equal independent-unit weights.",
             "Repetitions do not increase the number of independent units.",
         ),
     )
@@ -259,6 +291,12 @@ def _view(
         },
         "scale": plan["scale"],
         "analysis": analysis,
+        "descriptive_means": {
+            "baseline": baseline_mean,
+            "subject": subject["mean"] if subject is not None else None,
+            "change": effect["mean"] if effect is not None else None,
+            "weighting": "equal_independent_units",
+        },
         "detail_limits": {
             "shown_cases": len(details),
             "total_cases": len(baseline_rows),
@@ -323,6 +361,13 @@ def _view(
             ),
         ),
         next_steps=(
+            ()
+            if signed
+            else (
+                "For recipient verification, republish the same retained inputs to a new evidence destination with evaluate --signing-key and the declared signer identity. Do not modify this evidence bundle.",
+            )
+        )
+        + (
             "Use verify with an independently maintained judge recipient policy before relying on this result.",
         ),
         limitations=(

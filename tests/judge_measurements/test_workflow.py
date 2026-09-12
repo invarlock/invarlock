@@ -170,6 +170,18 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
     assert payload["collection_available"] is False
     assert payload["ready"] and not payload["errors"]
     assert "inspect-judge collect API" in payload["next_action"]
+    text_result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+    assert text_result.exit_code == 0, text_result.output
+    text = " ".join(text_result.stdout.split())
+    assert "Maximum admitted calls: 2; full plan reserved: yes" in text
+    assert "Next: " + payload["next_action"] in text
+    budget["max_calls"] = 1
+    (path.parent / "collection.json").write_text(json.dumps(budget))
+    partial = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+    assert partial.exit_code == 0, partial.output
+    assert "Maximum admitted calls: 1; full plan reserved: no" in " ".join(
+        partial.stdout.split()
+    )
     result = RUNNER.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
     assert result.exit_code == 2
     assert "does not execute provider calls" in result.stdout
@@ -381,3 +393,14 @@ def test_committed_judge_example_preflights_and_renders(tmp_path):
         json.loads(result.stdout)["assurance"]["recipient_acceptance"]
         == "not_performed"
     )
+
+
+def test_judge_supported_cli_options_have_accurate_help():
+    result = RUNNER.invoke(app, ["evaluate", "--help"], terminal_width=160)
+    assert result.exit_code == 0
+    text = " ".join(result.stdout.replace("│", " ").split())
+    assert "retained judge measurements" in text
+    assert "Publish captured or judge evaluation as unsigned local evidence" in text
+    assert "Captured or judge baseline run override" in text
+    assert "Captured or judge subject run override" in text
+    assert "judge (recorded ratings)" in text

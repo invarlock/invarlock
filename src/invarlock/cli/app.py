@@ -304,7 +304,7 @@ def _root(
     name="evaluate",
     help=(
         "Evaluate one closed request using native execution, authenticated imports, "
-        "or captured results.\n\n"
+        "captured results, or retained judge measurements.\n\n"
         "Signed handoff: evaluate REQUEST -> verify EVIDENCE -> report EVIDENCE.\n\n"
         "Unsigned local use: evaluate REQUEST --unsigned -> report EVIDENCE."
     ),
@@ -362,7 +362,7 @@ def evaluate(  # noqa: C901
     unsigned: bool = typer.Option(
         False,
         "--unsigned",
-        help="Explicitly publish captured evaluation as unsigned local evidence.",
+        help="Publish captured or judge evaluation as unsigned local evidence.",
         rich_help_panel="Signing and execution authorization",
     ),
     max_bootstrap_draws: int = typer.Option(
@@ -382,13 +382,13 @@ def evaluate(  # noqa: C901
     baseline_run: Path | None = typer.Option(
         None,
         "--baseline-run",
-        help="Captured baseline override, caller-relative and confined to request root.",
+        help="Captured or judge baseline run override, caller-relative and confined to request root.",
         rich_help_panel="Output and workflow",
     ),
     subject_run: Path | None = typer.Option(
         None,
         "--subject-run",
-        help="Captured subject override, caller-relative and confined to request root.",
+        help="Captured or judge subject run override, caller-relative and confined to request root.",
         rich_help_panel="Output and workflow",
     ),
     output: Path | None = typer.Option(
@@ -407,7 +407,7 @@ def evaluate(  # noqa: C901
     example: str = typer.Option(
         "classification",
         "--example",
-        help="Example for --init: classification, extraction, or judge.",
+        help="Captured example for --init: classification, extraction, or judge (recorded ratings).",
         rich_help_panel="Evaluation setup",
     ),
     keygen_directory: Path | None = typer.Option(
@@ -803,9 +803,19 @@ def evaluate(  # noqa: C901
                     f"Collection budgets: {_terminal_text(str(payload['budgets']))}",
                     markup=False,
                 )
+            capacity = payload.get("budget_capacity")
+            if isinstance(capacity, dict):
+                console.print(
+                    f"Maximum admitted calls: {capacity['maximum_admitted_calls']}; "
+                    f"full plan reserved: {'yes' if capacity['full_plan_reserved'] else 'no'}"
+                )
             for error in payload["errors"]:
                 console.print(_terminal_text(error), markup=False)
             console.print("No model calls, signing, or publication were performed.")
+            if payload.get("next_action"):
+                console.print(
+                    f"Next: {_terminal_text(payload['next_action'])}", markup=False
+                )
         else:
             console.print("Bounded judge evidence created")
             console.print(f"Recorded policy result: {payload['decision']}")
