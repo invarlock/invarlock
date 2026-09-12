@@ -17,6 +17,14 @@ provider-client retries set to zero. The model may carry only the explicit
 those choices. Other inherited model, provider or generation settings are
 rejected before a call is admitted.
 
+For `openai/gpt-5.6-sol`, the pinned SDK converts system messages to developer
+messages, uses `max_completion_tokens`, and omits temperature from the provider
+request. The approved plan must therefore declare temperature `1`, the provider
+default. Collection rejects other temperatures before admission. Offline replay
+accepts exactly this version-bound projection for that model; other models keep
+their existing message and sampling-control checks. Normalized requests retain
+the approved system message and configuration alongside the actual provider call.
+
 `bind_requests` creates exact request digests for a plan before independent
 approval. `render_request` uses the core renderer to separate rubric, input and answer
 values in JSON fields. Templates remain literal instructions. This separation

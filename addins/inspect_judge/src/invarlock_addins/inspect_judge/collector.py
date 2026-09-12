@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import importlib.metadata
 from dataclasses import asdict, dataclass, fields
+from decimal import Decimal
 from typing import Any, cast
 
 from invarlock.evidence_pack_json import StrictJsonError, parse_json_bytes
@@ -184,6 +185,12 @@ def _check_options(plan: JudgeMeasurementPlan, options: CollectionOptions) -> st
         plan["judge"]["model_identity"]["kind"] == "hosted_api",
         "local weight execution is not qualified by this adapter",
     )
+    if options.grader == "openai/gpt-5.6-sol":
+        _require(
+            options.inspect_version == "0.3.263"
+            and Decimal(plan["judge"]["config"]["temperature"]) == Decimal(1),
+            "GPT-5.6 Sol requires Inspect 0.3.263 and approved temperature 1",
+        )
     return digest
 
 

@@ -73,6 +73,21 @@ def test_missing_grader_is_rejected() -> None:
         CollectionOptions.from_mapping({"grader": None})
 
 
+@pytest.mark.parametrize("temperature", ["0", "0.5", "2", "1.000000000000001"])
+def test_sol_rejects_unavailable_temperature_before_admission(data, temperature):
+    plan = copy.deepcopy(data[0])
+    plan["judge"].update(
+        provider="openai",
+        requested_model="openai/gpt-5.6-sol",
+        approved_resolved_models=["gpt-5.6-sol"],
+    )
+    plan["judge"]["config"]["temperature"] = temperature
+    plan = bind_requests(plan, data[2])
+    options = replace(data[3], grader="openai/gpt-5.6-sol")
+    with pytest.raises(InspectJudgeError, match="approved temperature 1"):
+        prepare_collection(plan, options)
+
+
 def test_complete_export_replays_offline(data, monkeypatch):
     original_import = importlib.import_module
 

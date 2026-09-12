@@ -606,6 +606,7 @@ def _check_retained_inspect_event(
         output=output,
         normalized_request=normalized_request,
         completed=attempt.get("status") == "completed",
+        inspect_version=collection.get("inspect_version"),
     )
     if output.get("model") != attempt.get("resolved_model"):
         _fail("retained Inspect resolved model does not match its attempt")
@@ -813,9 +814,19 @@ def _provider_completion(response: dict[str, Any]) -> object:
 
 
 def _check_native_inspect_controls(
-    request: dict[str, Any], expected: dict[str, Any]
+    request: dict[str, Any], expected: dict[str, Any], *, sol_projection: bool = False
 ) -> None:
+    if sol_projection and (
+        "temperature" in request
+        or Decimal(str(expected["temperature"])) != Decimal(1)
+        or "max_completion_tokens" not in request
+    ):
+        _fail(
+            "retained Inspect GPT-5.6 Sol controls differ from its approved projection"
+        )
     for provider_key in ("temperature", "top_p"):
+        if sol_projection and provider_key == "temperature":
+            continue
         try:
             if type(request[provider_key]) not in (int, float):
                 _fail("retained Inspect provider controls must be numeric")
@@ -845,9 +856,17 @@ def _check_inspect_provider_projection(
     output: dict[str, Any],
     normalized_request: dict[str, Any],
     completed: bool,
+    inspect_version: object,
 ) -> None:
     request = call["request"]
     normalized = request.get("format") == "invarlock/judge-request-v1"
+    # This is the qualified, version-bound SDK projection, not permission for
+    # arbitrary role changes or missing sampling controls on other models.
+    sol_projection = (
+        not normalized
+        and inspect_version == "0.3.263"
+        and normalized_request["model"] == "openai/gpt-5.6-sol"
+    )
     if normalized:
         if canonical_payload(request) != canonical_payload(normalized_request):
             _fail(
@@ -884,7 +903,13 @@ def _check_inspect_provider_projection(
         provider_messages.append(
             {"role": message["role"], "content": message["content"]}
         )
-    if provider_messages != normalized_request["messages"]:
+    expected_messages = normalized_request["messages"]
+    if sol_projection:
+        expected_messages = [
+            {**message, "role": "developer"} if message["role"] == "system" else message
+            for message in expected_messages
+        ]
+    if provider_messages != expected_messages:
         _fail("retained Inspect provider messages differ from the approved request")
     requested_model = normalized_request["model"]
     provider_model = request.get("model")
@@ -895,7 +920,7 @@ def _check_inspect_provider_projection(
         _fail("retained Inspect provider model differs from the approved request")
     expected = normalized_request["config"]
     if not normalized:
-        _check_native_inspect_controls(request, expected)
+        _check_native_inspect_controls(request, expected, sol_projection=sol_projection)
     # Inspect 0.3.254 retains OpenAI's NOT_GIVEN values as JSON null. Both
     # absent/null and an empty list describe the same tool-free request.
     if request.get("tools") not in (None, []):

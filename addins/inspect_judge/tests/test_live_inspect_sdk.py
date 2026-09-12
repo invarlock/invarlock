@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import importlib.metadata
 import json
 import os
@@ -18,11 +19,15 @@ from invarlock_addins.inspect_judge import (
     import_export,
 )
 
-from invarlock.judge_measurements.contracts import canonical_payload
+from invarlock.judge_measurements.contracts import (
+    JudgeMeasurementContractError,
+    canonical_payload,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.mark.parametrize("judge_model", ["gpt-4o-2024-08-06", "gpt-5.6-sol"])
 @pytest.mark.parametrize(
     ("finish_reason", "completion", "parse_status"),
     [
@@ -32,7 +37,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
     ],
 )
 def test_live_inspect_chat_completion_replays_offline(
-    tmp_path, monkeypatch, finish_reason, completion, parse_status
+    tmp_path, monkeypatch, finish_reason, completion, parse_status, judge_model
 ):
     required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
     try:
@@ -64,9 +69,11 @@ def test_live_inspect_chat_completion_replays_offline(
     ]
     plan["judge"].update(
         provider="openai",
-        requested_model="openai/gpt-4o-2024-08-06",
-        approved_resolved_models=["gpt-4o-2024-08-06"],
+        requested_model=f"openai/{judge_model}",
+        approved_resolved_models=[judge_model],
     )
+    if judge_model == "gpt-5.6-sol":
+        plan["judge"]["config"]["temperature"] = "1"
     plan = bind_requests(plan, frozen)
     options = replace(
         CollectionOptions.from_mapping(exported["collection"]),
@@ -87,7 +94,7 @@ def test_live_inspect_chat_completion_replays_offline(
                 "id": f"chatcmpl-{len(requests)}",
                 "object": "chat.completion",
                 "created": 0,
-                "model": "gpt-4o-2024-08-06",
+                "model": judge_model,
                 "choices": [
                     {
                         "index": 0,
@@ -134,6 +141,16 @@ def test_live_inspect_chat_completion_replays_offline(
             await original_client.close()
 
     measurements = asyncio.run(run())
+    for request in requests:
+        if judge_model == "gpt-5.6-sol":
+            assert request["messages"][0]["role"] == "developer"
+            assert "temperature" not in request
+            assert request["max_completion_tokens"] == 128
+            assert "max_tokens" not in request
+        else:
+            assert request["messages"][0]["role"] == "system"
+            assert request["temperature"] == 0
+            assert request["max_tokens"] == 128
     source = json.loads(measurements["sources"][0]["content"])
     samples = []
     for record in source["records"]:
@@ -179,3 +196,39 @@ def test_live_inspect_chat_completion_replays_offline(
         **runs,
     )
     assert imported == measurements
+    # Check the precise wire projection during offline import too. The native
+    # SDK test must not turn missing controls or arbitrary role edits into an
+    # allowance for every provider/model.
+    for mutation in ("role", "temperature", "top_p", "token_limit"):
+        changed = copy.deepcopy(samples)
+        request = changed[0]["events"][0]["call"]["request"]
+        if mutation == "role":
+            request["messages"][0]["role"] = (
+                "system" if judge_model == "gpt-5.6-sol" else "developer"
+            )
+        elif mutation == "temperature":
+            if judge_model == "gpt-5.6-sol":
+                request["temperature"] = 1
+            else:
+                request.pop("temperature")
+        elif mutation == "top_p":
+            request.pop("top_p")
+        elif judge_model == "gpt-5.6-sol":
+            request["max_tokens"] = request.pop("max_completion_tokens")
+        else:
+            request["max_tokens"] += 1
+        with pytest.raises(JudgeMeasurementContractError, match="provider|projection"):
+            import_export(
+                canonical_payload(
+                    {
+                        "format": exported["format"],
+                        "profile": exported["profile"],
+                        "inspect_version": version,
+                        "collection": asdict(options),
+                        "samples": changed,
+                    }
+                ),
+                plan=plan,
+                options=options,
+                **runs,
+            )
