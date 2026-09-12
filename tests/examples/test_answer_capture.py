@@ -294,6 +294,26 @@ def test_storage_envelope_is_admitted_before_calls(tmp_path, inputs):
     assert not adapter.calls
 
 
+def test_storage_reservation_counts_journal_and_run_output_copies(tmp_path, inputs):
+    cases = inputs["cases"]["cases"]
+    inputs["cases"]["cases"] = [
+        {**copy.deepcopy(cases[index % len(cases)]), "id": f"case-{index:02}"}
+        for index in range(10)
+    ]
+    limits = inputs["config"]["limits"]
+    limits.update(
+        max_calls=20,
+        max_output_bytes_per_call=1024 * 1024,
+        max_total_input_tokens=200,
+        max_total_output_tokens=200,
+        max_cost_microusd=400,
+    )
+    adapter = Adapter()
+    with pytest.raises(ValueError, match="storage envelope"):
+        run(tmp_path, inputs, adapter)
+    assert not adapter.calls
+
+
 def test_documented_cli_offline_journey_and_explicit_execution(
     tmp_path, monkeypatch, capsys
 ):

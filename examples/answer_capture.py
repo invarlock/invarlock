@@ -157,10 +157,12 @@ def prepare(
         },
     }
     manifest_bytes = len(canonical_json_bytes(manifest))
-    # Six bytes per output byte covers worst-case JSON escaping. The remaining
-    # reservation covers duplicated identities, case fields and journal wrappers.
+    # Six bytes per output byte covers worst-case JSON escaping. Each answer is
+    # retained twice: once in its result journal and once in an evaluation run.
+    # The remaining reservation covers duplicated identities, case fields and
+    # journal wrappers.
     storage_reserve = 2 * manifest_bytes + count * (
-        6 * limits["max_output_bytes_per_call"] + 4096
+        12 * limits["max_output_bytes_per_call"] + 4096
     )
     if manifest_bytes > 16 * 1024 * 1024 or storage_reserve > 128 * 1024 * 1024:
         raise ValueError(
