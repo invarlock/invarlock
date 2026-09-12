@@ -269,6 +269,7 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		tests/ci/test_coverage_branch_rate.py \
 		tests/ci/test_public_evidence_audit.py \
 		tests/ci/test_public_text_check.py \
+		tests/judge_measurements/test_statistics_calibration.py \
 		tests/scripts/test_check_repo_cruft.py \
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
