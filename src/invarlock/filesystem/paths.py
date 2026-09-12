@@ -6,7 +6,7 @@ import errno
 import os
 import stat
 from collections.abc import Iterator
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -41,6 +41,62 @@ def _directory_descriptor(
 
 
 @contextmanager
+def _pinned_descendants(
+    parent: int,
+    names: tuple[str, ...],
+    *,
+    flags: int,
+    traversal_flags: int,
+    create: bool,
+    bindings: list[tuple[int, str, tuple[int, int, int]]],
+    index: int = 0,
+) -> Iterator[int]:
+    if index == len(names):
+        yield parent
+        return
+
+    name = names[index]
+    if create:
+        try:
+            os.mkdir(name, mode=0o700, dir_fd=parent)
+        except FileExistsError:
+            pass
+    before = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    if not stat.S_ISDIR(before.st_mode):
+        raise UnsafePathError("path must use non-symlink directories")
+    try:
+        descriptor = os.open(
+            name,
+            flags if index == len(names) - 1 else traversal_flags,
+            dir_fd=parent,
+        )
+    except OSError as exc:
+        if exc.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
+            raise PathChangedError("directory changed while opening") from exc
+        raise
+    try:
+        identity = entry_identity(before)
+        if identity != entry_identity(os.fstat(descriptor)):
+            raise PathChangedError("directory changed while opening")
+        bindings.append((parent, name, identity))
+        with _pinned_descendants(
+            descriptor,
+            names,
+            flags=flags,
+            traversal_flags=traversal_flags,
+            create=create,
+            bindings=bindings,
+            index=index + 1,
+        ) as leaf:
+            yield leaf
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+
+
+@contextmanager
 def pinned_directory(path: Path, *, create: bool = False) -> Iterator[int]:
     """Reject symlinks and retain/check every ancestor through the operation.
 
@@ -57,41 +113,22 @@ def pinned_directory(path: Path, *, create: bool = False) -> Iterator[int]:
     traversal_flags = flags | getattr(os, "O_PATH", 0)
     names = path.parts[1:]
     bindings: list[tuple[int, str, tuple[int, int, int]]] = []
-    with ExitStack() as descriptors:
-        current = descriptors.enter_context(
-            _directory_descriptor(path.anchor, traversal_flags if names else flags)
-        )
-        for index, name in enumerate(names):
-            parent = current
-            if create:
+    with _directory_descriptor(
+        path.anchor, traversal_flags if names else flags
+    ) as root:
+        with _pinned_descendants(
+            root,
+            names,
+            flags=flags,
+            traversal_flags=traversal_flags,
+            create=create,
+            bindings=bindings,
+        ) as current:
+            yield current
+            for parent, name, identity in bindings:
                 try:
-                    os.mkdir(name, mode=0o700, dir_fd=parent)
-                except FileExistsError:
-                    pass
-            before = os.stat(name, dir_fd=parent, follow_symlinks=False)
-            if not stat.S_ISDIR(before.st_mode):
-                raise UnsafePathError("path must use non-symlink directories")
-            try:
-                current = descriptors.enter_context(
-                    _directory_descriptor(
-                        name,
-                        flags if index == len(names) - 1 else traversal_flags,
-                        dir_fd=parent,
-                    )
-                )
-            except OSError as exc:
-                if exc.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
-                    raise PathChangedError("directory changed while opening") from exc
-                raise
-            identity = entry_identity(before)
-            if identity != entry_identity(os.fstat(current)):
-                raise PathChangedError("directory changed while opening")
-            bindings.append((parent, name, identity))
-        yield current
-        for parent, name, identity in bindings:
-            try:
-                named = os.stat(name, dir_fd=parent, follow_symlinks=False)
-            except FileNotFoundError as exc:
-                raise PathChangedError("directory source was replaced") from exc
-            if entry_identity(named) != identity:
-                raise PathChangedError("directory source was replaced")
+                    named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                except FileNotFoundError as exc:
+                    raise PathChangedError("directory source was replaced") from exc
+                if entry_identity(named) != identity:
+                    raise PathChangedError("directory source was replaced")
