@@ -9,6 +9,7 @@ import importlib.metadata
 import os
 import stat
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -37,9 +38,9 @@ from .collector import (
     CollectionOptions,
     InspectJudgeError,
     _check_options,
+    _LiveCheckpoint,
     _render_request,
     import_export,
-    prepare_collection,
     prepare_inspect_config,
 )
 
@@ -654,7 +655,7 @@ async def _collect_pinned(
         pacer = _Pacer(60 / options.requests_per_minute)
         started = time.monotonic()
 
-        while True:
+        def replay() -> tuple[dict[str, Any], JudgeMeasurements]:
             check_directory()
             exported = _checkpoint_export(plan, options, runner, directory_fd)
             checkpoint = import_export(
@@ -664,21 +665,38 @@ async def _collect_pinned(
                 baseline_run=baseline_run,
                 subject_run=subject_run,
             )
-            batch = prepare_collection(
-                plan,
-                options,
-                checkpoint=checkpoint,
-                baseline_run=baseline_run,
-                subject_run=subject_run,
-            )
-            if not batch["next_batch"] or batch["budget_exhausted"]:
-                return checkpoint
+            check_directory()
+            return exported, checkpoint
+
+        exported, checkpoint = replay()
+        state = _LiveCheckpoint(
+            plan=plan,
+            options=options,
+            exported=exported,
+            checkpoint=checkpoint,
+            frozen_inputs=rows,
+        )
+        pending: deque[dict[str, Any]] = deque(
+            {
+                "trial_id": trial["trial_id"],
+                "case_id": trial["case_id"],
+                "side": trial["side"],
+                "repetition": trial["repetition"],
+                "attempt": 1,
+            }
+            for trial in checkpoint["trials"]
+            if not trial["attempts"]
+        )
+        while True:
+            check_directory()
+            admitted = min(len(pending), options.concurrency, state.capacity())
             remaining = runner.invocation_timeout_seconds - (time.monotonic() - started)
-            if remaining <= 0:
-                return checkpoint
+            if not admitted or remaining <= 0:
+                return replay()[1]
 
             scheduled: list[tuple[dict[str, Any], dict[str, Any]]] = []
-            for item in batch["next_batch"]:
+            for _ in range(admitted):
+                item = pending.popleft()
                 check_directory()
                 row = rows[item["case_id"]]
                 request = _render_request(
@@ -699,6 +717,7 @@ async def _collect_pinned(
                     > MAX_RETAINED_EVENT_BYTES
                 ):
                     raise InspectJudgeError("admission event exceeds byte allowance")
+                state.replace_event(item["trial_id"], admission["event"])
                 write_file_no_replace(
                     _checkpoint_path(
                         runner,
@@ -745,18 +764,7 @@ async def _collect_pinned(
                     "event": event,
                 }
                 check_directory()
-                candidate = _checkpoint_export(plan, options, runner, directory_fd)
-                for sample in candidate["samples"]:
-                    if sample["id"] == item["trial_id"]:
-                        sample["events"][item["attempt"] - 1] = event
-                        break
-                import_export(
-                    canonical_payload(candidate),
-                    plan=plan,
-                    options=options,
-                    baseline_run=baseline_run,
-                    subject_run=subject_run,
-                )
+                state.replace_event(item["trial_id"], event)
                 write_file_no_replace(
                     _checkpoint_path(
                         runner,
@@ -789,15 +797,7 @@ async def _collect_pinned(
                         persist(item, event)
             except TimeoutError:
                 await drain()
-                return import_export(
-                    canonical_payload(
-                        _checkpoint_export(plan, options, runner, directory_fd)
-                    ),
-                    plan=plan,
-                    options=options,
-                    baseline_run=baseline_run,
-                    subject_run=subject_run,
-                )
+                return replay()[1]
             except BaseException:
                 await drain()
                 raise

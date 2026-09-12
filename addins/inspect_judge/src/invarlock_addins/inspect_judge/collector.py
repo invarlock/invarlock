@@ -18,6 +18,10 @@ from invarlock.judge_measurement_types import (
 from invarlock.judge_measurements.contracts import (
     JUDGE_REQUEST_MAX_BYTES,
     MEASUREMENTS_MAX_BYTES,
+    _check_attempts,
+    _check_retained_inspect_event,
+    _check_trial_integer_types,
+    _validator,
     canonical_payload,
     expected_trial_id,
     measurement_plan_digest,
@@ -545,6 +549,419 @@ def _assemble_measurements(
     return measurements
 
 
+def _import_sample(
+    sample: dict[str, Any],
+    *,
+    plan: JudgeMeasurementPlan,
+    options: CollectionOptions,
+    digest: str,
+    bindings: dict[str, dict[str, Any]],
+    frozen_inputs: dict[str, dict[str, str]],
+    record_index: int,
+    event_ids: set[str],
+) -> dict[str, Any]:
+    """Normalize one scheduled slot; callers validate shared inputs once."""
+    sample = _object(sample, {"id", "epoch", "metadata", "events"}, "sample")
+    _require(
+        type(sample["epoch"]) is int and sample["epoch"] == 1,
+        "only epoch one is supported",
+    )
+    metadata = _object(
+        sample["metadata"],
+        {
+            "case_id",
+            "side",
+            "repetition",
+            "plan_sha256",
+            "answer_sha256",
+            "scorer_id",
+        },
+        "sample metadata",
+    )
+    case_id, side, repetition = (
+        metadata["case_id"],
+        metadata["side"],
+        metadata["repetition"],
+    )
+    _require(
+        isinstance(case_id, str)
+        and case_id in bindings
+        and side in ("baseline", "subject"),
+        "unknown sample binding",
+    )
+    _int(repetition, 1, plan["schedule"]["repetitions"], "repetition")
+    trial_id = expected_trial_id(digest, case_id, side, repetition)
+    _require(
+        sample["id"] == trial_id
+        and metadata["plan_sha256"] == digest
+        and metadata["answer_sha256"] == bindings[case_id][f"{side}_answer_sha256"],
+        "sample binding mismatch",
+    )
+    _text(metadata["scorer_id"], 128, "scorer identity")
+    expected_request = _render_request(
+        plan,
+        input_text=frozen_inputs[case_id]["input"],
+        answer=frozen_inputs[case_id][side],
+    )
+    _require(
+        _sha(canonical_payload(expected_request))
+        == bindings[case_id][f"{side}_request_sha256"],
+        "rendered request digest differs from approved plan",
+    )
+    events = sample["events"]
+    _require(
+        isinstance(events, list) and len(events) <= plan["schedule"]["max_attempts"],
+        "invalid attempt count",
+    )
+    attempts = []
+    parsed = {"status": "unavailable", "rating": None, "value": None}
+    selected = None
+    for index, event in enumerate(events):
+        _require(
+            len(canonical_payload(event)) <= MAX_RETAINED_EVENT_BYTES,
+            "model event exceeds the retained-event byte allowance",
+        )
+        event = _object(
+            event,
+            {
+                "event",
+                "uuid",
+                "role",
+                "model",
+                "input",
+                "tools",
+                "tool_choice",
+                "config",
+                "retries",
+                "cache",
+                "call",
+                "output",
+                "error",
+            },
+            "model event",
+        )
+        _text(event["uuid"], 128, "model event ID")
+        _require(event["uuid"] not in event_ids, "duplicate model event ID")
+        event_ids.add(event["uuid"])
+        _require(
+            event["event"] == "model"
+            and event["role"] == "grader"
+            and event["model"] == options.grader,
+            "explicit grader event is required",
+        )
+        _require(
+            event["tools"] == [] and event["tool_choice"] == "none",
+            "tools are unsupported",
+        )
+        _require(
+            type(event["retries"]) is int
+            and event["retries"] == 0
+            and event["cache"] is None,
+            "SDK retries and caching are unsupported",
+        )
+        expected_config = {
+            "temperature": float(plan["judge"]["config"]["temperature"]),
+            "top_p": float(plan["judge"]["config"]["top_p"]),
+            "max_tokens": plan["judge"]["config"]["max_output_tokens"],
+            "seed": plan["judge"]["config"]["seed"],
+            "max_retries": 0,
+            "timeout": options.request_timeout_seconds,
+            "attempt_timeout": options.request_timeout_seconds,
+            "max_connections": options.concurrency,
+            "adaptive_connections": False,
+            "num_choices": 1,
+            "internal_tools": False,
+            "parallel_tool_calls": False,
+            "reasoning_summary": "none",
+            "reasoning_history": "none",
+            "cache": False,
+            "batch": False,
+        }
+        _require(
+            canonical_payload(event["config"]) == canonical_payload(expected_config),
+            "model event has hidden or changed generation settings",
+        )
+        _require(
+            event["input"] == expected_request["messages"],
+            "model input differs from frozen request",
+        )
+        call = _object(event["call"], {"request", "response", "error"}, "full API call")
+        _require(
+            isinstance(call["request"], dict)
+            and len(canonical_payload(call["request"])) <= 1048576,
+            "full API request must be a bounded object",
+        )
+        _reject_credential_fields(call["request"])
+        output = _object(
+            event["output"],
+            {"model", "request_id", "finish_reason", "usage", "completion"},
+            "accessible output",
+        )
+        error = event["error"]
+        response = call["response"]
+        if error is None:
+            _require(
+                call["error"] in (False, None) and isinstance(response, dict),
+                "completed call requires full response",
+            )
+            _require(
+                output["model"] in plan["judge"]["approved_resolved_models"],
+                "unapproved resolved model",
+            )
+            status = "completed"
+            accessible_response = _completion_value(output["completion"])
+            parsed = _parse_rating(accessible_response, plan)
+            selected = index + 1
+        else:
+            error = _object(error, {"status", "code", "message"}, "attempt error")
+            _require(
+                isinstance(error["status"], str)
+                and error["status"]
+                in {"transport_error", "timeout_ambiguous", "cancelled", "refusal"}
+                and call["error"] is True,
+                "unknown attempt error",
+            )
+            status = error["status"]
+            _require(
+                response is None or isinstance(response, dict),
+                "failed API response must be an object or null",
+            )
+            error = {"code": error["code"], "message": error["message"]}
+            parsed = {
+                "status": "refusal" if status == "refusal" else "unavailable",
+                "rating": None,
+                "value": None,
+            }
+        usage = output["usage"]
+        if usage is not None:
+            usage = _object(usage, {"input_tokens", "output_tokens"}, "token usage")
+            _int(
+                usage["input_tokens"],
+                0,
+                options.input_tokens_per_call,
+                "input token usage",
+            )
+            _int(
+                usage["output_tokens"],
+                0,
+                plan["judge"]["config"]["max_output_tokens"],
+                "output token usage",
+            )
+        _require(
+            status != "completed" or usage is not None,
+            "completed call requires token usage",
+        )
+        if index + 1 < len(events):
+            _require(
+                status == "transport_error"
+                and "transport_error" in plan["schedule"]["retry_on"],
+                "cannot retry a terminal judgment",
+            )
+        attempts.append(
+            {
+                "attempt": index + 1,
+                "role": "judge",
+                "resolved_model": output["model"],
+                "status": status,
+                "request": _blob(expected_request),
+                "response": (
+                    _blob(_completion_value(output["completion"]))
+                    if status == "completed"
+                    else None
+                ),
+                "request_id": output["request_id"],
+                "finish_reason": output["finish_reason"],
+                "error": error,
+                "usage": usage,
+                "cache": "none",
+                "source": {
+                    "source_id": "inspect-export",
+                    "scorer_id": metadata["scorer_id"],
+                    "model_event_id": event["uuid"],
+                    "record_index": record_index,
+                    "attempt_index": index,
+                },
+            }
+        )
+    return {
+        "trial_id": trial_id,
+        "case_id": case_id,
+        "side": side,
+        "repetition": repetition,
+        "answer_sha256": metadata["answer_sha256"],
+        "plan_sha256": digest,
+        "status": "complete" if parsed["status"] == "ok" else "incomplete",
+        "attempts": attempts,
+        "selected_attempt": selected,
+        "parse": parsed,
+    }
+
+
+class _LiveCheckpoint:
+    """Incremental checks after full resume replay and before durable writes.
+
+    Slot membership and frozen inputs were validated by the initial full import.
+    Each replacement uses the same normalization, schema, attempt and provider
+    checks as full replay. Aggregate storage is conservatively bounded without
+    serializing the entire checkpoint on every call.
+    """
+
+    def __init__(
+        self,
+        *,
+        plan: JudgeMeasurementPlan,
+        options: CollectionOptions,
+        exported: dict[str, Any],
+        checkpoint: JudgeMeasurements,
+        frozen_inputs: dict[str, dict[str, str]],
+    ) -> None:
+        self.plan = plan
+        self.options = options
+        self.digest = checkpoint["plan_sha256"]
+        self.bindings = {
+            row["case_id"]: cast(dict[str, Any], row) for row in plan["answer_bindings"]
+        }
+        self.frozen_inputs = frozen_inputs
+        self.samples = {sample["id"]: sample for sample in exported["samples"]}
+        self.trials = {
+            trial["trial_id"]: cast(dict[str, Any], trial)
+            for trial in checkpoint["trials"]
+        }
+        self.event_ids = {
+            event["uuid"]
+            for sample in self.samples.values()
+            for event in sample["events"]
+        }
+        self.spent_calls = sum(
+            len(sample["events"]) for sample in self.samples.values()
+        )
+        validator = _validator("measurements")
+        schema = cast(dict[str, Any], validator.schema)
+        self.validator = validator.evolve(
+            schema={
+                **schema["properties"]["trials"]["items"],
+                "$defs": schema["$defs"],
+            }
+        )
+        self.collection = asdict(options)
+        self.header_bytes = len(
+            canonical_payload(
+                {
+                    "format": RETAINED_SOURCE_FORMAT,
+                    "inspect_version": options.inspect_version,
+                    "collection": self.collection,
+                    "records": [],
+                }
+            )
+        )
+        self.record_bytes = 0
+        self.retained_bytes = 0
+        self.sizes: dict[str, tuple[int, int]] = {}
+        for trial_id, sample in self.samples.items():
+            sizes = self._sizes(self.trials[trial_id], sample["events"])
+            self.sizes[trial_id] = sizes
+            self.record_bytes += sizes[0]
+            self.retained_bytes += sizes[1]
+
+    def _sizes(self, trial: dict[str, Any], events: list[Any]) -> tuple[int, int]:
+        record = canonical_payload({"trial": trial, "events": events})
+        # Source-position remapping can grow every attempt's identifiers. Live
+        # collection has exactly one attempt per slot. Reserve this separately.
+        raw_size = len(record) + 128 + 1
+        _require(
+            raw_size + self.header_bytes <= MAX_SOURCE_BYTES,
+            "one retained trial exceeds the per-source byte allowance",
+        )
+        retained = (
+            len(canonical_payload(record.decode()))
+            + len(canonical_payload(trial))
+            + 256
+            + 2
+        )
+        return raw_size, retained
+
+    def _storage_bounds(self) -> tuple[int, int]:
+        # Greedy packing leaves every adjacent pair of shards larger than one
+        # shard capacity. This bounds shard count for any completion/order mix.
+        usable = MAX_SOURCE_BYTES - self.header_bytes
+        source_bound = min(len(self.samples), 2 * self.record_bytes // usable + 1)
+        # Sixfold header allowance covers JSON quoting and source metadata;
+        # per-record quoting was already counted by _sizes.
+        retained = (
+            self.retained_bytes + source_bound * (6 * self.header_bytes + 1024) + 4096
+        )
+        return retained, source_bound
+
+    def capacity(self) -> int:
+        retained, source_bound = self._storage_bounds()
+        return max(
+            0,
+            min(
+                self.options.max_calls - self.spent_calls,
+                self.options.max_input_tokens // self.options.input_tokens_per_call
+                - self.spent_calls,
+                self.options.max_output_tokens
+                // self.plan["judge"]["config"]["max_output_tokens"]
+                - self.spent_calls,
+                self.options.max_cost_microusd // self.options.cost_microusd_per_call
+                - self.spent_calls,
+                (MAX_SOURCES - source_bound) // 2,
+                (MEASUREMENTS_MAX_BYTES - retained) // MAX_ADMISSION_GROWTH_BYTES,
+            ),
+        )
+
+    def replace_event(self, trial_id: str, event: dict[str, Any]) -> None:
+        sample = self.samples[trial_id]
+        prior_events = sample["events"]
+        prior_id = prior_events[0]["uuid"] if prior_events else None
+        # Replacement owns its prior admission UUID, but no other event UUID.
+        if event.get("uuid") != prior_id:
+            _require(
+                event.get("uuid") not in self.event_ids, "duplicate model event ID"
+            )
+        candidate = {**sample, "events": [event]}
+        trial = _import_sample(
+            candidate,
+            plan=self.plan,
+            options=self.options,
+            digest=self.digest,
+            bindings=self.bindings,
+            frozen_inputs=self.frozen_inputs,
+            record_index=0,
+            event_ids=set(),
+        )
+        error = next(self.validator.iter_errors(trial), None)
+        _require(error is None, "judge trial contract is invalid")
+        _check_trial_integer_types(trial)
+        expected_request = canonical_payload(
+            _render_request(
+                self.plan,
+                input_text=self.frozen_inputs[trial["case_id"]]["input"],
+                answer=self.frozen_inputs[trial["case_id"]][trial["side"]],
+            )
+        )
+        _check_attempts(
+            trial,
+            plan=cast(dict[str, Any], self.plan),
+            source_ids={"inspect-export"},
+            expected_request_sha256=_sha(expected_request),
+            expected_request=expected_request,
+        )
+        _check_retained_inspect_event(trial["attempts"][0], event, self.collection)
+        sizes = self._sizes(trial, [event])
+        prior_sizes = self.sizes[trial_id]
+        self.record_bytes += sizes[0] - prior_sizes[0]
+        self.retained_bytes += sizes[1] - prior_sizes[1]
+        self.sizes[trial_id] = sizes
+        if prior_id is not None:
+            self.event_ids.remove(prior_id)
+        else:
+            self.spent_calls += 1
+        self.event_ids.add(event["uuid"])
+        self.samples[trial_id] = candidate
+        self.trials[trial_id] = trial
+
+
 def import_export(
     payload: bytes,
     *,
@@ -634,245 +1051,17 @@ def import_export(
     trials = []
     event_ids: set[str] = set()
     for record_index, sample in enumerate(samples):
-        sample = _object(sample, {"id", "epoch", "metadata", "events"}, "sample")
-        _require(
-            type(sample["epoch"]) is int and sample["epoch"] == 1,
-            "only epoch one is supported",
-        )
-        metadata = _object(
-            sample["metadata"],
-            {
-                "case_id",
-                "side",
-                "repetition",
-                "plan_sha256",
-                "answer_sha256",
-                "scorer_id",
-            },
-            "sample metadata",
-        )
-        case_id, side, repetition = (
-            metadata["case_id"],
-            metadata["side"],
-            metadata["repetition"],
-        )
-        _require(
-            isinstance(case_id, str)
-            and case_id in bindings
-            and side in ("baseline", "subject"),
-            "unknown sample binding",
-        )
-        _int(repetition, 1, plan["schedule"]["repetitions"], "repetition")
-        trial_id = expected_trial_id(digest, case_id, side, repetition)
-        _require(
-            sample["id"] == trial_id
-            and metadata["plan_sha256"] == digest
-            and metadata["answer_sha256"] == bindings[case_id][f"{side}_answer_sha256"],
-            "sample binding mismatch",
-        )
-        _text(metadata["scorer_id"], 128, "scorer identity")
-        expected_request = _render_request(
-            plan,
-            input_text=frozen_inputs[case_id]["input"],
-            answer=frozen_inputs[case_id][side],
-        )
-        _require(
-            _sha(canonical_payload(expected_request))
-            == bindings[case_id][f"{side}_request_sha256"],
-            "rendered request digest differs from approved plan",
-        )
-        events = sample["events"]
-        _require(
-            isinstance(events, list)
-            and len(events) <= plan["schedule"]["max_attempts"],
-            "invalid attempt count",
-        )
-        attempts = []
-        parsed = {"status": "unavailable", "rating": None, "value": None}
-        selected = None
-        for index, event in enumerate(events):
-            _require(
-                len(canonical_payload(event)) <= MAX_RETAINED_EVENT_BYTES,
-                "model event exceeds the retained-event byte allowance",
-            )
-            event = _object(
-                event,
-                {
-                    "event",
-                    "uuid",
-                    "role",
-                    "model",
-                    "input",
-                    "tools",
-                    "tool_choice",
-                    "config",
-                    "retries",
-                    "cache",
-                    "call",
-                    "output",
-                    "error",
-                },
-                "model event",
-            )
-            _text(event["uuid"], 128, "model event ID")
-            _require(event["uuid"] not in event_ids, "duplicate model event ID")
-            event_ids.add(event["uuid"])
-            _require(
-                event["event"] == "model"
-                and event["role"] == "grader"
-                and event["model"] == options.grader,
-                "explicit grader event is required",
-            )
-            _require(
-                event["tools"] == [] and event["tool_choice"] == "none",
-                "tools are unsupported",
-            )
-            _require(
-                type(event["retries"]) is int
-                and event["retries"] == 0
-                and event["cache"] is None,
-                "SDK retries and caching are unsupported",
-            )
-            expected_config = {
-                "temperature": float(plan["judge"]["config"]["temperature"]),
-                "top_p": float(plan["judge"]["config"]["top_p"]),
-                "max_tokens": plan["judge"]["config"]["max_output_tokens"],
-                "seed": plan["judge"]["config"]["seed"],
-                "max_retries": 0,
-                "timeout": options.request_timeout_seconds,
-                "attempt_timeout": options.request_timeout_seconds,
-                "max_connections": options.concurrency,
-                "adaptive_connections": False,
-                "num_choices": 1,
-                "internal_tools": False,
-                "parallel_tool_calls": False,
-                "reasoning_summary": "none",
-                "reasoning_history": "none",
-                "cache": False,
-                "batch": False,
-            }
-            _require(
-                canonical_payload(event["config"])
-                == canonical_payload(expected_config),
-                "model event has hidden or changed generation settings",
-            )
-            _require(
-                event["input"] == expected_request["messages"],
-                "model input differs from frozen request",
-            )
-            call = _object(
-                event["call"], {"request", "response", "error"}, "full API call"
-            )
-            _require(
-                isinstance(call["request"], dict)
-                and len(canonical_payload(call["request"])) <= 1048576,
-                "full API request must be a bounded object",
-            )
-            _reject_credential_fields(call["request"])
-            output = _object(
-                event["output"],
-                {"model", "request_id", "finish_reason", "usage", "completion"},
-                "accessible output",
-            )
-            error = event["error"]
-            response = call["response"]
-            if error is None:
-                _require(
-                    call["error"] in (False, None) and isinstance(response, dict),
-                    "completed call requires full response",
-                )
-                _require(
-                    output["model"] in plan["judge"]["approved_resolved_models"],
-                    "unapproved resolved model",
-                )
-                status = "completed"
-                accessible_response = _completion_value(output["completion"])
-                parsed = _parse_rating(accessible_response, plan)
-                selected = index + 1
-            else:
-                error = _object(error, {"status", "code", "message"}, "attempt error")
-                _require(
-                    isinstance(error["status"], str)
-                    and error["status"]
-                    in {"transport_error", "timeout_ambiguous", "cancelled", "refusal"}
-                    and call["error"] is True,
-                    "unknown attempt error",
-                )
-                status = error["status"]
-                _require(
-                    response is None or isinstance(response, dict),
-                    "failed API response must be an object or null",
-                )
-                error = {"code": error["code"], "message": error["message"]}
-                parsed = {
-                    "status": "refusal" if status == "refusal" else "unavailable",
-                    "rating": None,
-                    "value": None,
-                }
-            usage = output["usage"]
-            if usage is not None:
-                usage = _object(usage, {"input_tokens", "output_tokens"}, "token usage")
-                _int(
-                    usage["input_tokens"],
-                    0,
-                    options.input_tokens_per_call,
-                    "input token usage",
-                )
-                _int(
-                    usage["output_tokens"],
-                    0,
-                    plan["judge"]["config"]["max_output_tokens"],
-                    "output token usage",
-                )
-            _require(
-                status != "completed" or usage is not None,
-                "completed call requires token usage",
-            )
-            if index + 1 < len(events):
-                _require(
-                    status == "transport_error"
-                    and "transport_error" in plan["schedule"]["retry_on"],
-                    "cannot retry a terminal judgment",
-                )
-            attempts.append(
-                {
-                    "attempt": index + 1,
-                    "role": "judge",
-                    "resolved_model": output["model"],
-                    "status": status,
-                    "request": _blob(expected_request),
-                    "response": (
-                        _blob(_completion_value(output["completion"]))
-                        if status == "completed"
-                        else None
-                    ),
-                    "request_id": output["request_id"],
-                    "finish_reason": output["finish_reason"],
-                    "error": error,
-                    "usage": usage,
-                    "cache": "none",
-                    "source": {
-                        "source_id": "inspect-export",
-                        "scorer_id": metadata["scorer_id"],
-                        "model_event_id": event["uuid"],
-                        "record_index": record_index,
-                        "attempt_index": index,
-                    },
-                }
-            )
         trials.append(
-            {
-                "trial_id": trial_id,
-                "case_id": case_id,
-                "side": side,
-                "repetition": repetition,
-                "answer_sha256": metadata["answer_sha256"],
-                "plan_sha256": digest,
-                "status": "complete" if parsed["status"] == "ok" else "incomplete",
-                "attempts": attempts,
-                "selected_attempt": selected,
-                "parse": parsed,
-            }
+            _import_sample(
+                sample,
+                plan=plan,
+                options=options,
+                digest=digest,
+                bindings=bindings,
+                frozen_inputs=frozen_inputs,
+                record_index=record_index,
+                event_ids=event_ids,
+            )
         )
     spent_calls = sum(len(trial["attempts"]) for trial in trials)
     _require(spent_calls <= options.max_calls, "export exceeds the call allowance")

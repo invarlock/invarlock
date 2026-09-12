@@ -1209,3 +1209,211 @@ def test_reference_capacity_7728_completed_trials_shards_and_replays(data):
     assert 1 < len(result["sources"]) <= 1000
     assert max(source["byte_size"] for source in result["sources"]) <= 16 * 1024 * 1024
     assert len(canonical_payload(result)) <= 384 * 1024 * 1024
+
+
+def test_live_collection_replays_only_at_boundaries_for_thousands_of_slots(
+    data, monkeypatch, tmp_path
+):
+    import invarlock_addins.inspect_judge.runner as live
+
+    from invarlock.evaluation_records.cases import case_set_digest
+    from invarlock.evaluation_records.io import run_digest
+
+    plan = copy.deepcopy(data[0])
+    runs = frozen_runs(data)
+    case_ids = [f"case-{index:04d}" for index in range(600)]
+    plan["sampling"]["case_units"] = [
+        {"case_id": case_id, "unit_id": case_id} for case_id in case_ids
+    ]
+    plan["answer_bindings"] = [
+        dict(plan["answer_bindings"][0], case_id=case_id) for case_id in case_ids
+    ]
+    plan["schedule"]["expected_trials"] = 1200
+    for side in ("baseline", "subject"):
+        run = runs[f"{side}_run"]
+        run["records"] = [dict(run["records"][0], id=case_id) for case_id in case_ids]
+        plan[f"{side}_run_sha256"] = run_digest(run)
+    plan["case_set_sha256"] = case_set_digest(
+        {
+            "format": "invarlock/evaluation-case-set-v1",
+            "cases": [
+                {key: record[key] for key in ("id", "input", "expected", "metadata")}
+                for record in runs["baseline_run"]["records"]
+            ],
+        }
+    )
+    options = replace(
+        data[3],
+        concurrency=8,
+        max_calls=1200,
+        max_input_tokens=10**9,
+        max_output_tokens=10**9,
+        max_cost_microusd=10**9,
+    )
+    counts = {"calls": 0, "imports": 0, "exports": 0}
+    original_import = live.import_export
+    original_export = live._checkpoint_export
+
+    def counted_import(*args, **kwargs):
+        counts["imports"] += 1
+        return original_import(*args, **kwargs)
+
+    def counted_export(*args, **kwargs):
+        counts["exports"] += 1
+        return original_export(*args, **kwargs)
+
+    async def call_one(*args, request, **kwargs):
+        counts["calls"] += 1
+        event = copy.deepcopy(data[1]["samples"][0]["events"][0])
+        event["uuid"] = f"live-{counts['calls']}"
+        event["input"] = request["messages"]
+        event["call"]["request"]["messages"] = request["messages"]
+        event["config"]["max_connections"] = options.concurrency
+        await asyncio.sleep(0)
+        return event
+
+    class Model:
+        def __str__(self):
+            return options.grader
+
+    model = Model()
+    monkeypatch.setattr(live, "import_export", counted_import)
+    monkeypatch.setattr(live, "_checkpoint_export", counted_export)
+    monkeypatch.setattr(live, "_call_one", call_one)
+    monkeypatch.setattr(live, "prepare_inspect_config", lambda *_: None)
+    monkeypatch.setattr(live, "_require_provider_retries_disabled", lambda _: None)
+    monkeypatch.setattr(live, "_require_clean_model_configuration", lambda _: None)
+    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.263")
+    runner = RunnerOptions(tmp_path / "scaling", "correctness", 120)
+    result = asyncio.run(
+        collect(plan=plan, options=options, runner=runner, model=model, **runs)
+    )
+    assert result["completeness"]["completed_trials"] == 1200
+    assert counts == {"calls": 1200, "imports": 2, "exports": 2}
+    assert len(list(runner.checkpoint_directory.glob("result-*.json"))) == 1200
+    # Boundary replay produces exactly the same bytes after restart, and a
+    # completed schedule never dispatches another paid call.
+    resumed = asyncio.run(
+        collect(plan=plan, options=options, runner=runner, model=model, **runs)
+    )
+    assert resumed == result
+    assert counts == {"calls": 1200, "imports": 4, "exports": 4}
+
+
+@pytest.mark.parametrize(
+    "mutate, message",
+    [
+        (lambda event: event["call"]["request"].update(api_key="secret"), "credential"),
+        (lambda event: event["output"].update(request_id=[]), "trial contract"),
+        (
+            lambda event: event["call"]["response"].update(rating="incorrect"),
+            "contradicts its completion",
+        ),
+        (
+            lambda event: event["output"]["usage"].update(input_tokens=10**9),
+            "token usage",
+        ),
+    ],
+)
+def test_live_incremental_validation_rejects_before_persistence(data, mutate, message):
+    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+
+    checkpoint = ingest(data)
+    state = _LiveCheckpoint(
+        plan=data[0],
+        options=data[3],
+        exported=copy.deepcopy(data[1]),
+        checkpoint=checkpoint,
+        frozen_inputs=data[2],
+    )
+    sample = copy.deepcopy(data[1]["samples"][0])
+    event = sample["events"][0]
+    mutate(event)
+    with pytest.raises(
+        (InspectJudgeError, JudgeMeasurementContractError), match=message
+    ):
+        state.replace_event(sample["id"], event)
+    assert state.trials[sample["id"]] == checkpoint["trials"][0]
+
+
+def test_live_incremental_validation_rejects_duplicate_event(data):
+    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+
+    state = _LiveCheckpoint(
+        plan=data[0],
+        options=data[3],
+        exported=copy.deepcopy(data[1]),
+        checkpoint=ingest(data),
+        frozen_inputs=data[2],
+    )
+    event = copy.deepcopy(data[1]["samples"][0]["events"][0])
+    event["uuid"] = data[1]["samples"][1]["events"][0]["uuid"]
+    with pytest.raises(InspectJudgeError, match="duplicate model event"):
+        state.replace_event(data[1]["samples"][0]["id"], event)
+
+
+def test_live_incremental_storage_reservation_bounds_replayed_bytes(data, monkeypatch):
+    import invarlock_addins.inspect_judge.collector as collector
+
+    checkpoint = ingest(data)
+    state = collector._LiveCheckpoint(
+        plan=data[0],
+        options=data[3],
+        exported=copy.deepcopy(data[1]),
+        checkpoint=checkpoint,
+        frozen_inputs=data[2],
+    )
+    # Storage must reserve the maximum next event before dispatch even when
+    # resource budgets still allow calls. Large quoted text exercises both
+    # source-string escaping and the duplicated normalized trial.
+    sample = data[1]["samples"][0]
+    event = copy.deepcopy(sample["events"][0])
+    content = '"\\\n' * 5000
+    event["output"]["completion"] = content
+    event["call"]["response"] = {
+        "choices": [{"message": {"content": content}, "finish_reason": "stop"}]
+    }
+    state.replace_event(sample["id"], event)
+    export = copy.deepcopy(data[1])
+    export["samples"][0]["events"] = [event]
+    replayed = ingest(data, export)
+    assert state._storage_bounds()[0] > len(canonical_payload(replayed))
+    assert state.capacity() > 0
+    monkeypatch.setattr(collector, "MEASUREMENTS_MAX_BYTES", state.retained_bytes)
+    assert state.capacity() == 0
+
+
+def test_live_incremental_reservations_charge_admissions_once(data):
+    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+    from invarlock_addins.inspect_judge.runner import (
+        _admission_event,
+        _empty_export,
+        _frozen_rows,
+    )
+
+    plan, _, _, options = data
+    runner = RunnerOptions(Path("unused"), "correctness", 10)
+    exported = _empty_export(plan, options, runner)
+    checkpoint = ingest(data, exported)
+    rows = _frozen_rows(**frozen_runs(data))
+    state = _LiveCheckpoint(
+        plan=plan,
+        options=options,
+        exported=exported,
+        checkpoint=checkpoint,
+        frozen_inputs=rows,
+    )
+    sample = data[1]["samples"][0]
+    event = sample["events"][0]
+    request = render_request(
+        plan, input_text=rows["case-1"]["input"], answer=rows["case-1"]["baseline"]
+    )
+    admission = _admission_event(
+        trial_id=sample["id"], attempt=1, request=request, options=options
+    )
+    state.replace_event(sample["id"], admission)
+    assert state.spent_calls == 1
+    state.replace_event(sample["id"], event)
+    assert state.spent_calls == 1
+    assert admission["uuid"] not in state.event_ids
+    assert event["uuid"] in state.event_ids
